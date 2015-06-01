@@ -94,7 +94,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     private void assertAggNoGroupBy(VoltTable[] results, String... values) throws IOException, ProcCallException
     {
-    		assertTrue(values != null);
+            assertTrue(values != null);
         assertTrue(results != null);
         assertEquals(1, results.length);
         VoltTable t = results[0];
@@ -104,25 +104,25 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         for (int i=0; i<values.length; ++i) {
             // if it's integer
             if (t.getColumnType(i) == VoltType.TINYINT ||
-            		t.getColumnType(i) == VoltType.SMALLINT || 
-            		t.getColumnType(i) == VoltType.INTEGER ||
-            		t.getColumnType(i) == VoltType.BIGINT) {
-            		long value = t.getLong(i);
-            		if (values[i].equals("null")) {
-            			assertTrue(t.wasNull());
-            		}
-            		else {
-            			assertEquals(Long.parseLong(values[i]), value);      
-            		}
+                    t.getColumnType(i) == VoltType.SMALLINT ||
+                    t.getColumnType(i) == VoltType.INTEGER ||
+                    t.getColumnType(i) == VoltType.BIGINT) {
+                    long value = t.getLong(i);
+                    if (values[i].equals("null")) {
+                        assertTrue(t.wasNull());
+                    }
+                    else {
+                        assertEquals(Long.parseLong(values[i]), value);
+                    }
             }
             else if (t.getColumnType(i) == VoltType.FLOAT) {
-	            	double value = t.getDouble(i);
-	        		if (values[i].equals("null")) {
-	        			assertTrue(t.wasNull());
-	        		}
-	        		else {
-	        			assertEquals(Double.parseDouble(values[i]), value);      
-	        		}
+                    double value = t.getDouble(i);
+                    if (values[i].equals("null")) {
+                        assertTrue(t.wasNull());
+                    }
+                    else {
+                        assertEquals(Double.parseDouble(values[i]), value);
+                    }
             }
         }
     }
@@ -168,7 +168,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(results, "3", "900.0", "5");
 
         results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
-        
+
         results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
         assertAggNoGroupBy(results, "4");
         results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
@@ -179,7 +179,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(results, "2", "1000.0", "5");
 
         results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 200, 9).getResults();
-        
+
         results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
         assertAggNoGroupBy(results, "4");
         results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
@@ -187,20 +187,20 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
         assertAggNoGroupBy(results, "1", "3");
         results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
-        assertAggNoGroupBy(results, "3", "200.0", "9");  
+        assertAggNoGroupBy(results, "3", "200.0", "9");
     }
 
     public void testSinglePartition() throws IOException, ProcCallException
     {
-		subtestInsertSinglePartition();
-		subtestDeleteSinglePartition();
-		subtestUpdateSinglePartition();
-		subtestSinglePartitionWithPredicates();
-		subtestMinMaxSinglePartition();
-		subtestMinMaxSinglePartitionWithPredicate();
-		subtestIndexMinMaxSinglePartition();
-		subtestIndexMinMaxSinglePartitionWithPredicate();
-		subtestNullMinMaxSinglePartition();
+        subtestInsertSinglePartition();
+        subtestDeleteSinglePartition();
+        subtestUpdateSinglePartition();
+        subtestSinglePartitionWithPredicates();
+        subtestMinMaxSinglePartition();
+        subtestMinMaxSinglePartitionWithPredicate();
+        subtestIndexMinMaxSinglePartition();
+        subtestIndexMinMaxSinglePartitionWithPredicate();
+        subtestNullMinMaxSinglePartition();
         subtestENG7872SinglePartition();
     }
 
@@ -788,10 +788,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(200, (int)(t.getDouble(3)));
         assertEquals(9, t.getLong(4));
     }
-    
-    private void subtestENG7872MP() throws IOException, ProcCallException 
+
+    private void subtestENG7872MP() throws IOException, ProcCallException
     {
-    		Client client = getClient();
+            Client client = getClient();
         truncateBeforeTest(client);
         VoltTable[] results = null;
 

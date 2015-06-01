@@ -82,9 +82,9 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
             processTupleInsert(scannedTuple, false);
         }
     }
-    /* If there is no group by column and the target table is still empty 
-     * even after catching up with pre-existing source tuples, we should initialize the 
-     * target table with one default row of data. 
+    /* If there is no group by column and the target table is still empty
+     * even after catching up with pre-existing source tuples, we should initialize the
+     * target table with one default row of data.
      * COUNT() functions should have value 0, other aggregation functions should have value NULL.
      * See ENG-7872
      */
@@ -531,11 +531,11 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     int aggOffset = (int)m_groupByColumnCount + 1;
     // check if we should remove the tuple
     if (count.isZero()) {
-        if (m_groupByColumnCount != 0) {            
+        if (m_groupByColumnCount != 0) {
             m_target->deleteTuple(m_existingTuple, fallible);
         }
-        // If there is no group by columns, the count() should remain 0 and other functions should 
-        // have value null. 
+        // If there is no group by columns, the count() should remain 0 and other functions should
+        // have value null.
         // ENG-7872
         else {
             m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
