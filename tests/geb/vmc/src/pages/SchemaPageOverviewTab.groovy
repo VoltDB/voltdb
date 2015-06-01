@@ -31,11 +31,11 @@ package vmcTest.pages
 class SchemaPageOverviewTab extends SchemaPage {
     static content = {
         systemOverview 				{ $("h4", text:"System Overview") }
-        mode						{ $("td", text:"Mode") }
-        voltDBVersion				{ $("td", text:"VoltDB Version") }
-        buildstring					{ $("td", text:"Buildstring") }
-        clusterComposition			{ $("td", text:"Cluster Composition") }
-        runningSince				{ $("td", text:"Running Since") }
+        mode						{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
+        voltDBVersion				{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
+        buildstring					{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
+        clusterComposition			{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
+        runningSince				{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
 
         modeValue					{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(1) > td:nth-child(2)") }
         voltDBVersionValue			{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(2) > td:nth-child(2)") }
@@ -43,14 +43,14 @@ class SchemaPageOverviewTab extends SchemaPage {
         clusterCompositionValue		{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(4) > td:nth-child(2)") }
         runningSinceValue			{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(5) > td:nth-child(2)") }
 
-        catalogOverviewStatistics	{ $("h3", text:"Catalog Overview Statistics") }
-        compiledBy					{ $("td", text:"Compiled by VoltDB Version") }
-        compiledOn					{ $("td", text:"Compiled on") }
-        tableCount					{ $("td", text:"Table Count") }
-        materializedViewCount		{ $("td", text:"Materialized View Count") }
-        indexCount					{ $("td", text:"Index Count") }
-        procedureCount				{ $("td", text:"Procedure Count") }
-        sqlStatementCount			{ $("td", text:"SQL Statement Count") }
+        schemaOverview          	{ $("#o > div:nth-child(2) > div.dataBlockHeading > h3") }
+        compiledBy					{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
+        compiledOn					{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
+        tableCount					{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
+        materializedViewCount		{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
+        indexCount					{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
+        procedureCount				{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(6) > td:nth-child(1)") }
+        sqlStatementCount			{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(7) > td:nth-child(1)") }
 
         compiledByValue				{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(1) > td:nth-child(2)") }
         compiledOnValue				{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(2) > td:nth-child(2)") }
@@ -71,8 +71,8 @@ class SchemaPageOverviewTab extends SchemaPage {
         systemOverview.isDisplayed()
     }
 
-    def boolean checkCatalogOverviewStatistics() {
-        catalogOverviewStatistics.isDisplayed()
+    def boolean checkSchemaOverview() {
+        schemaOverview.isDisplayed()
     }
 
     def boolean checkMode() {

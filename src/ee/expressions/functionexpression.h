@@ -138,10 +138,13 @@ static const int FUNC_SUBSTR           = 139;
 static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 
-// Specializations of EXTRACT.
-// They are based on various sets of constants and need to be adjusted by a constant offset
-// to prevent conflict with the other FUNC_ definitions
+// Function ID offsets for specializations of EXTRACT and TRIM.
+// Individual ID values are based on various Tokens.java constants
+// and need to be adjusted by these constant offsets to avoid overlap
+// with other sources of Function ID constants.
+// These are from FunctionSQL.java
 static const int SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
+static const int SQL_TRIM_VOLT_FUNC_OFFSET = 2000;
 
 // These are from DTIType.java
 static const int SQL_TYPE_NUMBER_LIMIT = 256;
@@ -202,11 +205,6 @@ static const int FUNC_EXTRACT_WEEKDAY                   = SQL_EXTRACT_VOLT_FUNC_
 // VoltDB aliases (optimized implementations for existing HSQL functions)
 static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
 
-// These are from Tokens.java.
-static const int SQL_TRIM_LEADING                      = 149;
-static const int SQL_TRIM_TRAILING                     = 284;
-static const int SQL_TRIM_BOTH                         = 22;
-
 // VoltDB-specific functions
 static const int FUNC_VOLT_SQL_ERROR                   = 20000;
 static const int FUNC_DECODE                           = 20001;
@@ -239,6 +237,22 @@ static const int FUNC_VOLT_FROM_UNIXTIME               = 20023;
 static const int FUNC_VOLT_SET_FIELD                   = 20024;
 
 static const int FUNC_VOLT_FORMAT_CURRENCY             = 20025;
+
+static const int FUNC_VOLT_BITNOT                      = 20026;
+static const int FUNC_VOLT_BIT_SHIFT_LEFT              = 20027;
+static const int FUNC_VOLT_BIT_SHIFT_RIGHT             = 20028;
+static const int FUNC_VOLT_HEX                         = 20029;
+static const int FUNC_VOLT_BIN                         = 20030;
+
+// From Tokens.java.
+static const int SQL_TRIM_LEADING                     = 149;
+static const int SQL_TRIM_TRAILING                    = 284;
+static const int SQL_TRIM_BOTH                        = 22;
+
+static const int FUNC_TRIM_LEADING_CHAR               = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_LEADING;
+static const int FUNC_TRIM_TRAILING_CHAR              = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_TRAILING;
+static const int FUNC_TRIM_BOTH_CHAR                  = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_BOTH;
+
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

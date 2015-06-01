@@ -461,7 +461,7 @@ public class SocketJoiner {
         else if (!remoteAcceptsLocalVersion) {
             if (!VoltDB.instance().isCompatibleVersionString(remoteVersionString)) {
                 VoltDB.crashLocalVoltDB("Cluster contains nodes running VoltDB version " + remoteVersionString +
-                        " which is incompatbile with local version " + localVersionString + ".\n", false, null);
+                        " which is incompatibile with local version " + localVersionString + ".\n", false, null);
             }
         }
         activeVersions.add(remoteVersionString);

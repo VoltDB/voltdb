@@ -79,7 +79,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         results.advanceRow();
         assertEquals("CC_T_WITH_EXEC_DELETE", results.get("TABLE_NAME", VoltType.STRING));
         assertEquals("{\"partitionColumn\":\"A1\","
-                + "\"limitPartitionRowsDeleteStmt\":\"DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1 = 0;\"}",
+                + "\"limitPartitionRowsDeleteStmt\":\"DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1=0;\"}",
                 results.get("REMARKS", VoltType.STRING));
 
         assertEquals(false, results.advanceRow());
@@ -129,7 +129,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("@SystemCatalog", "TYPEINFO").getResults();
-        assertEquals(9, results[0].getRowCount()); // Will break if we add a type, hopefully gets
+        assertEquals(10, results[0].getRowCount()); // Will break if we add a type, hopefully gets
                                                    // type-adder to double-check they've got things right
         assertEquals(18, results[0].getColumnCount());
         System.out.println(results[0]);

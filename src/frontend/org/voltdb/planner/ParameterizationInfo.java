@@ -19,8 +19,10 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
@@ -75,33 +77,82 @@ class ParameterizationInfo {
         return info;
     }
 
-    public static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,
-                                    Map<String, Integer> idToParamIndexMap,
-                                    List<String> paramValues) {
-
-        if (parameterizedXmlSQL.name.equals("union")) {
+    public static void findUserParametersRecursively(final VoltXMLElement xmlSQL, Set<Integer> paramIds) {
+        if (xmlSQL.name.equals("union")) {
             // UNION has its parameters on the individual selects level
-            for (VoltXMLElement xmlChildSQL : parameterizedXmlSQL.children) {
-                parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
+            for (VoltXMLElement xmlChildSQL : xmlSQL.children) {
+                findUserParametersRecursively(xmlChildSQL, paramIds);
             }
         } else {
             // find the parameters xml node
-            VoltXMLElement paramsNode = null;
-            for (VoltXMLElement child : parameterizedXmlSQL.children) {
-                if (child.name.equals("parameters")) {
-                    paramsNode = child;
+            for (VoltXMLElement child : xmlSQL.children) {
+                if (! child.name.equals("parameters")) {
+                    continue;
+                }
+
+                // "paramerters" element contains all the parameter infomation for the query
+                // also including its subqueries if it has.
+                for (VoltXMLElement node : child.children) {
+                    String idStr = node.attributes.get("id");
+                    assert(idStr != null);
+                    // ID attribute is assumed to be global unique per query.
+                    // but for UNION query, "paramerters" are copied to each query level.
+                    paramIds.add(Integer.parseInt(idStr));
+                }
+
+                // there is ONLY one parameters element per query
+                break;
+            }
+        }
+    }
+
+    public static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,
+                                    Map<String, Integer> idToParamIndexMap,
+                                    List<String> paramValues) {
+        List<VoltXMLElement> unionChildren = null;
+        if (parameterizedXmlSQL.name.equals("union")) {
+            // Set ops may may have their own nodes to parameterize (limit/offset)
+            // in addition to children's nodes. Process children  first
+            unionChildren = new ArrayList<VoltXMLElement>();
+            Iterator<VoltXMLElement> iter = parameterizedXmlSQL.children.iterator();
+            while (iter.hasNext()) {
+                VoltXMLElement xmlChildSQL = iter.next();
+                if ("select".equals(xmlChildSQL.name) || "union".equals(xmlChildSQL.name)) {
+                    parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
+                    // Temporarily remove it from the list
+                    iter.remove();
+                    unionChildren.add(xmlChildSQL);
                 }
             }
-            assert(paramsNode != null);
-
-            // don't optimize plans with params yet
-            if (paramsNode.children.size() > 0) {
-                return;
-            }
-
-            parameterizeRecursively(parameterizedXmlSQL, paramsNode,
-                    idToParamIndexMap, paramValues);
         }
+        // Parameterize itself
+        parameterizeItself(parameterizedXmlSQL, idToParamIndexMap, paramValues);
+        if (unionChildren != null) {
+            // Add union children back
+            parameterizedXmlSQL.children.addAll(unionChildren);
+        }
+    }
+
+    static void parameterizeItself(VoltXMLElement parameterizedXmlSQL,
+                                    Map<String, Integer> idToParamIndexMap,
+                                    List<String> paramValues) {
+        // find the parameters xml node
+        VoltXMLElement paramsNode = null;
+        for (VoltXMLElement child : parameterizedXmlSQL.children) {
+            if (child.name.equals("parameters")) {
+                paramsNode = child;
+                break;
+            }
+        }
+        assert(paramsNode != null);
+
+        // don't optimize plans with params yet
+        if (paramsNode.children.size() > 0) {
+            return;
+        }
+
+        parameterizeRecursively(parameterizedXmlSQL, paramsNode,
+                idToParamIndexMap, paramValues);
     }
 
     static void parameterizeRecursively(VoltXMLElement node,

@@ -294,7 +294,7 @@ public class Cartographer extends StatsSource
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */
     public List<Long> getReplicasForPartition(int partition) {
-        String zkpath = LeaderElector.electionDirForPartition(partition);
+        String zkpath = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partition);
         List<Long> retval = new ArrayList<Long>();
         try {
             List<String> children = m_zk.getChildren(zkpath, null);
@@ -323,7 +323,7 @@ public class Cartographer extends StatsSource
         List<Pair<Integer,ZKUtil.ChildrenCallback>> callbacks = new ArrayList<Pair<Integer, ZKUtil.ChildrenCallback>>();
 
         for (Integer partition : partitions) {
-            String zkpath = LeaderElector.electionDirForPartition(partition);
+            String zkpath = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partition);
             ZKUtil.ChildrenCallback cb = new ZKUtil.ChildrenCallback();
             callbacks.add(Pair.of(partition, cb));
             m_zk.getChildren(zkpath, false, cb, null);

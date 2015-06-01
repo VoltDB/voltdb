@@ -15,18 +15,19 @@ import org.openqa.selenium.JavascriptExecutor
  */
 
 class NetworkInterfaces extends Module {
-    static content = {
-        title			{ $("h1", text:"Network Interfaces") }
 
-        portNameTitle			{ $("th", text:"Port Name") }
-        clusterSettingTitle		{ $("th", text:"Cluster Settings") }
-        serverSettingTitle		{ $("th", text:"Server Settings") }
-        clientPortTitle			{ $("td", text:"Client Port") }
-        adminPortTitle			{ $("td", text:"Admin Port") }
-        httpPortTitle 			{ $("td", text:"HTTP Port") }
-        internalPortTitle		{ $("td", text:"Internal Port") }
-        zookeeperPortTitle		{ $("td", text:"Zookeeper Port") }
-        replicationPortTitle	{ $("td", text:"Replication Port") }
+    static content = {
+        title			                { $("h1", text:"Network Interfaces") }
+
+        portNameTitle			        { $("th", text:"Port Name") }
+        clusterSettingTitle		        { $("th", text:"Cluster Settings") }
+        serverSettingTitle		        { $("#hServerSettings") }
+        clientPortTitle			        { $("#clientport").previous() }
+        adminPortTitle			        { $("#adminport").previous() }
+        httpPortTitle 			        { $("#httpport").previous() }
+        internalPortTitle		        { $("#internalPort").previous() }
+        zookeeperPortTitle		        { $("#zookeeperPort").previous() }
+        replicationPortTitle	        { $("#replicationPort").previous() }
 
         clusterClientPortValue			{ $("#clusterClientport") }
         clusterAdminPortValue			{ $("#clusterAdminport") }
@@ -34,6 +35,13 @@ class NetworkInterfaces extends Module {
         clusterInternalPortValue		{ $("#clusterInternalPort") }
         clusterZookeeperPortValue		{ $("#clusterZookeeperPort") }
         clusterReplicationPortValue		{ $("#clusterReplicationPort") }
+
+        serversettingclientvalue		{ $("#clientport")}
+        serversettingadminvalue			{ $("#adminport")}
+        serversettinghttpvalue			{ $("#httpport")}
+        serversettinginternalvalue		{ $("#internalPort")}
+        serversettingzookeepervalue		{ $("#zookeeperPort")}
+        serversettingreplicationvalue	{ $("#replicationPort")}
     }
 
 }

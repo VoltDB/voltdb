@@ -260,7 +260,6 @@ public class TestSqlCmdInterface
     @Test
     public void testParseQuery21() throws FileNotFoundException {
         ID = 21;
-
         SQLCommand.testFrontEndOnly();
         final String fileName = "./tests/frontend/org/voltdb/utils/localQry.txt";
         String fileCmd = "file " + fileName;
@@ -427,6 +426,33 @@ public class TestSqlCmdInterface
         assertThis(create, create, 1, ID);
         create = "create procedure foo as SELECT * FROM table UNION SELECT * FROM table2;";
         assertThis(create, create, 1, ID);
+    }
+
+    // test select statement with FROM subquery
+    @Test
+    public void testParseQuery30() {
+        String raw = "SELECT * FROM (SELECT * FROM table2);";
+        String expected = raw;
+        ID = 30;
+        assertThis(raw, expected, 1, ID);
+    }
+
+    // test select statement with IN subquery
+    @Test
+    public void testParseQuery31() {
+        String raw = "SELECT * FROM table1 WHERE (A,C) IN ( SELECT A,C FROM table2);";
+        String expected = raw;
+        ID = 31;
+        assertThis(raw, expected, 1, ID);
+    }
+
+    // test select statement with EXISTS subquery
+    @Test
+    public void testParseQuery32() {
+        String raw = "SELECT * FROM table1 WHERE EXISTS( SELECT 1FROM table2);";
+        String expected = raw;
+        ID = 32;
+        assertThis(raw, expected, 1, ID);
     }
 
     private void assertThis(String qryStr, int numOfQry, int testID) {

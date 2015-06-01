@@ -634,9 +634,24 @@ public class ExpressionLogical extends Expression {
 
         if (nodes[LEFT].opType == OpTypes.ROW
                 || nodes[RIGHT].opType == OpTypes.ROW) {
+            // A VoltDB extension to allow row subqueries (C1, C2) = (SELECT C1, C2 FROM ...)
+            if (nodes[RIGHT].opType == OpTypes.TABLE_SUBQUERY) {
+                assert(nodes[RIGHT].subQuery != null);
+                if (nodes[LEFT].nodes.length != nodes[RIGHT].subQuery.getTable().columnCount) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+            } else if (nodes[LEFT].opType == OpTypes.TABLE_SUBQUERY) {
+                assert(nodes[LEFT].subQuery != null);
+                if (nodes[LEFT].subQuery.getTable().columnCount != nodes[RIGHT].nodes.length) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+            } else if (nodes[LEFT].nodes.length != nodes[RIGHT].nodes.length) {
+            /* Disable 3 lines ...
             if (nodes[LEFT].opType != OpTypes.ROW
                     || nodes[RIGHT].opType != OpTypes.ROW
                     || nodes[LEFT].nodes.length != nodes[RIGHT].nodes.length) {
+            ... disabled 3 lines. */
+            // End of VoltDB extension
                 throw Error.error(ErrorCode.X_42564);
             }
 
@@ -659,6 +674,10 @@ public class ExpressionLogical extends Expression {
                                            nodes[RIGHT])) {
 
                     // compatibility for scalars only
+                // A VoltDB extension to support X'..' as numeric literals
+                } else if (voltConvertBinaryIntegerLiteral(session, nodes[LEFT],
+                            nodes[RIGHT])) {
+                    // End VoltDB extension
                 } else {
                     throw Error.error(ErrorCode.X_42562);
                 }
@@ -1699,4 +1718,26 @@ public class ExpressionLogical extends Expression {
 
         return true;
     }
+    // A VoltDB extension to support X'..' as numeric literals
+    /**
+     * If one child is an integer, and the other is a VARBINARY literal, try to convert the
+     * literal to an integer.
+     */
+    private boolean voltConvertBinaryIntegerLiteral(Session session, Expression lhs, Expression rhs) {
+        Expression nonIntegralExpr;
+        int whichChild;
+        if (lhs.dataType.isIntegralType()) {
+            nonIntegralExpr = rhs;
+            whichChild = RIGHT;
+        }
+        else if (rhs.dataType.isIntegralType()) {
+            nonIntegralExpr = lhs;
+            whichChild = LEFT;
+        } else {
+            return false;
+        }
+
+        return ExpressionValue.voltMutateToBigintType(nonIntegralExpr, this, whichChild);
+    }
+    // End VoltDB extension
 }

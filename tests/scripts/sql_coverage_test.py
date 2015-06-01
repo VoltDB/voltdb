@@ -233,6 +233,22 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     if "normalizer" in config:
         normalize = imp.load_source("normalizer", config["normalizer"]).normalize
         # print "DEBUG: using normalizer ", config["normalizer"], " for ", template
+        self_check_safecmp = imp.load_source("normalizer", config["normalizer"]).safecmp
+        theNow = datetime.datetime.now()
+        if self_check_safecmp([theNow], [theNow]) != 0:
+             print >> sys.stderr, "safe_cmp fails [datetime] selfcheck"
+             exit(2)
+        if self_check_safecmp([None], [None]) != 0:
+             print >> sys.stderr, "safe_cmp fails [None] selfcheck"
+             exit(2)
+        if self_check_safecmp([theNow], [None]) <= 0:
+             print >> sys.stderr, "safe_cmp fails [datetime], [None] selfcheck"
+             exit(2)
+        theLater = datetime.datetime.now()
+        if self_check_safecmp([None, theNow], [None, theLater]) >= 0:
+             print >> sys.stderr, "safe_cmp fails [None, datetime] selfcheck"
+             exit(2)
+
     else:
         normalize = lambda x, y: x
         # print "DEBUG: using no normalizer for ", template
@@ -589,9 +605,14 @@ if __name__ == "__main__":
 
     # Write the summary
     time1 = time.time()
-    valid_percent = '{0:.2f}'.format(100.00 * valid_statements / total_statements)
-    invalid_percent = '{0:.2f}'.format(100.00 * invalid_statements / total_statements)
-    mismatched_percent = '{0:.2f}'.format(100.00 * mismatched_statements / total_statements)
+    if total_statements > 0:
+        valid_percent = '{0:.2f}'.format(100.00 * valid_statements / total_statements)
+        invalid_percent = '{0:.2f}'.format(100.00 * invalid_statements / total_statements)
+        mismatched_percent = '{0:.2f}'.format(100.00 * mismatched_statements / total_statements)
+    else:
+        valid_percent = '0.00'
+        invalid_percent = '0.00'
+        mismatched_percent = '0.00'
     statistics["totals"] = "\n<td align=right>" + str(valid_statements) + "</td>" + \
                            "\n<td align=right>" + valid_percent + "%</td>" + \
                            "\n<td align=right>" + str(invalid_statements) + "</td>" + \

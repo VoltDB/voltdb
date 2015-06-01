@@ -36,8 +36,9 @@ namespace voltdb
      */
     class StreamBlock {
     public:
-        StreamBlock(char* data, size_t capacity, size_t uso)
-            : m_data(data + MAGIC_HEADER_SPACE_FOR_JAVA), m_capacity(capacity - MAGIC_HEADER_SPACE_FOR_JAVA), m_offset(0),
+        StreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso)
+            : m_data(data + headerSize), m_capacity(capacity - headerSize),
+              m_headerSize(headerSize), m_offset(0),
               m_uso(uso),
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
@@ -52,7 +53,8 @@ namespace voltdb
         }
 
         StreamBlock(StreamBlock *other)
-            : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
+            : m_data(other->m_data), m_capacity(other->m_capacity),
+              m_headerSize(other->m_headerSize), m_offset(other->m_offset),
               m_uso(other->m_uso),
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
@@ -74,11 +76,11 @@ namespace voltdb
          * Returns a pointer to the underlying raw memory allocation
          */
         char* rawPtr() {
-            return m_data - MAGIC_HEADER_SPACE_FOR_JAVA;
+            return m_data - m_headerSize;
         }
 
         int32_t rawLength() const {
-            return  static_cast<int32_t>(m_offset) + MAGIC_HEADER_SPACE_FOR_JAVA;
+            return static_cast<int32_t>(m_offset + m_headerSize);
         }
 
         /**
@@ -104,6 +106,10 @@ namespace voltdb
          */
         size_t remaining() const {
             return m_capacity - m_offset;
+        }
+
+        size_t headerSize() const {
+            return m_headerSize;
         }
 
         /**
@@ -188,6 +194,7 @@ namespace voltdb
 
         char *m_data;
         const size_t m_capacity;
+        const size_t m_headerSize;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
         int64_t m_startSpHandle;

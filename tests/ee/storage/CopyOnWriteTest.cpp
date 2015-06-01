@@ -874,7 +874,6 @@ public:
     std::string generateHashRangePredicate(const T_HashRange& range) {
         T_HashRangeVector ranges;
         ranges.push_back(range);
-        std::vector<std::string> predicateStrings;
         return generateHashRangePredicate(ranges);
     }
 

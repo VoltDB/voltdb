@@ -28,6 +28,7 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -42,7 +43,7 @@ public class PartitionDRGateway {
     private static final VoltLogger log = new VoltLogger("DR");
 
     public enum DRRecordType {
-        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE;
+        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX;
 
         public static final ImmutableMap<Integer, DRRecordType> conversion;
         static {
@@ -124,7 +125,6 @@ public class PartitionDRGateway {
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
     }
-    public void tick(long txnId) {}
 
     private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
         @Override
@@ -151,7 +151,7 @@ public class PartitionDRGateway {
             AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
             buf.order(ByteOrder.LITTLE_ENDIAN);
             //Magic header space for Java for implementing zero copy stuff
-            buf.position(8);
+            buf.position(8 + 65 + (partitionId == MpInitiator.MP_INIT_PID ? 0 : 4));
             while (buf.hasRemaining()) {
                 int startPosition = buf.position();
                 byte version = buf.get();
@@ -160,31 +160,28 @@ public class PartitionDRGateway {
                 int checksum = 0;
                 if (version != 0) log.trace("Remaining is " + buf.remaining());
 
-                switch (DRRecordType.valueOf(type)) {
-                case INSERT: {
+                DRRecordType recordType = DRRecordType.valueOf(type);
+                switch (recordType) {
+                case INSERT:
+                case DELETE:
+                case DELETE_BY_INDEX: {
                     //Insert
                     if (haveOpenTransaction.get() == -1) {
-                        log.error("Have insert but no open transaction");
+                        log.error("Have insert/delete but no open transaction");
                         break;
                     }
                     final long tableHandle = buf.getLong();
                     final int lengthPrefix = buf.getInt();
-                    buf.position(buf.position() + lengthPrefix);
-                    checksum = buf.getInt();
-                    log.trace("Version " + version + " type INSERT table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
-                    break;
-                }
-                case DELETE: {
-                    //Delete
-                    if (haveOpenTransaction.get() == -1) {
-                        log.error("Have insert but no open transaction");
-                        break;
+                    final int indexCrc;
+                    if (recordType == DRRecordType.DELETE_BY_INDEX) {
+                        indexCrc = buf.getInt();
+                    } else {
+                        indexCrc = 0;
                     }
-                    final long tableHandle = buf.getLong();
-                    final int lengthPrefix = buf.getInt();
                     buf.position(buf.position() + lengthPrefix);
                     checksum = buf.getInt();
-                    log.trace("Version " + version + " type DELETE table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
+                    log.trace("Version " + version + " type " + recordType + "table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
+                              (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
                     break;
                 }
                 case BEGIN_TXN: {

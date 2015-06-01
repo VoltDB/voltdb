@@ -118,6 +118,7 @@ public class LocalCluster implements VoltServerConfig {
 
     private String[] m_versionOverrides = null;
     private String[] m_versionCheckRegexOverrides = null;
+    private String[] m_buildStringOverrides = null;
 
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
@@ -232,13 +233,8 @@ public class LocalCluster implements VoltServerConfig {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
 
-        String jzmq_dir = System.getenv("VOLTDB_JZMQ_DIR"); // via build.xml
-        if (jzmq_dir == null) {
-            jzmq_dir = System.getProperty("user.dir") + "/third_party/cpp/jnilib";
-        }
-
         // set the java lib path to the one for this process - default to obj/release/nativelibs
-        String java_library_path = buildDir + "/nativelibs" + ":" + jzmq_dir;
+        String java_library_path = buildDir + "/nativelibs";
         java_library_path = System.getProperty("java.library.path", java_library_path);
 
         String classPath = System.getProperty("java.class.path") + ":" + buildDir
@@ -427,6 +423,10 @@ public class LocalCluster implements VoltServerConfig {
             assert(m_versionCheckRegexOverrides[hostId] != null);
             cmdln.m_versionStringOverrideForTest = m_versionOverrides[hostId];
             cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+            if ((m_buildStringOverrides != null) && (m_buildStringOverrides.length > hostId)) {
+                assert(m_buildStringOverrides[hostId] != null);
+                cmdln.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
+            }
         }
 
         // for debug, dump the command line to a unique file.
@@ -695,6 +695,10 @@ public class LocalCluster implements VoltServerConfig {
                 assert(m_versionCheckRegexOverrides[hostId] != null);
                 cmdln.m_versionStringOverrideForTest = m_versionOverrides[hostId];
                 cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+                if ((m_buildStringOverrides != null) && (m_buildStringOverrides.length > hostId)) {
+                    assert(m_buildStringOverrides[hostId] != null);
+                    cmdln.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
+                }
             }
 
             m_cmdLines.add(cmdln);
@@ -862,6 +866,10 @@ public class LocalCluster implements VoltServerConfig {
                 assert(m_versionCheckRegexOverrides[hostId] != null);
                 rejoinCmdLn.m_versionStringOverrideForTest = m_versionOverrides[hostId];
                 rejoinCmdLn.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+                if ((m_buildStringOverrides != null) && (m_buildStringOverrides.length > hostId)) {
+                    assert(m_buildStringOverrides[hostId] != null);
+                    rejoinCmdLn.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
+                }
             }
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
@@ -1231,6 +1239,13 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public boolean isHSQL() {
         return templateCmdLine.target() == BackendTarget.HSQLDB_BACKEND;
+    }
+
+    public void setOverridesForHotfix(String[] versions, String[] regexOverrides, String[] buildStrings) {
+        assert(buildStrings != null);
+
+        m_buildStringOverrides = buildStrings;
+        setOverridesForHotfix(versions, regexOverrides);
     }
 
     public void setOverridesForHotfix(String[] versions, String[] regexOverrides) {

@@ -43,7 +43,7 @@ public class ClientConfig {
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
-    long m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(DEFAULT_PROCEDURE_TIMOUT_NANOS);
+    long m_procedureCallTimeoutNanos = DEFAULT_PROCEDURE_TIMOUT_NANOS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
     boolean m_useClientAffinity = true;
     Subject m_subject = null;

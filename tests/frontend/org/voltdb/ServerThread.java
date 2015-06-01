@@ -96,7 +96,7 @@ public class ServerThread extends Thread {
         this(pathToCatalog, pathToDeployment, VoltDB.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
     }
 
-    public ServerThread(String pathToCatalog,
+    private ServerThread(String pathToCatalog,
                         String pathToDeployment,
                         int leaderPort,
                         int internalPort,
