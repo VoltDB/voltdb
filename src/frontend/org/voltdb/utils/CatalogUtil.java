@@ -124,6 +124,7 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
@@ -1112,11 +1113,30 @@ public abstract class CatalogUtil {
 
         Properties processorProperties = new Properties();
         String modulePrefix = "osgi|";
+        InputStream is;
         try {
             //Make sure we can load stream
-            InputStream is = (new URL(importBundleUrl)).openStream();
-            is.close();
-        } catch (IOException ex) {
+            is = (new URL(importBundleUrl)).openStream();
+        } catch (Exception ex) {
+            is = null;
+        }
+        if (is == null) {
+            try {
+                String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                System.out.println("Module base is: " + rpath);
+                String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
+                is = new FileInputStream(new File(bpath));
+                importBundleUrl = "file:" + bpath;
+            } catch (URISyntaxException | FileNotFoundException ex) {
+                is = null;
+            }
+        }
+        if (is != null) {
+            try {
+                is.close();
+            } catch (IOException ex) {
+            }
+        } else {
             //Not a URL try as a class
             try {
                 CatalogUtil.class.getClassLoader().loadClass(importBundleUrl);

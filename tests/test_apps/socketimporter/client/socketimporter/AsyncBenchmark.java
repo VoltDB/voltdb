@@ -46,6 +46,18 @@ import org.voltdb.client.ClientFactory;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
+import com.google_voltpatches.common.net.HostAndPort;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.CLIConfig;
 
 public class AsyncBenchmark {
 
@@ -81,6 +93,7 @@ public class AsyncBenchmark {
     static final AtomicLong writers = new AtomicLong(0);
     static final AtomicLong socketWrites = new AtomicLong(0);
     static final AtomicLong socketWriteExceptions = new AtomicLong(0);
+    static final AtomicLong finalInsertCount = new AtomicLong(0);
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -89,10 +102,10 @@ public class AsyncBenchmark {
      */
     static class Config extends CLIConfig {
         @Option(desc = "Interval for performance feedback, in seconds.")
-        long displayinterval = 2;
+        long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 10;
+        int duration = 2000;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
@@ -260,7 +273,7 @@ public class AsyncBenchmark {
         SecureRandom rnd = new SecureRandom();
         rnd.setSeed(Thread.currentThread().getId());
         final AtomicLong icnt = new AtomicLong(0);
-        //System.out.println(rnd.nextInt());
+        //  TODO: check if this removes discrepancy: long icnt = 0;
         try {
             // Run the benchmark loop for the requested warmup time
             // The throughput may be throttled depending on client configuration
@@ -300,7 +313,7 @@ public class AsyncBenchmark {
         } finally {
             // cancel periodic stats printing
             timer.cancel();
-            finalInsertCount.addAndGet(icnt.get());
+            finalInsertCount.addAndGet(icnt);
             // print the summary results
             printResults();
         }
@@ -368,7 +381,7 @@ public class AsyncBenchmark {
             runner.start();
         }
 
-        // TODO: start checking the table that's being populated by the socket injester(s)
+        // start checking the table that's being populated by the socket injester(s)
 
         System.out.println("Starting CheckData methods. Queue size: " + queue.size());
         CheckData checkDB = new CheckData(queue, client);
@@ -410,4 +423,3 @@ public class AsyncBenchmark {
         System.exit(0);
     }
 }
-
