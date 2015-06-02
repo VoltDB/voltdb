@@ -295,6 +295,7 @@ public class PBDRegularSegment implements PBDSegment {
 
         try {
             final int written = PBDUtils.writeDeferredSerialization(destBuf.b(), ds);
+            destBuf.b().flip();
 
             while (destBuf.b().hasRemaining()) {
                 m_fc.write(destBuf.b());
@@ -398,6 +399,6 @@ public class PBDRegularSegment implements PBDSegment {
     @Override
     public int uncompressedBytesToRead() {
         if (m_closed) throw new RuntimeException("Segment closed");
-        return m_size - m_bytesRead - SEGMENT_HEADER_BYTES;
+        return m_size - m_bytesRead;
     }
 }
