@@ -171,10 +171,22 @@ public class CSVParser {
     }
 
     public String[] parseLineMulti(String nextLine) throws IOException {
-        return parseLine(nextLine, true);
+        List<Object> list = parseLine(nextLine, true);
+        if (list != null) {
+            return list.toArray(new String[list.size()]);
+        }
+        return null;
     }
 
     public String[] parseLine(String nextLine) throws IOException {
+        List<Object> list = parseLine(nextLine, false);
+        if (list != null) {
+            return list.toArray(new String[list.size()]);
+        }
+        return null;
+    }
+
+    public List<Object> parseLineList(String nextLine) throws IOException {
         return parseLine(nextLine, false);
     }
 
@@ -186,7 +198,7 @@ public class CSVParser {
      * @return the comma-tokenized list of elements, or null if nextLine is null
      * @throws IOException if bad things happen during the read
      */
-    private String[] parseLine(String nextLine, boolean multi) throws IOException {
+    private List<Object> parseLine(String nextLine, boolean multi) throws IOException {
 
         if (!multi && pending != null) {
             pending = null;
@@ -196,13 +208,13 @@ public class CSVParser {
             if (pending != null) {
                 String s = pending;
                 pending = null;
-                return new String[]{s};
+                return new ArrayList<Object>();
             } else {
                 return null;
             }
         }
 
-        List<String> tokensOnThisLine = new ArrayList<String>();
+        List<Object> tokensOnThisLine = new ArrayList<Object>();
         StringBuilder sb = new StringBuilder(INITIAL_READ_SIZE);
         boolean inQuotes = false;
         if (pending != null) {
@@ -275,7 +287,7 @@ public class CSVParser {
         if (sb != null) {
             tokensOnThisLine.add(sb.toString());
         }
-        return tokensOnThisLine.toArray(new String[tokensOnThisLine.size()]);
+        return tokensOnThisLine;
 
     }
 
