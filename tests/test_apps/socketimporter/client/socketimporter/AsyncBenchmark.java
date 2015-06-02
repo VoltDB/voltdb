@@ -80,6 +80,7 @@ public class AsyncBenchmark {
     static final AtomicLong finalInsertCount = new AtomicLong(0);
     static final AtomicLong writers = new AtomicLong(0);
     static final AtomicLong socketWrites = new AtomicLong(0);
+    static final AtomicLong socketWriteExceptions = new AtomicLong(0);
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -96,11 +97,11 @@ public class AsyncBenchmark {
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
 
-        @Option(desc = "Comma separated list of the form server[:port] to connect to for streaming data")
+        @Option(desc = "Comma separated list of the form server[:port] to connect to for database queuries")
         String servers = "localhost";
 
-        @Option(desc = "Comma separated list of the form server[:port] to connect to for database queries")
-        String dbservers = "localhost";
+        @Option(desc = "Comma separated list of the form server[:port] to connect to for streaming import")
+        String sockservers = "localhost";
 
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = false;
@@ -199,14 +200,14 @@ public class AsyncBenchmark {
      * syntax (where :port is optional). Assumes 21212 if not specified otherwise.
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    static void dbconnect(String dbservers) throws InterruptedException, Exception {
-    	System.out.println("Connecting to VoltDB Interface...");
+    static void dbconnect(String servers) throws InterruptedException, Exception {
+        System.out.println("Connecting to VoltDB Interface...");
 
-        String[] serverArray = dbservers.split(",");
+        String[] serverArray = servers.split(",");
         client = ClientFactory.createClient();
         for (String server : serverArray) {
-        	System.out.println("..." + server);
-        	client.createConnection(server);
+            System.out.println("..." + server);
+            client.createConnection(server);
         }
     }
 
@@ -257,18 +258,18 @@ public class AsyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         SecureRandom rnd = new SecureRandom();
-	    rnd.setSeed(Thread.currentThread().getId());
+        rnd.setSeed(Thread.currentThread().getId());
         final AtomicLong icnt = new AtomicLong(0);
-	    //System.out.println(rnd.nextInt());
+        //System.out.println(rnd.nextInt());
         try {
             // Run the benchmark loop for the requested warmup time
             // The throughput may be throttled depending on client configuration
             System.out.println("Warming up...");
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
-            	long t = System.currentTimeMillis();
-            	long key = rnd.nextLong();
-            	Pair<Long,Long> p = new Pair<Long,Long>(key, t);
+                long t = System.currentTimeMillis();
+                long key = rnd.nextLong();
+                Pair<Long,Long> p = new Pair<Long,Long>(key, t);
                 queue.offer(p);
                 String s = key + "," + t + "\n";
 
@@ -287,9 +288,9 @@ public class AsyncBenchmark {
             System.out.println("\nRunning benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
-            	long t = System.currentTimeMillis();
-            	long key = rnd.nextLong();
-            	Pair<Long,Long> p = new Pair<Long,Long>(key, t);
+                long t = System.currentTimeMillis();
+                long key = rnd.nextLong();
+                Pair<Long,Long> p = new Pair<Long,Long>(key, t);
                 queue.offer(p);
                 String s = key + "," + t + "\n";
                 writeFully(s, hap, benchmarkEndTime);
@@ -315,6 +316,7 @@ public class AsyncBenchmark {
             } catch (IOException ex) {
                 OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), hap.getPort());
                 haplist.put(hap, writer);
+                socketWriteExceptions.incrementAndGet();
             }
         }
     }
@@ -350,14 +352,14 @@ public class AsyncBenchmark {
      * @see {@link VoterConfig}
      */
     public static void main(String[] args) throws Exception {
-    	final long WAIT_FOR_A_WHILE = 100 * 1000; // 5 minutes in milliseconds
+        final long WAIT_FOR_A_WHILE = 100 * 1000; // 5 minutes in milliseconds
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(AsyncBenchmark.class.getName(), args);
 
         // connect to one or more servers, loop until success
-        connect(config.servers);
-        dbconnect(config.dbservers);
+        connect(config.sockservers);
+        dbconnect(config.servers);
 
         CountDownLatch cdl = new CountDownLatch(haplist.size());
         for (HostAndPort hap : haplist.keySet()) {
@@ -371,11 +373,11 @@ public class AsyncBenchmark {
         System.out.println("Starting CheckData methods. Queue size: " + queue.size());
         CheckData checkDB = new CheckData(queue, client);
         while (queue.size() == 0) {
-        	try {
-        		Thread.sleep(1000);                 //1000 milliseconds is one second.
-        	} catch(InterruptedException ex) {
-        		Thread.currentThread().interrupt();
-        	}
+            try {
+                Thread.sleep(1000);                 //1000 milliseconds is one second.
+            } catch(InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
         }
         System.out.println("Starting CheckData methods. Queue size: " + queue.size());
         checkDB.processQueue();
@@ -394,15 +396,18 @@ public class AsyncBenchmark {
         System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
 
         while (queueEndTime > System.currentTimeMillis()) {
-        	checkDB.processQueue();
+            checkDB.processQueue();
         }
         client.drain();
 
         System.out.println("Queued tuples remaining: " + queue.size());
         System.out.println("Total rows added by Socket Injester: " + finalInsertCount.get());
         System.out.println("Socket write count: " + socketWrites.get());
+        System.out.println("Socket write exception count: " + socketWriteExceptions.get());
         System.out.println("Rows checked against database: " + rowsChecked.get());
         System.out.println("Mismatch rows (value added <> value in DB): " + rowsMismatch.get());
+
+        System.exit(0);
     }
 }
 

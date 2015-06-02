@@ -128,7 +128,8 @@ function async-benchmark() {
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \
-        --servers=localhost:7001
+        --servers=localhost \
+        --sockservers=localhost:7001
 }
 
 # The following two demo functions are used by the Docker package. Don't remove.
@@ -147,6 +148,12 @@ function demo() {
     echo When you are done with the demo database, \
         remember to use \"voltadmin shutdown\" to stop \
         the server process.
+}
+
+# build an application catalog
+# used by apprunner (test automation); not used otherwise
+function catalog() {
+    voltdb compile -o socketstreamcatalog.jar ddl.sql
 }
 
 function help() {
