@@ -388,7 +388,6 @@
                                 </div>
                             </div>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -637,6 +636,17 @@
                                         <a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
+                                <tr class="child-row-4 subLabelRow">
+                                    <td class="configLabel">Export Tables</td>
+                                    <td align="right">
+                                        &nbsp;
+                                    </td>
+                                    <td></td>
+                                    <td>
+                                        <a href="javascript:void(0);" id="lstExportTbl" class="drTblBtn" style="display: block;" title="List of Export Tables">Export Tables</a>
+                                        <a href="#exportTablePopup" id="lstExportTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
+                                    </td>
+                                </tr>
                                 <tbody id="exportConfiguration" data-status="value" style="display: none;"></tbody>
                                 <tr class="hasSubLabel parent" id="row-5">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
@@ -756,11 +766,11 @@
                                         <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
                                     </tr>
                                     <tr>
-                                        <td class="configLabel">DR Tables <span id="replicaSource" style="font-weight:normal"></span></td>
-                                        
-                                        <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
-                                        <td><a href="#replicatedTablePopup" id="lstReplicatedTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a></td>
-                                        <td align="right"><a href="javascript:void(0);" id="lstReplicatedTbl" class="drTblBtn" style="display: block;" title="List Replicated Tables">List of DR Tables</a></td>
+                                        <td class="configLabel">DR Tables</td>
+
+                                        <td></td>
+                                        <td><a href="#replicatedTablePopup" id="lstDrTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a></td>
+                                        <td align="right"><a href="javascript:void(0);" id="lstDrTbl" class="drTblBtn" style="display: block;" title="List of DR Tables">DR Tables</a></td>
                                     </tr>
                                 </table>
                             </div>
@@ -1169,7 +1179,6 @@
         </div>
     </div>
     <!--help popup ends-->
-    
     <!--About popup-->
     <div id="About" style="display: none">
         <div class="overlay-title helpIcon ">System Overview</div>
@@ -1209,10 +1218,10 @@
                         <p></p>
                     </div>
                 </div>
+            </div>
         </div>
     </div>
     <!--help popup ends-->
-
     <!-- POPUP shutDownConfirmationPop -->
     <div id="shutDownConfirmationPop" style="display: none">
         <div class="overlay-title icon-alert">Shutdown: Confirmation</div>
@@ -1605,13 +1614,23 @@
             </div>
         </div>
     </div>
-
     <div id="replicatedTablePopup" style="display:none">
         <div class="overlay-title icon-alert">DR Tables</div>
         <div class="overlay-content resizeCon">
-            <div class="repliWrapper">
-                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblReplicated">
+            <div id="drPopup" class="repliWrapper">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblPopup">
                     <tbody id="replicatedTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
+    </div>
+    <div id="exportTablePopup" style="display:none">
+        <div class="overlay-title icon-alert">Export Tables</div>
+        <div class="overlay-content resizeCon">
+            <div id="exportPopup" class="repliWrapper">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblPopup">
+                    <tbody id="exportTableBody"></tbody>
                 </table>
             </div>
         </div>

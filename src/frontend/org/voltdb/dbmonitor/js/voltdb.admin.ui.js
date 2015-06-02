@@ -82,7 +82,8 @@ function loadAdminPage() {
         //ServerList Section
         adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody"),
         serverSettingHeader: $('#hServerSettings'),
-        lstReplicatedTables: $('#lstReplicatedTblLink')
+        lstReplicatedTables: $('#lstDrTblLink'),
+        lstExportTable: $('#lstExportTblLink')
 
     };
 
@@ -1559,15 +1560,23 @@ function loadAdminPage() {
         adminDOMObjects.addConfigLink.trigger("click");
     });
 
-    $("#lstReplicatedTbl").on("click", function () {
+    $("#lstDrTbl").on("click", function () {
         adminDOMObjects.lstReplicatedTables.trigger("click");
     });
 
-    $("#lstReplicatedTblLink").popup({
+    $("#lstExportTbl").on("click", function () {
+        adminDOMObjects.lstExportTable.trigger("click");
+    });
+
+    $("#lstDrTblLink").popup({
         open: function (event, ui, ele) {
             var content = '';
-            for (var i = 0; i <= voltDbRenderer.replicatedTablesArray.length - 1; i++) {
-                content = content + "<tr><td>" + voltDbRenderer.replicatedTablesArray[i] + "</td></tr>";
+            if (voltDbRenderer.drTablesArray.length == 0) {
+                $("#drPopup").html("No DR tables available.");
+            } else {
+                for (var i = 0; i <= voltDbRenderer.drTablesArray.length - 1; i++) {
+                    content = content + "<tr><td>" + voltDbRenderer.drTablesArray[i] + "</td></tr>";
+                }
             }
             $("#replicatedTableBody").html(content);
         },
@@ -1579,8 +1588,29 @@ function loadAdminPage() {
             });
         }
     });
+
+    $("#lstExportTblLink").popup({
+        open: function (event, ui, ele) {
+            var content = '';
+            if (voltDbRenderer.exportTablesArray.length == 0) {
+                $("#exportPopup").html("No Export tables available.");
+            } else {
+                for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
+                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr>";
+                }
+            }
+            $("#exportTableBody").html(content);
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $(".closeBtn").on("click", function () {
+                //Close the popup
+                popup.close();
+            });
+        }
+    });
     var editId = -1;
-    
+
     function setConnectorClassValidation() {
         var settings = $('#formAddConfiguration').validate().settings;
         if ($('#txtType').val() == "CUSTOM") {
@@ -1697,8 +1727,8 @@ function loadAdminPage() {
             $('#chkStream').on('ifChanged', function () {
                 $("#chkStreamValue").text(getOnOffText($('#chkStream').is(":checked")));
             });
-            
-            
+
+
             $('#txtType').change(function () {
                 setConnectorClassValidation();
             });
@@ -1750,7 +1780,7 @@ function loadAdminPage() {
                 var config = existingAdminConfig.export.configuration[editId * 1];
                 $("#txtType").val(config.type);
                 $("#txtStream").val(config.stream);
-                
+
                 $("#chkStream").iCheck(config.enabled ? 'check' : 'uncheck');
                 $("#txtExportConnectorClass").val(config.exportconnectorclass);
                 var properties = config.property;
@@ -1832,7 +1862,7 @@ function loadAdminPage() {
                     }
                     newConfig["stream"] = $("#txtStream").val();
                     newConfig["type"] = $("#txtType").val().trim();
-                    newConfig["enabled"] = $("#chkStream").is(':checked'); 
+                    newConfig["enabled"] = $("#chkStream").is(':checked');
                     newConfig["exportconnectorclass"] = $("#txtExportConnectorClass").val();
 
                     if (!adminConfigurations.export) {

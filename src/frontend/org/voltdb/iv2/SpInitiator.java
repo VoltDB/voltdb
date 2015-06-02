@@ -86,6 +86,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     @Override
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
@@ -117,7 +118,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             ((SpScheduler) m_scheduler).setMpDRGateway(mpPDRG);
         }
 
-        super.configureCommon(backend, catalogContext,
+        super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway, mpPDRG);
 
         m_tickProducer.start();

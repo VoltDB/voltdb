@@ -365,7 +365,7 @@ ul.topRightList {
 }
 
     ul.topRightList li {
-      padding: 20px 0 0 5px;
+        padding: 20px 0 0 5px;
         float: left;
         line-height: 12px;
     }
@@ -393,56 +393,71 @@ ul.topRightList {
         }
 
 
-        /*help drop down*/
-        .menuHome ul {
-	font-size: 14px;
-	margin: 0;
-	padding: 0;
-	list-style: none;
-	display:block;
-}
-.menuHome ul li {
-	display: block;
-	position: relative;
+/*help drop down*/
+.menuHome ul {
+    font-size: 14px;
+    margin: 0;
     padding: 0;
-    background: #FFFFFF;
+    list-style: none;
+    display: block;
 }
-.menuHome ul li ul {
-	display: none;
-   
-}
-.menuHome ul li a {
-	display: block;
-	text-decoration: none;
-	color: #000000;
-	padding: 3px 2px 5px 15px;
-	
 
-	white-space: nowrap;
-}
-.menuHome ul li a:hover {
-	
-}
-.menuHome ul li:hover ul {
-	display: block;
-	position: absolute;
-}
-.menuHome ul li:hover li {
-	float: none;
-	font-size: 13px;
-}
-.menuHome ul li ul li { border-bottom:1px solid #CCCCCC;border-left:1px solid #CCCCCC;border-right:1px solid #CCCCCC;position: relative;
-  right: 50px;z-index: 1; width: 115px;}
-.menuHome ul li ul li:first-child{border-top:1px solid #CCCCCC;}
-.menuHome ul li ul li a {
-    padding:5px 10px;
-color:#000000;	
-}
-.menuHome ul li ul li a:hover {
-	background: #76BD1D;
-	color:#FFFFFF!important;
-}
-         /*help drop down End*/
+    .menuHome ul li {
+        display: block;
+        position: relative;
+        padding: 0;
+        background: #FFFFFF;
+    }
+
+        .menuHome ul li ul {
+            display: none;
+        }
+
+        .menuHome ul li a {
+            display: block;
+            text-decoration: none;
+            color: #000000;
+            padding: 3px 2px 5px 15px;
+            white-space: nowrap;
+        }
+
+            .menuHome ul li a:hover {
+            }
+
+        .menuHome ul li:hover ul {
+            display: block;
+            position: absolute;
+        }
+
+        .menuHome ul li:hover li {
+            float: none;
+            font-size: 13px;
+        }
+
+        .menuHome ul li ul li {
+            border-bottom: 1px solid #CCCCCC;
+            border-left: 1px solid #CCCCCC;
+            border-right: 1px solid #CCCCCC;
+            position: relative;
+            right: 50px;
+            z-index: 1;
+            width: 115px;
+        }
+
+            .menuHome ul li ul li:first-child {
+                border-top: 1px solid #CCCCCC;
+            }
+
+            .menuHome ul li ul li a {
+                padding: 5px 10px;
+                color: #000000;
+            }
+
+                .menuHome ul li ul li a:hover {
+                    background: #76BD1D;
+                    color: #FFFFFF !important;
+                }
+/*help drop down End*/
 
 
 .overlay-contentHelp {
@@ -468,6 +483,7 @@ color:#000000;
     max-width: 600px;
     overflow: auto;
 }
+
 .line {
     border-right: 1px solid #AAAAAA;
     font-size: 27px;
@@ -2086,7 +2102,7 @@ ul.helpSchemaList {
 .arrow,
 .labelCollapsed,
 .labelExpanded,
-a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd, .replicatedIcon,{
+a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd {
     background-image: url(images/admin-icons.png);
 }
 
@@ -2476,9 +2492,13 @@ ul.adminClusterList li a.shutdown {
 .hasSubLabel {
 }
 
-.helpDrop {float: right;cursor: pointer;
-   width: 16px;height: 16px; background:url("images/help-arrow.png") no-repeat;margin-top: 2px;
-   
+.helpDrop {
+    float: right;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    background: url("images/help-arrow.png") no-repeat;
+    margin-top: 2px;
 }
 
 .labelCollapsed {
@@ -2912,7 +2932,10 @@ a.restoreBtn {
     border-radius: 0;
     border: none;
 }
-.configCustom { padding: 0 0 0 5px;}
+
+.configCustom {
+    padding: 0 0 0 5px;
+}
 
 /****Export details*******/
 .btnEd {
@@ -3123,16 +3146,26 @@ a.restoreBtn {
     position: relative;
     top: 8px;
 }
-.replicatedIcon {
+/*.replicatedIcon {
     background-position: -438px -61px;
     width: 31px;
     height: 17px;
     display: inline-block;
     position: relative;
     top: 8px;
+}*/
+a.drTblBtn {
+    background: #4E8DB5;
+    margin: 3px 4px 3px 0;
+    color: #ffffff;
+    text-align: center;
+    width: 110px;
+    line-height: 27px;
 }
-a.drTblBtn { background: #4E8DB5;margin:3px 4px 3px 0; color: #ffffff;text-align: center;width: 110px;}
-a.drTblBtn:hover {background: #AA1F2F;}
+
+    a.drTblBtn:hover {
+        background: #AA1F2F;
+    }
 
 
 .loadExport {
@@ -3155,8 +3188,14 @@ a.drTblBtn:hover {background: #AA1F2F;}
 }
 
 /****Export details Ends*******/
-table.tblReplicated { border: 1px solid #CCCCCC;}
-.repliWrapper { height: 150px;overflow: auto;}
+table.tblPopup {
+    border: 1px solid #CCCCCC;
+}
+
+.repliWrapper {
+    height: 150px;
+    overflow: auto;
+}
 
 /****DR *******/
 .drWrapper {
@@ -3970,10 +4009,12 @@ a:hover.changePsd {
         width: 80%;
     }
 
-   /* .configWrapper {
+    /* .configWrapper {
         width: 380px;
     }*/
-    .popup_cont {width: 380px;}
+    .popup_cont {
+        width: 380px;
+    }
 }
 
 @media (width: 768px) {

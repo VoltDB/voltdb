@@ -169,7 +169,7 @@ public class StoredProcedureInvocation implements JSONString {
             }
         }
         catch (Exception ex) {
-            throw new RuntimeException("Invalid partitionIndex", ex);
+            throw new RuntimeException("Invalid partitionIndex: " + partitionIndex, ex);
         }
     }
 

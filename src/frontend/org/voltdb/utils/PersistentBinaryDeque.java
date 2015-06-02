@@ -515,10 +515,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         @Override
-        public void writeTruncatedObject(ByteBuffer output) {
-            output.putInt(m_retval.remaining());
-            output.putInt(0);
+        public int writeTruncatedObject(ByteBuffer output) {
+            int objectSize = m_retval.remaining();
+            output.putInt(objectSize);
+            output.putInt(PBDSegment.NO_FLAGS);
             output.put(m_retval);
+            return objectSize;
         }
     }
 
@@ -537,11 +539,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         @Override
-        public void writeTruncatedObject(ByteBuffer output) throws IOException {
+        public int writeTruncatedObject(ByteBuffer output) throws IOException {
             int bytesWritten = PBDSegment.writeDeferredSerialization(output, m_ds);
             if (m_truncationCallback != null) {
                 m_truncationCallback.bytesWritten(bytesWritten);
             }
+            return bytesWritten;
         }
     }
 
@@ -576,7 +579,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 try {
                     //Get the number of objects and then iterator over them
                     int numObjects = readBuffer.getInt();
-                    int size = readBuffer.getInt();
+                    readBuffer.position(PBDSegment.SIZE_OFFSET + 4);
+                    int sizeInBytes = 0;
+
                     int objectsProcessed = 0;
                     m_usageSpecificLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
                     for (int ii = 0; ii < numObjects; ii++) {
@@ -611,6 +616,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             TruncatorResponse retval = truncator.parse(nextObject);
                             if (retval == null) {
                                 //Nothing to do, leave the object alone and move to the next
+                                sizeInBytes += uncompressedLength;
                                 continue;
                             } else {
                                 //If the returned bytebuffer is empty, remove the object and truncate the file
@@ -626,8 +632,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                     } else {
                                         addToNumObjects(-(numObjects - (objectsProcessed - 1)));
                                         //Don't forget to update the number of entries in the file
-                                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
-                                        numObjectsBuffer.putInt(0, ii);
+                                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(8);
+                                        numObjectsBuffer.putInt(ii);
+                                        numObjectsBuffer.putInt(sizeInBytes);
+                                        numObjectsBuffer.flip();
                                         fc.position(0);
                                         while (numObjectsBuffer.hasRemaining()) {
                                             fc.write(numObjectsBuffer);
@@ -639,8 +647,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                     addToNumObjects(-(numObjects - objectsProcessed));
                                     //Partial object truncation
                                     readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
-                                    retval.writeTruncatedObject(readBuffer);
-                                    readBuffer.putInt(0, ii + 1);
+                                    sizeInBytes += retval.writeTruncatedObject(readBuffer);
+                                    readBuffer.putInt(PBDSegment.COUNT_OFFSET, ii + 1);
+                                    readBuffer.putInt(PBDSegment.SIZE_OFFSET, sizeInBytes);
                                     /*
                                      * SHOULD REALLY make a copy of the original and then swap them with renaming
                                      */

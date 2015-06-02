@@ -119,7 +119,9 @@ function alertNodeClicked(obj) {
         var alertCount = 0;
         var serverSettings = false;
 
-        this.replicatedTablesArray = [];
+        this.drTablesArray = [];
+
+        this.exportTablesArray = [];
 
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
@@ -488,7 +490,7 @@ function alertNodeClicked(obj) {
             });
         };
         //
-        
+
         //Get host and site count
         this.GetHostAndSiteCount = function (onInformationLoaded) {
             var countDetails = {};
@@ -1152,7 +1154,7 @@ function alertNodeClicked(obj) {
                 if (!schemaCatalogTableTypes.hasOwnProperty(tableName)) {
                     schemaCatalogTableTypes[tableName] = {};
                     schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
-                    schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
+
                     if (entry[remarksIndex] != null) {
                         schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
                         schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
@@ -1160,6 +1162,7 @@ function alertNodeClicked(obj) {
                         schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
                     }
                 }
+                schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
             });
 
         };
@@ -1649,11 +1652,16 @@ function alertNodeClicked(obj) {
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
                 if (this.isTableSearch == false) voltDbRenderer.tableDataSize = Object.keys(tableData).length;
 
-                voltDbRenderer.replicatedTablesArray = [];
+                voltDbRenderer.drTablesArray = [];
+                voltDbRenderer.exportTablesArray = [];
 
                 $.each(lTableData, function (id, val) {
                     if (val['drEnabled'] == "true") {
-                        voltDbRenderer.replicatedTablesArray.push(val['TABLE_NAME']);
+                        voltDbRenderer.drTablesArray.push(val['TABLE_NAME']);
+                    }
+
+                    if (val['TABLE_TYPE1'] == "EXPORT") {
+                        voltDbRenderer.exportTablesArray.push(val['TABLE_NAME']);
                     }
 
                     if (lTableData)
@@ -1784,7 +1792,7 @@ function alertNodeClicked(obj) {
             });
             return serverAddress;
         };
-        
+
         this.getClusterDetail = function (serverName) {
             var clusterInfo = [];
             $.each(systemOverview, function (key, val) {
@@ -2388,7 +2396,7 @@ function alertNodeClicked(obj) {
             return portConfigValues;
         };
 
-        var getCountDetails = function(connection, countDetails) {
+        var getCountDetails = function (connection, countDetails) {
             var colIndex = {};
             var counter = 0;
             var hostCount = 0;
@@ -2969,7 +2977,8 @@ function alertNodeClicked(obj) {
                                 "AVG_ROWS": getAverage(tupleCountPartitions),
                                 "TUPLE_COUNT": schemaCatalogTableTypes[key].REMARKS == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
                                 "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS,
-                                "drEnabled": schemaCatalogTableTypes[key].drEnabled
+                                "drEnabled": schemaCatalogTableTypes[key].drEnabled,
+                                "TABLE_TYPE1": schemaCatalogTableTypes[key].TABLE_TYPE
                             };
 
                         });

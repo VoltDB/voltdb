@@ -56,6 +56,7 @@ public class VoltZK {
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
+    public static final String importerBase = "/db/import";
 
     /*
      * Processes that want to block catalog updates create children here
