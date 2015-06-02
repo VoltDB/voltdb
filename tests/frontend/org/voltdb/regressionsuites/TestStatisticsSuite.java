@@ -72,17 +72,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         super(name);
     }
 
-    // For the provided table, verify that there is a row for each host in the cluster where
-    // the column designated by 'columnName' has the value 'targetValue'.  For example, for
-    // Initiator stats, if columnName is 'PROCEDURE_NAME' and targetValue is 'foo', this
-    // will verify that the initiator at each node has seen a procedure invocation for 'foo'
-    private void validateRowSeenAtAllHosts(VoltTable result, String columnName, String targetValue,
-            boolean enforceUnique)
-    {
-        int hostCount = countHostsProvidingRows(result, columnName, targetValue, enforceUnique);
-        assertEquals(claimRecentAnalysis(), HOSTS, hostCount);
-    }
-
     private String claimRecentAnalysis() {
         String result = "No root cause analysis is available for this failure.";
         if (m_recentAnalysis != null) {
@@ -90,50 +79,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             m_recentAnalysis = null;
         }
         return result;
-    }
-
-    private int countHostsProvidingRows(VoltTable result, String columnName, String targetValue,
-            boolean enforceUnique)
-    {
-        result.resetRowPosition();
-        Set<Long> hostsSeen = new HashSet<Long>();
-        while (result.advanceRow()) {
-            String colValFromRow = result.getString(columnName);
-            if (targetValue.equalsIgnoreCase(colValFromRow)) {
-                Long thisHostId = result.getLong("HOST_ID");
-                if (enforceUnique) {
-                    assertFalse("HOST_ID: " + thisHostId + " seen twice in table looking for " + targetValue +
-                            " in column " + columnName, hostsSeen.contains(thisHostId));
-                }
-                hostsSeen.add(thisHostId);
-            }
-        }
-
-        //* Enable this to force a failure with diagnostics */ hostsSeen.add(123456789L);
-
-        // Before possibly failing an assert, prepare to report details of the non-conforming result.
-        m_recentAnalysis = null;
-        if (HOSTS != hostsSeen.size()) {
-            m_recentAnalysis = new StringBuilder();
-            m_recentAnalysis.append("Failure follows from these results:\n");
-            Set<Long> seenAgain = new HashSet<Long>();
-            result.resetRowPosition();
-            while (result.advanceRow()) {
-                String colValFromRow = result.getString(columnName);
-                Long thisHostId = result.getLong("HOST_ID");
-                String rowStatus = "Found a non-match";
-                if (targetValue.equalsIgnoreCase(colValFromRow)) {
-                    if (seenAgain.add(thisHostId)) {
-                        rowStatus = "Added a match";
-                    } else {
-                        rowStatus = "Duplicated a match";
-                    }
-                }
-                m_recentAnalysis.append(rowStatus +
-                        " at host " + thisHostId + " for " + columnName + " " + colValFromRow + "\n");
-            }
-        }
-        return hostsSeen.size();
     }
 
     // validation functions supporting multiple columns
@@ -144,13 +89,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             }
         }
         return true;
-    }
-
-    private void validateRowSeenAtAllHosts(VoltTable result, Map<String, String> columnTargets,
-            boolean enforceUnique)
-    {
-        int hostCount = countHostsProvidingRows(result, columnTargets, enforceUnique);
-        assertEquals(claimRecentAnalysis(), HOSTS, hostCount);
     }
 
     private int countHostsProvidingRows(VoltTable result, Map<String, String> columnTargets,
@@ -201,6 +139,18 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             }
         }
         return hostsSeen.size();
+    }
+
+    // For the provided table, verify that there is a row for each host in the cluster where
+    // the column designated by each key of columnTargets has the value corresponding to this
+    // key in columnTargets.  For example, for Initiator stats, if there is an entry
+    // <'PROCEDURE_NAME', 'foo> in columnTargets, this will verify that the initiator at each
+    // node has seen a procedure invocation for 'foo'
+    private void validateRowSeenAtAllHosts(VoltTable result, Map<String, String> columnTargets,
+            boolean enforceUnique)
+    {
+        int hostCount = countHostsProvidingRows(result, columnTargets, enforceUnique);
+        assertEquals(claimRecentAnalysis(), HOSTS, hostCount);
     }
 
     // For the provided table, verify that there is a row for each site in the cluster where
@@ -314,7 +264,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateSchema(results[0], expectedTable);
         // should have at least one row from each host
         results[0].advanceRow();
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, false);
         // actually, there are 26 rows per host so:
         assertEquals(HOSTS, results[0].getRowCount());
         // Check for non-zero invocations (ENG-4668)
@@ -378,7 +330,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         }
         assertEquals(1000, counts);
         // verify that each node saw a NEW_ORDER.insert initiation
-        validateRowSeenAtAllHosts(results[0], "PROCEDURE_NAME", "NEW_ORDER.insert", true);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("PROCEDURE_NAME", "NEW_ORDER.insert");
+        validateRowSeenAtAllHosts(results[0], columnTargets, true);
     }
 
     public void testPartitionCount() throws Exception {
@@ -533,7 +487,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         results[0].advanceRow();
         // Hacky, on a single local cluster make sure that all 'nodes' are present.
         // MEMORY stats lacks a common string across nodes, but we can hijack the hostname in this case.
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, true);
     }
 
     public void testCpuStatistics() throws Exception {
@@ -562,7 +518,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         results[0].advanceRow();
         // Hacky, on a single local cluster make sure that all 'nodes' are present.
         // CPU stats lacks a common string across nodes, but we can hijack the hostname in this case.
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, true);
     }
 
     public void testProcedureStatistics() throws Exception {
@@ -624,7 +582,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateSchema(results[0], expectedTable);
         // For this table, where unique HSID isn't written to SITE_ID, these
         // two checks should ensure we get all the rows we expect?
-        validateRowSeenAtAllHosts(results[0], "PROCEDURE", "NEW_ORDER.insert", false);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("PROCEDURE", "NEW_ORDER.insert");
+        validateRowSeenAtAllHosts(results[0], columnTargets, false);
         validateRowSeenAtAllPartitions(results[0], "PROCEDURE", "NEW_ORDER.insert", false);
         results[0].resetRowPosition();
 
@@ -918,7 +878,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateSchema(results[0], expectedTable2);
         // One row per host for DRNODE stats
         results[0].advanceRow();
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, true);
     }
 
     public void testDRPartitionStatistics() throws Exception {
@@ -959,7 +921,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // don't have HSID for ease of check, just check a bunch of stuff
         assertEquals(HOSTS * SITES + HOSTS, results[0].getRowCount());
         results[0].advanceRow();
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, false);
         results[0].advanceRow();
         validateRowSeenAtAllPartitions(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
     }
@@ -1014,12 +978,14 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // don't have HSID for ease of check, just check a bunch of stuff
         assertEquals(HOSTS * SITES + HOSTS, results[0].getRowCount());
         results[0].advanceRow();
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, false);
         results[0].advanceRow();
         validateRowSeenAtAllPartitions(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         // One row per host for DRNODE stats
         results[1].advanceRow();
-        validateRowSeenAtAllHosts(results[1], "HOSTNAME", results[1].getString("HOSTNAME"), true);
+        validateRowSeenAtAllHosts(results[1], columnTargets, true);
     }
 
     public void testLiveClientsStatistics() throws Exception {
@@ -1051,8 +1017,10 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             // Hacky, on a single local cluster make sure that all 'nodes' are present.
             // LiveClients stats lacks a common string across nodes, but we can hijack the hostname in this case.
             results[0].advanceRow();
+            Map<String, String> columnTargets = new HashMap<String, String>();
+            columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
             hostsHeardFrom =
-                    countHostsProvidingRows(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+                    countHostsProvidingRows(results[0], columnTargets, true);
         } while ((hostsHeardFrom < HOSTS) && (--patientRetries) > 0);
         assertEquals(claimRecentAnalysis(), HOSTS, hostsHeardFrom);
     }
@@ -1088,7 +1056,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // We also get starvation stats for the MPI, so we need to add a site per host.
         assertEquals(HOSTS * (SITES + 1), results[0].getRowCount());
         results[0].advanceRow();
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, false);
     }
 
     public void testSnapshotStatus() throws Exception {
@@ -1265,13 +1235,14 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         VoltTable[] results = null;
 
         // Test table schema
-        Thread.sleep(1000);
         results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
         System.out.println("Node commandlog statistics table: " + results[0].toString());
         assertEquals(1, results.length);
         validateSchema(results[0], expectedTable);
         results[0].advanceRow();
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, true);
 
         // Enough for community version
         if (!MiscUtils.isPro()) {
@@ -1292,6 +1263,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             }
 
             // Issue commandlog stats query
+            Thread.sleep(1000);
             results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
             System.out.println("commandlog statistics: " + results[0].toString());
 
@@ -1306,7 +1278,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                     int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name());
                     int actualSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.SEGMENT_COUNT.name());
                     String message = "Unexpected segment count: should be 2";
-                    assertTrue(message, (actualSegmentCount == 2) && (actualLoanedSegmentCount <= actualSegmentCount));
+                    assertTrue(message, actualSegmentCount == 2);
+                    message = "Unexpected segment count: loaned segment count should be less than total count";
+                    assertTrue(message, actualLoanedSegmentCount <= actualSegmentCount);
                 }
             }
         }
