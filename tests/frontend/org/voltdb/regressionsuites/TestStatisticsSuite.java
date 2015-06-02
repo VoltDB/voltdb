@@ -985,6 +985,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllPartitions(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         // One row per host for DRNODE stats
         results[1].advanceRow();
+        columnTargets.put("HOSTNAME", results[1].getString("HOSTNAME"));
         validateRowSeenAtAllHosts(results[1], columnTargets, true);
     }
 
