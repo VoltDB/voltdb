@@ -142,7 +142,7 @@
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 }
                 var headerLength = params.replace(/'/g, "%27").length;
-                if (headerLength > 5720) {
+                if (headerLength > 5632) {
                     callback({ "status": -131, "statusstring": "SQL query is too long for the web interface. Use a shorter query or use the command line utility sqlcmd.", "results": [] });
                     return;
                 }
