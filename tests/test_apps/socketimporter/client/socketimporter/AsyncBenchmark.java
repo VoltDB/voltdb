@@ -21,7 +21,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * PUT NICE COMMENT HERE
+ * This program exercises the socket import capability by writing
+ * <key, value> pairs to one or more VoltDB socket importers.
+ *
+ * The pairs accumulate in a Queue structure. The program removes pairs
+ * from the Queue and uses asynchronous database queuries to verify that
+ * all the pairs written to the socket interface are present and have
+ * matching values.
+ *
+ * The checking proceeds in parallel as the socket writers write to the
+ * socket importers, and continues on until all pairs have been checked and
+ * the database has time to complete all socket importer input transactions.
  */
 
 package socketimporter;
@@ -89,7 +99,6 @@ public class AsyncBenchmark {
     AtomicLong rowsAdded = new AtomicLong(0);
     static final AtomicLong rowsChecked = new AtomicLong(0);
     static final AtomicLong rowsMismatch = new AtomicLong(0);
-    static final AtomicLong finalInsertCount = new AtomicLong(0);
     static final AtomicLong writers = new AtomicLong(0);
     static final AtomicLong socketWrites = new AtomicLong(0);
     static final AtomicLong socketWriteExceptions = new AtomicLong(0);
@@ -272,7 +281,7 @@ public class AsyncBenchmark {
 
         SecureRandom rnd = new SecureRandom();
         rnd.setSeed(Thread.currentThread().getId());
-        final AtomicLong icnt = new AtomicLong(0);
+        long icnt = 0;
         //  TODO: check if this removes discrepancy: long icnt = 0;
         try {
             // Run the benchmark loop for the requested warmup time
@@ -285,9 +294,8 @@ public class AsyncBenchmark {
                 Pair<Long,Long> p = new Pair<Long,Long>(key, t);
                 queue.offer(p);
                 String s = key + "," + t + "\n";
-
                 writeFully(s, hap, warmupEndTime);
-                icnt.getAndIncrement();
+                icnt++;
             }
 
             // print periodic statistics to the console
@@ -307,7 +315,7 @@ public class AsyncBenchmark {
                 queue.offer(p);
                 String s = key + "," + t + "\n";
                 writeFully(s, hap, benchmarkEndTime);
-                icnt.getAndIncrement();
+                icnt++;
             }
             haplist.get(hap).flush();
         } finally {
@@ -418,7 +426,7 @@ public class AsyncBenchmark {
         System.out.println("Socket write count: " + socketWrites.get());
         System.out.println("Socket write exception count: " + socketWriteExceptions.get());
         System.out.println("Rows checked against database: " + rowsChecked.get());
-        System.out.println("Mismatch rows (value added <> value in DB): " + rowsMismatch.get());
+        System.out.println("Mismatch rows (value imported <> value in DB): " + rowsMismatch.get());
 
         System.exit(0);
     }

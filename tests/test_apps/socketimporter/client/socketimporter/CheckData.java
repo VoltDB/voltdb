@@ -40,11 +40,9 @@ public class CheckData {
 				}
 				AsyncBenchmark.rowsChecked.incrementAndGet();
 			} catch (NoConnectionsException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 				System.exit(1);
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 				System.exit(1);
 			} catch (Exception e) {
@@ -66,13 +64,11 @@ public class CheckData {
         	m_pair = p;
         	m_queue = q;
         	m_key = key;
-        	//System.out.println("in SelectCallback constructor. key: " + key);
         }
 
         @Override
         public void clientCallback(ClientResponse response)
                 throws Exception {
-        	//System.out.println("Pair: " + m_pair.toString() + ". " + "SelectCallback.clientCallback.response: " + response.toString());
 			if (response.getStatus() != ClientResponse.SUCCESS) {
 				System.out.println(response.getStatusString());
 				return;
@@ -100,15 +96,12 @@ public class CheckData {
             List<Long> m_pair = new ArrayList<Long>();
         	//Long[] m_pairString = new Long[0];
             VoltTable[] m_results = response.getResults();
-            //System.out.println("Size of results: " + m_results.length);
             if (m_results.length == 0) {
             	System.out.println("zero length results");
             	return m_pair;
             }
             VoltTable recordset = m_results[0];
             if (recordset.advanceRow()) {
-            	//System.out.println("Size of results after advance: " + m_results.length + ". ");
-            	//System.out.println("Recordset after advance: " + recordset.toString() + ". ");
 
             	m_pair.add((Long) recordset.get(KEY, VoltType.BIGINT));
             	m_pair.add((Long) recordset.get(VALUE, VoltType.BIGINT));
