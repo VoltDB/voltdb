@@ -1,0 +1,25 @@
+<!-- Simple build file to build socket stream importer -->
+<project name="httpstream"      basedir="." default="httpstream.jar">
+<property name='base.dir'         location='.' />
+<property name='bundles.dir'      location='./bundles' />
+<property name='build.dir'        location='obj/${build}' />
+<property name='build.prod.dir'   location='${build.dir}/prod' />
+
+    <!-- regular build compile will compile the classes -->
+    <target name="httpstream.jar">
+        <mkdir dir="${bundles.dir}" />
+        <jar destfile="${bundles.dir}//${ant.project.name}.jar" basedir="${build.prod.dir}">
+            <include name="org/voltdb/importclient/HttpStreamImporter.class"/>
+            <include name="org/voltdb/importclient/HttpStreamImporter$ClientConnectionHandler.class"/>
+            <manifest>
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.HttpStreamImporter" />
+                <attribute name="Bundle-ManifestVersion" value="1" />
+                <attribute name="Bundle-Name" value="HttpStream Bundle" />
+                <attribute name="Bundle-SymbolicName" value="HttpStreamImporter" />
+                <attribute name="Bundle-Version" value="1.0.0" />
+                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer" />
+            </manifest>
+        </jar>
+    </target>
+
+</project>
