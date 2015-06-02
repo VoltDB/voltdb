@@ -924,22 +924,51 @@ public abstract class StatementDMQL extends Statement {
                     queryExpr.getLeftQueryExpression(), parameters, session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
                     queryExpr.getRightQueryExpression(), parameters, session);
-            if (queryExpr.sortAndSlice.hasOrder() || queryExpr.sortAndSlice.hasLimit()) {
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                        queryExpr.operatorName() + " tuple set operator with ORDER BY or LIMIT/OFFSET is not supported.");
+
+            // parameters
+            voltAppendParameters(session, unionExpr, parameters);
+
+            // Limit/Offset
+            List<VoltXMLElement> limitOffsetXml = voltGetLimitOffsetXMLFromSortAndSlice(session, queryExpr.sortAndSlice);
+            for (VoltXMLElement elem : limitOffsetXml) {
+                unionExpr.children.add(elem);
             }
+
+            // Order By
+            if (queryExpr.sortAndSlice.getOrderLength() > 0) {
+                List<Expression> displayCols = getDisplayColumnsForSetOp(queryExpr);
+                java.util.Set<Integer> ignoredColsIndexes = new java.util.HashSet<Integer>();
+
+                VoltXMLElement orderCols = new VoltXMLElement("ordercolumns");
+                unionExpr.children.add(orderCols);
+                for (int i=0; i < queryExpr.sortAndSlice.exprList.size(); ++i) {
+                    Expression e = (Expression) queryExpr.sortAndSlice.exprList.get(i);
+                    assert(e.getLeftNode() != null);
+                    // Get the display column with a corresponding index
+                    int index = e.getLeftNode().queryTableColumnIndex;
+                    assert(index < displayCols.size());
+                    Expression column = displayCols.get(index);
+                    e.setLeftNode(column);
+                    VoltXMLElement xml = e.voltGetXML(session, displayCols, ignoredColsIndexes, i);
+                    orderCols.children.add(xml);
+                }
+            }
+
             /**
-             * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
+             * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation
+             * only if they don't have their own limit/offset/order by clauses
              * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
              * associativity - (Select1 EXCEPT Select2) EXCEPT Select3 vs. Select1 EXCEPT (Select2 EXCEPT Select3)
              */
-            if ("union".equalsIgnoreCase(leftExpr.name) &&
+            boolean canMergeLeft = !hasLimitOrOrder(leftExpr);
+            if (canMergeLeft && "union".equalsIgnoreCase(leftExpr.name) &&
                     queryExpr.operatorName().equalsIgnoreCase(leftExpr.attributes.get("uniontype"))) {
                 unionExpr.children.addAll(leftExpr.children);
             } else {
                 unionExpr.children.add(leftExpr);
             }
-            if (exprType != QueryExpression.EXCEPT && exprType != QueryExpression.EXCEPT_ALL &&
+            boolean canMergeRight = !hasLimitOrOrder(rightExpr);
+            if (canMergeRight && exprType != QueryExpression.EXCEPT && exprType != QueryExpression.EXCEPT_ALL &&
                 "union".equalsIgnoreCase(rightExpr.name) &&
                 queryExpr.operatorName().equalsIgnoreCase(rightExpr.attributes.get("uniontype"))) {
                 unionExpr.children.addAll(rightExpr.children);
@@ -950,6 +979,38 @@ public abstract class StatementDMQL extends Statement {
         } else {
             throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                     queryExpr.operatorName() + " tuple set operator is not supported.");
+        }
+    }
+
+    /**
+     * Return true if the input element itself contains one of the limit/offset/ordercolumns elements
+     * @param xmlElement
+     */
+    private static boolean hasLimitOrOrder(VoltXMLElement xmlElement) {
+        String names[] = {"limit", "offset", "ordercolumns"};
+        for (String name : names) {
+            List<VoltXMLElement> elements = xmlElement.findChildren(name);
+            if (!elements.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Return a list of the display columns for the left most statement from a set op
+     * @return
+     */
+    private static List<Expression> getDisplayColumnsForSetOp(QueryExpression queryExpr) {
+        assert(queryExpr != null);
+        if (queryExpr.getLeftQueryExpression() == null) {
+            // end of recursion. This is a QuerySpecification
+            assert(queryExpr instanceof QuerySpecification);
+            QuerySpecification select = (QuerySpecification) queryExpr;
+            return select.displayCols;
+        } else {
+            // recurse
+            return getDisplayColumnsForSetOp(queryExpr.getLeftQueryExpression());
         }
     }
 
@@ -1070,7 +1131,7 @@ public abstract class StatementDMQL extends Statement {
 
         java.util.ArrayList<Expression> orderByCols = new java.util.ArrayList<Expression>();
         java.util.ArrayList<Expression> groupByCols = new java.util.ArrayList<Expression>();
-        java.util.ArrayList<Expression> displayCols = new java.util.ArrayList<Expression>();
+        select.displayCols.clear();
         java.util.ArrayList<Pair<Integer, HsqlNameManager.SimpleName>> aliases =
                 new java.util.ArrayList<Pair<Integer, HsqlNameManager.SimpleName>>();
 
@@ -1139,7 +1200,7 @@ public abstract class StatementDMQL extends Statement {
             } else if (expr.opType != OpTypes.SIMPLE_COLUMN || (expr.isAggregate && expr.alias != null)) {
                 // Add aggregate aliases to the display columns to maintain
                 // the output schema column ordering.
-                displayCols.add(expr);
+                select.displayCols.add(expr);
             }
             // else, other simple columns are ignored. If others exist, maybe
             // volt infers a display column from another column collection?
@@ -1170,16 +1231,16 @@ public abstract class StatementDMQL extends Statement {
         if (havingCondition != null) {
             VoltXMLElement having = new VoltXMLElement("having");
             query.children.add(having);
-            VoltXMLElement havingExpr = havingCondition.voltGetXML(session, displayCols, ignoredColsIndexes, 0);
+            VoltXMLElement havingExpr = havingCondition.voltGetXML(session, select.displayCols, ignoredColsIndexes, 0);
             having.children.add(havingExpr);
         }
 
-        for (int jj=0; jj < displayCols.size(); ++jj) {
-            Expression expr = displayCols.get(jj);
+        for (int jj=0; jj < select.displayCols.size(); ++jj) {
+            Expression expr = select.displayCols.get(jj);
             if (ignoredColsIndexes.contains(jj)) {
                 continue;
             }
-            VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
+            VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
             cols.children.add(xml);
             assert(xml != null);
         }
@@ -1203,7 +1264,7 @@ public abstract class StatementDMQL extends Statement {
 
             for (int jj=0; jj < groupByCols.size(); ++jj) {
                 Expression expr = groupByCols.get(jj);
-                VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
+                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
                 groupCols.children.add(xml);
             }
         }
@@ -1214,7 +1275,7 @@ public abstract class StatementDMQL extends Statement {
             query.children.add(orderCols);
             for (int jj=0; jj < orderByCols.size(); ++jj) {
                 Expression expr = orderByCols.get(jj);
-                VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
+                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
                 orderCols.children.add(xml);
             }
         }
