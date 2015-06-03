@@ -1940,7 +1940,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(waitTime) { header.help.isDisplayed() }
+        page.header.checkShowHelp()
     }
 
     // HEADER TAB TESTS
@@ -2061,16 +2061,8 @@ class AdminTest extends TestBase {
     def "help popup existance" () {
         when:
         at AdminPage
-        waitFor(waitTime) { header.help.isDisplayed() }
-        header.help.click()
         then:
-        waitFor(waitTime) {
-            header.popupTitle.isDisplayed()
-            header.popupClose.isDisplayed()
-            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
-        }
-
-        header.popupClose.click()
+        page.header.checkIfHelpIsOpen()
     }
 
     // FOOTER TESTS

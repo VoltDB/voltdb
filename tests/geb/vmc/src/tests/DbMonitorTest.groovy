@@ -192,7 +192,7 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.help.isDisplayed() }
+        page.header.checkShowHelp()
     }
 
     // HEADER TAB TESTS
@@ -314,16 +314,8 @@ class DbMonitorTest extends TestBase {
     def "help popup existance" () {
         when:
         at DbMonitorPage
-        waitFor(30) { header.help.isDisplayed() }
-        header.help.click()
         then:
-        waitFor(30) {
-            header.popupTitle.isDisplayed()
-            header.popupClose.isDisplayed()
-            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
-        }
-
-        header.popupClose.click()
+        page.header.checkIfHelpIsOpen()
     }
 
     // FOOTER TESTS

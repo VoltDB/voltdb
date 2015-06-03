@@ -1153,14 +1153,14 @@ function alertNodeClicked(obj) {
                 tableName = entry[tableNameIndex];
                 if (!schemaCatalogTableTypes.hasOwnProperty(tableName)) {
                     schemaCatalogTableTypes[tableName] = {};
-                    schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
+                }
+                schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
 
-                    if (entry[remarksIndex] != null) {
-                        schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
-                        schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
-                    } else {
-                        schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
-                    }
+                if (entry[remarksIndex] != null) {
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
+                    schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
+                } else {
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
                 }
                 schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
             });
