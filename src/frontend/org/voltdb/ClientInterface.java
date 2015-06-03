@@ -152,6 +152,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
+    public static final long IMPORTER_CID               = Long.MIN_VALUE + 5;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
@@ -881,7 +882,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Runs on the network thread to prepare client response. If a transaction needs to be
      * restarted, it will get restarted here.
      */
-    private class ClientResponseWork implements DeferredSerialization {
+    public class ClientResponseWork implements DeferredSerialization {
         private final ClientInterfaceHandleManager cihm;
         private final InitiateResponseMessage response;
         private final Procedure catProc;
@@ -1287,10 +1288,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Tell the clientInterface about a connection adapter.
      */
-    public void bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
-        m_cihm.put(adapter.connectionId(),
-                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
-                    AdmissionControlGroup.getDummy()));
+    public ClientInterfaceHandleManager bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
+        if (m_cihm.get(adapter.connectionId()) == null) {
+            ClientInterfaceHandleManager cihm = ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
+                        AdmissionControlGroup.getDummy());
+            m_cihm.put(adapter.connectionId(), cihm);
+        }
+        return m_cihm.get(adapter.connectionId());
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID

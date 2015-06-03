@@ -124,7 +124,12 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import java.net.URISyntaxException;
+import java.util.HashMap;
 import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.importer.ImportDataProcessor;
 
 /**
  *
@@ -567,6 +572,7 @@ public abstract class CatalogUtil {
 
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
+                setImportInfo(catalog, deployment.getImport());
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
@@ -1092,6 +1098,80 @@ public abstract class CatalogUtil {
         return processorProperties;
     }
 
+    private static Properties checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
+        String importBundleUrl = importConfiguration.getModule();
+
+        if (!importConfiguration.isEnabled()) {
+            return null;
+        }
+        switch(importConfiguration.getType()) {
+            case CUSTOM:
+                break;
+            default:
+                throw new DeploymentCheckException("Import Configuration type must be specified.");
+        }
+
+        Properties processorProperties = new Properties();
+        String modulePrefix = "osgi|";
+        InputStream is;
+        try {
+            //Make sure we can load stream
+            is = (new URL(importBundleUrl)).openStream();
+        } catch (Exception ex) {
+            is = null;
+        }
+        if (is == null) {
+            try {
+                String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                System.out.println("Module base is: " + rpath);
+                String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
+                is = new FileInputStream(new File(bpath));
+                importBundleUrl = "file:" + bpath;
+            } catch (URISyntaxException | FileNotFoundException ex) {
+                is = null;
+            }
+        }
+        if (is != null) {
+            try {
+                is.close();
+            } catch (IOException ex) {
+            }
+        } else {
+            //Not a URL try as a class
+            try {
+                CatalogUtil.class.getClassLoader().loadClass(importBundleUrl);
+                modulePrefix = "class|";
+            }
+            catch (ClassNotFoundException ex2) {
+                String msg =
+                        "Import failed to configure, failed to load module by URL or classname provided" +
+                        " import module: " + importBundleUrl;
+                hostLog.error(msg);
+                throw new DeploymentCheckException(msg);
+            }
+        }
+        if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
+            processorProperties.setProperty(ImportDataProcessor.IMPORT_MODULE, modulePrefix + importBundleUrl);
+        }
+
+        List<PropertyType> configProperties = importConfiguration.getProperty();
+        if (configProperties != null && ! configProperties.isEmpty()) {
+
+            for( PropertyType configProp: configProperties) {
+                String key = configProp.getName();
+                String value = configProp.getValue();
+                if (!key.toLowerCase().contains("passw")) {
+                    processorProperties.setProperty(key, value.trim());
+                } else {
+                    //Dont trim passwords
+                    processorProperties.setProperty(key, value);
+                }
+            }
+        }
+
+        return processorProperties;
+    }
+
     /**
      * Set deployment time settings for export
      * @param catalog The catalog to be updated.
@@ -1187,6 +1267,56 @@ public abstract class CatalogUtil {
                 }
             }
         }
+    }
+
+    /**
+     * Set deployment time settings for export
+     * @param catalog The catalog to be updated.
+     * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     */
+    private static void setImportInfo(Catalog catalog, ImportType importType) {
+        if (importType == null) {
+            return;
+        }
+        List<String> streamList = new ArrayList<String>();
+
+        for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
+
+            boolean connectorEnabled = importConfiguration.isEnabled();
+            if (!connectorEnabled) continue;
+            if (streamList.contains(importConfiguration.getModule())) {
+                throw new RuntimeException("Multiple connectors can not be assigned to single import module: " +
+                        importConfiguration.getModule()+ ".");
+            } else {
+                streamList.add(importConfiguration.getModule());
+            }
+
+            checkImportProcessorConfiguration(importConfiguration);
+        }
+    }
+
+    public static Map<String, Properties> getImportProcessorConfig(ImportType importType) {
+        Map<String, Properties> processorConfig = new HashMap<String, Properties>();
+        if (importType == null) {
+            return processorConfig;
+        }
+        List<String> streamList = new ArrayList<String>();
+
+        for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
+
+            boolean connectorEnabled = importConfiguration.isEnabled();
+            if (!connectorEnabled) continue;
+            if (streamList.contains(importConfiguration.getModule())) {
+                throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
+                        importConfiguration.getModule()+ ".");
+            } else {
+                streamList.add(importConfiguration.getModule());
+            }
+
+            Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            processorConfig.put(importConfiguration.getModule(), processorProperties);
+        }
+        return processorConfig;
     }
 
     /**
