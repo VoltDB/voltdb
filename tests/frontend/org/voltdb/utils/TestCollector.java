@@ -159,8 +159,7 @@ public class TestCollector {
            //maintain the file naming format
            String fileNamePrefix = "volt-junit-fulllog.txt.";
            String fileText = "This is a dummy log file.";
-           String workingDir = getWorkingDir(voltDbRootPath);
-           VoltFile logFolder = new VoltFile(workingDir + "/obj/release/testoutput/");
+           VoltFile logFolder = new VoltFile(System.getenv("JUNIT_TESTOUTPUT_DIR"));
            logFolder.mkdir();
 
            for(File oldLogFile : logFolder.listFiles()) {
