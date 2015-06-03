@@ -1364,7 +1364,7 @@ TEST CASES
             <jvmarg value="-XX:-UseSplitVerifier"/>
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
-        	<env key="JUNIT_TESTOUTPUT_DIR" value="${build.testoutput.dir}" />
+            <env key="JUNIT_TESTOUTPUT_DIR" value="${build.testoutput.dir}" />
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />
             <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
