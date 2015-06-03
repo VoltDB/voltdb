@@ -36,7 +36,7 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-CLIENTCLASSPATH=voter-client.jar:$CLASSPATH:$({ \
+CLIENTCLASSPATH=socketstream-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
@@ -47,36 +47,29 @@ HOST="localhost"
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
     rm -rf debugoutput voltdbroot log catalog-report.html \
-         statement-plans procedures/voter/*.class client/voter/*.class
+         statement-plans build/*.class clientbuild/*.class
 }
 
 # remove everything from "clean" as well as the jarfiles
 function cleanall() {
-    clean
-    rm -rf voter-procs.jar voter-client.jar
+    ant clean
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
-    # compile java source
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/voter/*.java
-    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/voter/*.java
-    # build procedure and client jars
-    jar cf voter-procs.jar -C procedures voter
-    jar cf voter-client.jar -C client voter
-    # remove compiled .class files
-    rm -rf procedures/voter/*.class client/voter/*.class
+    ant client
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
+    if [ ! -e socketstream.jar ] || [ ! -e socketstream-client.jar ]; then
         jars;
     fi
 }
 
 # run the voltdb server locally
 function server() {
+    jars-ifneeded
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
@@ -93,7 +86,7 @@ function init() {
 
 # wait for backgrounded server to start up
 function wait_for_startup() {
-    until echo "exec @SystemInformation, OVERVIEW;" | sqlcmd > /dev/null 2>&1
+    until sqlcmd  --query=' exec @SystemInformation, OVERVIEW;' > /dev/null 2>&1
     do
         sleep 2
         echo " ... Waiting for VoltDB to start"
@@ -106,6 +99,7 @@ function wait_for_startup() {
 
 # startup server in background and load schema
 function background_server_andload() {
+    jars-ifneeded
     # run the server in the background
     voltdb create -B -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
     wait_for_startup
@@ -121,7 +115,7 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     jars-ifneeded
-    java -classpath $CLIENTCLASSPATH voter.AsyncBenchmark --help
+    java -classpath $CLIENTCLASSPATH socketstream.AsyncBenchmark --help
 }
 
 # latencyreport: default is OFF
@@ -130,60 +124,11 @@ function async-benchmark-help() {
 function async-benchmark() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.AsyncBenchmark \
+        socketimporter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \
-        --servers=localhost:21212 \
-        --contestants=6 \
-        --maxvotes=2 \
-        --ratelimit=2000000
-#        --latencyreport=true \
-}
-
-function simple-benchmark() {
-    jars-ifneeded
-    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.SimpleBenchmark localhost
-}
-
-# Multi-threaded synchronous benchmark sample
-# Use this target for argument help
-function sync-benchmark-help() {
-    jars-ifneeded
-    java -classpath $CLIENTCLASSPATH voter.SyncBenchmark --help
-}
-
-function sync-benchmark() {
-    jars-ifneeded
-    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.SyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=localhost:21212 \
-        --contestants=6 \
-        --maxvotes=2 \
-        --threads=40
-}
-
-# JDBC benchmark sample
-# Use this target for argument help
-function jdbc-benchmark-help() {
-    jars-ifneeded
-    java -classpath $CLIENTCLASSPATH voter.JDBCBenchmark --help
-}
-
-function jdbc-benchmark() {
-    jars-ifneeded
-    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.JDBCBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --maxvotes=2 \
-        --servers=localhost:21212 \
-        --contestants=6 \
-        --threads=40
+        --servers=localhost:7001
 }
 
 # The following two demo functions are used by the Docker package. Don't remove.
@@ -205,8 +150,7 @@ function demo() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|server|init|demo|client|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|server|init|demo|client|async-benchmark|aysnc-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line

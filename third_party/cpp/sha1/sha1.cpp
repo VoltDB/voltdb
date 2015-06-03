@@ -76,7 +76,9 @@ A million repetitions of "a"
   34AA973C D4C4DAA4 F61EEB2B DBAD2731 6534016F
 */
 
-/* #define SHA1HANDSOFF  */
+// SHA1HANDSOFF is used by the library to decide if the library is allowed to use your data as temp storage
+// defining it turns this feature off
+#define SHA1HANDSOFF
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
