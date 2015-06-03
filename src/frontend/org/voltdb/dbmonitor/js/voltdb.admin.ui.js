@@ -2566,18 +2566,14 @@ function loadAdminPage() {
         var getDrMode = function (drListen) {
             var replicationRole = VoltDbUI.drReplicationRole;
             if (replicationRole.toLowerCase() == "replica") {
-                if (drListen) {
+                if (VoltDbUI.drMasterState.toUpperCase() == "ACTIVE") {
                     adminEditObjects.labelDrmode.text("Both");
                 } else {
                     adminEditObjects.labelDrmode.text("Replica");
                 }
                 adminEditObjects.LinkDrMasterEdit.removeClass().addClass('edit');
             } else {
-                if (drListen) {
-                    adminEditObjects.labelDrmode.text("Master");
-                } else {
-                    adminEditObjects.labelDrmode.text("None");
-                }
+                adminEditObjects.labelDrmode.text("Master");
                 adminEditObjects.LinkDrMasterEdit.removeClass().addClass('editDisabled');
             }
         };
