@@ -36,8 +36,7 @@ import org.voltdb.exceptions.SQLException;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
-    @Override
-    protected void throwExceptionForError(int errorCode) {
+    private void throwExceptionForError(int errorCode) {
         if (errorCode == ERRORCODE_ERROR) {
             throw new SQLException("66666");
         }
@@ -142,13 +141,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void release() throws EEException {
-    }
+    public void release() throws EEException { }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
-        return false;
-    }
+    public void releaseUndoToken(final long undoToken) { }
 
     @Override
     public VoltTable serializeTable(final int tableId) throws EEException {
@@ -156,28 +152,19 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void tick(final long time, final long lastCommittedTxnId) {
-    }
+    public void tick(final long time, final long lastCommittedTxnId) { }
 
     @Override
-    public void toggleProfiler(final int toggle) {
-        return;
-    }
+    public void toggleProfiler(final int toggle) { }
 
     @Override
-    public boolean undoUndoToken(final long undoToken) {
-        return false;
-    }
+    public void undoUndoToken(final long undoToken) { }
 
     @Override
-    public boolean setLogLevels(final long logLevels) throws EEException {
-        return false;
-    }
+    public void setLogLevels(final long logLevels) throws EEException { }
 
     @Override
-    public void quiesce(long lastCommittedTxnId) {
-
-    }
+    public void quiesce(long lastCommittedTxnId) { }
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, byte[] predicates) {
