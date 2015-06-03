@@ -57,7 +57,7 @@ public class LocalCluster implements VoltServerConfig {
     // NOTE: This mechanism can't be used when m_hasLocalServer is enabled
     public static final String clusterHostIdProperty = "__VOLTDB_CLUSTER_HOSTID__";
 
-    private VoltLogger log = new VoltLogger("HOST");
+    private final VoltLogger log = new VoltLogger("HOST");
 
     // the timestamp salt for the TransactionIdManager
     // will vary between -3 and 3 uniformly
@@ -712,10 +712,10 @@ public class LocalCluster implements VoltServerConfig {
             log.info(cmdLineFull);
             m_procBuilder.command().addAll(cmdlnList);
 
-            // write output to obj/release/testoutput/<test name>-n.txt
+            // write output to JUNIT_TESTOUTPUT_DIR/<test name>-n.txt
             // this may need to be more unique? Also very useful to just
             // set this to a hardcoded path and use "tail -f" to debug.
-            String testoutputdir = cmdln.buildDir() + File.separator + "testoutput";
+            String testoutputdir = System.getenv("JUNIT_TESTOUTPUT_DIR");
             System.out.println("Process output will be redirected to: " + testoutputdir);
             // make sure the directory exists
             File dir = new File(testoutputdir);

@@ -1364,6 +1364,7 @@ TEST CASES
             <jvmarg value="-XX:-UseSplitVerifier"/>
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
+        	<env key="JUNIT_TESTOUTPUT_DIR" value="${build.testoutput.dir}" />
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />
             <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
@@ -1517,11 +1518,11 @@ TEST CASES
     <element name='tests'/>
     <sequential>
         <mkdir dir='${build.testoutput.dir}' />
-        <mkdir dir='${build.dir}/testoutput-archive/' />
+        <mkdir dir='${build.testoutput.archive.dir}' />
         <exec executable="/usr/bin/env" failonerror='true'>
             <arg value="python" />
             <arg value="${base.dir}/tools/junit-pre-process.py" />
-            <arg value="--archivepath=${build.dir}/testoutput-archive/" />
+            <arg value="--archivepath=${build.testoutput.archive.dir}" />
             <arg value="--outputpath=${build.testoutput.dir}" />
         </exec>
         <junit-files>
