@@ -1595,11 +1595,12 @@ function loadAdminPage() {
             if (voltDbRenderer.exportTablesArray.length == 0) {
                 $("#exportPopup").html("No Export tables available.");
             } else {
+                content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
-                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr>";
+                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr></tbody></table>";
                 }
             }
-            $("#exportTableBody").html(content);
+            $("#exportPopup").html(content);
         },
         afterOpen: function () {
             var popup = $(this)[0];
