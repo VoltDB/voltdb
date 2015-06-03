@@ -74,7 +74,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     protected Procedure m_catProc;
     protected Cluster m_cluster;
-    protected SiteProcedureConnection m_site;
+    protected AdHocProcedureConnection m_site;
     private LoadedProcedureSet m_loadedProcedureSet;
     protected ProcedureRunner m_runner; // overrides private parent var
 
@@ -109,7 +109,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         m_runner = procRunner;
     }
 
-    void initSysProc(SiteProcedureConnection site,
+    void initSysProc(AdHocProcedureConnection site,
             LoadedProcedureSet loadedProcedureSet,
             Procedure catProc, Cluster cluster) {
 

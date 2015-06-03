@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
@@ -35,48 +34,6 @@ import org.voltdb.iv2.JoinProducerBase;
 public interface SiteProcedureConnection {
 
     public long getLatestUndoToken();
-
-    /**
-     * Get the HSQL backend, if any.  Returns null if we're not configured
-     * to use it
-     */
-    public HsqlBackend getHsqlBackendIfExists();
-
-    /**
-     * Get the catalog site id for the corresponding SiteProcedureConnection
-     */
-    public long getCorrespondingSiteId();
-
-    /**
-     * Get the partition id for the corresponding SiteProcedureConnection
-     */
-    public int getCorrespondingPartitionId();
-
-    /**
-     * Get the catalog host id for the corresponding SiteProcedureConnection
-     */
-    public int getCorrespondingHostId();
-
-    /**
-     * Log settings changed. Signal EE to update log level.
-     */
-    public void updateBackendLogLevels();
-
-    /**
-     * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
-     */
-    public byte[] loadTable(
-            long txnId,
-            long spHandle,
-            long uniqueId,
-            String clusterName,
-            String databaseName,
-            String tableName,
-            VoltTable data,
-            boolean returnUniqueViolations,
-            boolean shouldDRStream,
-            boolean undo)
-    throws VoltAbortException;
 
     /**
      * loadTable method used internally by ExecutionSite/Site clients
@@ -164,34 +121,14 @@ public interface SiteProcedureConnection {
             Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers);
 
-    public long[] getUSOForExportTable(String signature);
-
-    public TupleStreamStateInfo getDRTupleStreamStateInfo();
-
-    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber);
-
-    public void toggleProfiler(int toggle);
-
-    public void tick();
-
-    public void quiesce();
-
-    public void exportAction(boolean syncAction,
-                             long ackOffset,
-                             Long sequenceNumber,
-                             Integer partitionId,
-                             String tableSignature);
-
-    public VoltTable[] getStats(StatsSelector selector, int[] locators,
-                                boolean interval, Long now);
-
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork();
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart);
+    public void setSinglePartitionTxnIds(long[] perPartitionTxnIds);
 
     public TheHashinator getCurrentHashinator();
     public void updateHashinator(TheHashinator hashinator);
-    public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
-    public void applyBinaryLog(long txnId, long spHandle, long uniqueId, byte logData[]);
+
+    public void tick();
+
 }

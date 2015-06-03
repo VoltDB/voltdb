@@ -141,8 +141,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     public DefaultSnapshotDataTarget(
             final File file,
             final int hostId,
-            final String clusterName,
-            final String databaseName,
             final String tableName,
             final int numPartitions,
             final boolean isReplicated,
@@ -153,8 +151,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         this(
                 file,
                 hostId,
-                clusterName,
-                databaseName,
+                "cluster",
+                "database",
                 tableName,
                 numPartitions,
                 isReplicated,

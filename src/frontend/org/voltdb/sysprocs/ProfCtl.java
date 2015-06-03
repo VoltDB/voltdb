@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -63,10 +63,10 @@ public class ProfCtl extends VoltSystemProcedure {
             table.addRow(command);
             if (ctx.isLowestSiteId()) {
                 if (command.equalsIgnoreCase("GPERF_ENABLE")) {
-                    ctx.getSiteProcedureConnection().toggleProfiler(1);
+                    ctx.toggleProfiler(1);
                 }
                 else {
-                    ctx.getSiteProcedureConnection().toggleProfiler(0);
+                    ctx.toggleProfiler(0);
                 }
             }
         }

@@ -67,7 +67,7 @@ public class SQLStmt {
     boolean inCatalog;
 
     // used to clean up plans
-    SiteProcedureConnection site;
+    AdHocProcedureConnection site;
 
     /**
      * Construct a SQLStmt instance from a SQL statement.
@@ -159,7 +159,7 @@ public class SQLStmt {
                                   boolean isReplicatedTableDML,
                                   boolean isReadOnly,
                                   VoltType[] params,
-                                  SiteProcedureConnection site) {
+                                  AdHocProcedureConnection site) {
         SQLStmt stmt = new SQLStmt(sqlText, null);
 
         stmt.aggregator = new SQLStmt.Frag(aggFragId, aggPlanHash, isAggTransactional);

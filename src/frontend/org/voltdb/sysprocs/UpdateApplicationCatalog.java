@@ -33,7 +33,6 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -118,19 +117,14 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         }
 
         // get the table stats for these tables from the EE
-        final VoltTable[] s1 =
-                context.getSiteProcedureConnection().getStats(StatsSelector.TABLE,
-                                                              tableIds,
-                                                              false,
-                                                              getTransactionTime().getTime());
-        if ((s1 == null) || (s1.length == 0)) {
+        VoltTable stats = context.getTableStats(tableIds, getTransactionTime().getTime());
+        if (stats == null) {
             String tableNames = StringUtils.join(tablesThatMustBeEmpty, ", ");
             String msg = String.format("@UpdateApplicationCatalog was checking to see if tables (%s) were empty ," +
                                        "presumably as part of a schema change, but failed to get the row counts " +
                                        "from the native storage engine.", tableNames);
             throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
         }
-        VoltTable stats = s1[0];
         SortedSet<String> nonEmptyTables = new TreeSet<String>();
 
         // find all empty tables

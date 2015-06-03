@@ -48,19 +48,23 @@ public class LoadedProcedureSet {
     final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
         new HashMap<Long, ProcedureRunner>();
 
-    final ProcedureRunnerFactory m_runnerFactory;
     CatalogSpecificPlanner m_csp = null;
     PlannerTool m_plannerTool = null;
     DefaultProcedureManager m_defaultProcManager = null;
     final long m_siteId;
     final int m_siteIndex;
-    final SiteProcedureConnection m_site;
+    final AdHocProcedureConnection m_site;
+    final SystemProcedureExecutionContext m_context;
 
-    public LoadedProcedureSet(SiteProcedureConnection site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex) {
-        m_runnerFactory = runnerFactory;
+    public LoadedProcedureSet(AdHocProcedureConnection adHocProcedureConnection,
+            SystemProcedureExecutionContext context,
+            long siteId, int siteIndex,
+            CatalogContext catalogContext, BackendTarget backend, CatalogSpecificPlanner csp) {
         m_siteId = siteId;
         m_siteIndex = siteIndex;
-        m_site = site;
+        m_site = adHocProcedureConnection;
+        m_context = context;
+        loadProcedures(catalogContext, backend, csp);
     }
 
    public ProcedureRunner getSysproc(long fragmentId) {
@@ -152,7 +156,7 @@ public class LoadedProcedureSet {
             }
 
             assert(procedure != null);
-            runner = m_runnerFactory.create(procedure, proc, m_csp);
+            runner = new ProcedureRunner(procedure, m_site, m_context, proc, m_csp);
             builder.put(proc.getTypeName().intern(), runner);
         }
         return builder;
@@ -179,9 +183,6 @@ public class LoadedProcedureSet {
             Config sysProc = entry.getValue();
             Procedure proc = sysProc.asCatalogProcedure();
 
-            VoltSystemProcedure procedure = null;
-            ProcedureRunner runner = null;
-
             final String className = sysProc.getClassname();
             Class<?> procClass = null;
 
@@ -202,6 +203,7 @@ public class LoadedProcedureSet {
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
 
+                VoltSystemProcedure procedure = null;
                 try {
                     procedure = (VoltSystemProcedure) procClass.newInstance();
                 }
@@ -214,7 +216,7 @@ public class LoadedProcedureSet {
                             new Object[] { m_siteId, m_siteIndex }, e);
                 }
 
-                runner = m_runnerFactory.create(procedure, proc, m_csp);
+                ProcedureRunner runner = new ProcedureRunner(procedure, m_site, m_context, proc, m_csp);
                 procedure.initSysProc(m_site, this, proc, catalogContext.cluster);
                 builder.put(entry.getKey().intern(), runner);
             }
@@ -238,7 +240,7 @@ public class LoadedProcedureSet {
                 String sqlText = m_defaultProcManager.sqlForDefaultProc(catProc);
                 Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
-                pr = m_runnerFactory.create(voltProc, newCatProc, m_csp);
+                pr = new ProcedureRunner(voltProc, m_site, m_context, newCatProc, m_csp);
                 // this will ensure any created fragment tasks know to load the plans
                 // for this plan-on-the-fly procedure
                 pr.setProcNameToLoadForFragmentTasks(catProc.getTypeName());

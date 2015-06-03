@@ -50,7 +50,7 @@ public class SQLStmtAdHocHelper {
                                          boolean isReplicatedTableDML,
                                          boolean isReadOnly,
                                          VoltType[] params,
-                                         SiteProcedureConnection site) {
+                                         AdHocProcedureConnection site) {
         return SQLStmt.createWithPlan(sqlText,
                 aggFragId, aggPlanHash, isAggTransactional,
                 collectorFragId, collectorPlanHash, isCollectorTransactional,

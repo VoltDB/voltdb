@@ -117,7 +117,7 @@ public class ProcedureRunner {
 
     // hooks into other parts of voltdb
     //
-    protected final SiteProcedureConnection m_site;
+    protected final AdHocProcedureConnection m_site;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
     protected final CatalogSpecificPlanner m_csp;
 
@@ -129,7 +129,6 @@ public class ProcedureRunner {
     protected final boolean m_isSinglePartition;
     protected final boolean m_hasJava;
     protected final boolean m_isReadOnly;
-    protected final boolean m_isEverySite;
     protected final int m_partitionColumn;
     protected final VoltType m_partitionColumnType;
     protected final Language m_language;
@@ -163,7 +162,7 @@ public class ProcedureRunner {
             };
 
     ProcedureRunner(VoltProcedure procedure,
-                    SiteProcedureConnection site,
+                    AdHocProcedureConnection site,
                     SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
@@ -191,11 +190,6 @@ public class ProcedureRunner {
         m_hasJava = catProc.getHasjava();
         m_isReadOnly = catProc.getReadonly();
         m_isSinglePartition = m_catProc.getSinglepartition();
-        boolean isEverySite = false;
-        if (isSystemProcedure()) {
-            isEverySite = m_catProc.getEverysite();
-        }
-        m_isEverySite = isEverySite();
         if (m_isSinglePartition) {
             ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
             m_partitionColumn = ppi.index;
@@ -230,9 +224,6 @@ public class ProcedureRunner {
         return m_isSysProc;
     }
 
-    public boolean isEverySite() {
-        return m_isEverySite;
-    }
     /**
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
@@ -785,8 +776,8 @@ public class ProcedureRunner {
         return results;
     }
 
-    public byte[] voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
+    public byte[] voltLoadTable(String tableName, VoltTable data,
+            boolean returnUniqueViolations)
     throws VoltAbortException
     {
         if (data == null || data.getRowCount() == 0) {
@@ -794,8 +785,7 @@ public class ProcedureRunner {
         }
         try {
             return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle, m_txnState.uniqueId,
-                             clusterName, databaseName,
-                             tableName, data, returnUniqueViolations, shouldDRStream, false);
+                             tableName, data, returnUniqueViolations, false);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
@@ -1300,7 +1290,7 @@ public class ProcedureRunner {
        /*
         * Replicated fragment.
         */
-       void addStatement(int index, SQLStmt stmt, ByteBuffer params, SiteProcedureConnection site) {
+       void addStatement(int index, SQLStmt stmt, ByteBuffer params, AdHocProcedureConnection site) {
            assert(index >= 0);
            assert(index < m_batchSize);
            assert(stmt != null);

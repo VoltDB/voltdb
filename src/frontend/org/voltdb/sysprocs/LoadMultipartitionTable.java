@@ -64,8 +64,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         VoltTable result = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
 
         if (fragmentId == SysProcFragmentId.PF_distribute) {
-            assert context.getCluster().getTypeName() != null;
-            assert context.getDatabase().getTypeName() != null;
             assert params != null;
             assert params.toArray() != null;
             assert params.toArray()[0] != null;
@@ -80,10 +78,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
             try {
                 // voltLoadTable is void. Assume success or exception.
-                voltLoadTable(context.getCluster().getTypeName(),
-                                    context.getDatabase().getTypeName(),
-                                    tableName,
-                                    toInsert, false, false);
+                m_runner.voltLoadTable(tableName, toInsert, false);
                 // return the number of rows inserted
                 result.addRow(toInsert.getRowCount());
             }

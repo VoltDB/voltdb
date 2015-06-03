@@ -346,6 +346,7 @@ public abstract class VoltProcedure {
                               String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
     throws VoltAbortException
     {
-        return m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream);
+        m_runner.voltLoadTable(tableName, data, false);
+        return null;
     }
 }

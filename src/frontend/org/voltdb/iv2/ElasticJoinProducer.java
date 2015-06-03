@@ -109,7 +109,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         //If there was no ID nothing to do
         long partitionTxnIds[] = fetchPerPartitionTxnId();
         if (partitionTxnIds == null) return;
-        connection.setPerPartitionTxnIds(partitionTxnIds, true);
+        connection.setSinglePartitionTxnIds(partitionTxnIds);
     }
 
     private void doInitiation(RejoinMessage message)

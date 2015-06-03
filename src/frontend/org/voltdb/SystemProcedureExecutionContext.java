@@ -24,14 +24,11 @@ import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.dtxn.SiteTracker;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
 
     public Cluster getCluster();
-
-    public long getSpHandleForSnapshotDigest();
 
     public long getSiteId();
 
@@ -50,16 +47,7 @@ public interface SystemProcedureExecutionContext {
 
     public byte[] getDeploymentHash();
 
-    // Separate SiteTracker accessor for IV2 use.
-    // Snapshot services that need this can get a SiteTracker in IV2, but
-    // all other calls to the regular getSiteTracker() are going to throw.
-    public SiteTracker getSiteTrackerForSnapshot();
-
     public int getNumberOfPartitions();
-
-    public void setNumberOfPartitions(int partitionCount);
-
-    public SiteProcedureConnection getSiteProcedureConnection();
 
     public SiteSnapshotConnection getSiteSnapshotConnection();
 
@@ -79,8 +67,35 @@ public interface SystemProcedureExecutionContext {
 
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 
-    public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
-
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);
+
+    public long[] getUSOForExportTable(String signature);
+
+    public void applyBinaryLog(ProcedureRunner m_runner, byte[] log);
+
+    public void exportAction(long sequenceNumber, Integer myPartitionId, String signature);
+
+    public void quiesce();
+
+    public void toggleProfiler(int i);
+
+    public VoltTable getTableStats(int[] tableIds, long time);
+
+    public void validatePartitioning(VoltTable result, long[] tableIds,
+            String[] tableNames, int hashinatorType, byte[] hashinatorConfig);
+
+    /**
+     * loadTable method used internally by ExecutionSite/Site clients
+     */
+    public byte[] loadTable(
+            long txnId,
+            long spHandle,
+            long uniqueId,
+            int tableId,
+            VoltTable data,
+            boolean returnUniqueViolations,
+            boolean shouldDRStream,
+            boolean undo);
+
 }

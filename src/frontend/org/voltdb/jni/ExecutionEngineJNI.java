@@ -537,15 +537,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public void exportAction(boolean syncAction,
+    public void exportAction(
             long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
         //Clear is destructive, do it before the native call
         deserializer.clear();
         long retval = nativeExportAction(pointer,
-                                         syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
+                                         true, ackTxnId, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
-            LOG.info("exportAction failed.  syncAction: " + syncAction + ", ackTxnId: " +
+            LOG.info("exportAction failed. ackTxnId: " +
                     ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + tableSignature);
         }

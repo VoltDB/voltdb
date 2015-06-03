@@ -29,8 +29,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-import org.voltdb.LoadedProcedureSet;
-import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StarvationTracker;
 
 /**
@@ -45,31 +43,22 @@ class MpRoSitePool {
     static int INITIAL_POOL_SIZE = 1;
 
     class MpRoSiteContext {
-        final private BackendTarget m_backend;
         final private SiteTaskerQueue m_queue;
         final private MpRoSite m_site;
         final private CatalogContext m_catalogContext;
-        final private ProcedureRunnerFactory m_prf;
-        final private LoadedProcedureSet m_loadedProcedures;
         final private Thread m_siteThread;
 
         MpRoSiteContext(long siteId, BackendTarget backend,
                 CatalogContext context, int partitionId,
-                InitiatorMailbox initiatorMailbox, CatalogSpecificPlanner csp,
+                CatalogSpecificPlanner csp,
                 ThreadFactory threadFactory)
         {
-            m_backend = backend;
             m_catalogContext = context;
             m_queue = new SiteTaskerQueue();
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
-            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
-            m_prf = new ProcedureRunnerFactory();
-            m_prf.configure(m_site, m_site.m_sysprocContext);
-            m_loadedProcedures = new LoadedProcedureSet(m_site, m_prf,
-                    initiatorMailbox.getHSId(), 0); // Stale constructor arg, fill with bleh
-            m_loadedProcedures.loadProcedures(m_catalogContext, m_backend, csp);
-            m_site.setLoadedProcedures(m_loadedProcedures);
+            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext,
+                    partitionId, csp);
             m_siteThread = threadFactory.newThread(m_site);
             m_siteThread.start();
         }
@@ -109,7 +98,6 @@ class MpRoSitePool {
     private final long m_siteId;
     private final BackendTarget m_backend;
     private final int m_partitionId;
-    private final InitiatorMailbox m_initiatorMailbox;
     private CatalogContext m_catalogContext;
     private CatalogSpecificPlanner m_csp;
     private ThreadFactory m_poolThreadFactory;
@@ -120,14 +108,12 @@ class MpRoSitePool {
             BackendTarget backend,
             CatalogContext context,
             int partitionId,
-            InitiatorMailbox initiatorMailbox,
             CatalogSpecificPlanner csp)
     {
         m_siteId = siteId;
         m_backend = backend;
         m_catalogContext = context;
         m_partitionId = partitionId;
-        m_initiatorMailbox = initiatorMailbox;
         m_csp = csp;
         m_poolThreadFactory =
             CoreUtils.getThreadFactory("RO MP Iv2ExecutionSite - " + CoreUtils.hsIdToString(m_siteId),
@@ -146,7 +132,6 @@ class MpRoSitePool {
                         m_backend,
                         m_catalogContext,
                         m_partitionId,
-                        m_initiatorMailbox,
                         m_csp,
                         m_poolThreadFactory));
         }
@@ -206,8 +191,7 @@ class MpRoSitePool {
      */
     boolean doWork(long txnId, TransactionTask task)
     {
-        boolean retval = canAcceptWork();
-        if (!retval) {
+        if (!canAcceptWork()) {
             return false;
         }
         MpRoSiteContext site;
@@ -217,15 +201,16 @@ class MpRoSitePool {
         }
         else {
             if (m_idleSites.isEmpty()) {
-                m_idleSites.push(new MpRoSiteContext(m_siteId,
+                site = new MpRoSiteContext(m_siteId,
                             m_backend,
                             m_catalogContext,
                             m_partitionId,
-                            m_initiatorMailbox,
                             m_csp,
-                            m_poolThreadFactory));
+                            m_poolThreadFactory);
             }
-            site = m_idleSites.pop();
+            else {
+                site = m_idleSites.pop();
+            }
             m_busySites.put(txnId, site);
         }
         site.offer(task);

@@ -59,7 +59,7 @@ public class Quiesce extends VoltSystemProcedure {
         try {
             if (fragmentId == SysProcFragmentId.PF_quiesce_sites) {
                 // tell each site to quiesce
-                context.getSiteProcedureConnection().quiesce();
+                context.quiesce();
                 VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
                 results.addRow(context.getSiteId());
                 return new DependencyPair(DEP_SITES, results);

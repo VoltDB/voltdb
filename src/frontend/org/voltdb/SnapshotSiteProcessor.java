@@ -223,6 +223,7 @@ public class SnapshotSiteProcessor {
      * set and reset the contents.
      */
     public static void populateSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
+        SiteSnapshotConnection snapshotContext = context.getSiteSnapshotConnection();
         Database database = context.getDatabase();
         for (Table t : database.getTables()) {
             if (!CatalogUtil.isTableExportOnly(database, t))
@@ -235,14 +236,14 @@ public class SnapshotSiteProcessor {
             }
 
             long[] ackOffSetAndSequenceNumber =
-                context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
+                    snapshotContext.getUSOForExportTable(t.getSignature());
             sequenceNumbers.put(
                             context.getPartitionId(),
                             Pair.of(
                                 ackOffSetAndSequenceNumber[0],
                                 ackOffSetAndSequenceNumber[1]));
         }
-        TupleStreamStateInfo drStateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
+        TupleStreamStateInfo drStateInfo = snapshotContext.getDRTupleStreamStateInfo();
         m_drTupleStreamInfo.put(context.getPartitionId(), Pair.of(drStateInfo.partitionSequenceNumber, drStateInfo.partitionUniqueId));
         if (drStateInfo.containsReplicatedStreamInfo) {
             m_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, Pair.of(drStateInfo.replicatedSequenceNumber, drStateInfo.replicatedUniqueId));

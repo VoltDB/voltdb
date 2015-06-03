@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Map;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.dtxn.SiteTracker;
 
 /**
  * Defines the interface between a site and the snapshot
@@ -40,4 +41,25 @@ public interface SiteSnapshotConnection
 
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets);
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
+
+    public long getSpHandleForSnapshotDigest();
+
+    public long[] getUSOForExportTable(String signature);
+
+    public TupleStreamStateInfo getDRTupleStreamStateInfo();
+
+    public void setDRSequenceNumbers(Long drSequenceNumber,
+            Long mpDRSequenceNumber);
+
+    public void setMultiPartitionTxnIds(long[] perPartitionTxnIds);
+
+    // Separate SiteTracker accessor for IV2 use.
+    // Snapshot services that need this can get a SiteTracker in IV2, but
+    // all other calls to the regular getSiteTracker() are going to throw.
+    public SiteTracker getSiteTrackerForSnapshot();
+
+    public void setNumberOfPartitions(int m_newPartitionCount);
+
+    public void forceAllDRNodeBuffersToDisk();
+
 }

@@ -38,8 +38,6 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
 
-import com.google_voltpatches.common.primitives.Longs;
-
 /**
  * A system procedure for validating that the rows at every partition hash correctly when hashed with the
  * hash function stored at the MPI. Optionally you can supply your own hash function which is useful
@@ -78,20 +76,21 @@ public class ValidatePartitioning extends VoltSystemProcedure {
     {
         if (fragmentId == SysProcFragmentId.PF_validatePartitioning) {
 
+            List<Table> normalTables = CatalogUtil.getNormalTables(context.getDatabase(), false);
+            int nTables = normalTables.size();
+            long tableIds[] = new long[nTables];
+            String tableNames[] = new String[nTables];
+            int ii = 0;
+            for (Table t : normalTables) {
+                tableIds[ii] = t.getRelativeIndex();
+                tableNames[ii] = t.getTypeName();
+                ++ii;
+            }
             final VoltTable results = constructPartitioningResultsTable();
-            List<Integer> tableIds = new ArrayList<Integer>();
-            List<String> tableNames = new ArrayList<String>();
-            for (Table t : CatalogUtil.getNormalTables(context.getDatabase(), false)) {
-                tableIds.add(t.getRelativeIndex());
-                tableNames.add(t.getTypeName());
-            }
-            long mispartitionedCounts[] = context.getSiteProcedureConnection().validatePartitioning(
-                    Longs.toArray(tableIds), (Integer)params.toArray()[0], (byte[])params.toArray()[1]);
+            context.validatePartitioning(results, tableIds, tableNames,
+                    (Integer)params.toArray()[0], (byte[])params.toArray()[1]);
 
-            for (int ii = 0; ii < tableNames.size(); ii++) {
-                results.addRow(context.getHostId(), CoreUtils.getSiteIdFromHSId(context.getSiteId()), context.getPartitionId(), tableNames.get(ii), mispartitionedCounts[ii]);
-            }
-            return new DependencyPair( DEP_validatePartitioning, results);
+            return new DependencyPair(DEP_validatePartitioning, results);
 
         } else if (fragmentId == SysProcFragmentId.PF_validatePartitioningResults) {
 

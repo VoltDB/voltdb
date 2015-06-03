@@ -119,11 +119,12 @@ public class SnapshotSaveAPI
      */
     public VoltTable startSnapshotting(
             final String file_path, final String file_nonce, final SnapshotFormat format, final byte block,
-            final long multiPartTxnId, final long partitionTxnId, final long legacyPerPartitionTxnIds[],
+            final long multiPartTxnId, final long legacyPerPartitionTxnIds[],
             final String data, final SystemProcedureExecutionContext context, final String hostname,
             final HashinatorSnapshotData hashinatorData,
             final long timestamp)
     {
+        final SiteSnapshotConnection snapshotContext = context.getSiteSnapshotConnection();
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
         final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
@@ -173,7 +174,6 @@ public class SnapshotSaveAPI
                             result,
                             exportSequenceNumbers,
                             drTupleStreamInfo,
-                            context.getSiteTrackerForSnapshot(),
                             hashinatorData,
                             timestamp);
                 }
@@ -186,8 +186,9 @@ public class SnapshotSaveAPI
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateSequenceNumbersForExecutionSite(context);
+            long partitionTxnId = snapshotContext.getSpHandleForSnapshotDigest();
             Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
-            SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId));
+            SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + partitionId);
             m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
         }
 
@@ -235,7 +236,7 @@ public class SnapshotSaveAPI
                         }
                     }
                     else {
-                        context.getSiteSnapshotConnection().initiateSnapshots(
+                        snapshotContext.initiateSnapshots(
                                 format,
                                 taskList,
                                 multiPartTxnId,
@@ -259,7 +260,7 @@ public class SnapshotSaveAPI
                                 }
 
                                 assert deferredSnapshotSetup != null;
-                                context.getSiteSnapshotConnection().startSnapshotWithTargets(
+                                snapshotContext.startSnapshotWithTargets(
                                         deferredSnapshotSetup.getPlan().getSnapshotDataTargets());
                             }
                         }, CoreUtils.SAMETHREADEXECUTOR);
@@ -311,7 +312,7 @@ public class SnapshotSaveAPI
                     failures.add(deferredSnapshotSetup.getError());
                 }
 
-                failures.addAll(context.getSiteSnapshotConnection().completeSnapshotWork());
+                failures.addAll(snapshotContext.completeSnapshotWork());
                 SnapshotSiteProcessor.runPostSnapshotTasks(context);
             } catch (Exception e) {
                 status = "FAILURE";
@@ -459,7 +460,6 @@ public class SnapshotSaveAPI
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
-            SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
     {
@@ -490,6 +490,8 @@ public class SnapshotSaveAPI
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
+        SiteSnapshotConnection snapshotContext = context.getSiteSnapshotConnection();
+        SiteTracker tracker = snapshotContext.getSiteTrackerForSnapshot();
         final Callable<Boolean> deferredSetup = plan.createSetup(file_path, file_nonce, txnId,
                 partitionTransactionIds, remoteDCLastIds, jsData, context, result, exportSequenceNumbers, drTupleStreamInfo,
                 tracker, hashinatorData, timestamp);

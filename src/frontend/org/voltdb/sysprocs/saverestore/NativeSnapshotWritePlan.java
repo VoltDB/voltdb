@@ -207,7 +207,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     @Override
                     public void run()
                     {
-                        context.forceAllDRNodeBuffersToDisk(false);
+                        context.getSiteSnapshotConnection().forceAllDRNodeBuffersToDisk();
                     }
                 });
 
@@ -220,8 +220,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 SnapshotDataTarget target = m_createdTargets.get(task.m_table.getRelativeIndex());
                 if (target == null) {
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
-                            context.getHostId(), context.getCluster().getTypeName(),
-                            context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
+                            context.getHostId(), context.getNumberOfPartitions(),
                             tracker, timestamp, numTables, snapshotRecord);
                     m_createdTargets.put(task.m_table.getRelativeIndex(), target);
                 }
@@ -235,8 +234,6 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                         Table table,
                                                         long txnId,
                                                         int hostId,
-                                                        String clusterName,
-                                                        String databaseName,
                                                         int partitionCount,
                                                         SiteTracker tracker,
                                                         long timestamp,
@@ -255,8 +252,6 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
         sdt = new DefaultSnapshotDataTarget(saveFilePath,
                 hostId,
-                clusterName,
-                databaseName,
                 table.getTypeName(),
                 partitionCount,
                 table.getIsreplicated(),

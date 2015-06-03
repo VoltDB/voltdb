@@ -30,7 +30,6 @@ import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.BackendTarget;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -142,7 +141,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     private class Connection {
         private Socket m_socket = null;
         private SocketChannel m_socketChannel = null;
-        Connection(BackendTarget target, int port) {
+        Connection(boolean targetIsIPC, int port) {
             boolean connected = false;
             int retries = 0;
             while (!connected) {
@@ -170,7 +169,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                         System.exit(-1);
                     }
                 }
-                if (!connected && retries == 1 && target == BackendTarget.NATIVE_EE_IPC) {
+                if (!connected && retries == 1 && targetIsIPC) {
                     System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
                     System.out.println("Press Enter after you have started the EE process to initiate the connection to the EE");
                     try {
@@ -596,7 +595,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
-            final BackendTarget target,
+            final boolean targetIsIPC,
             final int port,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream) {
@@ -609,7 +608,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_hostId = hostId;
         m_hostname = hostname;
         // m_fser = new FastSerializer(false, false);
-        m_connection = new Connection(target, port);
+        m_connection = new Connection(targetIsIPC, port);
 
         // voltdbipc assumes host byte order everywhere
         // Arbitrarily set to 20MB when 10MB crashed for an arbitrarily scaled unit test.
@@ -1286,12 +1285,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction,
+    public void exportAction(
             long ackOffset, long seqNo, int partitionId, String mTableSignature) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
-            m_data.putInt(syncAction ? 1 : 0);
+            m_data.putInt(1); // syncAction always 1
             m_data.putLong(ackOffset);
             m_data.putLong(seqNo);
             if (mTableSignature == null) {
@@ -1309,7 +1308,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             results.flip();
             long result_offset = results.getLong();
             if (result_offset < 0) {
-                System.out.println("exportAction failed!  syncAction: " + syncAction + ", ackTxnId: " +
+                System.out.println("exportAction failed! ackTxnId: " +
                     ackOffset + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + mTableSignature);
             }
