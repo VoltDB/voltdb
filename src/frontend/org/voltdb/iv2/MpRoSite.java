@@ -450,7 +450,7 @@ public class MpRoSite implements Runnable, SystemProcedureExecutionContext, AdHo
     @Override
     public TheHashinator getCurrentHashinator()
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        return null;
     }
 
     @Override
