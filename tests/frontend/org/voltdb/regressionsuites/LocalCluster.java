@@ -887,7 +887,7 @@ public class LocalCluster implements VoltServerConfig {
             // write output to obj/release/testoutput/<test name>-n.txt
             // this may need to be more unique? Also very useful to just
             // set this to a hardcoded path and use "tail -f" to debug.
-            String testoutputdir = rejoinCmdLn.buildDir() + File.separator + "testoutput";
+            String testoutputdir = System.getenv("JUNIT_TESTOUTPUT_DIR");
             // make sure the directory exists
             File dir = new File(testoutputdir);
             if (dir.exists()) {
