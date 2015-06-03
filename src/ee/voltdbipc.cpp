@@ -594,13 +594,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
         m_exceptionBuffer = new char[MAX_MSG_SZ];
-        ::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
-        ::memset(m_exceptionBuffer, 0, MAX_MSG_SZ);
+//        ::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
+//        ::memset(m_exceptionBuffer, 0, MAX_MSG_SZ);
         m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
-        ::memset(m_tupleBuffer, 0, MAX_MSG_SZ);
+//        ::memset(m_tupleBuffer, 0, MAX_MSG_SZ);
 
         if (m_engine->initialize(cs->clusterId,
                                  cs->siteId,
@@ -762,9 +762,9 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     if (errors == 0) {
         // write the results array back across the wire
         const int32_t size = m_engine->getResultsSize();
-        char *resultBuffer = m_engine->getReusedResultBuffer();
-        resultBuffer[0] = kErrorCode_Success;
-        writeOrDie(m_fd, (unsigned char*)resultBuffer, size);
+        char *resultsBuffer = m_engine->getReusedResultBuffer();
+        resultsBuffer[0] = kErrorCode_Success;
+        writeOrDie(m_fd, (unsigned char*)resultsBuffer, size);
     } else {
         sendException(kErrorCode_Error);
     }
@@ -1518,10 +1518,16 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
     try {
         execute_task *task = (execute_task*)cmd;
         voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
-        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
         m_engine->executeTask(taskId, task->task);
         int32_t responseLength = m_engine->getResultsSize();
         char *resultsBuffer = m_engine->getReusedResultBuffer();
+        if (responseLength == 0) {
+            cout << "executeTask got 0 response length" << std::endl;
+        } else {
+            cout << "executeTask got " << responseLength << " bytes" << std::endl;
+        }
+        resultsBuffer[0] = kErrorCode_Success;
         writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
     } catch (const FatalException& e) {
         crashVoltDB(e);

@@ -46,10 +46,13 @@ public:
     /** Set the total number of bytes used (for rejoin/recover) */
     void setBytesUsed(size_t count) {
         assert(m_uso == 0);
+        assert(count >= 8);
         StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
         // Valgrind needs the newly created block to be initialized
         // Leaving the last 8 bytes for MAGIC_HEADER_SPACE_FOR_JAVA
-        ::memset(sb->rawPtr(), 0, (count-8));
+        if (count > 8) {
+//            ::memset(sb->rawPtr(), 0, (count-8));
+        }
         ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
                                 m_generation, m_partitionId, m_signature, sb, false, false);
         delete sb;
