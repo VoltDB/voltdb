@@ -36,10 +36,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google_voltpatches.common.base.Charsets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.AgreementSite;
@@ -153,6 +155,32 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    /**
+     * Stores the information about the host's IP.
+     */
+    private static class HostInfo {
+        final String m_hostIp;
+
+        public HostInfo(String hostIp) {
+            m_hostIp = hostIp;
+        }
+
+        public byte[] toBytes() throws JSONException
+        {
+            final JSONStringer js = new JSONStringer();
+            js.object();
+            js.key("hostIp").value(m_hostIp);
+            js.endObject();
+            return js.toString().getBytes(Charsets.UTF_8);
+        }
+
+        public static HostInfo fromBytes(byte[] bytes) throws JSONException
+        {
+            final JSONObject obj = new JSONObject(new String(bytes, Charsets.UTF_8));
+            return new HostInfo(obj.getString("hostIp"));
         }
     }
 
@@ -395,8 +423,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * Store all the hosts and host ids here so that waitForGroupJoin
              * knows the size of the mesh. This part only registers this host
              */
-            byte hostInfoBytes[] = m_config.coordinatorIp.toString().getBytes("UTF-8");
-            m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString());
+            m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
     }
@@ -711,18 +739,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * Publish the address of this node to ZK as seen by the leader
          * Also allows waitForGroupJoin to know the number of nodes in the cluster
          */
-        byte hostInfoBytes[];
+        HostInfo hostInfo;
         if (m_config.internalInterface.isEmpty()) {
-            InetSocketAddress addr =
-                new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort);
-            hostInfoBytes = addr.toString().getBytes("UTF-8");
+            hostInfo = new HostInfo(new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort).toString());
         } else {
-            InetSocketAddress addr =
-                new InetSocketAddress(m_config.internalInterface, m_config.internalPort);
-            hostInfoBytes = addr.toString().getBytes("UTF-8");
+            hostInfo = new HostInfo(new InetSocketAddress(m_config.internalInterface, m_config.internalPort).toString());
         }
 
-        m_zk.create(CoreZK.hosts_host + getHostId(), hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
     }
 
     /**
