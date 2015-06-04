@@ -22,6 +22,7 @@
 #include "catalog/table.h"
 #include "catalog/index.h"
 #include "storage/persistenttable.h"
+#include "storage/streamedtable.h"
 
 namespace catalog {
 class Database;
@@ -30,6 +31,7 @@ class Database;
 namespace voltdb {
 class Table;
 class PersistentTable;
+class StreamedTable;
 class Pool;
 class ExecutorContext;
 class TupleSchema;
@@ -109,6 +111,10 @@ class TableCatalogDelegate : public CatalogDelegate {
 
     PersistentTable *getPersistentTable() {
         return dynamic_cast<PersistentTable *> (m_table);
+    }
+
+    StreamedTable *getStreamedTable() {
+        return dynamic_cast<StreamedTable *> (m_table);
     }
 
     void setTable(Table * tb) {

@@ -77,6 +77,7 @@
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/MaterializedViewMetadata.h"
+#include "storage/ExportMaterializedViewMetadata.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
@@ -965,6 +966,43 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             if (tcd->exportEnabled()) {
                 tcd->getTable()->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 m_exportingTables[catalogTable->signature()] = tcd->getTable();
+                StreamedTable *streamedtable = dynamic_cast<StreamedTable *>(tcd->getTable());
+                //Deal with views if we have
+                std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+                std::vector<ExportMaterializedViewMetadata*> survivingViews;
+                std::vector<ExportMaterializedViewMetadata*> obsoleteViews;
+
+                const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
+
+                streamedtable->segregateMaterializedViews(views.begin(), views.end(),
+                                                            survivingInfos, survivingViews,
+                                                            obsoleteViews);
+
+                for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+                    catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
+                    StreamedTable* oldTargetTable = survivingViews[ii]->targetTable();
+                    // Use the now-current definiton of the target table, to be updated later, if needed.
+                    TableCatalogDelegate* targetDelegate =
+                        dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
+                                                                            m_delegatesByName));
+                    StreamedTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+                    if (targetDelegate) {
+                        StreamedTable* newTargetTable =
+                            dynamic_cast<StreamedTable*>(targetDelegate->getTable());
+                        if (newTargetTable) {
+                            targetTable = newTargetTable;
+                        }
+                    }
+                    // This is not a leak -- the view metadata is self-installing into the new table.
+                    // Also, it guards its targetTable from accidental deletion with a refcount bump.
+                    new ExportMaterializedViewMetadata(streamedtable, targetTable, currInfo);
+                    obsoleteViews.push_back(survivingViews[ii]);
+                }
+
+                BOOST_FOREACH (ExportMaterializedViewMetadata * toDrop, obsoleteViews) {
+                    streamedtable->dropMaterializedView(toDrop);
+                }
+
             }
         }
         else {
@@ -998,6 +1036,42 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 }
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
+
+                //Deal with views if we have
+                std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+                std::vector<ExportMaterializedViewMetadata*> survivingViews;
+                std::vector<ExportMaterializedViewMetadata*> obsoleteViews;
+
+                const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
+
+                streamedtable->segregateMaterializedViews(views.begin(), views.end(),
+                                                            survivingInfos, survivingViews,
+                                                            obsoleteViews);
+
+                for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+                    catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
+                    StreamedTable* oldTargetTable = survivingViews[ii]->targetTable();
+                    // Use the now-current definiton of the target table, to be updated later, if needed.
+                    TableCatalogDelegate* targetDelegate =
+                        dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
+                                                                            m_delegatesByName));
+                    StreamedTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+                    if (targetDelegate) {
+                        StreamedTable* newTargetTable =
+                            dynamic_cast<StreamedTable*>(targetDelegate->getTable());
+                        if (newTargetTable) {
+                            targetTable = newTargetTable;
+                        }
+                    }
+                    // This is not a leak -- the view metadata is self-installing into the new table.
+                    // Also, it guards its targetTable from accidental deletion with a refcount bump.
+                    new ExportMaterializedViewMetadata(streamedtable, targetTable, currInfo);
+                    obsoleteViews.push_back(survivingViews[ii]);
+                }
+
+                BOOST_FOREACH (ExportMaterializedViewMetadata * toDrop, obsoleteViews) {
+                    streamedtable->dropMaterializedView(toDrop);
+                }
                 continue;
             }
 
@@ -1393,6 +1467,20 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
                 // table if it has been removed from the catalog
                 boost::shared_ptr<ExecutorVector> nullPtr;
                 srcPTable->swapPurgeExecutorVector(nullPtr);
+            }
+        }
+        //Do streamed table
+        StreamedTable *ssrcPTable = dynamic_cast<StreamedTable*>(srcTable);
+        if (ssrcPTable != NULL) {
+            // walk views
+            BOOST_FOREACH (LabeledView labeledView, srcCatalogTable->views()) {
+                catalog::MaterializedViewInfo *catalogView = labeledView.second;
+                const catalog::Table *destCatalogTable = catalogView->dest();
+                StreamedTable *destTable = dynamic_cast<StreamedTable*>(m_tables[destCatalogTable->relativeIndex()]);
+                assert(destTable);
+                // Either connect source and destination tables with a new link...
+                // Or Ensure that the materialized view is using the latest version of the target table.
+                ssrcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
             }
         }
     }
