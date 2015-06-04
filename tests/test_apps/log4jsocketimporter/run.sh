@@ -32,12 +32,12 @@ LICENSE="$VOLTDB_VOLTDB/license.xml"
 
 # remove build artifacts
 function clean() {
-    rm -rf classes debugoutput $APPNAME-client.jar voltdbroot log
+    rm -rf classes debugoutput $APPNAME-client.jar voltdbroot log felix-cache
 }
 
 # compile the source code for client
 function buildclient() {
-    mkdir -p classes/client
+    mkdir -p classes
     javac -classpath $CLASSPATH -d classes \
         src/$APPNAME/*.java
     # stop if compilation fails
@@ -50,6 +50,7 @@ function buildclient() {
 
 # Initialize the application by loading the procedures and table defns
 function init() {
+    buildclient
     sqlcmd < ddl.sql
     if [ $? != 0 ]; then exit; fi
 }
@@ -60,20 +61,14 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H localhost
 }
 
-# run socket listener
-function socketlistener() {
-    buildclient
-    java -classpath $CLASSPATH:$APPNAME-client.jar $APPNAME.Log4jImporter 6060 localhost
-}
-
-function logger() {
+function testclient() {
     buildclient
     java -classpath $CLASSPATH:$APPNAME-client.jar -Dlog4j.configuration=file://$LOG4J \
-        $APPNAME.LogGenerator
+        $APPNAME.LogTestClient localhost
 }
 
 function help() {
-    echo "Usage: ./run.sh {server|init|socketlistener|logger|clean}"
+    echo "Usage: ./run.sh {server|init|testclient|clean}"
 }
 
 # Run the target passed as the first arg on the command line

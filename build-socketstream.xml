@@ -5,19 +5,38 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
+    <target name="buildbundles" depends="socketstream, log4jsocketimporter"/>
+
+    <target name="socketstream">
+        <antcall target="osgibundle">
+	    <param name="bundle.name" value="socketstream"/>
+	    <param name="activator" value="org.voltdb.importclient.SocketStreamImporter"/>
+	    <param name="bundle.displayname" value="SocketStreamImporter"/>
+            <param name="include.classpattern" value="SocketStream*.class"/>
+        </antcall>
+    </target>
+
+    <target name="log4jsocketimporter">
+        <antcall target="osgibundle">
+	    <param name="bundle.name" value="log4jsocketimporter"/>
+	    <param name="activator" value="org.voltdb.importclient.Log4jSocketHandlerImporter"/>
+	    <param name="bundle.displayname" value="Log4jSocketImporter"/>
+            <param name="include.classpattern" value="Log4jSocket*.class"/>
+        </antcall>
+    </target>
+
     <!-- regular build compile will compile the classes -->
-    <target name="socketstream.jar">
+    <target name="osgibundle">
         <mkdir dir="${bundles.dir}" />
-        <jar destfile="${bundles.dir}//${ant.project.name}.jar" basedir="${build.prod.dir}">
-            <include name="org/voltdb/importclient/SocketStreamImporter.class"/>
-            <include name="org/voltdb/importclient/SocketStreamImporter$ClientConnectionHandler.class"/>
+        <jar destfile="${bundles.dir}//${bundle.name}.jar" basedir="${build.prod.dir}">
+            <include name="org/voltdb/importclient/${include.classpattern}"/>
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.SocketStreamImporter" />
+                <attribute name="Bundle-Activator" value="${activator}" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
-                <attribute name="Bundle-Name" value="SocketStream OSGi Bundle" />
-                <attribute name="Bundle-SymbolicName" value="SocketStreamImporter" />
+                <attribute name="Bundle-Name" value="${bundle.displayname} OSGi Bundle" />
+                <attribute name="Bundle-SymbolicName" value="${bundle.displayname}" />
                 <attribute name="Bundle-Version" value="1.0.0" />
-                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer" />
+                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.apache.log4j,org.voltdb.importer,org.voltcore.network" />
             </manifest>
         </jar>
     </target>

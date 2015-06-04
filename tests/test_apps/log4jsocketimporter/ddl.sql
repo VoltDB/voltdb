@@ -11,3 +11,6 @@ CREATE TABLE log_events
 );
 
 PARTITION TABLE log_events ON COLUMN log_event_host;
+
+LOAD CLASSES log4jsocketimporter-client.jar;
+CREATE PROCEDURE FROM CLASS log4jsocketimporter.FetchLogRowsProcedure;
