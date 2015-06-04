@@ -106,7 +106,7 @@ function init() {
 
 # wait for backgrounded server to start up
 function wait_for_startup() {
-    until sqlcmd  --query=' exec @SystemInformation, OVERVIEW;' > /dev/null 2>&1
+    until echo "exec @SystemInformation, OVERVIEW;" | sqlcmd > /dev/null 2>&1
     do
         sleep 2
         echo " ... Waiting for VoltDB to start"
