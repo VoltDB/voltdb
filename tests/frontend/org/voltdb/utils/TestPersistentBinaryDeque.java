@@ -36,14 +36,16 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.google_voltpatches.common.collect.Sets;
 import junit.framework.Assert;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+
+import com.google_voltpatches.common.collect.Sets;
 
 public class TestPersistentBinaryDeque {
 
@@ -158,19 +160,26 @@ public class TestPersistentBinaryDeque {
 
         for (long ii = 0; ii < 96; ii++) {
             BBContainer cont = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            assertNotNull(cont);
-            assertEquals(cont.b().remaining(), 1024 * 1024 * 2);
-            while (cont.b().remaining() > 15) {
-                assertEquals(cont.b().getLong(), ii);
-                cont.b().getLong();
+            try {
+                assertNotNull(cont);
+                assertEquals(cont.b().remaining(), 1024 * 1024 * 2);
+                while (cont.b().remaining() > 15) {
+                    assertEquals(ii, cont.b().getLong());
+                    cont.b().getLong();
+                }
+            } catch (Throwable t) {
+                System.err.println("Something threw");
+                t.printStackTrace();
+                throw t;
+            } finally {
+                cont.discard();
             }
-            cont.discard();
         }
     }
 
     @Test
-    public void testTruncatorWithEmptyBufferReturn() throws Exception {
-        System.out.println("Running testTruncatorWithEmptyBufferReturn");
+    public void testTruncatorWithFullTruncateReturn() throws Exception {
+        System.out.println("Running testTruncatorWithFullTruncateReturn");
         assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
         for (int ii = 0; ii < 150; ii++) {
@@ -214,6 +223,8 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
         }
 
+        long actualSizeInBytes = 0;
+        long reportedSizeInBytes = m_pbd.sizeInBytes();
         long blocksFound = 0;
         BBContainer cont = null;
         while ((cont = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
@@ -223,6 +234,7 @@ public class TestPersistentBinaryDeque {
                     blocksFound++;//white lie, so we expect the right block contents
                 }
                 assertEquals(buffer.remaining(), 1024 * 1024 * 2);
+                actualSizeInBytes += buffer.remaining();
                 while (buffer.remaining() > 15) {
                     assertEquals(buffer.getLong(), blocksFound);
                     buffer.getLong();
@@ -278,6 +290,8 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
         }
 
+        long actualSizeInBytes = 0;
+        long reportedSizeInBytes = m_pbd.sizeInBytes();
         long blocksFound = 0;
         BBContainer cont = null;
         while ((cont = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
@@ -288,6 +302,7 @@ public class TestPersistentBinaryDeque {
                 } else {
                     assertEquals(buffer.remaining(), 1024 * 1024 * 2);
                 }
+                actualSizeInBytes += buffer.remaining();
                 while (buffer.remaining() > 15) {
                     assertEquals(buffer.getLong(), blocksFound);
                     buffer.getLong();
@@ -393,8 +408,6 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer(defaultContainer());
             assertFalse(m_pbd.isEmpty());
         }
-        //Compression results in a weird magic number
-        assertEquals( 1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
         File files[] = TEST_DIR.listFiles();
         assertEquals( 3, files.length);
 
@@ -406,7 +419,6 @@ public class TestPersistentBinaryDeque {
         pushContainers[1] = DBBPool.dummyWrapBB(buffer2);
 
         m_pbd.push(pushContainers);
-        assertEquals( 1024 * 1024 * 2 * 98, m_pbd.sizeInBytes());
 
         //Expect this to create a single new file
         TreeSet<String> names = getSortedDirectoryListing();
@@ -422,14 +434,11 @@ public class TestPersistentBinaryDeque {
             buffer1.clear();
             System.err.println(Long.toHexString(buffer1.getLong(0)) + " " + Long.toHexString(retval1.b().getLong(0)));
             assertEquals(retval1.b(), buffer1);
-            assertEquals(1024 * 1024 * 2 * 97, m_pbd.sizeInBytes());
 
             BBContainer retval2 = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             try {
                 buffer2.clear();
                 assertEquals(retval2.b(), buffer2);
-                assertEquals(1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
-
 
                 //Expect the file for the two polled objects to still be there
                 //until the discard
@@ -442,8 +451,6 @@ public class TestPersistentBinaryDeque {
         } finally {
             retval1.discard();
         }
-
-        assertEquals(1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
 
         names = getSortedDirectoryListing();
         assertEquals( 3, names.size());
@@ -458,7 +465,6 @@ public class TestPersistentBinaryDeque {
             retval.discard();
         }
 
-        assertEquals( 0, m_pbd.sizeInBytes());
         assertTrue(m_pbd.isEmpty());
 
         //Expect just the current write segment
@@ -691,8 +697,11 @@ public class TestPersistentBinaryDeque {
         for (int ii = 0; ii < 192; ii++) {
             ByteBuffer defaultBuffer = getFilledBuffer(ii);
             BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            assertTrue(defaultBuffer.equals(retval.b()));
-            retval.discard();
+            try {
+                assertTrue(defaultBuffer.equals(retval.b()));
+            } finally {
+                retval.discard();
+            }
             defaultBuffer.clear();
         }
 
@@ -746,8 +755,11 @@ public class TestPersistentBinaryDeque {
         for (int ii = 0; ii < 10; ii++) {
             ByteBuffer defaultBuffer = getFilledSmallBuffer(ii);
             BBContainer retval = small_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            assertTrue(defaultBuffer.equals(retval.b()));
-            retval.discard();
+            try {
+                assertTrue(defaultBuffer.equals(retval.b()));
+            } finally {
+                retval.discard();
+            }
             defaultBuffer.clear();
         }
         small_pbd.sync();
