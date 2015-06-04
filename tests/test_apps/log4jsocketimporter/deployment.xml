@@ -5,7 +5,7 @@
         <jsonapi enabled="true" />
     </httpd>
     <import>
-        <configuration module="file:/Users/manjujames/workspaces/voltdb/tests/test_apps/log4jsocketimporter/../../../bundles/log4jsocketimporter.jar" type="custom" enabled="true">
+        <configuration module="file:../../../bundles/log4jsocketimporter.jar" type="custom" enabled="true">
             <property name="port">6060</property>
             <property name="log-event-table">log_events</property>
         </configuration>

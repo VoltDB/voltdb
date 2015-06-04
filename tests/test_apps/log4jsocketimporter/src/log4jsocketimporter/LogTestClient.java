@@ -23,7 +23,9 @@
 
 package log4jsocketimporter;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,17 +36,11 @@ import org.apache.log4j.Logger;
 
 /**
  * Starts multiple threads logging to log4j.
- *
+ * The log statements are of the form "<timetakenMillis>" to make it easy to use this in a demo app.
+ * Also starts a input reader loop that calculates some operation time statistics based on user input.
  */
-public class LogGenerator
+public class LogTestClient
 {
-    private static final Logger[] s_loggers= {
-        Logger.getLogger("blue"),
-        Logger.getLogger("black"),
-        Logger.getLogger("yellow"),
-        Logger.getLogger("green")
-    };
-
     public static void main(String[] args) throws IOException
     {
         // start 10 threads that log
@@ -54,13 +50,39 @@ public class LogGenerator
         for (int i=0; i<numThreads; i++) {
             executor.submit(new LoggingRunnable(i));
         }
+
+        LogAnalyzer analyzer = new LogAnalyzer(args.length==0 ? "localhost" : args[0]);
+
+        // Read user input and get statistics on operations
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        while(true) {
+            System.out.print("Enter operation to analyze or Exit/Quit to quit: ");
+            String input = reader.readLine();
+            if (input.equalsIgnoreCase("exit") || input.equalsIgnoreCase("quit")) {
+                break;
+            }
+            analyzer.analyzeOperation(input);
+        }
+
+        System.exit(0);
     }
 
+    /**
+     * Runnable that generates logs in different categories and with different messages.
+     */
     private static class LoggingRunnable implements Runnable
     {
         private static final Level[] levels =
-            { Level.ALL, Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.OFF, Level.TRACE, Level.WARN };
+            { Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.TRACE, Level.WARN };
 
+        private static final OperationInfo[] s_operations = {
+            new OperationInfo(Logger.getLogger("xs"), 25, 10),
+            new OperationInfo(Logger.getLogger("small"), 100, 40),
+            new OperationInfo(Logger.getLogger("medium"), 500, 100),
+            new OperationInfo(Logger.getLogger("large"), 1000, 300)
+        };
+
+        @SuppressWarnings("unused")
         private final int m_id;
 
         public LoggingRunnable(int id)
@@ -71,18 +93,37 @@ public class LogGenerator
         @Override
         public void run()
         {
-            System.out.println("Thread " + m_id + " starting logging...");
             Random random = new Random();
             int count = 0;
             while (true) {
-                Logger logger = s_loggers[random.nextInt(s_loggers.length)];
+                /*
                 String msg = String.format("From logger %d - Count %d", m_id, count++);
                 if (count%5==0) {
                     logger.log(levels[random.nextInt(levels.length)], msg, new Exception("test exception from " + m_id));
                 } else {
-                    logger.log(levels[random.nextInt(levels.length)], msg);
-                }
+                */
+                // About 20% of the time, generate times that go over the threshold
+                boolean exceedThreshold = random.nextInt(5)==0;
+                OperationInfo op = s_operations[count%s_operations.length];
+                int opTimeTaken = exceedThreshold ? (op.thresholdTime + random.nextInt(op.timeDelta)) : random.nextInt(op.thresholdTime);
+                op.logger.log(levels[random.nextInt(levels.length)], opTimeTaken);
+                //}
+                count++;
             }
+        }
+    }
+
+    private static class OperationInfo
+    {
+        final Logger logger;
+        final int thresholdTime;
+        final int timeDelta;
+
+        public OperationInfo(Logger logger, int thresholdTime, int timeDelta)
+        {
+            this.logger = logger;
+            this.thresholdTime = thresholdTime;
+            this.timeDelta = timeDelta;
         }
     }
 }

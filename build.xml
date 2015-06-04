@@ -886,7 +886,7 @@ JAR BUILDING
     </ant>
 </target>
 <target name="importbundles" depends="compile, buildinfo">
-    <ant antfile="build-socketstream.xml" target="buildbundles" inheritAll="false">
+    <ant antfile="build-importers.xml" target="buildbundles" inheritAll="false">
         <property name="build" value="${build}"/>
     </ant>
 </target>

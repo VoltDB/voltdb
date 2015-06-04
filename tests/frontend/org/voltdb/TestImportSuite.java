@@ -75,7 +75,7 @@ public class TestImportSuite extends RegressionSuite {
         if (socketHandlerInitialized) return;
 
         SocketAppender appender = new SocketAppender("localhost", 6060);
-        appender.setReconnectionDelay(100);
+        appender.setReconnectionDelay(50);
         s_testSocketLogger.setAdditivity(false);
         s_testSocketLogger.removeAllAppenders();
         s_testSocketLogger.setLevel(Level.ALL);
