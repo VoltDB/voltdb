@@ -138,7 +138,7 @@ void SHA1_Transform(uint32_t state[5], const uint8_t buffer[64])
     CHAR64LONG16* block;
 
 #ifdef SHA1HANDSOFF
-    static uint8_t workspace[64];
+    uint8_t workspace[64];
     block = (CHAR64LONG16*)workspace;
     memcpy(block, buffer, 64);
 #else
