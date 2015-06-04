@@ -29,9 +29,7 @@ from voltcli import utility
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
-    description = 'Update the log4j configuration.',
-    options = (
-    ),
+    description = 'Update the Log4J configuration.',
     arguments = (
         VOLT.PathArgument('log4j_xml_path', 'the Log4J configuration file', exists=True),
     )
