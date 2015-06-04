@@ -353,48 +353,31 @@ public final class DBBPool {
     private static final NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
             new NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>>();
 
-    /**
-     * Find the closest power of 2 that's larger than or equal to the requested capacity.
-     * @return 0 if the requested capacity is 0, the requested capacity itself if the
-     * next power of 2 overflows, or the next power of 2.
-     */
-    static int roundToClosestPowerOf2(int capacity) {
-        if (capacity == 0) return 0;
-        else if (capacity == 1) return 2;
-
-        final int result = Integer.highestOneBit(capacity - 1) << 1;
-        return result < 0 ? capacity : result;
-    }
-
-    /**
-     * Allocate a DirectByteBuffer from a global lock free pool. The allocated buffer may
-     * have a capacity larger than the requested size. The limit will be set to the requested
-     * size.
+    /*
+     * Allocate a DirectByteBuffer from a global lock free pool
      */
     public static BBContainer allocateDirectAndPool(final Integer capacity) {
-        final int bucket = roundToClosestPowerOf2(capacity);
-        ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(bucket);
+        ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(capacity);
         if (pooledBuffers == null) {
             pooledBuffers = new ConcurrentLinkedQueue<BBContainer>();
-            if (m_pooledBuffers.putIfAbsent(bucket, pooledBuffers) == null) {
-                pooledBuffers = m_pooledBuffers.get(bucket);
+            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) == null) {
+                pooledBuffers = m_pooledBuffers.get(capacity);
             }
         }
 
         BBContainer cont = pooledBuffers.poll();
         if (cont == null) {
-            cont = allocateDirect(bucket);
+            cont = allocateDirect(capacity);
         }
         final BBContainer origin = cont;
         cont = new BBContainer(origin.b()) {
             @Override
             public void discard() {
-                checkDoubleFree();
-                m_pooledBuffers.get(bucket).offer(origin);
+                final ByteBuffer b = checkDoubleFree();
+                m_pooledBuffers.get(b.capacity()).offer(origin);
             }
         };
         cont.b().clear();
-        cont.b().limit(capacity);
         return cont;
     }
 
