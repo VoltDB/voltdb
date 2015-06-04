@@ -20,6 +20,7 @@ package org.voltcore.utils;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.util.concurrent.Callable;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -119,5 +120,78 @@ public final class Bits {
             fc.force(false);
         }
         return syncedBytes;
+    }
+
+    public static Callable<Boolean> rolling_sync_file_range_with_task(final VoltLogger logger, final FileDescriptor fd, final FileChannel fc, final Callable<Boolean> prevWrite, final long syncStart, final long positionAtSync) throws IOException {
+        assert syncStart % Bits.pageSize() == 0;
+        final long syncLength = positionAtSync - syncStart;
+        if (PosixAdvise.SYNC_FILE_RANGE_SUPPORTED) {
+            logger.info("Starting Sync from range " + syncStart + " to " + positionAtSync + " (" + syncLength + " bytes)");
+            final long retval = PosixAdvise.sync_file_range(fd,
+                                                            syncStart,
+                                                            syncLength,
+                                                            PosixAdvise.SYNC_FILE_RANGE_WRITE);
+            if (retval != 0) {
+                logger.error("Error in rolling_sync_file_range_with_wait: " + retval);
+                logger.error(
+                        "Params offset " + syncStart +
+                        " length " + syncLength +
+                        " flags " + PosixAdvise.SYNC_FILE_RANGE_WRITE);
+                fc.force(false);
+            }
+            else {
+                return new Callable<Boolean>() {
+                    @Override
+                    public Boolean call() {
+                        // should not bother calling for the end of the file but just use close
+                        try {
+                            if (prevWrite.call()) {
+                                assert syncLength % Bits.pageSize() == 0;
+                                logger.info("Waiting to complete Sync from range " + syncStart + " to " + positionAtSync + " (" + syncLength + " bytes)");
+                                final long retval2 = PosixAdvise.sync_file_range(fd,
+                                        syncStart,
+                                        syncLength,
+                                        PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                                if (retval2 != 0) {
+                                    logger.error("Error in rolling_sync_file_range_first(2): " + retval2);
+                                    logger.error(
+                                            "Params offset " + syncStart +
+                                            " length " + syncLength +
+                                            " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                                }
+                                else {
+                                    // Note: POSIX_FADV_DONTNEED of a partial page is ignored by the OS
+                                    PosixAdvise.fadvise(fd,
+                                            0,
+                                            positionAtSync,
+                                            PosixAdvise.POSIX_FADV_DONTNEED);
+                                }
+                                return (retval2 == 0);
+                            }
+                            else
+                                return false;
+                        }
+                        catch (Exception e) {
+                            e.printStackTrace();
+                            return false;
+                        }
+                    }
+                };
+            }
+        } else {
+            fc.force(false);
+        }
+        // Fall through if sync_file_range failed
+        PosixAdvise.fadvise(fd,
+                0,
+                positionAtSync,
+                PosixAdvise.POSIX_FADV_DONTNEED);
+        return new Callable<Boolean>() {
+            @Override
+            public Boolean call() {
+                // Since the force has been done in this path and the
+                return false;
+            }
+        };
     }
 }
