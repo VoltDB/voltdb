@@ -126,7 +126,7 @@ public final class Bits {
         assert syncStart % Bits.pageSize() == 0;
         final long syncLength = positionAtSync - syncStart;
         if (PosixAdvise.SYNC_FILE_RANGE_SUPPORTED) {
-            logger.info("Starting Sync from range " + syncStart + " to " + positionAtSync + " (" + syncLength + " bytes)");
+//            logger.info("Starting Sync from range " + syncStart + " to " + positionAtSync + " (" + syncLength + " bytes)");
             final long retval = PosixAdvise.sync_file_range(fd,
                                                             syncStart,
                                                             syncLength,
@@ -147,7 +147,7 @@ public final class Bits {
                         try {
                             if (prevWrite.call()) {
                                 assert syncLength % Bits.pageSize() == 0;
-                                logger.info("Waiting to complete Sync from range " + syncStart + " to " + positionAtSync + " (" + syncLength + " bytes)");
+//                                logger.info("Waiting to complete Sync from range " + syncStart + " to " + positionAtSync + " (" + syncLength + " bytes)");
                                 final long retval2 = PosixAdvise.sync_file_range(fd,
                                         syncStart,
                                         syncLength,
