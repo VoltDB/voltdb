@@ -250,7 +250,7 @@ public class PBDRegularSegment implements PBDSegment {
             m_tmpHeaderBuf.b().clear();
 
             if (compress) {
-                destBuf = DBBPool.allocateDirectAndPool(maxCompressedSize);
+                destBuf = DBBPool.allocateDirect(maxCompressedSize);
                 final int compressedSize = CompressionService.compressBuffer(buf, destBuf.b());
                 destBuf.b().limit(compressedSize);
 
@@ -316,7 +316,7 @@ public class PBDRegularSegment implements PBDSegment {
 
             final DBBPool.BBContainer retcont;
             if (compressed) {
-                final DBBPool.BBContainer compressedBuf = DBBPool.allocateDirectAndPool(length);
+                final DBBPool.BBContainer compressedBuf = DBBPool.allocateDirect(length);
                 try {
                     while (compressedBuf.b().hasRemaining()) {
                         int read = m_fc.read(compressedBuf.b());
