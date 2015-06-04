@@ -13,7 +13,7 @@
         </layout>
     </appender>
     <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
-        <param name="file" value="${build.testoutput.dir}/volt-junit-fulllog.txt"/>
+        <param name="file" value="obj/release/testoutput/volt-junit-fulllog.txt"/>
         <param name="DatePattern" value="'.'yyyy-MM-dd" />
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
