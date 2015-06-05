@@ -93,6 +93,10 @@ public class PBDRegularSegment implements PBDSegment {
     @Override
     public int getNumEntries() throws IOException
     {
+        if (m_numOfEntries != -1 && m_size != -1) {
+            return m_numOfEntries;
+        }
+
         if (m_closed) {
             open(false);
         }
@@ -374,5 +378,12 @@ public class PBDRegularSegment implements PBDSegment {
     public int uncompressedBytesToRead() {
         if (m_closed) throw new RuntimeException("Segment closed");
         return m_size - m_bytesRead;
+    }
+
+    @Override
+    public void updateCountAndSize(int count, int size)
+    {
+        m_numOfEntries = count;
+        m_size = size;
     }
 }
