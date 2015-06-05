@@ -354,4 +354,10 @@ class PBDMMapSegment implements PBDSegment {
         if (m_closed) throw new RuntimeException("closed");
         return Math.max(0, m_buf.b().getInt(SIZE_OFFSET) - m_bytesRead);
     }
+
+    @Override
+    public void updateCountAndSize(int count, int size)
+    {
+        // no-op. This implementation doesn't cache count and size
+    }
 }

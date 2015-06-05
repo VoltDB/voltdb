@@ -570,6 +570,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                         while (numObjectsBuffer.hasRemaining()) {
                                             fc.write(numObjectsBuffer);
                                         }
+                                        segment.updateCountAndSize(ii, sizeInBytes);
                                         fc.truncate(readBuffer.position() - (nextObjectLength + PBDSegment.OBJECT_HEADER_BYTES));
                                     }
                                 } else {
@@ -586,6 +587,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                                     readBuffer.putInt(PBDSegment.COUNT_OFFSET, ii + 1);
                                     readBuffer.putInt(PBDSegment.SIZE_OFFSET, sizeInBytes);
+                                    segment.updateCountAndSize(ii + 1, sizeInBytes);
                                     sizeInBytes += objectSize;
 
                                     /*
