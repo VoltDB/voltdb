@@ -38,7 +38,9 @@ public class ServerThread extends Thread {
 
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
-        m_config.m_pathToLicense = getTestLicensePath();
+        if (m_config.m_pathToLicense == null) {
+            m_config.m_pathToLicense = getTestLicensePath();
+        }
         if (m_config.m_leader == null) {
             m_config.m_leader = "";
         }
@@ -57,7 +59,9 @@ public class ServerThread extends Thread {
         m_config = new VoltDB.Configuration();
         m_config.m_pathToCatalog = pathToCatalog;
         m_config.m_backend = target;
-        m_config.m_pathToLicense = getTestLicensePath();
+        if (m_config.m_pathToLicense == null) {
+            m_config.m_pathToLicense = getTestLicensePath();
+        }
         m_config.m_leader = "";
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
@@ -73,7 +77,9 @@ public class ServerThread extends Thread {
         m_config.m_pathToCatalog = pathToCatalog;
         m_config.m_pathToDeployment = pathToDeployment;
         m_config.m_backend = target;
-        m_config.m_pathToLicense = getTestLicensePath();
+        if (m_config.m_pathToLicense == null) {
+            m_config.m_pathToLicense = getTestLicensePath();
+        }
         m_config.m_leader = "";
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
@@ -107,7 +113,9 @@ public class ServerThread extends Thread {
         m_config.m_pathToCatalog = pathToCatalog;
         m_config.m_pathToDeployment = pathToDeployment;
         m_config.m_backend = target;
-        m_config.m_pathToLicense = getTestLicensePath();
+        if (m_config.m_pathToLicense == null) {
+            m_config.m_pathToLicense = getTestLicensePath();
+        }
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
         m_config.m_internalPort = internalPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
