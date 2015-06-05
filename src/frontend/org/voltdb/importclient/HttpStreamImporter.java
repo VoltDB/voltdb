@@ -20,17 +20,20 @@ package org.voltdb.importclient;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.net.URI;
-import java.util.ArrayList;
+import java.net.URISyntaxException;
+import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.ParseException;
 import org.apache.http.ProtocolException;
 import org.apache.http.annotation.Immutable;
 import org.apache.http.client.methods.HttpGet;
@@ -40,26 +43,40 @@ import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.ContentType;
 import org.apache.http.impl.client.DefaultRedirectStrategy;
+import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.apache.http.impl.nio.client.HttpAsyncClients;
+import org.apache.http.impl.nio.conn.PoolingNHttpClientConnectionManager;
+import org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor;
 import org.apache.http.message.BasicHeader;
+import org.apache.http.nio.reactor.ConnectingIOReactor;
+import org.apache.http.nio.reactor.IOReactorException;
 import org.apache.http.protocol.HttpContext;
+import org.apache.http.util.EntityUtils;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.ImmutableMap;
+
 /**
  * Implement a BundleActivator interface and extend ImportHandlerProxy.
  */
 public class HttpStreamImporter extends ImportHandlerProxy implements BundleActivator {
-    private final static Pattern PERCENT = Pattern.compile("%");
-
+    private static final int HTTP_EXPORT_MAX_CONNS = Integer.getInteger("HTTP_EXPORT_MAX_CONNS", 20);
     public static final Header OctetStreamContentTypeHeader =
             new BasicHeader("Content-Type", ContentType.APPLICATION_OCTET_STREAM.getMimeType());
 
     private Properties m_properties;
-    private ServerSocket m_serverSocket;
+    private CloseableHttpAsyncClient m_client = HttpAsyncClients.createDefault();
+    private PoolingNHttpClientConnectionManager m_connManager = null;
     private String m_procedure;
-    private final ArrayList<ClientConnectionHandler> m_clients = new ArrayList<ClientConnectionHandler>();
+    private URI m_endpoint;
 
     // Register ImportHandlerProxy service.
     @Override
@@ -75,12 +92,8 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
     @Override
     public void stop() {
         try {
-            for (ClientConnectionHandler s : m_clients) {
-                s.stopClient();
-            }
-            m_clients.clear();
-            m_serverSocket.close();
-            m_serverSocket = null;
+            m_client.close();
+            m_connManager.shutdown(60 * 1000);
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -92,7 +105,42 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
      */
     @Override
     public String getName() {
-        return "SocketImporter";
+        return "HttpImporter";
+    }
+
+    /**
+     * Construct an async HTTP client with connection pool.
+     * @throws IOReactorException
+     */
+    private void connect() throws IOReactorException
+    {
+        if (m_connManager == null) {
+            ConnectingIOReactor ioReactor = new DefaultConnectingIOReactor();
+            m_connManager = new PoolingNHttpClientConnectionManager(ioReactor);
+            m_connManager.setMaxTotal(HTTP_EXPORT_MAX_CONNS);
+            m_connManager.setDefaultMaxPerRoute(HTTP_EXPORT_MAX_CONNS);
+        }
+
+        if (m_client == null || !m_client.isRunning()) {
+            HttpAsyncClientBuilder client = HttpAsyncClients.custom().setConnectionManager(m_connManager).
+                    setRedirectStrategy(new HadoopRedirectStrategy());
+            m_client = client.build();
+            m_client.start();
+        }
+    }
+
+    private void makeReadDir() throws PathHandlingException {
+        DecodedStatus status = DecodedStatus.FAIL;
+        try {
+            HttpPut dirMaker = new HttpPut(new URI(m_endpoint.getScheme(), m_endpoint.getAuthority(),
+                    m_endpoint.getPath() + "/TmpReadDir", "op=MKDIRS", m_endpoint.getFragment()));
+            HttpResponse resp = m_client.execute(dirMaker,null).get();
+            status = DecodedStatus.fromResponse(resp);
+            if (status != DecodedStatus.OK) error(status.toString());
+        } catch (InterruptedException|ExecutionException|URISyntaxException e) {
+            //rateLimitedLogError(m_logger, "error creating parent directory for %s %s", path, Throwables.getStackTraceAsString(e));
+            throw new PathHandlingException("error creating parent directory for " + m_endpoint.toString(), e);
+        }
     }
 
     /**
@@ -103,63 +151,21 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
     @Override
     public void configure(Properties p) {
         m_properties = (Properties) p.clone();
-        String s = (String )m_properties.get("port");
+        try {
+            m_endpoint = new URI((String)m_properties.get("endpoint"));
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
         m_procedure = (String )m_properties.get("procedure");
         if (m_procedure == null || m_procedure.trim().length() == 0) {
             throw new RuntimeException("Missing procedure.");
         }
         try {
-            if (m_serverSocket != null) {
-                m_serverSocket.close();
-            }
-            m_serverSocket = new ServerSocket(Integer.parseInt(s));
+            connect();
+            makeReadDir();
         } catch (IOException ex) {
            ex.printStackTrace();
            throw new RuntimeException(ex.getCause());
-        }
-    }
-
-    //This is ClientConnection handler to read and dispatch data to stored procedure.
-    private class ClientConnectionHandler extends Thread {
-        private final Socket m_clientSocket;
-        private final String m_procedure;
-        private final ImportHandlerProxy m_importHandlerProxy;
-
-        public ClientConnectionHandler(ImportHandlerProxy ic, Socket clientSocket, String procedure) {
-            m_importHandlerProxy = ic;
-            m_clientSocket = clientSocket;
-            m_procedure = procedure;
-        }
-
-        @Override
-        public void run() {
-            try {
-                while (true) {
-                    BufferedReader in = new BufferedReader(
-                            new InputStreamReader(m_clientSocket.getInputStream()));
-                    while (true) {
-                        String line = in.readLine();
-                        //You should convert your data to params here.
-                        if (line == null) break;
-                        CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        if (!callProcedure(m_importHandlerProxy, invocation)) {
-                            System.out.println("Inserted failed: " + line);
-                        }
-                    }
-                    m_clientSocket.close();
-                    System.out.println("Client Closed.");
-                }
-            } catch (IOException ioe) {
-                ioe.printStackTrace();
-            }
-        }
-
-        public void stopClient() {
-            try {
-                m_clientSocket.close();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
         }
     }
 
@@ -170,41 +176,131 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
     public void readyForData() {
         try {
             info("Configured and ready with properties: " + m_properties);
-            String procedure = m_properties.getProperty("procedure");
             while (true) {
-                Socket clientSocket = m_serverSocket.accept();
-                ClientConnectionHandler ch = new ClientConnectionHandler(this, clientSocket, procedure);
-                m_clients.add(ch);
-                ch.start();
+                HttpGet checkDir = new HttpGet(new URI(m_endpoint.getScheme(), m_endpoint.getAuthority(),
+                        m_endpoint.getPath(), "op=LISTSTATUS", m_endpoint.getFragment()));
+                HttpResponse resp = m_client.execute(checkDir,null).get();
+                DecodedStatus status = DecodedStatus.fromResponse(resp);
+                if (status != DecodedStatus.OK) error(status.toString());
+                else {
+                    JSONObject result = new JSONObject(EntityUtils.toString(resp.getEntity()));
+                    JSONArray dirList = result.getJSONObject("FileStatuses").getJSONArray("FileStatus");
+                    for(int i=0; i < dirList.length(); i++) {
+                        JSONObject entry = dirList.getJSONObject(i);
+                        if ("FILE".equals(entry.getString("type"))) {
+                            String pathSuffix = entry.getString("pathSuffix");
+                            if (takeImportFile(pathSuffix)) {
+                                String filePath = m_endpoint.getPath() + "/TmpReadDir/" + entry.getString("pathSuffix");
+                                ingestFile(filePath);
+                            }
+                        }
+                    }
+                }
+                Thread.sleep(Integer.parseInt(m_properties.getProperty("delay")) * 1000);
             }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
     }
 
-    /**
-     * Convenient method to check if the given URI string is a WebHDFS URL.
-     * See {@link #isHdfsUri(java.net.URI)} for more.
-     */
-    public static boolean isHdfsUri(String uriStr)
-    {
-        return isHdfsUri(URI.create(PERCENT.matcher(uriStr).replaceAll("")));
+    private Boolean takeImportFile(String pathSuffix) throws PathHandlingException {
+        try {
+            info("m_endpoint.getPath().split('v1')[1] = " + m_endpoint.getPath().split("v1")[1]);
+            HttpPut dirMaker = new HttpPut(new URI(m_endpoint.getScheme(), m_endpoint.getAuthority(),
+                    m_endpoint.getPath() + "/" + pathSuffix, "op=RENAME&destination=" + m_endpoint.getPath().split("v1")[1] +
+                    "/TmpReadDir/" + pathSuffix, m_endpoint.getFragment()));
+            HttpResponse resp = m_client.execute(dirMaker,null).get();
+            DecodedStatus status = DecodedStatus.fromResponse(resp);
+            if (status != DecodedStatus.OK) {
+                error(status.toString());
+                return false;
+            }
+            else {
+                return new JSONObject(EntityUtils.toString(resp.getEntity())).getBoolean("boolean");
+            }
+        } catch (InterruptedException|ExecutionException|URISyntaxException | ParseException | JSONException | IOException e) {
+            //rateLimitedLogError(m_logger, "error creating parent directory for %s %s", path, Throwables.getStackTraceAsString(e));
+            throw new PathHandlingException("error creating parent directory for " + m_endpoint.getPath(), e);
+        }
     }
 
-    /**
-     * Checks if the given URI is a WebHDFS URL. WebHDFS URLs have the form
-     * http[s]://hostname:port/webhdfs/v1/.
-     *
-     * @param endpoint    The URI
-     * @return true if it is a WebHDFS URL, false otherwise.
-     */
-    public static boolean isHdfsUri(URI endpoint)
-    {
-        final String path = endpoint.getPath();
-        if (path != null && path.indexOf('/', 1) != -1) {
-            return path.substring(1, path.indexOf('/', 1)).equalsIgnoreCase("webhdfs");
-        } else {
-            return false;
+    private void ingestFile(String filePath) throws PathHandlingException {
+        try {
+            HttpGet fileRead = new HttpGet(new URI(m_endpoint.getScheme(), m_endpoint.getAuthority(),
+                    filePath, "op=OPEN", m_endpoint.getFragment()));
+            HttpResponse resp = m_client.execute(fileRead,null).get();
+            DecodedStatus status = DecodedStatus.fromResponse(resp);
+            if (status != DecodedStatus.OK) error(status.toString());
+            else {
+                BufferedReader in = new BufferedReader(new InputStreamReader(resp.getEntity().getContent()));
+                while (true) {
+                    String line = in.readLine();
+                    //You should convert your data to params here.
+                    if (line == null) break;
+                    CSVInvocation invocation = new CSVInvocation(m_procedure, line);
+                    if (!callProcedure(this, invocation)) {
+                        System.out.println("Inserted failed: " + line);
+                    }
+                }
+            }
+        } catch (InterruptedException|ExecutionException|URISyntaxException | ParseException | IOException e) {
+            //rateLimitedLogError(m_logger, "error creating parent directory for %s %s", path, Throwables.getStackTraceAsString(e));
+            throw new PathHandlingException("error creating parent directory for " + m_endpoint.getPath(), e);
+        }
+    }
+
+    enum DecodedStatus {
+
+        OK(null),
+        FAIL(null),
+        FILE_NOT_FOUND("FileNotFoundException"),
+        FILE_ALREADY_EXISTS("FileAlreadyExistsException");
+
+        static final Pattern hdfsExceptionRE =
+                Pattern.compile("\"exception\":\"(?<exception>(?:[^\"\\\\]|\\\\.)+)");
+
+        static final Map<String, DecodedStatus> exceptions;
+
+        static {
+            ImmutableMap.Builder<String, DecodedStatus> builder = ImmutableMap.builder();
+            for (DecodedStatus drsp: values()) {
+                if (drsp.exception != null) {
+                    builder.put(drsp.exception, drsp);
+                }
+            }
+            exceptions = builder.build();
+        }
+
+        String exception;
+
+        DecodedStatus(String exception) {
+            this.exception = exception;
+        }
+
+        static DecodedStatus fromResponse(HttpResponse rsp) {
+            if (rsp == null) return FAIL;
+            switch (rsp.getStatusLine().getStatusCode()) {
+            case HttpStatus.SC_OK:
+            case HttpStatus.SC_CREATED:
+            case HttpStatus.SC_ACCEPTED:
+                return OK;
+            case HttpStatus.SC_NOT_FOUND:
+            case HttpStatus.SC_FORBIDDEN:
+                DecodedStatus decoded = FAIL;
+                String msg = "";
+                try {
+                    msg = EntityUtils.toString(rsp.getEntity(), Charsets.UTF_8);
+                } catch (ParseException | IOException e) {
+                    //m_logger.warn("could not load response body to parse error message", e);
+                }
+                Matcher mtc = hdfsExceptionRE.matcher(msg);
+                if (mtc.find() && exceptions.containsKey(mtc.group("exception"))) {
+                    decoded = exceptions.get(mtc.group("exception"));
+                }
+                return decoded;
+            default:
+                return FAIL;
+            }
         }
     }
 
@@ -238,9 +334,7 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
                 HttpPost post = new HttpPost(uri);
                 post.setEntity(((HttpEntityEnclosingRequest) request).getEntity());
                 redirectRequest = post;
-                if (isHdfsUri(uri)) {
-                    redirectRequest.setHeader("Expect", "100-continue");
-                }
+                redirectRequest.setHeader("Expect", "100-continue");
                 if (post.getEntity() == null || post.getEntity().getContentLength() == 0) {
                     post.setHeader(OctetStreamContentTypeHeader);
                 }
@@ -250,9 +344,7 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
                 HttpPut put = new HttpPut(uri);
                 put.setEntity(((HttpEntityEnclosingRequest) request).getEntity());
                 redirectRequest = put;
-                if (isHdfsUri(uri)) {
-                    redirectRequest.setHeader("Expect", "100-continue");
-                }
+                redirectRequest.setHeader("Expect", "100-continue");
                 if (put.getEntity() == null || put.getEntity().getContentLength() == 0) {
                     put.setHeader(OctetStreamContentTypeHeader);
                 }
@@ -262,4 +354,22 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
 
     }
 
+    static public class PathHandlingException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public PathHandlingException(String message, Throwable cause)
+        {
+            super(message, cause);
+        }
+
+        public PathHandlingException(Throwable cause)
+        {
+            super(cause);
+        }
+
+        public PathHandlingException(String message)
+        {
+            super(message);
+        }
+    }
 }

@@ -49,7 +49,12 @@ public class ImportProcessor implements ImportDataProcessor {
         //create properties for osgi
         m_frameworkProps = new HashMap<String, String>();
         //Need this so that ImportContext is available.
-        m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0");
+        m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0," +
+                "org.apache.http;version=1.0.0,org.apache.http.impl;version=1.0.0,org.apache.http.client;version=1.0.0,org.json_voltpatches;version=1.0.0," +
+                "org.apache.http.nio;version=1.0.0,org.apache.http.nio.reactor;version=1.0.0,org.apache.http.nio.conn;version=1.0.0,org.apache.http.impl.nio.client;version=1.0.0," +
+                "org.apache.http.client.methods;version=1.0.0,org.apache.http.message;version=1.0.0,org.apache.http.entity;version=1.0.0,org.apache.http.impl.nio.client;version=1.0.0," +
+                "org.apache.http.impl.nio.reactor;version=1.0.0,org.apache.http.impl.nio.conn;version=1.0.0,org.apache.http.impl.client;version=1.0.0,com.google_voltpatches.common.collect;version=1.0.0," +
+                "org.apache.http.util;version=1.0.0");
         // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
         //m_frameworkProps.put("felix.cache.rootdir", "/tmp"); ?? Should this be under voltdbroot?
         m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();

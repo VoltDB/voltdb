@@ -10,14 +10,18 @@
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}//${ant.project.name}.jar" basedir="${build.prod.dir}">
             <include name="org/voltdb/importclient/HttpStreamImporter.class"/>
-            <include name="org/voltdb/importclient/HttpStreamImporter$ClientConnectionHandler.class"/>
+            <include name="org/voltdb/importclient/HttpStreamImporter$HadoopRedirectStrategy.class"/>
+            <include name="org/voltdb/importclient/HttpStreamImporter$PathHandlingException.class"/>
+            <include name="org/voltdb/importclient/HttpStreamImporter$DecodedStatus.class"/>
             <manifest>
                 <attribute name="Bundle-Activator" value="org.voltdb.importclient.HttpStreamImporter" />
-                <attribute name="Bundle-ManifestVersion" value="1" />
                 <attribute name="Bundle-Name" value="HttpStream Bundle" />
                 <attribute name="Bundle-SymbolicName" value="HttpStreamImporter" />
                 <attribute name="Bundle-Version" value="1.0.0" />
-                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer" />
+                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer,org.apache.http,org.apache.http.impl,org.apache.http.nio,
+                                                        org.apache.http.nio.reactor,org.apache.http.nio.conn,org.apache.http.client,org.apache.http.client.methods,org.apache.http.message,
+                                                        org.apache.http.entity,org.apache.http.impl.nio.client,org.apache.http.impl.nio.reactor,org.apache.http.impl.nio.conn,
+                                                        org.apache.http.impl.client,com.google_voltpatches.common.collect,org.apache.http.util,org.json_voltpatches" />
             </manifest>
         </jar>
     </target>
