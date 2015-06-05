@@ -107,6 +107,21 @@ public class VoltXMLElement {
     /**
      * Given a name, recursively find all the children  with matching name, if any.
      */
+    public List<VoltXMLElement> findChildrenRecursively(String name)
+    {
+        List<VoltXMLElement> retval = new ArrayList<VoltXMLElement>();
+        for (VoltXMLElement vxe : children) {
+            if (name.equals(vxe.name)) {
+                retval.add(vxe);
+            }
+            retval.addAll(vxe.findChildrenRecursively(name));
+        }
+        return retval;
+    }
+
+    /**
+     * Given a name, find all the immediate children  with matching name, if any.
+     */
     public List<VoltXMLElement> findChildren(String name)
     {
         List<VoltXMLElement> retval = new ArrayList<VoltXMLElement>();
@@ -114,7 +129,6 @@ public class VoltXMLElement {
             if (name.equals(vxe.name)) {
                 retval.add(vxe);
             }
-            retval.addAll(vxe.findChildren(name));
         }
         return retval;
     }
