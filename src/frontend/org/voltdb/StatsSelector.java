@@ -49,6 +49,8 @@ public enum StatsSelector {
 
     TOPO,           // return leader and site info for iv2
     REBALANCE,      // return elastic rebalance progress
-    KSAFETY,         // return ksafety coverage information
-    CPU // Return CPU Stats
+    KSAFETY,        // return ksafety coverage information
+    CPU,            // Return CPU Stats
+
+    COMMANDLOG      // return number of outstanding bytes and txns on this node
 }

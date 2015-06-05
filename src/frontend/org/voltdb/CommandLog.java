@@ -92,4 +92,10 @@ public interface CommandLog {
      * If a truncation snapshot is pending, passing false means don't start another one
      */
     public void requestTruncationSnapshot(final boolean queueIfPending);
+
+    /**
+     * Statistics-related interface
+     * Implementation should populate the stats based on column name to index mapping
+     */
+    public void populateCommandLogStats(Map<String, Integer> columnNameToIndex, Object[] rowValues);
 }
