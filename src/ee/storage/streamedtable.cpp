@@ -206,8 +206,6 @@ bool StreamedTable::insertTuple(TableTuple &source)
     if (m_wrapper) {
         // handle any materialized views
         for (int i = 0; i < m_views.size(); i++) {
-//            std::cout << "Updating view" << "\n";
-//            std::cout.flush();
             m_views[i]->processTupleInsert(source, false);
         }
         mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
@@ -238,6 +236,9 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
 {
     size_t mark = 0;
     if (m_wrapper) {
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(tuple, false);
+        }
         mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
                                       m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
