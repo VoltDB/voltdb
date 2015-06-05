@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.Maps;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -93,6 +94,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public String zkInterface = "127.0.0.1:7181";
         public String internalInterface = "";
         public int internalPort = 3021;
+        public String group = "0";
         public int deadHostTimeout = Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
@@ -141,6 +143,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             JSONStringer js = new JSONStringer();
             try {
                 js.object();
+                js.key("group").value(group);
                 js.key("coordinatorip").value(coordinatorIp.toString());
                 js.key("zkinterface").value(zkInterface);
                 js.key("internalinterface").value(internalInterface);
@@ -163,9 +166,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     private static class HostInfo {
         final String m_hostIp;
+        final String m_group;
 
-        public HostInfo(String hostIp) {
+        public HostInfo(String hostIp, String group) {
             m_hostIp = hostIp;
+            m_group = group;
         }
 
         public byte[] toBytes() throws JSONException
@@ -173,6 +178,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             final JSONStringer js = new JSONStringer();
             js.object();
             js.key("hostIp").value(m_hostIp);
+            js.key("group").value(m_group);
             js.endObject();
             return js.toString().getBytes(Charsets.UTF_8);
         }
@@ -180,7 +186,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public static HostInfo fromBytes(byte[] bytes) throws JSONException
         {
             final JSONObject obj = new JSONObject(new String(bytes, Charsets.UTF_8));
-            return new HostInfo(obj.getString("hostIp"));
+            return new HostInfo(obj.getString("hostIp"), obj.getString("group"));
         }
     }
 
@@ -423,7 +429,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * Store all the hosts and host ids here so that waitForGroupJoin
              * knows the size of the mesh. This part only registers this host
              */
-            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString());
+            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString(), m_config.group);
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
@@ -741,9 +747,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          */
         HostInfo hostInfo;
         if (m_config.internalInterface.isEmpty()) {
-            hostInfo = new HostInfo(new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort).toString());
+            hostInfo = new HostInfo(new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort).toString(),
+                                    m_config.group);
         } else {
-            hostInfo = new HostInfo(new InetSocketAddress(m_config.internalInterface, m_config.internalPort).toString());
+            hostInfo = new HostInfo(new InetSocketAddress(m_config.internalInterface, m_config.internalPort).toString(),
+                                    m_config.group);
         }
 
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -752,11 +760,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Wait until all the nodes have built a mesh.
      */
-    public void waitForGroupJoin(int expectedHosts) {
+    public Map<Integer, String> waitForGroupJoin(int expectedHosts) {
+        Map<Integer, String> hostGroups = Maps.newHashMap();
+
         try {
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                final int numChildren = m_zk.getChildren(CoreZK.hosts, fw).size();
+                final List<String> children = m_zk.getChildren(CoreZK.hosts, fw);
+                final int numChildren = children.size();
+
+                for (String child : children) {
+                    final HostInfo info = HostInfo.fromBytes(m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, null));
+                    // HostInfo ZK node name has the form "host#", hence the offset of 4 to skip the "host".
+                    hostGroups.put(Integer.parseInt(child.substring(child.indexOf("host") + 4)), info.m_group);
+                }
 
                 /*
                  * If the target number of hosts has been reached
@@ -783,6 +800,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         } catch (Exception e) {
             org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
         }
+
+        assert hostGroups.size() == expectedHosts;
+        return hostGroups;
     }
 
     public int getHostId() {

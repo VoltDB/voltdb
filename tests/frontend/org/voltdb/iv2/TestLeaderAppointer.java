@@ -33,10 +33,12 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google_voltpatches.common.collect.Maps;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -59,6 +61,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     private final int NUM_AGREEMENT_SITES = 1;
     private ClusterConfig m_config = null;
     private List<Integer> m_hostIds;
+    private Map<Integer, String> m_hostGroups;
     private MpInitiator m_mpi = null;
     private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
@@ -109,8 +112,10 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_config = new ClusterConfig(hostCount, sitesPerHost, replicationFactor);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(m_config.getPartitionCount()));
         m_hostIds = new ArrayList<Integer>();
+        m_hostGroups = Maps.newHashMap();
         for (int i = 0; i < hostCount; i++) {
             m_hostIds.add(i);
+            m_hostGroups.put(i, "0");
         }
         when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
         m_mpi = mock(MpInitiator.class);
@@ -126,7 +131,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                 m_config.getReplicationFactor(), enablePPD,
                 null, false,
-                m_config.getTopology(m_hostIds), m_mpi, stats, false);
+                m_config.getTopology(m_hostGroups), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -274,7 +279,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
                                     null, false,
-                                    m_config.getTopology(m_hostIds), m_mpi,
+                                    m_config.getTopology(m_hostGroups), m_mpi,
                                     new KSafetyStats(), false);
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;
@@ -570,7 +575,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
                                     null, false,
-                                    m_config.getTopology(m_hostIds), m_mpi,
+                                    m_config.getTopology(m_hostGroups), m_mpi,
                                     new KSafetyStats(), true);
         m_dut.onReplayCompletion();
         m_newAppointee.set(false);
