@@ -602,6 +602,15 @@ public class TestUnionSuite extends RegressionSuite {
         assertTrue(explainPlan.contains("range-scan covering from (PKEY > ?2)"));
 
 
+        vt = client.callProcedure("@AdHoc", "SELECT ABS(PKEY) as AP FROM A WHERE PKEY = 0 UNION ALL "
+                + "SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY AP DESC;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3,2,1,1,0});
+
+
+        vt = client.callProcedure("@AdHoc", "SELECT cast ((PKEY+1) as INTEGER) as AP FROM A WHERE PKEY = 0 UNION ALL "
+                + "SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY AP DESC;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3,2,1,1,1});
+
         //
         // with ORDER BY
         //
