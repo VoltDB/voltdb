@@ -350,13 +350,11 @@ public class TestUnion extends PlannerTestCase {
 
         // order by expression
         // voltdb has exception for type match on the output columns. expression that may change its type
-        errorMsg = "UNION with ORDER BY expression is not allowed";
-        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by 1", errorMsg);
-
-
-        // expression that does not change its type
-        failToCompile("select abs(C), C as C2 from T3 UNION select B,B from T2 order by 1", errorMsg);
-        failToCompile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by tag", errorMsg);
+//        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by 1");
+//
+//        // expression that does not change its type
+//        compile("select abs(C), C as C2 from T3 UNION select B,B from T2 order by 1");
+//        compile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by tag");
 
     }
 
