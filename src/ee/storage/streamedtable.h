@@ -97,7 +97,7 @@ class StreamedTable : public Table {
                                     std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
                                     std::vector<ExportMaterializedViewMetadata*> &survivingViewsOut,
                                     std::vector<ExportMaterializedViewMetadata*> &obsoleteViewsOut);
-    void updateMaterializedViewTargetTable(StreamedTable* target, catalog::MaterializedViewInfo* targetMvInfo);
+    void updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo);
 
     virtual std::string tableType() const {
         return "StreamedTable";

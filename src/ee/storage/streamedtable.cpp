@@ -23,6 +23,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "streamedtable.h"
+#include "persistenttable.h"
 #include "StreamedTableUndoAction.hpp"
 #include "ExportTupleStream.h"
 #include "common/executorcontext.hpp"
@@ -35,6 +36,8 @@ StreamedTable::StreamedTable(bool exportEnabled)
     : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(NULL),
       m_sequenceNo(0)
 {
+//    std::cout << "Streamed Table create " << name() << " \n";
+//    std::cout.flush();
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         enableStream();
@@ -59,9 +62,11 @@ bool StreamedTable::enableStream() {
 }
 
 void
-StreamedTable::updateMaterializedViewTargetTable(StreamedTable* target, catalog::MaterializedViewInfo* targetMvInfo)
+StreamedTable::updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo)
 {
     if (!target) {
+//    std::cout << "Found NULL target for streamed table\n";
+//    std::cout.flush();
         return;
     }
     std::string targetName = target->name();
@@ -70,7 +75,7 @@ StreamedTable::updateMaterializedViewTargetTable(StreamedTable* target, catalog:
 
     // find the materialized view that uses the table or its precursor (by the same name).
     BOOST_FOREACH(ExportMaterializedViewMetadata* currView, m_views) {
-        StreamedTable* currTarget = currView->targetTable();
+        PersistentTable* currTarget = currView->targetTable();
 
         // found: target is alreafy set
         if (currTarget == target) {
@@ -199,6 +204,12 @@ bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;
     if (m_wrapper) {
+        // handle any materialized views
+        for (int i = 0; i < m_views.size(); i++) {
+//            std::cout << "Updating view" << "\n";
+//            std::cout.flush();
+            m_views[i]->processTupleInsert(source, false);
+        }
         mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
                                       m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
@@ -213,13 +224,6 @@ bool StreamedTable::insertTuple(TableTuple &source)
             return true;
         }
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
-        // handle any materialized views
-        for (int i = 0; i < m_views.size(); i++) {
-            std::cout << "Updating view" << "\n";
-            std::cout.flush();
-            m_views[i]->processTupleInsert(source, false);
-        }
-
     }
     return true;
 }

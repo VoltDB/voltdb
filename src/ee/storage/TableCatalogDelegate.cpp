@@ -455,6 +455,9 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
                   PersistentTable *existingTable, PersistentTable *newTable,
                   std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
+    std::cout << "Migrating regular views\n";
+    std::cout.flush();
+
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
     std::vector<MaterializedViewMetadata*> survivingViews;
     std::vector<MaterializedViewMetadata*> obsoleteViews;
@@ -494,6 +497,8 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
         }
         // This is not a leak -- the materialized view metadata is self-installing into the new table.
         // Also, it guards its targetTable from accidental deletion with a refcount bump.
+    std::cout << "Creating reg view 1\n";
+    std::cout.flush();
         new MaterializedViewMetadata(newTable, targetTable, currInfo);
     }
 }
@@ -502,8 +507,8 @@ void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>
                   StreamedTable *existingTable, StreamedTable *newTable,
                   std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
-    std::cout << "Migrating export views\n";
-    std::cout.flush();
+//    std::cout << "Migrating export views\n";
+//    std::cout.flush();
 
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
     std::vector<ExportMaterializedViewMetadata*> survivingViews;
@@ -529,15 +534,15 @@ void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>
 
     for (int ii = 0; ii < survivingInfos.size(); ++ii) {
         catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
-        StreamedTable* oldTargetTable = survivingViews[ii]->targetTable();
+        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
         // Use the now-current definiton of the target table, to be updated later, if needed.
         TableCatalogDelegate* targetDelegate =
             dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
                                                                 delegatesByName));
-        StreamedTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
         if (targetDelegate) {
-            StreamedTable* newTargetTable =
-                dynamic_cast<StreamedTable*>(targetDelegate->getTable());
+            PersistentTable* newTargetTable =
+                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
             if (newTargetTable) {
                 targetTable = newTargetTable;
             }
