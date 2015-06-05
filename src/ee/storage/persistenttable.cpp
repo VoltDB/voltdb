@@ -308,8 +308,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         }
         PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
         assert(targetEmptyTable);
-    std::cout << "Creating reg view 3\n";
-    std::cout.flush();
         new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
     }
 
