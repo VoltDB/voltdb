@@ -70,8 +70,8 @@ StreamedTable::updateMaterializedViewTargetTable(PersistentTable* target, catalo
         return;
     }
     std::string targetName = target->name();
-    std::cout << "Streamed Table with views " << targetName << " \n";
-    std::cout.flush();
+//    std::cout << "Streamed Table with views " << targetName << " \n";
+//    std::cout.flush();
 
     // find the materialized view that uses the table or its precursor (by the same name).
     BOOST_FOREACH(ExportMaterializedViewMetadata* currView, m_views) {
