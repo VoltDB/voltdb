@@ -23,14 +23,18 @@
 
 package org.voltdb.planner;
 
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public class TestUnion extends PlannerTestCase {
@@ -300,20 +304,23 @@ public class TestUnion extends PlannerTestCase {
             AbstractPlanNode pn = compile("select B from T2 UNION select B from T2 order by B");
             pn = pn.getChild(0);
             String[] columnNames = {"B"};
-            checkOrderByNode(pn, columnNames);
+            int[] idxs = {0};
+            checkOrderByNode(pn, columnNames, idxs);
         }
         {
             AbstractPlanNode pn = compile("(select B as B1, B as B2 from T2 UNION select B as B1, B as B2 from T2) order by B1 asc, B2 desc");
             pn = pn.getChild(0);
             String[] columnNames = {"B1", "B2"};
-            checkOrderByNode(pn, columnNames);
+            int[] idxs = {1, 1};
+            checkOrderByNode(pn, columnNames, idxs);
         }
         {
             // T1 is partitioned
             AbstractPlanNode pn = compile("(select A from T1 UNION select B from T2) order by A");
             pn = pn.getChild(0);
             String[] columnNames = {"A"};
-            checkOrderByNode(pn, columnNames);
+            int[] idxs = {0};
+            checkOrderByNode(pn, columnNames, idxs);
         }
     }
 
@@ -413,12 +420,32 @@ public class TestUnion extends PlannerTestCase {
       }
   }
 
+    public void testUnionOrderByExpr() {
+        {
+            AbstractPlanNode pn = compile(
+                    "select C, abs(C) as A from T3 UNION select B, B from T2 order by C, A");
+            pn = pn.getChild(0);
+            String[] columnNames = {"C", "A"};
+            int[] idxs = {0, 1};
+            checkOrderByNode(pn, columnNames, idxs);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select C, abs(C) as A from T3 UNION select B, B from T2 order by 1,2");
+            pn = pn.getChild(0);
+            String[] columnNames = {"C", "A"};
+            int[] colIdx = { 0, 1};
+            checkOrderByNode(pn, columnNames, colIdx);
+        }
+    }
+
     public void testUnionOrderByLimit() {
         AbstractPlanNode pn = compile(
                 "select C from T3 UNION select B from T2 order by C limit 3 offset 2");
         String[] columnNames = {"C"};
         pn = pn.getChild(0);
-        checkOrderByNode(pn, columnNames);
+        int[] idxs = {0};
+        checkOrderByNode(pn, columnNames, idxs);
         assertTrue(pn.getChild(0) instanceof UnionPlanNode);
         pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
         checkLimitNode(pn, 3, 2);
@@ -429,20 +456,25 @@ public class TestUnion extends PlannerTestCase {
                 "select C from T3 where C = ? UNION select B from T2 order by C limit ? offset ?");
         String[] columnNames = {"C"};
         pn = pn.getChild(0);
-        checkOrderByNode(pn, columnNames);
+        int[] idxs = {0};
+        checkOrderByNode(pn, columnNames, idxs);
         assertTrue(pn.getChild(0) instanceof UnionPlanNode);
         pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
         assert (pn instanceof LimitPlanNode);
         assertTrue(pn.toExplainPlanString().contains("LIMIT with parameter"));
     }
 
-    private void checkOrderByNode(AbstractPlanNode pn, String columns[]) {
+    private void checkOrderByNode(AbstractPlanNode pn, String columns[], int[] idxs) {
         assertTrue(pn != null);
         assertTrue(pn instanceof OrderByPlanNode);
         OrderByPlanNode opn = (OrderByPlanNode) pn;
         assertEquals(columns.length, opn.getOutputSchema().size());
         for(int i = 0; i < columns.length; ++i) {
-            assertEquals(columns[i], opn.getOutputSchema().getColumns().get(i).getColumnAlias());
+            SchemaColumn col = opn.getOutputSchema().getColumns().get(i);
+            assertEquals(columns[i], col.getColumnAlias());
+            AbstractExpression colExpr = col.getExpression();
+            assertEquals(ExpressionType.VALUE_TUPLE, colExpr.getExpressionType());
+            assertEquals(idxs[i], ((TupleValueExpression) colExpr).getColumnIndex());
         }
     }
 

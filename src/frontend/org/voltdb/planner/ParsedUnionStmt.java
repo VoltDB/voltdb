@@ -19,8 +19,10 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -93,6 +95,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         // Parse ORDER BY
         if (orderbyElement != null) {
             parseOrderColumns(orderbyElement);
+            placeTVEsForOrderby();
         }
 
         // prepare the limit plan node if it needs one.
@@ -360,5 +363,25 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         }
         return retval;
+    }
+
+    private void placeTVEsForOrderby () {
+        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
+        Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <Integer, ParsedColInfo>();
+
+        int orderByIndex = 0;
+        ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();
+        for (ParsedColInfo col : leftmostSelectChild.m_displayColumns) {
+            displayIndexMap.put(col.expression, orderByIndex);
+            assert(col.alias != null);
+            displayIndexToColumnMap.put(orderByIndex, col);
+            orderByIndex++;
+        }
+
+        // place the TVEs from Display columns in the ORDER BY expression
+        for (ParsedColInfo orderCol : m_orderColumns) {
+            AbstractExpression expr = orderCol.expression.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
+            orderCol.expression = expr;
+        }
     }
 }

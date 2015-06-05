@@ -500,6 +500,14 @@ public class TestUnionSuite extends RegressionSuite {
         assertEquals(3, result.fetchRow(0).getLong(0));
         assertEquals(0, result.fetchRow(4).getLong(0));
 
+        // Order by with Expr
+        result = client.callProcedure("@AdHoc", "SELECT ABS(PKEY) as AP FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY AP DESC;")
+                .getResults()[0];
+        System.out.println(result.toString());
+        assertEquals(5, result.getRowCount());
+        assertEquals(3, result.fetchRow(0).getLong(0));
+        assertEquals(0, result.fetchRow(4).getLong(0));
+
         if (!isHSQL()) { // HSQL does not handle limit with union
             // limit 3, no offset
             result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0) LIMIT 3;")
