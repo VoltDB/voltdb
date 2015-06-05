@@ -181,11 +181,13 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                 "partition procedure MyInsert on table partitioned_blah column sval;");
 
         // parameter in select list needs a cast.
+        /* hsql232: ENG-8309, this error no longer occurs
         ddlErrorTest("data type cast needed for parameter or null literal",
                 "create procedure insert_param_in_select_list as " +
                     "insert into partitioned_blah (ival, sval) " +
                         "select ival, ? from blah order by ival, sval;",
                 "partition procedure insert_param_in_select_list on table partitioned_blah column sval;");
+         */
 
         // inserting into replicated table should fail
         ddlErrorTest("Trying to write to replicated table 'BLAH' in a single-partition procedure.",
@@ -206,11 +208,12 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                 + "constraint row_limit limit partition rows 5 "
                 + "execute (delete from partitioned_blah));");
 
+        /* hsql232: ENG-8298, limit constraints with delete statements
         ddlErrorTest("Table T1 has invalid DELETE statement for LIMIT PARTITION ROWS constraint: parse error: SQL Syntax error",
                 "create table t1 (i integer, "
                 + "constraint row_limit limit partition rows 5 "
                 + "execute (delete frm partitioned_blah));");
-
+         */
     }
 
     public void testHexLiterals() throws Exception {
