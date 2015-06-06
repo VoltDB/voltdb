@@ -76,5 +76,5 @@ public interface PBDSegment {
      * @param count    The new count
      * @param size     The new size
      */
-    void updateCountAndSize(int count, int size);
+    void updateCachedCountAndSize(int count, int size);
 }

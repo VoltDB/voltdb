@@ -381,7 +381,7 @@ public class PBDRegularSegment implements PBDSegment {
     }
 
     @Override
-    public void updateCountAndSize(int count, int size)
+    public void updateCachedCountAndSize(int count, int size)
     {
         m_numOfEntries = count;
         m_size = size;
