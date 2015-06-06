@@ -69,4 +69,12 @@ public interface PBDSegment {
      * although incredibly unlikely
      */
     int uncompressedBytesToRead();
+
+    /**
+     * Count and size may be cached in the object. If the segment is truncated out-of-band,
+     * call this method to update the cached values.
+     * @param count    The new count
+     * @param size     The new size
+     */
+    void updateCachedCountAndSize(int count, int size);
 }
