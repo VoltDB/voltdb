@@ -356,7 +356,7 @@ class PBDMMapSegment implements PBDSegment {
     }
 
     @Override
-    public void updateCountAndSize(int count, int size)
+    public void updateCachedCountAndSize(int count, int size)
     {
         // no-op. This implementation doesn't cache count and size
     }
