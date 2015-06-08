@@ -138,9 +138,7 @@ void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
 
 void MaterializedViewMetadata::freeBackedTuples()
 {
-    if (m_groupByColumnCount != 0) {
-        delete[] m_searchKeyBackingStore;
-    }
+    delete[] m_searchKeyBackingStore;
     delete[] m_updatedTupleBackingStore;
     delete[] m_emptyTupleBackingStore;
 }
@@ -149,7 +147,10 @@ void MaterializedViewMetadata::allocateBackedTuples()
 {
     // The materialized view will have no index if there is no group by columns.
     // In this case, we will not allocate space for m_searchKeyBackingStore (ENG-7872)
-    if (m_index != NULL) {
+    if (m_groupByColumnCount == 0) {
+        m_searchKeyBackingStore = NULL;
+    }
+    else {
         m_searchKeyTuple = TableTuple(m_index->getKeySchema());
         m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
         memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
