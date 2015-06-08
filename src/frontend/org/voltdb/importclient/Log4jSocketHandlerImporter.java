@@ -190,7 +190,9 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
                 ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(m_socket.getInputStream()));
                 while (true) {
                     LoggingEvent event = (LoggingEvent) ois.readObject();
-                    Log4jSocketHandlerImporter.this.callProcedure(new SaveLog4jEventInvocation(hostname, event, m_tableName));
+                    if (!Log4jSocketHandlerImporter.this.callProcedure(new SaveLog4jEventInvocation(hostname, event, m_tableName))) {
+                        Log4jSocketHandlerImporter.this.error("Failed to insert log4j event");
+                    }
                 }
             } catch(EOFException e) { // normal exit condition
                 Log4jSocketHandlerImporter.this.info("Client disconnected from " + m_socket.getRemoteSocketAddress());
