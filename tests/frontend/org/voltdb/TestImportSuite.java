@@ -59,7 +59,7 @@ public class TestImportSuite extends RegressionSuite {
     private static final Level[] s_levels =
         { Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.TRACE, Level.WARN };
 
-    private volatile boolean socketHandlerInitialized;
+    private Boolean m_socketHandlerInitialized = false;
 
     @Override
     public void setUp() throws Exception
@@ -72,15 +72,17 @@ public class TestImportSuite extends RegressionSuite {
     }
 
     private void setupLog4jSocketHandler() {
-        if (socketHandlerInitialized) return;
+        synchronized(m_socketHandlerInitialized) {
+            if (m_socketHandlerInitialized) return;
 
-        SocketAppender appender = new SocketAppender("localhost", 6060);
-        appender.setReconnectionDelay(50);
-        s_testSocketLogger.setAdditivity(false);
-        s_testSocketLogger.removeAllAppenders();
-        s_testSocketLogger.setLevel(Level.ALL);
-        s_testSocketLogger.addAppender(appender);
-        socketHandlerInitialized = true;
+            SocketAppender appender = new SocketAppender("localhost", 6060);
+            appender.setReconnectionDelay(50);
+            s_testSocketLogger.setAdditivity(false);
+            s_testSocketLogger.removeAllAppenders();
+            s_testSocketLogger.setLevel(Level.ALL);
+            s_testSocketLogger.addAppender(appender);
+            m_socketHandlerInitialized = true;
+        }
     }
 
     @Override
@@ -200,7 +202,7 @@ public class TestImportSuite extends RegressionSuite {
             assertEquals(count, response.getResults()[0].asScalarLong());
         } else {
             long result = response.getResults()[0].asScalarLong();
-            assertTrue(result>=min && result<=count);
+            assertTrue(result + " not between " + min + " and " + count, result>=min && result<=count);
         }
     }
 
