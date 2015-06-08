@@ -77,7 +77,7 @@ public class DummyCommandLog implements CommandLog {
             Object[] rowValues) {
         rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_BYTES.name())] = 0;
         rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_TXNS.name())] = 0;
-        rowValues[columnNameToIndex.get(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name())] = 0;
+        rowValues[columnNameToIndex.get(CommandLogStats.StatName.IN_USE_SEGMENT_COUNT.name())] = 0;
         rowValues[columnNameToIndex.get(CommandLogStats.StatName.SEGMENT_COUNT.name())] = 0;
         rowValues[columnNameToIndex.get(CommandLogStats.StatName.FSYNC_INTERVAL.name())] = 0;
     }
