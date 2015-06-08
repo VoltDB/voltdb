@@ -138,7 +138,9 @@ void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
 
 void MaterializedViewMetadata::freeBackedTuples()
 {
-    delete[] m_searchKeyBackingStore;
+    if (m_groupByColumnCount != 0) {
+        delete[] m_searchKeyBackingStore;
+    }
     delete[] m_updatedTupleBackingStore;
     delete[] m_emptyTupleBackingStore;
 }
@@ -146,25 +148,13 @@ void MaterializedViewMetadata::freeBackedTuples()
 void MaterializedViewMetadata::allocateBackedTuples()
 {
     // The materialized view will have no index if there is no group by columns.
-    // In this case, we will make something up to fill in as a work-around. See ENG-7872.
-    if (m_index == NULL) {
-        // Make up a fake search key tuple.
-        std::vector<int32_t> columnLengths(1, NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-        std::vector<ValueType> columnTypes(1, VALUE_TYPE_INTEGER);
-        std::vector<bool> columnAllowNull(1, false);
-        std::vector<bool> columnInBytes(1, false);
-        TupleSchema *searchKeySchema = TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                              columnAllowNull, columnInBytes);
-        m_searchKeyTuple = TableTuple(searchKeySchema);
-        m_searchKeyBackingStore = new char[searchKeySchema->tupleLength() + 1];
-        memset(m_searchKeyBackingStore, 0, searchKeySchema->tupleLength() + 1);
-    }
-    else {
+    // In this case, we will not allocate space for m_searchKeyBackingStore (ENG-7872)
+    if (m_index != NULL) {
         m_searchKeyTuple = TableTuple(m_index->getKeySchema());
         m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
         memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
+        m_searchKeyTuple.move(m_searchKeyBackingStore);
     }
-    m_searchKeyTuple.move(m_searchKeyBackingStore);
 
     m_existingTuple = TableTuple(m_target->schema());
 
@@ -608,25 +598,25 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
 
 bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
 {
-    // find the key for this tuple (which is the group by columns)
     // For the case where is no grouping column, like SELECT COUNT(*) FROM T;
     // We directly return the only row in the view. See ENG-7872.
     if (m_groupByColumnCount == 0) {
         TableIterator iterator = m_target->iteratorDeletingAsWeGo();
         iterator.next(m_existingTuple);
+        return true;
     }
-    else {
-        for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-            NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
-            m_searchKeyValue[colindex] = value;
-            m_searchKeyTuple.setNValue(colindex, value);
-        }
 
-        IndexCursor indexCursor(m_index->getTupleSchema());
-        // determine if the row exists (create the empty one if it doesn't)
-        m_index->moveToKey(&m_searchKeyTuple, indexCursor);
-        m_existingTuple = m_index->nextValueAtKey(indexCursor);
+    // find the key for this tuple (which is the group by columns)
+    for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+        NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
+        m_searchKeyValue[colindex] = value;
+        m_searchKeyTuple.setNValue(colindex, value);
     }
+
+    IndexCursor indexCursor(m_index->getTupleSchema());
+    // determine if the row exists (create the empty one if it doesn't)
+    m_index->moveToKey(&m_searchKeyTuple, indexCursor);
+    m_existingTuple = m_index->nextValueAtKey(indexCursor);
     return ! m_existingTuple.isNullTuple();
 }
 
