@@ -82,6 +82,15 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
             processTupleInsert(scannedTuple, false);
         }
     }
+    /* If there is no group by column and the target table is still empty
+     * even after catching up with pre-existing source tuples, we should initialize the
+     * target table with a row of default values.
+     * COUNT() functions should have value 0, other aggregation functions should have value NULL.
+     * See ENG-7872
+     */
+    if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
+        initializeTupleHavingNoGroupBy();
+    }
     VOLT_TRACE("Finish initialization...");
 }
 
@@ -136,10 +145,17 @@ void MaterializedViewMetadata::freeBackedTuples()
 
 void MaterializedViewMetadata::allocateBackedTuples()
 {
-    m_searchKeyTuple = TableTuple(m_index->getKeySchema());
-    m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
-    memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
-    m_searchKeyTuple.move(m_searchKeyBackingStore);
+    // The materialized view will have no index if there is no group by columns.
+    // In this case, we will not allocate space for m_searchKeyBackingStore (ENG-7872)
+    if (m_groupByColumnCount == 0) {
+        m_searchKeyBackingStore = NULL;
+    }
+    else {
+        m_searchKeyTuple = TableTuple(m_index->getKeySchema());
+        m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
+        memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
+        m_searchKeyTuple.move(m_searchKeyBackingStore);
+    }
 
     m_existingTuple = TableTuple(m_target->schema());
 
@@ -372,6 +388,26 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
     return newVal;
 }
 
+void MaterializedViewMetadata::initializeTupleHavingNoGroupBy()
+{
+    // clear the tuple that will be built to insert or overwrite
+    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    // COUNT(*) column will be zero.
+    m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
+    int aggOffset = (int)m_groupByColumnCount + 1;
+    NValue newValue;
+    for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+            newValue = ValueFactory::getBigIntValue(0);
+        }
+        else {
+            newValue = ValueFactory::getNullValue();
+        }
+        m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+    }
+    m_target->insertPersistentTuple(m_updatedTuple, true);
+}
+
 void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bool fallible)
 {
     // don't change the view if this tuple doesn't match the predicate
@@ -490,6 +526,11 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     // check if we should remove the tuple
     if (count.isZero()) {
         m_target->deleteTuple(m_existingTuple, fallible);
+        // If there is no group by column, the count() should remain 0 and other functions should
+        // have value null. See ENG-7872.
+        if (m_groupByColumnCount == 0) {
+            initializeTupleHavingNoGroupBy();
+        }
         return;
     }
     // assume from here that we're just updating the existing row
@@ -558,6 +599,14 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
 
 bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
 {
+    // For the case where is no grouping column, like SELECT COUNT(*) FROM T;
+    // We directly return the only row in the view. See ENG-7872.
+    if (m_groupByColumnCount == 0) {
+        TableIterator iterator = m_target->iteratorDeletingAsWeGo();
+        iterator.next(m_existingTuple);
+        return true;
+    }
+
     // find the key for this tuple (which is the group by columns)
     for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
         NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
