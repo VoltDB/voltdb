@@ -20,7 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.Map;
 
-public interface NodeDRGateway {
+public interface ProducerDRGateway {
 
     /*
      * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name

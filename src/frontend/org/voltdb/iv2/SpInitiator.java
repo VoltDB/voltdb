@@ -29,9 +29,9 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.ConsumerDRGateway;
-import org.voltdb.MemoryStats;
-import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.ProducerDRGateway;
+import org.voltdb.MemoryStats;
 import org.voltdb.Promotable;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StartAction;
@@ -93,7 +93,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway nodeDRGateway,
+                          ProducerDRGateway nodeDRGateway,
                           ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway,
                           String coreBindIds)
