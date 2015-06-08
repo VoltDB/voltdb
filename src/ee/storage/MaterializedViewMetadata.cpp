@@ -89,23 +89,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
      * See ENG-7872
      */
     if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
-        m_existingTuple.move(m_emptyTupleBackingStore);
-        // clear the tuple that will be built to insert or overwrite
-        memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
-        // COUNT(*) column will be zero.
-        m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
-        int aggOffset = (int)m_groupByColumnCount + 1;
-        NValue newValue;
-        for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
-                newValue = ValueFactory::getBigIntValue(0);
-            }
-            else {
-                newValue = ValueFactory::getNullValue();
-            }
-            m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
-        }
-        m_target->insertPersistentTuple(m_updatedTuple, true);
+        initializeTupleHavingNoGroupBy();
     }
     VOLT_TRACE("Finish initialization...");
 }
@@ -413,6 +397,26 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
     return newVal;
 }
 
+void MaterializedViewMetadata::initializeTupleHavingNoGroupBy()
+{
+    // clear the tuple that will be built to insert or overwrite
+    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    // COUNT(*) column will be zero.
+    m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
+    int aggOffset = (int)m_groupByColumnCount + 1;
+    NValue newValue;
+    for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+            newValue = ValueFactory::getBigIntValue(0);
+        }
+        else {
+            newValue = ValueFactory::getNullValue();
+        }
+        m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+    }
+    m_target->insertPersistentTuple(m_updatedTuple, true);
+}
+
 void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bool fallible)
 {
     // don't change the view if this tuple doesn't match the predicate
@@ -487,26 +491,6 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
         m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
                                                  m_updatableIndexList, fallible);
     }
-    else {
-        // set the next column, which is a count(*), to 1
-        m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(1));
-
-        // A new group row gets its initial agg values copied directly from the first source row
-        // except for user-defined COUNTs which get set to 0 or 1 depending on whether the
-        // source column value is null.
-        for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-            NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
-            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
-                if (newValue.isNull()) {
-                    newValue = ValueFactory::getBigIntValue(0);
-                } else {
-                    newValue = ValueFactory::getBigIntValue(1);
-                }
-            }
-            m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
-        }
-        m_target->insertPersistentTuple(m_updatedTuple, fallible);
-    }
 }
 
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
@@ -531,25 +515,11 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     int aggOffset = (int)m_groupByColumnCount + 1;
     // check if we should remove the tuple
     if (count.isZero()) {
-        if (m_groupByColumnCount != 0) {
-            m_target->deleteTuple(m_existingTuple, fallible);
-        }
+        m_target->deleteTuple(m_existingTuple, fallible);
         // If there is no group by column, the count() should remain 0 and other functions should
         // have value null. See ENG-7872.
-        else {
-            m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
-            NValue newValue;
-            for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-                if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
-                    newValue = ValueFactory::getBigIntValue(0);
-                }
-                else {
-                    newValue = ValueFactory::getNullValue();
-                }
-                m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
-            }
-            m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                                       m_updatableIndexList, fallible);
+        if (m_groupByColumnCount == 0) {
+            initializeTupleHavingNoGroupBy();
         }
         return;
     }
