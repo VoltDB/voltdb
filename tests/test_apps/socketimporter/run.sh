@@ -126,8 +126,8 @@ function async-benchmark() {
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         socketimporter.AsyncBenchmark \
         --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
+        --warmup=2 \
+        --duration=20 \
         --servers=localhost \
         --sockservers=localhost:7001
 }
@@ -148,12 +148,6 @@ function demo() {
     echo When you are done with the demo database, \
         remember to use \"voltadmin shutdown\" to stop \
         the server process.
-}
-
-# build an application catalog
-# used by apprunner (test automation); not used otherwise
-function catalog() {
-    voltdb compile -o socketstreamcatalog.jar ddl.sql
 }
 
 function help() {
