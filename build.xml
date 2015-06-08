@@ -314,7 +314,7 @@
     <patternset refid='junit.exclusions'/>
 </patternset>
 
-<patternset id='junit.regression.p4.path'>
+<patternset id='junit.other.p1.path'>
     <!-- Standard junit fileset -->
 	<include name='org/voltdb/Test*.class' />
 
@@ -322,11 +322,12 @@
     <patternset refid='junit.exclusions'/>
 </patternset>
 	
-<patternset id='junit.regression.p5.path'>
+<patternset id='junit.other.p2.path'>
     <!-- Standard junit fileset -->
 	<include name='org/voltdb/**/Test*.class' />
 	<include name='org/voltcore/**/Test*.class' />
 	<include name='org.hsqldb_voltpatches/Test*.class' />
+	<exclude name='org/voltdb/Test*.class' />
 
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
@@ -1672,23 +1673,23 @@ TEST CASES
     </run_junit>
 </target>
 	
-<target name="junit_regression_p4"
-    description="Execute part 4 of JUnit regression test suites.">
+<target name="junit_other_p1"
+    description="Execute part 1 of other JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <patternset refid="junit.regression.p4.path" />
+                <patternset refid="junit.other.p1.path" />
             </fileset>
         </tests>
     </run_junit>
 </target>
 	
-<target name="junit_regression_p5"
-    description="Execute part 5 of JUnit regression test suites.">
+<target name="junit_other_p2"
+    description="Execute part 2 of other JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <patternset refid="junit.regression.p5.path" />
+                <patternset refid="junit.other.p2.path" />
             </fileset>
         </tests>
     </run_junit>
