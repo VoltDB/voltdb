@@ -29,7 +29,7 @@ public interface NodeDRGateway {
     /**
      * Start listening on the ports
      */
-    public abstract void bindPorts(boolean drProducerEnabled, int listenPort, String portInterface);
+    public abstract void initialize(boolean drProducerEnabled, int listenPort, String portInterface);
 
     /**
      * @return true if bindPorts has been called.
