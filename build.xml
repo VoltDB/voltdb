@@ -205,6 +205,132 @@
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
 </patternset>
+	
+<patternset id='junit.regression.p1.path'>
+    <!-- Standard junit fileset -->
+	<include name='org/voltdb/regressionsuites/TestCatalogUpdateSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestFailuresSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestFunctionsSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestGroupByComplexSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestHexLiteralsSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestIndexCountSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestIndexReverseScanSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestIndexesSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestInternalPort.class' />
+	<include name='org/voltdb/regressionsuites/TestLimitOffsetSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestLoadingSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestMaxSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestOrderBySuite.class' />
+	<include name='org/voltdb/regressionsuites/TestProcedureAPISuite.class' />
+	<include name='org/voltdb/regressionsuites/TestReplicatedSaveRestoreSysprocSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestReplicationSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSaveRestoreSysprocSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSnapshotSaveTruncation.class' />
+	<include name='org/voltdb/regressionsuites/TestSqlAggregateSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSqlLogicOperatorsSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSqlUpdateSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSqlUpsertSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestUnionSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestZooKeeperPort.class' />
+    <!-- Exclude tests -->
+    <patternset refid='junit.exclusions'/>
+</patternset>
+
+<patternset id='junit.regression.p2.path'>
+    <!-- Standard junit fileset -->
+	<include name='org/voltdb/regressionsuites/TestCRUDSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestCatalogUpdateAutoUpgradeSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestClientPortChannel.class' />
+	<include name='org/voltdb/regressionsuites/TestClientPortListener.class' />
+	<include name='org/voltdb/regressionsuites/TestCompactingViewsSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestDecimalDefaults.class' />
+	<include name='org/voltdb/regressionsuites/TestElasticJoinSettings.class' />
+	<include name='org/voltdb/regressionsuites/TestEmptySchema.class' />
+	<include name='org/voltdb/regressionsuites/TestExecutionSiteDeath.class' />
+	<include name='org/voltdb/regressionsuites/TestExplainCommandSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestFailureDetectSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestFunctionsForJSON.class' />
+	<include name='org/voltdb/regressionsuites/TestGroupByComplexMaterializedViewSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestInsertIntoSelectSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestLiveSchemaChanges.class' />
+	<include name='org/voltdb/regressionsuites/TestMPBasecaseSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestMaterializedViewSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestQueryTimeout.class' />
+	<include name='org/voltdb/regressionsuites/TestReplicationPort.class' />
+	<include name='org/voltdb/regressionsuites/TestSQLFeaturesNewSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSQLFeaturesSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSecuritySuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSnapshotStatus.class' />
+	<include name='org/voltdb/regressionsuites/TestStatisticsSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestStopNode.class' />
+	<include name='org/voltdb/regressionsuites/TestStopNode2NK1PartitionDetection.class' />
+	<include name='org/voltdb/regressionsuites/TestSystemCatalogSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSystemInformationSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestTableCountSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestUpdateDeployment.class' />
+
+    <!-- Exclude tests -->
+    <patternset refid='junit.exclusions'/>
+</patternset>
+	
+<patternset id='junit.regression.p3.path'>
+    <!-- Standard junit fileset -->
+	<include name='org/voltdb/regressionsuites/TestAdHocPlannerCache.class' />
+	<include name='org/voltdb/regressionsuites/TestAdminMode.class' />
+	<include name='org/voltdb/regressionsuites/TestAdminPort.class' />
+	<include name='org/voltdb/regressionsuites/TestFixedSQLSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestFunctionsForVoltDBSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestGiantDeleteSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestGroupBySuite.class' />
+	<include name='org/voltdb/regressionsuites/TestHttpPort.class' />
+	<include name='org/voltdb/regressionsuites/TestIndexColumnLessThanSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestIndexLimitSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestIndexMemoryOwnershipSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestIndexOverflowSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestIndexScanCountSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestJMXPort.class' />
+	<include name='org/voltdb/regressionsuites/TestJoinsSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestMPMultiRoundTripSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestMultiPartitionSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestPartialIndexesSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestPartitionDetection.class' />
+	<include name='org/voltdb/regressionsuites/TestPasswordMaskSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestRollbackSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSPBasecaseSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSQLTypesSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSecurityNoAdminUser.class' />
+	<include name='org/voltdb/regressionsuites/TestShutdown.class' />
+	<include name='org/voltdb/regressionsuites/TestSqlDeleteSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSqlInsertSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSqlLikeRegressionSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSubQueriesSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestSystemProcedureSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestTPCCSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestTempTableMemoryKnob.class' />
+	<include name='org/voltdb/regressionsuites/TestUndoSuite.class' />
+	<include name='org/voltdb/regressionsuites/TestUpdateClasses.class' />
+
+    <!-- Exclude tests -->
+    <patternset refid='junit.exclusions'/>
+</patternset>
+
+<patternset id='junit.regression.p4.path'>
+    <!-- Standard junit fileset -->
+	<include name='org/voltdb/Test*.class' />
+
+    <!-- Exclude tests -->
+    <patternset refid='junit.exclusions'/>
+</patternset>
+	
+<patternset id='junit.regression.p5.path'>
+    <!-- Standard junit fileset -->
+	<include name='org/voltdb/**/Test*.class' />
+	<include name='org/voltcore/**/Test*.class' />
+	<include name='org.hsqldb_voltpatches/Test*.class' />
+
+    <!-- Exclude tests -->
+    <patternset refid='junit.exclusions'/>
+</patternset>
 
 <patternset id='junit.all.path'>
     <!-- Standard junit fileset -->
@@ -1513,7 +1639,62 @@ TEST CASES
     </run_junit>
 </target>
 
-<!-- common macro to run a bynch of junit -->
+<target name="junit_regression_p1"
+    description="Execute part 1 of JUnit regression test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.p1.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name="junit_regression_p2"
+    description="Execute part 2 of JUnit regression test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.p2.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name="junit_regression_p3"
+    description="Execute part 3 of JUnit regression test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.p3.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+	
+<target name="junit_regression_p4"
+    description="Execute part 4 of JUnit regression test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.p4.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+	
+<target name="junit_regression_p5"
+    description="Execute part 5 of JUnit regression test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.p5.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<!-- common macro to run a bunch of junit -->
 <macrodef name='run_junit'>
     <element name='tests'/>
     <sequential>
