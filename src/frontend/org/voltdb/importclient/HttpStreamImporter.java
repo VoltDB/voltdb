@@ -36,6 +36,7 @@ import org.apache.http.HttpStatus;
 import org.apache.http.ParseException;
 import org.apache.http.ProtocolException;
 import org.apache.http.annotation.Immutable;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPost;
@@ -192,6 +193,11 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
                             if (takeImportFile(pathSuffix)) {
                                 String filePath = m_endpoint.getPath() + "/TmpReadDir/" + entry.getString("pathSuffix");
                                 ingestFile(filePath);
+                                Boolean keepFile = Boolean.parseBoolean((String)m_properties.get("keepfile"));
+                                info("keepFile = " + keepFile.toString());
+                                if (!keepFile) {
+                                    deleteFile(filePath);
+                                }
                             }
                         }
                     }
@@ -205,7 +211,6 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
 
     private Boolean takeImportFile(String pathSuffix) throws PathHandlingException {
         try {
-            info("m_endpoint.getPath().split('v1')[1] = " + m_endpoint.getPath().split("v1")[1]);
             HttpPut dirMaker = new HttpPut(new URI(m_endpoint.getScheme(), m_endpoint.getAuthority(),
                     m_endpoint.getPath() + "/" + pathSuffix, "op=RENAME&destination=" + m_endpoint.getPath().split("v1")[1] +
                     "/TmpReadDir/" + pathSuffix, m_endpoint.getFragment()));
@@ -246,6 +251,19 @@ public class HttpStreamImporter extends ImportHandlerProxy implements BundleActi
         } catch (InterruptedException|ExecutionException|URISyntaxException | ParseException | IOException e) {
             //rateLimitedLogError(m_logger, "error creating parent directory for %s %s", path, Throwables.getStackTraceAsString(e));
             throw new PathHandlingException("error creating parent directory for " + m_endpoint.getPath(), e);
+        }
+    }
+
+    private void deleteFile(String filePath) throws PathHandlingException {
+        try {
+            HttpDelete fileDelete = new HttpDelete(new URI(m_endpoint.getScheme(), m_endpoint.getAuthority(),
+                    filePath, "op=DELETE", m_endpoint.getFragment()));
+            HttpResponse resp = m_client.execute(fileDelete,null).get();
+            DecodedStatus status = DecodedStatus.fromResponse(resp);
+            if (status != DecodedStatus.OK) error(status.toString());
+        } catch (InterruptedException|ExecutionException|URISyntaxException | ParseException e) {
+            //rateLimitedLogError(m_logger, "error creating parent directory for %s %s", path, Throwables.getStackTraceAsString(e));
+            throw new PathHandlingException("error deleting file " + m_endpoint.getPath(), e);
         }
     }
 
