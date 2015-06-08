@@ -491,6 +491,26 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
         m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
                                                  m_updatableIndexList, fallible);
     }
+    else {
+        // set the next column, which is a count(*), to 1
+        m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(1));
+
+        // A new group row gets its initial agg values copied directly from the first source row
+        // except for user-defined COUNTs which get set to 0 or 1 depending on whether the
+        // source column value is null.
+        for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
+            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+                if (newValue.isNull()) {
+                    newValue = ValueFactory::getBigIntValue(0);
+                } else {
+                    newValue = ValueFactory::getBigIntValue(1);
+                }
+            }
+            m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+        }
+        m_target->insertPersistentTuple(m_updatedTuple, fallible);
+    }
 }
 
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
