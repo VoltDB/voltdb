@@ -201,6 +201,9 @@ public abstract class StatementCompiler {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         }
+        catch (AssertionError e) {
+            throw compiler.new VoltCompilerException("Unexpected assertion error: " + e);
+        }
 
         // There is a hard-coded limit to the number of parameters that can be passed to the EE.
         if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {

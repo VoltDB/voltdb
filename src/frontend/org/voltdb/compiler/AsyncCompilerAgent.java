@@ -373,6 +373,9 @@ public class AsyncCompilerAgent {
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
             }
+            catch (AssertionError e) {
+                errorMsgs.add("Unexpected AssertionError in the VoltDB Planner: " + e);
+            }
         }
         String errorSummary = null;
         if (!errorMsgs.isEmpty()) {
