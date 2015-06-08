@@ -36,6 +36,8 @@
 
 package socketimporter;
 
+import com.google_voltpatches.common.net.HostAndPort;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
@@ -53,21 +55,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-
-import com.google_voltpatches.common.net.HostAndPort;
-
-import com.google_voltpatches.common.net.HostAndPort;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.voltdb.CLIConfig;
 
 public class AsyncBenchmark {
 
