@@ -737,7 +737,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(builtin_kafkadeployment.getExport().getConfiguration().get(0).isEnabled());
         assertEquals(builtin_kafkadeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.KAFKA);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
-        assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.kafka.KafkaExportClient");
     }
 
     public void testMultiExportClientSettings() throws Exception {
