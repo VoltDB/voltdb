@@ -66,7 +66,6 @@ public class RegressionSuite extends TestCase {
     private final ArrayList<Client> m_clients = new ArrayList<Client>();
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<SocketChannel>();
     protected final String m_methodName;
-    private static String m_failureContext = null;
 
     /**
      * Trivial constructor that passes parameter on to superclass.
@@ -366,20 +365,11 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
-    static private void dumpFailureContext() {
-        if (m_failureContext != null) {
-            System.out.println("Failure context: " + m_failureContext);
-            m_failureContext = null;
-        }
-    }
-
     static public void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
-        m_failureContext = sql;
-        validateTableOfLongs(vt, expected);
-        m_failureContext = null;
+        validateTableOfLongs(sql, vt, expected);
     }
 
     static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
@@ -397,6 +387,17 @@ public class RegressionSuite extends TestCase {
         validateTableOfScalarLongs(vt, expected);
     }
 
+    static private void validateTableOfLongs(String messagePrefix,
+            VoltTable vt, long[][] expected) {
+        assertNotNull(expected);
+        assertEquals(messagePrefix + " returned wrong number of rows.  ",
+                        expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            validateRowOfLongs(messagePrefix + " at row " + i + ", ", vt, expected[i]);
+        }
+    }
+
     static public void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals("Wrong number of rows in table.  ",
@@ -411,6 +412,8 @@ public class RegressionSuite extends TestCase {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
+            String message = messagePrefix + "at column " + i + ", ";
+
             long actual = -10000000;
             // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
             try {
@@ -426,41 +429,27 @@ public class RegressionSuite extends TestCase {
                             actual = vt.getDecimalAsBigDecimal(i).longValueExact();
                         } catch (IllegalArgumentException newerEx) {
                             newerEx.printStackTrace();
-                            dumpFailureContext();
-                            fail();
+                            fail(message);
                         }
                     } catch (ArithmeticException newestEx) {
                         newestEx.printStackTrace();
-                        dumpFailureContext();
-                        fail();
+                        fail(message);
                     }
                 }
             }
 
-            String message = "at column " + i +", ";
-            if (messagePrefix != null) {
-                message = messagePrefix + message;
-            }
-
             // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
-                if (expected[i] != actual) {
-                    dumpFailureContext();
-                }
                 assertEquals(message, expected[i], actual);
             } else {
                 VoltType type = vt.getColumnType(i);
-                long expectedNull = Long.parseLong(type.getNullValue().toString());
-                if (expectedNull != actual) {
-                    dumpFailureContext();
-                }
-                assertEquals(message + "expected null: ", expectedNull, actual);
+                assertEquals(message + "expected null: ", Long.parseLong(type.getNullValue().toString()), actual);
             }
         }
     }
 
     static public void validateRowOfLongs(VoltTable vt, long [] expected) {
-        validateRowOfLongs(null, vt, expected);
+        validateRowOfLongs("", vt, expected);
     }
 
     static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
