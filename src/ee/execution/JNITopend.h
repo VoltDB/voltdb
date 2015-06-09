@@ -70,7 +70,7 @@ private:
     jmethodID m_pushDRBufferMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jclass m_exportManagerClass;
-    jclass m_drPartitionGatewayClass;
+    jclass m_partitionDRGatewayClass;
     jclass m_encoderClass;
 };
 

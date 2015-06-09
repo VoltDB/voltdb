@@ -2026,7 +2026,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 AdHocCompilerCache.clearHashCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
-                PartitionDRGateway.m_PartitionDRGateways.clear();
+                PartitionDRGateway.m_partitionDRGateways.clear();
 
                 // probably unnecessary, but for tests it's nice because it
                 // will do the memory checking and run finalizers

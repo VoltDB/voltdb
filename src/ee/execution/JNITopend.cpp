@@ -157,22 +157,22 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_drPartitionGatewayClass = m_jniEnv->FindClass("org/voltdb/DRPartitionGateway");
-    if (m_drPartitionGatewayClass == NULL) {
+    m_partitionDRGatewayClass = m_jniEnv->FindClass("org/voltdb/PartitionDRGateway");
+    if (m_partitionDRGatewayClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_drPartitionGatewayClass != NULL);
+        assert(m_partitionDRGatewayClass != NULL);
         throw std::exception();
     }
 
-    m_drPartitionGatewayClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_drPartitionGatewayClass));
-    if (m_drPartitionGatewayClass == NULL) {
+    m_partitionDRGatewayClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_partitionDRGatewayClass));
+    if (m_partitionDRGatewayClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_drPartitionGatewayClass != NULL);
+        assert(m_partitionDRGatewayClass != NULL);
         throw std::exception();
     }
 
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
-            m_drPartitionGatewayClass,
+            m_partitionDRGatewayClass,
             "pushDRBuffer",
             "(IJJJLjava/nio/ByteBuffer;)V");
     if (m_pushDRBufferMID == NULL) {
@@ -463,7 +463,7 @@ void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
         }
         //std::cout << "Block is length " << block->rawLength() << std::endl;
         m_jniEnv->CallStaticVoidMethod(
-                m_drPartitionGatewayClass,
+                m_partitionDRGatewayClass,
                 m_pushDRBufferMID,
                 partitionId,
                 block->startDRSequenceNumber(),

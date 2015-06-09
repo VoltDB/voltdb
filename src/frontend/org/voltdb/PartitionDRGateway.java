@@ -59,7 +59,7 @@ public class PartitionDRGateway {
         }
     }
 
-    public static final Map<Integer, PartitionDRGateway> m_PartitionDRGateways = new NonBlockingHashMap<Integer, PartitionDRGateway>();
+    public static final Map<Integer, PartitionDRGateway> m_partitionDRGateways = new NonBlockingHashMap<>();
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -92,7 +92,7 @@ public class PartitionDRGateway {
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
-        m_PartitionDRGateways.put(partitionId,  pdrg);
+        m_partitionDRGateways.put(partitionId,  pdrg);
 
         return pdrg;
     }
@@ -229,7 +229,7 @@ public class PartitionDRGateway {
             }
         }
 
-        final PartitionDRGateway pdrg = m_PartitionDRGateways.get(partitionId);
+        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
