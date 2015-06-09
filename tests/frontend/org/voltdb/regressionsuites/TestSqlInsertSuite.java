@@ -99,6 +99,13 @@ public class TestSqlInsertSuite extends RegressionSuite {
         // This should round down.
         validateInsertStmt("insert into decimaltable values 0.9999999999994000;",
                            new BigDecimal("0.999999999999"));
+        try {
+            validateInsertStmt("insert into decimaltable values 999999999999999999999999999999999999999999.0;",
+                               (BigDecimal)null);
+            fail("Expected an exception here.");
+        } catch (Exception ex) {
+            assertTrue(true);
+        }
         validateInsertStmt("insert into decimaltable values null;", (BigDecimal)null);
     }
 
