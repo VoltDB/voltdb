@@ -55,6 +55,8 @@ public:
      */
     void processTupleDelete(const TableTuple &oldTuple, bool fallible);
 
+    void initializeTupleHavingNoGroupBy();
+
     PersistentTable * targetTable() const { return m_target; }
     std::string indexForMinMax() const { return m_indexForMinMax == NULL ? "" : m_indexForMinMax->getName(); }
 
