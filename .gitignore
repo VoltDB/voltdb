@@ -20,6 +20,7 @@
 host*+0000.txt
 voltdb_crash*
 buildstring.txt
+bundles/
 obj/
 groovyout/
 debugoutput/

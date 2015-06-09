@@ -77,8 +77,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
                 m_serverSocket.close();
             }
         } catch(IOException e) { // nothing to do other than log
-            error("Unexpected error closing log4j socket appender listener on " + m_port);
-            e.printStackTrace();
+            info("Unexpected error closing log4j socket appender listener on " + m_port);
         }
     }
 
@@ -102,7 +101,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
     {
         Properties properties = (Properties) p.clone();
         String str = properties.getProperty(PORT_CONFIG);
-        if (str==null || str.trim().length()==0) {
+        if (str == null || str.trim().length() == 0) {
             throw new RuntimeException(PORT_CONFIG + " must be specified as a log4j socket importer property");
         }
         m_port = Integer.parseInt(str);
@@ -112,6 +111,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
             m_serverSocket = new ServerSocket(m_port);
             info("Log4j socket appender listener listening on port: " + m_port);
         } catch(IOException e) {
+            error("IOException opening server socket on port " + m_port + " - " + e.getMessage());
             throw new RuntimeException(e);
         }
 
