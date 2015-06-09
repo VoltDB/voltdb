@@ -326,7 +326,7 @@
     <!-- Standard junit fileset -->
 	<include name='org/voltdb/**/Test*.class' />
 	<include name='org/voltcore/**/Test*.class' />
-	<include name='org.hsqldb_voltpatches/Test*.class' />
+	<include name='org/hsqldb_voltpatches/**/Test*.class' />
 	<exclude name='org/voltdb/Test*.class' />
 	<exclude name='org/voltdb/regressionsuites/*.class' />
 
