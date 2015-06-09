@@ -33,6 +33,7 @@ import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -42,6 +43,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 
@@ -64,6 +66,7 @@ public class RegressionSuite extends TestCase {
     private final ArrayList<Client> m_clients = new ArrayList<Client>();
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<SocketChannel>();
     protected final String m_methodName;
+    private static String m_failureContext = null;
 
     /**
      * Trivial constructor that passes parameter on to superclass.
@@ -363,11 +366,20 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
+    static private void dumpFailureContext() {
+        if (m_failureContext != null) {
+            System.out.println("Failure context: " + m_failureContext);
+            m_failureContext = null;
+        }
+    }
+
     static public void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
+        m_failureContext = sql;
         validateTableOfLongs(vt, expected);
+        m_failureContext = null;
     }
 
     static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
@@ -414,10 +426,12 @@ public class RegressionSuite extends TestCase {
                             actual = vt.getDecimalAsBigDecimal(i).longValueExact();
                         } catch (IllegalArgumentException newerEx) {
                             newerEx.printStackTrace();
+                            dumpFailureContext();
                             fail();
                         }
                     } catch (ArithmeticException newestEx) {
                         newestEx.printStackTrace();
+                        dumpFailureContext();
                         fail();
                     }
                 }
@@ -430,10 +444,17 @@ public class RegressionSuite extends TestCase {
 
             // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
+                if (expected[i] != actual) {
+                    dumpFailureContext();
+                }
                 assertEquals(message, expected[i], actual);
             } else {
                 VoltType type = vt.getColumnType(i);
-                assertEquals(message + "expected null: ", Long.parseLong(type.getNullValue().toString()), actual);
+                long expectedNull = Long.parseLong(type.getNullValue().toString());
+                if (expectedNull != actual) {
+                    dumpFailureContext();
+                }
+                assertEquals(message + "expected null: ", expectedNull, actual);
             }
         }
     }
@@ -610,4 +631,41 @@ public class RegressionSuite extends TestCase {
             assertTrue(vtStr.contains(pattern));
         }
     }
+
+    /**
+     * Utility function to run queries and dump results to stdout.
+     * @param client
+     * @param queries one or more query strings to send in a batch
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    protected static void dumpQueryResults(Client client, String... queries)
+            throws IOException, NoConnectionsException, ProcCallException {
+        VoltTable vts[] = client.callProcedure("@AdHoc", StringUtils.join(queries, '\n')).getResults();
+        int ii = 0;
+        for (VoltTable vtn : vts) {
+            System.out.println("DEBUG: result for " + queries[ii] + "\n" + vtn + "\n");
+            ++ii;
+        }
+    }
+
+    /**
+     * Utility function to explain queries and dump results to stdout.
+     * @param client
+     * @param queries one or more query strings to send in a batch to @Explain.
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    protected static void dumpQueryPlans(Client client, String... queries)
+            throws IOException, NoConnectionsException, ProcCallException {
+        VoltTable vts[] = client.callProcedure("@Explain", StringUtils.join(queries, '\n')).getResults();
+        int ii = 0;
+        for (VoltTable vtn : vts) {
+            System.out.println("DEBUG: plan for " + queries[ii] + "\n" + vtn + "\n");
+            ++ii;
+        }
+    }
+
 }
