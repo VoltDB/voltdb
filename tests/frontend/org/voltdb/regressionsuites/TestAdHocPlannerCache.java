@@ -166,6 +166,8 @@ public class TestAdHocPlannerCache extends RegressionSuite {
          subtest3AdHocBadParameters(client);
 
          // union and subquery
+         // This part of the test is disabled because of the wrong answer of UNION query with parameters
+         // subquery expression is in V5.2, not in earlier version.
 //         subtest4AdvancedBadParameters(client);
 
          subtest5ExplainPlans(client);
@@ -652,8 +654,6 @@ public class TestAdHocPlannerCache extends RegressionSuite {
                 + "RATIO FLOAT, "
                 + "PRIMARY KEY (desc)); "
 
-             // ENG-8243 shows that expression index has a bug not being able to be created.
-//                + "CREATE INDEX EXPRIDX ON R1 (POWER(num,2));"
                 + "CREATE INDEX absIdx ON R1 (ABS(num-1));"
 
                 + "create procedure proc1 AS select num as number from R1 where id > ? order by num;"

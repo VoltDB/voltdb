@@ -89,13 +89,13 @@ class ParameterizationInfo {
                     continue;
                 }
 
-                // "paramerters" element contains all the parameter infomation for the query
+                // "parameters" element contains all the parameter information for the query
                 // also including its subqueries if it has.
                 for (VoltXMLElement node : child.children) {
                     String idStr = node.attributes.get("id");
                     assert(idStr != null);
                     // ID attribute is assumed to be global unique per query.
-                    // but for UNION query, "paramerters" are copied to each query level.
+                    // but for UNION query, "parameters" are copied to each query level.
                     paramIds.add(Integer.parseInt(idStr));
                 }
 
