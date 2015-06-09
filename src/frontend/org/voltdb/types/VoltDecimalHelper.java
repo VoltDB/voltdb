@@ -190,7 +190,9 @@ public class VoltDecimalHelper {
         if (bd.scale() > kDefaultScale) {
             bd = bd.stripTrailingZeros();
             if (bd.scale() > kDefaultScale) {
-                throw new IOException("Decimal " + bd + " has more than " + kDefaultScale + " digits of scale");
+                // We used to throw an exception, but now we round up.
+                // throw new IOException("Decimal " + bd + " has more than " + kDefaultScale + " digits of scale");
+                bd = bd.round(new MathContext(kDefaultScale, RoundingMode.HALF_UP));
             }
         }
         // enforce scale 12 to make the precision check right

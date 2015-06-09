@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
@@ -37,6 +38,14 @@ public class TestSqlInsertSuite extends RegressionSuite {
         validateTableOfLongs(client, insertStmt, new long[][] {{1}});
         validateTableOfLongs(client, "select * from p1", new long[][] {expectedValues});
         validateTableOfLongs(client, "delete from p1;", new long[][] {{1}});
+    }
+
+    private void validateInsertStmt(String insertStmt, BigDecimal... expectedValues) throws Exception {
+        Client client = getClient();
+
+        validateTableOfLongs(client, insertStmt, new long[][]{{1}});
+        validateTableOfDecimal(client, "select * from decimaltable;", new BigDecimal[][] {expectedValues});
+        validateTableOfLongs(client, "delete from decimaltable;", new long[][] {{1}});
     }
 
     public void testInsert() throws Exception
@@ -73,6 +82,26 @@ public class TestSqlInsertSuite extends RegressionSuite {
         verifyStmtFails(getClient(), "insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
     }
 
+
+    public void testDecimalScaleInsertion() throws Exception {
+        // Sanity check.  See if we can insert a vanilla value.
+        validateInsertStmt("insert into decimaltable values 0.9;",
+                           new BigDecimal("0.900000000000"));
+        // See if we can insert a value bigger then the fixed point
+        // scale, and that we round up.
+        validateInsertStmt("insert into decimaltable values 0.999999999999999;",
+                           new BigDecimal("1.000000000000"));
+        // Do the same as the last time, but make the last digit equal to 5.
+        // This should round up.
+        validateInsertStmt("insert into decimaltable values 0.999999999999500;",
+                           new BigDecimal("1.000000000000"));
+        // Do the same as the last time, but make the last digit equal to 4.
+        // This should round down.
+        validateInsertStmt("insert into decimaltable values 0.9999999999994000;",
+                           new BigDecimal("0.999999999999"));
+        validateInsertStmt("insert into decimaltable values null;", (BigDecimal)null);
+    }
+
     // See also tests for INSERT using DEFAULT NOW columns in TestFunctionsSuite.java
 
     //
@@ -97,6 +126,9 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 "xxx bigint " + // default null
                 ");" +
                 "PARTITION TABLE P1 ON COLUMN ccc;" +
+                "CREATE TABLE DECIMALTABLE ( " +
+                "dec decimal" +
+                ");" +
                 ""
                 ;
         try {
