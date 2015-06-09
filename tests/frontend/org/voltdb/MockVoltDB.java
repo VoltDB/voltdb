@@ -554,7 +554,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public NodeDRGateway getNodeDRGateway()
+    public ProducerDRGateway getNodeDRGateway()
     {
         return null;
     }
