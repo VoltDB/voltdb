@@ -218,7 +218,9 @@ public class AdHocCompilerCache implements Serializable {
     public synchronized void put(String sql,
                                  String parsedToken,
                                  AdHocPlannedStatement planIn,
-                                 String[] extractedLiterals)
+                                 String[] extractedLiterals,
+                                 boolean hasUserQuestionMarkParameters,
+                                 boolean hasAutoParameterizedException)
     {
         assert(sql != null);
         assert(parsedToken != null);
@@ -226,53 +228,62 @@ public class AdHocCompilerCache implements Serializable {
         AdHocPlannedStatement plan = planIn;
         assert(new String(plan.sql, Constants.UTF8ENCODING).equals(sql));
 
+        // hasUserQuestionMarkParameters and hasAutoParameterizedException can not be true at the same time
+        // it means that a query can not be both user parameterized query and auto parameterized query.
+        assert(!hasUserQuestionMarkParameters || !hasAutoParameterizedException);
+
         // uncomment this to get some raw stdout cache performance stats every 5s
         //startPeriodicStatsPrinting();
 
-        BoundPlan matched = null;
-        BoundPlan unmatched = new BoundPlan(planIn.core, planIn.parameterBindings(extractedLiterals));
-        // deal with the parameterized plan cache first
-        List<BoundPlan> boundVariants = m_coreCache.get(parsedToken);
-        if (boundVariants == null) {
-            boundVariants = new ArrayList<BoundPlan>();
-            m_coreCache.put(parsedToken, boundVariants);
-            // Note that there is an edge case in which more than one plan is getting counted as one
-            // "plan insertion". This only happens when two different plans arose from the same parameterized
-            // query (token) because one invocation used the correct constants to trigger an expression index and
-            // another invocation did not.  These are not counted separately (which would have to happen below
-            // after each call to boundVariants.add) because they are not evicted separately.
-            // It seems saner to use consistent units when counting insertions vs. evictions.
-            ++m_planInsertions;
-        } else {
-            for (BoundPlan boundPlan : boundVariants) {
-                if (boundPlan.equals(unmatched)) {
-                    matched = boundPlan;
-                    break;
+        // deal with L2 cache
+        if (! hasAutoParameterizedException) {
+            BoundPlan matched = null;
+            BoundPlan unmatched = new BoundPlan(planIn.core, planIn.parameterBindings(extractedLiterals));
+            // deal with the parameterized plan cache first
+            List<BoundPlan> boundVariants = m_coreCache.get(parsedToken);
+            if (boundVariants == null) {
+                boundVariants = new ArrayList<BoundPlan>();
+                m_coreCache.put(parsedToken, boundVariants);
+                // Note that there is an edge case in which more than one plan is getting counted as one
+                // "plan insertion". This only happens when two different plans arose from the same parameterized
+                // query (token) because one invocation used the correct constants to trigger an expression index and
+                // another invocation did not.  These are not counted separately (which would have to happen below
+                // after each call to boundVariants.add) because they are not evicted separately.
+                // It seems saner to use consistent units when counting insertions vs. evictions.
+                ++m_planInsertions;
+            } else {
+                for (BoundPlan boundPlan : boundVariants) {
+                    if (boundPlan.equals(unmatched)) {
+                        matched = boundPlan;
+                        break;
+                    }
+                }
+                if (matched != null) {
+                    // if a different core is found, reuse it
+                    // this is useful when updating the literal cache
+                    if (unmatched.core != matched.core) {
+                        plan = new AdHocPlannedStatement(planIn, matched.core);
+                        plan.setBoundConstants(matched.constants);
+                    }
                 }
             }
-            if (matched != null) {
-                // if a different core is found, reuse it
-                // this is useful when updating the literal cache
-                if (unmatched.core != matched.core) {
-                    plan = new AdHocPlannedStatement(planIn, matched.core);
-                    plan.setBoundConstants(matched.constants);
-                }
+            if (matched == null) {
+                // Don't count insertions (of possibly repeated tokens) here
+                //  -- see the comment above where only UNIQUE token insertions are being counted, instead.
+                boundVariants.add(unmatched);
             }
-        }
-        if (matched == null) {
-            // Don't count insertions (of possibly repeated tokens) here
-            //  -- see the comment above where only UNIQUE token insertions are being counted, instead.
-            boundVariants.add(unmatched);
         }
 
-        // then deal with the
-        AdHocPlannedStatement cachedPlan = m_literalCache.get(sql);
-        if (cachedPlan == null) {
-            m_literalCache.put(sql, plan);
-            ++m_literalInsertions;
-        }
-        else {
-            assert(cachedPlan.equals(plan));
+        // then deal with the L1 cache
+        if (! hasUserQuestionMarkParameters) {
+            AdHocPlannedStatement cachedPlan = m_literalCache.get(sql);
+            if (cachedPlan == null) {
+                m_literalCache.put(sql, plan);
+                ++m_literalInsertions;
+            }
+            else {
+                assert(cachedPlan.equals(plan));
+            }
         }
     }
 

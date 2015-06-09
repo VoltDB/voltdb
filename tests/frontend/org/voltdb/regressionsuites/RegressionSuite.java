@@ -390,6 +390,10 @@ public class RegressionSuite extends TestCase {
         verifyProcFails(client, expectedMsg, "@AdHoc", stmt);
     }
 
+    static public void verifyAdHocFails(Client client, String expectedPattern, Object... args) throws IOException {
+        verifyProcFails(client, expectedPattern, "@AdHoc", args);
+    }
+
     static public void verifyProcFails(Client client, String expectedMsg, String storedProc, Object... args) throws IOException {
 
         String what;
