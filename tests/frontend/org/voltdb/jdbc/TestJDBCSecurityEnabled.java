@@ -23,7 +23,7 @@
 
 package org.voltdb.jdbc;
 
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -32,6 +32,9 @@ import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 import org.junit.AfterClass;
@@ -59,32 +62,48 @@ public class TestJDBCSecurityEnabled {
     static VoltProjectBuilder pb;
 
     public static final RoleInfo GROUPS[] = new RoleInfo[] {
-        new RoleInfo("Group1", false, false, false, false, false, false),
-        new RoleInfo("Group2", true, false, false, false, false, false),
-        new RoleInfo("Group3", true, false, false, false, false, false),
-        new RoleInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
+        new RoleInfo("GroupWithSQLPerm", true, false, false, false, false, false),
+        new RoleInfo("GroupWithSQLReadPerm", false, true, false, false, false, false),
+        new RoleInfo("GroupWithAdminPerm", false, false, true, false, false, false),
         new RoleInfo("GroupWithDefaultProcPerm", false, false, false, true, false, false),
-        new RoleInfo("GroupWithoutDefaultProcPerm", false, false, false, false, false, false),
-        new RoleInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false)
+        new RoleInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false),
+        new RoleInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
+        new RoleInfo("GroupWithNoPerm", false, false, false, false, false, false),
+        new RoleInfo("GroupWithNoPerm2", false, false, false, false, false, false) // group with same permission, used for test user procedures
     };
 
     public static final UserInfo[] USERS = new UserInfo[] {
-        new UserInfo("admin", "password", new String[] {"AdMINISTRATOR"}),
-        new UserInfo("user1", "password", new String[] {"Group1"}),
-        new UserInfo("user2", "password", new String[] {"Group2"}),
-        new UserInfo("user3", "password", new String[] {"Group3"}),
-        new UserInfo("userWithDefaultUserPerm", "password", new String[] {"User"}),
-        new UserInfo("userWithAllProcPerm", "password", new String[] {"GroupWithAllProcPerm"}),
+        new UserInfo("userWithSQLPerm", "password", new String[] {"GroupWithSQLPerm"}),
+        new UserInfo("userWithSQLReadPerm", "password", new String[] {"GroupWithSQLReadPerm"}),
+        new UserInfo("userWithAdminPerm", "password", new String[] {"GroupWithAdminPerm"}),
         new UserInfo("userWithDefaultProcPerm", "password", new String[] {"GroupWithDefaultProcPerm"}),
-        new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWiThoutDefaultProcPerm"}),
-        new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"groupWiThDefaultProcReadPerm"})
+        new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"GroupWithDefaultProcReadPerm"}),
+        new UserInfo("userWithAllProcPerm", "password", new String[] {"GroupWithAllProcPerm"}),
+        new UserInfo("userWithNoPerm", "password", new String[] {"GroupWithNoPerm"}),
+        new UserInfo("userWithNoPerm2", "password", new String[] {"GroupWithNoPerm2"}),
+        new UserInfo("userWithDefaultUserPerm", "password", new String[] {"User"}) // user of default User Group
     };
 
     public static final ProcedureInfo[] PROCEDURES = {
         new ProcedureInfo(new String[0], DoNothing1.class),
-        new ProcedureInfo(new String[] { "Group1" }, DoNothing2.class),
-        new ProcedureInfo(new String[] { "Group1", "Group2" }, DoNothing3.class)
+        new ProcedureInfo(new String[] { "GroupWithNoPerm" }, DoNothing2.class),
+        new ProcedureInfo(new String[] { "GroupWithNoPerm", "GroupWithNoPerm2" }, DoNothing3.class)
     };
+
+    static final Map<String,Boolean[]> ExpectedResultMap  = new HashMap<String,Boolean[]>() {{
+        // tests procedures for each user in the order of
+        // adhoc proc, adhoc read proc, admin proc, default proc, defaultread proc
+        // user procs DoNothin1, DoNothing2, DoNothing3
+        put("userWithSQLPerm", new Boolean[] {true,true,false,true,true,false,false,false});
+        put("userWithSQLReadPerm", new Boolean[] {false,true,false,false,true,false,false,false});
+        put("userWithAdminPerm", new Boolean[] {true,true,true,true,true,true,true,true});
+        put("userWithDefaultProcPerm", new Boolean[] {false,false,false,true,true,false,false,false});
+        put("userWithDefaultProcReadPerm", new Boolean[] {false,false,false,false,true,false,false,false});
+        put("userWithAllProcPerm", new Boolean[] {false,false,false,false,false,true,true,true});
+        put("userWithNoPerm", new Boolean[] {false,false,false,false,false,false,true,true});
+        put("userWithNoPerm2", new Boolean[] {false,false,false,false,false,false,false,true});
+        put("userWithDefaultUserPerm", new Boolean[] {true,true,false,true,true,true,true,true});
+    }};
 
     @BeforeClass
     public static void setUp() throws Exception {
@@ -184,7 +203,7 @@ public class TestJDBCSecurityEnabled {
         assertTrue("Connection which should have failed did not.", threw);
 
         // Test failed auth with wrong password
-        props.setProperty("user", "user1");
+        props.setProperty("user", "userWithAdminPerm");
         props.setProperty("password", "wrongpassword");
         threw = false;
         try {
@@ -198,9 +217,8 @@ public class TestJDBCSecurityEnabled {
         assertTrue("Connection which should have failed did not.", threw);
 
         // Test success
-        props.setProperty("user", "user1");
+        props.setProperty("user", "userWithAdminPerm");
         props.setProperty("password", "password");
-        threw = false;
         try {
             myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
             CloseUserConnection();
@@ -211,279 +229,24 @@ public class TestJDBCSecurityEnabled {
     }
 
     @Test
-    public void testAdmin() throws Exception {
-        // administrator can run every thing
+    public void testPerms() throws Exception {
         Properties props = new Properties();
-        props.setProperty("user", "admin");
         props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
 
-        //sysproc should pass
-        assertTrue(execSysProc());
-
-        // adhoc should pass
-        assertTrue(execAdhocProc());
-        assertTrue(execAdhocReadProc());
-
-        //default proc should pass
-        assertTrue(execDefaultProc());
-        assertTrue(execDefaultReadProc());
-
-        //all user proc should pass
-        assertTrue(execUserProc("DoNothing1"));
-        assertTrue(execUserProc("DoNothing2"));
-        assertTrue(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
+        for (Entry<String, Boolean[]> entry : ExpectedResultMap.entrySet()) {
+            String userName = entry.getKey();
+            Boolean[] expectedRet = entry.getValue();
+            props.setProperty("user", userName);
+            myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+            assertEquals(userName + " has wrong perms", expectedRet, processProc());
+            //close connection
+            CloseUserConnection();
+        }
     }
 
-
-    @Test
-    public void testUser1() throws Exception{
-        // user1 can only run User-Defined procedure 2 and 3
-        Properties props = new Properties();
-        props.setProperty("user", "user1");
-        props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-
-        //sysproc should fail
-        assertFalse(execSysProc());
-
-        // adhoc should fail
-        assertFalse(execAdhocProc());
-        assertFalse(execAdhocReadProc());
-
-        //default proc should fail
-        assertFalse(execDefaultProc());
-        assertFalse(execDefaultReadProc());
-
-        //user proc DoNothing1 should fail
-        //user proc DoNothing2 should pass
-        //user proc DoNothing3 should pass
-        assertFalse(execUserProc("DoNothing1"));
-        assertTrue(execUserProc("DoNothing2"));
-        assertTrue(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
-    }
-
-
-    @Test
-    public void testUser2() throws Exception {
-        // user2 can run adhoc procedure, default procedur and user proc 3
-        Properties props = new Properties();
-        props.setProperty("user", "user2");
-        props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-
-        //sysproc should fail
-        assertFalse(execSysProc());
-
-        // adhoc should pass
-        assertTrue(execAdhocProc());
-        assertTrue(execAdhocReadProc());
-
-        //default proc should pass
-        assertTrue(execDefaultProc());
-        assertTrue(execDefaultReadProc());
-
-        //user proc DoNothing1 should fail
-        //user proc DoNothing2 should fail
-        //user proc DoNothing3 should pass
-        assertFalse(execUserProc("DoNothing1"));
-        assertFalse(execUserProc("DoNothing2"));
-        assertTrue(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
-    }
-
-
-    @Test
-    public void testUser3() throws Exception {
-        // user3 can run adhoc procedure, default procedure
-        // no user procedures can run
-        Properties props = new Properties();
-        props.setProperty("user", "user3");
-        props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-
-        //sysproc should fail
-        assertFalse(execSysProc());
-
-        // adhoc should pass
-        assertTrue(execAdhocProc());
-        assertTrue(execAdhocReadProc());
-
-        //default proc should pass
-        assertTrue(execDefaultProc());
-        assertTrue(execDefaultReadProc());
-
-        //user proc DoNothing1 should fail
-        //user proc DoNothing2 should fail
-        //user proc DoNothing3 should fail
-        assertFalse(execUserProc("DoNothing1"));
-        assertFalse(execUserProc("DoNothing2"));
-        assertFalse(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
-    }
-
-    @Test
-    public void testUserWithDefaultUserPerms() throws Exception{
-        // userWithDefaultUserPerms can run ad hoc and all user-defined permission
-        Properties props = new Properties();
-        props.setProperty("user", "userWithDefaultUserPerm");
-        props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-
-        //sysproc should fail
-        assertFalse(execSysProc());
-
-        // adhoc should pass
-        assertTrue(execAdhocProc());
-        assertTrue(execAdhocReadProc());
-
-        //default proc should pass
-        assertTrue(execDefaultProc());
-        assertTrue(execDefaultReadProc());
-
-        //user proc DoNothing1 should pass
-        //user proc DoNothing2 should pass
-        //user proc DoNothing3 should pass
-        assertTrue(execUserProc("DoNothing1"));
-        assertTrue(execUserProc("DoNothing2"));
-        assertTrue(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
-    }
-
-    @Test
-    public void testUserWithDefaultProcPerm() throws Exception{
-        // userWithDefaultProcPerm can run all default procedures
-        Properties props = new Properties();
-        props.setProperty("user", "userWithDefaultProcPerm");
-        props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-
-        //sysproc should fail
-        assertFalse(execSysProc());
-
-        // adhoc should fail
-        assertFalse(execAdhocProc());
-        assertFalse(execAdhocReadProc());
-
-        //default proc should pass
-        assertTrue(execDefaultProc());
-        assertTrue(execDefaultReadProc());
-
-        //user proc DoNothing1 should fail
-        //user proc DoNothing2 should fail
-        //user proc DoNothing3 should fail
-        assertFalse(execUserProc("DoNothing1"));
-        assertFalse(execUserProc("DoNothing2"));
-        assertFalse(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
-    }
-
-
-    @Test
-    public void testUserWithDefaultProcReadPerm() throws Exception{
-        // userWithDefaultProcReadPerm can run read only default procedures
-        Properties props = new Properties();
-        props.setProperty("user", "userWithDefaultProcReadPerm");
-        props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-
-        //sysproc should fail
-        assertFalse(execSysProc());
-
-        // adhoc should fail
-        assertFalse(execAdhocProc());
-        assertFalse(execAdhocReadProc());
-
-        //default Write proc should fail
-        //default Read proc should pass
-        assertFalse(execDefaultProc());
-        assertTrue(execDefaultReadProc());
-
-        //user proc DoNothing1 should fail
-        //user proc DoNothing2 should fail
-        //user proc DoNothing3 should fail
-        assertFalse(execUserProc("DoNothing1"));
-        assertFalse(execUserProc("DoNothing2"));
-        assertFalse(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
-    }
-
-    @Test
-    public void testUserWithAllProcPerm() throws Exception{
-        // userWithAllProcPerm can run user defined procedures
-        Properties props = new Properties();
-        props.setProperty("user", "userWithAllProcPerm");
-        props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-
-        //sysproc should fail
-        assertFalse(execSysProc());
-
-        // adhoc should fail
-        assertFalse(execAdhocProc());
-        assertFalse(execAdhocReadProc());
-
-        //default Write proc should fail
-        //default Read proc should fail
-        assertFalse(execDefaultProc());
-        assertFalse(execDefaultReadProc());
-
-        //user proc DoNothing1 should pass
-        //user proc DoNothing2 should pass
-        //user proc DoNothing3 should pass
-        assertTrue(execUserProc("DoNothing1"));
-        assertTrue(execUserProc("DoNothing2"));
-        assertTrue(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
-    }
-
-    @Test
-    public void testUserWithoutDefaultProcPerm() throws Exception{
-        // userWithoutDefaultProcPerm can run no procedures
-        Properties props = new Properties();
-        props.setProperty("user", "userWithoutDefaultProcPerm");
-        props.setProperty("password", "password");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-
-        //sysproc should fail
-        assertFalse(execSysProc());
-
-        // adhoc should fail
-        assertFalse(execAdhocProc());
-        assertFalse(execAdhocReadProc());
-
-        //default Write proc should fail
-        //default Read proc should fail
-        assertFalse(execDefaultProc());
-        assertFalse(execDefaultReadProc());
-
-        //user proc DoNothing1 should fail
-        //user proc DoNothing2 should fail
-        //user proc DoNothing3 should fail
-        assertFalse(execUserProc("DoNothing1"));
-        assertFalse(execUserProc("DoNothing2"));
-        assertFalse(execUserProc("DoNothing3"));
-
-        //close connection
-        CloseUserConnection();
+    private Boolean[] processProc() throws SQLException {
+        return new Boolean[] {execAdhocProc(),execAdhocReadProc(),execSysProc(),execDefaultProc(),execDefaultReadProc(),
+                execUserProc("DoNothing1"),execUserProc("DoNothing2"),execUserProc("DoNothing3")};
     }
 
     private boolean execAdhocProc() throws SQLException{
