@@ -112,6 +112,10 @@ public class LocalCluster implements VoltServerConfig {
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
     private Map<String, String> m_additionalProcessEnv = null;
+    protected final Map<String, String> getAdditionalProcessEnv() {
+        return m_additionalProcessEnv;
+    }
+
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
     private String m_voltdbroot = "";
@@ -125,6 +129,9 @@ public class LocalCluster implements VoltServerConfig {
     // with the port numbers and command line parameter value specific to that
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
+
+    // This is used in generating the name.
+    private String m_prefix = null;
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -1143,9 +1150,13 @@ public class LocalCluster implements VoltServerConfig {
         return listeners;
     }
 
+    public void setPrefix(String prefix) {
+        m_prefix  = prefix;
+    }
+
     @Override
     public String getName() {
-        String prefix = "localCluster";
+        String prefix = (m_prefix == null) ? "localCluster" : String.format("localCluster-%s", m_prefix);
         if (m_failureState == FailureState.ONE_FAILURE)
             prefix += "OneFail";
         if (m_failureState == FailureState.ONE_RECOVERING)
