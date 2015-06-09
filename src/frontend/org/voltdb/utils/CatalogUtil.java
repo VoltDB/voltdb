@@ -130,12 +130,15 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+<<<<<<< HEAD
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.importer.ImportDataProcessor;
+=======
+>>>>>>> 9469fe1... associate kafka connector type to the new kafka export client
 
 /**
  *
@@ -1019,7 +1022,7 @@ public abstract class CatalogUtil {
         switch(exportConfiguration.getType()) {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
-            case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+            case KAFKA: exportClientClassName = "org.voltdb.exportclient.kafka.KafkaExportClient"; break;
             case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
             //Validate that we can load the class.
