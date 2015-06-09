@@ -24,7 +24,7 @@ A million repetitions of "a"
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include "solarisfixes.h"
+//#include "solarisfixes.h"
 #include "sha1.h"
 //#include "config.h"
 
