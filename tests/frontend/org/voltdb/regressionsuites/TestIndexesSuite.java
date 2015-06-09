@@ -1135,10 +1135,21 @@ public class TestIndexesSuite extends RegressionSuite {
 
     public void testKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
+
         ClientResponseImpl cr =
-               (ClientResponseImpl) client.callProcedure("@AdHoc",
-                                                         "select * from P1 where ID = 6000000000;", 0);
+                (ClientResponseImpl) client.callProcedure("@AdHoc",
+                                                          "select * from P1 where ID = ?;", 0);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+
+        try {
+            cr = (ClientResponseImpl) client.callProcedure("@AdHoc",
+                                                           "select * from P1 where ID = ?;", 6000000000L);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (6000000000) of type:"
+                    + " java.lang.Long is not a match or is out of range for the target parameter type: int"));
+        }
+
     }
 
     //
