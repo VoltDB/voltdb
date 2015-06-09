@@ -1228,7 +1228,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         expectedSchema[3] = new ColumnInfo(CommandLogStats.StatName.OUTSTANDING_BYTES.name(), VoltType.BIGINT);
         expectedSchema[4] = new ColumnInfo(CommandLogStats.StatName.OUTSTANDING_TXNS.name(), VoltType.BIGINT);
-        expectedSchema[5] = new ColumnInfo(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name(), VoltType.INTEGER);
+        expectedSchema[5] = new ColumnInfo(CommandLogStats.StatName.IN_USE_SEGMENT_COUNT.name(), VoltType.INTEGER);
         expectedSchema[6] = new ColumnInfo(CommandLogStats.StatName.SEGMENT_COUNT.name(), VoltType.INTEGER);
         expectedSchema[7] = new ColumnInfo(CommandLogStats.StatName.FSYNC_INTERVAL.name(), VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
@@ -1276,7 +1276,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
                 // Test segment counts
                 if (i == 1) {
-                    int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name());
+                    int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.IN_USE_SEGMENT_COUNT.name());
                     int actualSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.SEGMENT_COUNT.name());
                     String message = "Unexpected segment count: should be 2";
                     assertTrue(message, actualSegmentCount == 2);
