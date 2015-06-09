@@ -36,7 +36,6 @@ import java.util.Arrays;
  *
  */
 public class VoltDecimalHelper {
-
     /**
      * The scale of decimals in Volt
      */
@@ -55,7 +54,7 @@ public class VoltDecimalHelper {
         new BigInteger("-170141183460469231731687303715884105728").toByteArray();
 
     /**
-     * Math context specifying the precision of decimals in Volt
+     * Math context specifying the precision of decimals in Volt.
      */
     private static final MathContext context = new MathContext( kDefaultPrecision );
 
@@ -83,11 +82,11 @@ public class VoltDecimalHelper {
         if (bd == null) {
             return Arrays.copyOf(NULL_INDICATOR, NULL_INDICATOR.length);
         }
-        final int scale = bd.scale();
-        final int precision = bd.precision();
-        if (scale > 12) {
-            throw new IOException("Scale of " + bd + " is " + scale + " and the max is 12");
+        if (bd.scale() > kDefaultScale) {
+            bd = roundToScale(bd, kDefaultScale, RoundingMode.HALF_UP);
         }
+        int scale = bd.scale();
+        int precision = bd.precision();
         final int precisionMinusScale = precision - scale;
         if ( precisionMinusScale > 26 ) {
             throw new IOException("Precision of " + bd + " to the left of the decimal point is " +
@@ -142,10 +141,37 @@ public class VoltDecimalHelper {
     }
 
     /**
+     * Round a BigDecimal number to a scale given the rounding mode.
+     * Note that rounding may return the precision.  For example,
+     * rounding 9.99999 and 9.1999 to a scale of 2 gives 10.00 and 9.20.
+     * The latter has precision 3, and the former has precision 4.
+     * @param bd
+     * @param scale
+     * @return
+     */
+    static private final BigDecimal roundToScale(BigDecimal bd, int scale, RoundingMode mode)
+    {
+        int lostScaleDigits = bd.scale() - scale;
+        if (lostScaleDigits <= 0) {
+            return bd;
+        }
+        int desiredPrecision = bd.precision() - lostScaleDigits;
+        MathContext mc = new MathContext(desiredPrecision, mode);
+        BigDecimal nbd = bd.round(mc);
+        if (nbd.precision() != desiredPrecision) {
+            desiredPrecision += 1;
+            mc = new MathContext(desiredPrecision, mode);
+            nbd = bd.round(mc);
+        }
+        assert(nbd.scale() <= scale);
+        return nbd;
+    }
+
+    /**
      * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
      * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
      * @param buf {@link java.nio.ByteBuffer ByteBuffer} to serialize the <code>BigDecimal</code> to
-     * @throws RuntimeException Thrown if the precision or scale is out of range
+     * @throws RuntimeEx)ception Thrown if the precision or scale is out of range
      */
     static public void serializeBigDecimal(BigDecimal bd, ByteBuffer buf)
     {
@@ -153,11 +179,11 @@ public class VoltDecimalHelper {
               serializeNull(buf);
               return;
           }
-          final int scale = bd.scale();
-          final int precision = bd.precision();
-          if (scale > 12) {
-              throw new RuntimeException("Scale of " + bd + " is " + scale + " and the max is 12");
+          if (bd.scale() > 12) {
+              bd = roundToScale(bd, kDefaultScale, RoundingMode.HALF_UP);
           }
+          int scale = bd.scale();
+          int precision = bd.precision();
           final int precisionMinusScale = precision - scale;
           if ( precisionMinusScale > 26) {
               throw new RuntimeException("Precision of " + bd + " to the left of the decimal point is " +
@@ -190,7 +216,7 @@ public class VoltDecimalHelper {
         if (bd.scale() > kDefaultScale) {
             bd = bd.stripTrailingZeros();
             if (bd.scale() > kDefaultScale) {
-                throw new IOException("Decimal " + bd + " has more than " + kDefaultScale + " digits of scale");
+                bd = roundToScale(bd, kDefaultScale, RoundingMode.HALF_UP);
             }
         }
         // enforce scale 12 to make the precision check right

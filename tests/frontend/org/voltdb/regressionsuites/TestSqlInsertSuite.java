@@ -24,9 +24,12 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestSqlInsertSuite extends RegressionSuite {
@@ -37,6 +40,14 @@ public class TestSqlInsertSuite extends RegressionSuite {
         validateTableOfLongs(client, insertStmt, new long[][] {{1}});
         validateTableOfLongs(client, "select * from p1", new long[][] {expectedValues});
         validateTableOfLongs(client, "delete from p1;", new long[][] {{1}});
+    }
+
+    private void validateInsertStmt(String insertStmt, BigDecimal... expectedValues) throws Exception {
+        Client client = getClient();
+
+        validateTableOfLongs(client, insertStmt, new long[][]{{1}});
+        validateTableOfDecimal(client, "select * from decimaltable;", new BigDecimal[][] {expectedValues});
+        validateTableOfLongs(client, "delete from decimaltable;", new long[][] {{1}});
     }
 
     public void testInsert() throws Exception
@@ -73,7 +84,247 @@ public class TestSqlInsertSuite extends RegressionSuite {
         verifyStmtFails(getClient(), "insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
     }
 
-    // See also tests for INSERT using DEFAULT NOW columns in TestFunctionsSuite.java
+
+    public void testDecimalScaleInsertion() throws Exception {
+        // Sanity check.  See if we can insert a vanilla value.
+        validateInsertStmt("insert into decimaltable values 0.9;",
+                           new BigDecimal("0.900000000000"));
+        // See if we can insert a value bigger then the fixed point
+        // scale, and that we round up.
+        validateInsertStmt("insert into decimaltable values 0.999999999999999;",
+                           new BigDecimal("1.000000000000"));
+        // Do the same as the last time, but make the last digit equal to 5.
+        // This should round up.
+        validateInsertStmt("insert into decimaltable values 0.999999999999500;",
+                           new BigDecimal("1.000000000000"));
+        // Do the same as the last time, but make the last digit equal to 4.
+        // This should round down.
+        validateInsertStmt("insert into decimaltable values 0.9999999999994000;",
+                           new BigDecimal("0.999999999999"));
+        // Rounding gives the an extra digit of precision.  Make sure
+        // that we don't take it from the scale.
+        validateInsertStmt("insert into decimaltable values 9.9999999999999999;",
+                           new BigDecimal("10.000000000000"));
+        // Rounding here does *not* give an extra digit of precision.  Make sure
+        // that we still get the expected scale.
+        validateInsertStmt("insert into decimaltable values 9.4999999999999999;",
+                           new BigDecimal("9.500000000000"));
+        //
+        // Test negative numbers.
+        //
+        // Rounding gives the an extra digit of precision.  Make sure
+        // that we don't take it from the scale.
+        validateInsertStmt("insert into decimaltable values -9.9999999999999999;",
+                           new BigDecimal("-10.000000000000"));
+        // Rounding here does *not* give an extra digit of precision.  Make sure
+        // that we still get the expected scale.
+        validateInsertStmt("insert into decimaltable values -9.4999999999999999;",
+                           new BigDecimal("-9.500000000000"));
+        validateInsertStmt("insert into decimaltable values null;", (BigDecimal)null);
+
+        //
+        // For these tests we give both a stored procedure and the
+        // equivalent ad-hoc sql for an insertion and a query.
+        // We execute the stored procedure insertion and query statements
+        // and then the ad hoc procedure and query statements back
+        // to back.  After each we execute the clean procedure.  That
+        // is, we execute:
+        //    callStoredInsertProcedure
+        //    callStoredQueryProcerue
+        //    test that the queried value is what we expect
+        //    cleanup the table
+        //    callAdHocInsertProcedure
+        //    callAdHocQueryProcedure
+        //    test that the queried value is what we expect
+        //    cleanup the table.
+
+        // Insert overscale decimal.  Round up.
+        validateDecimalInsertStmt("INSERT_DECIMAL", "insert into decimaltable values ?",
+                                  new BigDecimal("9.9999999999999999"),
+                                  "FETCH_DECIMAL",  "select dec from decimaltable;",
+                                  new BigDecimal("10.000000000000"),
+                                  "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert overscale decimal with 5 in the 13th digit.  Round up.
+        validateDecimalInsertStmt("INSERT_DECIMAL", "insert into decimaltable values ?",
+                                    new BigDecimal("9.9999999999995"),
+                                    "FETCH_DECIMAL", "select dec from decimaltable;",
+                                    new BigDecimal("10.000000000000"),
+                                    "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert overscale decimal with 4 in the 13th digit.  Round down.
+        validateDecimalInsertStmt("INSERT_DECIMAL", "insert into decimaltable values ?",
+                                    new BigDecimal("9.9999999999994"),
+                                    "FETCH_DECIMAL", "select dec from decimaltable;",
+                                    new BigDecimal("9.999999999999"),
+                                    "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert overscale decimal with 3 in the 13th digit.  Round down.
+        validateDecimalInsertStmt("INSERT_DECIMAL", "insert into decimaltable values ?",
+                                    new BigDecimal("9.9999999999993"),
+                                    "FETCH_DECIMAL", "select dec from decimaltable;",
+                                    new BigDecimal("9.999999999999"),
+                                    "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert overscale decimal, then search for less then the rounded down value.
+        // Expect to find nothing.
+        validateDecimalInsertStmtAdHoc("insert into decimaltable values ?",
+                                    new BigDecimal("9.9999999999994"),
+                                    "select dec from decimaltable where dec < 9.999999999999;",
+                                    null,
+                                    "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert overscale decimal, then search for equal to the rounded down value.
+        // Expect to find the rounded down row.
+        validateDecimalInsertStmtAdHoc("insert into decimaltable values ?",
+                                    new BigDecimal("9.9999999999994"),
+                                    "select dec from decimaltable where dec = 9.999999999999;",
+                                    new BigDecimal("9.999999999999"),
+                                    "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert overscale decimal, then search for equal to the inserted value.
+        // Expect to find the rounded down row, because the 9.9...2 value in the
+        // predicate is rounded as well.
+        validateDecimalInsertStmtAdHoc("insert into decimaltable values ?",
+                                    new BigDecimal("9.9999999999992"),
+                                    "select dec from decimaltable where dec = 9.9999999999992;",
+                                    new BigDecimal("9.999999999999"),
+                                    "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert overscale decimal, then search for less than the inserted value.
+        // Expect to find nothing, because we inserted the rounded down value
+        // and the predicate's right hand constant is rounded to the same value.
+        validateDecimalInsertStmtAdHoc("insert into decimaltable values ?",
+                                    new BigDecimal("9.9999999999992"),
+                                    "select dec from decimaltable where dec < 9.9999999999992;",
+                                    null,
+                                    "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert overscale decimal, search for the rounded down quantity exactly.
+        // Expect to find the rounded down row.
+        validateDecimalInsertStmtAdHoc("insert into decimaltable values ?",
+                                    new BigDecimal("9.9999999999993"),
+                                    "select dec from decimaltable where dec = 9.999999999999;",
+                                    new BigDecimal("9.999999999999"),
+                                    "TRUNCATE TABLE DECIMALTABLE;");
+        // Insert some constants.  Check that the rounded down inserted values
+        // are truncated in the same way that the constants are.
+        validateDecimalQuery("insert into decimaltable values 9.9999999999999999;",
+                             "select dec from decimaltable where dec < 9.9999999999999999;",
+                             "truncate table decimaltable;"
+                             /* No answers expected */
+                             );
+        // Insert some constants.  Check that the rounded down inserted values
+        // are truncated in the same way that the constants are.
+        validateDecimalQuery("insert into decimaltable values 9.9999999999999999;",
+                             "select dec from decimaltable where dec = 9.9999999999999999;",
+                             "truncate table decimaltable;",
+                             new BigDecimal("10.000000000000")
+                             );
+        //
+        // Make sure adding the smallest possible value to the
+        // largest possible value causes an underflow.
+        //
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure("@AdHoc", "insert into decimaltable values 99999999999999999999999999.999999999999;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        verifyStmtFails(client,
+                        "select dec+0.000000000001 from decimaltable;",
+                        "Attempted to add 99999999999999999999999999.999999999999 with 0.000000000001 causing overflow/underflow");
+        cr = client.callProcedure("@AdHoc", "truncate table decimaltable;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        //
+        // Try it again with negative numbers.
+        //
+        cr = client.callProcedure("@AdHoc", "insert into decimaltable values -99999999999999999999999999.999999999999;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        verifyStmtFails(client,
+                        "select dec-0.000000000001 from decimaltable;",
+                        "Attempted to subtract 0.000000000001 from -99999999999999999999999999.999999999999 causing overflow/underflow");
+        cr = client.callProcedure("@AdHoc", "truncate table decimaltable;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    private void validateDecimalInsertStmt(String storedInsProcName,
+                                           String adHocInsSQL,
+                                           BigDecimal parameter,
+                                           String storedProcQueryName,
+                                           String adHocQuerySQL,
+                                           BigDecimal expected,
+                                           String cleanup) throws Exception {
+        validateDecimalInsertStmtProcedure(storedInsProcName, parameter, storedProcQueryName, expected, cleanup);
+        validateDecimalInsertStmtAdHoc(adHocInsSQL, parameter, adHocQuerySQL, expected, cleanup);
+    }
+
+    private void validateDecimalInsertStmtAdHoc(String insertStmt,
+                                           BigDecimal insertValue,
+                                           String fetchStmt,
+                                           BigDecimal expected,
+                                           String cleanupStmt) throws Exception {
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure("@AdHoc", insertStmt, insertValue);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", fetchStmt);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable[] tbls = cr.getResults();
+        assertEquals(1, tbls.length);
+        int idx = 0;
+        VoltTable tbl = tbls[0];
+        while (tbl.advanceRow()) {
+            BigDecimal actual = tbl.getDecimalAsBigDecimal(0);
+            assertNotSame(null, expected);
+            assertEquals(expected, actual);
+        }
+        // A Null expected implies no results are expected.
+        if (expected == null) {
+            assertEquals(0, idx);
+        }
+        cr = client.callProcedure("@AdHoc", cleanupStmt);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+
+    private void validateDecimalInsertStmtProcedure(String insertProcName,
+                                             BigDecimal insertValue,
+                                             String fetchProcName,
+                                             BigDecimal expected,
+                                             String cleanupProcedure) throws Exception {
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure(insertProcName, insertValue);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(fetchProcName);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable[] tbls = cr.getResults();
+        assertEquals(1, tbls.length);
+        VoltTable tbl = tbls[0];
+        int idx = 0;
+        while (tbl.advanceRow()) {
+            BigDecimal actual = tbl.getDecimalAsBigDecimal(idx);
+            assertNotSame(null, expected);
+            assertEquals(expected, actual);
+        }
+        if (expected == null) {
+            assertEquals(0, idx);
+        }
+        cr = client.callProcedure("@AdHoc", cleanupProcedure);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    private void validateDecimalQuery(String insertStmt,
+                                      String fetchStmt,
+                                      String cleanupStmt,
+                                      BigDecimal... expected) throws Exception {
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure("@AdHoc", insertStmt);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", fetchStmt);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable[] resultTable = cr.getResults();
+        int idx = 0;
+        VoltTable tbl = resultTable[0];
+        while (tbl.advanceRow()) {
+            BigDecimal actual = tbl.getDecimalAsBigDecimal(0);
+            assertTrue(idx < expected.length);
+            assertEquals(expected[idx], actual);
+            idx += 1;
+        }
+        assertEquals(idx, expected.length);
+        cr = client.callProcedure("@AdHoc", cleanupStmt);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -97,6 +348,15 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 "xxx bigint " + // default null
                 ");" +
                 "PARTITION TABLE P1 ON COLUMN ccc;" +
+                "CREATE TABLE DECIMALTABLE ( " +
+                "dec decimal" +
+                ");" +
+                "CREATE PROCEDURE INSERT_DECIMAL AS " +
+                "INSERT INTO DECIMALTABLE VALUES ?;" +
+                "CREATE PROCEDURE FETCH_DECIMAL AS " +
+                "SELECT DEC FROM DECIMALTABLE;" +
+                "CREATE PROCEDURE TRUNCATE_DECIMAL AS " +
+                "TRUNCATE TABLE DECIMALTABLE;" +
                 ""
                 ;
         try {

@@ -105,7 +105,9 @@ AbstractExpression::initParamShortCircuits()
 std::string
 AbstractExpression::debug() const
 {
-    if (this == NULL) {
+    // Subvert a g++ error message;
+    const AbstractExpression *thisProxy = this;
+    if (thisProxy == NULL) {
         return "NULL";
     }
     std::ostringstream buffer;
@@ -117,7 +119,9 @@ AbstractExpression::debug() const
 std::string
 AbstractExpression::debug(bool traverse) const
 {
-    if (this == NULL) {
+    // Subvert a g++ error message;
+    const AbstractExpression *thisProxy = this;
+    if (thisProxy == NULL) {
         return "NULL";
     }
     return (traverse ? debug(std::string("")) : debug());
@@ -126,7 +130,9 @@ AbstractExpression::debug(bool traverse) const
 std::string
 AbstractExpression::debug(const std::string &spacer) const
 {
-    if (this == NULL) {
+    // Subvert a g++ error message;
+    const AbstractExpression *thisProxy = this;
+    if (thisProxy == NULL) {
         return "NULL";
     }
     std::ostringstream buffer;
