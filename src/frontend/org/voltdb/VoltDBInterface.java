@@ -175,7 +175,7 @@ public interface VoltDBInterface
 
     public boolean getReplicationActive();
 
-    public NodeDRGateway getNodeDRGateway();
+    public ProducerDRGateway getNodeDRGateway();
 
     public ConsumerDRGateway getConsumerDRGateway();
 
