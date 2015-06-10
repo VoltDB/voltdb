@@ -133,24 +133,10 @@ public class ImportHandler {
         }
 
         if (catProc == null) {
-            if (proc.equals("@AdHoc")) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(proc);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-            if (catProc == null) {
-                m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
-                m_failedCount.incrementAndGet();
-                return false;
-            }
+            m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
+            m_failedCount.incrementAndGet();
+            return false;
         }
-
         int counter = 1;
         int maxSleepNano = 100000;
         long start = System.nanoTime();
