@@ -134,6 +134,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.text.SimpleDateFormat;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -325,6 +326,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
+    String m_licenseInformation;
     private LatencyStats m_latencyStats;
 
     private LatencyHistogramStats m_latencyHistogramStats;
@@ -332,6 +334,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Override
     public LicenseApi getLicenseApi() {
         return m_licenseApi;
+    }
+
+    @Override
+    public String getLicenseInformation() {
+        return m_licenseInformation;
     }
 
     /**
@@ -503,6 +510,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
                         "See previous log message for details.", false, null);
             }
+
+            Map<String, String> licprops = new HashMap<String, String>();
+            SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
+            licprops.put("trial", Boolean.toString(m_licenseApi.isTrial()));
+            licprops.put("hostcount", Integer.toString(m_licenseApi.maxHostcount()));
+            licprops.put("commandlogging", Boolean.toString(m_licenseApi.isCommandLoggingAllowed()));
+            licprops.put("wanreplication", Boolean.toString(m_licenseApi.isDrReplicationAllowed()));
+            licprops.put("expiration", sdf.format(m_licenseApi.expires().getTime()));
+            JSONObject jo = new JSONObject(licprops);
+            m_licenseInformation = jo.toString();
 
             // Create the GlobalServiceElector.  Do this here so we can register the MPI with it
             // when we construct it below
