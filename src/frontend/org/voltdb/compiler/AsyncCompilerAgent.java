@@ -225,7 +225,12 @@ public class AsyncCompilerAgent {
         work.completionHandler.onCompletion(result);
     }
 
-    AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {
+    public static final String AdHocErrorResponseMessage =
+            "The @AdHoc stored procedure when called with more than one parameter "
+                    + "must be passed a single parameterized SQL statement as its first parameter. "
+                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
+
+    AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
@@ -246,6 +251,13 @@ public class AsyncCompilerAgent {
         // when the batch has one statement.
         StatementPartitioning partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
+
+        if (work.userParamSet != null && work.userParamSet.length > 0) {
+            if (work.sqlStatements.length != 1) {
+                return AsyncCompilerResult.makeErrorResult(work, AdHocErrorResponseMessage);
+            }
+        }
+
         for (final String sqlStatement : work.sqlStatements) {
             if (inferSP) {
                 partitioning = StatementPartitioning.inferPartitioning();
@@ -256,7 +268,8 @@ public class AsyncCompilerAgent {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
+                        work.isExplainWork, work.userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
