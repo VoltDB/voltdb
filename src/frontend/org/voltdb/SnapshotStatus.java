@@ -17,18 +17,44 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
-import org.voltcore.utils.Pair;
 
 public class SnapshotStatus extends StatsSource {
+
+    enum SNAPSHOT_TYPE {
+        AUTO_SNAPSHOT,
+        MANUAL_SNAPSHOT,
+        TRUNCATION_SNAPSHOT
+    };
+
+    private File m_truncationSnapshotPath = null;
+    private File m_autoSnapshotPath = null;
+
+    public void setSnapshotPath(String truncationSnapshotPathStr, String autoSnapshotPathStr) {
+        m_truncationSnapshotPath = new File(truncationSnapshotPathStr);
+        m_autoSnapshotPath = new File(autoSnapshotPathStr);
+    }
+
+    private String getSnapshotType(String path) {
+        File thisSnapshotPath = new File(path);
+        if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
+            return SNAPSHOT_TYPE.TRUNCATION_SNAPSHOT.name();
+        }
+        else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
+            return SNAPSHOT_TYPE.AUTO_SNAPSHOT.name();
+        }
+        return SNAPSHOT_TYPE.MANUAL_SNAPSHOT.name();
+    }
 
     /**
      * Since there are multiple tables inside a Snapshot object, and we cannot
@@ -81,6 +107,7 @@ public class SnapshotStatus extends StatsSource {
         columns.add(new ColumnInfo("TABLE", VoltType.STRING));
         columns.add(new ColumnInfo("PATH", VoltType.STRING));
         columns.add(new ColumnInfo("FILENAME", VoltType.STRING));
+        columns.add(new ColumnInfo("TYPE", VoltType.STRING));
         columns.add(new ColumnInfo("NONCE", VoltType.STRING));
         columns.add(new ColumnInfo("TXNID", VoltType.BIGINT));
         columns.add(new ColumnInfo("START_TIME", VoltType.BIGINT));
@@ -109,6 +136,7 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("TABLE")] = t.name;
         rowValues[columnNameToIndex.get("PATH")] = s.path;
         rowValues[columnNameToIndex.get("FILENAME")] = t.filename;
+        rowValues[columnNameToIndex.get("TYPE")] = getSnapshotType(s.path);
         rowValues[columnNameToIndex.get("NONCE")] = s.nonce;
         rowValues[columnNameToIndex.get("TXNID")] = s.txnId;
         rowValues[columnNameToIndex.get("START_TIME")] = timeStarted;
