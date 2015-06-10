@@ -81,7 +81,8 @@ public class TestJDBCSecurityEnabled {
         new UserInfo("userWithAllProcPerm", "password", new String[] {"GroupWithAllProcPerm"}),
         new UserInfo("userWithNoPerm", "password", new String[] {"GroupWithNoPerm"}),
         new UserInfo("userWithNoPerm2", "password", new String[] {"GroupWithNoPerm2"}),
-        new UserInfo("userWithDefaultUserPerm", "password", new String[] {"User"}) // user of default User Group
+        new UserInfo("userWithDefaultUserPerm", "password", new String[] {"User"}), // user of default User Group
+        new UserInfo("userWithDefaultAdminPerm", "password", new String[] {"ADMINISTRATOR"}) // user of default "ADMINISTRATOR" Group
     };
 
     public static final ProcedureInfo[] PROCEDURES = {
@@ -103,6 +104,7 @@ public class TestJDBCSecurityEnabled {
         put("userWithNoPerm", new Boolean[] {false,false,false,false,false,false,true,true});
         put("userWithNoPerm2", new Boolean[] {false,false,false,false,false,false,false,true});
         put("userWithDefaultUserPerm", new Boolean[] {true,true,false,true,true,true,true,true});
+        put("userWithDefaultAdminPerm", new Boolean[] {true,true,true,true,true,true,true,true});
     }};
 
     @BeforeClass
