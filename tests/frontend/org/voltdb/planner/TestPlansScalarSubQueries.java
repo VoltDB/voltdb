@@ -39,6 +39,7 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.QuantifierType;
@@ -362,6 +363,62 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
             assertEquals(ExpressionType.COMPARE_GREATERTHAN, pred.getExpressionType());
             assertEquals(QuantifierType.ALL, ((ComparisonExpression) pred).getQuantifier());
             assertEquals(ExpressionType.ROW_SUBQUERY, pred.getLeft().getExpressionType());
+        }
+    }
+
+    public void testUnion() {
+        {
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "    select * from R5)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            assertEquals(0, selSubq.getArgs().size()); // no correlation params
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "    where outer_tbl.a = c "
+                            + "  union "
+                            + "    select * from R5)");
+            System.out.println(pn.toExplainPlanString());
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
         }
     }
 
