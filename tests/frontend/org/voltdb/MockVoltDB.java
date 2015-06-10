@@ -617,6 +617,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getLicenseInformation() {
+        return "";
+    }
+
+    @Override
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work)
     {
         return null;
