@@ -534,6 +534,18 @@ public class TestSubQueriesSuite extends RegressionSuite {
                             " EXCEPT SELECT ID from R2 WHERE ID <= 2) order by ID;").getResults()[0];
             //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{3}, {4}, {5}});
+
+            // Now let's try a correlated subquery.
+            vt = client.callProcedure("@AdHoc",
+                    "select ID "
+                    + "from " + tb + " as outer_tbl "
+                    + "where ID = all (" +
+                    "      select id from r1 where id = outer_tbl.id " +
+                    "    UNION "
+                    + "    select id from r2 where id = outer_tbl.id  + 2"
+                    + ")")
+                    .getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{4}, {5}});
         }
     }
 
@@ -1615,6 +1627,151 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID having MAX(WAGE) > 9 offset 2)").getResults()[0];
         validateTableOfLongs(vt, new long[][] { });
 
+    }
+
+    public void testEng8394SubqueryWithUnionAndCorrelation() throws Exception {
+        Client client = getClient();
+
+        Object[][] paramsArray = {
+            {8, "MkqCtZgvOHdpeG", -25010, 6.94485579315452628002e-01 },
+            {9, "MkqCtZgvOHdpeG", -25010, 5.09864294045922816778e-01},
+            {10, "MkqCtZgvOHdpeG", -18299, 7.41008138128985693882e-02},
+            {11, "MkqCtZgvOHdpeG", -18299, 1.60503696919861771342e-01},
+            {12, "BQIdkCDzTcGaTW", -17683, 3.32297930030505339616e-01},
+            {13, "BQIdkCDzTcGaTW", -17683, 7.72335099708186811895e-01},
+            {14, "BQIdkCDzTcGaTW", null, 2.89585585895251185207e-02},
+            {15, "BQIdkCDzTcGaTW", null, 6.75424182636293113369e-01}
+        };
+
+        for (Object[] params : paramsArray) {
+            client.callProcedure("R4.Insert", params);
+        }
+
+        // In this bug, we were getting an invalid cast here, because
+        // we were peeking at the stale VARCHAR parameter from the insert statement
+        // when trying to evaluate the outer reference in the subquery.
+        // The correct answer is zero rows.
+        String subqueryWithUnionAndCorrelation =
+                "SELECT ID, RATIO "
+                + "FROM R4 Z "
+                + "WHERE RATIO > ("
+                + "    SELECT RATIO "
+                + "    FROM R4 "
+                + "    WHERE RATIO = Z.RATIO "
+                + "  UNION "
+                + "    SELECT RATIO "
+                + "    FROM R4 "
+                + "    WHERE RATIO = Z.RATIO); ";
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                subqueryWithUnionAndCorrelation)
+                .getResults()[0];
+        assertFalse(vt.advanceRow());
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT RATIO "
+                + "FROM R4 "
+                + "WHERE RATIO = 0.6944855793154526 "
+                + "UNION "
+                + "  SELECT RATIO "
+                + "  FROM R4 "
+                + "  WHERE RATIO = 0.6944855793154526;")
+                .getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(0.6944855793154526, vt.getDouble(0), 0.000001);
+        assertFalse(vt.advanceRow());
+
+        // Before the bug was fixed we saw a wrong answer here when
+        // we picked up the stale double parameter from the previous query.
+        vt = client.callProcedure("@AdHoc",
+                subqueryWithUnionAndCorrelation)
+                .getResults()[0];
+        assertFalse(vt.advanceRow());
+
+        // Another case found by sqlcoverage.  This was ENG-8391.
+        client.callProcedure("R4.Insert", new Object[]
+                {16, "IYMzTgzZjBNgji", null, 3.03873080947161366971e-01});
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT ID, DESC "
+                + "FROM R4 Z "
+                + "WHERE DESC > ("
+                + "    SELECT DESC "
+                + "    FROM R4 WHERE "
+                + "    DESC <> Z.DESC "
+                + "  INTERSECT ALL "
+                + "    SELECT DESC "
+                + "    FROM R4 "
+                + "    WHERE DESC = Z.DESC)")
+                .getResults()[0];
+        assertFalse(vt.advanceRow());
+
+        // ENG-8393
+        client.callProcedure("R4.Insert", new Object[]
+                {17, "MkqCtZgvOHdpeG", -25010, 6.94485579315452628002e-01});
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT ID, NUM "
+                + "FROM R4 Z "
+                + "WHERE NUM > ("
+                + "    SELECT NUM "
+                + "    FROM R4 "
+                + "    WHERE NUM = Z.NUM "
+                + "  UNION "
+                + "    SELECT NUM "
+                + "    FROM R4 "
+                + "    WHERE NUM = Z.NUM);")
+                .getResults()[0];
+        assertFalse(vt.advanceRow());
+
+        // ENG-8395
+        client.callProcedure("R4.Insert", new Object[]
+                {18, "MkqCtZgvOHdpeG", -25010, 6.94485579315452628002e-01});
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT ID, NUM "
+                + "FROM R4 Z "
+                + "WHERE NUM > ("
+                + "    SELECT NUM "
+                + "    FROM R4 "
+                + "    WHERE NUM = Z.NUM "
+                + "  INTERSECT ALL "
+                + "    SELECT NUM "
+                + "    FROM R4 "
+                + "    WHERE NUM <> Z.NUM); ")
+                .getResults()[0];
+        assertFalse(vt.advanceRow());
+
+        // ENG-8396.  In this one the "more than one row" error is expected.
+        paramsArray = new Object[][] {
+                {19, "MkqCtZgvOHdpeG", -25010, 6.94485579315452628002e-01},
+                {20, "MkqCtZgvOHdpeG", -25010, 5.09864294045922816778e-01},
+                {21, "MkqCtZgvOHdpeG", -18299, 7.41008138128985693882e-02},
+                {22, "MkqCtZgvOHdpeG", -18299, 1.60503696919861771342e-01},
+                {23, "BQIdkCDzTcGaTW", -17683, 3.32297930030505339616e-01},
+                {24, "BQIdkCDzTcGaTW", -17683, 7.72335099708186811895e-01},
+                {25, "BQIdkCDzTcGaTW", null, 2.89585585895251185207e-02},
+                {26, "BQIdkCDzTcGaTW", null, 6.75424182636293113369e-01}
+        };
+
+        for (Object[] params : paramsArray) {
+            client.callProcedure("R4.Insert", params);
+        }
+
+        String expectedError = isHSQL() ?
+                "cardinality violation" : "More than one row returned by a scalar/row subquery";
+        verifyStmtFails(client,
+                "SELECT ID ID7, ID "
+                + "FROM R4 Z "
+                + "WHERE ID > ("
+                + "    SELECT ID "
+                + "    FROM R4 "
+                + "    WHERE ID = Z.ID "
+                + "  UNION ALL "
+                + "    SELECT ID "
+                + "    FROM R4 "
+                + "    WHERE ID = Z.ID);",
+                expectedError);
     }
 
     static public junit.framework.Test suite()
