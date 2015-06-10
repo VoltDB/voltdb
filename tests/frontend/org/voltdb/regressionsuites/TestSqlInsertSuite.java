@@ -99,10 +99,25 @@ public class TestSqlInsertSuite extends RegressionSuite {
         // This should round down.
         validateInsertStmt("insert into decimaltable values 0.9999999999994000;",
                            new BigDecimal("0.999999999999"));
-        Client client = getClient();
-        verifyStmtFails(client,
-                        "insert into decimaltable values 999999999999999999999999999999999999999999.0;",
-                        "has more than 38 digits of precision.");
+        // Rounding gives the an extra digit of precision.  Make sure
+        // that we don't take it from the scale.
+        validateInsertStmt("insert into decimaltable values 9.9999999999999999;",
+                           new BigDecimal("10.000000000000"));
+        // Rounding here does *not* give an extra digit of precision.  Make sure
+        // that we still get the expected scale.
+        validateInsertStmt("insert into decimaltable values 9.4999999999999999;",
+                           new BigDecimal("9.500000000000"));
+        //
+        // Test negative numbers.
+        //
+        // Rounding gives the an extra digit of precision.  Make sure
+        // that we don't take it from the scale.
+        validateInsertStmt("insert into decimaltable values -9.9999999999999999;",
+                           new BigDecimal("-10.000000000000"));
+        // Rounding here does *not* give an extra digit of precision.  Make sure
+        // that we still get the expected scale.
+        validateInsertStmt("insert into decimaltable values -9.4999999999999999;",
+                           new BigDecimal("-9.500000000000"));
         validateInsertStmt("insert into decimaltable values null;", (BigDecimal)null);
     }
 
