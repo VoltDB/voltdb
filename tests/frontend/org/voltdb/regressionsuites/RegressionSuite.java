@@ -405,8 +405,6 @@ public class RegressionSuite extends TestCase {
                 ex.printStackTrace();
                 fail();
             }
-            // Long.MIN_VALUE is like a NULL
-
             if (expected[i] != null) {
                 assertNotSame(null, actual);
                 assertEquals(expected[i], actual);
