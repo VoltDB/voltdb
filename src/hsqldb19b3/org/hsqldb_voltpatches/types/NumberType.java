@@ -1864,7 +1864,6 @@ public final class NumberType extends Type {
          }
      }
     // End of VoltDB extension
-
     public Object floor(Object a) {
 
         if (a == null) {

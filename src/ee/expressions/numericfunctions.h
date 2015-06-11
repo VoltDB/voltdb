@@ -201,7 +201,10 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     return retval;
 }
 
-
+// C99: The % operator in C is not the modulo operator but the remainder operator.
+// http://stackoverflow.com/questions/11720656/modulo-operation-with-negative-numbers
+// For different vendors like MySQL, Oracle, SQL Server,
+// the MOD functions is actually calculating the reminder.
 template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& base = arguments[0];

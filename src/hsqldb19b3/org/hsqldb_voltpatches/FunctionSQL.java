@@ -828,7 +828,6 @@ public class FunctionSQL extends Expression {
                         ((NumberType) nodes[0].dataType).mod(data[0],
                                 data[1]);
                 // End of VoltDB extension
-                
                 // result type is the same as argList[1]
                 return ((NumberType) dataType).convertToTypeLimits(session,
                         value);
