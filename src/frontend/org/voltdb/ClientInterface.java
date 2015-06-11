@@ -2257,7 +2257,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             writeResponseToConnection(new ClientResponseImpl(
                                     ClientResponseImpl.SERVER_UNAVAILABLE,
                                     new VoltTable[0],
-                                    "Server is paused and is available in read-only mode only - please try again later",
+                                    "Server is paused and is available in read-only mode - please try again later",
                                     result.clientHandle));
                         } else {
                             ExplainMode explainMode = plannedStmtBatch.getExplainMode();
@@ -2369,7 +2369,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
 
-            private void writeResponseToConnection(ClientResponseImpl response) {
+            private final void writeResponseToConnection(ClientResponseImpl response) {
                 ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
                 buf.putInt(buf.capacity() - 4);
                 response.flattenToBuffer(buf);

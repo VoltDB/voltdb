@@ -1094,6 +1094,15 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public String getListenerAddress(int hostId) {
+        return getListenerAddress(hostId, false);
+    }
+
+    @Override
+    public String getAdminAddress(int hostId) {
+        return getListenerAddress(hostId, true);
+    }
+
+    private String getListenerAddress(int hostId, boolean useAdmin) {
         if (!m_running) {
             return null;
         }
@@ -1105,11 +1114,16 @@ public class LocalCluster implements VoltServerConfig {
                 Process p = m_cluster.get(i);
                 // if the process is alive, or is the in-process server
                 if ((p != null) || (i == 0 && m_hasLocalServer)) {
-                    return "localhost:" + cl.m_port;
+                    return "localhost:" + (useAdmin ? cl.m_adminPort : cl.m_port);
                 }
             }
         }
         return null;
+    }
+
+    @Override
+    public int getListenerCount() {
+        return m_cmdLines.size();
     }
 
     @Override

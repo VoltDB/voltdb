@@ -29,6 +29,7 @@ import java.util.Random;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -396,6 +397,50 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertTrue(true);
     }
 
+    public void testPause() throws Exception {
+        Client client = getClient();
+        VoltTable[] results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
+        for (VoltTable result : results) {
+            assertEquals(0, result.asScalarLong());
+        }
+
+        // pause
+        Client admin = getAdminClient();
+        ClientResponse resp = admin.callProcedure("@Pause");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        try {
+            client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (10);");
+            fail();
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        try {
+            resp = client.callProcedure("@UpdateLogging", m_loggingConfig);
+            fail();
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        resp = client.callProcedure("@Ping");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        resp = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM pause_test_tbl");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(0, resp.getResults()[0].asScalarLong());
+        resp = client.callProcedure("pauseTestCount");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(0, resp.getResults()[0].asScalarLong());
+
+        // resume
+        resp = admin.callProcedure("@Resume");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
+        for (VoltTable result : results) {
+            assertEquals(0, result.asScalarLong());
+        }
+    }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
@@ -434,11 +479,15 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         ");\n" +
                         "CREATE TABLE NEW_ORDER (\n" +
                         "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
+                        ");\n" +
+                        "CREATE TABLE PAUSE_TEST_TBL (\n" +
+                        "  TEST_ID SMALLINT DEFAULT '0' NOT NULL\n" +
                         ");\n");
 
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
+        project.addStmtProcedure("pauseTestCount", "SELECT COUNT(*) FROM pause_test_tbl");
 
         /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
                                   BackendTarget.NATIVE_EE_JNI);
@@ -452,7 +501,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.SITES, TestSystemProcedureSuite.HOSTS, TestSystemProcedureSuite.KFACTOR,
                                   BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
-        boolean success = config.compile(project);
+        //boolean success = config.compile(project);
+        boolean success = config.compileWithAdminMode(project, VoltDB.DEFAULT_ADMIN_PORT, false);
         assertTrue(success);
         builder.addServerConfig(config);
 
