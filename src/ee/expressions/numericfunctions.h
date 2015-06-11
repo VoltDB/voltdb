@@ -201,6 +201,19 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     return retval;
 }
 
+/**
+ * FYI, http://stackoverflow.com/questions/7594508/modulo-operator-with-negative-values
+ *
+ * It looks like having any negative operand results in undefined behavior,
+ * meaning different C++ compilers could get different answers here.
+ * In C++2003, the modulo operator (%) is implementation defined.
+ * In C++2011 the policy is slavish devotion to Fortran semantics. This makes sense because,
+ * apparently, all the current hardware uses Fortran semantics anyway. So, even if it's implementation
+ * defined it's likely to be implementation defined in the same way.
+ *
+ * FYI, Fortran semantics: https://gcc.gnu.org/onlinedocs/gfortran/MOD.html
+ * It has the same semantics with C99 as: (a / b) * b + MOD(a,b)  == a
+ */
 template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& base = arguments[0];
@@ -229,9 +242,6 @@ template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& argum
     int64_t baseValue = base.castAsBigIntAndGetValue();
     int64_t divisorValue = divisor.castAsBigIntAndGetValue();
 
-    // http://stackoverflow.com/questions/7594508/modulo-operator-with-negative-values
-    // It looks like having exactly one negative operand results in undefined behavior,
-    // meaning different C++ compilers could get different answers here.
     int64_t result = std::abs(baseValue) % std::abs(divisorValue);
     if (baseValue < 0) {
         result *= -1;
