@@ -127,6 +127,193 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     };
 
+    class SpDurabilityListener implements DurabilityListener {
+
+        // AsyncSpCompletionChecks
+        class CompletionChecks {
+            long m_lastSpUniqueId;
+
+            CompletionChecks(long lastSpUniqueId) {
+                m_lastSpUniqueId = lastSpUniqueId;
+            }
+
+            CompletionChecks startNewCheckList(int startSize) {
+                return new CompletionChecks(m_lastSpUniqueId);
+            }
+
+            void addTask(TransactionTask task) {
+                m_lastSpUniqueId = task.m_txnState.uniqueId;
+            }
+
+            public int getTaskListSize() {
+                return 0;
+            }
+
+            void processChecks() {
+                m_drGateway.uniqueIdDurable(m_lastSpUniqueId);
+            }
+        };
+
+        class AsyncMpCompletionChecks extends CompletionChecks {
+            long m_lastMpUniqueId;
+
+            AsyncMpCompletionChecks(long lastSpUniqueId, long lastMpUniqueId) {
+                super(lastSpUniqueId);
+                m_lastMpUniqueId = lastMpUniqueId;
+            }
+
+            @Override
+            CompletionChecks startNewCheckList(int startSize) {
+                return new AsyncMpCompletionChecks(m_lastSpUniqueId, m_lastMpUniqueId);
+            }
+
+            @Override
+            void addTask(TransactionTask task) {
+                m_lastSpUniqueId = task.m_txnState.uniqueId;
+                if (!task.m_txnState.isSinglePartition()) {
+                    m_lastMpUniqueId = m_lastSpUniqueId;
+                }
+            }
+
+            @Override
+            void processChecks() {
+                super.processChecks();
+                m_drGatewayMP.uniqueIdDurable(m_lastMpUniqueId);
+            }
+        };
+
+        class SyncSpCompletionChecks extends CompletionChecks {
+            ArrayList<TransactionTask> m_pendingTransactions;
+
+            public SyncSpCompletionChecks(long lastSpUniqueId, int startSize) {
+                super(lastSpUniqueId);
+                m_pendingTransactions = new ArrayList<TransactionTask>(startSize);
+            }
+
+            @Override
+            CompletionChecks startNewCheckList(int startSize) {
+                return new SyncSpCompletionChecks(m_lastSpUniqueId, startSize);
+            }
+
+            @Override
+            void addTask(TransactionTask task) {
+                m_pendingTransactions.add(task);
+                m_lastSpUniqueId = task.m_txnState.uniqueId;
+            }
+
+            @Override
+            public int getTaskListSize() {
+                return m_pendingTransactions.size();
+            }
+
+            @Override
+            void processChecks() {
+                for (TransactionTask o : m_pendingTransactions) {
+                    m_pendingTasks.offer(o);
+                    // Make sure all queued tasks for this MP txn are released
+                    if (!o.getTransactionState().isSinglePartition()) {
+                        offerPendingMPTasks(o.getTxnId());
+                    }
+                }
+                super.processChecks();
+            }
+        }
+
+        class SyncMpCompletionChecks extends SyncSpCompletionChecks {
+            long m_lastMpUniqueId;
+
+            public SyncMpCompletionChecks(long lastSpUniqueId, long lastMpUniqueId, int startSize) {
+                super(lastSpUniqueId, startSize);
+                m_lastMpUniqueId = lastMpUniqueId;
+            }
+
+            @Override
+            CompletionChecks startNewCheckList(int startSize) {
+                return new SyncMpCompletionChecks(m_lastSpUniqueId, m_lastMpUniqueId, startSize);
+            }
+
+            @Override
+            void addTask(TransactionTask task) {
+                m_pendingTransactions.add(task);
+                m_lastSpUniqueId = task.m_txnState.uniqueId;
+                if (!task.m_txnState.isSinglePartition()) {
+                    m_lastMpUniqueId = m_lastSpUniqueId;
+                }
+            }
+
+            @Override
+            public int getTaskListSize() {
+                return m_pendingTransactions.size();
+            }
+
+            @Override
+            void processChecks() {
+                super.processChecks();
+            }
+        }
+
+        final ArrayDeque<CompletionChecks> m_writingTransactionLists =
+                new ArrayDeque<CompletionChecks>(4);
+
+        CompletionChecks m_currentCompletionChecks = null;
+
+        @Override
+        public void onDurability() {
+            final CompletionChecks m_currentChecks = m_writingTransactionLists.poll();
+            final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
+                @Override
+                void run() {
+                    assert(m_currentChecks != null);
+                    synchronized (m_lock) {
+                        m_currentChecks.processChecks();
+                    }
+                }
+            };
+            if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
+                m_tasks.offer(r);
+            } else {
+                r.run();
+            }
+        }
+
+        @Override
+        public void addTransaction(TransactionTask pendingTask) {
+            m_currentCompletionChecks.addTask(pendingTask);
+        }
+
+        @Override
+        public void startNewTaskList(int nextStartTaskListSize) {
+            m_writingTransactionLists.offer(m_currentCompletionChecks);
+            m_currentCompletionChecks = m_currentCompletionChecks.startNewCheckList(nextStartTaskListSize);
+        }
+
+        @Override
+        public int getNumberOfTasks() {
+            return m_currentCompletionChecks.getTaskListSize();
+        }
+
+        @Override
+        public void createFirstCompletionCheck(boolean isSyncLogging, boolean haveMpGateway) {
+            if (isSyncLogging) {
+                if (haveMpGateway) {
+                    m_currentCompletionChecks = new SyncMpCompletionChecks(Long.MIN_VALUE, Long.MIN_VALUE, 16);
+                }
+                else {
+                    m_currentCompletionChecks = new SyncSpCompletionChecks(Long.MIN_VALUE, 16);
+                }
+            }
+            else {
+                if (haveMpGateway) {
+                    m_currentCompletionChecks = new AsyncMpCompletionChecks(Long.MIN_VALUE, Long.MIN_VALUE);
+                }
+                else {
+                    m_currentCompletionChecks = new CompletionChecks(Long.MIN_VALUE);
+                }
+            }
+        }
+    }
+
+
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
 
@@ -140,6 +327,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
     private PartitionDRGateway m_drGateway = new PartitionDRGateway();
+    private PartitionDRGateway m_drGatewayMP = null;
     private final SnapshotCompletionMonitor m_snapMonitor;
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
@@ -157,31 +345,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         super(partitionId, taskQueue);
         m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
         m_snapMonitor = snapMonitor;
-        m_durabilityListener = new DurabilityListener() {
-            @Override
-            public void onDurability(final ArrayList<Object> durableThings) {
-                final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
-                    @Override
-                    void run() {
-                        synchronized (m_lock) {
-                            for (Object o : durableThings) {
-                                m_pendingTasks.offer((TransactionTask)o);
-
-                                // Make sure all queued tasks for this MP txn are released
-                                if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
-                                    offerPendingMPTasks(((TransactionTask) o).getTxnId());
-                                }
-                            }
-                        }
-                    }
-                };
-                if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
-                    m_tasks.offer(r);
-                } else {
-                    r.run();
-                }
-            }
-        };
+        m_durabilityListener = new SpDurabilityListener();
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
@@ -199,14 +363,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
-    public void setDRGateway(PartitionDRGateway gateway)
+    public long setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
+        return
     }
 
     public void setMpDRGateway(final PartitionDRGateway mpGateway)
     {
-        // intentionally blank placeholder
+        m_drGatewayMP = mpGateway;
+        if (m_cl != null) {
+            m_durabilityListener.createFirstCompletionCheck(m_cl.isSynchronous(), m_drGatewayMP != null);
+        }
     }
 
     @Override
@@ -1001,6 +1169,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
+        m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), m_drGatewayMP != null);
+        m_cl.registerDurabilityListener(m_durabilityListener);
     }
 
     @Override
