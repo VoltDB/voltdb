@@ -65,6 +65,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         // integral types
         validateTableOfScalarLongs(client, "select MOD(25,7) from R1", new long[]{4});
+        validateTableOfScalarLongs(client, "select MOD(25,-7) from R1", new long[]{4});
         validateTableOfScalarLongs(client, "select MOD(-25,7) from R1", new long[]{-4});
         validateTableOfScalarLongs(client, "select MOD(-25,-7) from R1", new long[]{-4});
 

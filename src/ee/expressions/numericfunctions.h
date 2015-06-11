@@ -201,10 +201,6 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     return retval;
 }
 
-// C99: The % operator in C is not the modulo operator but the remainder operator.
-// http://stackoverflow.com/questions/11720656/modulo-operation-with-negative-numbers
-// For different vendors like MySQL, Oracle, SQL Server,
-// the MOD functions is actually calculating the reminder.
 template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& base = arguments[0];
@@ -232,7 +228,16 @@ template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& argum
     NValue retval(divisorType);
     int64_t baseValue = base.castAsBigIntAndGetValue();
     int64_t divisorValue = divisor.castAsBigIntAndGetValue();
-    return getBigIntValue(baseValue % divisorValue);
+
+    // http://stackoverflow.com/questions/7594508/modulo-operator-with-negative-values
+    // It looks like having exactly one negative operand results in undefined behavior,
+    // meaning different C++ compilers could get different answers here.
+    int64_t result = std::abs(baseValue) % std::abs(divisorValue);
+    if (baseValue < 0) {
+        result *= -1;
+    }
+
+    return getBigIntValue(result);
 }
 
 }
