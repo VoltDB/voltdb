@@ -49,7 +49,8 @@ public class ImportProcessor implements ImportDataProcessor {
         //create properties for osgi
         m_frameworkProps = new HashMap<String, String>();
         //Need this so that ImportContext is available.
-        m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0");
+        m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0,org.voltdb.utils;version=1.0.0," +
+                "org.voltdb.client;version=1.0.0,kafka.consumer;version=1.0.0");
         // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
         //m_frameworkProps.put("felix.cache.rootdir", "/tmp"); ?? Should this be under voltdbroot?
         m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
@@ -106,6 +107,7 @@ public class ImportProcessor implements ImportDataProcessor {
             ImportHandlerProxy importHandlerProxy = null;
             BundleWrapper wrapper = null;
             if (moduleType.equalsIgnoreCase("osgi")) {
+                m_logger.warn("ImportProcessor: osgi");
                 Framework framework = m_frameworkFactory.newFramework(m_frameworkProps);
                 framework.start();
 
@@ -124,6 +126,7 @@ public class ImportProcessor implements ImportDataProcessor {
                 //Save bundle and properties
                 wrapper = new BundleWrapper(bundle, framework, importHandlerProxy, properties);
             } else {
+                m_logger.warn("ImportProcessor: ClassLoader");
                 //Class based importer.
                 Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
                 if (reference == null) {

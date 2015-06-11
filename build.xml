@@ -237,7 +237,7 @@ PRIMARY ENTRY POINTS
 -->
 
 <target name="default"
-    depends="compile, ee, voltdb.jar, voltdbclient.jar, socketstream.jar"
+    depends="compile, ee, voltdb.jar, voltdbclient.jar, socketstream.jar, kafkastream.jar"
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
@@ -338,7 +338,7 @@ PRIMARY ENTRY POINTS
     description="Do all tasks."
 />
 <target name="jars"
-    depends="voltdb.jar, voltdbfat.jar, voltdbclient.jar, socketstream.jar"
+    depends="voltdb.jar, voltdbfat.jar, voltdbclient.jar, socketstream.jar, kafkastream.jar"
     description="Create production JAR files."
 />
 <target name="dist"
@@ -440,7 +440,7 @@ DISTRIBUTION
 
 <!-- dist_internal_core populates the core distribution components needed by all
      distributions except tools. -->
-<target name="dist_internal_core" depends="compile, ee, javadoc, voltdb.jar, voltdbclient.jar, socketstream.jar, bindoc">
+<target name="dist_internal_core" depends="compile, ee, javadoc, voltdb.jar, voltdbclient.jar, socketstream.jar, kafkastream.jar, bindoc">
     <!-- prepare release directory for new content -->
     <delete includeemptydirs="true" failonerror='false'>
         <fileset dir="${dist.dir}" includes="**/*" />
@@ -887,6 +887,11 @@ JAR BUILDING
 </target>
 <target name="socketstream.jar" depends="compile, buildinfo">
     <ant antfile="build-socketstream.xml" target="socketstream.jar" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
+</target>
+<target name="kafkastream.jar" depends="compile, buildinfo">
+    <ant antfile="build-kafkastream.xml" target="kafkastream.jar" inheritAll="false">
         <property name="build" value="${build}"/>
     </ant>
 </target>
