@@ -344,25 +344,25 @@ public class TestUnion extends PlannerTestCase {
 
     public void testInvalidOrderBy() {
         String errorMsg = "invalid ORDER BY expression";
+        // hsqldb 1.9 parser does not like ORDER BY expression operating on output columns
         failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by C+1", errorMsg);
+        // Column B is not avaiable
         failToCompile("(select C from T3 UNION select B from T2) order by B", errorMsg);
+        // ORDER BY is not at the end of the UNION SQL clause
         failToCompile("select C from T3 UNION select A from T1 order by A UNION select B from T2", errorMsg);
 
-        // order by in the union has to be at the last part
+        // ORDER BY in the union has to be at the last part of the query
         failToCompile("select C from T3 UNION select A from T1 order by C UNION select B from T2", "unexpected token: UNION");
 
+        // C is not available in ORDER BY clause "abs(C)"
         failToCompile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by abs(C)", errorMsg);
 
+        // hsqldb 1.9 parser does not like ORDER BY expression operating on output columns
         failToCompile("select C from T3 UNION select B from T2 order by C+1", errorMsg);
 
-        // order by expression
+        // ORDER BY expression
         // voltdb has exception for type match on the output columns. expression that may change its type
-        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by 1");
-        compile("select cast((C+1) as integer), C as C2 from T3 UNION select B,B from T2 order by 1");
-
-        // expression that does not change its type
-        compile("select abs(C), C as C2 from T3 UNION select B,B from T2 order by 1");
-        compile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by tag");
+        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by 1", "Incompatible data types in UNION");
     }
 
     public void testMultiUnionOrderby() {
@@ -452,6 +452,20 @@ public class TestUnion extends PlannerTestCase {
             pn = pn.getChild(0);
             String[] columnNames = {"C", "A"};
             int[] colIdx = { 0, 1};
+            checkOrderByNode(pn, columnNames, colIdx);
+        }
+        {
+            AbstractPlanNode pn = compile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by tag, C2");
+            pn = pn.getChild(0);
+            String[] columnNames = {"TAG", "C2"};
+            int[] colIdx = {0, 1};
+            checkOrderByNode(pn, columnNames, colIdx);
+        }
+        {
+            AbstractPlanNode pn = compile("select cast((C+1) as integer) TAG, C as C2 from T3 UNION select B,B from T2 order by TAG");
+            pn = pn.getChild(0);
+            String[] columnNames = {"TAG", "C2"};
+            int[] colIdx = {0, 1};
             checkOrderByNode(pn, columnNames, colIdx);
         }
     }
