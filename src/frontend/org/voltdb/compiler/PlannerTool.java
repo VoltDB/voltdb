@@ -129,6 +129,9 @@ public class PlannerTool {
         catch (Exception e) {
             throw new RuntimeException("Error compiling query: " + e.toString(), e);
         }
+        catch (AssertionError e) {
+            throw new RuntimeException("Assertion error compiling query: " + e.toString(), e);
+        }
 
         if (plan == null) {
             throw new RuntimeException("Null plan received in PlannerTool.planSql");
@@ -256,6 +259,8 @@ public class PlannerTool {
                 }
             } catch (Exception e) {
                 throw new RuntimeException("Error compiling query: " + e.toString(), e);
+            } catch (AssertionError ae) {
+                throw new RuntimeException("Assertion Error compiling query: " + ae.toString(), ae);
             }
 
             if (plan == null) {

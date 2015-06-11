@@ -149,7 +149,11 @@ public class PlannerTestAideDeCamp {
 
         CompiledPlan plan = null;
         planner.parse();
-        plan = planner.plan();
+        try {
+            plan = planner.plan();
+        } catch (AssertionError e) {
+            throw new RuntimeException("Unexpected Assertion Error in Planner: " + e.toString(), e);
+        }
         assert(plan != null);
 
         // Partitioning optionally inferred from the planning process.
