@@ -142,7 +142,7 @@ public class VoltDecimalHelper {
 
     /**
      * Round a BigDecimal number to a scale given the rounding mode.
-     * Note that rounding may return the precision.  For example,
+     * Note that rounding may increase the precision.  For example,
      * rounding 9.99999 and 9.1999 to a scale of 2 gives 10.00 and 9.20.
      * The latter has precision 3, and the former has precision 4.
      * @param bd
