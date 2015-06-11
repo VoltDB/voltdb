@@ -1998,11 +1998,11 @@ TEST CASES
     <element name='tests'/>
     <sequential>
         <mkdir dir='${build.testoutput.dir}' />
-        <mkdir dir='${build.testoutput.archive.dir}' />
+        <mkdir dir='${build.dir}/testoutput-archive/' />
         <exec executable="/usr/bin/env" failonerror='true'>
             <arg value="python" />
             <arg value="${base.dir}/tools/junit-pre-process.py" />
-            <arg value="--archivepath=${build.testoutput.archive.dir}" />
+            <arg value="--archivepath=${build.dir}/testoutput-archive/" />
             <arg value="--outputpath=${build.testoutput.dir}" />
         </exec>
         <junit-files>
