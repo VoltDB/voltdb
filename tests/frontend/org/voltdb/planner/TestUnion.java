@@ -504,17 +504,6 @@ public class TestUnion extends PlannerTestCase {
             pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
             checkLimitNode(pn, 3, 2);
         }
-        {
-            AbstractPlanNode pn = compile(
-                    "select C from T3 UNION select B from T2 order by C limit 3 offset 2");
-            String[] columnNames = {"C"};
-            pn = pn.getChild(0);
-            int[] idxs = {0};
-            checkOrderByNode(pn, columnNames, idxs);
-            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-            pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
-            checkLimitNode(pn, 3, 2);
-        }
     }
 
     public void testUnionOrderByLimitParams() {
