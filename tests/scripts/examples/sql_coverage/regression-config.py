@@ -164,8 +164,8 @@
                                          "template": "regression-advanced-ints-cntonly.sql",
                                          "normalizer": "not-a-normalizer.py"},
 # To test advanced IN/EXISTS
-    "advanced-inexists": {"schema": "int-schema.py",
-                          "ddl": "int-DDL.sql",
+    "advanced-inexists": {"schema": "schema.py",
+                          "ddl": "DDL.sql",
                           "template": "advanced-inexists.sql",
                           "normalizer": "normalizer.py"},
 

@@ -386,9 +386,9 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
     SHA1_CTX shaCTX;
-    SHA1_Init(&shaCTX);
-    SHA1_Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), ::strlen(catalogTable.signature().c_str()));
-    SHA1_Final(&shaCTX, reinterpret_cast<uint8_t*>(signatureHash));
+    SHA1Init(&shaCTX);
+    SHA1Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), (uint32_t )::strlen(catalogTable.signature().c_str()));
+    SHA1Final(reinterpret_cast<unsigned char *>(signatureHash), &shaCTX);
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, signatureHash,
                                                     materialized,
