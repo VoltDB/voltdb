@@ -687,6 +687,7 @@ var loadPage = function (serverName, portid) {
                         $("#buildString").html(clusterDetails.BUILDSTRING);
                         $("#clusterComposition").html(hostCount + " hosts with " + (hostCount * siteCount) + " sites (" + siteCount + " per host)");
                         $("#runningSince").html(getRunningTimeInfo(parseInt(clusterDetails.STARTTIME), clusterDetails.UPTIME));
+                        getLicenseInformation(clusterDetails.LICENSE);
                     }
                 }
             }
@@ -698,6 +699,23 @@ var loadPage = function (serverName, portid) {
            var upTimeHrMin = upTime1[2].split(':');
            var runningSince = strTime + " (" + parseInt(upTime1[0]) + "d " + parseInt(upTimeHrMin[0]) + "h " + parseInt(upTimeHrMin[1]) + "m)";
            return runningSince;
+       };
+
+        var getLicenseInformation = function(licenseInfo) {
+            if (licenseInfo != undefined && licenseInfo != "" ) {
+                var licInfo = $.parseJSON(licenseInfo);
+                $(".licenseInfo").show();
+                $("#tdLicenseInfo").hide();
+                $("#tdLicenseInfo").css("display", "none");
+                $("#tdHostCount").html(licInfo.hostcount);
+                $("#tdWanReplication").html(licInfo.wanreplication);
+                $("#tdExpiration").html(licInfo.expiration);
+                $("#tdCommandLogging").html(licInfo.commandlogging);
+                $("#tdTrial").html(licInfo.trial);
+            } else {
+                $(".licenseInfo").hide();
+                $("#tdLicenseInfo").show();
+            }
         };
         //
     };

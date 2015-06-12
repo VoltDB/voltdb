@@ -483,6 +483,7 @@ ul.topRightList {
     max-width: 600px;
     overflow: auto;
 }
+.helpAboutWrap { overflow: auto;height: 380px;}
 
 .line {
     border-right: 1px solid #AAAAAA;
@@ -1294,6 +1295,7 @@ ul.catalogNav {
 #tblSystemOverview tr:first-child td {
     border-top: none;
 }
+tr.trLicenseInfo td { border: none !important;}
 
 
 .sysOverviewContent {
