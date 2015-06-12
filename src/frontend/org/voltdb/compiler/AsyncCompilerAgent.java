@@ -374,6 +374,10 @@ public class AsyncCompilerAgent {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
             }
             catch (AssertionError e) {
+                /*
+                 * We get these sometimes.  If we don't catch them the
+                 * replies are never generated, and the client hangs.
+                 */
                 errorMsgs.add("Unexpected AssertionError in the VoltDB Planner: " + e);
             }
         }
