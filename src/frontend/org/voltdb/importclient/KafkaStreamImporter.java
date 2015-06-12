@@ -150,7 +150,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         //You should convert your data to params here.
                         if (line == null) break;
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        if (!callProcedure(m_importHandlerProxy, invocation)) {
+                        if (!callProcedure(invocation)) {
                             System.out.println("Inserted failed: " + line);
                         }
                     }
