@@ -1688,59 +1688,63 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 .getResults()[0];
         assertFalse(vt.advanceRow());
 
-        // Another case found by sqlcoverage.  This was ENG-8391.
+        // The following test cases are modified from bugs
+        // found by sqlcoverage:
+        //   ENG-8391
+        //   ENG-8393
+        //   ENG-8395
+
         client.callProcedure("R4.Insert", new Object[]
                 {16, "IYMzTgzZjBNgji", null, 3.03873080947161366971e-01});
 
         vt = client.callProcedure("@AdHoc",
                 "SELECT ID, DESC "
                 + "FROM R4 Z "
-                + "WHERE DESC > ("
+                + "WHERE DESC > ANY ("
                 + "    SELECT DESC "
-                + "    FROM R4 WHERE "
-                + "    DESC <> Z.DESC "
+                + "    FROM R4 "
+                + "    WHERE NUM > -20000 "
                 + "  INTERSECT ALL "
                 + "    SELECT DESC "
                 + "    FROM R4 "
-                + "    WHERE DESC = Z.DESC)")
+                + "    WHERE NUM < 10000 "
+                + "    AND Z.NUM IS NOT NULL "
+                + ") "
+                + "ORDER BY ID")
                 .getResults()[0];
-        assertFalse(vt.advanceRow());
+        int i = 8;
+        while (vt.advanceRow()) {
+            assertEquals(i, vt.getLong(0));
+            assertEquals("MkqCtZgvOHdpeG", vt.getString(1));
+            ++i;
+        }
+        assertEquals(12, i);
 
-        // ENG-8393
         client.callProcedure("R4.Insert", new Object[]
                 {17, "MkqCtZgvOHdpeG", -25010, 6.94485579315452628002e-01});
 
         vt = client.callProcedure("@AdHoc",
                 "SELECT ID, NUM "
                 + "FROM R4 Z "
-                + "WHERE NUM > ("
+                + "WHERE NUM = ALL ("
                 + "    SELECT NUM "
                 + "    FROM R4 "
                 + "    WHERE NUM = Z.NUM "
                 + "  UNION "
-                + "    SELECT NUM "
-                + "    FROM R4 "
-                + "    WHERE NUM = Z.NUM);")
-                .getResults()[0];
-        assertFalse(vt.advanceRow());
-
-        // ENG-8395
-        client.callProcedure("R4.Insert", new Object[]
-                {18, "MkqCtZgvOHdpeG", -25010, 6.94485579315452628002e-01});
-
-        vt = client.callProcedure("@AdHoc",
-                "SELECT ID, NUM "
-                + "FROM R4 Z "
-                + "WHERE NUM > ("
-                + "    SELECT NUM "
+                + "    SELECT CAST(NUM + 1 AS INTEGER) "
                 + "    FROM R4 "
                 + "    WHERE NUM = Z.NUM "
-                + "  INTERSECT ALL "
-                + "    SELECT NUM "
-                + "    FROM R4 "
-                + "    WHERE NUM <> Z.NUM); ")
+                + "    AND Z.ID >= 10"
+                + ") "
+                + "AND NUM IS NOT NULL")
                 .getResults()[0];
-        assertFalse(vt.advanceRow());
+        i = 8;
+        while (vt.advanceRow()) {
+            assertEquals(i, vt.getLong(0));
+            assertEquals(-25010, vt.getLong(1));
+            ++i;
+        }
+        assertEquals(10, i);
 
         // ENG-8396.  In this one the "more than one row" error is expected.
         paramsArray = new Object[][] {

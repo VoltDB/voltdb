@@ -390,6 +390,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
             assertTrue(subqPlanNode instanceof UnionPlanNode);
         }
         {
+            // Correlation parameter on the LHS of the union
             AbstractPlanNode pn = compile(
                     "select * "
                             + "from r4 as outer_tbl "
@@ -398,7 +399,6 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
                             + "    where outer_tbl.a = c "
                             + "  union "
                             + "    select * from R5)");
-            System.out.println(pn.toExplainPlanString());
             pn = pn.getChild(0);
             assertTrue(pn instanceof IndexScanPlanNode);
             AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
@@ -419,6 +419,71 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
             AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
             assertNotNull(subqPlanNode);
             assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            // Correlation parameter on the RHS of the union
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "    select * from R5"
+                            + "    where outer_tbl.a = c)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            // Correlation parameter in an intersect under a union
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "      (select * from R4 "
+                            + "    intersect"
+                            + "      select * from R5"
+                            + "      where outer_tbl.a = c))");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+
         }
     }
 
