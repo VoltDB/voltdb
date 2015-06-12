@@ -128,7 +128,7 @@ void SHA1Init(SHA1_CTX* context)
 
 /* Run your data through this. */
 
-void SHA1Update(SHA1_CTX* context, const unsigned char* data, const size_t len)
+void SHA1Update(SHA1_CTX* context, const unsigned char* data, uint32_t len)
 {
     uint32_t i, j;
 
