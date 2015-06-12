@@ -404,14 +404,19 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             assertEquals(0, result.asScalarLong());
         }
 
+        ClientResponse resp = client.callProcedure("pauseTestInsert");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (10);");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
         // pause
         Client admin = getAdminClient();
-        ClientResponse resp = admin.callProcedure("@Pause");
+        resp = admin.callProcedure("@Pause");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
         try {
-            client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (10);");
-            fail();
+            client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
+            fail("AdHoc insert did not fail in pause mode");
         } catch(ProcCallException e) {
             assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
         }
@@ -422,14 +427,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
         }
 
+        try {
+            resp = client.callProcedure("pauseTestInsert");
+            fail();
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
         resp = client.callProcedure("@Ping");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         resp = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM pause_test_tbl");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(0, resp.getResults()[0].asScalarLong());
+        assertEquals(2, resp.getResults()[0].asScalarLong());
         resp = client.callProcedure("pauseTestCount");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(0, resp.getResults()[0].asScalarLong());
+        assertEquals(2, resp.getResults()[0].asScalarLong());
 
         // resume
         resp = admin.callProcedure("@Resume");
@@ -488,6 +500,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("pauseTestCount", "SELECT COUNT(*) FROM pause_test_tbl");
+        project.addStmtProcedure("pauseTestInsert", "INSERT INTO pause_test_tbl VALUES (1)");
 
         /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
                                   BackendTarget.NATIVE_EE_JNI);

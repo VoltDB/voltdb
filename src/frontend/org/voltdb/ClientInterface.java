@@ -2201,6 +2201,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         ClientResponseImpl error = null;
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED &&
+                !plannedStmtBatch.isReadOnly() && !plannedStmtBatch.adminConnection) {
+            error = new ClientResponseImpl(
+                    ClientResponseImpl.SERVER_UNAVAILABLE,
+                    new VoltTable[0],
+                    "Server is paused and is available in read-only mode - please try again later",
+                    plannedStmtBatch.clientHandle);
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
+        }
+        else
         if ((error = m_permissionValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
                 SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
             ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
@@ -2252,49 +2265,40 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (result.errorMsg == null) {
                     if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                        if (VoltDB.instance().getMode() == OperationMode.PAUSED &&
-                                !plannedStmtBatch.isReadOnly() && !plannedStmtBatch.adminConnection) {
-                            writeResponseToConnection(new ClientResponseImpl(
-                                    ClientResponseImpl.SERVER_UNAVAILABLE,
-                                    new VoltTable[0],
-                                    "Server is paused and is available in read-only mode - please try again later",
-                                    result.clientHandle));
-                        } else {
-                            ExplainMode explainMode = plannedStmtBatch.getExplainMode();
+                        ExplainMode explainMode = plannedStmtBatch.getExplainMode();
 
-                            // assume all stmts have the same catalog version
-                            if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
-                                    (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
-                            {
+                        // assume all stmts have the same catalog version
+                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
+                                (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
+                        {
 
-                                /* The adhoc planner learns of catalog updates after the EE and the
+                            /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an
                                obsolete catalog, re-plan. */
-                                LocalObjectMessage work = new LocalObjectMessage(
-                                        AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
+                            LocalObjectMessage work = new LocalObjectMessage(
+                                    AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
 
-                                m_mailbox.send(m_plannerSiteId, work);
+                            m_mailbox.send(m_plannerSiteId, work);
+                        }
+                        else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
+                            processExplainPlannedStmtBatch(plannedStmtBatch);
+                        }
+                        else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
+                            processExplainDefaultProc(plannedStmtBatch);
+                        }
+                        else {
+                            try {
+                                createAdHocTransaction(plannedStmtBatch, c);
                             }
-                            else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
-                                processExplainPlannedStmtBatch(plannedStmtBatch);
-                            }
-                            else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
-                                processExplainDefaultProc(plannedStmtBatch);
-                            }
-                            else {
-                                try {
-                                    createAdHocTransaction(plannedStmtBatch, c);
-                                }
-                                catch (VoltTypeException vte) {
-                                    String msg = "Unable to execute adhoc sql statement(s): " +
-                                            vte.getMessage();
-                                    ClientResponseImpl errorResponse =
-                                            new ClientResponseImpl(
-                                                    ClientResponseImpl.GRACEFUL_FAILURE,
-                                                    new VoltTable[0], msg,
-                                                    result.clientHandle);
-                                    writeResponseToConnection(errorResponse);
-                                }
+                            catch (VoltTypeException vte) {
+                                String msg = "Unable to execute adhoc sql statement(s): " +
+                                        vte.getMessage();
+                                ClientResponseImpl errorResponse =
+                                        new ClientResponseImpl(
+                                                ClientResponseImpl.GRACEFUL_FAILURE,
+                                                new VoltTable[0], msg,
+                                                result.clientHandle);
+                                writeResponseToConnection(errorResponse);
                             }
                         }
                     }
