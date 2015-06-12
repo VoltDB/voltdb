@@ -1802,6 +1802,7 @@ function alertNodeClicked(obj) {
                     clusterInfo["BUILDSTRING"] = val["BUILDSTRING"];
                     clusterInfo["STARTTIME"] = val["STARTTIME"];
                     clusterInfo["UPTIME"] = val["UPTIME"];
+                    clusterInfo["LICENSE"] = val["LICENSE"];
                     return false;
                 }
             });
