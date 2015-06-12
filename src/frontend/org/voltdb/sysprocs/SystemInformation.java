@@ -437,6 +437,10 @@ public class SystemInformation extends VoltSystemProcedure
         if (hubAppender != null)
             port = hubAppender.getPort();
         vt.addRow(hostId, "LOG4JPORT", Integer.toString(port));
+        //Add license information
+        if (MiscUtils.isPro()) {
+            vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
+        }
 
         return vt;
     }
