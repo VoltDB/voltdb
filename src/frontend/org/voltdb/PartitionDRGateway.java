@@ -147,7 +147,7 @@ public class PartitionDRGateway {
             long lastSequenceNumber,
             long lastUniqueId,
             ByteBuffer buf) {
-        if (log.isTraceEnabled()) {
+        if (startSequenceNumber == lastUniqueId) {
             log.trace("Received DR buffer size " + buf.remaining());
             AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
             buf.order(ByteOrder.LITTLE_ENDIAN);
