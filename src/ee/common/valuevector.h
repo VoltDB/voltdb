@@ -56,6 +56,7 @@
 #include "boost/array.hpp"
 #include "common/types.h"
 #include "common/NValue.hpp"
+#include "common/ValuePeeker.hpp"
 
 namespace voltdb {
 
@@ -88,24 +89,24 @@ public:
         delete[] reinterpret_cast<char*>(data_);
     }
 
-    inline void reset(int size) {
-        delete[] reinterpret_cast<char*>(data_);
-        size_ = size;
-        data_ = reinterpret_cast<V*>(new char[sizeof(V) * size_]);
+    inline void reset() {
         ::memset(data_, 0, sizeof(V) * size_);
     }
 
     GenericValueArray<V>& operator=(const GenericValueArray<V> &rhs);
 
     inline const V* getRawPointer() const { return data_; }
-    inline V& operator[](int index) {
+    inline V& getAssignable(int index) {
         assert (index >= 0);
         assert (index < size_);
         return data_[index];
     }
-    inline const V& operator[](int index) const {
+    inline const V& get(int index) const {
         assert (index >= 0);
         assert (index < size_);
+#ifdef DEBUG
+        assert (isValidValue(*this, index));
+#endif
         return data_[index];
     }
     inline int size() const { return size_;}
@@ -125,6 +126,15 @@ private:
     int size_;
     V* data_;
 };
+
+template<typename V>
+bool isValidValue(const GenericValueArray<V>& array, int elemIndex);
+
+template<>
+inline bool isValidValue<NValue>(const GenericValueArray<NValue>& array, int elemIndex) {
+    GenericValueArray<NValue>& nonConstArray = const_cast<GenericValueArray<NValue>&>(array);
+    return ValuePeeker::peekValueType(nonConstArray.getAssignable(elemIndex)) != VALUE_TYPE_INVALID;
+}
 
 template <typename V> inline bool operator == (const GenericValueArray<V> &lhs, const GenericValueArray<V> &rhs) {
     return lhs.compareValue(rhs) == 0;

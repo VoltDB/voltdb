@@ -61,8 +61,7 @@ namespace voltdb {
         NValueArray* params = context->getParameterContainer();
 
         assert(value_idx < params->size());
-        m_paramValue = &(*params)[value_idx];
+        m_paramValue = &(params->get(value_idx));
     };
 
 }
-

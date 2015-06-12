@@ -376,8 +376,11 @@ static VoltDBIPC *currentVolt = NULL;
 void deserializeParameterSetCommon(int cnt, ReferenceSerializeInputBE &serialize_in,
                                    NValueArray &params, Pool *stringPool)
 {
+#ifdef DEBUG
+    params.reset(); // mark all elements as invalid
+#endif
     for (int i = 0; i < cnt; ++i) {
-        params[i].deserializeFromAllocateForStorage(serialize_in, stringPool);
+        params.getAssignable(i).deserializeFromAllocateForStorage(serialize_in, stringPool);
     }
 }
 
@@ -1391,7 +1394,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         Pool *pool = m_engine->getStringPool();
         deserializeParameterSetCommon(cnt, serialize_in, params, pool);
         retval =
-            hashinator->hashinate(params[0]);
+            hashinator->hashinate(params.get(0));
         pool->purge();
     } catch (const FatalException &e) {
         crashVoltDB(e);

@@ -559,8 +559,12 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         }
         assert (m_usedParamcnt < MAX_PARAM_COUNT);
 
+#ifdef DEBUG
+        m_staticParams.reset(); // mark all elements as invalid
+#endif
+
         for (int j = 0; j < m_usedParamcnt; ++j) {
-            m_staticParams[j].deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
+            m_staticParams.getAssignable(j).deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
         }
 
         // success is 0 and error is 1.

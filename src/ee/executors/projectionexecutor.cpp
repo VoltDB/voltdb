@@ -145,7 +145,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
         } else if (all_param_array != NULL) {
             VOLT_TRACE("sweet, all params");
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
+                temp_tuple.setNValue(ctr, params.get(all_param_array[ctr]));
             }
         } else {
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {

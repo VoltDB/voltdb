@@ -83,15 +83,15 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
             // compare the new param value with the previous one. Since this parameter is set
             // by this subquery, no other subquery can change its value. So, we don't need to
             // save its value on the side for future comparisons.
-            NValue& prevParam = parameterContainer[m_paramIdxs[i]];
             if (hasPriorResult) {
+                const NValue& prevParam = parameterContainer.get(m_paramIdxs[i]);
                 if (param.compare(prevParam) == VALUE_COMPARE_EQUAL) {
                     continue;
                 }
                 paramsChanged = true;
             }
             // Update the value stored in the executor context's parameter container:
-            prevParam = param.copyNValue();
+            parameterContainer.getAssignable(m_paramIdxs[i]) = param.copyNValue();
         }
     }
 
@@ -100,7 +100,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
         std::vector<NValue>& lastParams = context->accessLastParams();
         assert(lastParams.size() == m_otherParamIdxs.size());
         for (size_t i = 0; i < lastParams.size(); ++i) {
-            NValue& prevParam = parameterContainer[m_otherParamIdxs[i]];
+            const NValue& prevParam = parameterContainer.get(m_otherParamIdxs[i]);
             if (lastParams[i].compare(prevParam) != VALUE_COMPARE_EQUAL) {
                 lastParams[i] = prevParam.copyNValue();
                 paramsChanged = true;
@@ -129,7 +129,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
         std::vector<NValue> lastParams;
         lastParams.reserve(m_otherParamIdxs.size());
         for (size_t i = 0; i < m_otherParamIdxs.size(); ++i) {
-            NValue& prevParam = parameterContainer[m_otherParamIdxs[i]];
+            const NValue& prevParam = parameterContainer.get(m_otherParamIdxs[i]);
             lastParams.push_back(prevParam.copyNValue());
         }
         context = exeContext->setSubqueryContext(m_subqueryId, lastParams);

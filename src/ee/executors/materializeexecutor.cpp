@@ -110,7 +110,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
         TableTuple &temp_tuple = output_table->tempTuple();
         for (int i = 0, tuples = paramcnt / m_columnCount; i < tuples; ++i) {
             for (int j = m_columnCount - 1; j >= 0; --j) {
-                temp_tuple.setNValue(j, params[i * m_columnCount + j]);
+                temp_tuple.setNValue(j, params.get(i * m_columnCount + j));
             }
             output_table->insertTupleNonVirtual(temp_tuple);
         }
@@ -134,7 +134,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
     if (all_param_array != NULL) {
         VOLT_TRACE("sweet, all params\n");
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-            temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
+            temp_tuple.setNValue(ctr, params.get(all_param_array[ctr]));
         }
     }
     else {

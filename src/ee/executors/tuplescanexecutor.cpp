@@ -77,7 +77,7 @@ bool TupleScanExecutor::p_execute(const NValueArray &params) {
     assert(paramIdxs.size() == output_temp_table->schema()->columnCount());
     for (int i = 0; i < paramIdxs.size(); ++i)
     {
-        temp_tuple.setNValue(i, params[paramIdxs[i]]);
+        temp_tuple.setNValue(i, params.get(paramIdxs[i]));
     }
 
     output_temp_table->insertTupleNonVirtual(temp_tuple);

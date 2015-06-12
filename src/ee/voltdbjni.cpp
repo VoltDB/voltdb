@@ -460,8 +460,11 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
 void deserializeParameterSetCommon(int cnt, ReferenceSerializeInputBE &serialize_in,
                                    NValueArray &params, Pool *stringPool)
 {
+#ifdef DEBUG
+    params.reset(); // mark all elements as invalid
+#endif
     for (int i = 0; i < cnt; ++i) {
-        params[i].deserializeFromAllocateForStorage(serialize_in, stringPool);
+        params.getAssignable(i).deserializeFromAllocateForStorage(serialize_in, stringPool);
     }
 }
 
@@ -1176,9 +1179,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
         NValueArray& params = engine->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[1]));
+        HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params.get(1)));
         boost::scoped_ptr<TheHashinator> hashinator;
-        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[2]));
+        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params.get(2)));
         switch (hashinatorType) {
         case HASHINATOR_LEGACY:
             hashinator.reset(LegacyHashinator::newInstance(configValue));
@@ -1190,7 +1193,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
         }
         int retval =
-            hashinator->hashinate(params[0]);
+            hashinator->hashinate(params.get(0));
         stringPool->purge();
         return retval;
     } catch (const FatalException &e) {
@@ -1222,7 +1225,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
         NValueArray& params = engine->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[0]));
+        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params.get(0)));
         engine->updateHashinator(hashinatorType, configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
         stringPool->purge();
     } catch (const FatalException &e) {

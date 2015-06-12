@@ -93,7 +93,7 @@ public:
   private:
     int m_valueIdx;
 
-    voltdb::NValue *m_paramValue;
+    const voltdb::NValue *m_paramValue;
 };
 
 }
