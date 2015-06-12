@@ -478,12 +478,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     " where (id, dept + 2) in " +
                     "       (select dept, count(dept) from " + tb +
                     "        group by dept " +
-//// Leaving out ORDER BY -- which really should be getting ignored/dropped
-//// from an "in expression" subquery but instead was getting serialized with
-//// a bad column index.
-//// TODO: retry? (since fixed?)
-////                    "        order by dept DESC " +
-                    "        ) " +
+                    // ORDER BY here is meaningless,
+                    // but it used to cause serious problems, so keep the test.
+                    "        order by dept DESC) " +
                     "group by dept;";
             //* enable for debug */ System.out.println(vt);
             validateTableOfLongs(client, sql, new long[][] {{1,10}});
