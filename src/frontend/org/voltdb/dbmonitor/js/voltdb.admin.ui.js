@@ -1574,11 +1574,14 @@ function loadAdminPage() {
             if (voltDbRenderer.drTablesArray.length == 0) {
                 $("#drPopup").html("No DR tables available.");
             } else {
+                content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='replicatedTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.drTablesArray.length - 1; i++) {
                     content = content + "<tr><td>" + voltDbRenderer.drTablesArray[i] + "</td></tr>";
                 }
+                content = content + "</tbody></table>";
+                $("#drPopup").html(content);
             }
-            $("#replicatedTableBody").html(content);
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
@@ -1597,9 +1600,10 @@ function loadAdminPage() {
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
-                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr></tbody></table>";
-                    $("#exportPopup").html(content);
+                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr>";
                 }
+                content = content + "</tbody></table>";
+                $("#exportPopup").html(content);
             }
 
         },
