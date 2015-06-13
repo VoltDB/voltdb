@@ -142,7 +142,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             // Add statement's tables to the consolidated list
             m_tableList.addAll(childStmt.m_tableList);
 
-            // m_tableAliasList is not interesting for UNION
+            // m_tableAliasListAsJoinOrder is not interesting for UNION
             // m_tableAliasMap may have same alias table from different children
             addStmtTablesFromChildren(childStmt.m_tableAliasMap);
         }
@@ -207,7 +207,10 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 // find a new unique name for the key
                 // the value in the map are more interesting
                 alias += "_" + System.currentTimeMillis();
-                m_tableAliasMap.put(alias, tableScan);
+                HashMap<String, StmtTableScan> duplicates = new HashMap<String, StmtTableScan>();
+                duplicates.put(alias, tableScan);
+
+                addStmtTablesFromChildren(duplicates);
             }
         }
     }
