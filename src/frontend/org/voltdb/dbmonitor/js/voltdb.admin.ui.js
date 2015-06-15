@@ -1612,15 +1612,11 @@ function loadAdminPage() {
     });
     var editId = -1;
 
-    function setConnectorClassValidation() {
-        var settings = $('#formAddConfiguration').validate().settings;
+    function showHideConnectorClass() {
         if ($('#txtType').val() == "CUSTOM") {
-            $("#TdExportConnectorClass").append('<label id="errorExportConnectorClass" for="txtExportConnectorClass" class="error" style="display: none;"></label>');
-            settings.rules.txtExportConnectorClass = adminValidationRules.streamNameRules;
-            settings.messages.txtExportConnectorClass = adminValidationRules.streamNameMessages;
+            $("#TrExportConnectorClass").show();
         } else {
-            delete settings.rules.txtExportConnectorClass;
-            $("#errorExportConnectorClass").remove();
+            $("#TrExportConnectorClass").hide();
         }
     };
 
@@ -1664,10 +1660,11 @@ function loadAdminPage() {
                 '    <td>&nbsp;</td>' +
                 '    <td>&nbsp;</td>' +
                 '</tr>' +
-                '<tr id="TrExportConnectorClass">' +
-                '    <td>Export Connector Class</td>' +
+                '<tr id="TrExportConnectorClass" style="display:none">' +
+                '    <td>Custom connector class</td>' +
                 '    <td width="15%" id="TdExportConnectorClass">' +
                 '       <input id="txtExportConnectorClass" name="txtExportConnectorClass" type="text" size="38">' +
+                '       <label id="errorExportConnectorClass" for="txtExportConnectorClass" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
                 '    <td>&nbsp;</td>' +
@@ -1688,7 +1685,6 @@ function loadAdminPage() {
                 '</tr>' +
                 '<tr>' +
                 '    <td>' +
-                '       ' +
                 '        <div class="addConfigProperWrapper">' +
                 '            <table id="tblAddNewProperty" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">' +
                 '                <tr class="headerProperty">' +
@@ -1729,7 +1725,7 @@ function loadAdminPage() {
 
 
             $('#txtType').change(function () {
-                setConnectorClassValidation();
+                showHideConnectorClass();
                 addExportProperties();
             });
 
@@ -1793,6 +1789,9 @@ function loadAdminPage() {
                 var count = 0;
                 for (var i = 0; i < properties.length; i++) {
                     if (VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name)) {
+                        if (properties[i].name == "broker.host" || properties[i].name == "amqp.uri") {
+                            $("#selectRabbitMq").val(properties[i].name);
+                        }
                         $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).val(properties[i].value);
                         $(".newStreamMinProperty").addClass("orgProperty");
                     } else {
@@ -1805,7 +1804,7 @@ function loadAdminPage() {
             } else {
                 addExportProperties();
             }
-            setConnectorClassValidation();
+            showHideConnectorClass();
             var popup = $(this)[0];
             $("#btnAddConfigSave").unbind("click");
             $("#btnAddConfigSave").on("click", function (e) {
@@ -1826,10 +1825,8 @@ function loadAdminPage() {
                 for (var j = 0; j < newStreamPropertyValues.length; j++) {
                     $(newStreamPropertyValues[j]).rules("add", {
                         required: true,
-                        regex: /^[a-zA-Z0-9_\-.]+$/,
                         messages: {
-                            required: "This field is required",
-                            regex: 'Only alphabets, numbers, <br/> _, - and . are allowed.'
+                            required: "This field is required"
                         }
                     });
                 }
@@ -1864,7 +1861,6 @@ function loadAdminPage() {
             $("#btnSaveConfigOk").unbind("click");
             $("#btnSaveConfigOk").on("click", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
-
                 if ($("#expotSaveConfigText").data("status") == "delete") {
                     adminConfigurations.export.configuration.splice(editId * 1, 1);
                 }
@@ -1882,7 +1878,9 @@ function loadAdminPage() {
                     newConfig["stream"] = $("#txtStream").val();
                     newConfig["type"] = $("#txtType").val().trim();
                     newConfig["enabled"] = $("#chkStream").is(':checked');
-                    newConfig["exportconnectorclass"] = $("#txtExportConnectorClass").val();
+                    if ($("#txtType").val().trim().toUpperCase() == "CUSTOM") {
+                        newConfig["exportconnectorclass"] = $("#txtExportConnectorClass").val();
+                    }
 
                     if (!adminConfigurations.export) {
                         adminConfigurations.export = {};
@@ -1970,7 +1968,6 @@ function loadAdminPage() {
 
     var addExportProperties = function() {
         var exportType = $('#txtType').val();
-
         if (editId == 1)
             VoltDbAdminConfig.orgTypeValue = "";
         for (var i = 0; i < $(".newStreamMinProperty").length; i++) {
@@ -2082,15 +2079,18 @@ function loadAdminPage() {
                     '   <td></td>' +
                     '</tr>';
         } else if (exportType.toUpperCase() == "RABBITMQ") {
-            if (!$('#txtBrokerOrAmqp').length)
-                exportProperties += '<tr class="newStreamMinProperty">' +
+            if (!$('#selectRabbitMq').length)
+                exportProperties += '' +
+                    '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtBrokerOrAmqp" name="txtBrokerOrAmqp" value="broker.host || amqp.uri" disabled="disabled" class="newStreamPropertyName newStreamProperty" type="text">' +
-                    '       <label id="errorBrokerOrAmqp" for="txtBrokerOrAmqp" class="error" style="display: none;"></label>' +
+                    '       <select id="selectRabbitMq" name="selectRabbitMq" class="newStreamPropertyName newStreamProperty"> ' +
+                    '           <option>broker.host</option> ' +
+                    '           <option>amqp.uri</option> ' +
+                    '       </select>' +
                     '   </td>' +
                     '   <td>' +
-                    '       <input size="15" id="txtBrokerOrAmqpValue" name="txtBrokerOrAmqpValue" class="newStreamPropertyValue newStreamProperty" type="text">' +
-                    '       <label id="errorBrokerOrAmqpValue" for="txtBrokerOrAmqpValue" class="error" style="display: none;"></label>' +
+                    '       <input size="15" id="txtRabbitMqValue" name="txtRabbitMqValue" class="newStreamPropertyValue newStreamProperty" type="text">' +
+                    '       <label id="errorRabbitMqValue" for="txtRabbitMqValue" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
@@ -2582,7 +2582,8 @@ function loadAdminPage() {
             "metadata.broker.list": "#txtMetadataBrokerListValue",
             "jdbcurl": "#txtJdbcUrlValue",
             "jdbcdriver": "#txtJdbcDriverValue",
-            "broker.host": "#txtBrokerOrAmqpValue"
+            "broker.host": "#txtRabbitMqValue",
+            "amqp.uri": "#txtRabbitMqValue"
         };
 
         this.orgTypeValue = "";
