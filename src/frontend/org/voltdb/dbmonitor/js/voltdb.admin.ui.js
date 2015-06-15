@@ -1574,11 +1574,14 @@ function loadAdminPage() {
             if (voltDbRenderer.drTablesArray.length == 0) {
                 $("#drPopup").html("No DR tables available.");
             } else {
+                content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='replicatedTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.drTablesArray.length - 1; i++) {
                     content = content + "<tr><td>" + voltDbRenderer.drTablesArray[i] + "</td></tr>";
                 }
+                content = content + "</tbody></table>";
+                $("#drPopup").html(content);
             }
-            $("#replicatedTableBody").html(content);
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
@@ -1597,10 +1600,12 @@ function loadAdminPage() {
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
-                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr></tbody></table>";
+                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr>";
                 }
+                content = content + "</tbody></table>";
+                $("#exportPopup").html(content);
             }
-            $("#exportPopup").html(content);
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
@@ -1799,7 +1804,7 @@ function loadAdminPage() {
                         $("#txtName" + count).val(properties[i].name);
                         $("#txtValue" + count).val(properties[i].value);
                         count++;
-                    }                        
+                    }
                 }
             } else {
                 addExportProperties();
@@ -1966,14 +1971,14 @@ function loadAdminPage() {
         }
     });
 
-    var addExportProperties = function() {
+    var addExportProperties = function () {
         var exportType = $('#txtType').val();
         if (editId == 1)
             VoltDbAdminConfig.orgTypeValue = "";
         for (var i = 0; i < $(".newStreamMinProperty").length; i++) {
             if (!$($(".newStreamMinProperty")[i]).hasClass("orgProperty")) {
                 $($(".newStreamMinProperty")[i]).addClass("propertyToRemove");
-            } 
+            }
         }
         $(".propertyToRemove").remove();
 
@@ -1984,7 +1989,7 @@ function loadAdminPage() {
             $($(".newStreamMinProperty td:first-child input")).removeAttr('disabled');
             $($(".newStreamMinProperty td:last-child")).html('<div class="securityDelete" onclick="deleteRow(this)"></div>');
         }
-      
+
         var exportProperties = '';
         if (exportType.toUpperCase() == "FILE") {
             if (!$('#txtOutdir').length)
@@ -2013,7 +2018,7 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
-            
+
             if (!$('#txtFileType').length)
                 exportProperties += '<tr class="newStreamMinProperty">' +
                     '   <td>' +
@@ -2026,7 +2031,7 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
-                
+
         } else if (exportType.toUpperCase() == "HTTP") {
             if (!$('#txtEndpoint').length)
                 exportProperties = '<tr class="newStreamMinProperty">' +

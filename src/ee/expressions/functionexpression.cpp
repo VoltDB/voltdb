@@ -364,6 +364,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_LEFT:
             ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
             break;
+        case FUNC_MOD:
+            ret = new GeneralFunctionExpression<FUNC_MOD>(*arguments);
+            break;
         case FUNC_OVERLAY_CHAR:
             ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);
             break;
