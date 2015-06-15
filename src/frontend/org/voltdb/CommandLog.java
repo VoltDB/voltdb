@@ -81,6 +81,13 @@ public interface CommandLog {
             int partitionId, long spHandle);
 
     public interface DurabilityListener {
+
+        /**
+         * Because the scheduler's lock is assigned late, we need to propagate it to the
+         * DurabilityListener so it can share the lock during task processing
+         */
+        void setLock(Object o);
+
         /**
          * Assign the listener that we will send SP UniqueId durability notifications to
          */
