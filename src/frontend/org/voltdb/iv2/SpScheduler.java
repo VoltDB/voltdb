@@ -171,8 +171,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         super(partitionId, taskQueue);
         m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
         m_snapMonitor = snapMonitor;
-        m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks, taskQueue, m_lock);
+        m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks, taskQueue);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
+    }
+
+    @Override
+    public void setLock(Object o) {
+        super.setLock(o);
+        m_durabilityListener.setLock(o);
     }
 
     @Override
