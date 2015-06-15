@@ -23,29 +23,18 @@ import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import kafka.consumer.ConsumerConfig;
-import kafka.consumer.ConsumerIterator;
-import kafka.consumer.KafkaStream;
-import kafka.javaapi.consumer.ConsumerConnector;
-import kafka.message.MessageAndMetadata;
-
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.voltdb.client.Client;
 import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 import org.voltdb.utils.CSVDataLoader;
-
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
  * Implement a BundleActivator interface and extend ImportHandlerProxy.
@@ -63,6 +52,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private ServerSocket m_serverSocket;
     private String m_procedure;
     private String m_zookeeper;
+    private String m_bootstrap;
     private String m_topic;
     private Integer m_maxErrors = 100;
     private final ArrayList<ClientConnectionHandler> m_clients = new ArrayList<ClientConnectionHandler>();
@@ -116,6 +106,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         m_zookeeper = (String )m_properties.getProperty("zookeeper");
         if (m_zookeeper == null || m_zookeeper.trim().length() == 0) {
             throw new RuntimeException("Missing zookeeper.");
+        }
+        m_bootstrap = (String )m_properties.getProperty("bootstrap");
+        if (m_bootstrap == null || m_bootstrap.trim().length() == 0) {
+            throw new RuntimeException("Missing bootstrap.");
         }
         m_topic = (String )m_properties.getProperty("topic");
         if (m_topic == null || m_topic.trim().length() == 0) {
@@ -179,8 +173,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         try {
             info("Configured and ready with properties: " + m_properties);
             String procedure = m_properties.getProperty("procedure");
-            m_consumer = new KafkaConsumerConnector(m_zookeeper, m_topic);
-            m_es = getConsumerExecutor(m_consumer, m_loader);
+            m_consumer = new KafkaConsumerConnector(m_zookeeper, m_topic, m_bootstrap);
             close();
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -189,10 +182,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     private static class KafkaConsumerConnector {
 
-        final ConsumerConfig m_consumerConfig;
-        final ConsumerConnector m_consumer;
+        final KafkaConsumer m_consumer;
 
-        public KafkaConsumerConnector(String zk, String groupName) {
+        public KafkaConsumerConnector(String zk, String groupName, String bootstrap) {
             //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
             String groupId = "voltdb-" + groupName;
             //TODO: Should get this from properties file or something as override?
@@ -205,10 +197,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             props.put("auto.commit.enable", "true");
             props.put("auto.offset.reset", "smallest");
             props.put("rebalance.backoff.ms", "10000");
-
-            m_consumerConfig = new ConsumerConfig(props);
-
-            m_consumer = kafka.consumer.Consumer.createJavaConsumerConnector(m_consumerConfig);
+            props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+            props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+            props.put("partition.assignment.strategy", "roundrobin");
+            props.put("bootstrap.servers", bootstrap);
+            m_consumer = new KafkaConsumer(props);
         }
 
         public void stop() {
@@ -217,52 +210,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 Thread.sleep(1100);
             } catch (InterruptedException ex) { }
             finally {
-                m_consumer.commitOffsets();
-                m_consumer.shutdown();
+                m_consumer.commit(true);
+                m_consumer.close();
             }
         }
-    }
-
-    public static class KafkaConsumer implements Runnable {
-
-        private final KafkaStream m_stream;
-        private final CSVParser m_csvParser;
-
-        public KafkaConsumer(KafkaStream a_stream) {
-            m_stream = a_stream;
-            m_csvParser = new CSVParser();
-        }
-
-        @Override
-        public void run() {
-            ConsumerIterator<byte[], byte[]> it = m_stream.iterator();
-            while (it.hasNext()) {
-                MessageAndMetadata<byte[], byte[]> md = it.next();
-                byte msg[] = md.message();
-                long offset = md.offset();
-                String smsg = new String(msg);
-            }
-        }
-
-    }
-
-    private ExecutorService getConsumerExecutor(KafkaConsumerConnector consumer,
-            CSVDataLoader loader) throws Exception {
-
-        Map<String, Integer> topicCountMap = new HashMap<>();
-        //Get this from config or arg. Use 3 threads default.
-        ExecutorService executor = Executors.newFixedThreadPool(3);
-        topicCountMap.put(m_topic, 3);
-        Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.m_consumer.createMessageStreams(topicCountMap);
-        List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(m_topic);
-
-        // now launch all the threads for partitions.
-        for (final KafkaStream stream : streams) {
-            KafkaConsumer bconsumer = new KafkaConsumer(stream);
-            executor.submit(bconsumer);
-        }
-
-        return executor;
     }
 
   //Close the consumer after this app will exit.
