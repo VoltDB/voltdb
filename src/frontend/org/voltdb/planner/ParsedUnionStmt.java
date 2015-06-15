@@ -35,6 +35,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.planner.ParsedSelectStmt.LimitOffset;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.types.ExpressionType;
 
@@ -140,6 +141,10 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             m_children.add(childStmt);
             // Add statement's tables to the consolidated list
             m_tableList.addAll(childStmt.m_tableList);
+
+            // m_tableAliasListAsJoinOrder is not interesting for UNION
+            // m_tableAliasMap may have same alias table from different children
+            addStmtTablesFromChildren(childStmt.m_tableAliasMap);
         }
     }
 
@@ -188,6 +193,25 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();
         for (VoltXMLElement child : columnsNode.children) {
             parseOrderColumn(child, leftmostSelectChild);
+        }
+    }
+
+    private void addStmtTablesFromChildren(HashMap<String, StmtTableScan> tableAliasMap) {
+        for (String alias: tableAliasMap.keySet()) {
+            StmtTableScan tableScan = tableAliasMap.get(alias);
+
+            if (m_tableAliasMap.get(alias) == null) {
+                m_tableAliasMap.put(alias, tableScan);
+            } else {
+                // if there is a duplicate table alias in the map,
+                // find a new unique name for the key
+                // the value in the map are more interesting
+                alias += "_" + System.currentTimeMillis();
+                HashMap<String, StmtTableScan> duplicates = new HashMap<String, StmtTableScan>();
+                duplicates.put(alias, tableScan);
+
+                addStmtTablesFromChildren(duplicates);
+            }
         }
     }
 

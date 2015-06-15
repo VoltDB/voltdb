@@ -140,6 +140,10 @@ public class RegressionSuite extends TestCase {
         return m_config;
     }
 
+    public Client getAdminClient() throws IOException {
+        return getClient(1000 * 60 * 10, ClientAuthHashScheme.HASH_SHA256, true); // 10 minute default
+    }
+
     public Client getClient() throws IOException {
         return getClient(1000 * 60 * 10, ClientAuthHashScheme.HASH_SHA256); // 10 minute default
     }
@@ -181,9 +185,17 @@ public class RegressionSuite extends TestCase {
      * VoltServerConfig instance.
      */
     public Client getClient(long timeout, ClientAuthHashScheme scheme) throws IOException {
-        final List<String> listeners = m_config.getListenerAddresses();
+        return getClient(timeout, scheme, false);
+    }
+
+    public Client getClient(long timeout, ClientAuthHashScheme scheme, boolean useAdmin) throws IOException {
         final Random r = new Random();
-        String listener = listeners.get(r.nextInt(listeners.size()));
+        String listener = null;
+        if (useAdmin) {
+            listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
+        } else {
+            listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
+        }
         ClientConfig config = new ClientConfigForTest(m_username, m_password, scheme);
         config.setConnectionResponseTimeout(timeout);
         config.setProcedureCallTimeout(timeout);
@@ -194,7 +206,11 @@ public class RegressionSuite extends TestCase {
         }
         // retry once
         catch (ConnectException e) {
-            listener = listeners.get(r.nextInt(listeners.size()));
+            if (useAdmin) {
+                listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
+            } else {
+                listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
+            }
             client.createConnection(listener);
         }
         m_clients.add(client);

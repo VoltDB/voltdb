@@ -508,7 +508,7 @@ public class PlanAssembler {
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan subqueryBestPlan = subqueryScan.getBestCostPlan();
-           if (subqueryBestPlan == null) {
+            if (subqueryBestPlan == null) {
                 throw new PlanningErrorException(m_recentErrorMsg);
             }
             orderIsDeterministic &= subqueryBestPlan.isOrderDeterministic();
