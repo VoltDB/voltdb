@@ -26,6 +26,7 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -52,6 +53,7 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthenticationResult;
@@ -69,6 +71,7 @@ import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
+
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 
@@ -462,6 +465,8 @@ public class HTTPAdminListener {
                     } else {
                         handleGetUsers(jsonp, target, baseRequest, request, response, authResult.m_client);
                     }
+                } else if (baseRequest.getRequestURI().contains("/export/type")) {
+                    handleGetExportTypes(jsonp, response);
                 } else {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
                         handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult.m_client);
@@ -723,6 +728,28 @@ public class HTTPAdminListener {
                 if (jsonp != null) {
                     response.getWriter().write(")");
                 }
+            }
+        }
+
+        //Handle GET for export types
+        public void handleGetExportTypes(String jsonp, HttpServletResponse response)
+                           throws IOException, ServletException {
+            if (jsonp != null) {
+                response.getWriter().write(jsonp + "(");
+            }
+            JSONObject exportTypes = new JSONObject();
+            HashSet<String> exportList = new HashSet<String>();
+            for (ServerExportEnum type : ServerExportEnum.values()) {
+                exportList.add(type.value());
+            }
+            try {
+                exportTypes.put("types", exportList);
+            } catch (JSONException e) {
+                m_log.warn("Failed to generate exportTypes JSON: ", e);
+            }
+            response.getWriter().write(exportTypes.toString());
+            if (jsonp != null) {
+                response.getWriter().write(")");
             }
         }
     }
