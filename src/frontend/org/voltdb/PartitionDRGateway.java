@@ -59,7 +59,7 @@ public class PartitionDRGateway {
         }
     }
 
-    public static final Map<Integer, PartitionDRGateway> gateways = new NonBlockingHashMap<Integer, PartitionDRGateway>();
+    public static final Map<Integer, PartitionDRGateway> m_partitionDRGateways = new NonBlockingHashMap<>();
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -69,7 +69,7 @@ public class PartitionDRGateway {
      * @return Instance of PartitionDRGateway
      */
     public static PartitionDRGateway getInstance(int partitionId,
-                                                 NodeDRGateway nodeGateway,
+                                                 ProducerDRGateway producerGateway,
                                                  StartAction startAction)
     {
         final VoltDBInterface vdb = VoltDB.instance();
@@ -79,7 +79,7 @@ public class PartitionDRGateway {
         // if this is a primary cluster in a DR-enabled scenario
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToDR && nodeGateway != null) {
+        if (licensedToDR && producerGateway != null) {
             pdrg = tryToLoadProVersion();
         }
         if (pdrg == null) {
@@ -88,11 +88,11 @@ public class PartitionDRGateway {
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, nodeGateway, startAction);
+            pdrg.init(partitionId, producerGateway, startAction);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
-        gateways.put(partitionId,  pdrg);
+        m_partitionDRGateways.put(partitionId,  pdrg);
 
         return pdrg;
     }
@@ -112,7 +112,7 @@ public class PartitionDRGateway {
 
     // empty methods for community edition
     protected void init(int partitionId,
-                        NodeDRGateway gateway,
+                        ProducerDRGateway producerGateway,
                         StartAction startAction) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
                                           StoredProcedureInvocation spi,
@@ -229,7 +229,7 @@ public class PartitionDRGateway {
             }
         }
 
-        final PartitionDRGateway pdrg = gateways.get(partitionId);
+        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }

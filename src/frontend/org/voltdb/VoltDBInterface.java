@@ -175,7 +175,7 @@ public interface VoltDBInterface
 
     public boolean getReplicationActive();
 
-    public NodeDRGateway getNodeDRGateway();
+    public ProducerDRGateway getNodeDRGateway();
 
     public ConsumerDRGateway getConsumerDRGateway();
 
@@ -247,8 +247,12 @@ public interface VoltDBInterface
 
     /**
      * Return the license api. This may be null in community editions!
+     * @return License API based on edition.
      */
      public LicenseApi getLicenseApi();
+     //Return JSON string represenation of license information.
+     public String getLicenseInformation();
+
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
 }
