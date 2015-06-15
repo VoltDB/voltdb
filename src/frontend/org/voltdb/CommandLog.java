@@ -19,6 +19,8 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.SpScheduler.DurableMpUniqueIdListener;
+import org.voltdb.iv2.SpScheduler.DurableSpUniqueIdListener;
 import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -80,9 +82,25 @@ public interface CommandLog {
 
     public interface DurabilityListener {
         /**
+         * Assign the listener that we will send SP UniqueId durability notifications to
+         */
+        public void setSpUniqueIdListener(DurableSpUniqueIdListener listener);
+
+        /**
+         * Assign the listener that we will send MP UniqueId durability notifications to
+         */
+        public void setMpUniqueIdListener(DurableMpUniqueIdListener listener);
+
+        /**
          * Called from Scheduler to set up how all future completion checks will be handled
          */
         public void createFirstCompletionCheck(boolean isSyncLogging, boolean haveMpGateway);
+
+        /**
+         * Determines if a completionCheck has already been allocated.
+         */
+        public boolean completionCheckInitialized(boolean supportsMp);
+
         /**
          * Called from CommandLog to notify a Scheduler of the tasks/uniqueIds that have been made durable
          */
