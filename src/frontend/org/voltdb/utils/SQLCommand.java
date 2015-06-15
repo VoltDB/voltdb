@@ -1306,7 +1306,7 @@ public class SQLCommand
             // which would fail in the opposite direction, when a 0-length
             // file was piped in, showing an interactive greeting and prompt
             // before quitting.
-            if (System.console() == null) {
+            if (System.console() == null && m_interactive) {
                 m_interactive = false;
                 executeNoninteractive();
             }
