@@ -98,7 +98,7 @@ public abstract class AbstractParsedStmt {
 
     // This list is used to identify the order of the table aliases returned by
     // the parser for possible use as a default join order.
-    protected ArrayList<String> m_tableAliasList = new ArrayList<String>();
+    protected ArrayList<String> m_tableAliasListAsJoinOrder = new ArrayList<String>();
 
     protected final String[] m_paramValues;
     public final Database m_db;
@@ -930,7 +930,7 @@ public abstract class AbstractParsedStmt {
             tableAlias = tableName;
         }
         // Hsql rejects name conflicts in a single query
-        m_tableAliasList.add(tableAlias);
+        m_tableAliasListAsJoinOrder.add(tableAlias);
 
         VoltXMLElement subqueryElement = null;
         // Possible sub-query

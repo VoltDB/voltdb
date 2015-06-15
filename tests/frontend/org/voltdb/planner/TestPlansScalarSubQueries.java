@@ -492,6 +492,27 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
 
         failToCompile("select * from r5 where (a,c) > ALL (select a, c from p1);", errorMessage);
         failToCompile("select r2.c from r2 where r2.c = (select p1.a from p1 where p1.a = r2.c);", errorMessage);
+
+        // partition table in the UNION clause
+        // 2 partition tables
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p1.a from p1 where p1.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // 1 partition table and 1 replicated table
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // 2 tables with the same table alias
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p2.a from r4 as p2 where p2.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // swap the UNION order for the previous case
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p2.a from p2 where p2.a = r2.a UNION select p2.a from r4 as p2 where p2.a = r2.a);", errorMessage);
+        // Join in the right clause of UNION
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION select p2.a from p2, r3 where p2.a = r2.a and p2.a = r3.a);", errorMessage);
+        // partition sub-query in the UNION
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION "
+                + "  select tb.c from (select a, c from p2 where a = 3 and d > 2) tb, r3 where tb.a = r2.a and tb.a = r3.a);", errorMessage);
     }
 
     @Override
