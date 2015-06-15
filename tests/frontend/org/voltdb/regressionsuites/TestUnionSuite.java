@@ -45,33 +45,46 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testUnion() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
         client.callProcedure("InsertA", 0, 1); // In the final result set - 0
         client.callProcedure("InsertB", 1, 1); // In the final result set - 1
         client.callProcedure("InsertB", 2, 1); // Eliminated (duplicate)
         client.callProcedure("InsertC", 1, 2); // In the final result set - 2
         client.callProcedure("InsertC", 2, 3); // In the final result set - 3
         client.callProcedure("InsertC", 3, 3); // Eliminated (duplicate)
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION SELECT I FROM B UNION SELECT I FROM C;")
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION SELECT I FROM B UNION SELECT I FROM C order by pkey;")
                 .getResults()[0];
-        assertEquals(4, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION SELECT I FROM B) UNION SELECT I FROM C;")
+        assertEquals(4, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,2,3});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION SELECT I FROM B) UNION SELECT I FROM C order by pkey;")
                 .getResults()[0];
-        assertEquals(4, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION (SELECT I FROM B UNION SELECT I FROM C);")
+        assertEquals(4, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,2,3});
+
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION (SELECT I FROM B UNION SELECT I FROM C) order by pkey;")
                 .getResults()[0];
-        assertEquals(4, result.getRowCount());
+        assertEquals(4, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,2,3});
+
         // test with parameters
-        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B where PKEY = 2 UNION SELECT I FROM C WHERE I = 3;")
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B where PKEY = 2 "
+                + "UNION SELECT I FROM C WHERE I = 3 order by pkey;")
                 .getResults()[0];
-        assertEquals(3, result.getRowCount());
-        result = client.callProcedure("@Explain", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;").getResults()[0];
-        String resultStr = result.toString();
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,3});
+
+        vt = client.callProcedure("@Explain", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B "
+                + "UNION SELECT I FROM C WHERE I = 3;").getResults()[0];
+        String resultStr = vt.toString();
         assertTrue(resultStr.contains("(PKEY = ?0)"));
         assertTrue(resultStr.contains("(column#1 = ?1)"));
 
-        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B WHERE PKEY=? UNION SELECT I FROM C WHERE PKEY = ? AND I = 3;", 3, 2)
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B WHERE PKEY=? "
+                + "UNION SELECT I FROM C WHERE PKEY = ? AND I = 3 order by pkey;", 3, 2)
                 .getResults()[0];
-        assertEquals(2, result.getRowCount());
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,3});
 
         String sql;
         // data
@@ -82,21 +95,25 @@ public class TestUnionSuite extends RegressionSuite {
 
         sql = "select client_id, config_id from RPT_P where client_id=140 " +
               " UNION " +
-              "select client_id, config_id from rpt_copy_p where client_id=140;";
-        result = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(3, result.getRowCount());
+              "select client_id, config_id from rpt_copy_p where client_id=140 " +
+              " order by client_id, config_id;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfLongs(vt, new long[][]{{140,1},{140,2},{140,3}});
 
         sql = "select client_id, config_id, sum(cost) as cost from RPT_P where client_id=140 group by client_id, config_id " +
               " UNION " +
-              "select client_id, config_id, sum(cost) as cost from rpt_copy_p where client_id=140 group by client_id, config_id;";
-        result = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(3, result.getRowCount());
+              "select client_id, config_id, sum(cost) as cost from rpt_copy_p where client_id=140 group by client_id, config_id " +
+              " order by client_id, config_id;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfLongs(vt, new long[][]{{140,1,1},{140,2,2},{140,3,3}});
 
-        result = client.callProcedure("testunion_p", 140, 140).getResults()[0];
-        assertEquals(3, result.getRowCount());
+        vt = client.callProcedure("testunion_p", 140, 140).getResults()[0];
+        assertEquals(3, vt.getRowCount());
 
-        result = client.callProcedure("testunion_p", 10, 10).getResults()[0];
-        assertEquals(0, result.getRowCount());
+        vt = client.callProcedure("testunion_p", 10, 10).getResults()[0];
+        assertEquals(0, vt.getRowCount());
     }
 
     /**
@@ -107,20 +124,29 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testUnionAll() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
         client.callProcedure("InsertA", 0, 1); //In the final result set
         client.callProcedure("InsertB", 1, 1); //In the final result set
         client.callProcedure("InsertB", 2, 1); //In the final result set
         client.callProcedure("InsertC", 1, 2); //In the final result set
         client.callProcedure("InsertC", 2, 3); //In the final result set
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C;")
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B "
+                + "UNION ALL SELECT I FROM C order by pkey;")
                 .getResults()[0];
-        assertEquals(5, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B) UNION ALL SELECT I FROM C;")
+        assertEquals(5, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,1,2,3});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B) "
+                + "UNION ALL SELECT I FROM C order by pkey;")
                 .getResults()[0];
-        assertEquals(5, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL (SELECT I FROM B UNION ALL SELECT I FROM C);")
+        assertEquals(5, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,1,2,3});
+
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL "
+                + "(SELECT I FROM B UNION ALL SELECT I FROM C) order by pkey;")
                 .getResults()[0];
-        assertEquals(5, result.getRowCount());
+        assertEquals(5, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,1,2,3});
     }
 
     /**
@@ -131,13 +157,16 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testUnionMultiColumns() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 1); //In the final result set
         client.callProcedure("InsertA", 1, 1); //In the final result set
         client.callProcedure("InsertB", 1, 1); //Eliminated (duplicate)
         client.callProcedure("InsertB", 2, 1); //In the final result set
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY, I FROM A UNION SELECT PKEY, I FROM B;")
-                .getResults()[0];
-        assertEquals(3, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY, I FROM A "
+                + "UNION SELECT PKEY, I FROM B order by pkey, I;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfLongs(vt, new long[][]{{0,1},{1,1},{2,1}});
     }
 
     /**
@@ -148,13 +177,15 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testUnionAllMultiColumns() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
         client.callProcedure("InsertA", 0, 1); //In the final result set
         client.callProcedure("InsertA", 1, 1); //In the final result set
         client.callProcedure("InsertB", 1, 1); //In the final result set
         client.callProcedure("InsertB", 2, 1); //In the final result set
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY, I FROM A UNION ALL SELECT PKEY, I FROM B;")
-                .getResults()[0];
-        assertEquals(4, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY, I FROM A UNION ALL "
+                + "SELECT PKEY, I FROM B order by pkey, i;").getResults()[0];
+        assertEquals(4, vt.getRowCount());
+        validateTableOfLongs(vt, new long[][]{{0,1},{1,1},{1,1},{2,1}});
     }
 
     /**
@@ -165,13 +196,14 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testUnionStar() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
         client.callProcedure("InsertA", 0, 1); //In the final result set
         client.callProcedure("InsertA", 1, 1); //In the final result set
         client.callProcedure("InsertB", 1, 1); //Eliminated (duplicate)
         client.callProcedure("InsertB", 2, 1); //In the final result set
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM A UNION SELECT * FROM B;")
-                .getResults()[0];
-        assertEquals(3, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM A UNION SELECT * FROM B;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfLongs(vt, new long[][]{{0,1},{1,1},{2,1}});
     }
 
     /**
@@ -182,15 +214,17 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testExcept1() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
         client.callProcedure("InsertA", 0, 1); //Eliminated (both in C and A)
         client.callProcedure("InsertA", 1, 1); //Eliminated (duplicate)
         client.callProcedure("InsertA", 2, 1); //Eliminated (duplicate)
         client.callProcedure("InsertA", 3, 4); //Eliminated (not in C)
         client.callProcedure("InsertC", 1, 1); //Eliminated (both in C and A)
         client.callProcedure("InsertC", 2, 2); //IN (not in A)
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM C EXCEPT SELECT I FROM A;")
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM C EXCEPT SELECT I FROM A;")
                 .getResults()[0];
-        assertEquals(1, result.getRowCount());
+        assertEquals(1, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{2});
     }
 
     /**
@@ -201,6 +235,8 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testExcept2() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 1); //Eliminated (by C.PKEY=1)
         client.callProcedure("InsertA", 1, 1); //Eliminated (duplicate)
         client.callProcedure("InsertA", 2, 1); //Eliminated (duplicate)
@@ -208,12 +244,15 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertB", 1, 2); //Eliminated (not in A)
         client.callProcedure("InsertC", 1, 1); //Eliminated (by A.PKEY=0)
         client.callProcedure("InsertC", 2, 2); //Eliminated (not in A)
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT SELECT I FROM B EXCEPT SELECT I FROM C;")
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT SELECT I FROM B EXCEPT SELECT I FROM C;")
                 .getResults()[0];
-        assertEquals(1, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "(SELECT I FROM A EXCEPT SELECT I FROM B) EXCEPT SELECT I FROM C;")
+        assertEquals(1, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{4});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT I FROM A EXCEPT SELECT I FROM B) EXCEPT SELECT I FROM C;")
                 .getResults()[0];
-        assertEquals(1, result.getRowCount());
+        assertEquals(1, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{4});
     }
 
     /**
@@ -224,6 +263,8 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testExceptAll1() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 0); //In the final result set
         client.callProcedure("InsertA", 1, 0); //In the final result set
         client.callProcedure("InsertA", 2, 1); //Eliminated (by B.PKEY=1)
@@ -239,12 +280,16 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertB", 5, 5); //Eliminated (by A.PKEY=5)
         client.callProcedure("InsertC", 0, 2); //Eliminated (not in (A-B))
         client.callProcedure("InsertC", 1, 5); //Eliminated (by A.PKEY=6)
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT ALL SELECT I FROM B EXCEPT ALL SELECT I FROM C;")
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT ALL SELECT I FROM B "
+                + "EXCEPT ALL SELECT I FROM C order by i;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,0,5});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT I FROM A EXCEPT ALL SELECT I FROM B) "
+                + "EXCEPT ALL SELECT I FROM C order by I;")
                 .getResults()[0];
-        assertEquals(3, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "(SELECT I FROM A EXCEPT ALL SELECT I FROM B) EXCEPT ALL SELECT I FROM C;")
-                .getResults()[0];
-        assertEquals(3, result.getRowCount());
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,0,5});
     }
 
     /**
@@ -275,6 +320,8 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testIntersect() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 0); //In the final result set
         client.callProcedure("InsertA", 1, 1); //In the final result set
         client.callProcedure("InsertA", 2, 1); //Eliminated (duplicate)
@@ -284,15 +331,20 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 1, 1); //Eliminated (duplicate)
         client.callProcedure("InsertC", 2, 2); //Eliminated (not in A)
         client.callProcedure("InsertC", 3, 0); //Eliminated (duplicate)
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT SELECT I FROM B INTERSECT SELECT I FROM C;")
-                .getResults()[0];
-        assertEquals(2, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "(SELECT I FROM A INTERSECT SELECT I FROM B) INTERSECT SELECT I FROM C;")
-                .getResults()[0];
-        assertEquals(2, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT (SELECT I FROM B INTERSECT SELECT I FROM C);")
-                .getResults()[0];
-        assertEquals(2, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT SELECT I FROM B "
+                + "INTERSECT SELECT I FROM C order by i;").getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT I FROM A INTERSECT SELECT I FROM B) "
+                + "INTERSECT SELECT I FROM C order by i;").getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1});
+
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT "
+                + "(SELECT I FROM B INTERSECT SELECT I FROM C) order by i;").getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1});
     }
 
     /**
@@ -303,6 +355,8 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testIntersectAll() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 0); //In the final result set
         client.callProcedure("InsertA", 1, 1); //In the final result set
         client.callProcedure("InsertA", 2, 1); //In the final result set
@@ -318,15 +372,20 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 2, 2); //Eliminated (not in B)
         client.callProcedure("InsertC", 3, 0); //Eliminated (same as A.PKEY=0)
         client.callProcedure("InsertC", 4, 0); //Eliminated (A & B have only one 0)
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL SELECT I FROM B INTERSECT ALL SELECT I FROM C;")
-                .getResults()[0];
-        assertEquals(3, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "(SELECT I FROM A INTERSECT ALL SELECT I FROM B) INTERSECT ALL SELECT I FROM C;")
-                .getResults()[0];
-        assertEquals(3, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL (SELECT I FROM B INTERSECT ALL SELECT I FROM C);")
-                .getResults()[0];
-        assertEquals(3, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL SELECT I FROM B "
+                + "INTERSECT ALL SELECT I FROM C order by i;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,1});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT I FROM A INTERSECT ALL SELECT I FROM B) "
+                + "INTERSECT ALL SELECT I FROM C order by i;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,1});
+
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL "
+                + "(SELECT I FROM B INTERSECT ALL SELECT I FROM C) order by i;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,1});
     }
 
     /**
@@ -337,6 +396,8 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testMultipleSetOperations1() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 0); // in A,B union. Eliminated by C.PKEY=3
         client.callProcedure("InsertA", 1, 1); // in A,B union. Eliminated by C.PKEY=1
         client.callProcedure("InsertA", 2, 1); // Eliminated (duplicate in A,B union)
@@ -347,16 +408,21 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 1, 1); // Eliminated ( in A,B union)
         client.callProcedure("InsertC", 3, 0); // Eliminated ( in A,B union)
         client.callProcedure("InsertC", 4, 3); // Eliminated ( not in A or B)
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A UNION SELECT I FROM B EXCEPT SELECT I FROM C;")
-                .getResults()[0];
-        assertEquals(1, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "(SELECT I FROM A UNION SELECT I FROM B) EXCEPT SELECT I FROM C;")
-                .getResults()[0];
-        assertEquals(1, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A UNION SELECT I FROM B "
+                + "EXCEPT SELECT I FROM C order by i;").getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{2});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT I FROM A UNION SELECT I FROM B) "
+                + "EXCEPT SELECT I FROM C order by i;").getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{2});
+
         // test with parameters
-        result = client.callProcedure("@AdHoc", "SELECT I FROM A where I = 0 UNION SELECT I FROM B EXCEPT SELECT I FROM C WHERE I = 3;")
-                .getResults()[0];
-        assertEquals(3, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A where I = 0 UNION SELECT I FROM B "
+                + "EXCEPT SELECT I FROM C WHERE I = 3 order by i;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,2});
     }
 
     /**
@@ -367,6 +433,8 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testMultipleSetOperations2() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 1, 1); // in A,B and C,D unions. Eliminated by EXCEPT
         client.callProcedure("InsertA", 3, 4); // in A,B union. Not in C,D. In final result set
         client.callProcedure("InsertB", 1, 0); // in A,B and C,D unions. Eliminated by EXCEPT
@@ -375,11 +443,10 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 3, 0); // in A,B and C,D unions. Eliminated by EXCEPT
         client.callProcedure("InsertC", 4, 3); // only in C,D union. Eliminated by EXCEPT
         client.callProcedure("InsertD", 0, 2); // in A,B and C,D unions. Eliminated by EXCEPT
-        VoltTable result = client.callProcedure("@AdHoc", "(SELECT I FROM A UNION SELECT I FROM B) EXCEPT (SELECT I FROM C UNION SELECT I FROM D);")
-                .getResults()[0];
-        assertEquals(1, result.getRowCount());
-        result.advanceToRow(0);
-        assertEquals(4, result.getLong(0));
+        vt = client.callProcedure("@AdHoc", "(SELECT I FROM A UNION SELECT I FROM B) EXCEPT "
+                + "(SELECT I FROM C UNION SELECT I FROM D);").getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{4});
     }
 
     /**
@@ -390,6 +457,7 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testMultipleSetOperations3() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
         client.callProcedure("InsertA", 0, 0); // in A but not in B-C. Eliminated by final INTERSECT
         client.callProcedure("InsertA", 1, 1); // in A but not in B-C. Eliminated by final INTERSECT
         client.callProcedure("InsertA", 2, 1); // in A but not in B-C. Eliminated by final INTERSECT
@@ -403,9 +471,10 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 1, 1); // in B and C. Eliminated by B-C
         client.callProcedure("InsertC", 3, 0); // in B and C. Eliminated by B-C
         client.callProcedure("InsertC", 4, 3); // not in B. Eliminated by B-C
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL (SELECT I FROM B EXCEPT ALL SELECT I FROM C);")
-                .getResults()[0];
-        assertEquals(2, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL "
+                + "(SELECT I FROM B EXCEPT ALL SELECT I FROM C);").getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{2,2});
     }
 
     /**
@@ -416,6 +485,8 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testMultipleSetOperations4() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 0); // in A and B and C. Eliminated by inner EXCEPT, so IN final result.
         client.callProcedure("InsertA", 1, 1); // in A and B, not in C. Eliminated by outer EXCEPT.
         client.callProcedure("InsertA", 2, 2); // in A and has no effect in C. IN final result set.
@@ -428,9 +499,10 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 2, 2); // in A and has no effect in C. IN final result set.
         client.callProcedure("InsertC", 4, 4); // Not in A. Has no effect in B and C. Not in final result.
         client.callProcedure("InsertC", 6, 6); // Not in A. Has no effect in C. Not in final result.
-        VoltTable result = client.callProcedure("@AdHoc", "(SELECT I FROM A) EXCEPT (SELECT I FROM B EXCEPT SELECT I FROM C);")
-                .getResults()[0];
-        assertEquals(3, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "(SELECT I FROM A) EXCEPT "
+                + "(SELECT I FROM B EXCEPT SELECT I FROM C) order by i;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,2,3});
     }
 
     /**
@@ -442,6 +514,8 @@ public class TestUnionSuite extends RegressionSuite {
     public void testMultipleSetOperations5()
     throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 0); // in A and B and C, not in D. Eliminated by inner EXCEPT, so IN final result.
         client.callProcedure("InsertA", 1, 1); // in A and B, not in C and D. Eliminated by the first outer EXCEPT.
         client.callProcedure("InsertA", 2, 2); // in A and has no effect in C and not in D. IN final result set.
@@ -455,23 +529,27 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 4, 4); // Not in A. Has no effect in B and C. Not in final result.
         client.callProcedure("InsertC", 6, 6); // Not in A. Has no effect in C. Not in final result.
         client.callProcedure("InsertD", 1, 3); // in A and D only. Eliminated by the second outer EXCEPT.
-        VoltTable result = client.callProcedure("@AdHoc", "(SELECT I FROM A) EXCEPT (SELECT I FROM B EXCEPT SELECT I FROM C) EXCEPT SELECT I FROM D;")
+        vt = client.callProcedure("@AdHoc", "(SELECT I FROM A) EXCEPT (SELECT I FROM B EXCEPT SELECT I FROM C) "
+                + "EXCEPT SELECT I FROM D order by i;")
                 .getResults()[0];
-        assertEquals(2, result.getRowCount());
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,2});
     }
 
     public void testStoredProcUnionWithParams()
     throws NoConnectionsException, IOException, ProcCallException {
         // Test that parameterized query with union can be invoked.
         Client client = getClient();
+
         client.callProcedure("InsertB", 2, 2);
         client.callProcedure("InsertC", 3, 3);
         client.callProcedure("InsertD", 4, 4);
-        VoltTable result;
-        result = client.callProcedure("UnionBCD", 2, "XYZ", 4).getResults()[0];
-        assertEquals(3, result.getRowCount());
-        result = client.callProcedure("UnionBCD", 4, "ABC", 2).getResults()[0];
-        assertEquals(1, result.getRowCount());
+        VoltTable vt;
+        vt = client.callProcedure("UnionBCD", 2, "XYZ", 4).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+
+        vt = client.callProcedure("UnionBCD", 4, "ABC", 2).getResults()[0];
+        assertEquals(1, vt.getRowCount());
     }
 
     /**
@@ -482,6 +560,8 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testUnionOrderLimitOffset() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
+        VoltTable vt;
+
         client.callProcedure("InsertA", 0, 1); //In the final result set
         client.callProcedure("InsertB", 1, 1); //In the final result set
         client.callProcedure("InsertB", 2, 1); //In the final result set
@@ -489,71 +569,120 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 2, 3); //In the final result set
 
         // No limit, offset
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0;")
-                .getResults()[0];
-        assertEquals(5, result.getRowCount());
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 "
+                + "UNION ALL SELECT I FROM C WHERE PKEY > 0 order by pkey;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0,1,1,2,3});
 
-        // Order by
-        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY PKEY DESC;")
-                .getResults()[0];
-        assertEquals(5, result.getRowCount());
-        assertEquals(3, result.fetchRow(0).getLong(0));
-        assertEquals(0, result.fetchRow(4).getLong(0));
+        // Order by column
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 "
+                + "UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY PKEY DESC;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3,2,1,1,0});
 
-        if (!isHSQL()) { // HSQL does not handle limit with union
-            // limit 3, no offset
-            result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0) LIMIT 3;")
-                .getResults()[0];
-            assertEquals(3, result.getRowCount());
+        // order by number
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 "
+                + "UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY 1 DESC;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3,2,1,1,0});
 
-            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C LIMIT ?;", 3)
-                .getResults()[0];
-            assertEquals(3, result.getRowCount());
-
-            // no limit, offset 3
-            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C ORDER BY PKEY OFFSET 3;")
-                .getResults()[0];
-            assertEquals(2, result.getRowCount());
-            assertEquals(2, result.fetchRow(0).getLong(0));
-            assertEquals(3, result.fetchRow(1).getLong(0));
-
-            // limit 2, offset 2
-            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY PKEY LIMIT 2 OFFSET 2;")
-                .getResults()[0];
-            assertEquals(2, result.getRowCount());
-            assertEquals(1, result.fetchRow(0).getLong(0));
-            assertEquals(2, result.fetchRow(1).getLong(0));
-
-            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C LIMIT ? OFFSET ?;", 2, 2)
-                    .getResults()[0];
-            assertEquals(2, result.getRowCount());
-
-            result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B LIMIT 1) UNION ALL SELECT I FROM C;")
-                    .getResults()[0];
-            assertEquals(3, result.getRowCount());
-
-            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL (SELECT I FROM B UNION ALL SELECT I FROM C LIMIT 1);")
-                    .getResults()[0];
-            assertEquals(2, result.getRowCount());
-
-            result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B ORDER BY PKEY) UNION ALL SELECT I FROM C;")
-                    .getResults()[0];
-            assertEquals(5, result.getRowCount());
-
-            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL (SELECT I FROM B UNION ALL SELECT I FROM C ORDER BY I);")
-                    .getResults()[0];
-            assertEquals(5, result.getRowCount());
-}
+        // order by parameter
+        try {
+            client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 "
+                    + "UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY ? DESC;", 1);
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+        }
 
         // Make sure the query is parameterized
-        result = client.callProcedure("@Explain", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 LIMIT 2 OFFSET 2;")
-                .getResults()[0];
-        String explainPlan = result.toString();
+        vt = client.callProcedure("@Explain", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 "
+                + "UNION ALL SELECT I FROM C WHERE PKEY > 0 LIMIT 2 OFFSET 2;").getResults()[0];
+        String explainPlan = vt.toString();
         assertTrue(explainPlan.contains("LIMIT with parameter"));
         assertTrue(explainPlan.contains("uniquely match (PKEY = ?0)"));
         assertTrue(explainPlan.contains("filter by (column#1 = ?1)"));
         assertTrue(explainPlan.contains("range-scan covering from (PKEY > ?2)"));
 
+
+        vt = client.callProcedure("@AdHoc", "SELECT ABS(PKEY) as AP FROM A WHERE PKEY = 0 UNION ALL "
+                + "SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY AP DESC;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3,2,1,1,0});
+
+
+        vt = client.callProcedure("@AdHoc", "SELECT cast ((PKEY+1) as INTEGER) as AP FROM A WHERE PKEY = 0 UNION ALL "
+                + "SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY AP DESC;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3,2,1,1,1});
+
+        //
+        // with ORDER BY
+        //
+
+        // limit 3, no offset
+        vt = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 "
+                + "UNION ALL SELECT I FROM C WHERE PKEY > 0) order by pkey LIMIT 3;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0,1,1});
+
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B "
+                + "UNION ALL SELECT I FROM C order by pkey LIMIT ?;", 3).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0,1,1});
+
+        // limit 2, offset 2
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 "
+                + " UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY PKEY LIMIT 2 OFFSET 2;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1,2});
+
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL "
+                + "SELECT I FROM C order by pkey LIMIT ? OFFSET ?;", 2, 2).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1,2});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B order by pkey LIMIT 1) "
+                + "UNION ALL SELECT I FROM C order by pkey;").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,2,3});
+
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL (SELECT I FROM B UNION ALL "
+                + "SELECT I FROM C order by I LIMIT 1) order by pkey;").getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1});
+
+        vt = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B ORDER BY PKEY) UNION ALL "
+                + "SELECT I FROM C order by pkey;").getResults()[0];
+        assertEquals(5, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,1,2,3});
+
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL (SELECT I FROM B UNION ALL "
+                + "SELECT I FROM C ORDER BY I) order by pkey;").getResults()[0];
+        assertEquals(5, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1,1,2,3});
+
+        //
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL "
+                + "SELECT I FROM C ORDER BY PKEY LIMIT 2 OFFSET 3;").getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{2,3});
+
+        // without ORDER BY
+        // hsqldb bug ENG-8382: hsqldb does not apply the LIMIT, returning wrong answers
+        if (!isHSQL()) {
+            // limit 3, no offset
+            vt = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 "
+                    + "UNION ALL SELECT I FROM C WHERE PKEY > 0) LIMIT 3;").getResults()[0];
+            assertEquals(3, vt.getRowCount());
+
+            // parameter
+            vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B "
+                    + "UNION ALL SELECT I FROM C LIMIT ?;", 3).getResults()[0];
+            assertEquals(3, vt.getRowCount());
+
+            // parameter
+            vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL "
+                    + "SELECT I FROM C LIMIT ? OFFSET ?;", 2, 2).getResults()[0];
+            assertEquals(2, vt.getRowCount());
+
+            // hsqdldb bug ENG-8381: without LIMIT, the OFFSET has NPE in hsqldb backend
+            vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL "
+                    + "SELECT I FROM C ORDER BY PKEY OFFSET 3;").getResults()[0];
+            assertEquals(2, vt.getRowCount());
+            validateTableOfScalarLongs(vt, new long[]{2,3});
+        }
     }
 
     static public junit.framework.Test suite() {

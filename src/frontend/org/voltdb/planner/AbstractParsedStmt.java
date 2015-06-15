@@ -1085,8 +1085,15 @@ public abstract class AbstractParsedStmt {
     // statements each of which may or may not use each parameter.
     // The list is required later at the top-level statement for
     // proper cataloging, so promote it here to each parent union.
+    //
+    // Similarly, as we build the parsed statement representation of a
+    // a union, we need to promote "parameter TVEs" appearing in
+    // leaf select statements.  Parameter TVEs are column references
+    // in tables from an outer query.  These are represented as parameters
+    // in the EE.
     protected void promoteUnionParametersFromChild(AbstractParsedStmt childStmt) {
         m_paramsByIndex.putAll(childStmt.m_paramsByIndex);
+        m_parameterTveMap.putAll(childStmt.m_parameterTveMap);
     }
 
     /**
