@@ -33,6 +33,7 @@ import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -42,6 +43,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 
@@ -140,6 +142,10 @@ public class RegressionSuite extends TestCase {
         return m_config;
     }
 
+    public Client getAdminClient() throws IOException {
+        return getClient(1000 * 60 * 10, ClientAuthHashScheme.HASH_SHA256, true); // 10 minute default
+    }
+
     public Client getClient() throws IOException {
         return getClient(1000 * 60 * 10, ClientAuthHashScheme.HASH_SHA256); // 10 minute default
     }
@@ -181,9 +187,17 @@ public class RegressionSuite extends TestCase {
      * VoltServerConfig instance.
      */
     public Client getClient(long timeout, ClientAuthHashScheme scheme) throws IOException {
-        final List<String> listeners = m_config.getListenerAddresses();
+        return getClient(timeout, scheme, false);
+    }
+
+    public Client getClient(long timeout, ClientAuthHashScheme scheme, boolean useAdmin) throws IOException {
         final Random r = new Random();
-        String listener = listeners.get(r.nextInt(listeners.size()));
+        String listener = null;
+        if (useAdmin) {
+            listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
+        } else {
+            listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
+        }
         ClientConfig config = new ClientConfigForTest(m_username, m_password, scheme);
         config.setConnectionResponseTimeout(timeout);
         config.setProcedureCallTimeout(timeout);
@@ -194,7 +208,11 @@ public class RegressionSuite extends TestCase {
         }
         // retry once
         catch (ConnectException e) {
-            listener = listeners.get(r.nextInt(listeners.size()));
+            if (useAdmin) {
+                listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
+            } else {
+                listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
+            }
             client.createConnection(listener);
         }
         m_clients.add(client);
@@ -367,7 +385,7 @@ public class RegressionSuite extends TestCase {
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableOfLongs(vt, expected);
+        validateTableOfLongs(sql, vt, expected);
     }
 
     static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
@@ -385,6 +403,17 @@ public class RegressionSuite extends TestCase {
         validateTableOfScalarLongs(vt, expected);
     }
 
+    static private void validateTableOfLongs(String messagePrefix,
+            VoltTable vt, long[][] expected) {
+        assertNotNull(expected);
+        assertEquals(messagePrefix + " returned wrong number of rows.  ",
+                        expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            validateRowOfLongs(messagePrefix + " at row " + i + ", ", vt, expected[i]);
+        }
+    }
+
     static public void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals("Wrong number of rows in table.  ",
@@ -399,6 +428,8 @@ public class RegressionSuite extends TestCase {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
+            String message = messagePrefix + "at column " + i + ", ";
+
             long actual = -10000000;
             // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
             try {
@@ -414,18 +445,13 @@ public class RegressionSuite extends TestCase {
                             actual = vt.getDecimalAsBigDecimal(i).longValueExact();
                         } catch (IllegalArgumentException newerEx) {
                             newerEx.printStackTrace();
-                            fail();
+                            fail(message);
                         }
                     } catch (ArithmeticException newestEx) {
                         newestEx.printStackTrace();
-                        fail();
+                        fail(message);
                     }
                 }
-            }
-
-            String message = "at column " + i +", ";
-            if (messagePrefix != null) {
-                message = messagePrefix + message;
             }
 
             // Long.MIN_VALUE is like a NULL
@@ -439,7 +465,7 @@ public class RegressionSuite extends TestCase {
     }
 
     static public void validateRowOfLongs(VoltTable vt, long [] expected) {
-        validateRowOfLongs(null, vt, expected);
+        validateRowOfLongs("", vt, expected);
     }
 
     static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
@@ -610,4 +636,41 @@ public class RegressionSuite extends TestCase {
             assertTrue(vtStr.contains(pattern));
         }
     }
+
+    /**
+     * Utility function to run queries and dump results to stdout.
+     * @param client
+     * @param queries one or more query strings to send in a batch
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    protected static void dumpQueryResults(Client client, String... queries)
+            throws IOException, NoConnectionsException, ProcCallException {
+        VoltTable vts[] = client.callProcedure("@AdHoc", StringUtils.join(queries, '\n')).getResults();
+        int ii = 0;
+        for (VoltTable vtn : vts) {
+            System.out.println("DEBUG: result for " + queries[ii] + "\n" + vtn + "\n");
+            ++ii;
+        }
+    }
+
+    /**
+     * Utility function to explain queries and dump results to stdout.
+     * @param client
+     * @param queries one or more query strings to send in a batch to @Explain.
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    protected static void dumpQueryPlans(Client client, String... queries)
+            throws IOException, NoConnectionsException, ProcCallException {
+        VoltTable vts[] = client.callProcedure("@Explain", StringUtils.join(queries, '\n')).getResults();
+        int ii = 0;
+        for (VoltTable vtn : vts) {
+            System.out.println("DEBUG: plan for " + queries[ii] + "\n" + vtn + "\n");
+            ++ii;
+        }
+    }
+
 }

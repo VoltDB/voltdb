@@ -57,6 +57,30 @@ public class TestFunctionsSuite extends RegressionSuite {
     private static final String paddedToNonInlineLength =
         "will you still free me (will memcheck see me) when Im sixty-four";
 
+    public void testMod() throws Exception {
+        System.out.println("STARTING testMod");
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (2, '', -10, 2.3, NULL)");
+
+        // integral types
+        validateTableOfScalarLongs(client, "select MOD(25,7) from R1", new long[]{4});
+        validateTableOfScalarLongs(client, "select MOD(25,-7) from R1", new long[]{4});
+        validateTableOfScalarLongs(client, "select MOD(-25,7) from R1", new long[]{-4});
+        validateTableOfScalarLongs(client, "select MOD(-25,-7) from R1", new long[]{-4});
+
+        validateTableOfScalarLongs(client, "select MOD(id,7) from R1", new long[]{2});
+        validateTableOfScalarLongs(client, "select MOD(id * 4,id+2) from R1", new long[]{0});
+
+        // Edge case: MOD 0
+        verifyStmtFails(client, "select MOD(-25,0) from R1", "division by zero");
+
+        // Test guards on other types
+        verifyStmtFails(client, "select MOD(-25.32, 2.5) from R1", "unsupported non-integral type for SQL MOD function");
+        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "unsupported non-integral type for SQL MOD function");
+
+    }
+
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
     public void testFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
         System.out.println("STARTING testFoundHSQLBackendOutOfRange");

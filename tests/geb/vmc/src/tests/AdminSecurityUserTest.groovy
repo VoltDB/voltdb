@@ -14,7 +14,7 @@ import geb.Page.*
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
 
-class AdminSecurityUser extends TestBase {
+class AdminSecurityUserTest extends TestBase {
 	int insideCount = 0
 	boolean loopStatus = false
 	

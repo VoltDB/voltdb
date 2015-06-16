@@ -293,7 +293,7 @@ function QueryUI(queryString, userName) {
     }
 
     function printGrid(target, id, table) {
-        var src = '<table id="table_'+id+'" width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl sortable tablesorter" id="queryResultTbl"><thead class="ui-widget-header noborder"><tr>';
+        var src = '<table id="table_' + id + '" width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl sortable tablesorter" id="queryResultTbl"><thead class="ui-widget-header noborder"><tr>';
         if (isUpdateResult(table))
             src += '<th>modified_tuples</th>';
         else {
@@ -319,7 +319,7 @@ function QueryUI(queryString, userName) {
                     typ = 9;  //code for varchar
                 }
                 val = applyFormat(val);
-                src += '<td align="left">' + val + '</td>';
+                src += '<td align="left">' + htmlEncode(val) + '</td>';
             }
             src += '</tr>';
         }
@@ -342,7 +342,7 @@ function QueryUI(queryString, userName) {
         for (var j = 0; j < table.data.length; j++) {
             for (var k = 0; k < table.data[j].length; k++) {
                 if (k > 0) src += '\t';
-                src += table.data[j][k];
+                src += htmlEncode(table.data[j][k]);
             }
             src += '</br>\r\n';
         }
@@ -365,12 +365,16 @@ function QueryUI(queryString, userName) {
         for (var j = 0; j < table.data.length; j++) {
             for (var k = 0; k < table.data[j].length; k++) {
                 if (k > 0) src += ', ';
-                src += table.data[j][k];
+                src += htmlEncode(table.data[j][k]);
             }
             src += '</br>\r\n';
         }
         src += '</br>\r\n(' + j + ' row(s) affected)\r\n\r\n</pr></br></br>';
         $(target).append(src);
+    }
+
+    function htmlEncode(value) {
+        return $('<div/>').text(value).html();
     }
 
     this.execute = executeMethod;

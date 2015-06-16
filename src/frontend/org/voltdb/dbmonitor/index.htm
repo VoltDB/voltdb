@@ -81,7 +81,21 @@
                             </a>
                         </li>
                         <li class="line" id="userLine"></li>
-                        <li class="help"><a href="#help" id="showMyHelp">Help</a></li>
+                        <li>
+                            <div class="menuHome">
+                            <ul class="menuHomeList">
+                                <li>
+                                    <a href="#" style="float:left">Help</a>
+                                    <div class="helpDrop"></div>
+                                    <div class="clear"></div>
+                                    <ul>
+                                        <li><a href="#help" id="showMyHelp">DB Monitor Help</a></li>
+                                        <li><a href="#About" id="ShowAbout">About</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                            </div>
+                        </li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
                     </ul>
                 </div>
@@ -310,7 +324,6 @@
                                         </a>
                                     </li>
                                 </ul>
-
                                 <div class="clear"></div>
                             </div>
                             <div class="clear"></div>
@@ -324,7 +337,6 @@
                                         <div class="clear"></div>
                                     </div>
                                     <div class="clear"></div>
-
                                     <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate">
                                         <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
                                         <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
@@ -347,7 +359,6 @@
                                     </div>
                                 </div>
                             </div>
-
                             <div id="drReplicaSection" class="replicaWrapper" style="display:block">
                                 <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
@@ -356,7 +367,6 @@
                                         <div class="clear"></div>
                                     </div>
                                     <div class="clear"></div>
-
                                     <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate">
                                         <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
                                         <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
@@ -378,8 +388,6 @@
                                 </div>
                             </div>
                         </div>
-
-
                     </div>
                 </div>
             </div>
@@ -401,7 +409,6 @@
                                 <li><a href="#restorePop" id="restoreConfirmation" class="restoreConfirmationDisable">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
                             </ul>
-
                         </div>
                         <div class="clear"></div>
                     </div>
@@ -629,6 +636,17 @@
                                         <a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
+                                <tr class="child-row-4 subLabelRow">
+                                    <td class="configLabel">Export Tables</td>
+                                    <td align="right">
+                                        &nbsp;
+                                    </td>
+                                    <td></td>
+                                    <td>
+                                        <a href="javascript:void(0);" id="lstExportTbl" class="drTblBtn" style="display: block;" title="List of Export Tables">Export Tables</a>
+                                        <a href="#exportTablePopup" id="lstExportTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
+                                    </td>
+                                </tr>
                                 <tbody id="exportConfiguration" data-status="value" style="display: none;"></tbody>
                                 <tr class="hasSubLabel parent" id="row-5">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
@@ -747,16 +765,13 @@
                                         <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
                                         <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
                                     </tr>
-                                    <!--<tr class="child-row-8 subLabelRow" id="Tr1">
-                                        <td class="configLabel">Source </td>
-                                        <td align="right" class="">
-                                            <div id="loadingDrSource" class="loading-small" style="display: none;"></div>
-                                            <span id="drSourceSpan">serverBz</span>
-                                            <input id="txtDrSource" name="txtDrSource" class="exitableTxtDr" value="serverBz" type="text" style="display: none" />
-                                        </td>
-                                        <td>&nbsp;</td>
-                                        <td>&nbsp;</td>
-                                    </tr>-->
+                                    <tr>
+                                        <td class="configLabel">DR Tables</td>
+
+                                        <td></td>
+                                        <td><a href="#replicatedTablePopup" id="lstDrTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a></td>
+                                        <td align="right"><a href="javascript:void(0);" id="lstDrTbl" class="drTblBtn" style="display: block;" title="List of DR Tables">DR Tables</a></td>
+                                    </tr>
                                 </table>
                             </div>
                         </div>
@@ -1163,7 +1178,88 @@
             </div>
         </div>
     </div>
-
+    <!--help popup ends-->
+    <!--About popup-->
+    <div id="About" style="display: none">
+        <div class="overlay-title helpIcon ">System Overview</div>
+        <div class="clear"></div>
+        <div class="overlay-contentAbout helpAboutWrap">
+            <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
+            <div class="dataBlock">
+                    <div class="dataBlockContent systemOver" style="padding:0;">
+                        <table id="tblSystemOverview" class="table table-condensed">
+                            <tbody>
+                                <tr>
+                                    <td>Mode</td>
+                                    <td id="mode"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>VoltDB Version</td>
+                                    <td id="voltdbVersion"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Buildstring</td>
+                                    <td id="buildString"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Cluster Composition</td>
+                                    <td id="clusterComposition"></td>
+                                    <td></td>
+                                </tr>
+                                <tr><td>Running Since</td>
+                                    <td id="runningSince"></td>
+                                    <td></td>
+                                </tr>
+                                <tr class="trLicenseInfo"><td></td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                                <tr >
+                                    <td style="font-weight: bold">License Information:</td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                                <tr id="tdLicenseInfo" style="display: none">
+                                  <td>Community Edition</td>
+                                    <td></td>
+                                    <td></td>  
+                                </tr>
+                                <tr class="licenseInfo" style="display: none">
+                                    <td>Host Count</td>
+                                    <td id="tdHostCount"></td>
+                                    <td></td>
+                                </tr>
+                                <tr class="licenseInfo" style="display: none">
+                                    <td>WAN Replication</td>
+                                    <td id="tdWanReplication"></td>
+                                    <td></td>
+                                </tr>
+                                <tr class="licenseInfo" style="display: none">
+                                    <td>Expiration</td>
+                                    <td id="tdExpiration"></td>
+                                    <td></td>
+                                </tr>
+                                <tr class="licenseInfo" style="display: none">
+                                    <td>Command Logging</td>
+                                    <td id="tdCommandLogging"></td>
+                                    <td></td>
+                                </tr>
+                                <tr class="licenseInfo" style="display: none">
+                                    <td>Trial</td>
+                                    <td id="tdTrial"></td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <!--help popup ends-->
     <!-- POPUP shutDownConfirmationPop -->
     <div id="shutDownConfirmationPop" style="display: none">
@@ -1556,6 +1652,22 @@
                 <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
             </div>
         </div>
+    </div>
+    <div id="replicatedTablePopup" style="display:none">
+        <div class="overlay-title icon-alert">DR Tables</div>
+        <div class="overlay-content resizeCon">
+            <div id="drPopup" class="repliWrapper">
+            </div>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
+    </div>
+    <div id="exportTablePopup" style="display:none">
+        <div class="overlay-title icon-alert">Export Tables</div>
+        <div class="overlay-content resizeCon">
+            <div id="exportPopup" class="repliWrapper">
+            </div>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
     </div>
     <!--Add Configuration Popup-->
     <!-- Query error because of Paused Database Popup-->
