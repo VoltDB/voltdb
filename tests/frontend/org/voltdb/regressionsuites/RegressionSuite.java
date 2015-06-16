@@ -61,6 +61,7 @@ import com.google_voltpatches.common.net.HostAndPort;
  */
 public class RegressionSuite extends TestCase {
 
+    protected static int m_verboseDiagnosticRowCap = 40;
     protected VoltServerConfig m_config;
     protected String m_username = "default";
     protected String m_password = "password";
@@ -392,7 +393,6 @@ public class RegressionSuite extends TestCase {
 
     static public void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
-        assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, expected);
     }
@@ -415,6 +415,11 @@ public class RegressionSuite extends TestCase {
     static private void validateTableOfLongs(String messagePrefix,
             VoltTable vt, long[][] expected) {
         assertNotNull(expected);
+        if (expected.length != vt.getRowCount()) {
+            if (vt.getRowCount() < m_verboseDiagnosticRowCap) {
+                System.out.println("Diagnostic dump of unexpected result:" + vt);
+            }
+        }
         assertEquals(messagePrefix + " returned wrong number of rows.  ",
                         expected.length, vt.getRowCount());
         int len = expected.length;
