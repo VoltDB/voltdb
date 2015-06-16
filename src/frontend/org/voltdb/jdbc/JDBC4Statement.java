@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -112,13 +113,13 @@ public class JDBC4Statement implements java.sql.Statement
             return false;
         }
 
-        protected VoltTable[] execute(JDBC4ClientConnection connection, long timeout) throws SQLException {
+        protected VoltTable[] execute(JDBC4ClientConnection connection, long timeout, TimeUnit queryTimeOutUnit) throws SQLException {
             try
             {
                 if (this.type == TYPE_EXEC) {
-                    return connection.execute(this.sql[0], timeout, this.parameters).getResults();
+                    return connection.execute(this.sql[0], timeout, queryTimeOutUnit, this.parameters).getResults();
                 } else {
-                    return connection.execute("@AdHoc", timeout, this.sql[0]).getResults();
+                    return connection.execute("@AdHoc", timeout, queryTimeOutUnit, this.sql[0]).getResults();
                 }
             }
             catch(ProcCallException e)
@@ -367,12 +368,12 @@ public class JDBC4Statement implements java.sql.Statement
         checkClosed();
         if (query.isQueryOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
         {
-            setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout), -1);
+            setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.QueryTimeOutUnit), -1);
             return true;
         }
         else
         {
-            setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout)[0].fetchRow(0).getLong(0));
+            setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.QueryTimeOutUnit)[0].fetchRow(0).getLong(0));
             return false;
         }
     }
@@ -429,7 +430,7 @@ public class JDBC4Statement implements java.sql.Statement
             try
             {
                 setCurrentResult(null, (int) batch.get(i).execute(sourceConnection.NativeConnection,
-                        this.m_timeout)[0].fetchRow(0).getLong(0));
+                        this.m_timeout,sourceConnection.QueryTimeOutUnit)[0].fetchRow(0).getLong(0));
                 updateCounts[i] = this.lastUpdateCount;
                 runningUpdateCount += this.lastUpdateCount;
             }
@@ -449,7 +450,7 @@ public class JDBC4Statement implements java.sql.Statement
 
     protected ResultSet executeQuery(VoltSQL query) throws SQLException
     {
-        setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout), -1);
+        setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout, this.sourceConnection.QueryTimeOutUnit), -1);
         return this.result;
     }
 
@@ -467,7 +468,7 @@ public class JDBC4Statement implements java.sql.Statement
 
     protected int executeUpdate(VoltSQL query) throws SQLException
     {
-        setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout)[0].fetchRow(0).getLong(0));
+        setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.QueryTimeOutUnit)[0].fetchRow(0).getLong(0));
         return this.lastUpdateCount;
     }
 

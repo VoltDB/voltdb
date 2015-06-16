@@ -42,9 +42,11 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.junit.AfterClass;
@@ -613,9 +615,9 @@ public class TestJDBCDriver {
         assertEquals(10, count);
     }
 
-    //Test to check Query Timeout
+    // Test to check Query without Timeout
     @Test
-    public void testQueryTimeout() throws SQLException {
+    public  void testQueryNotTimeout() throws SQLException {
         //this should not timeout at all proc will wait for 3 min before returning.
         PreparedStatement stmt = conn.prepareCall("{call ArbitraryDurationProc(?)}");
         stmt.setLong(1, 180*1000);
@@ -637,6 +639,13 @@ public class TestJDBCDriver {
             exceptionCalled = true;
         }
         assertFalse(exceptionCalled);
+    }
+
+    //Test to check Query Timeout
+    public  Boolean[] testQueryTimeout() throws SQLException {
+        Boolean[] result = new Boolean[3];
+        boolean exceptionCalled = false;
+        PreparedStatement stmt = myconn.prepareCall("{call ArbitraryDurationProc(?)}");
 
         //Now make it timeout
         stmt.setQueryTimeout(1);
@@ -647,19 +656,21 @@ public class TestJDBCDriver {
             System.out.println("Query timed out: " + ex.getSQLState());
             exceptionCalled = true;
         }
-        assertTrue(exceptionCalled);
+        result[0] = exceptionCalled;
 
-        //redo statement with long timeout should not timeout
+        //redo statement with long timeout
+        // should not timeout if time Unit is Seconds
+        // should timeout if time Unit is MILLISECONDS
         stmt.setQueryTimeout(30);
         stmt.setLong(1, 7000);
         exceptionCalled = false;
         try {
             stmt.execute();
         } catch (SQLException ex) {
-            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
+            System.out.println("Query timed out: " + ex.getSQLState());
             exceptionCalled = true;
         }
-        assertFalse(exceptionCalled);
+        result[1] = exceptionCalled;
 
         //Check -ve value
         try {
@@ -668,8 +679,37 @@ public class TestJDBCDriver {
             //Bad value
             exceptionCalled = true;
         }
-        assertTrue(exceptionCalled);
+        result[2] = exceptionCalled;
+        return result;
+    }
 
+    //Test to check Query Timeout with Time Unit being setup
+    @Test
+    public void testQueryTimeoutSetUnitThroughURL() throws Exception {
+        // expected test result from testQueryTimeout()
+        // expectionCalled for cases: 3 min Call, 1 min Call, 7 s Call with 1 s or 1 ms timeout, 7 seonds with 30 s or 30 ms timeout, call with wrong varaible for timeout
+        final Boolean[][] ExpectedResult  = new Boolean[][] {
+                new Boolean[] {true,false,true},
+                new Boolean[] {true,true,true},
+                new Boolean[] {true,false,true}};
+
+        Properties props = new Properties();
+        // Check default setting, should be TimeUnit.SECONDS
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertEquals(ExpectedResult[0], testQueryTimeout());
+        myconn.close();
+
+        // Check set time unit to TimeUnit.MILLISECONDS
+        props.setProperty(JDBC4Connection.QUERY_TIMEOUT_UNIT, TimeUnit.MILLISECONDS.toString());
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertEquals(ExpectedResult[1], testQueryTimeout());
+        myconn.close();
+
+        // Check set time unit to other unsupported unit, should by default still use TimeUnit.SECONDS
+        props.setProperty(JDBC4Connection.QUERY_TIMEOUT_UNIT, TimeUnit.NANOSECONDS.toString());
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertEquals(ExpectedResult[2], testQueryTimeout());
+        myconn.close();
     }
 
     private void checkSafeMode(Connection myconn)
