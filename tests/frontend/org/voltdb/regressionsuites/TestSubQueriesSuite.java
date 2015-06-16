@@ -785,7 +785,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
     {
         Client client = getClient();
         //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert",  10,  100, 1, "2013-07-18 02:00:00.123457");
         client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 300, 3000, 3, "2013-07-18 02:00:00.123457");
 
         client.callProcedure("R2.insert", 100, null, 2, "2013-07-18 02:00:00.123457");
         client.callProcedure("R2.insert", 101, null, 2, "2013-07-18 02:00:00.123457");
@@ -814,13 +816,13 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "      (select WAGE, DEPT from R2 " +
                 "       where ID = 0 " +
                 "       order by WAGE, DEPT limit 6 offset 1) is false;";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
+        validateTableOfLongs(client, sql, new long[][] {{10}, {100}, {300}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) = ANY " +
                 "      (select WAGE, DEPT from R2 " +
                 "       where ID = 0 " +
                 "       order by WAGE, DEPT limit 6 offset 1) is false;";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
+        validateTableOfLongs(client, sql, new long[][] {{10}, {100}, {300}});
 
         // There is no match, the "IN" or "OP ANY" expression evaluates to NULL
         // (non-empty inner result set has a null in one of its columns).
@@ -843,7 +845,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "      (select WAGE, DEPT from R2 " +
                 "       where WAGE != 1000 or WAGE is NULL " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        validateTableOfLongs(client, sql, new long[][] {{300}});
         if (!isHSQL()) {
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) <= ANY " +
@@ -856,12 +858,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "      (select WAGE, DEPT from R2 " +
                 "       where WAGE != 1000 or WAGE is NULL " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        validateTableOfLongs(client, sql, new long[][] {{300}});
         if (!isHSQL()) {
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) < ANY " +
                     "      (select WAGE, DEPT from R2 " +
-                "       where WAGE > 1005 or WAGE is NULL);";
+                    "       where WAGE > 1005 or WAGE is NULL);";
             validateTableOfLongs(client, sql, EMPTY_TABLE);
         }
         // Repeat the above with the null in a different position
@@ -871,7 +873,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       where WAGE != 1000 or WAGE is NULL " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
-        //*/ From here to "// *", Ubuntu 12.04 dev build got 1 row:
+        //*/ From here to "// *", Ubuntu 12.04 dev build got an extra row:
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) = ANY " +
                 "      (select DEPT, WAGE from R2 " +
@@ -883,33 +885,37 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "      (select DEPT, WAGE from R2 " +
                 "       where WAGE != 1000 or WAGE is NULL " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        validateTableOfLongs(client, sql, new long[][] {{300}});
         // */
+        //*/ From here to "// *", Ubuntu 12.04 dev build got no row:
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <= ANY " +
                 "      (select DEPT, WAGE from R2 " +
                 "       where WAGE > 1005 or WAGE is NULL " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        validateTableOfLongs(client, sql, new long[][] {{10}});
+        // */
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) > ANY " +
                 "      (select DEPT, WAGE from R2 " +
                 "       where WAGE != 1000 or WAGE is NULL " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        //*/ From here to "// *", Ubuntu 12.04 dev build got no row:
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) < ANY " +
                 "      (select DEPT, WAGE from R2 " +
                 "       where WAGE > 1005 or WAGE is NULL " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        validateTableOfLongs(client, sql, new long[][] {{10}});
+        // */
 
         // There is an exact match, NOT IN evaluates to FALSE
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) not IN " +
                 "      (select WAGE, DEPT from R2 " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
         // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
         // HSQL gets it wrong
@@ -1861,11 +1867,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{2}, {3}});
 
+        //*/ From here to "// *", Ubuntu 12.04 dev build got 3 rows:
         sql =   "select R1.ID from R1 " +
                 "where (R1.WAGE, R1.DEPT) <= " +
                 "      (select WAGE, DEPT from R2 where ID = 4) " +
                 "order by ID;";
-        //*/ From here to "// *", Ubuntu 12.04 dev build got 3 rows:
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
         // R1 2, 10, 1 = R2 4, 10, 1 and 5, 10, 1
