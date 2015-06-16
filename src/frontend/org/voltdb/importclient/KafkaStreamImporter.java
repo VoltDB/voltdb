@@ -17,19 +17,19 @@
 
 package org.voltdb.importclient;
 
-import java.io.IOException;
-import java.net.ServerSocket;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
-import org.voltdb.client.Client;
 import org.voltdb.importer.ImportHandlerProxy;
-import org.voltdb.utils.CSVDataLoader;
 
 /**
  * Implement a BundleActivator interface and extend ImportHandlerProxy.
@@ -37,19 +37,15 @@ import org.voltdb.utils.CSVDataLoader;
  */
 public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
 
-    private KafkaConsumerConnector m_consumer = null;
-    private final static AtomicLong m_failedCount = new AtomicLong(0);
-    private ExecutorService m_es = null;
-    private CSVDataLoader m_loader = null;
-    private Client m_client = null;
-
     private Properties m_properties;
-    private ServerSocket m_serverSocket;
     private String m_procedure;
-    private String m_zookeeper;
-    private String m_bootstrap;
     private String m_topic;
+    private String m_bootstrapServers;
     private Integer m_maxErrors = 100;
+    private Integer m_pollInterval = 5000;
+    private boolean m_closed = false;
+
+    private KafkaConsumer m_consumer;
 
     // Register ImportHandlerProxy service.
     @Override
@@ -65,10 +61,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     @Override
     public void stop() {
         try {
-            m_serverSocket.close();
-            m_serverSocket = null;
-        } catch (IOException ex) {
+            m_consumer.close();
+        } catch (Exception ex) {
             ex.printStackTrace();
+        } finally {
+            m_closed = true;
         }
     }
 
@@ -93,21 +90,22 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         if (m_procedure == null || m_procedure.trim().length() == 0) {
             throw new RuntimeException("Missing procedure.");
         }
-        m_zookeeper = (String )m_properties.getProperty("zookeeper");
-        if (m_zookeeper == null || m_zookeeper.trim().length() == 0) {
-            throw new RuntimeException("Missing zookeeper.");
-        }
-        m_bootstrap = (String )m_properties.getProperty("bootstrap");
-        if (m_bootstrap == null || m_bootstrap.trim().length() == 0) {
-            throw new RuntimeException("Missing bootstrap.");
-        }
         m_topic = (String )m_properties.getProperty("topic");
         if (m_topic == null || m_topic.trim().length() == 0) {
             throw new RuntimeException("Missing topic.");
         }
+        //bootstrap.servers
+        m_bootstrapServers = (String )m_properties.getProperty("bootstrap.servers");
+        if (m_bootstrapServers == null || m_bootstrapServers.trim().length() == 0) {
+            throw new RuntimeException("Missing bootstrap.servers");
+        }
         String maxErrors = (String )m_properties.getProperty("maxErrors");
         if (maxErrors != null && maxErrors.trim().length() != 0) {
             m_maxErrors = Integer.parseInt(maxErrors);
+        }
+        String pollInt = (String )m_properties.getProperty("pollInterval");
+        if (pollInt != null && pollInt.trim().length() != 0) {
+            m_pollInterval = Integer.parseInt(pollInt);
         }
     }
 
@@ -118,75 +116,49 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     public void readyForData() {
         try {
             info("Configured and ready with properties: " + m_properties);
-            String procedure = m_properties.getProperty("procedure");
-            m_consumer = new KafkaConsumerConnector(m_zookeeper, m_topic, m_bootstrap);
-            close();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-    }
-
-    private static class KafkaConsumerConnector {
-
-        final KafkaConsumer m_consumer;
-
-        public KafkaConsumerConnector(String zk, String groupName, String bootstrap) {
-            //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
-            String groupId = "voltdb-" + groupName;
-            //TODO: Should get this from properties file or something as override?
             Properties props = new Properties();
-            props.put("zookeeper.connect", zk);
-            props.put("group.id", groupId);
-            props.put("zookeeper.session.timeout.ms", "400");
-            props.put("zookeeper.sync.time.ms", "200");
-            props.put("auto.commit.interval.ms", "1000");
-            props.put("auto.commit.enable", "true");
-            props.put("auto.offset.reset", "smallest");
-            props.put("rebalance.backoff.ms", "10000");
+            props.put("bootstrap.servers", m_bootstrapServers);
+            props.put("group.id", "voltdb-importer");
             props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-            props.put("partition.assignment.strategy", "roundrobin");
-            props.put("bootstrap.servers", bootstrap);
+            props.put("partition.assignment.strategy", "friend");
             m_consumer = new KafkaConsumer(props);
-        }
-
-        public void stop() {
-            try {
-                //Let offset get pushed to zk....so sleep for auto.commit.interval.ms
-                Thread.sleep(1100);
-            } catch (InterruptedException ex) { }
-            finally {
-                m_consumer.commit(true);
-                m_consumer.close();
+            m_consumer.subscribe(m_topic);
+            boolean isRunning = true;
+            while (isRunning) {
+                if (m_closed) {
+                    break;
+                }
+                Map<String, ConsumerRecords> records = m_consumer.poll(m_pollInterval);
+                if (records != null) {
+                    System.out.println("Got some records.");
+                    process(records);
+                }
             }
-        }
-    }
-
-  //Close the consumer after this app will exit.
-    public void closeConsumer() throws InterruptedException {
-        if (m_consumer != null) {
-            m_consumer.stop();
+            m_consumer.close();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        } finally {
             m_consumer = null;
         }
-        if (m_es != null) {
-            m_es.shutdownNow();
-            m_es.awaitTermination(365, TimeUnit.DAYS);
-            m_es = null;
-        }
     }
-    /**
-     * Close all connections and cleanup on both the sides.
-     */
-    public void close() {
-        try {
-            closeConsumer();
-            m_loader.close();
-            if (m_client != null) {
-                m_client.close();
-                m_client = null;
-            }
-        } catch (Exception ex) {
-        }
-    }
+
+    //Call client interface
+    private Map<TopicPartition, Long> process(Map<String, ConsumerRecords> records) {
+         Map<TopicPartition, Long> processedOffsets = new HashMap<TopicPartition, Long>();
+         for(Entry<String, ConsumerRecords> recordMetadata : records.entrySet()) {
+              List<ConsumerRecord> recordsPerTopic = recordMetadata.getValue().records();
+              for(int i = 0;i < recordsPerTopic.size();i++) {
+                   ConsumerRecord record = recordsPerTopic.get(i);
+                   // process record
+                   try {
+                    processedOffsets.put(record.topicAndPartition(), record.offset());
+                   } catch (Exception e) {
+                    e.printStackTrace();
+                   }
+              }
+         }
+         return processedOffsets;
+     }
 
 }
