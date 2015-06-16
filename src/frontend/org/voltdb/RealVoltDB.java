@@ -174,7 +174,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private String m_buildString;
     static final String m_defaultVersionString = "4.9.3.1";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.9.3.1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "4.9.3(\\.1)?$";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
