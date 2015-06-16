@@ -119,6 +119,10 @@ function alertNodeClicked(obj) {
         var alertCount = 0;
         var serverSettings = false;
 
+        this.drTablesArray = [];
+
+        this.exportTablesArray = [];
+
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
         };
@@ -483,6 +487,16 @@ function alertNodeClicked(obj) {
             VoltDBService.GetTransactionInformation(function (connection) {
                 getTransactionDetails(connection, transactionDetails);
                 onInformationLoaded(transactionDetails);
+            });
+        };
+        //
+
+        //Get host and site count
+        this.GetHostAndSiteCount = function (onInformationLoaded) {
+            var countDetails = {};
+            VoltDBService.GetSystemInformationDeployment(function (connection) {
+                getCountDetails(connection, countDetails);
+                onInformationLoaded(countDetails);
             });
         };
 
@@ -1139,14 +1153,16 @@ function alertNodeClicked(obj) {
                 tableName = entry[tableNameIndex];
                 if (!schemaCatalogTableTypes.hasOwnProperty(tableName)) {
                     schemaCatalogTableTypes[tableName] = {};
-                    schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
-                    schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
-                    if (entry[remarksIndex] != null)
-                        schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
-                    else {
-                        schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
-                    }
                 }
+                schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
+
+                if (entry[remarksIndex] != null) {
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
+                    schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
+                } else {
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
+                }
+                schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
             });
 
         };
@@ -1636,90 +1652,101 @@ function alertNodeClicked(obj) {
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
                 if (this.isTableSearch == false) voltDbRenderer.tableDataSize = Object.keys(tableData).length;
 
+                voltDbRenderer.drTablesArray = [];
+                voltDbRenderer.exportTablesArray = [];
 
                 $.each(lTableData, function (id, val) {
-                    if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTupleDataHtml(val, id);
-                            if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
+                    if (val['drEnabled'] == "true") {
+                        voltDbRenderer.drTablesArray.push(val['TABLE_NAME']);
+                    }
+
+                    if (val['TABLE_TYPE1'] == "EXPORT") {
+                        voltDbRenderer.exportTablesArray.push(val['TABLE_NAME']);
+                    }
+
+                    if (lTableData)
+                        if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
+                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                                setTableTupleDataHtml(val, id);
+                                if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
+                                    voltDbRenderer.tableIndex++;
+                                    return false;
+                                }
+
+                            } else if (counter == tablePageStartIndex * 2) {
                                 voltDbRenderer.tableIndex++;
                                 return false;
                             }
 
-                        } else if (counter == tablePageStartIndex * 2) {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
+                        } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
+                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows)) {
+                                setTableTupleDataHtml(val, id);
+                            }
+                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                                voltDbRenderer.tableIndex--;
+                            }
 
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows)) {
-                            setTableTupleDataHtml(val, id);
-                        }
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
+                        } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
+                            if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
+                                setTableTupleDataHtml(val, id);
+                            }
 
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
-                        if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
-                            setTableTupleDataHtml(val, id);
+                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                                voltDbRenderer.tableIndex--;
+                            }
+
+                        } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
+                            if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                                voltDbRenderer.tableIndex--;
+                            }
+
+                        } else if (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
+                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                        } else if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
+                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
+                                setTableTupleDataHtml(val, id);
+
+                            }
+
+                        } else if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.NONE) || (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.SEARCH) ||
+                        (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
+                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                        } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.SEARCH) || (currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                            if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
+                                voltDbRenderer.tableIndex++;
+                                return false;
+                            }
+
+                        } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
+                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                            if ((counter == (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
+                                voltDbRenderer.tableIndex++;
+                                return false;
+                            }
+
+                        } else {
+                            if (counter < voltDbRenderer.maxVisibleRows) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
                         }
-
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
-
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
-                        if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
-
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                            setTableTupleDataHtml(val, id);
-
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.NONE) || (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.SEARCH) ||
-                    (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.SEARCH) || (currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                        if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                        if ((counter == (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
-
-                    } else {
-                        if (counter < voltDbRenderer.maxVisibleRows) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                    }
                     counter++;
 
                 });
@@ -1764,6 +1791,22 @@ function alertNodeClicked(obj) {
 
             });
             return serverAddress;
+        };
+
+        this.getClusterDetail = function (serverName) {
+            var clusterInfo = [];
+            $.each(systemOverview, function (key, val) {
+                if (val["HOSTNAME"] == serverName) {
+                    clusterInfo["VERSION"] = val["VERSION"];
+                    clusterInfo["MODE"] = val["CLUSTERSTATE"];
+                    clusterInfo["BUILDSTRING"] = val["BUILDSTRING"];
+                    clusterInfo["STARTTIME"] = val["STARTTIME"];
+                    clusterInfo["UPTIME"] = val["UPTIME"];
+                    clusterInfo["LICENSE"] = val["LICENSE"];
+                    return false;
+                }
+            });
+            return clusterInfo;
         };
 
         this.sortTablesByColumns = function (isSearched) {
@@ -2064,9 +2107,6 @@ function alertNodeClicked(obj) {
         };
         //
 
-
-
-
         //Get DR Replication Data
         var getDrReplicationData = function (connection, replicationDetails) {
             var colIndex = {};
@@ -2355,6 +2395,36 @@ function alertNodeClicked(obj) {
             });
 
             return portConfigValues;
+        };
+
+        var getCountDetails = function (connection, countDetails) {
+            var colIndex = {};
+            var counter = 0;
+            var hostCount = 0;
+            var siteCount = 0;
+            if (connection.Metadata['@SystemInformation_DEPLOYMENT'] == null) {
+                return;
+            }
+
+            connection.Metadata['@SystemInformation_DEPLOYMENT'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "PROPERTY" || columnInfo["name"] == "VALUE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (info) {
+                if (info[colIndex["PROPERTY"]] == "hostcount") {
+                    hostCount = info[colIndex["VALUE"]];
+                }
+                if (info[colIndex["PROPERTY"]] == "sitesperhost") {
+                    siteCount = info[colIndex["VALUE"]];
+                }
+            });
+            if (!countDetails.hasOwnProperty("DETAILS")) {
+                countDetails["DETAILS"] = {};
+            }
+            countDetails["DETAILS"]["HOSTCOUNT"] = hostCount;
+            countDetails["DETAILS"]["SITECOUNT"] = siteCount;
         };
 
         var validateServerSpecificSettings = function (overviewValues) {
@@ -2907,7 +2977,9 @@ function alertNodeClicked(obj) {
                                 "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
                                 "AVG_ROWS": getAverage(tupleCountPartitions),
                                 "TUPLE_COUNT": schemaCatalogTableTypes[key].REMARKS == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
-                                "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS
+                                "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS,
+                                "drEnabled": schemaCatalogTableTypes[key].drEnabled,
+                                "TABLE_TYPE1": schemaCatalogTableTypes[key].TABLE_TYPE
                             };
 
                         });

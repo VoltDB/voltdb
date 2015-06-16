@@ -141,6 +141,11 @@
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 }
+                var headerLength = params.replace(/'/g, "%27").length;
+                if (headerLength > 5632) {
+                    callback({ "status": -131, "statusstring": "SQL query is too long for the web interface. Use a shorter query or use the command line utility sqlcmd.", "results": [] });
+                    return;
+                }
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
@@ -511,7 +516,7 @@
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION"  || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" ? "_" + processName : "";
+                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" || processName == "GET_HOST_SITE_COUNT" ? "_" + processName : "";
 
                         if (processName == "SYSTEMINFORMATION_STOPSERVER") {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;

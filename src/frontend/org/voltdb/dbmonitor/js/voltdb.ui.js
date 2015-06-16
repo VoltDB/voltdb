@@ -260,6 +260,7 @@ $(document).ready(function () {
             $("#VDBSchHelp").hide();
             $("#VDBQHelp").show();
             $("#VDBAdmHelp").hide();
+            $("#showMyHelp").html("SQL Query Help");
 
             if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
                 shortcut.add("f6", function () {
@@ -274,7 +275,7 @@ $(document).ready(function () {
 
             //Refresh the charts if the current tab is "DB Monitor"
             if (VoltDbUI.CurrentTab == NavigationTabs.DBMonitor) {
-
+                $("#showMyHelp").html("DB Monitor Help");
                 $("#VDBMonHelp").show();
                 $("#VDBSchHelp").hide();
                 $("#VDBQHelp").hide();
@@ -283,14 +284,14 @@ $(document).ready(function () {
                 MonitorGraphUI.UpdateCharts();
             }
             else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
-
+                $("#showMyHelp").html("Schema Help");
                 $("#VDBMonHelp").hide();
                 $("#VDBSchHelp").show();
                 $("#VDBQHelp").hide();
                 $("#VDBAdmHelp").hide();
             }
             else if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-
+                $("#showMyHelp").html("Admin Help");
                 $("#VDBMonHelp").hide();
                 $("#VDBSchHelp").hide();
                 $("#VDBQHelp").hide();
@@ -671,6 +672,52 @@ var loadPage = function (serverName, portid) {
             } else
                 VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
         });
+        
+        //Get System Overview information
+        voltDbRenderer.GetHostAndSiteCount(function (countDetails) {
+            if (countDetails != undefined) {
+                var siteCount = countDetails.DETAILS.SITECOUNT;
+                var hostCount = countDetails.DETAILS.HOSTCOUNT;
+
+                var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
+                if (clusterDetails != undefined && clusterDetails != null) {
+                    if (clusterDetails.MODE != undefined && clusterDetails.VERSION != undefined && clusterDetails.BUILDSTRING != undefined && clusterDetails.UPTIME != undefined) {
+                        $("#mode").html(clusterDetails.MODE);
+                        $("#voltdbVersion").html(clusterDetails.VERSION);
+                        $("#buildString").html(clusterDetails.BUILDSTRING);
+                        $("#clusterComposition").html(hostCount + " hosts with " + (hostCount * siteCount) + " sites (" + siteCount + " per host)");
+                        $("#runningSince").html(getRunningTimeInfo(parseInt(clusterDetails.STARTTIME), clusterDetails.UPTIME));
+                        getLicenseInformation(clusterDetails.LICENSE);
+                    }
+                }
+            }
+        });
+
+       var getRunningTimeInfo = function (startTime, upTime) {
+           var strTime = new Date(startTime).toUTCString();
+           var upTime1 = upTime.split(' ');
+           var upTimeHrMin = upTime1[2].split(':');
+           var runningSince = strTime + " (" + parseInt(upTime1[0]) + "d " + parseInt(upTimeHrMin[0]) + "h " + parseInt(upTimeHrMin[1]) + "m)";
+           return runningSince;
+       };
+
+        var getLicenseInformation = function(licenseInfo) {
+            if (licenseInfo != undefined && licenseInfo != "" ) {
+                var licInfo = $.parseJSON(licenseInfo);
+                $(".licenseInfo").show();
+                $("#tdLicenseInfo").hide();
+                $("#tdLicenseInfo").css("display", "none");
+                $("#tdHostCount").html(licInfo.hostcount);
+                $("#tdWanReplication").html(licInfo.wanreplication);
+                $("#tdExpiration").html(licInfo.expiration);
+                $("#tdCommandLogging").html(licInfo.commandlogging);
+                $("#tdTrial").html(licInfo.trial);
+            } else {
+                $(".licenseInfo").hide();
+                $("#tdLicenseInfo").show();
+            }
+        };
+        //
     };
 
     var refreshGraphAndData = function (graphView, currentTab) {
@@ -694,7 +741,7 @@ var loadPage = function (serverName, portid) {
             if (getCurrentServer() != undefined)
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
-
+        
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
@@ -707,6 +754,7 @@ var loadPage = function (serverName, portid) {
                         var drResult = drDetails["Details"]["STATUS"];
                         if (drResult != -2) {
                             VoltDbUI.drMasterEnabled = (drDetails[currentServer]['MASTERENABLED'] != null && drDetails[currentServer]['MASTERENABLED'] != false) ? true : false;
+                            VoltDbUI.drMasterState = (drDetails[currentServer]['STATE']);
                             //show master/replica table
                             if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
                                 var userPreference = getUserPreferences();
@@ -722,17 +770,6 @@ var loadPage = function (serverName, portid) {
                                 showHideLastLineClass(true);
 
                                 $("#divDrWrapperAdmin").show();
-
-                                if (VoltDbUI.drMasterEnabled) {
-                                    $("#drMasterSection").show();
-                                    //$(".replicaWrapper").css('top', '0');
-                                    //show master table
-                                    refreshDrMasterSection();
-                                } else {
-                                    //$(".replicaWrapper").css('top', '0');
-                                    $("#drMasterSection").hide();
-                                }
-
                                 if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                                     $('#liDrReplication').css('display', 'block');
                                     if (userPreference["DrReplicationRate"]) {
@@ -742,10 +779,11 @@ var loadPage = function (serverName, portid) {
                                     // $("#drSection").removeClass("drHeightBoth");
                                     // $("#drSection").removeClass("drHeightIndividual");
                                     //to show DR Mode and DR tables
-                                    if (VoltDbUI.drMasterEnabled) {
+                                    if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE' ) {
                                         // $("#drSection").addClass("drHeightBoth");
                                         $("#dbDrMode").text("Both");
                                         $('#drMasterSection').css('display', 'block');
+                                        refreshDrMasterSection();
                                         $(".replicaWrapper").css('top', '-27px');
                                     } else {
                                         $("#dbDrMode").text("Replica");
@@ -761,20 +799,18 @@ var loadPage = function (serverName, portid) {
                                     if (VoltDbUI.drMasterEnabled) {
                                         $("#dbDrMode").text("Master");
                                         $('#drMasterSection').css('display', 'block');
-                                    } else {
-                                        $("#dbDrMode").text("None");
-                                        $('#drMasterSection').css('display', 'none');
-                                    }
+                                        refreshDrMasterSection();
+                                    } 
                                     $('#drReplicaSection').css('display', 'none');
                                 }
                             } else {
-                                VoltDbUI.isDRInfoRequired = false;
+                                VoltDbUI.isDRInfoRequired = true;
                                 $("#divDrReplication").hide();
                                 $('#liDrReplication').css('display', 'none');
                                 $('#liDrTables').css('display', 'none');
                                 showHideLastLineClass(false);
                                 $("#ChartDrReplicationRate").hide();
-                                $("#divDrWrapperAdmin").hide();
+                                $("#divDrWrapperAdmin").show();
                             }
                         } else {
                             VoltDbUI.isDRInfoRequired = false;
@@ -1150,8 +1186,7 @@ var loadPage = function (serverName, portid) {
                     htmlcontent = htmlcontent + "<tr>";
                     htmlcontent = htmlcontent + "<td>" + key + "</td>" +
                         "<td>" + VoltDbUI.drStatus + "</td>" +
-                        "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
-                        "<td>" + response[key][i].TOTALBYTES + "</td >" +
+                        "<td>" + response[key][i].TOTALBYTES / 1024 / 1024 + "</td >" +
                         "<td>" + replicaLatencyMs + "</td >" +
                         "<td>" + replicaLatencyTrans + "</td >";
                     htmlcontent = htmlcontent + "</tr>";
@@ -1166,8 +1201,7 @@ var loadPage = function (serverName, portid) {
             var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
                 "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
                 "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
-                "<th id='Th3' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Total Buffer</th>" +
-                "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
+                "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >MB on disk</th>" +
                 "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
                 "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
             $("#tblMAster_wrapper").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
@@ -1189,27 +1223,37 @@ var loadPage = function (serverName, portid) {
 
                     $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
 
-                    var length = $("#tblDrMAster tr").length - 1;
-                    if (length >= 5) {
-                        $("#drMasterSection").css("min-height", "280px");
-                    } else if (length == 4) {
-                        $("#drMasterSection").css("min-height", "250px");
+                    if ((screen.width == 1600) && (screen.height == 900)) {
+                        var length = $("#tblDrMAster tr").length - 1;
+                        if (length >= 5) {
+                            $("#drMasterSection").css("min-height", "280px");
+                        } else if (length == 4) {
+                            $("#drMasterSection").css("min-height", "250px");
+                        } else if (length == 3) {
+                            $("#drMasterSection").css("min-height", "230px");
+                        } else if (length == 2) {
+                            $("#drMasterSection").css("min-height", "200px");
+                        } else if (length == 1 || length == 0) {
+                            $("#drMasterSection").css("min-height", "170px");
+                        }
                     }
-                    else if (length == 3) {
-                        $("#drMasterSection").css("min-height", "230px");
+
+                    else if ((screen.width == 360) && (screen.height == 640)) {
+                        $("#drMasterSection").css("min-height", "380px");
                     }
-                    else if (length == 2) {
-                        $("#drMasterSection").css("min-height", "200px");
+                    else if ((screen.width == 640) && (screen.height == 960)) {
+                        alert("iphone resolution mode");
+                        $("#drMasterSection").css("min-height", "380px");
                     }
-                    else if (length == 1 || length == 0) {
-                        $("#drMasterSection").css("min-height", "170px");
-                    }
+                    //else if ($(window).width() == '751') {
+                    //    $("#drMasterSection").css("min-height", "350px");
+                    //}
+                    //console.log(screen.width + "*" + screen.height);
                 },
 
                 "sDom": 'p<"tblScroll drScroll"t>',
                 "aoColumns": [
                     null,
-                    { "bSearchable": false },
                     { "bSearchable": false },
                     { "bSearchable": false },
                     { "bSearchable": false },
@@ -1782,6 +1826,7 @@ var loadPage = function (serverName, portid) {
     saveThreshold();
 
     $('#showMyHelp').popup();
+    $('#ShowAbout').popup();
     $("#conPopup").popup({
         closeDialog: function () {
             VoltDbUI.isConnectionChecked = false;
@@ -2037,6 +2082,7 @@ var adjustGraphSpacing = function () {
         this.isSchemaTabLoading = false;
         this.isFirstHit = true;
         this.drMasterEnabled = false;
+        this.drMasterState = '';
         this.drStatus = '';
         this.drReplicationRole = "NONE";
         this.isDRInfoRequired = false;

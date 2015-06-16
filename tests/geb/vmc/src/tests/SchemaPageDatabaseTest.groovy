@@ -34,7 +34,7 @@ import vmcTest.pages.*
  * This class tests navigation between pages (or tabs), of the the VoltDB
  * Management Center (VMC), which is the VoltDB (new) web UI.
  */
-class SchemaPageTestDatabase extends TestBase {
+class SchemaPageDatabaseTest extends TestBase {
 
     static final String DDL_SOURCE_FILE = 'src/resources/expectedDdlSource.txt';
     static Boolean runningGenqa = null;
