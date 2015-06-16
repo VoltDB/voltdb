@@ -5,7 +5,7 @@ import vmcTest.pages.*
 import geb.Page.*
 
 
-class AdminExport extends TestBase {
+class AdminExportTest extends TestBase {
 	def "Check export Click and check its value"(){
 		
 		when: 'click the Admin link (if needed)'
