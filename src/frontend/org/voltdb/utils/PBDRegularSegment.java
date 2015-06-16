@@ -407,6 +407,86 @@ public class PBDRegularSegment implements PBDSegment {
     }
 
     @Override
+    public int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException
+    {
+        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
+
+        open(true, false);
+
+        // Do stuff
+        final int initialEntryCount = getNumEntries();
+        int entriesTruncated = 0;
+        int sizeInBytes = 0;
+
+        DBBPool.BBContainer cont;
+        while (true) {
+            final long beforePos = m_readOffset;
+
+            cont = poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            if (cont == null) {
+                break;
+            }
+
+            final int compressedLength = (int) (m_readOffset - beforePos - OBJECT_HEADER_BYTES);
+            final int uncompressedLength = cont.b().limit();
+
+            try {
+                //Handoff the object to the truncator and await a decision
+                BinaryDeque.TruncatorResponse retval = truncator.parse(cont);
+                if (retval == null) {
+                    //Nothing to do, leave the object alone and move to the next
+                    sizeInBytes += uncompressedLength;
+                } else {
+                    //If the returned bytebuffer is empty, remove the object and truncate the file
+                    if (retval.status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
+                        if (readIndex() == 1) {
+                            /*
+                             * If truncation is occuring at the first object
+                             * Whammo! Delete the file.
+                             */
+                            entriesTruncated = -1;
+                        } else {
+                            entriesTruncated = initialEntryCount - (readIndex() - 1);
+                            //Don't forget to update the number of entries in the file
+                            initNumEntries(readIndex() - 1, sizeInBytes);
+                            m_fc.truncate(m_readOffset - (compressedLength + PBDSegment.OBJECT_HEADER_BYTES));
+                        }
+                    } else {
+                        assert retval.status == BinaryDeque.TruncatorResponse.Status.PARTIAL_TRUNCATE;
+                        entriesTruncated = initialEntryCount - readIndex();
+                        //Partial object truncation
+                        m_readOffset -= compressedLength + PBDSegment.OBJECT_HEADER_BYTES;
+                        m_fc.position(m_readOffset);
+
+                        final DBBPool.BBContainer partialCont = DBBPool.allocateDirect(compressedLength);
+                        try {
+                            sizeInBytes += retval.writeTruncatedObject(partialCont.b());
+                            partialCont.b().flip();
+
+                            while (partialCont.b().hasRemaining()) {
+                                m_fc.write(partialCont.b());
+                            }
+                        } finally {
+                            partialCont.discard();
+                        }
+
+                        initNumEntries(readIndex(), sizeInBytes);
+                        m_fc.truncate(m_fc.position());
+                    }
+
+                    break;
+                }
+            } finally {
+                cont.discard();
+            }
+        }
+
+        close();
+
+        return entriesTruncated;
+    }
+
+    @Override
     public int uncompressedBytesToRead() {
         if (m_closed) throw new RuntimeException("Segment closed");
         return m_size - m_bytesRead;

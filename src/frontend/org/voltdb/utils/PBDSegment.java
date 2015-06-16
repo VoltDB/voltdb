@@ -65,6 +65,15 @@ public interface PBDSegment {
 
     DBBPool.BBContainer poll(BinaryDeque.OutputContainerFactory factory) throws IOException;
 
+    /**
+     * Parse the segment and truncate the file if necessary.
+     * @param truncator    A caller-supplied truncator that decides where in the segment to truncate
+     * @return The number of objects that was truncated. This number will be subtracted from the total number
+     * of available objects in the PBD. -1 means that this whole segment should be removed.
+     * @throws IOException
+     */
+    int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException;
+
     /*
      * Don't use size in bytes to determine empty, could potentially
      * diverge from object count on crash or power failure
