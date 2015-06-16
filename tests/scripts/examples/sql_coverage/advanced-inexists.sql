@@ -82,6 +82,7 @@ SELECT * FROM @fromtables A35 WHERE _maybe EXISTS (SELECT A._variable[#col], B._
 SELECT * FROM @fromtables A41 WHERE _variable[#col]                 _cmp _anyorall (SELECT __[#col] FROM @fromtables SQ WHERE SQ.__[#col] _cmp A41.__[#col])
 SELECT * FROM @fromtables A42 WHERE _variable[#col @comparabletype] _cmp _anyorall (SELECT _colexpr FROM @fromtables SQ WHERE SQ.__[#col] _cmp A42.__[#col])
 SELECT * FROM @fromtables A43 WHERE _variable[#col @comparabletype] _cmp _anyorall (SELECT __[#col] FROM @fromtables SQ WHERE SQ._colexpr _cmp A43.__[#col])
+SELECT * FROM @fromtables A44 WHERE _colexpr _cmp _anyorall (SELECT _variable[#col @comparabletype] FROM @fromtables SQ WHERE SQ.__[#col] _cmp A44.__[#col])
 
 --- ANY / ALL with multiple columns
-SELECT * FROM @fromtables A44 WHERE (_variable[#col1], _variable[#col2]) _cmp _anyorall (SELECT __[#col1], __[#col2] FROM @fromtables SQ WHERE SQ.__[#col1] _cmp A44.__[#col1])
+SELECT * FROM @fromtables A45 WHERE (_variable[#col1], _variable[#col2]) _cmp _anyorall (SELECT __[#col1], __[#col2] FROM @fromtables SQ WHERE SQ.__[#col1] _cmp A45.__[#col1])
