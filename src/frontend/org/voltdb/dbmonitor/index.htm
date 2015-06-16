@@ -39,6 +39,8 @@
     <link href="css/resources/datatables/dataTables_page.css" rel="stylesheet" />
     <link href="css/resources/datatables/dataTables_table.css" rel="stylesheet" />
     <link href="css/resources/datatables/jquery.dataTables.css" rel="stylesheet" />
+    <script src="js/bignumber.js"></script>
+    <script src="js/jsonParse.js"></script>
     <!--<link href="css/resources/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
     <link href="css/resources/datatables/theme.default.min.css" rel="stylesheet" />
     <script src="js/jquery.dataTables.js"></script>
@@ -83,17 +85,17 @@
                         <li class="line" id="userLine"></li>
                         <li>
                             <div class="menuHome">
-                            <ul class="menuHomeList">
-                                <li>
-                                    <a href="#" style="float:left">Help</a>
-                                    <div class="helpDrop"></div>
-                                    <div class="clear"></div>
-                                    <ul>
-                                        <li><a href="#help" id="showMyHelp">DB Monitor Help</a></li>
-                                        <li><a href="#About" id="ShowAbout">About</a></li>
-                                    </ul>
-                                </li>
-                            </ul>
+                                <ul class="menuHomeList">
+                                    <li>
+                                        <a href="#" style="float:left">Help</a>
+                                        <div class="helpDrop"></div>
+                                        <div class="clear"></div>
+                                        <ul>
+                                            <li><a href="#help" id="showMyHelp">DB Monitor Help</a></li>
+                                            <li><a href="#About" id="ShowAbout">About</a></li>
+                                        </ul>
+                                    </li>
+                                </ul>
                             </div>
                         </li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
@@ -767,7 +769,6 @@
                                     </tr>
                                     <tr>
                                         <td class="configLabel">DR Tables</td>
-
                                         <td></td>
                                         <td><a href="#replicatedTablePopup" id="lstDrTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a></td>
                                         <td align="right"><a href="javascript:void(0);" id="lstDrTbl" class="drTblBtn" style="display: block;" title="List of DR Tables">DR Tables</a></td>
@@ -1186,79 +1187,81 @@
         <div class="overlay-contentAbout helpAboutWrap">
             <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
             <div class="dataBlock">
-                    <div class="dataBlockContent systemOver" style="padding:0;">
-                        <table id="tblSystemOverview" class="table table-condensed">
-                            <tbody>
-                                <tr>
-                                    <td>Mode</td>
-                                    <td id="mode"></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>VoltDB Version</td>
-                                    <td id="voltdbVersion"></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Buildstring</td>
-                                    <td id="buildString"></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Cluster Composition</td>
-                                    <td id="clusterComposition"></td>
-                                    <td></td>
-                                </tr>
-                                <tr><td>Running Since</td>
-                                    <td id="runningSince"></td>
-                                    <td></td>
-                                </tr>
-                                <tr class="trLicenseInfo"><td></td>
-                                    <td></td>
-                                    <td></td>
-                                </tr>
-                                <tr >
-                                    <td style="font-weight: bold">License Information:</td>
-                                    <td></td>
-                                    <td></td>
-                                </tr>
-                                <tr id="tdLicenseInfo" style="display: none">
-                                  <td>Community Edition</td>
-                                    <td></td>
-                                    <td></td>  
-                                </tr>
-                                <tr class="licenseInfo" style="display: none">
-                                    <td>Host Count</td>
-                                    <td id="tdHostCount"></td>
-                                    <td></td>
-                                </tr>
-                                <tr class="licenseInfo" style="display: none">
-                                    <td>WAN Replication</td>
-                                    <td id="tdWanReplication"></td>
-                                    <td></td>
-                                </tr>
-                                <tr class="licenseInfo" style="display: none">
-                                    <td>Expiration</td>
-                                    <td id="tdExpiration"></td>
-                                    <td></td>
-                                </tr>
-                                <tr class="licenseInfo" style="display: none">
-                                    <td>Command Logging</td>
-                                    <td id="tdCommandLogging"></td>
-                                    <td></td>
-                                </tr>
-                                <tr class="licenseInfo" style="display: none">
-                                    <td>Trial</td>
-                                    <td id="tdTrial"></td>
-                                    <td></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <p></p>
-                    </div>
+                <div class="dataBlockContent systemOver" style="padding:0;">
+                    <table id="tblSystemOverview" class="table table-condensed">
+                        <tbody>
+                            <tr>
+                                <td>Mode</td>
+                                <td id="mode"></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>VoltDB Version</td>
+                                <td id="voltdbVersion"></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Buildstring</td>
+                                <td id="buildString"></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Cluster Composition</td>
+                                <td id="clusterComposition"></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Running Since</td>
+                                <td id="runningSince"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="trLicenseInfo">
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold">License Information:</td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                            <tr id="tdLicenseInfo" style="display: none">
+                                <td>Community Edition</td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>Host Count</td>
+                                <td id="tdHostCount"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>WAN Replication</td>
+                                <td id="tdWanReplication"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>Expiration</td>
+                                <td id="tdExpiration"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>Command Logging</td>
+                                <td id="tdCommandLogging"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>Trial</td>
+                                <td id="tdTrial"></td>
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p></p>
                 </div>
             </div>
         </div>
+    </div>
     </div>
     <!--help popup ends-->
     <!-- POPUP shutDownConfirmationPop -->

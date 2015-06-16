@@ -23,7 +23,8 @@
             this.Metadata = {};
             this.ready = false;
             this.procedureCommands = {};
-            this.authorization = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password)
+            this.authorization = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+            this.procedure = '';
 
             this.getQueue = function () {
                 return (new iQueue(this));
@@ -34,8 +35,12 @@
                 credentials[credentials.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
-
-                var param = credentials.join('&') + '&jsonp=?';
+                var param = '';
+                if (DbConnection.procedure != '@AdHoc') {
+                    param = credentials.join('&') + '&jsonp=?';
+                } else {
+                    param = credentials.join('&');
+                }
                 return param;
             };
 
@@ -105,7 +110,13 @@
                 }
                 if (this.admin)
                     s[s.length] = 'admin=true';
-                var paramSet = s.join('&') + '&jsonp=?';
+                var paramSet = '';
+                if (DbConnection.procedure != '@AdHoc') {
+                    paramSet = s.join('&') + '&jsonp=?';
+                } else {
+                    paramSet = s.join('&');
+                }
+                
 
                 if (VoltDBCore.shortApiCredentials == "" && VoltDBCore.isLoginVerified) {
                     var credentials = [];
@@ -125,6 +136,7 @@
             };
 
             this.CallExecute = function (procedure, parameters, callback, shortApiCallDetails) {
+                DbConnection.procedure = procedure;
                 var uri;
                 if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
@@ -262,7 +274,11 @@
                             (function (queue, item) {
                                 return function (response, headerInfo) {
                                     try {
-
+                                        if ($.type(response) == "string") {
+                                            response = json_parse(response, function (key, value) {
+                                                return value;
+                                            });
+                                        }
                                         if (VoltDBCore.hostIP == "") {
                                             VoltDBCore.hostIP = headerInfo;
                                         }
@@ -406,7 +422,12 @@
                 s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.HashedPassword);
             if (this.Admin)
                 s[s.length] = 'admin=true';
-            var paramSet = s.join('&') + '&jsonp=?';
+            var paramSet = '';
+            if (DbConnection.procedure != '@AdHoc') {
+                paramSet = s.join('&') + '&jsonp=?';
+            } else {
+                paramSet = s.join('&');
+            }
             return paramSet;
         };
 
@@ -509,9 +530,9 @@
             connectionQueue.Start();
 
             if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
-                connectionQueue.BeginExecute([], [], function (data) {                                      
+                connectionQueue.BeginExecute([], [], function (data) {
                     connection.Metadata[processName] = data;
-                    
+
                 }, shortApiCallDetails);
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
@@ -648,38 +669,59 @@ jQuery.extend({
 
 jQuery.extend({
     getJSON: function (url, formData, callback, authorization) {
-        if (VoltDBCore.hostIP == "") {
-            jQuery.ajax({
-                type: 'GET',
-                url: url,
-                data: formData,
-                dataType: 'jsonp',
-                beforeSend: function (request) {
-                    if (authorization != null) {
-                        request.setRequestHeader("Authorization", authorization);
+        formData += '&User=admin&Hashedpassword=20e3aae7fc23385295505a6b703fd1fba66760d5';
+        if (DbConnection.procedure != '@AdHoc') {
+            if (VoltDBCore.hostIP == "") {
+                jQuery.ajax({
+                    type: 'GET',
+                    url: url,
+                    data: formData,
+                    dataType: 'jsonp',
+                    beforeSend: function (request) {
+                        if (authorization != null) {
+                            request.setRequestHeader("Authorization", authorization);
+                        }
+                    },
+                    success: function (data, textStatus, request) {
+                        var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
+                        callback(data, host);
+                    },
+                    error: function (e) {
+                        console.log(e.message);
                     }
-                },
-                success: function (data, textStatus, request) {
-                    var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
-                    callback(data, host);
-                },
-                error: function (e) {
-                    console.log(e.message);
-                }
-            });
+                });
 
+            } else {
+                jQuery.ajax({
+                    type: 'GET',
+                    url: url,
+                    data: formData,
+                    dataType: 'jsonp',
+                    beforeSend: function (request) {
+                        if (authorization != null) {
+                            request.setRequestHeader("Authorization", authorization);
+                        }
+                    },
+                    success: callback,
+                    error: function (e) {
+                        console.log(e.message);
+                    }
+                });
+            }
         } else {
             jQuery.ajax({
                 type: 'GET',
                 url: url,
                 data: formData,
-                dataType: 'jsonp',
+                dataType: 'text',
                 beforeSend: function (request) {
                     if (authorization != null) {
                         request.setRequestHeader("Authorization", authorization);
                     }
                 },
-                success: callback,
+                success: function (data) {
+                    callback(data);
+                },
                 error: function (e) {
                     console.log(e.message);
                 }
