@@ -1574,14 +1574,11 @@ function loadAdminPage() {
             if (voltDbRenderer.drTablesArray.length == 0) {
                 $("#drPopup").html("No DR tables available.");
             } else {
-                content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='replicatedTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.drTablesArray.length - 1; i++) {
                     content = content + "<tr><td>" + voltDbRenderer.drTablesArray[i] + "</td></tr>";
                 }
-                content = content + "</tbody></table>";
-                $("#drPopup").html(content);
             }
-
+            $("#replicatedTableBody").html(content);
         },
         afterOpen: function () {
             var popup = $(this)[0];
@@ -1600,12 +1597,10 @@ function loadAdminPage() {
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
-                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr>";
+                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr></tbody></table>";
                 }
-                content = content + "</tbody></table>";
-                $("#exportPopup").html(content);
             }
-
+            $("#exportPopup").html(content);
         },
         afterOpen: function () {
             var popup = $(this)[0];
@@ -1697,17 +1692,7 @@ function loadAdminPage() {
                 '                    <th align="right">Value</th>' +
                 '                    <th>Delete</th>' +
                 '                </tr>' +
-                '                <tr>' +
-                '                    <td>' +
-                '                        <input size="15" id="txtName0" name="txtName0" class="newStreamPropertyName newStreamProperty" type="text">' +
-                '                        <label id="errorName0" for="txtName0" class="error" style="display: none;"></label>' +
-                '                    </td>' +
-                '                    <td>' +
-                '                        <input size="15" id="txtValue0" name="txtValue0" class="newStreamPropertyValue newStreamProperty" type="text">' +
-                '                        <label id="errorValue0" for="txtValue0" class="error" style="display: none;"></label>' +
-                '                    </td>' +
-                '                    <td><div class="securityDelete" id="delRow0" onclick="deleteRow(this)"></div></td>' +
-                '                </tr>' +
+                
                 '            </table>' +
                 '        </div>' +
                 '    </td>' +
@@ -1791,14 +1776,21 @@ function loadAdminPage() {
                 if (properties.length == 0) {
                     $("#deleteFirstProperty").trigger("click");
                 }
-                var count = 0;
+                var count = 1;
                 for (var i = 0; i < properties.length; i++) {
                     if (VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name)) {
                         if (properties[i].name == "broker.host" || properties[i].name == "amqp.uri") {
                             $("#selectRabbitMq").val(properties[i].name);
                         }
-                        $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).val(properties[i].value);
-                        $(".newStreamMinProperty").addClass("orgProperty");
+                        if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).length) {
+                            $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).val(properties[i].value);
+                            $(".newStreamMinProperty").addClass("orgProperty");
+                        } else {
+                            $("#lnkAddNewProperty").trigger("click");
+                            $("#txtName" + count).val(properties[i].name);
+                            $("#txtValue" + count).val(properties[i].value);
+                            count++;
+                        }
                     } else {
                         $("#lnkAddNewProperty").trigger("click");
                         $("#txtName" + count).val(properties[i].name);
@@ -1980,23 +1972,15 @@ function loadAdminPage() {
                 $($(".newStreamMinProperty")[i]).addClass("propertyToRemove");
             }
         }
-        $(".propertyToRemove").remove();
-
-        if (VoltDbAdminConfig.orgTypeValue != "" && VoltDbAdminConfig.orgTypeValue == exportType) {
-            $($(".newStreamMinProperty td:first-child input")).attr('disabled', 'disabled');
-            $($(".newStreamMinProperty td:last-child")).html('');
-        } else {
-            $($(".newStreamMinProperty td:first-child input")).removeAttr('disabled');
-            $($(".newStreamMinProperty td:last-child")).html('<div class="securityDelete" onclick="deleteRow(this)"></div>');
-        }
+        $(".propertyToRemove").not(".addedProperty").remove();
 
         var exportProperties = '';
         if (exportType.toUpperCase() == "FILE") {
-            if (!$('#txtOutdir').length)
+            if (!$('#txtOutdir').length) {
                 exportProperties += '' +
                     '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtOutdir" name="txtOutdir" value="outdir" disabled="disabled" class="newStreamPropertyName newStreamProperty" type="text">' +
+                    '       <input size="15" id="txtOutdir" name="txtOutdir" value="outdir" disabled="disabled" class="newStreamPropertyName newStreamProperty requiredProperty" type="text">' +
                     '       <label id="errorOutdir" for="txtOutdir" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
@@ -2005,11 +1989,14 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
-            if (!$('#txtnonce').length)
+            } else {
+                $('#txtOutdir').attr("disabled", "disabled");
+            }
+            if (!$('#txtnonce').length) {
                 exportProperties += '' +
                     '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtnonce" name="txtnonce" value="nonce" disabled="disabled" class="newStreamPropertyName newStreamProperty" type="text">' +
+                    '       <input size="15" id="txtnonce" name="txtnonce" value="nonce" disabled="disabled" class="newStreamPropertyName newStreamProperty  requiredProperty" type="text">' +
                     '       <label id="errornonce" for="txtnonce" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
@@ -2018,11 +2005,13 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
-
-            if (!$('#txtFileType').length)
+            } else {
+                $('#txtnonce').attr("disabled", "disabled");
+            }
+            if (!$('#txtFileType').length) {
                 exportProperties += '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtFileType" name="txtFileType" value="type" disabled="disabled" class="newStreamPropertyName newStreamProperty" type="text">' +
+                    '       <input size="15" id="txtFileType" name="txtFileType" value="type" disabled="disabled" class="newStreamPropertyName newStreamProperty  requiredProperty" type="text">' +
                     '       <label id="errorFileType" for="txtFileType" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
@@ -2031,12 +2020,14 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
-
+            } else {
+                $('#txtFileType').attr("disabled", "disabled");
+            }
         } else if (exportType.toUpperCase() == "HTTP") {
-            if (!$('#txtEndpoint').length)
+            if (!$('#txtEndpoint').length) {
                 exportProperties = '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtEndpoint" name="txtEndpoint" value="endpoint" disabled="disabled" class="newStreamPropertyName newStreamProperty" type="text">' +
+                    '       <input size="15" id="txtEndpoint" name="txtEndpoint" value="endpoint" disabled="disabled" class="newStreamPropertyName newStreamProperty  requiredProperty" type="text">' +
                     '       <label id="errorEndpoint" for="txtEndpoint" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
@@ -2045,11 +2036,14 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
+            } else {
+                $('#txtEndpoint').attr("disabled", "disabled");
+            }
         } else if (exportType.toUpperCase() == "KAFKA") {
-            if (!$('#txtMetadataBrokerList').length)
+            if (!$('#txtMetadataBrokerList').length) {
                 exportProperties += '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtMetadataBrokerList" name="txtMetadataBrokerList" value="metadata.broker.list" disabled="disabled" class="newStreamPropertyName newStreamProperty" type="text">' +
+                    '       <input size="15" id="txtMetadataBrokerList" name="txtMetadataBrokerList" value="metadata.broker.list" disabled="disabled" class="newStreamPropertyName newStreamProperty requiredProperty" type="text">' +
                     '       <label id="errorMetadataBrokerList" for="txtMetadataBrokerList" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
@@ -2058,11 +2052,14 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
+            } else {
+                $('#txtMetadataBrokerList').attr("disabled", "disabled");
+            }
         } else if (exportType.toUpperCase() == "JDBC") {
-            if (!$('#txtJdbcUrl').length)
+            if (!$('#txtJdbcUrl').length) {
                 exportProperties += '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtJdbcUrl" name="txtJdbcUrl" value="jdbcurl" disabled="disabled" class="newStreamPropertyName newStreamProperty" type="text">' +
+                    '       <input size="15" id="txtJdbcUrl" name="txtJdbcUrl" value="jdbcurl" disabled="disabled" class="newStreamPropertyName newStreamProperty requiredProperty" type="text">' +
                     '       <label id="errorJdbcUrl" for="txtJdbcUrl" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
@@ -2071,10 +2068,13 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
-            if (!$('#txtJdbcDriver').length)
+            } else {
+                $('#txtJdbcUrl').attr("disabled", "disabled");
+            }
+            if (!$('#txtJdbcDriver').length) {
                 exportProperties += '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtJdbcDriver" name="txtJdbcDriver" value="jdbcdriver" disabled="disabled" class="newStreamPropertyName newStreamProperty" type="text">' +
+                    '       <input size="15" id="txtJdbcDriver" name="txtJdbcDriver" value="jdbcdriver" disabled="disabled" class="newStreamPropertyName newStreamProperty requiredProperty" type="text">' +
                     '       <label id="errorJdbcDriver" for="txtJdbcDriver" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
@@ -2083,12 +2083,15 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
+            } else {
+                $('#txtJdbcDriver').attr("disabled", "disabled");
+            }
         } else if (exportType.toUpperCase() == "RABBITMQ") {
-            if (!$('#selectRabbitMq').length)
+            if (!$('#selectRabbitMq').length) {
                 exportProperties += '' +
                     '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <select id="selectRabbitMq" name="selectRabbitMq" class="newStreamPropertyName newStreamProperty"> ' +
+                    '       <select id="selectRabbitMq" name="selectRabbitMq" class="newStreamPropertyName newStreamProperty  requiredProperty"> ' +
                     '           <option>broker.host</option> ' +
                     '           <option>amqp.uri</option> ' +
                     '       </select>' +
@@ -2099,9 +2102,108 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
+            } 
         }
         $('#tblAddNewProperty tr.headerProperty').after(exportProperties);
-        //return exportProperties;
+
+        removeDuplicateProperty();
+        setDefaultProperty();
+    };
+
+    var removeDuplicateProperty = function() {
+        $('#tblAddNewProperty :input').each(function () {
+            if ($(this).val() == "outdir") {
+                removeDuplicate(this,"outdir");
+            } else if ($(this).val() == "nonce") {
+                removeDuplicate(this,"nonce");
+            } else if ($(this).val() == "type") {
+                removeDuplicate(this, "type");
+            } else if ($(this).val() == "endpoint") {
+                removeDuplicate(this, "endpoint");
+            } else if ($(this).val() == "metadata.broker.list") {
+                removeDuplicate(this, "metadata.broker.list");
+            } else if ($(this).val() == "jdbcurl") {
+                removeDuplicate(this, "jdbcurl");
+            } else if ($(this).val() == "jdbcdriver") {
+                removeDuplicate(this, "jdbcdriver");
+            } else if ($(this).val() == "broker.host") {
+                removeDuplicate(this, "broker.host");
+            } else if($(this).val() == "amqp.uri") {
+                removeDuplicate(this, "amqp.uri");
+            }
+        });
+    };
+
+    var removeDuplicate = function(object, propertyName) {
+        if (!$(object).hasClass("requiredProperty")) {
+            var val = $(':input:eq(' + ($(':input').index(object) + 1) + ')').val();
+            if ($(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName]).length) {
+                $(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName]).val(val);
+                $(".newStreamMinProperty").addClass("addedProperty");
+                var $row = $(object).closest("tr");
+                $row.remove();
+            }
+            if (propertyName == "broker.host" || propertyName == "amqp.uri") {
+                $("#selectRabbitMq").val(propertyName);
+            }
+        }
+    };
+
+    var setDefaultProperty = function() {
+
+        var exportType = $('#txtType').val();
+        if (exportType.toUpperCase() == "FILE") {
+            setDefaultDisplay($("#txtOutdir"));
+            setDefaultDisplay($("#txtnonce"));
+            setDefaultDisplay($("#txtFileType"));
+        } else {
+            setNormalDisplay($("#txtOutdir"));
+            setNormalDisplay($("#txtnonce"));
+            setNormalDisplay($("#txtFileType"));
+        }
+        
+        if (exportType.toUpperCase() == "HTTP") {
+            setDefaultDisplay($("#txtEndpoint"));
+        } else {
+            setNormalDisplay($("#txtEndpoint"));
+        } 
+        
+        if (exportType.toUpperCase() == "KAFKA") {
+            setDefaultDisplay($("#txtMetadataBrokerList"));
+        } else {
+            setNormalDisplay($("#txtMetadataBrokerList"));
+        }
+        
+        if (exportType.toUpperCase() == "JDBC") {
+            setDefaultDisplay($("#txtJdbcUrl"));
+            setDefaultDisplay($("#txtJdbcDriver"));
+        } else {
+            setNormalDisplay($("#txtJdbcUrl"));
+            setNormalDisplay($("#txtJdbcDriver"));
+        }
+        
+        if (exportType.toUpperCase() == "RABBITMQ") {
+            setDefaultDisplay($("#selectRabbitMq"));
+        } else {
+            setNormalDisplay($("#selectRabbitMq"));
+        }
+
+    };
+
+    var setDefaultDisplay = function(txtbox) {
+        if (txtbox.selector != "#selectRabbitMq")
+            txtbox.attr('disabled', 'disabled');
+        var $row = txtbox.closest("tr");
+        $('#tblAddNewProperty tr.headerProperty').after($row);
+        var $td = $row.find("td:last-child");
+        $td.html('');
+    };
+
+    var setNormalDisplay = function(txtbox) {
+        txtbox.removeAttr('disabled');
+        var $row = txtbox.closest("tr");
+        var $td = $row.find("td:last-child");
+        $td.html('<div class="securityDelete" onclick="deleteRow(this)"></div>');
     };
 
     var editUserState = -1;
@@ -3128,6 +3230,7 @@ var formatDisplayName = function (displayName) {
     displayName = displayName.toLowerCase();
     return displayName.charAt(0).toUpperCase() + displayName.slice(1);
 };
+
 
 
 
