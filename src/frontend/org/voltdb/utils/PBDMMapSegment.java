@@ -102,8 +102,7 @@ class PBDMMapSegment implements PBDSegment {
             open(false);
         }
         if (m_fc.size() > SEGMENT_HEADER_BYTES) {
-            final int numEntries = m_buf.b().getInt(0);
-            return numEntries;
+            return m_buf.b().getInt(COUNT_OFFSET);
         } else {
             return 0;
         }
@@ -119,10 +118,10 @@ class PBDMMapSegment implements PBDSegment {
         return m_objectReadIndex;
     }
 
-    private void initNumEntries() throws IOException {
+    private void initNumEntries(int count, int size) throws IOException {
         final ByteBuffer buf = m_buf.b();
-        buf.putInt(0, 0);
-        buf.putInt(4, 0);
+        buf.putInt(0, count);
+        buf.putInt(4, size);
         m_syncedSinceLastEdit = false;
     }
 
@@ -136,6 +135,15 @@ class PBDMMapSegment implements PBDSegment {
 
     @Override
     public void open(boolean forWrite) throws IOException {
+        open(forWrite, forWrite);
+    }
+
+    /**
+     * @param forWrite    Open the file in read/write mode
+     * @param truncate    true to overwrite the header with 0 entries
+     * @throws IOException
+     */
+    private void open(boolean forWrite, boolean truncate) throws IOException {
         if (!m_closed) {
             throw new IOException("Segment is already opened");
         }
@@ -152,7 +160,9 @@ class PBDMMapSegment implements PBDSegment {
             m_buf = DBBPool.wrapMBB(m_fc.map(MapMode.READ_WRITE, 0, CHUNK_SIZE));
             m_buf.b().position(SIZE_OFFSET + 4);
             m_readBuf = m_buf.b().duplicate();
-            initNumEntries();
+            if (truncate) {
+                initNumEntries(0, 0);
+            }
         } else {
             //If it isn't for write, map read only to the actual size and put the write buf position at the end
             //so size is reported correctly

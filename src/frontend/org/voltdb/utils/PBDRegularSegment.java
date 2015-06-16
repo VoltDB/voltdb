@@ -125,6 +125,16 @@ public class PBDRegularSegment implements PBDSegment {
     @Override
     public void open(boolean forWrite) throws IOException
     {
+        open(forWrite, forWrite);
+    }
+
+    /**
+     * @param forWrite    Open the file in read/write mode
+     * @param emptyFile   true to overwrite the header with 0 entries, essentially emptying the file
+     * @throws IOException
+     */
+    private void open(boolean forWrite, boolean emptyFile) throws IOException
+    {
         if (!m_closed) {
             throw new IOException("Segment is already opened");
         }
@@ -140,17 +150,17 @@ public class PBDRegularSegment implements PBDSegment {
         m_fc = m_ras.getChannel();
         m_tmpHeaderBuf = DBBPool.allocateDirect(SEGMENT_HEADER_BYTES);
 
-        if (forWrite) {
-            initNumEntries();
+        if (emptyFile) {
+            initNumEntries(0, 0);
         }
         m_fc.position(SEGMENT_HEADER_BYTES);
 
         m_closed = false;
     }
 
-    private void initNumEntries() throws IOException {
-        m_numOfEntries = 0;
-        m_size = 0;
+    private void initNumEntries(int count, int size) throws IOException {
+        m_numOfEntries = count;
+        m_size = size;
 
         m_tmpHeaderBuf.b().clear();
         m_tmpHeaderBuf.b().putInt(m_numOfEntries);
