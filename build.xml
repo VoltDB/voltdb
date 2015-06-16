@@ -459,6 +459,7 @@ DISTRIBUTION
             <exclude name=".gitignore"/>
             <exclude name="lib/python" />
             <exclude name="doc/tutorials/**" />
+            <exclude name="voltdb/libvoltdb*" />
         </fileset>
     </copy>
 
@@ -470,11 +471,6 @@ DISTRIBUTION
         <fileset dir="voltdb" defaultexcludes="yes">
             <include name="voltdbclient-${dist.version}.jar" />
             <include name="voltdbclient-${dist.version}-javadoc.jar" />
-        </fileset>
-    </copy>
-    <copy todir="${dist.dir}/voltdb" flatten="true" >
-        <fileset dir="${build.dir}" defaultexcludes="yes">
-            <include name="nativelibs/libvoltdb*" />
         </fileset>
     </copy>
 
@@ -499,9 +495,6 @@ DISTRIBUTION
             <include name="python/**" />
         </fileset>
     </copy>
-
-    <!-- OS-specific preparation of libvoltdb* -->
-    <antcall target="dist_libvoltdb" />
 
     <!-- copy license to voltdb dir -->
     <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
@@ -636,35 +629,51 @@ DISTRIBUTION
     </exec>
 </target>
 
+<target name="prep_libvoltdb">
+    <copy todir='voltdb'>
+        <fileset dir="${build.dir}/nativelibs">
+            <include name="libvoltdb-${dist.version}.*"/>
+        </fileset>
+    </copy>
+   <condition property="isDebug">
+       <equals arg1="${build}" arg2="debug"/>
+   </condition>
+    <antcall target="call_strip_lib" />
+</target>
+
+<target name="call_strip_lib" unless="isDebug">
+    <antcall target="strip_libvoltdb" />
+</target>
+
 <!-- Prepare libvoltdb* for distribution. -->
-<target name="dist_libvoltdb" depends="dist_libvoltdb_linux, dist_libvoltdb_mac" />
+<target name="strip_libvoltdb" depends="strip_libvoltdb_linux, strip_libvoltdb_mac" />
 
 <!-- Linux prepare libvoltdb* for distribution. -->
-<target name="dist_libvoltdb_linux" unless="os.mac">
+<target name="strip_libvoltdb_linux" unless="os.mac">
 
     <!-- save the symbols from the shared library -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+    <exec dir='${base.dir}/voltdb' executable='/bin/sh'>
         <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
     </exec>
 
     <!-- strip the voltbin shared library (~40x size reduction) -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+    <exec dir='${base.dir}/voltdb' executable='/bin/sh'>
         <arg line="-c '/usr/bin/strip --strip-debug --strip-unneeded libvoltdb*'"/>
     </exec>
 
     <!-- embed the path to the symbol file into the ELF binary -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+    <exec dir='${base.dir}/voltdb' executable='/bin/sh'>
         <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
     </exec>
 
 </target>
 
 <!-- Mac prepare libvoltdb* for distribution. -->
-<target name="dist_libvoltdb_mac" if="os.mac">
+<target name="strip_libvoltdb_mac" if="os.mac">
     <!-- objcopy is unavailable by default on Mac -->
 
     <!-- Just use strip -S since strip-unneeded option is unavailable. -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+    <exec dir='${base.dir}/voltdb' executable='/bin/sh'>
         <arg line="-c '/usr/bin/strip -S libvoltdb*'"/>
     </exec>
 </target>
@@ -795,7 +804,18 @@ JAR BUILDING
   </exec>
 </target>
 
-<target name="voltdb.jar" depends="compile, buildinfo">
+<target name="voltdb.jar" depends="compile, ee, buildinfo">
+    <condition property="jar.nativelib.dir"
+	value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
+        else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
+        <isset property="os.mac"/>
+    </condition>
+    <copy todir="${jar.nativelib.dir}">
+        <fileset dir="${base.dir}/voltdb">
+            <include name="libvoltdb*" />
+        </fileset>
+    </copy>
+
     <jar destfile="voltdb/voltdb-${dist.version}.jar" duplicate="preserve">
         <fileset dir="${build.client.dir}" defaultexcludes="yes">
             <include name="**"/>
@@ -1199,11 +1219,7 @@ NATIVE EE STUFF
         <env key="EESKIPBUILDMAKEFILE" value="true" />
         <arg line="build.py ${build}" />
     </exec>
-    <copy todir='voltdb'>
-        <fileset dir="${build.dir}/nativelibs">
-            <include name="libvoltdb-${dist.version}.*"/>
-        </fileset>
-    </copy>
+    <antcall target="prep_libvoltdb"/>
 </target>
 
 <target name='ee_makefile.uptodate'>
@@ -1238,11 +1254,7 @@ NATIVE EE STUFF
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build}" />
     </exec>
-    <copy todir='voltdb'>
-        <fileset dir="${build.dir}/nativelibs">
-            <include name="libvoltdb-${dist.version}.*"/>
-        </fileset>
-    </copy>
+    <antcall target="prep_libvoltdb"/>
 </target>
 
 <target name='ee_profile' depends="catalog, jnicompile"
@@ -1286,8 +1298,7 @@ TEST CASES
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name='classpath' refid='project.classpath' />
     <property name='echoserver.command' value="java
-    -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -server -Xmx256m -ea
+    -classpath ${classpath} -server -Xmx256m -ea
     org.voltdb.messaging.EchoServer" />
     <exec dir='tests/scripts/' executable='python' failonerror='true'>
         <arg line="Testvoltdbclient.py"/>
@@ -1356,7 +1367,6 @@ TEST CASES
             showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
-            <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
             <jvmarg value="-server" />
             <jvmarg value="-Xcheck:jni" />
             <jvmarg value="-Xmx256m"/>
@@ -1924,8 +1934,8 @@ TEST CASES
     </condition>
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
-    -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -XX:+HeapDumpOnOutOfMemoryError -Xmx640m -XX:+AggressiveOpts -ea
+    -classpath ${classpath}
+    -Dlog4j.configuration=file://${log4j.configuration} -server -XX:+HeapDumpOnOutOfMemoryError -Xmx640m -XX:+AggressiveOpts -ea
     org.voltdb.sqlgenerator.SimpleServer create hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
     ' />
@@ -2100,7 +2110,6 @@ BENCHMARKS
     <java fork="true" failonerror="true"
         classname="org.voltdb.ProcedureCallMicrobench" >
         <arg value='${clients}' />
-        <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
         <classpath refid='project.classpath' />
