@@ -17,12 +17,8 @@
 
 package org.voltdb.importclient;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +28,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.voltdb.client.Client;
-import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 import org.voltdb.utils.CSVDataLoader;
 
@@ -55,7 +50,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private String m_bootstrap;
     private String m_topic;
     private Integer m_maxErrors = 100;
-    private final ArrayList<ClientConnectionHandler> m_clients = new ArrayList<ClientConnectionHandler>();
 
     // Register ImportHandlerProxy service.
     @Override
@@ -71,10 +65,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     @Override
     public void stop() {
         try {
-            for (ClientConnectionHandler s : m_clients) {
-                s.stopClient();
-            }
-            m_clients.clear();
             m_serverSocket.close();
             m_serverSocket = null;
         } catch (IOException ex) {
@@ -118,50 +108,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         String maxErrors = (String )m_properties.getProperty("maxErrors");
         if (maxErrors != null && maxErrors.trim().length() != 0) {
             m_maxErrors = Integer.parseInt(maxErrors);
-        }
-    }
-
-    //This is ClientConnection handler to read and dispatch data to stored procedure.
-    private class ClientConnectionHandler extends Thread {
-        private final Socket m_clientSocket;
-        private final String m_procedure;
-        private final ImportHandlerProxy m_importHandlerProxy;
-
-        public ClientConnectionHandler(ImportHandlerProxy ic, Socket clientSocket, String procedure) {
-            m_importHandlerProxy = ic;
-            m_clientSocket = clientSocket;
-            m_procedure = procedure;
-        }
-
-        @Override
-        public void run() {
-            try {
-                while (true) {
-                    BufferedReader in = new BufferedReader(
-                            new InputStreamReader(m_clientSocket.getInputStream()));
-                    while (true) {
-                        String line = in.readLine();
-                        //You should convert your data to params here.
-                        if (line == null) break;
-                        CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        if (!callProcedure(invocation)) {
-                            System.out.println("Inserted failed: " + line);
-                        }
-                    }
-                    m_clientSocket.close();
-                    System.out.println("Client Closed.");
-                }
-            } catch (IOException ioe) {
-                ioe.printStackTrace();
-            }
-        }
-
-        public void stopClient() {
-            try {
-                m_clientSocket.close();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
         }
     }
 
