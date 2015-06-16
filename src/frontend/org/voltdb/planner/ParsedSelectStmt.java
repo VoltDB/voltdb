@@ -1252,15 +1252,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // prepare the join order if needed
         if (m_joinOrder == null &&
-                m_tableAliasList.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
+                m_tableAliasListAsJoinOrder.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
             // When there are large number of table joins, give up the all permutations.
             // By default, try the join order with the SQL query table order first.
             m_hasLargeNumberOfTableJoins = true;
 
             StringBuilder sb = new StringBuilder();
             String separator = "";
-            for (int ii = 0; ii < m_tableAliasList.size(); ii++) {
-                String tableAlias = m_tableAliasList.get(ii);
+            for (int ii = 0; ii < m_tableAliasListAsJoinOrder.size(); ii++) {
+                String tableAlias = m_tableAliasListAsJoinOrder.get(ii);
                 sb.append(separator).append(tableAlias);
                 separator = ",";
             }

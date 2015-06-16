@@ -27,10 +27,10 @@ class Header extends Module {
         showHelp                 	{ $("#showMyHelp") }
         help                        { $("#userSection > li:nth-child(4) > div > ul > li > a") }
         popup                     	{ $(class:"popup_content10") }
-        popupTitle                	{ $(class:"overlay-title helpIcon ", text:"Help") }
+        popupTitle                	{ $(class:"overlay-title helpIcon ") }
         popupClose                	{ $(class:"popup_close") }
         logoutPopup               	{ $(class:"popup_content2") }
-        logoutPopupTitle          	{ $(class:"overlay-contentError errorMsg") }
+        logoutPopupTitle          	{ $(class:"overlay-title ") }
         logoutPopupOkButton       	{ $("#A1") }
         logoutPopupCancelButton   	{ $("#btnCancel") }
     }

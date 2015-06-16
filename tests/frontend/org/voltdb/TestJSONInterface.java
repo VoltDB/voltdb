@@ -361,7 +361,7 @@ public class TestJSONInterface extends TestCase {
             varString = getHTTPVarString(params);
 
             varString = getHTTPVarString(params);
-            String ignret = callProcOverJSONRaw(varString, expectedCode);
+            callProcOverJSONRaw(varString, expectedCode);
         }
         return ret;
     }
@@ -392,6 +392,104 @@ public class TestJSONInterface extends TestCase {
         }
 
         return response;
+    }
+
+    public void testPausedMode() throws Exception {
+        try {
+            String testSchema
+                    = "CREATE TABLE foo (\n"
+                    + "  ival bigint default 23 not null, "
+                    + "  sval varchar(200) default 'foo', "
+                    + "  PRIMARY KEY (ival)\n"
+                    + ");";
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(testSchema);
+            builder.addPartitionInfo("foo", "ival");
+            builder.addStmtProcedure("fooinsert", "insert into foo values (?, ?);");
+            builder.addStmtProcedure("foocount", "select count(*) from foo;");
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            int pkStart = 0;
+            pkStart = runPauseTests(pkStart, false, false);
+            pkStart = runPauseTests(pkStart, false, true);
+
+            // pause server
+            ParameterSet pset = ParameterSet.emptyParameterSet();
+            Response response = responseFromJSON(callProcOverJSON("@Pause", pset, null, null, false, true));
+            assertTrue(response.status == ClientResponse.SUCCESS);
+
+            pkStart = runPauseTests(pkStart, true, false);
+            pkStart = runPauseTests(pkStart, true, true);
+
+            // resume server
+            pset = ParameterSet.emptyParameterSet();
+            response = responseFromJSON(callProcOverJSON("@Resume", pset, null, null, false, true));
+            assertTrue(response.status == ClientResponse.SUCCESS);
+
+            pkStart = runPauseTests(pkStart, false, false);
+            pkStart = runPauseTests(pkStart, false, true);
+
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    private int runPauseTests(int pkStart, boolean paused, boolean useAdmin) throws Exception {
+        ParameterSet pset;
+        String responseJSON;
+        Response response;
+
+        pset = ParameterSet.fromArrayNoCopy(pkStart++, "hello");
+        responseJSON = callProcOverJSON("fooinsert", pset, null, null, false, useAdmin);
+        response = responseFromJSON(responseJSON);
+        if (paused && !useAdmin) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, response.status);
+            assertTrue(response.statusString.contains("is paused"));
+            pkStart--;
+        } else {
+            assertEquals(ClientResponse.SUCCESS, response.status);
+            assertEquals(1L, response.results[0].fetchRow(0).getLong(0));
+        }
+
+        pset = ParameterSet.emptyParameterSet();
+        responseJSON = callProcOverJSON("foocount", pset, null, null, false, useAdmin);
+        response = responseFromJSON(responseJSON);
+        assertEquals(ClientResponse.SUCCESS, response.status);
+        assertEquals(pkStart, response.results[0].fetchRow(0).getLong(0));
+
+        // try AdHoc
+        pset = ParameterSet.fromArrayNoCopy("insert into foo values (" + (pkStart++) + ", 'adhochello')");
+        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false, useAdmin);
+        response = responseFromJSON(responseJSON);
+        if (paused && !useAdmin) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, response.status);
+            assertTrue(response.statusString.contains("is paused"));
+            pkStart--;
+        } else {
+            assertEquals(ClientResponse.SUCCESS, response.status);
+        }
+
+        pset = ParameterSet.fromArrayNoCopy("select count(*) from foo");
+        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false, useAdmin);
+        response = responseFromJSON(responseJSON);
+        assertEquals(ClientResponse.SUCCESS, response.status);
+        assertEquals(pkStart, response.results[0].fetchRow(0).getLong(0));
+
+        return pkStart;
     }
 
     public void testAJAXAndClientTogether() throws Exception {
