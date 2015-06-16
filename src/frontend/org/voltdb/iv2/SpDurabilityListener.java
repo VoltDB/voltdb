@@ -21,87 +21,94 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 
 import org.voltdb.CommandLog.DurabilityListener;
-import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
-import org.voltdb.iv2.SpScheduler.DurableMpUniqueIdListener;
-import org.voltdb.iv2.SpScheduler.DurableSpUniqueIdListener;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 
 class SpDurabilityListener implements DurabilityListener {
+    interface CompletionChecks {
+        public CompletionChecks startNewCheckList(int startSize);
 
-    // AsyncSpCompletionChecks
-    class CompletionChecks {
-        long m_lastSpUniqueId;
+        public void addTask(TransactionTask task);
 
-        CompletionChecks(long lastSpUniqueId) {
-            m_lastSpUniqueId = lastSpUniqueId;
+        public int getTaskListSize();
+
+        public void processChecks();
+    }
+
+    // No command logging
+    class NoCompletionChecks implements CompletionChecks {
+        NoCompletionChecks() {}
+
+        public CompletionChecks startNewCheckList(int startSize) {
+            return this;
         }
 
-        CompletionChecks startNewCheckList(int startSize) {
-            return new CompletionChecks(m_lastSpUniqueId);
-        }
+        @Override
+        public void addTask(TransactionTask task) {}
 
-        void addTask(TransactionTask task) {
-            m_lastSpUniqueId = task.m_txnState.uniqueId;
-        }
-
-        int getTaskListSize() {
+        @Override
+        public int getTaskListSize() {
             return 0;
         }
 
-        void processChecks() {
-            for (DurableSpUniqueIdListener mpListener : m_spUniqueIdListeners) {
-                mpListener.lastSpUniqueIdMadeDurable(m_lastSpUniqueId);
-            }
-        }
+        @Override
+        public void processChecks() {}
     };
 
-    class AsyncMpCompletionChecks extends CompletionChecks {
-        long m_lastMpUniqueId;
+    class AsyncCompletionChecks implements CompletionChecks {
+        protected long m_lastSpUniqueId;
+        protected long m_lastMpUniqueId;
 
-        AsyncMpCompletionChecks(long lastSpUniqueId, long lastMpUniqueId) {
-            super(lastSpUniqueId);
+        AsyncCompletionChecks(long lastSpUniqueId, long lastMpUniqueId) {
+            m_lastSpUniqueId = lastSpUniqueId;
             m_lastMpUniqueId = lastMpUniqueId;
         }
 
         @Override
-        CompletionChecks startNewCheckList(int startSize) {
-            return new AsyncMpCompletionChecks(m_lastSpUniqueId, m_lastMpUniqueId);
+        public CompletionChecks startNewCheckList(int startSize) {
+            return new AsyncCompletionChecks(m_lastSpUniqueId, m_lastMpUniqueId);
         }
 
         @Override
-        void addTask(TransactionTask task) {
-            m_lastSpUniqueId = task.m_txnState.uniqueId;
-            if (!task.m_txnState.isSinglePartition()) {
-                m_lastMpUniqueId = m_lastSpUniqueId;
+        public void addTask(TransactionTask task) {
+            if (task.m_txnState.isSinglePartition()) {
+                m_lastSpUniqueId = task.m_txnState.uniqueId;
+            }
+            else {
+                m_lastMpUniqueId = task.m_txnState.uniqueId;
             }
         }
 
         @Override
-        void processChecks() {
+        public int getTaskListSize() {
+            return 0;
+        }
+
+        @Override
+        public void processChecks() {
             // Notify the SP UniqueId listeners
-            super.processChecks();
-            for (DurableMpUniqueIdListener mpListener : m_mpUniqueIdListeners) {
-                mpListener.lastMpUniqueIdMadeDurable(m_lastMpUniqueId);
+            for (DurableUniqueIdListener listener : m_uniqueIdListeners) {
+                listener.lastUniqueIdsMadeDurable(m_lastSpUniqueId, m_lastMpUniqueId);
             }
         }
     };
 
-    class SyncSpCompletionChecks extends CompletionChecks {
+    class SyncCompletionChecks extends AsyncCompletionChecks {
         ArrayList<TransactionTask> m_pendingTransactions;
 
-        public SyncSpCompletionChecks(long lastSpUniqueId, int startSize) {
-            super(lastSpUniqueId);
+        public SyncCompletionChecks(long lastSpUniqueId, long lastMpUniqueId, int startSize) {
+            super(lastSpUniqueId, lastMpUniqueId);
             m_pendingTransactions = new ArrayList<TransactionTask>(startSize);
         }
 
         @Override
-        CompletionChecks startNewCheckList(int startSize) {
-            return new SyncSpCompletionChecks(m_lastSpUniqueId, startSize);
+        public CompletionChecks startNewCheckList(int startSize) {
+            return new SyncCompletionChecks(m_lastSpUniqueId, m_lastMpUniqueId, startSize);
         }
 
         @Override
-        void addTask(TransactionTask task) {
+        public void addTask(TransactionTask task) {
             m_pendingTransactions.add(task);
-            m_lastSpUniqueId = task.m_txnState.uniqueId;
+            super.addTask(task);
         }
 
         @Override
@@ -110,7 +117,8 @@ class SpDurabilityListener implements DurabilityListener {
         }
 
         @Override
-        void processChecks() {
+        public void processChecks() {
+            // Notify all sync transactions and the SP UniqueId listeners
             for (TransactionTask o : m_pendingTransactions) {
                 m_pendingTasks.offer(o);
                 // Make sure all queued tasks for this MP txn are released
@@ -118,45 +126,7 @@ class SpDurabilityListener implements DurabilityListener {
                     m_spScheduler.offerPendingMPTasks(o.getTxnId());
                 }
             }
-            // Notify the SP UniqueId listeners
             super.processChecks();
-        }
-    }
-
-    class SyncMpCompletionChecks extends SyncSpCompletionChecks {
-        long m_lastMpUniqueId;
-
-        public SyncMpCompletionChecks(long lastSpUniqueId, long lastMpUniqueId, int startSize) {
-            super(lastSpUniqueId, startSize);
-            m_lastMpUniqueId = lastMpUniqueId;
-        }
-
-        @Override
-        CompletionChecks startNewCheckList(int startSize) {
-            return new SyncMpCompletionChecks(m_lastSpUniqueId, m_lastMpUniqueId, startSize);
-        }
-
-        @Override
-        void addTask(TransactionTask task) {
-            m_pendingTransactions.add(task);
-            m_lastSpUniqueId = task.m_txnState.uniqueId;
-            if (!task.m_txnState.isSinglePartition()) {
-                m_lastMpUniqueId = m_lastSpUniqueId;
-            }
-        }
-
-        @Override
-        public int getTaskListSize() {
-            return m_pendingTransactions.size();
-        }
-
-        @Override
-        void processChecks() {
-            // Notify all sync transactions and the SP UniqueId listeners
-            super.processChecks();
-            for (DurableMpUniqueIdListener mpListener : m_mpUniqueIdListeners) {
-                mpListener.lastMpUniqueIdMadeDurable(m_lastMpUniqueId);
-            }
         }
     }
 
@@ -167,50 +137,27 @@ class SpDurabilityListener implements DurabilityListener {
 
     private final SpScheduler m_spScheduler;
     private final TransactionTaskQueue m_pendingTasks;
-    private final SiteTaskerQueue m_tasks;
-    private Object m_lock;
+    private boolean m_commandLoggingEnabled;
 
-    private final ArrayList<DurableSpUniqueIdListener> m_spUniqueIdListeners = new ArrayList<DurableSpUniqueIdListener>(2);
-    private final ArrayList<DurableMpUniqueIdListener> m_mpUniqueIdListeners = new ArrayList<DurableMpUniqueIdListener>(2);
+    private final ArrayList<DurableUniqueIdListener> m_uniqueIdListeners = new ArrayList<DurableUniqueIdListener>(2);
 
-    public SpDurabilityListener(SpScheduler spScheduler, TransactionTaskQueue pendingTasks, SiteTaskerQueue taskQueue) {
+    public SpDurabilityListener(SpScheduler spScheduler, TransactionTaskQueue pendingTasks) {
         m_spScheduler = spScheduler;
         m_pendingTasks = pendingTasks;
-        m_tasks = taskQueue;
     }
 
     @Override
-    public void setLock(Object o) {
-        m_lock = o;
-    }
-
-    @Override
-    public void setSpUniqueIdListener(DurableSpUniqueIdListener listener) {
-        m_spUniqueIdListeners.add(listener);
-    }
-
-    @Override
-    public void setMpUniqueIdListener(DurableMpUniqueIdListener listener) {
-        m_mpUniqueIdListeners.add(listener);
+    public void setUniqueIdListener(DurableUniqueIdListener listener) {
+        m_uniqueIdListeners.add(listener);
+        if (m_currentCompletionChecks != null && !m_commandLoggingEnabled) {
+            // Since command logging is disabled set the durable uniqueId to maxLong
+            listener.lastUniqueIdsMadeDurable(Long.MAX_VALUE, Long.MAX_VALUE);
+        }
     }
 
     @Override
     public void onDurability() {
-        final CompletionChecks m_currentChecks = m_writingTransactionLists.poll();
-        final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
-            @Override
-            void run() {
-                assert(m_currentChecks != null);
-                synchronized (m_lock) {
-                    m_currentChecks.processChecks();
-                }
-            }
-        };
-        if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
-            m_tasks.offer(r);
-        } else {
-            r.run();
-        }
+        m_spScheduler.processDurabilityChecks(m_writingTransactionLists.poll());
     }
 
     @Override
@@ -230,34 +177,25 @@ class SpDurabilityListener implements DurabilityListener {
     }
 
     @Override
-    public void createFirstCompletionCheck(boolean isSyncLogging, boolean haveMpGateway) {
-        if (isSyncLogging) {
-            if (haveMpGateway) {
-                m_currentCompletionChecks = new SyncMpCompletionChecks(Long.MIN_VALUE, Long.MIN_VALUE, 16);
-            }
-            else {
-                m_currentCompletionChecks = new SyncSpCompletionChecks(Long.MIN_VALUE, 16);
+    public void createFirstCompletionCheck(boolean isSyncLogging, boolean commandLoggingEnabled) {
+        m_commandLoggingEnabled = commandLoggingEnabled;
+        if (!commandLoggingEnabled) {
+            m_currentCompletionChecks = new NoCompletionChecks();
+            // Since command logging is disabled set the durable uniqueId to maxLong
+            for (DurableUniqueIdListener listener : m_uniqueIdListeners) {
+                listener.lastUniqueIdsMadeDurable(Long.MAX_VALUE, Long.MAX_VALUE);
             }
         }
+        if (isSyncLogging) {
+            m_currentCompletionChecks = new SyncCompletionChecks(Long.MIN_VALUE, Long.MIN_VALUE, 16);
+        }
         else {
-            if (haveMpGateway) {
-                m_currentCompletionChecks = new AsyncMpCompletionChecks(Long.MIN_VALUE, Long.MIN_VALUE);
-            }
-            else {
-                m_currentCompletionChecks = new CompletionChecks(Long.MIN_VALUE);
-            }
+            m_currentCompletionChecks = new AsyncCompletionChecks(Long.MIN_VALUE, Long.MIN_VALUE);
         }
     }
 
     @Override
-    public boolean completionCheckInitialized(boolean supportsMp) {
-        if (supportsMp) {
-            return (m_currentCompletionChecks != null &&
-                    (m_currentCompletionChecks instanceof AsyncMpCompletionChecks ||
-                    m_currentCompletionChecks instanceof SyncMpCompletionChecks));
-        }
-        else {
-            return (m_currentCompletionChecks != null);
-        }
+    public boolean completionCheckInitialized() {
+        return (m_currentCompletionChecks != null);
     }
 }
