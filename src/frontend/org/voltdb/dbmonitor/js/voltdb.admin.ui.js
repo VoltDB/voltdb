@@ -1597,10 +1597,12 @@ function loadAdminPage() {
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
-                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr></tbody></table>";
+                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr>";
                 }
+                content = content + "</tbody></table>";
+                $("#exportPopup").html(content);
             }
-            $("#exportPopup").html(content);
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
