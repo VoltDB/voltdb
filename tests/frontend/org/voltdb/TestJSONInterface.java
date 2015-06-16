@@ -1854,7 +1854,12 @@ public class TestJSONInterface extends TestCase {
             //Get exportTypes
             String json = getUrlOverJSON("http://localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
             JSONObject jobj = new JSONObject(json);
-            assertTrue(jobj.getString("types").contains("file"));
+            assertTrue(jobj.getString("types").contains("FILE"));
+            assertTrue(jobj.getString("types").contains("JDBC"));
+            assertTrue(jobj.getString("types").contains("KAFKA"));
+            assertTrue(jobj.getString("types").contains("HTTP"));
+            assertTrue(jobj.getString("types").contains("RABBITMQ"));
+            assertTrue(jobj.getString("types").contains("CUSTOM"));
         } finally {
             if (server != null) {
                 server.shutdown();

@@ -740,12 +740,15 @@ public class HTTPAdminListener {
             JSONObject exportTypes = new JSONObject();
             HashSet<String> exportList = new HashSet<String>();
             for (ServerExportEnum type : ServerExportEnum.values()) {
-                exportList.add(type.value());
+                exportList.add(type.value().toUpperCase());
             }
             try {
                 exportTypes.put("types", exportList);
             } catch (JSONException e) {
-                m_log.warn("Failed to generate exportTypes JSON: ", e);
+                m_log.error("Failed to generate exportTypes JSON: ", e);
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Type list failed to build"));
+                return;
             }
             response.getWriter().write(exportTypes.toString());
             if (jsonp != null) {
