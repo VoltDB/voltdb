@@ -45,6 +45,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
+import org.voltdb.iv2.SpDurabilityListener.CompletionChecks;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -126,20 +128,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     };
 
-    public interface DurableSpUniqueIdListener {
+    public interface DurableUniqueIdListener {
         /**
-         * Notify listener of last durable SinglePart uniqueId
+         * Notify listener of last durable Single-Part and Multi-Part uniqueIds
          */
-        public void lastSpUniqueIdMadeDurable(long uniqueId);
+        public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId);
     }
-
-    public interface DurableMpUniqueIdListener {
-        /**
-         * Notify listener of last durable MultiPart uniqueId
-         */
-        public void lastMpUniqueIdMadeDurable(long uniqueId);
-    }
-
 
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
@@ -154,7 +148,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
     private PartitionDRGateway m_drGateway = new PartitionDRGateway();
-    private PartitionDRGateway m_drGatewayMP = null;
     private final SnapshotCompletionMonitor m_snapMonitor;
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
@@ -171,14 +164,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         super(partitionId, taskQueue);
         m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
         m_snapMonitor = snapMonitor;
-        m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks, taskQueue);
+        m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
     @Override
     public void setLock(Object o) {
         super.setLock(o);
-        m_durabilityListener.setLock(o);
     }
 
     @Override
@@ -195,30 +187,24 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
-    public void setSpUniqueIdListener(DurableSpUniqueIdListener listener) {
-        m_durabilityListener.setSpUniqueIdListener(listener);
-        if (m_cl != null && !m_durabilityListener.completionCheckInitialized(false)) {
-            m_durabilityListener.createFirstCompletionCheck(m_cl.isSynchronous(), false);
-        }
-    }
-
-    public void setMpUniqueIdListener(DurableMpUniqueIdListener listener) {
-        m_durabilityListener.setMpUniqueIdListener(listener);
-        if (m_cl != null && !m_durabilityListener.completionCheckInitialized(true)) {
-            m_durabilityListener.createFirstCompletionCheck(m_cl.isSynchronous(), true);
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
+        m_durabilityListener.setUniqueIdListener(listener);
+        // We assume that listeners will not be added after initialization completes. However
+        // listeners may be added after the command logger is assigned.
+        if (m_cl != null && !m_durabilityListener.completionCheckInitialized()) {
+            m_durabilityListener.createFirstCompletionCheck(m_cl.isSynchronous(), m_cl.isEnabled());
         }
     }
 
     public void setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
-        setSpUniqueIdListener(gateway);
+        setDurableUniqueIdListener(gateway);
     }
 
     public void setMpDRGateway(final PartitionDRGateway mpGateway)
     {
-        m_drGatewayMP = mpGateway;
-        m_durabilityListener.setMpUniqueIdListener(mpGateway);
+        setDurableUniqueIdListener(mpGateway);
     }
 
     @Override
@@ -1013,7 +999,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
-        m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), m_drGatewayMP != null);
+        m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), cl.isEnabled());
         m_cl.registerDurabilityListener(m_durabilityListener);
     }
 
@@ -1063,6 +1049,23 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         return new CountDownLatch(0);
+    }
+
+    public void processDurabilityChecks(final CompletionChecks currentChecks) {
+        final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
+            @Override
+            void run() {
+                assert(currentChecks != null);
+                synchronized (m_lock) {
+                    currentChecks.processChecks();
+                }
+            }
+        };
+        if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
+            m_tasks.offer(r);
+        } else {
+            r.run();
+        }
     }
 
     @Override

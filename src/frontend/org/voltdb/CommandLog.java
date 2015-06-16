@@ -19,8 +19,7 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
-import org.voltdb.iv2.SpScheduler.DurableMpUniqueIdListener;
-import org.voltdb.iv2.SpScheduler.DurableSpUniqueIdListener;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -81,32 +80,20 @@ public interface CommandLog {
             int partitionId, long spHandle);
 
     public interface DurabilityListener {
-
         /**
-         * Because the scheduler's lock is assigned late, we need to propagate it to the
-         * DurabilityListener so it can share the lock during task processing
+         * Assign the listener that we will send SP and MP UniqueId durability notifications to
          */
-        void setLock(Object o);
-
-        /**
-         * Assign the listener that we will send SP UniqueId durability notifications to
-         */
-        public void setSpUniqueIdListener(DurableSpUniqueIdListener listener);
-
-        /**
-         * Assign the listener that we will send MP UniqueId durability notifications to
-         */
-        public void setMpUniqueIdListener(DurableMpUniqueIdListener listener);
+        public void setUniqueIdListener(DurableUniqueIdListener listener);
 
         /**
          * Called from Scheduler to set up how all future completion checks will be handled
          */
-        public void createFirstCompletionCheck(boolean isSyncLogging, boolean haveMpGateway);
+        public void createFirstCompletionCheck(boolean isSyncLogging, boolean commandLoggingEnabled);
 
         /**
          * Determines if a completionCheck has already been allocated.
          */
-        public boolean completionCheckInitialized(boolean supportsMp);
+        public boolean completionCheckInitialized();
 
         /**
          * Called from CommandLog to notify a Scheduler of the tasks/uniqueIds that have been made durable
