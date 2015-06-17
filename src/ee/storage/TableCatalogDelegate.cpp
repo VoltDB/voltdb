@@ -389,12 +389,23 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     SHA1Init(&shaCTX);
     SHA1Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), (uint32_t )::strlen(catalogTable.signature().c_str()));
     SHA1Final(reinterpret_cast<unsigned char *>(signatureHash), &shaCTX);
+    // Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
+    int tableAllocationTargetSize = 0;
+    if (materialized) {
+      catalog::MaterializedViewInfo *mvInfo = catalogTable.materializer()->views().get(catalogTable.name());
+      if (mvInfo->groupbycols().size() == 0) {
+        // ENG-8490: If the materialized view came with no group by, set table block size to 64KB
+        // to achieve better space efficiency.
+        // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
+        tableAllocationTargetSize = 1024 * 64;
+      }
+    }
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, signatureHash,
                                                     materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
-                                                    0,
+                                                    tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),
                                                     compactionThreshold,
                                                     drEnabled);
