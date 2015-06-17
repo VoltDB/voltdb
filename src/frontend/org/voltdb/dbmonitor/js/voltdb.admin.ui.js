@@ -1574,11 +1574,14 @@ function loadAdminPage() {
             if (voltDbRenderer.drTablesArray.length == 0) {
                 $("#drPopup").html("No DR tables available.");
             } else {
+                content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='drTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.drTablesArray.length - 1; i++) {
                     content = content + "<tr><td>" + voltDbRenderer.drTablesArray[i] + "</td></tr>";
                 }
+                content = content + "</tbody></table>";
+                $("#drPopup").html(content);
             }
-            $("#replicatedTableBody").html(content);
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
@@ -1597,10 +1600,12 @@ function loadAdminPage() {
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
-                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr></tbody></table>";
+                    content = content + "<tr><td>" + voltDbRenderer.exportTablesArray[i] + "</td></tr>";
                 }
+                content = content + "</tbody></table>";
+                $("#exportPopup").html(content);
             }
-            $("#exportPopup").html(content);
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
@@ -1692,7 +1697,7 @@ function loadAdminPage() {
                 '                    <th align="right">Value</th>' +
                 '                    <th>Delete</th>' +
                 '                </tr>' +
-                
+
                 '            </table>' +
                 '        </div>' +
                 '    </td>' +
@@ -2102,7 +2107,7 @@ function loadAdminPage() {
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
-            } 
+            }
         }
         $('#tblAddNewProperty tr.headerProperty').after(exportProperties);
 
@@ -2110,12 +2115,12 @@ function loadAdminPage() {
         setDefaultProperty();
     };
 
-    var removeDuplicateProperty = function() {
+    var removeDuplicateProperty = function () {
         $('#tblAddNewProperty :input').each(function () {
             if ($(this).val() == "outdir") {
-                removeDuplicate(this,"outdir");
+                removeDuplicate(this, "outdir");
             } else if ($(this).val() == "nonce") {
-                removeDuplicate(this,"nonce");
+                removeDuplicate(this, "nonce");
             } else if ($(this).val() == "type") {
                 removeDuplicate(this, "type");
             } else if ($(this).val() == "endpoint") {
@@ -2128,13 +2133,13 @@ function loadAdminPage() {
                 removeDuplicate(this, "jdbcdriver");
             } else if ($(this).val() == "broker.host") {
                 removeDuplicate(this, "broker.host");
-            } else if($(this).val() == "amqp.uri") {
+            } else if ($(this).val() == "amqp.uri") {
                 removeDuplicate(this, "amqp.uri");
             }
         });
     };
 
-    var removeDuplicate = function(object, propertyName) {
+    var removeDuplicate = function (object, propertyName) {
         if (!$(object).hasClass("requiredProperty")) {
             var val = $(':input:eq(' + ($(':input').index(object) + 1) + ')').val();
             if ($(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName]).length) {
@@ -2149,7 +2154,7 @@ function loadAdminPage() {
         }
     };
 
-    var setDefaultProperty = function() {
+    var setDefaultProperty = function () {
 
         var exportType = $('#txtType').val();
         if (exportType.toUpperCase() == "FILE") {
@@ -2161,19 +2166,19 @@ function loadAdminPage() {
             setNormalDisplay($("#txtnonce"));
             setNormalDisplay($("#txtFileType"));
         }
-        
+
         if (exportType.toUpperCase() == "HTTP") {
             setDefaultDisplay($("#txtEndpoint"));
         } else {
             setNormalDisplay($("#txtEndpoint"));
-        } 
-        
+        }
+
         if (exportType.toUpperCase() == "KAFKA") {
             setDefaultDisplay($("#txtMetadataBrokerList"));
         } else {
             setNormalDisplay($("#txtMetadataBrokerList"));
         }
-        
+
         if (exportType.toUpperCase() == "JDBC") {
             setDefaultDisplay($("#txtJdbcUrl"));
             setDefaultDisplay($("#txtJdbcDriver"));
@@ -2181,7 +2186,7 @@ function loadAdminPage() {
             setNormalDisplay($("#txtJdbcUrl"));
             setNormalDisplay($("#txtJdbcDriver"));
         }
-        
+
         if (exportType.toUpperCase() == "RABBITMQ") {
             setDefaultDisplay($("#selectRabbitMq"));
         } else {
@@ -2190,7 +2195,7 @@ function loadAdminPage() {
 
     };
 
-    var setDefaultDisplay = function(txtbox) {
+    var setDefaultDisplay = function (txtbox) {
         if (txtbox.selector != "#selectRabbitMq")
             txtbox.attr('disabled', 'disabled');
         var $row = txtbox.closest("tr");
@@ -2199,7 +2204,7 @@ function loadAdminPage() {
         $td.html('');
     };
 
-    var setNormalDisplay = function(txtbox) {
+    var setNormalDisplay = function (txtbox) {
         txtbox.removeAttr('disabled');
         var $row = txtbox.closest("tr");
         var $td = $row.find("td:last-child");
