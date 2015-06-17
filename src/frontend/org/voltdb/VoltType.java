@@ -828,6 +828,27 @@ public enum VoltType {
         }
     }
 
+    public static boolean isInlineVarType(VoltType type, int size, boolean inBytes) {
+        switch(type) {
+        case STRING:
+            if (inBytes && size < 64) {
+                return true;
+            } else if (!inBytes && size < 16) {
+                return true;
+            }
+            break;
+        case VARBINARY:
+            if (size < 64) {
+                return true;
+            }
+            break;
+        default:
+            break;
+        }
+
+        return false;
+    }
+
     public boolean isNumber() {
         switch (this) {
             case TINYINT:

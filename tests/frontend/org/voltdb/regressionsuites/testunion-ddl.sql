@@ -47,3 +47,26 @@ select client_id, config_id, sum(cost) as cost
 from rpt_copy_p
 where client_id=?
 group by client_id, config_id;
+
+
+-- ENG-6291: UNION with inline/non-inline
+CREATE TABLE my_votes
+(
+  phone_number       bigint       NOT NULL
+, state              varchar(2)   NOT NULL
+, state100           varchar(100) NOT NULL
+, state_b            varchar(2 bytes) NOT NULL
+, state100_b         varchar(100 bytes) NOT NULL
+, binary2            varbinary(2) NOT NULL
+, binary100          varbinary(100) NOT NULL
+);
+
+CREATE TABLE area_code_state
+(
+  area_code smallint   NOT NULL
+, state     varchar(2) NOT NULL
+, CONSTRAINT PK_area_code_state PRIMARY KEY
+  (
+    area_code
+  )
+);

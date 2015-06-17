@@ -107,6 +107,9 @@ public abstract class AbstractParsedStmt {
     public AbstractParsedStmt m_parentStmt = null;
     boolean m_isUpsert = false;
 
+    // mark whether the statement's parent is UNION clause or not
+    private boolean m_isParentUnionClause = false;
+
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
     static final String DELETE_NODE_NAME = "delete";
@@ -1217,6 +1220,14 @@ public abstract class AbstractParsedStmt {
         } else {
             return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
         }
+    }
+
+    public void setParentAsUnionClause() {
+        m_isParentUnionClause = true;
+    }
+
+    public boolean isParentUnionClause() {
+        return m_isParentUnionClause;
     }
 
     public boolean hasLimitOrOffset()

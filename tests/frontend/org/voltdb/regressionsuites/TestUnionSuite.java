@@ -685,6 +685,75 @@ public class TestUnionSuite extends RegressionSuite {
         }
     }
 
+    public void testUnionVarchar() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+
+        client.callProcedure("MY_VOTES.insert", 1, "MA", "MA", "MA", "MA", "10", "11");
+        client.callProcedure("AREA_CODE_STATE.insert", 1803, "RI");
+        client.callProcedure("AREA_CODE_STATE.insert", 1804, "RI");
+
+        String[] columns = new String[]{"state", "state100", "state_b", "state100_b"};
+
+        for (String col : columns) {
+          validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union select 'MA' from area_code_state;",
+                  new String[] {"MA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union select 'VOLTDB_VOLTDB_VOLTDB_VOLTDB_VOLTDB' from area_code_state order by 1;",
+                  new String[] {"MA", "VOLTDB_VOLTDB_VOLTDB_VOLTDB_VOLTDB"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes except select 'MA' from area_code_state;",
+                  new String[] {});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union all select 'MA' from area_code_state;",
+                  new String[] {"MA","MA", "MA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union select state from area_code_state order by 1;",
+                  new String[] {"MA","RI"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" || '_USA' from my_votes union select state from area_code_state order by 1;",
+                  new String[] {"MA_USA","RI"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union select state || '_USA' from area_code_state order by 1;",
+                  new String[] {"MA","RI_USA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" || '_USA' from my_votes union select state || '_USA' from area_code_state order by 1;",
+                  new String[] {"MA_USA","RI_USA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" || '_USA' from my_votes union select state || '_USA' from area_code_state order by 1;",
+                  new String[] {"MA_USA","RI_USA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" || '_USA' from my_votes union select state100 || '_USA' from my_votes order by 1;",
+                  new String[] {"MA_USA"});
+        }
+
+        // varbinary
+        validateTableColumnOfScalarVarbinary(client,
+                "select binary2 from my_votes union select binary100 from my_votes order by 1;",
+                new String[] {"10", "11"});
+
+        validateTableColumnOfScalarVarbinary(client,
+                "select binary100 from my_votes union select binary2 from my_votes order by 1;",
+                new String[] {"10", "11"});
+
+        validateTableColumnOfScalarVarbinary(client,
+                "select binary2 from my_votes union select binary2 from my_votes;",
+                new String[] {"10"});
+
+        validateTableColumnOfScalarVarbinary(client,
+                "select binary100 from my_votes union select binary100 from my_votes;",
+                new String[] {"11"});
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(

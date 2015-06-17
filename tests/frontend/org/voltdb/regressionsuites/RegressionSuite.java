@@ -397,7 +397,8 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected) throws Exception {
+    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, expected);
@@ -468,6 +469,12 @@ public class RegressionSuite extends TestCase {
         validateRowOfLongs("", vt, expected);
     }
 
+    static public void validateTableColumnOfScalarVarchar(Client client, String sql, String[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, 0, expected);
+    }
+
     static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
         validateTableColumnOfScalarVarchar(vt, 0, expected);
     }
@@ -484,6 +491,28 @@ public class RegressionSuite extends TestCase {
                 assertEquals(null, actual);
             } else {
                 assertEquals(expected[i], vt.getString(col));
+            }
+        }
+    }
+
+    static public void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableColumnOfScalarbinary(vt, 0, expected);
+    }
+
+    static private void validateTableColumnOfScalarbinary(VoltTable vt, int col, String[] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            assertTrue(vt.advanceRow());
+            String actual = VoltType.varbinaryToPrintableString(vt.getVarbinary(col));
+            if (expected[i] == null) {
+                assertTrue(vt.wasNull());
+                assertEquals(null, actual);
+            } else {
+                assertTrue(actual.contains(expected[i]));
             }
         }
     }

@@ -696,11 +696,37 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(colExpr.getValueType() != VoltType.NUMERIC);
         }
         assert(colExpr != null);
+
         if (isDistributed) {
             colExpr = colExpr.replaceAVG();
             updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(colExpr);
+
+        // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
+        if(isParentUnionClause() && VoltType.isInlineVarType(
+                colExpr.getValueType(), colExpr.getValueSize(), colExpr.getInBytes())) {
+            AbstractExpression expr = null;
+            try {
+                expr = ExpressionType.OPERATOR_CAST.getExpressionClass().newInstance();
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage(), e);
+            }
+            expr.setExpressionType(ExpressionType.OPERATOR_CAST);
+            VoltType voltType = colExpr.getValueType();
+            expr.setValueType(voltType);
+            expr.setInBytes(colExpr.getInBytes());
+
+            // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
+            // so assume max length for variable-length types (VARCHAR and VARBINARY).
+            expr.setValueSize(voltType.getMaxLengthInBytes());
+
+            expr.setLeft(colExpr);
+
+            // switch the new expression for CAST
+            colExpr = expr;
+        }
 
         if (child.name.equals("columnref")) {
             col.expression = colExpr;
