@@ -29,14 +29,17 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
+
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -304,6 +307,69 @@ public class TestJDBCQueries {
             }
             catch(SQLException e) {
                 System.err.printf("ERROR(SELECT): %s: %s\n", d.typename, e.getMessage());
+                fail();
+            }
+        }
+    }
+
+    @Test
+    public void testGetStringWorksForNonStringFiled() throws Exception {
+        int columnIndex = 1;
+        DatabaseMetaData dbmd = conn.getMetaData();
+        for (Data d : data) {
+            try {
+                String q = String.format("select * from %s", d.tablename);
+                Statement sel = conn.createStatement();
+                sel.execute(q);
+                ResultSet rs = sel.getResultSet();
+                ResultSetMetaData rsmd = rs.getMetaData();
+                int colType;
+                while (rs.next()) {
+                    colType = rsmd.getColumnType(columnIndex);
+                    assertTrue(dbmd.supportsConvert(colType,
+                            java.sql.Types.VARCHAR));
+                    String expectValStr;
+                    switch (colType) {
+                    case java.sql.Types.TINYINT:
+                        expectValStr = String.valueOf(rs.getByte(columnIndex));
+                        break;
+                    case java.sql.Types.SMALLINT:
+                        expectValStr = String.valueOf(rs.getShort(columnIndex));
+                        break;
+                    case java.sql.Types.INTEGER:
+                        expectValStr = String.valueOf(rs.getInt(columnIndex));
+                        break;
+                    case java.sql.Types.BIGINT:
+                        expectValStr = String.valueOf(rs.getLong(columnIndex));
+                        break;
+                    case java.sql.Types.FLOAT:
+                        expectValStr = String
+                                .valueOf(rs.getDouble(columnIndex));
+                        break;
+                    case java.sql.Types.VARCHAR:
+                        expectValStr = rs.getString(columnIndex);
+                        break;
+                    case java.sql.Types.VARBINARY:
+                        expectValStr = new String(rs.getBytes(columnIndex));
+                        break;
+                    case java.sql.Types.TIMESTAMP:
+                        expectValStr = String.valueOf(rs
+                                .getTimestamp(columnIndex));
+                        break;
+                    case java.sql.Types.DECIMAL:
+                        expectValStr = String.valueOf(rs
+                                .getBigDecimal(columnIndex));
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Invalid type '"
+                                + colType + "'");
+                    }
+                    assertEquals(expectValStr, rs.getString(columnIndex));
+                }
+
+            } catch (SQLException e) {
+                System.err.printf("ERROR Covert type  %s to String: %s\n",
+                        d.typename, e.getMessage());
                 fail();
             }
         }

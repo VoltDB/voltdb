@@ -790,7 +790,14 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public String getString(int columnIndex) throws SQLException {
         checkColumnBounds(columnIndex);
         try {
-            return table.getString(columnIndex - 1);
+            VoltType type = table.getColumnType(columnIndex - 1);
+            if (type == VoltType.STRING)
+                return table.getString(columnIndex - 1);
+            if (type == VoltType.TIMESTAMP)
+                return getTimestamp(columnIndex).toString();
+            if (type == VoltType.VARBINARY)
+                return new String(table.getVarbinary(columnIndex-1));
+            return table.get(columnIndex - 1, type).toString();
         } catch (Exception x) {
             throw SQLError.get(x);
         }
