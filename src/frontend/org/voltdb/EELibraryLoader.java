@@ -28,6 +28,7 @@ import org.voltcore.logging.VoltLogger;
 public class EELibraryLoader {
 
     private static final String USE_JAVA_LIBRARY_PATH = "use.javalib";
+    private static final String VOLT_TMP_DIR = "volt.tmpdir";
     private static boolean voltSharedLibraryLoaded = false;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -63,10 +64,10 @@ public class EELibraryLoader {
                     assert(versionString != null);
                     final String libname = "voltdb-" + versionString;
                     hostLog.info("Loading native VoltDB code ("+libname+"). A confirmation message will follow if the loading is successful.");
-                    File libFile = getNativeLibraryFile(libname);
-                    if (libFile==null) {
+                    if (Boolean.parseBoolean(System.getProperty(USE_JAVA_LIBRARY_PATH, "false"))) {
                         System.loadLibrary(libname);
                     } else {
+                        File libFile = getNativeLibraryFile(libname);
                         System.load(libFile.getAbsolutePath());
                     }
                     voltSharedLibraryLoaded = true;
@@ -95,13 +96,9 @@ public class EELibraryLoader {
     }
 
     /*
-     * Returns the native library file copied into a readable location, if the library from volt jar
-     * should be used. Returns null otherwise to default to java.library.path as fall back.
+     * Returns the native library file copied into a readable location.
      */
     private static File getNativeLibraryFile(String libname) {
-        if (Boolean.parseBoolean(System.getProperty(USE_JAVA_LIBRARY_PATH, "false"))) {
-            return null;
-        }
 
         // for now, arch is always x86_64
         String pathFormat = "/org/voltdb/native/%s/x86_64";
@@ -119,18 +116,18 @@ public class EELibraryLoader {
                 libFileName = "lib" + libname + ".jnilib";
             }
             if (EELibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
-                hostLog.warn("Could not find library resource using path: " + libPath + "/" + libFileName +
-                        ". Falling back to using java.library.path");
-                return null;
+                String msg = "Could not find library resource using path: " + libPath + "/" + libFileName;
+                hostLog.warn(msg);
+                throw new RuntimeException(msg);
             }
         }
 
-        File tmpFilePath = new File(System.getProperty("java.io.tmpdir"));
+        File tmpFilePath = new File(System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir")));
         try {
             return loadLibraryFile(libPath, libFileName, tmpFilePath.getAbsolutePath());
         } catch(IOException e) {
-            hostLog.error("Error loading library file from jar. Falling back to using java.library.path", e);
-            return null;
+            hostLog.error("Error loading Volt library file from jar", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -177,34 +174,10 @@ public class EELibraryLoader {
                 extractedLibFile.setWritable(true, true) &&
                 extractedLibFile.setExecutable(true);
         if (!success) {
-            hostLog.warn("Could not update extracted lib file " + extractedLibFile +
-                    " to be rwx. Falling back to using java.library.path");
-            return null;
+            String msg = "Could not update extracted lib file " + extractedLibFile + " to be rwx";
+            hostLog.warn(msg);
+            throw new RuntimeException(msg);
         }
-
-        /* Do we need this check that is in SnappyLoader?
-            // Check whether the contents are properly copied from the resource folder
-            {
-                InputStream nativeIn = null;
-                InputStream extractedLibIn = null;
-                try {
-                    nativeIn = EELibraryLoader.class.getResourceAsStream(libPath);
-                    extractedLibIn = new FileInputStream(extractedLibFile);
-
-                    if (!contentsEquals(nativeIn, extractedLibIn)) {
-                        throw new SnappyError(SnappyErrorCode.FAILED_TO_LOAD_NATIVE_LIBRARY, String.format("Failed to write a native library file at %s", extractedLibFile));
-                    }
-                }
-                finally {
-                    if (nativeIn != null) {
-                        nativeIn.close();
-                    }
-                    if (extractedLibIn != null) {
-                        extractedLibIn.close();
-                    }
-                }
-            }
-         */
 
         return new File(tmpFolder, extractedLibFileName);
     }

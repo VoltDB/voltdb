@@ -233,10 +233,6 @@ public class LocalCluster implements VoltServerConfig {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
 
-        // set the java lib path to the one for this process - default to obj/release/nativelibs
-        String java_library_path = buildDir + "/nativelibs";
-        java_library_path = System.getProperty("java.library.path", java_library_path);
-
         String classPath = System.getProperty("java.class.path") + ":" + buildDir
             + File.separator + m_jarFileName + ":" + buildDir + File.separator + "prod";
 
@@ -267,7 +263,6 @@ public class LocalCluster implements VoltServerConfig {
             startCommand("create").
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
-            javaLibraryPath(java_library_path).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
