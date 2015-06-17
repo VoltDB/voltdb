@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 
 /**
  * Objects placed in the deque are stored in file segments that are up to 64 megabytes.
@@ -34,15 +33,8 @@ import java.nio.channels.FileChannel;
  * to insert an object that exceeds the remaining space is made. A segment can be used
  * for reading and writing, but not both at the same time.
  */
-public class PBDRegularSegment implements PBDSegment {
+public class PBDRegularSegment extends PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
-
-    //Avoid unecessary sync with this flag
-    private boolean m_syncedSinceLastEdit = true;
-    private final File m_file;
-    private RandomAccessFile m_ras;
-    private FileChannel m_fc;
-    private boolean m_closed = true;
 
     //Index of the next object to read, not an offset into the file
     private int m_objectReadIndex = 0;
@@ -60,8 +52,8 @@ public class PBDRegularSegment implements PBDSegment {
     private DBBPool.BBContainer m_tmpHeaderBuf = null;
 
     public PBDRegularSegment(Long index, File file) {
+        super(file);
         m_index = index;
-        m_file = file;
         reset();
     }
 
@@ -128,12 +120,8 @@ public class PBDRegularSegment implements PBDSegment {
         open(forWrite, forWrite);
     }
 
-    /**
-     * @param forWrite    Open the file in read/write mode
-     * @param emptyFile   true to overwrite the header with 0 entries, essentially emptying the file
-     * @throws IOException
-     */
-    private void open(boolean forWrite, boolean emptyFile) throws IOException
+    @Override
+    protected void open(boolean forWrite, boolean emptyFile) throws IOException
     {
         if (!m_closed) {
             throw new IOException("Segment is already opened");
@@ -158,7 +146,8 @@ public class PBDRegularSegment implements PBDSegment {
         m_closed = false;
     }
 
-    private void initNumEntries(int count, int size) throws IOException {
+    @Override
+    protected void initNumEntries(int count, int size) throws IOException {
         m_numOfEntries = count;
         m_size = size;
 
@@ -407,88 +396,38 @@ public class PBDRegularSegment implements PBDSegment {
     }
 
     @Override
-    public int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException
-    {
-        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
-
-        open(true, false);
-
-        // Do stuff
-        final int initialEntryCount = getNumEntries();
-        int entriesTruncated = 0;
-        int sizeInBytes = 0;
-
-        DBBPool.BBContainer cont;
-        while (true) {
-            final long beforePos = m_readOffset;
-
-            cont = poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-            if (cont == null) {
-                break;
-            }
-
-            final int compressedLength = (int) (m_readOffset - beforePos - OBJECT_HEADER_BYTES);
-            final int uncompressedLength = cont.b().limit();
-
-            try {
-                //Handoff the object to the truncator and await a decision
-                BinaryDeque.TruncatorResponse retval = truncator.parse(cont);
-                if (retval == null) {
-                    //Nothing to do, leave the object alone and move to the next
-                    sizeInBytes += uncompressedLength;
-                } else {
-                    //If the returned bytebuffer is empty, remove the object and truncate the file
-                    if (retval.status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
-                        if (readIndex() == 1) {
-                            /*
-                             * If truncation is occuring at the first object
-                             * Whammo! Delete the file.
-                             */
-                            entriesTruncated = -1;
-                        } else {
-                            entriesTruncated = initialEntryCount - (readIndex() - 1);
-                            //Don't forget to update the number of entries in the file
-                            initNumEntries(readIndex() - 1, sizeInBytes);
-                            m_fc.truncate(m_readOffset - (compressedLength + PBDSegment.OBJECT_HEADER_BYTES));
-                        }
-                    } else {
-                        assert retval.status == BinaryDeque.TruncatorResponse.Status.PARTIAL_TRUNCATE;
-                        entriesTruncated = initialEntryCount - readIndex();
-                        //Partial object truncation
-                        m_readOffset -= compressedLength + PBDSegment.OBJECT_HEADER_BYTES;
-                        m_fc.position(m_readOffset);
-
-                        final DBBPool.BBContainer partialCont = DBBPool.allocateDirect(compressedLength);
-                        try {
-                            sizeInBytes += retval.writeTruncatedObject(partialCont.b());
-                            partialCont.b().flip();
-
-                            while (partialCont.b().hasRemaining()) {
-                                m_fc.write(partialCont.b());
-                            }
-                        } finally {
-                            partialCont.discard();
-                        }
-
-                        initNumEntries(readIndex(), sizeInBytes);
-                        m_fc.truncate(m_fc.position());
-                    }
-
-                    break;
-                }
-            } finally {
-                cont.discard();
-            }
-        }
-
-        close();
-
-        return entriesTruncated;
-    }
-
-    @Override
     public int uncompressedBytesToRead() {
         if (m_closed) throw new RuntimeException("Segment closed");
         return m_size - m_bytesRead;
+    }
+
+    @Override
+    protected long readOffset()
+    {
+        return m_readOffset;
+    }
+
+    @Override
+    protected void rewindReadOffset(int byBytes)
+    {
+        m_readOffset -= byBytes;
+    }
+
+    @Override
+    protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int length) throws IOException
+    {
+        int written = 0;
+        final DBBPool.BBContainer partialCont = DBBPool.allocateDirect(length);
+        try {
+            written += entry.writeTruncatedObject(partialCont.b());
+            partialCont.b().flip();
+
+            while (partialCont.b().hasRemaining()) {
+                m_fc.write(partialCont.b());
+            }
+        } finally {
+            partialCont.discard();
+        }
+        return written;
     }
 }

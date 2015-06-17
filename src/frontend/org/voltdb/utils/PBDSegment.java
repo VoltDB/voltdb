@@ -22,48 +22,81 @@ import org.voltcore.utils.DeferredSerialization;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 
-public interface PBDSegment {
-    int NO_FLAGS = 0;
-    int FLAG_COMPRESSED = 1;
+public abstract class PBDSegment {
+    static final int NO_FLAGS = 0;
+    static final int FLAG_COMPRESSED = 1;
 
-    int COUNT_OFFSET = 0;
-    int SIZE_OFFSET = 4;
+    static final int COUNT_OFFSET = 0;
+    static final int SIZE_OFFSET = 4;
 
-    int CHUNK_SIZE = (1024 * 1024) * 64;
-    int OBJECT_HEADER_BYTES = 8;
-    int SEGMENT_HEADER_BYTES = 8;
+    static final int CHUNK_SIZE = (1024 * 1024) * 64;
+    static final int OBJECT_HEADER_BYTES = 8;
+    static final int SEGMENT_HEADER_BYTES = 8;
+    protected final File m_file;
 
-    long segmentId();
-    File file();
+    protected boolean m_closed = true;
+    protected RandomAccessFile m_ras;
+    protected FileChannel m_fc;
+    //Avoid unecessary sync with this flag
+    protected boolean m_syncedSinceLastEdit = true;
 
-    void reset();
+    public PBDSegment(File file)
+    {
+        m_file = file;
+    }
 
-    int getNumEntries() throws IOException;
+    abstract long segmentId();
+    abstract File file();
 
-    boolean isBeingPolled();
+    abstract void reset();
 
-    int readIndex();
+    abstract int getNumEntries() throws IOException;
 
-    void open(boolean forWrite) throws IOException;
+    abstract boolean isBeingPolled();
 
-    void closeAndDelete() throws IOException;
+    abstract int readIndex();
 
-    boolean isClosed();
+    abstract void open(boolean forWrite) throws IOException;
+    /**
+     * @param forWrite    Open the file in read/write mode
+     * @param emptyFile   true to overwrite the header with 0 entries, essentially emptying the file
+     * @throws IOException
+     */
+    abstract protected void open(boolean forWrite, boolean emptyFile) throws IOException;
 
-    void close() throws IOException;
+    abstract void initNumEntries(int count, int size) throws IOException;
 
-    void sync() throws IOException;
+    abstract void closeAndDelete() throws IOException;
 
-    boolean hasMoreEntries() throws IOException;
+    abstract boolean isClosed();
 
-    boolean isEmpty() throws IOException;
+    abstract void close() throws IOException;
 
-    boolean offer(DBBPool.BBContainer cont, boolean compress) throws IOException;
+    abstract void sync() throws IOException;
 
-    int offer(DeferredSerialization ds) throws IOException;
+    abstract boolean hasMoreEntries() throws IOException;
 
-    DBBPool.BBContainer poll(BinaryDeque.OutputContainerFactory factory) throws IOException;
+    abstract boolean isEmpty() throws IOException;
+
+    abstract boolean offer(DBBPool.BBContainer cont, boolean compress) throws IOException;
+
+    abstract int offer(DeferredSerialization ds) throws IOException;
+
+    abstract DBBPool.BBContainer poll(BinaryDeque.OutputContainerFactory factory) throws IOException;
+
+    /*
+     * Don't use size in bytes to determine empty, could potentially
+     * diverge from object count on crash or power failure
+     * although incredibly unlikely
+     */
+    abstract int uncompressedBytesToRead();
+
+    abstract protected long readOffset();
+    abstract protected void rewindReadOffset(int byBytes);
+    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int length) throws IOException;
 
     /**
      * Parse the segment and truncate the file if necessary.
@@ -72,12 +105,73 @@ public interface PBDSegment {
      * of available objects in the PBD. -1 means that this whole segment should be removed.
      * @throws IOException
      */
-    int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException;
+    int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException {
+        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
 
-    /*
-     * Don't use size in bytes to determine empty, could potentially
-     * diverge from object count on crash or power failure
-     * although incredibly unlikely
-     */
-    int uncompressedBytesToRead();
+        open(true, false);
+
+        // Do stuff
+        final int initialEntryCount = getNumEntries();
+        int entriesTruncated = 0;
+        int sizeInBytes = 0;
+
+        DBBPool.BBContainer cont;
+        while (true) {
+            final long beforePos = readOffset();
+
+            cont = poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            if (cont == null) {
+                break;
+            }
+
+            final int compressedLength = (int) (readOffset() - beforePos - OBJECT_HEADER_BYTES);
+            final int uncompressedLength = cont.b().limit();
+
+            try {
+                //Handoff the object to the truncator and await a decision
+                BinaryDeque.TruncatorResponse retval = truncator.parse(cont);
+                if (retval == null) {
+                    //Nothing to do, leave the object alone and move to the next
+                    sizeInBytes += uncompressedLength;
+                } else {
+                    //If the returned bytebuffer is empty, remove the object and truncate the file
+                    if (retval.status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
+                        if (readIndex() == 1) {
+                            /*
+                             * If truncation is occuring at the first object
+                             * Whammo! Delete the file.
+                             */
+                            entriesTruncated = -1;
+                        } else {
+                            entriesTruncated = initialEntryCount - (readIndex() - 1);
+                            //Don't forget to update the number of entries in the file
+                            initNumEntries(readIndex() - 1, sizeInBytes);
+                            m_fc.truncate(readOffset() - (compressedLength + OBJECT_HEADER_BYTES));
+                        }
+                    } else {
+                        assert retval.status == BinaryDeque.TruncatorResponse.Status.PARTIAL_TRUNCATE;
+                        entriesTruncated = initialEntryCount - readIndex();
+                        //Partial object truncation
+                        rewindReadOffset(compressedLength + OBJECT_HEADER_BYTES);
+                        final long partialEntryBeginOffset = readOffset();
+                        m_fc.position(partialEntryBeginOffset);
+
+                        final int written = writeTruncatedEntry(retval, compressedLength);
+                        sizeInBytes += written;
+
+                        initNumEntries(readIndex(), sizeInBytes);
+                        m_fc.truncate(partialEntryBeginOffset + written + OBJECT_HEADER_BYTES);
+                    }
+
+                    break;
+                }
+            } finally {
+                cont.discard();
+            }
+        }
+
+        close();
+
+        return entriesTruncated;
+    }
 }
