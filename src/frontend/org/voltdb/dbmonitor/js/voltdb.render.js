@@ -495,8 +495,7 @@ function alertNodeClicked(obj) {
         this.GetHostAndSiteCount = function (onInformationLoaded) {
             var countDetails = {};
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-                getSystemInformations(connection, countDetails);
-                console.log(JSON.stringify(countDetails));
+                getCountDetails(connection, countDetails);
                 onInformationLoaded(countDetails);
             });
         };
@@ -2398,12 +2397,13 @@ function alertNodeClicked(obj) {
             return portConfigValues;
         };
 
-        var getSystemInformations = function (connection, countDetails) {
+
+        var getCountDetails = function (connection, countDetails) {
             var colIndex = {};
             var counter = 0;
             var hostCount = 0;
             var siteCount = 0;
-            var commandlogEnabled = '';
+
             if (connection.Metadata['@SystemInformation_DEPLOYMENT'] == null) {
                 return;
             }
@@ -2421,17 +2421,12 @@ function alertNodeClicked(obj) {
                 if (info[colIndex["PROPERTY"]] == "sitesperhost") {
                     siteCount = info[colIndex["VALUE"]];
                 }
-                if (info[colIndex["PROPERTY"]] == "commandlogenabled") {
-                    commandlogEnabled = info[colIndex["VALUE"]];
-                }
-
             });
             if (!countDetails.hasOwnProperty("DETAILS")) {
                 countDetails["DETAILS"] = {};
             }
             countDetails["DETAILS"]["HOSTCOUNT"] = hostCount;
             countDetails["DETAILS"]["SITECOUNT"] = siteCount;
-            countDetails["DETAILS"]["COMMANDLOGENABLED"] = commandlogEnabled;
         };
 
         var validateServerSpecificSettings = function (overviewValues) {

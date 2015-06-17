@@ -297,6 +297,7 @@ function QueryUI(queryString, userName) {
         return v;
     }
 
+
     function printGrid(target, id, table, isExplainQuery) {
         var src = '<table id="table_' + id + '" width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl sortable tablesorter" id="queryResultTbl"><thead class="ui-widget-header noborder"><tr>';
         if (isUpdateResult(table))
@@ -379,6 +380,7 @@ function QueryUI(queryString, userName) {
         src += '</br>\r\n(' + j + ' row(s) affected)\r\n\r\n</pr></br></br>';
         $(target).append(src);
     }
+
 
     function htmlEncode(value, isExplainQuery) {
         if (isExplainQuery == true) {
