@@ -2789,9 +2789,57 @@ function alertNodeClicked(obj) {
 
         this.getAdminconfiguration = function (onInformationLoaded) {
             VoltDBService.GetSystemInformationDeployment(function (connection) {
+                // this.getCommandLogStatus(connection, status);
+
                 onInformationLoaded(connection);
             });
         };
+
+
+        //var getCommandLogStatus = function (connection, status) {
+        //    var colIndex = {};
+        //    var colIndex2 = {};
+        //    var counter = 0;
+        //    var replicationRate1M = 0;
+        //    if (connection.Metadata['@SystemInformation_DEPLOYMENT'] == null) {
+        //        return;
+        //    }
+
+        //    connection.Metadata['@SystemInformation_DEPLOYMENT'].schema.forEach(function (columnInfo) {
+        //        //if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M")
+        //        //    colIndex[columnInfo["name"]] = counter;
+        //        //counter++;
+        //    });
+
+        //    counter = 0;
+        //    connection.Metadata['@SystemInformation_DEPLOYMENT_completeData'][1].schema.forEach(function (columnInfo) {
+        //        //if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == 'IS_COVERED')
+        //        //    colIndex2[columnInfo["name"]] = counter;
+        //        //counter++;
+        //    });
+
+        //    connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
+        //        //if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
+        //        //    replicationDetails["DR_GRAPH"] = {};
+        //        //    replicationDetails["DR_GRAPH"]["REPLICATION_DATA"] = [];
+        //        //}
+
+        //        //replicationRate1M += (info[colIndex["REPLICATION_RATE_1M"]] == null || info[colIndex["REPLICATION_RATE_1M"]] < 0) ? 0 : info[colIndex["REPLICATION_RATE_1M"]];
+
+        //        //var repData = {};
+        //        //repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+        //        //replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+        //        //repData["HOST_ID"] = info[colIndex["HOST_ID"]];
+        //        //repData["STATE"] = info[colIndex["STATE"]];
+        //        //repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
+        //        //repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
+        //        //replicationDetails["DR_GRAPH"]["REPLICATION_DATA"].push(repData);
+
+        //    });
+
+        //    //replicationDetails["DR_GRAPH"]['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1], colIndex2['IS_COVERED']);
+        //    //replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M / 1000;
+        //};
 
         this.updateAdminConfiguration = function (updatedData, onInformationLoaded) {
             VoltDBService.UpdateAdminConfiguration(updatedData, function (connection) {
