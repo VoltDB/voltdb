@@ -635,10 +635,24 @@ DISTRIBUTION
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
     </copy>
+
    <condition property="isDebug">
        <equals arg1="${build}" arg2="debug"/>
    </condition>
+
     <antcall target="call_strip_lib" />
+
+    <!-- copy to dir where jar picks it up as well -->
+    <condition property="jar.nativelib.dir"
+	value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
+        else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
+        <isset property="os.mac"/>
+    </condition>
+    <copy todir="${jar.nativelib.dir}">
+        <fileset dir="${base.dir}/voltdb">
+            <include name="libvoltdb*" />
+        </fileset>
+    </copy>
 </target>
 
 <target name="call_strip_lib" unless="isDebug">
@@ -805,16 +819,6 @@ JAR BUILDING
 </target>
 
 <target name="voltdb.jar" depends="compile, ee, buildinfo">
-    <condition property="jar.nativelib.dir"
-	value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
-        else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
-        <isset property="os.mac"/>
-    </condition>
-    <copy todir="${jar.nativelib.dir}">
-        <fileset dir="${base.dir}/voltdb">
-            <include name="libvoltdb*" />
-        </fileset>
-    </copy>
 
     <jar destfile="voltdb/voltdb-${dist.version}.jar" duplicate="preserve">
         <fileset dir="${build.client.dir}" defaultexcludes="yes">
