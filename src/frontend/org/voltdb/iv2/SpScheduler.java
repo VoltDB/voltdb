@@ -189,10 +189,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
         m_durabilityListener.setUniqueIdListener(listener);
-        // We assume that listeners will not be added after initialization completes. However
-        // listeners may be added after the command logger is assigned.
-        if (m_cl != null && !m_durabilityListener.completionCheckInitialized()) {
-            m_durabilityListener.createFirstCompletionCheck(m_cl.isSynchronous(), m_cl.isEnabled());
+        // If command logging is disabled, we need to notify the listener right
+        // away that all uniqueIds are considered durable
+        if (m_cl != null && !m_cl.isEnabled()) {
+            listener.lastUniqueIdsMadeDurable(Long.MAX_VALUE, Long.MAX_VALUE);
         }
     }
 
@@ -200,11 +200,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         m_drGateway = gateway;
         setDurableUniqueIdListener(gateway);
-    }
-
-    public void setMpDRGateway(final PartitionDRGateway mpGateway)
-    {
-        setDurableUniqueIdListener(mpGateway);
     }
 
     @Override
