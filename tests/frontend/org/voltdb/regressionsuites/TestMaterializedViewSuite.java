@@ -187,7 +187,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     private void assertTableContentEquals(VoltTable[] ra, VoltTable[] rb)
     {
-        assertEquals(1, ra.length);        
+        assertEquals(1, ra.length);
         assertEquals(1, rb.length);
         VoltTable a = ra[0];
         VoltTable b = rb[0];
@@ -227,7 +227,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
         assertTableContentEquals(vresult, tresult);
     }
-    
+
     private void ENG6511RunAndVerify(Client client, String query) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
@@ -241,7 +241,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     {
         Client client = getClient();
         truncateBeforeTest(client);
-        
+
         ENG6511Insert(client, 1, 1, 3, 70, -46);
         ENG6511Insert(client, 1, 1, 3, 70, 46);
         ENG6511Insert(client, 1, 1, 3, 12, 66);
@@ -263,7 +263,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         ENG6511Insert(client, 1, 2, 6, 21, -51);
         ENG6511Insert(client, 1, 2, 6, null, 17);
         ENG6511Verify(client);
-        
+
         ENG6511RunAndVerify(client, "UPDATE ENG6511 SET v2=120 WHERE v2=17;");
         ENG6511RunAndVerify(client, "DELETE FROM ENG6511 WHERE v2=-51;");
         ENG6511RunAndVerify(client, "DELETE FROM ENG6511 WHERE v1=-71;");
@@ -951,13 +951,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_SUM", "0", "null");
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX", "4", "0.0", "10");
     }
-    
+
     // Test the correctness of min/max when choosing an index on both group-by columns and aggregation column/exprs.
     private void subtestENG6511MP() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
-        
+
         ENG6511Insert(client, 1, 1, 3, 70, -46);
         ENG6511Insert(client, 1, 1, 3, 70, 46);
         ENG6511Insert(client, 1, 1, 3, 12, 66);
@@ -979,7 +979,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         ENG6511Insert(client, 2, 2, 6, 21, -51);
         ENG6511Insert(client, 2, 2, 6, null, 17);
         ENG6511Verify(client);
-        
+
         ENG6511RunAndVerify(client, "UPDATE ENG6511 SET v2=120 WHERE v2=17;");
         ENG6511RunAndVerify(client, "DELETE FROM ENG6511 WHERE v2=-51;");
         ENG6511RunAndVerify(client, "DELETE FROM ENG6511 WHERE v1=-71;");

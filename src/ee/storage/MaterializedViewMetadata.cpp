@@ -35,8 +35,6 @@
 #include "storage/persistenttable.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
-#include <iostream>
-using namespace std;
 
 namespace voltdb {
 
@@ -325,8 +323,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         m_minMaxSearchKeyValue[(int)m_groupByColumnCount] = oldValue;
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;
-        cout << "delete " << m_minMaxSearchKeyTuple.debugNoHeader() << endl;
-        cout << (negate_for_min == -1 ? "min" : "max") << endl;
         // Min
         if (negate_for_min == -1) {
             m_indexForMinMax->moveToKeyOrGreater(&m_minMaxSearchKeyTuple, minMaxCursor);
@@ -337,8 +333,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
             m_indexForMinMax->moveToPriorEntry(minMaxCursor);
         }
         while (!(tuple = m_indexForMinMax->nextValue(minMaxCursor)).isNullTuple()) {
-            // skip the oldTuple and apply post filter
-            cout << "Scanning " << tuple.debugNoHeader() << endl;
             // Check if the cursor already move out of the range of target group, exit the loop
             bool matchGroupBy = true;
             for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
@@ -363,13 +357,11 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
             newVal = current;
             break;
         }
-        cout << "Done" << endl << endl;
     }
     else {
         m_indexForMinMax->moveToKey(&m_searchKeyTuple, minMaxCursor);
         VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
         TableTuple tuple;
-        cout << (negate_for_min == -1 ? "min" : "max") << endl;
         while (!(tuple = m_indexForMinMax->nextValueAtKey(minMaxCursor)).isNullTuple()) {
             // skip the oldTuple and apply post filter
             if (tuple.equals(oldTuple) ||
@@ -377,7 +369,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
                 continue;
             }
             VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
-            cout << "Scanning " << tuple.debugNoHeader() << endl;
             NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
             if (current.isNull()) {
                 continue;
@@ -393,7 +384,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
                 VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
             }
         }
-        cout << "Done" << endl << endl;
     }
     return newVal;
 }
