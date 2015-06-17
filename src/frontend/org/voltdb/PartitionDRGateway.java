@@ -150,7 +150,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             long lastSequenceNumber,
             long lastUniqueId,
             ByteBuffer buf) {
-        if (startSequenceNumber == lastUniqueId) {
+        if (log.isTraceEnabled()) {
             log.trace("Received DR buffer size " + buf.remaining());
             AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
             buf.order(ByteOrder.LITTLE_ENDIAN);
