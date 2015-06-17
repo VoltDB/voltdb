@@ -492,11 +492,19 @@ function alertNodeClicked(obj) {
         //
 
         //Get host and site count
-        this.GetHostAndSiteCount = function (onInformationLoaded) {
-            var countDetails = {};
+        this.GetDeploymentInformation = function (onInformationLoaded) {
+            var deploymentDetails = {};
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-                getCountDetails(connection, countDetails);
-                onInformationLoaded(countDetails);
+                getDeploymentDetails(connection, deploymentDetails);
+                onInformationLoaded(deploymentDetails);
+            });
+        };
+
+        this.GetCommandLogInformation = function (onInformationLoaded) {
+            var cmdLogDetails = {};
+            VoltDBService.GetCommandLogInformation(function (connection) {
+                getCommandLogDetails(connection, cmdLogDetails);
+                onInformationLoaded(cmdLogDetails);
             });
         };
 
@@ -2397,11 +2405,12 @@ function alertNodeClicked(obj) {
             return portConfigValues;
         };
 
-        var getCountDetails = function (connection, countDetails) {
+        var getDeploymentDetails = function (connection, countDetails) {
             var colIndex = {};
             var counter = 0;
             var hostCount = 0;
             var siteCount = 0;
+            var commandLogStatus = false;
             if (connection.Metadata['@SystemInformation_DEPLOYMENT'] == null) {
                 return;
             }
@@ -2419,12 +2428,41 @@ function alertNodeClicked(obj) {
                 if (info[colIndex["PROPERTY"]] == "sitesperhost") {
                     siteCount = info[colIndex["VALUE"]];
                 }
+                if (info[colIndex["PROPERTY"]] == "commandlogenabled") {
+                    commandLogStatus = info[colIndex["VALUE"]];
+                }
             });
             if (!countDetails.hasOwnProperty("DETAILS")) {
                 countDetails["DETAILS"] = {};
             }
             countDetails["DETAILS"]["HOSTCOUNT"] = hostCount;
             countDetails["DETAILS"]["SITECOUNT"] = siteCount;
+            countDetails["DETAILS"]["COMMANDLOGSTATUS"] = commandLogStatus;
+        };
+
+        var getCommandLogDetails = function (connection, cmdLogDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_COMMANDLOG'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_COMMANDLOG'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "OUTSTANDING_TXNS" || columnInfo["name"] == "TIMESTAMP")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+
+            connection.Metadata['@Statistics_COMMANDLOG'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!cmdLogDetails.hasOwnProperty(hostName)) {
+                    cmdLogDetails[hostName] = {};
+                }
+                cmdLogDetails[hostName]["OUTSTANDING_TXNS"] = info[colIndex["OUTSTANDING_TXNS"]];
+                cmdLogDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+            });
         };
 
         var validateServerSpecificSettings = function (overviewValues) {
