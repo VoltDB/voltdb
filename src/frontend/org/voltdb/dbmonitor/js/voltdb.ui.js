@@ -708,10 +708,10 @@ var loadPage = function (serverName, portid) {
                 $("#tdLicenseInfo").hide();
                 $("#tdLicenseInfo").css("display", "none");
                 $("#tdHostCount").html(licInfo.hostcount);
-                $("#tdWanReplication").html(licInfo.wanreplication);
+                $("#tdWanReplication").html(licInfo.wanreplication == undefined ? '' : licInfo.wanreplication.toString());
                 $("#tdExpiration").html(licInfo.expiration);
-                $("#tdCommandLogging").html(licInfo.commandlogging);
-                $("#tdTrial").html(licInfo.trial);
+                $("#tdCommandLogging").html(licInfo.commandlogging == undefined ? '' : licInfo.commandlogging.toString());
+                $("#tdTrial").html(licInfo.trial == undefined ? '' : licInfo.trial.toString());
             } else {
                 $(".licenseInfo").hide();
                 $("#tdLicenseInfo").show();
