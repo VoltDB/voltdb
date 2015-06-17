@@ -186,6 +186,7 @@ class SpDurabilityListener implements DurabilityListener {
                 listener.lastUniqueIdsMadeDurable(Long.MAX_VALUE, Long.MAX_VALUE);
             }
         }
+        else
         if (isSyncLogging) {
             m_currentCompletionChecks = new SyncCompletionChecks(Long.MIN_VALUE, Long.MIN_VALUE, 16);
         }

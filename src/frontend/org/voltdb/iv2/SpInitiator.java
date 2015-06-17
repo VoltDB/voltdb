@@ -29,9 +29,9 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.ConsumerDRGateway;
+import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProducerDRGateway;
-import org.voltdb.MemoryStats;
 import org.voltdb.Promotable;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StartAction;
@@ -115,7 +115,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         PartitionDRGateway mpPDRG = null;
         if (createMpDRGateway) {
             mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
-            ((SpScheduler) m_scheduler).setMpDRGateway(mpPDRG);
+            ((SpScheduler) m_scheduler).setDurableUniqueIdListener(mpPDRG);
         }
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
