@@ -1065,7 +1065,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     public abstract String explain(String impliedTableName);
 
-    public static boolean isInlineVarType(AbstractExpression expr) {
+    public static boolean hasInlineVarType(AbstractExpression expr) {
         VoltType type = expr.getValueType();
         int size = expr.getValueSize();
         boolean inBytes = expr.getInBytes();
@@ -1074,7 +1074,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         case STRING:
             if (inBytes && size < 64) {
                 return true;
-            } else if (!inBytes && size < 16) {
+            }
+            if (!inBytes && size < 16) {
                 return true;
             }
             break;

@@ -107,7 +107,7 @@ public class UnionPlanNode extends AbstractPlanNode {
             ArrayList<SchemaColumn> columns = child.getOutputSchema().getColumns();
 
             for (SchemaColumn scol : columns) {
-                if (AbstractExpression.isInlineVarType(scol.getExpression())) {
+                if (AbstractExpression.hasInlineVarType(scol.getExpression())) {
                     return true;
                 }
             }

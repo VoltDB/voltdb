@@ -108,7 +108,7 @@ public abstract class AbstractParsedStmt {
     boolean m_isUpsert = false;
 
     // mark whether the statement's parent is UNION clause or not
-    private boolean m_isParentUnionClause = false;
+    private boolean m_isChildOfUnion = false;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
@@ -1223,11 +1223,11 @@ public abstract class AbstractParsedStmt {
     }
 
     public void setParentAsUnionClause() {
-        m_isParentUnionClause = true;
+        m_isChildOfUnion = true;
     }
 
     public boolean isParentUnionClause() {
-        return m_isParentUnionClause;
+        return m_isChildOfUnion;
     }
 
     public boolean hasLimitOrOffset()

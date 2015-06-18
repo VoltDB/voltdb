@@ -704,18 +704,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ExpressionUtil.finalizeValueTypes(colExpr);
 
         // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
-        if(isParentUnionClause() && AbstractExpression.isInlineVarType(colExpr)) {
-            AbstractExpression expr = null;
-            try {
-                expr = ExpressionType.OPERATOR_CAST.getExpressionClass().newInstance();
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage(), e);
-            }
+        if(isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
+            AbstractExpression expr = new OperatorExpression();;
             expr.setExpressionType(ExpressionType.OPERATOR_CAST);
             VoltType voltType = colExpr.getValueType();
             expr.setValueType(voltType);
-            expr.setInBytes(colExpr.getInBytes());
+            expr.setInBytes(true);
 
             // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
             // so assume max length for variable-length types (VARCHAR and VARBINARY).

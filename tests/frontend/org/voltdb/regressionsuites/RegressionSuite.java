@@ -47,6 +47,7 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -517,12 +518,13 @@ public class RegressionSuite extends TestCase {
           int len = expected.length;
           for (int i=0; i < len; i++) {
               assertTrue(vt.advanceRow());
-              String actual = VoltType.varbinaryToPrintableString(vt.getVarbinary(col));
+              byte[] actual = vt.getVarbinary(col);
+
               if (expected[i] == null) {
                   assertTrue(vt.wasNull());
                   assertEquals(null, actual);
               } else {
-                  assertTrue(actual.contains(expected[i]));
+                  assertEquals(expected[i], Encoder.hexEncode(actual));
               }
           }
     }
