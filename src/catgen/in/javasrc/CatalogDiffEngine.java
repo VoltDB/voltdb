@@ -638,6 +638,9 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Connector && "loaderclass".equals(field))
             return null;
+        // ENG-6511 Allow materialized view to change the index they use dynamically.
+        if (suspect instanceof MaterializedViewInfo && field.equals("indexForMinMax"))
+            return null;
 
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.
