@@ -78,6 +78,16 @@ function server() {
     voltdb create -d deployment.xml -l $LICENSE -H $HOST
 }
 
+#kafka importer
+function kafka() {
+    jars-ifneeded
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST"
+    echo
+    voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST
+}
 # load schema and procedures
 function init() {
     jars-ifneeded
