@@ -702,7 +702,6 @@ var loadPage = function (serverName, portid) {
                 var hostCount = deploymentDetails.DETAILS.HOSTCOUNT;
                 //check whether command log is enabled or not
                 VoltDbUI.isCommandLogEnabled = deploymentDetails.DETAILS.COMMANDLOGSTATUS;
-                console.log(VoltDbUI.isCommandLogEnabled);
                 //
                 var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
                 if (clusterDetails != undefined) {
@@ -784,7 +783,7 @@ var loadPage = function (serverName, portid) {
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
 
-        showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled,graphView, currentTab);
+        showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled, graphView, currentTab);
 
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
             if (getCurrentServer() != undefined) {
@@ -1218,7 +1217,7 @@ var loadPage = function (serverName, portid) {
             var response = cmdLogDetails;
             var htmlcontent = "";
             MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
-            
+
             for (var key in response) {
                 htmlcontent = htmlcontent + "<tr>";
                 htmlcontent = htmlcontent + "<td>" + key + "</td>" +
@@ -1287,7 +1286,6 @@ var loadPage = function (serverName, portid) {
                     else if ($(window).width() == '751') {
                         $("#clpSection").css("min-height", "350px");
                     }
-                    console.log(screen.width + "*" + screen.height);
                 },
 
                 "sDom": 'p<"tblScroll drScroll"t>',
