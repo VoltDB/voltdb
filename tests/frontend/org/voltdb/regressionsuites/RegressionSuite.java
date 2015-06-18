@@ -498,10 +498,10 @@ public class RegressionSuite extends TestCase {
     static public void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
             throws NoConnectionsException, IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarbinary(vt, 0, expected);
+        validateTableColumnOfScalarVarbinary(vt, 0, expected);
     }
 
-    static private void validateTableColumnOfScalarbinary(VoltTable vt, int col, String[] expected) {
+    static private void validateTableColumnOfScalarVarbinary(VoltTable vt, int col, String[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;

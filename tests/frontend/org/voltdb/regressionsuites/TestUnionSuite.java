@@ -688,14 +688,20 @@ public class TestUnionSuite extends RegressionSuite {
     public void testUnionVarchar() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
 
-        client.callProcedure("MY_VOTES.insert", 1, "MA", "MA", "MA", "MA", "10", "11");
+        String state = "MA";
+        String hex = "10";
+        client.callProcedure("MY_VOTES.insert", 1,
+                state, state, state, state, state, state,
+                state, state, state, state, state, state,
+                hex, hex, hex, hex, hex, "11");
         client.callProcedure("AREA_CODE_STATE.insert", 1803, "RI");
         client.callProcedure("AREA_CODE_STATE.insert", 1804, "RI");
 
-        String[] columns = new String[]{"state", "state100", "state_b", "state100_b"};
+        String[] columns = new String[]{"state2", "state15", "state16", "state63", "state64", "state100",
+                "state2_b", "state15_b", "state16_b", "state63_b", "state64_b", "state100_b"};
 
         for (String col : columns) {
-          validateTableColumnOfScalarVarchar(client,
+            validateTableColumnOfScalarVarchar(client,
                   "select "+ col +" from my_votes union select 'MA' from area_code_state;",
                   new String[] {"MA"});
 
@@ -737,21 +743,21 @@ public class TestUnionSuite extends RegressionSuite {
         }
 
         // varbinary
-        validateTableColumnOfScalarVarbinary(client,
-                "select binary2 from my_votes union select binary100 from my_votes order by 1;",
-                new String[] {"10", "11"});
+        String[] binaryColumns = new String[]{"binary2", "binary15", "binary16", "binary63", "binary64", "binary100"};
 
-        validateTableColumnOfScalarVarbinary(client,
-                "select binary100 from my_votes union select binary2 from my_votes order by 1;",
-                new String[] {"10", "11"});
+        for (String col : binaryColumns) {
+            validateTableColumnOfScalarVarbinary(client,
+                    "select "+ col +" from my_votes union select binary100 from my_votes order by 1;",
+                    col == "binary100" ? new String[] {"11"} : new String[] {"10", "11"});
 
-        validateTableColumnOfScalarVarbinary(client,
-                "select binary2 from my_votes union select binary2 from my_votes;",
-                new String[] {"10"});
+            validateTableColumnOfScalarVarbinary(client,
+                    "select binary100 from my_votes union select "+ col +" from my_votes order by 1;",
+                    col == "binary100" ? new String[] {"11"} : new String[] {"10", "11"});
 
-        validateTableColumnOfScalarVarbinary(client,
-                "select binary100 from my_votes union select binary100 from my_votes;",
-                new String[] {"11"});
+            validateTableColumnOfScalarVarbinary(client,
+                    "select "+ col +" from my_votes union select "+ col +" from my_votes order by 1;",
+                    new String[] { col == "binary100" ? "11" : "10"});
+        }
     }
 
     static public junit.framework.Test suite() {

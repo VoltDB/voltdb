@@ -704,8 +704,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ExpressionUtil.finalizeValueTypes(colExpr);
 
         // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
-        if(isParentUnionClause() && VoltType.isInlineVarType(
-                colExpr.getValueType(), colExpr.getValueSize(), colExpr.getInBytes())) {
+        if(isParentUnionClause() && AbstractExpression.isInlineVarType(colExpr)) {
             AbstractExpression expr = null;
             try {
                 expr = ExpressionType.OPERATOR_CAST.getExpressionClass().newInstance();

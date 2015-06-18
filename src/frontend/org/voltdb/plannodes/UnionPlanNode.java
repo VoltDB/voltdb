@@ -22,8 +22,8 @@ import java.util.ArrayList;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.ParsedUnionStmt.UnionType;
 import org.voltdb.planner.PlanningErrorException;
@@ -107,10 +107,8 @@ public class UnionPlanNode extends AbstractPlanNode {
             ArrayList<SchemaColumn> columns = child.getOutputSchema().getColumns();
 
             for (SchemaColumn scol : columns) {
-                if (scol.getType() == VoltType.STRING || scol.getType() == VoltType.VARBINARY) {
-                    if (scol.getSize() < 64) {
-                        return true;
-                    }
+                if (AbstractExpression.isInlineVarType(scol.getExpression())) {
+                    return true;
                 }
             }
         }
