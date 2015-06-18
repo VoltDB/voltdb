@@ -163,7 +163,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
     private String m_officialBuildString;
-    private static final String m_defaultVersionString = "4.0.1.12";
+    private static final String m_defaultVersionString = "4.0.1.13";
     private String m_versionString = m_defaultVersionString;
     private String m_officialVersionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
