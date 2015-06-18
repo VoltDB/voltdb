@@ -1207,8 +1207,8 @@ var loadPage = function (serverName, portid) {
         }
     };
 
+    var cmdLogTable = '';
     var refreshCmdLogSection = function (graphView, currentTab) {
-        var cmdLogTable = '';
         voltDbRenderer.GetCommandLogInformation(function (cmdLogDetails) {
             var response = cmdLogDetails;
             var htmlcontent = "";
@@ -1967,7 +1967,7 @@ var loadPage = function (serverName, portid) {
 
     refreshClusterHealth();
     refreshGraphAndData(VoltDbUI.getCookie("graph-view"), VoltDbUI.CurrentTab);
-    setInterval(refreshClusterHealth, 15000);
+    setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData(VoltDbUI.getCookie("graph-view"), VoltDbUI.CurrentTab);
     }, 5000);
