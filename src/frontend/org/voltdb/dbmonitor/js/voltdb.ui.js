@@ -357,8 +357,12 @@ function changePassword(obj) {
 
 var loadPage = function (serverName, portid) {
     $(".drShowHide").show();
+    $(".clpShowHide").show();
     $("#showHideDrBlock").removeClass('collapsed');
     $("#showHideDrBlock").addClass('expanded');
+    $("#showHideCLPBlock").removeClass('collapsed');
+    $("#showHideCLPBlock").addClass('expanded');
+
     var userName = VoltDbUI.getCookie('username') != undefined ? VoltDbUI.getCookie('username') : "";
     var password = VoltDbUI.getCookie('password') != undefined ? VoltDbUI.getCookie('password') : "";
 
@@ -698,7 +702,6 @@ var loadPage = function (serverName, portid) {
                 var hostCount = deploymentDetails.DETAILS.HOSTCOUNT;
                 //check whether command log is enabled or not
                 VoltDbUI.isCommandLogEnabled = deploymentDetails.DETAILS.COMMANDLOGSTATUS;
-                console.log(VoltDbUI.isCommandLogEnabled);
                 //
                 var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
                 if (clusterDetails != undefined) {
@@ -780,7 +783,7 @@ var loadPage = function (serverName, portid) {
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
 
-        showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled,graphView, currentTab);
+        showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled, graphView, currentTab);
 
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
             if (getCurrentServer() != undefined) {
@@ -1208,12 +1211,13 @@ var loadPage = function (serverName, portid) {
     };
 
     var cmdLogTable = '';
+
     var refreshCmdLogSection = function (graphView, currentTab) {
         voltDbRenderer.GetCommandLogInformation(function (cmdLogDetails) {
             var response = cmdLogDetails;
             var htmlcontent = "";
             MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
-            
+
             for (var key in response) {
                 htmlcontent = htmlcontent + "<tr>";
                 htmlcontent = htmlcontent + "<td>" + key + "</td>" +
@@ -1257,32 +1261,31 @@ var loadPage = function (serverName, portid) {
 
                     $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
 
-                    //if ((screen.width == 1600) && (screen.height == 900)) {
-                    //    var length = $("#tblCmdLog tr").length - 1;
-                    //    if (length >= 5) {
-                    //        $("#drMasterSection").css("min-height", "280px");
-                    //    } else if (length == 4) {
-                    //        $("#drMasterSection").css("min-height", "250px");
-                    //    } else if (length == 3) {
-                    //        $("#drMasterSection").css("min-height", "230px");
-                    //    } else if (length == 2) {
-                    //        $("#drMasterSection").css("min-height", "200px");
-                    //    } else if (length == 1 || length == 0) {
-                    //        $("#drMasterSection").css("min-height", "170px");
-                    //    }
-                    //}
+                    if ((screen.width == 1600) && (screen.height == 900)) {
+                        var length = $("#tblCmdLog tr").length - 1;
+                        if (length >= 5) {
+                            $("#clpSection").css("min-height", "280px");
+                        } else if (length == 4) {
+                            $("#clpSection").css("min-height", "250px");
+                        } else if (length == 3) {
+                            $("#clpSection").css("min-height", "230px");
+                        } else if (length == 2) {
+                            $("#clpSection").css("min-height", "200px");
+                        } else if (length == 1 || length == 0) {
+                            $("#clpSection").css("min-height", "170px");
+                        }
+                    }
 
-                    //else if ((screen.width == 360) && (screen.height == 640)) {
-                    //    $("#drMasterSection").css("min-height", "380px");
-                    //}
-                    //else if ((screen.width == 640) && (screen.height == 960)) {
-                    //    alert("iphone resolution mode");
-                    //    $("#drMasterSection").css("min-height", "380px");
-                    //}
-                    //else if ($(window).width() == '751') {
-                    //    $("#drMasterSection").css("min-height", "350px");
-                    //}
-                    //console.log(screen.width + "*" + screen.height);
+                    else if ((screen.width == 360) && (screen.height == 640)) {
+                        $("#clpSection").css("min-height", "380px");
+                    }
+                    else if ((screen.width == 640) && (screen.height == 960)) {
+                        alert("iphone resolution mode");
+                        $("#clpSection").css("min-height", "380px");
+                    }
+                    else if ($(window).width() == '751') {
+                        $("#clpSection").css("min-height", "350px");
+                    }
                 },
 
                 "sDom": 'p<"tblScroll drScroll"t>',
