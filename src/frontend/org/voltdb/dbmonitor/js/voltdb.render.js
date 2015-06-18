@@ -2449,7 +2449,8 @@ function alertNodeClicked(obj) {
             }
 
             connection.Metadata['@Statistics_COMMANDLOG'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "OUTSTANDING_TXNS" || columnInfo["name"] == "TIMESTAMP")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "OUTSTANDING_TXNS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "OUTSTANDING_BYTES" || columnInfo["name"] == "SEGMENT_COUNT" ||
+                    columnInfo["name"] == "FSYNC_INTERVAL" || columnInfo["name"] == "IN_USE_SEGMENT_COUNT")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2461,7 +2462,10 @@ function alertNodeClicked(obj) {
                     cmdLogDetails[hostName] = {};
                 }
                 cmdLogDetails[hostName]["OUTSTANDING_TXNS"] = info[colIndex["OUTSTANDING_TXNS"]];
-                cmdLogDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                cmdLogDetails[hostName]["OUTSTANDING_BYTES"] = info[colIndex["OUTSTANDING_BYTES"]];
+                cmdLogDetails[hostName]["SEGMENT_COUNT"] = info[colIndex["SEGMENT_COUNT"]];
+                cmdLogDetails[hostName]["FSYNC_INTERVAL"] = info[colIndex["FSYNC_INTERVAL"]];
+                cmdLogDetails[hostName]["IN_USE_SEGMENT_COUNT"] = info[colIndex["IN_USE_SEGMENT_COUNT"]];
             });
         };
 

@@ -483,7 +483,11 @@ ul.topRightList {
     max-width: 600px;
     overflow: auto;
 }
-.helpAboutWrap { overflow: auto;height: 380px;}
+
+.helpAboutWrap {
+    overflow: auto;
+    height: 380px;
+}
 
 .line {
     border-right: 1px solid #AAAAAA;
@@ -1295,7 +1299,10 @@ ul.catalogNav {
 #tblSystemOverview tr:first-child td {
     border-top: none;
 }
-tr.trLicenseInfo td { border: none !important;}
+
+tr.trLicenseInfo td {
+    border: none !important;
+}
 
 
 .sysOverviewContent {
@@ -3209,6 +3216,11 @@ table.tblPopup {
     }
 
 .drShowHide {
+    background: #FFFFFF;
+    padding: 20px;
+}
+
+.clpShowHide {
     background: #FFFFFF;
     padding: 20px;
 }
