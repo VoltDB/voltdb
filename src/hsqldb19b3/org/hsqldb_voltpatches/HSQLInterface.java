@@ -28,6 +28,7 @@ import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class is built to create a single in-memory database
@@ -42,6 +43,7 @@ import org.hsqldb_voltpatches.result.Result;
  * </ul>
  */
 public class HSQLInterface {
+    VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
 
     static public String XML_SCHEMA_NAME = "databaseschema";
     /**
@@ -328,6 +330,11 @@ public class HSQLInterface {
 
         VoltXMLElement xml = null;
         xml = cs.voltGetStatementXML(sessionProxy);
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug(String.format("SQL: %s\n", sql));
+            m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
+            m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
+        }
 
         // this releases some small memory hsql uses that builds up over time if not
         // cleared
@@ -337,7 +344,9 @@ public class HSQLInterface {
 
         // clean up sql-in expressions
         fixupInStatementExpressions(xml);
-
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug(String.format("VOLTDB: %s\n", (xml == null) ? "<NULL>" : xml));
+        }
         assert(xml != null);
 
         return xml;
@@ -346,7 +355,7 @@ public class HSQLInterface {
     /**
      * Recursively find all in-lists, subquery, row comparisons found in the XML and munge them into the
      * simpler thing we want to pass to the AbstractParsedStmt.
-     * @throws HSQLParseException 
+     * @throws HSQLParseException
      */
     private void fixupInStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
         if (doesExpressionReallyMeanIn(expr)) {
@@ -364,7 +373,7 @@ public class HSQLInterface {
      * Find in-expressions in fresh-off-the-hsql-boat Volt XML. Is this fake XML
      * representing an in-list in the weird table/row way that HSQL generates
      * in-list expressions. Used by {@link this#fixupInStatementExpressions(VoltXMLElement)}.
-     * @throws HSQLParseException 
+     * @throws HSQLParseException
      */
     private boolean doesExpressionReallyMeanIn(VoltXMLElement expr) throws HSQLParseException {
         if (!expr.name.equals("operation")) {
