@@ -3200,7 +3200,7 @@ a.drTblBtn {
 table.tblPopup {
     border: 1px solid #CCCCCC;
 }
-
+content drHeader
 .repliWrapper {
     height: 150px;
     overflow: auto;
@@ -3224,6 +3224,14 @@ table.tblPopup {
     background: #FFFFFF;
     padding: 20px;
 }
+
+.clpWrapper {
+    margin: 20px 0 0 0;
+}
+
+.clpWrapper .content {
+        margin-bottom: 2px;
+    }
 
 .masterWrapper {
 }
