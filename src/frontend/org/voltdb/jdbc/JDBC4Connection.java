@@ -44,11 +44,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
     public static final String COMMIT_THROW_EXCEPTION = "jdbc.committhrowexception";
     public static final String ROLLBACK_THROW_EXCEPTION = "jdbc.rollbackthrowexception";
-    public static final String QUERY_TIMEOUT_UNIT = "jdbc.querytimeoutunit";
+    public static final String QUERYTIMEOUT_UNIT = "jdbc.querytimeout.unit";
 
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
-    protected final TimeUnit QueryTimeOutUnit ;
+    protected TimeUnit QueryTimeOutUnit = TimeUnit.SECONDS;
     private boolean isClosed = false;
     private Properties props;
     private boolean autoCommit = true;
@@ -58,13 +58,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         this.NativeConnection = connection;
         this.props = props;
         this.User = this.props.getProperty("user", "");
-        if (this.props.getProperty(JDBC4Connection.QUERY_TIMEOUT_UNIT, "TimeUnit.Seconds").equalsIgnoreCase(TimeUnit.MILLISECONDS.toString())) {
+        if (this.props.getProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "Seconds").equalsIgnoreCase("milliseconds")) {
             this.QueryTimeOutUnit = TimeUnit.MILLISECONDS;
         }
-        else {
-            this.QueryTimeOutUnit = TimeUnit.SECONDS;
-        }
-
     }
 
     private void checkClosed() throws SQLException

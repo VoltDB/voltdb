@@ -274,6 +274,9 @@ public class JDBC4ClientConnection implements Closeable {
             throws NoConnectionsException, IOException, ProcCallException {
         long start = System.currentTimeMillis();
         ClientImpl currentClient = this.getClient();
+        if (unit == null) {
+            unit = TimeUnit.SECONDS;
+        }
         try {
             // If connections are lost try reconnecting.
             ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, unit, parameters);
