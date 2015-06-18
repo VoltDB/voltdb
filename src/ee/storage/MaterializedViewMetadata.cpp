@@ -313,7 +313,11 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
     NValue newVal = initialNull;
     IndexCursor minMaxCursor(m_indexForMinMax->getTupleSchema());
 
+    // Search for the min / max fallback value. use indexs differently according to their types.
+    // (Does the index include min / max aggCol? - ENG-6511)
     if ( minMaxIndexIncludesAggCol() ) {
+        // Assemble the m_minMaxSearchKeyTuple and m_minMaxSearchKeyValue with
+        // group-by column values and the old min/max value.
         for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
             NValue value = getGroupByValueFromSrcTuple(colindex, oldTuple);
             m_minMaxSearchKeyValue[colindex] = value;
@@ -323,17 +327,18 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         m_minMaxSearchKeyValue[(int)m_groupByColumnCount] = oldValue;
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;
-        // Min
+        // Search for the new min/max value and keep it in tuple.
         if (negate_for_min == -1) {
+            // min()
             m_indexForMinMax->moveToKeyOrGreater(&m_minMaxSearchKeyTuple, minMaxCursor);
         }
-        // Max
         else {
+            // max()
             m_indexForMinMax->moveToGreaterThanKey(&m_minMaxSearchKeyTuple, minMaxCursor);
             m_indexForMinMax->moveToPriorEntry(minMaxCursor);
         }
-        while (!(tuple = m_indexForMinMax->nextValue(minMaxCursor)).isNullTuple()) {
-            // Check if the cursor already move out of the range of target group, exit the loop
+        while ( ! (tuple = m_indexForMinMax->nextValue(minMaxCursor)).isNullTuple() ) {
+            // If the cursor already moved out of the target group range, exit the loop.
             bool matchGroupBy = true;
             for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
                 NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
@@ -359,6 +364,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         }
     }
     else {
+        // Use sub-optimal index (only group-by columns).
         m_indexForMinMax->moveToKey(&m_searchKeyTuple, minMaxCursor);
         VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
         TableTuple tuple;
