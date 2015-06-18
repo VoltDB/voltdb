@@ -198,7 +198,6 @@ function QueryUI(queryString, userName) {
         var start = (new Date()).getTime();
         var connectionQueue = connection.getQueue();
         connectionQueue.Start();
-
         for (var i = 0; i < statements.length; i++) {
             var isExplainQuery = false;
             var id = 'r' + i;
@@ -211,18 +210,18 @@ function QueryUI(queryString, userName) {
             if (/^exec /i.test(statements[i])) {
                 var params = CommandParser.parseProcedureCallParameters(statements[i].substr(5));
                 var procedure = params.splice(0, 1)[0];
-                connectionQueue.BeginExecute(procedure, params, callback.Callback);
+                connectionQueue.BeginExecute(procedure, params, callback.Callback, null, true);
             }
             else
                 if (/^explain /i.test(statements[i])) {
-                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                 }
                 else
                     if (/^explainproc /i.test(statements[i])) {
-                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                     }
                     else {
-                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                     }
         }
 
