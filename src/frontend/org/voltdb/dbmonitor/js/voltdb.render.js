@@ -508,6 +508,14 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.GetSnapshotStatus = function (onInformationLoaded) {
+            var snapshotDetails = {};
+            VoltDBService.GetSnapshotStatus(function (connection) {
+                getSnapshotStatus(connection, snapshotDetails);
+                onInformationLoaded(snapshotDetails);
+            });
+        };
+
         this.GetTableInformation = function (onInformationLoaded) {
             VoltDBService.GetTableInformation(function (connection) {
                 var tablesData = {};
@@ -2462,10 +2470,37 @@ function alertNodeClicked(obj) {
                     cmdLogDetails[hostName] = {};
                 }
                 cmdLogDetails[hostName]["OUTSTANDING_TXNS"] = info[colIndex["OUTSTANDING_TXNS"]];
+                cmdLogDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 cmdLogDetails[hostName]["OUTSTANDING_BYTES"] = info[colIndex["OUTSTANDING_BYTES"]];
                 cmdLogDetails[hostName]["SEGMENT_COUNT"] = info[colIndex["SEGMENT_COUNT"]];
                 cmdLogDetails[hostName]["FSYNC_INTERVAL"] = info[colIndex["FSYNC_INTERVAL"]];
                 cmdLogDetails[hostName]["IN_USE_SEGMENT_COUNT"] = info[colIndex["IN_USE_SEGMENT_COUNT"]];
+            });
+        };
+
+        var getSnapshotStatus = function(connection, snapshotDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_SNAPSHOTSTATUS'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_SNAPSHOTSTATUS'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PATH" || columnInfo["name"] == "START_TIME" || columnInfo["name"] == "END_TIME")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_SNAPSHOTSTATUS'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!snapshotDetails.hasOwnProperty(hostName)) {
+                    snapshotDetails[hostName] = {};
+                }
+                snapshotDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                snapshotDetails[hostName]["PATH"] = info[colIndex["PATH"]];
+                snapshotDetails[hostName]["START_TIME"] = info[colIndex["START_TIME"]];
+                snapshotDetails[hostName]["END_TIME"] = info[colIndex["END_TIME"]];
             });
         };
 
