@@ -339,16 +339,11 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         }
         while ( ! (tuple = m_indexForMinMax->nextValue(minMaxCursor)).isNullTuple() ) {
             // If the cursor already moved out of the target group range, exit the loop.
-            bool matchGroupBy = true;
             for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
                 NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
                 if ( value.compare(m_minMaxSearchKeyValue[colindex]) != 0 ) {
-                    matchGroupBy = false;
-                    break;
+                    return initialNull;
                 }
-            }
-            if ( ! matchGroupBy ) {
-                break;
             }
             // skip the oldTuple and apply post filter
             if (tuple.equals(oldTuple) ||
@@ -357,7 +352,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
             }
             NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
             if (current.isNull()) {
-                continue;
+                return initialNull;
             }
             newVal = current;
             break;

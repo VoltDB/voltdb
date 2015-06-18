@@ -2104,8 +2104,6 @@ public class DDLCompiler {
             List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
             boolean hasAggregationExprs = false;
             boolean hasMinOrMaxAgg = false;
-            boolean hasOnlyOneDistinctMinOrMaxAggExpr = false;
-
             ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
                 ParsedColInfo col = stmt.m_displayColumns.get(i);
@@ -2118,12 +2116,21 @@ public class DDLCompiler {
                         col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
                     hasMinOrMaxAgg = true;
                     minMaxAggs.add(aggExpr);
-                    /*
-                     * ENG-6511: If we only have one distinct min/max aggCol/aggExpr, we can try to
-                     * find an index that was built on both the group-by columns and the min/max
-                     * aggCol/aggExpr to achieve better performance.
-                     */
-                    hasOnlyOneDistinctMinOrMaxAggExpr = aggExpr.equals(minMaxAggs.get(0));
+                }
+            }
+            AbstractExpression singleUniqueMinMaxAggExpr = null;
+            /*
+             * ENG-6511: If we only have one distinct min/max aggCol/aggExpr, we can try to
+             * find an index that was built on both the group-by columns and the min/max
+             * aggCol/aggExpr to achieve better performance.
+             */
+            if (hasMinOrMaxAgg) {
+                singleUniqueMinMaxAggExpr = minMaxAggs.get(0);
+                for (int i=1; i<minMaxAggs.size(); ++i) {
+                    if ( ! minMaxAggs.get(i).equals(singleUniqueMinMaxAggExpr)) {
+                        singleUniqueMinMaxAggExpr = null;
+                        break;
+                    }
                 }
             }
 
@@ -2142,8 +2149,7 @@ public class DDLCompiler {
             if (hasMinOrMaxAgg) {
                 // ENG-6511: If we have only one distinct min/max aggCol/aggExpr, we will pass it into
                 // findBestMatchIndexForMatviewMinOrMax() to see if a better index can be found.
-                AbstractExpression singleDistinctMinMaxAggExpr = hasOnlyOneDistinctMinOrMaxAggExpr ? minMaxAggs.get(0) : null;
-                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, singleDistinctMinMaxAggExpr);
+                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, singleUniqueMinMaxAggExpr);
                 if (found != null) {
                     matviewinfo.setIndexforminmax(found.getTypeName());
                 } else {
@@ -2188,7 +2194,7 @@ public class DDLCompiler {
     //   -- (ENG-6511) indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
     // This function is mostly re-written for the fix of ENG-6511. --yzhang
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
-            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression singleDistinctMinMaxAggExpr)
+            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression singleUniqueMinMaxAggExpr)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
         StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
@@ -2197,13 +2203,13 @@ public class DDLCompiler {
         // return immediately. If the index found covers only group-by columns (sub-optimal), we will first cache it here.
         Index candidate = null;
         for (Index index : allIndexes) {
-            // matchedAll == ture if the index covered all group-by columns (sub-optimal candidate).
+            // matchedAll == true if the index covered all group-by columns (sub-optimal candidate).
             boolean matchedAll = true;
             // optimal == true if the index covered both the group-by columns and the min/max aggExpr.
             boolean optimal = false;
-            // If singleDistinctMinMaxAggExpr is not null, the diff can be zero or one.
+            // If singleUniqueMinMaxAggExpr is not null, the diff can be zero or one.
             // Otherwise, for a usable index, its number of columns must agree with that of the group-by columns.
-            int diffAllowance = singleDistinctMinMaxAggExpr == null ? 0 : 1;
+            int diffAllowance = singleUniqueMinMaxAggExpr == null ? 0 : 1;
 
             // Get all indexed exprs if there is any.
             String expressionjson = index.getExpressionsjson();
@@ -2230,7 +2236,7 @@ public class DDLCompiler {
                     List<ColumnRef> indexedColRefs =
                         CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
                     // The number of columns in index can never be less than that in the group-by column list.
-                    // If singleDistinctMinMaxAggExpr == null, they must be equal (diffAllowance == 0)
+                    // If singleUniqueMinMaxAggExpr == null, they must be equal (diffAllowance == 0)
                     // Otherwise they may be equal (sub-optimal) or
                     // indexedColRefs.size() == groupbyColRefs.size() + 1 (optimal, diffAllowance == 1)
                     if ( indexedColRefs.size() < groupbyColRefs.size() ||
@@ -2250,15 +2256,15 @@ public class DDLCompiler {
                         continue;
                     }
                     // Compare the min/max aggExpr if we got one.
-                    if ( singleDistinctMinMaxAggExpr != null &&
+                    if ( singleUniqueMinMaxAggExpr != null &&
                          indexedColRefs.size() == groupbyColRefs.size() + diffAllowance ) {
-                        // We have singleDistinctMinMaxAggExpr and the index also has one extra column
-                        if ( ! (singleDistinctMinMaxAggExpr instanceof TupleValueExpression) ) {
+                        // We have singleUniqueMinMaxAggExpr and the index also has one extra column
+                        if ( ! (singleUniqueMinMaxAggExpr instanceof TupleValueExpression) ) {
                             // Here because the index columns are all simple columns (indexedExprs == null)
-                            // so the singleDistinctMinMaxAggExpr must be TupleValueExpression.
+                            // so the singleUniqueMinMaxAggExpr must be TupleValueExpression.
                             continue;
                         }
-                        int aggSrcColIdx = ((TupleValueExpression)singleDistinctMinMaxAggExpr).getColumnIndex();
+                        int aggSrcColIdx = ((TupleValueExpression)singleUniqueMinMaxAggExpr).getColumnIndex();
                         Column aggSrcCol = srcColumnArray.get(aggSrcColIdx);
                         Column lastIndexCol = indexedColRefs.get(indexedColRefs.size() - 1).getColumn();
                         // Compare the two columns, if they are equal as well, then this is the optimal index! Congrats!
@@ -2298,11 +2304,11 @@ public class DDLCompiler {
                         continue;
                     }
                     // Compare the min/max agg expr if we got one.
-                    if ( singleDistinctMinMaxAggExpr != null &&
+                    if ( singleUniqueMinMaxAggExpr != null &&
                          indexedExprs.size() == groupbyColRefs.size() + diffAllowance ) {
-                        // We have singleDistinctMinMaxAggExpr and the index also has one extra column
+                        // We have singleUniqueMinMaxAggExpr and the index also has one extra column
                         // expr v.s. expr!
-                        if ( ! indexedExprs.get( indexedExprs.size() - 1 ).equals( singleDistinctMinMaxAggExpr ) ) {
+                        if ( ! indexedExprs.get( indexedExprs.size() - 1 ).equals( singleUniqueMinMaxAggExpr ) ) {
                             continue;
                         }
                         optimal = true;
@@ -2330,9 +2336,9 @@ public class DDLCompiler {
                 if ( ! matchedAll ) {
                     continue;
                 }
-                if ( singleDistinctMinMaxAggExpr != null &&
+                if ( singleUniqueMinMaxAggExpr != null &&
                      indexedExprs.size() == groupbyExprs.size() + diffAllowance ) {
-                    if (indexedExprs.get(indexedExprs.size() - 1).equals(singleDistinctMinMaxAggExpr)) {
+                    if (indexedExprs.get(indexedExprs.size() - 1).equals(singleUniqueMinMaxAggExpr)) {
                         optimal = true;
                     }
                     else {
