@@ -49,6 +49,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestJDBCQueries {
@@ -350,19 +351,17 @@ public class TestJDBCQueries {
                         expectValStr = rs.getString(columnIndex);
                         break;
                     case java.sql.Types.VARBINARY:
-                        expectValStr = new String(rs.getBytes(columnIndex));
+                        expectValStr = Encoder.hexEncode(rs.getBytes(columnIndex));
                         break;
                     case java.sql.Types.TIMESTAMP:
-                        expectValStr = String.valueOf(rs
-                                .getTimestamp(columnIndex));
+                        expectValStr = String.valueOf(rs.getTimestamp(columnIndex));
                         break;
                     case java.sql.Types.DECIMAL:
                         expectValStr = String.valueOf(rs
                                 .getBigDecimal(columnIndex));
                         break;
                     default:
-                        throw new IllegalArgumentException("Invalid type '"
-                                + colType + "'");
+                        throw new IllegalArgumentException("Invalid type '" + colType + "'");
                     }
                     assertEquals(expectValStr, rs.getString(columnIndex));
                 }
