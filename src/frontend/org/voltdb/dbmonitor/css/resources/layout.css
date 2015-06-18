@@ -88,7 +88,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring,
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica {
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
@@ -909,11 +909,11 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
 }
 
 .icon-procedures {
-    background-position: left -986px;
+    background-position: left -988px;
 }
 
 .icon-tables {
-    background-position: left -1043px;
+    background-position: left -1046px;
 }
 
 input.search-box {
@@ -3200,13 +3200,14 @@ a.drTblBtn {
 table.tblPopup {
     border: 1px solid #CCCCCC;
 }
-content drHeader
+
 .repliWrapper {
     height: 150px;
     overflow: auto;
 }
 
 /****DR *******/
+
 .drWrapper {
     margin: 20px 0 0 0;
 }
@@ -3228,10 +3229,13 @@ content drHeader
 .clpWrapper {
     margin: 20px 0 0 0;
 }
-
-.clpWrapper .content {
+ .clpWrapper .content {
         margin-bottom: 2px;
     }
+
+ .dr {
+  padding: 4px 0 8px 0;
+}
 
 .masterWrapper {
 }
@@ -3313,6 +3317,10 @@ tr.drSubSection td {
 
 .icon-replica {
     background-position: left -1653px;
+}
+
+.icon-command {
+    background-position: left -1701px;
 }
 
 .warningDr {
