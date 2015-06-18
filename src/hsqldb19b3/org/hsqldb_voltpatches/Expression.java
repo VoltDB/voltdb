@@ -383,8 +383,13 @@ public class Expression {
                 for (int i = 0; i < nodes.length; i++) {
                     sb.append(nodes[i].describe(session, blanks + 1));
                 }
-
-                sb.append("), TYPE = ").append(dataType.getNameString());
+                // A VoltDB extension to avoid crashing when describe is called.
+                if (dataType == null) {
+                    sb.append(")");
+                } else {
+                    sb.append("), TYPE = ").append(dataType.getNameString());
+                }
+                // End of VoltDB extension.
                 break;
 
             case OpTypes.TABLE :
@@ -402,8 +407,9 @@ public class Expression {
             sb.append(nodes[LEFT].describe(session, blanks + 1));
             sb.append(']');
         }
-
-        if (nodes[RIGHT] != null) {
+        // A VoltDB extension to avoid crashes when describe is called.
+        if (nodes.length > 1 && nodes[RIGHT] != null) {
+        // End of VoltDB extension
             sb.append(" arg2=[");
             sb.append(nodes[RIGHT].describe(session, blanks + 1));
             sb.append(']');
