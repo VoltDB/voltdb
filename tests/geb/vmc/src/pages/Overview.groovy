@@ -124,10 +124,55 @@ class Overview extends Module {
         // EXPORT EXPANSION
 
         export			            { $(class:"labelCollapsed", text:"Export") }
+        exportTablesText            { $(class:"configLabel", text:"Export Tables") }
+        listOfExport                { $("#lstExportTbl") }
         exportNoConfigAvailable     { $(class:"configLabel", text:"No configuration available.") }
         exportConfiguration         { $("#exportConfiguration") }
         exportConfig                { $(class:"configLabel expoStream", title:"Click to expand/collapse", number) }
 
+
+        // EXPORT POPUP
+        exportAddConfigPopupTitle   { $("#addConfigHeader") }
+        addProperty                 { $("#lnkAddNewProperty") }
+        save    			        { $("#btnAddConfigSave", text:"Save") }
+        cancel                      { $("#btnAddConfigCancel", text:"Cancel") }
+        
+        textType        			{ $("#txtType")}
+        
+        // EXPORT POPUP: FILE
+        type                        { $("#txtFileType") }
+        nonce                       { $("#txtnonce") }
+        outdir                      { $("#txtOutdir") }
+        
+        typeValue                   { $("#txtFileTypeValue") }
+        nonceValue                  { $("#txtnonceValue") }
+        outdirValue                 { $("#txtOutdirValue") }
+        
+        // EXPORT POPUP: JDBC
+        jdbcdriver                  { $("#txtJdbcDriver") }
+        jdbcurl                     { $("#txtJdbcUrl") }
+        
+        jdbcdriverValue             { $("#txtJdbcDriverValue") }
+        jdbcurlValue                { $("#txtJdbcUrlValue") }
+        
+        // EXPORT POPUP: KAFKA
+        metadatabroker              { $("#txtMetadataBrokerList") }
+        
+        metadatabrokerValue         { $("#txtMetadataBrokerListValue") }
+        
+        // EXPORT POPUP: HTTP
+        endpoint                    { $("#txtEndpoint") }
+        
+        endpointValue               { $("#txtEndpointValue") }
+        
+        // EXPORT POPUP: RABBITMQ
+        rabbitMq                    { $("#selectRabbitMq") }
+        
+        rabbitMqValue               { $("#txtRabbitMqValue") }
+        
+        // EXPORT POPUP: CUSTOM
+        exportConnectorClass        { $("#txtExportConnectorClass") }
+        
         // ADVANCED EXPANSION
 
         maxJavaHeap				{ $(class:"configLabel", text:"Max Java Heap") }
