@@ -95,6 +95,7 @@ CREATE VIEW id_min (
 	MIN(id) 
 FROM idsWithMinMatView GROUP BY group_id;
 CREATE INDEX idWithMinMatView_idx ON idsWithMinMatView (group_id);
+CREATE INDEX idWithMinMatView_idx_nouse ON idsWithMinMatView (group_id, value);
 
 CREATE VIEW id_min_opt (
   group_id,
@@ -106,3 +107,4 @@ CREATE VIEW id_min_opt (
   MIN(id) 
 FROM idsWithMinMatViewOpt GROUP BY group_id;
 CREATE INDEX idWithMinMatViewOpt_idx ON idsWithMinMatViewOpt (group_id, id);
+CREATE INDEX idWithMinMatViewOpt_idx_nouse ON idsWithMinMatViewOpt (group_id);
