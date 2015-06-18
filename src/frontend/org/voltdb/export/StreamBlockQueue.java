@@ -241,7 +241,7 @@ public class StreamBlockQueue {
         }
     }
 
-    public long sizeInBytes() {
+    public long sizeInBytes() throws IOException {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
             memoryBlockUsage += b.unreleasedSize(); //Use only unreleased size, but throw in the USO
