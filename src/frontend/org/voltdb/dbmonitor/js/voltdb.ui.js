@@ -699,7 +699,6 @@ var loadPage = function (serverName, portid) {
                 //check whether command log is enabled or not
                 VoltDbUI.isCommandLogEnabled = deploymentDetails.DETAILS.COMMANDLOGSTATUS;
                 console.log(VoltDbUI.isCommandLogEnabled);
-                showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled);
                 //
                 var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
                 if (clusterDetails != undefined) {
@@ -714,25 +713,6 @@ var loadPage = function (serverName, portid) {
                 }
             }
         });
-
-
-
-        var showHideCmdlogDataAndCharts = function (cmdLogStatus) {
-            if (cmdLogStatus == 'true') {
-                $("#liCommandLogStat").show();
-                $("#divCommandLog").show();
-                var userPreference = getUserPreferences();
-                if (userPreference["CommandLogStat"]) {
-                    $("#chartCommandLogging").show();
-
-                }
-                refreshCmdLogSection();
-            } else {
-                $("#liCommandLogStat").hide();
-                $("#chartCommandLogging").hide();
-                $("#divCommandLog").hide();
-            }
-        };
 
         var getRunningTimeInfo = function (startTime, upTime) {
             var strTime = new Date(startTime).toUTCString();
@@ -761,6 +741,23 @@ var loadPage = function (serverName, portid) {
         //
     };
 
+    var showHideCmdlogDataAndCharts = function (cmdLogStatus, graphView, currentTab) {
+        if (cmdLogStatus == 'true') {
+            $("#liCommandLogStat").show();
+            $("#divCommandLog").show();
+            var userPreference = getUserPreferences();
+            if (userPreference["CommandLogStat"]) {
+                $("#chartCommandLogging").show();
+
+            }
+            refreshCmdLogSection(graphView, currentTab);
+        } else {
+            $("#liCommandLogStat").hide();
+            $("#chartCommandLogging").hide();
+            $("#divCommandLog").hide();
+        }
+    };
+
     var refreshGraphAndData = function (graphView, currentTab) {
         voltDbRenderer.getMemoryGraphInformation(function (memoryDetails) {
             MonitorGraphUI.RefreshMemory(memoryDetails, getCurrentServer(), graphView, currentTab);
@@ -783,9 +780,7 @@ var loadPage = function (serverName, portid) {
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
 
-        //voltDbRenderer.GetCommandLogInformation(function (cmdLogDetails) {
-        //    MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
-        //});
+        showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled,graphView, currentTab);
 
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
             if (getCurrentServer() != undefined) {
@@ -1212,13 +1207,13 @@ var loadPage = function (serverName, portid) {
         }
     };
 
-    var refreshCmdLogSection = function () {
+    var refreshCmdLogSection = function (graphView, currentTab) {
         var cmdLogTable = '';
         voltDbRenderer.GetCommandLogInformation(function (cmdLogDetails) {
             var response = cmdLogDetails;
             var htmlcontent = "";
-
-
+            MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
+            
             for (var key in response) {
                 htmlcontent = htmlcontent + "<tr>";
                 htmlcontent = htmlcontent + "<td>" + key + "</td>" +
@@ -1717,7 +1712,7 @@ var loadPage = function (serverName, portid) {
         saveCookie("graph-view", $("#graphView").val());
 
     $("#graphView").val(VoltDbUI.getCookie("graph-view"));
-    MonitorGraphUI.AddGraph(VoltDbUI.getCookie("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'));//, $('#chartCommandLogging'));
+    MonitorGraphUI.AddGraph(VoltDbUI.getCookie("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'), $('#chartCommandLogging'));
 
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').unbind('click');
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').on('click', function () {
@@ -2185,10 +2180,10 @@ var showHideGraph = function (userpreferences) {
     } else {
         $("#divDrReplication").show();
     }
-    //if (userpreferences["CommandLogStat"] == false || VoltDbUI.isCommandLogEnabled == false)
-    //    $("#chartCommandLogging").hide();
-    //else
-    //    $("#chartCommandLogging").show();
+    if (userpreferences["CommandLogStat"] == false || VoltDbUI.isCommandLogEnabled == 'false')
+        $("#chartCommandLogging").hide();
+    else
+        $("#chartCommandLogging").show();
 
     adjustGraphSpacing();
     ChangeGraphLabelColor();
