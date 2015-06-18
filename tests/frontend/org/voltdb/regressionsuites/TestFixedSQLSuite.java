@@ -868,7 +868,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         try
         {
             sql = "SELECT * FROM R1_DECIMAL WHERE " +
-            "(R1_DECIMAL.CASH <= 0.0622493314185)" +
+            "(R1_DECIMAL.CASH <= 999999999999999999999999999999.0622493314185)" +
             " AND (R1_DECIMAL.ID > R1_DECIMAL.CASH)";
             client.callProcedure("@AdHoc", sql);
         }
