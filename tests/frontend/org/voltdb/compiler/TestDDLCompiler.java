@@ -495,7 +495,12 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE VIEW VT5 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " + // should choose T_TREE_6
                 "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
                 "FROM T WHERE D1 > 3 " +
-                "GROUP BY D1 + D2, ABS(D3);";
+                "GROUP BY D1 + D2, ABS(D3);\n" +
+
+                "CREATE VIEW VT6 (V_D1, V_D2, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL1) " + // should choose T_TREE_2
+                "AS SELECT D1, D2, COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL1) " +
+                "FROM T " +
+                "GROUP BY D1, D2;";
 
         VoltCompiler compiler = new VoltCompiler();
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
@@ -517,6 +522,7 @@ public class TestDDLCompiler extends TestCase {
         assertEquals(views.get("VT3").getIndexforminmax(), "T_TREE_8");
         assertEquals(views.get("VT4").getIndexforminmax(), "T_TREE_7");
         assertEquals(views.get("VT5").getIndexforminmax(), "T_TREE_6");
+        assertEquals(views.get("VT6").getIndexforminmax(), "T_TREE_2");
 
         // cleanup after the test
         jarOut.delete();
