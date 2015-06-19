@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <import>
+        <configuration module="kafkastream.jar" type="custom" enabled="true">
+            <property name="zookeeper">kafka2:2181</property>
+            <property name="bootstrap">kafka2:2181</property>
+            <property name="metadata.broker.list">kafka2:2181</property>
+            <property name="topic">foo</property>
+            <property name="procedure">importTable.insert</property>
+        </configuration>
+    </import>
+</deployment>
