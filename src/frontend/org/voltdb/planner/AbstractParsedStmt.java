@@ -689,12 +689,12 @@ public abstract class AbstractParsedStmt {
         if (!(subquery instanceof ParsedSelectStmt)) {
             return false;
         }
-        // Must not have OFFSET set
+        // Must not have OFFSET or LIMIT set
         // EXISTS (select * from T where T.X = parent.X order by T.Y offset 10 limit 5)
         //      seems to require 11 matches
         // parent.X IN (select T.X from T order by T.Y offset 10 limit 5)
         //      seems to require 1 match that has exactly 10-14 rows (matching or not) with lesser or equal values of Y.
-        return ! ((ParsedSelectStmt) subquery).hasOffset();
+        return ! ((ParsedSelectStmt) subquery).hasLimitOrOffset();
     }
 
     /**
