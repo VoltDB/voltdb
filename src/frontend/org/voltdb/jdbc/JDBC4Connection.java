@@ -48,7 +48,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
-    protected TimeUnit QueryTimeOutUnit = TimeUnit.SECONDS;
+    protected TimeUnit queryTimeOutUnit = TimeUnit.SECONDS;
     private boolean isClosed = false;
     private Properties props;
     private boolean autoCommit = true;
@@ -59,7 +59,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         this.props = props;
         this.User = this.props.getProperty("user", "");
         if (this.props.getProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "Seconds").equalsIgnoreCase("milliseconds")) {
-            this.QueryTimeOutUnit = TimeUnit.MILLISECONDS;
+            this.queryTimeOutUnit = TimeUnit.MILLISECONDS;
         }
     }
 

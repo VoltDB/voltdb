@@ -368,12 +368,12 @@ public class JDBC4Statement implements java.sql.Statement
         checkClosed();
         if (query.isQueryOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
         {
-            setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.QueryTimeOutUnit), -1);
+            setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.queryTimeOutUnit), -1);
             return true;
         }
         else
         {
-            setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.QueryTimeOutUnit)[0].fetchRow(0).getLong(0));
+            setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.queryTimeOutUnit)[0].fetchRow(0).getLong(0));
             return false;
         }
     }
@@ -430,7 +430,7 @@ public class JDBC4Statement implements java.sql.Statement
             try
             {
                 setCurrentResult(null, (int) batch.get(i).execute(sourceConnection.NativeConnection,
-                        this.m_timeout,sourceConnection.QueryTimeOutUnit)[0].fetchRow(0).getLong(0));
+                        this.m_timeout,sourceConnection.queryTimeOutUnit)[0].fetchRow(0).getLong(0));
                 updateCounts[i] = this.lastUpdateCount;
                 runningUpdateCount += this.lastUpdateCount;
             }
@@ -450,7 +450,7 @@ public class JDBC4Statement implements java.sql.Statement
 
     protected ResultSet executeQuery(VoltSQL query) throws SQLException
     {
-        setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout, this.sourceConnection.QueryTimeOutUnit), -1);
+        setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout, this.sourceConnection.queryTimeOutUnit), -1);
         return this.result;
     }
 
@@ -468,7 +468,7 @@ public class JDBC4Statement implements java.sql.Statement
 
     protected int executeUpdate(VoltSQL query) throws SQLException
     {
-        setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.QueryTimeOutUnit)[0].fetchRow(0).getLong(0));
+        setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout,this.sourceConnection.queryTimeOutUnit)[0].fetchRow(0).getLong(0));
         return this.lastUpdateCount;
     }
 
