@@ -289,6 +289,8 @@ public class TestPersistentBinaryDeque {
 
         });
 
+        assertEquals(95420416, m_pbd.sizeInBytes());
+
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 2);
 
