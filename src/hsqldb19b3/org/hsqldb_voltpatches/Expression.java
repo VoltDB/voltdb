@@ -383,8 +383,12 @@ public class Expression {
                 for (int i = 0; i < nodes.length; i++) {
                     sb.append(nodes[i].describe(session, blanks + 1));
                 }
-
-                sb.append("), TYPE = ").append(dataType.getNameString());
+                // A VoltDB extension to avoid crashing when describe is called.
+                if (dataType == null) {
+                    sb.append(")");
+                } else {
+                    sb.append("), TYPE = ").append(dataType.getNameString());
+                }
                 break;
 
             case OpTypes.TABLE :

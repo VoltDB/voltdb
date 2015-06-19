@@ -28,6 +28,7 @@ import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class is built to create a single in-memory database
@@ -42,7 +43,8 @@ import org.hsqldb_voltpatches.result.Result;
  * </ul>
  */
 public class HSQLInterface {
-
+    private VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
+    
     static public String XML_SCHEMA_NAME = "databaseschema";
     /**
      * Naming conventions for unnamed indexes and constraints
@@ -328,6 +330,11 @@ public class HSQLInterface {
 
         VoltXMLElement xml = null;
         xml = cs.voltGetStatementXML(sessionProxy);
+       if (m_logger.isDebugEnabled()) {
+            m_logger.debug(String.format("SQL: %s\n", sql));;
+            m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
+            m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
+        }
 
         // this releases some small memory hsql uses that builds up over time if not
         // cleared
