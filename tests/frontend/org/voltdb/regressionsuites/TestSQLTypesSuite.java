@@ -510,7 +510,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             long ts = rn.nextLong();
             long[] timestampValues = {
                     ts, // random
-                    ts / 1000 * 1000, // even milis
+                    ts / 1000 * 1000, // even milliseconds
                     ts / 1000000 * 1000000, // even seconds
                     ts / 1000000 * -1000000 // even seconds
             };
