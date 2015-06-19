@@ -179,7 +179,7 @@ public class PartitionDRGateway {
                     }
                     buf.position(buf.position() + lengthPrefix);
                     checksum = buf.getInt();
-                    log.trace("Version " + version + " type " + recordType + "table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
+                    log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
                               (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
                     break;
                 }
