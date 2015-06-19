@@ -306,13 +306,15 @@ public abstract class VoltTypeUtil {
 
         // The lower 6 digits of the microsecond timestamp (including the "double-counted" millisecond digits)
         // must be scaled up to get the 9-digit (rounded) nanosecond value.
-        if (timestamp >= 0) {
-            result = new java.sql.Timestamp(timestamp/1000);
-            result.setNanos(((int) (timestamp % 1000000))*1000);
-        } else {
-            result = new java.sql.Timestamp((timestamp/1000000 - 1) * 1000);
+        int remaining = (int) (timestamp % 1000000);
 
-            int remaining = (int) (timestamp % 1000000);
+        // timestamp after epoch or timestamp without fractional seconds
+        if (timestamp >= 0 || remaining == 0) {
+            result = new java.sql.Timestamp(timestamp/1000);
+            result.setNanos(remaining*1000);
+        } else {
+            // timestamp before epoch that has fractional seconds
+            result = new java.sql.Timestamp((timestamp/1000000 - 1) * 1000);
             result.setNanos((remaining+1000000) * 1000 );
         }
 
