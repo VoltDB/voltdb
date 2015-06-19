@@ -62,6 +62,7 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
+    rm -rf felix-cache
     if [ ! -e socketstream.jar ] || [ ! -e socketstream-client.jar ]; then
         jars;
     fi
@@ -88,6 +89,18 @@ function kafka() {
     echo
     voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST
 }
+
+#log4j importer
+function log4j() {
+    jars-ifneeded
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST"
+    echo
+    voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST
+}
+
 # load schema and procedures
 function init() {
     jars-ifneeded

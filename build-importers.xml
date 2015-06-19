@@ -42,7 +42,7 @@
                 <attribute name="Bundle-SymbolicName" value="KafkaStreamImporter" />
                 <attribute name="Bundle-Version" value="1.0.0" />
                 <attribute name="DynamicImport-Package" value="*" />
-                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer,org.voltdb.utils,org.voltdb.client,org.slf4j" />
+                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer,org.voltdb.client,org.slf4j" />
             </manifest>
         </jar>
     </target>

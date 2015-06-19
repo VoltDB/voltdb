@@ -42,7 +42,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     private Properties m_properties;
     private String m_procedure;
-    private String m_topic;
+    private String[] m_topic;
     private String m_zookeeper;
 
     private KafkaStreamConsumerConnector m_connector;
@@ -57,34 +57,34 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     @Override
     public void stop(BundleContext context) throws Exception {
         //Do any bundle related cleanup.
-        stop();
     }
 
     @Override
     public synchronized void stop() {
-        info("Stopping Kafka Importer.");
-        try {
-            if (m_connector != null) {
-                info("Stopping Kafka connector.");
-                m_connector.stop();
-                info("Stopped Kafka connector.");
+        synchronized (this) {
+            try {
+                if (m_connector != null) {
+                    info("Stopping Kafka connector.");
+                    m_connector.stop();
+                    info("Stopped Kafka connector.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                m_connector = null;
             }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        } finally {
-            m_connector = null;
-        }
-        try {
-            if (m_es != null) {
-                info("Stopping Kafka consumer executor.");
-                m_es.shutdown();
-                m_es.awaitTermination(1, TimeUnit.DAYS);
-                info("Stopped Kafka consumer executor.");
+            try {
+                if (m_es != null) {
+                    info("Stopping Kafka consumer executor.");
+                    m_es.shutdown();
+                    m_es.awaitTermination(1, TimeUnit.DAYS);
+                    info("Stopped Kafka consumer executor.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                m_es = null;
             }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        } finally {
-            m_es = null;
         }
     }
 
@@ -109,9 +109,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         if (m_procedure == null || m_procedure.trim().length() == 0) {
             throw new RuntimeException("Missing procedure.");
         }
-        m_topic = (String )m_properties.getProperty("topic");
-        if (m_topic == null || m_topic.trim().length() == 0) {
-            throw new RuntimeException("Missing topic.");
+        String topics = (String )m_properties.getProperty("topic");
+        if (topics == null || topics.trim().length() == 0) {
+            throw new RuntimeException("Missing topic(s).");
+        }
+        m_topic = topics.split(",");
+        if (m_topic == null || m_topic.length == 0) {
+            throw new RuntimeException("Missing topic(s).");
         }
         m_zookeeper = (String )m_properties.getProperty("zookeeper");
         if (m_zookeeper == null || m_zookeeper.trim().length() == 0) {
@@ -143,6 +147,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         public void stop() {
             try {
                 m_consumer.commitOffsets();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            try {
                 m_consumer.shutdown();
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -184,15 +192,20 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
         Map<String, Integer> topicCountMap = new HashMap<>();
         //Get this from config or arg. Use 3 threads default.
-        ExecutorService executor = Executors.newFixedThreadPool(3);
-        topicCountMap.put(m_topic, 1);
+        ExecutorService executor = Executors.newFixedThreadPool(3 * m_topic.length);
+        for (int i = 0; i < m_topic.length; i++) {
+            topicCountMap.put(m_topic[i], 1);
+        }
         Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.m_consumer.createMessageStreams(topicCountMap);
-        List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(m_topic);
 
-        // now launch all the threads for partitions.
-        for (final KafkaStream stream : streams) {
-            KafkaConsumer bconsumer = new KafkaConsumer(stream, m_procedure);
-            executor.submit(bconsumer);
+        for (int i = 0; i < m_topic.length; i++) {
+            List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(m_topic[i]);
+
+            // now launch all the threads for partitions.
+            for (final KafkaStream stream : streams) {
+                KafkaConsumer bconsumer = new KafkaConsumer(stream, m_procedure);
+                executor.submit(bconsumer);
+            }
         }
 
         return executor;
@@ -205,11 +218,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     public void readyForData() {
         try {
             info("Configured and ready with properties: " + m_properties);
-            m_connector = new KafkaStreamConsumerConnector(m_zookeeper, "voltdb-importer-" + m_topic);
-            m_es = getConsumerExecutor(m_connector);
-            while (!m_es.awaitTermination(365, TimeUnit.DAYS)) {
-                //
+            synchronized (this) {
+                //TODO: Make group id specific to node.
+                m_connector = new KafkaStreamConsumerConnector(m_zookeeper, "voltdb-importer");
+                m_es = getConsumerExecutor(m_connector);
             }
+            //Now we dont need lock as stop can come along.
+            m_es.awaitTermination(365, TimeUnit.DAYS);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
