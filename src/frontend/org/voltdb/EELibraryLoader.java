@@ -27,8 +27,8 @@ import org.voltcore.logging.VoltLogger;
 
 public class EELibraryLoader {
 
-    private static final String USE_JAVA_LIBRARY_PATH = "use.javalib";
-    private static final String VOLT_TMP_DIR = "volt.tmpdir";
+    public static final String USE_JAVA_LIBRARY_PATH = "use.javalib";
+    public static final String VOLT_TMP_DIR = "volt.tmpdir";
     private static boolean voltSharedLibraryLoaded = false;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -64,7 +64,7 @@ public class EELibraryLoader {
                     assert(versionString != null);
                     final String libname = "voltdb-" + versionString;
                     hostLog.info("Loading native VoltDB code ("+libname+"). A confirmation message will follow if the loading is successful.");
-                    if (Boolean.parseBoolean(System.getProperty(USE_JAVA_LIBRARY_PATH, "false"))) {
+                    if (Boolean.getBoolean(USE_JAVA_LIBRARY_PATH)) {
                         System.loadLibrary(libname);
                     } else {
                         File libFile = getNativeLibraryFile(libname);

@@ -31,6 +31,7 @@ import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
+import org.voltdb.EELibraryLoader;
 import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
@@ -233,8 +234,22 @@ public class LocalCluster implements VoltServerConfig {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
 
-        String classPath = System.getProperty("java.class.path") + ":" + buildDir
-            + File.separator + m_jarFileName + ":" + buildDir + File.separator + "prod";
+        String classPath = System.getProperty("java.class.path") + ":" +
+            buildDir + File.separator + m_jarFileName;
+
+        String javaLibraryPath = null;
+        if (m_additionalProcessEnv != null && m_additionalProcessEnv.containsKey(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
+            if (Boolean.parseBoolean(m_additionalProcessEnv.get(EELibraryLoader.USE_JAVA_LIBRARY_PATH))) {
+                // set the java lib path to the one for this process - default to obj/release/nativelibs
+                javaLibraryPath = System.getProperty("java.library.path", buildDir + "/nativelibs");
+            }
+        }
+
+        if (javaLibraryPath==null) {
+            // need this in classpath to find native library. Otherwise, don't add it to classpath to
+            // test override of loading EE lib from jar.
+            classPath = classPath + ":" + buildDir + File.separator + "prod";
+        }
 
         // Remove the stored procedures from the classpath.  Out-of-process nodes will
         // only be able to find procedures and dependent classes in the catalog, as intended
@@ -266,6 +281,9 @@ public class LocalCluster implements VoltServerConfig {
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
+        if (javaLibraryPath!=null) {
+            templateCmdLine.javaLibraryPath(javaLibraryPath);
+        }
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
         // "tag" this command line so it's clear which test started it
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
