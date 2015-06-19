@@ -224,7 +224,7 @@
                                 </div>
                                 <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg>
                             </div>
-                            <div id="chartCommandLogging" class="chart right"  style="display: none">
+                            <div id="chartCommandLogging" class="chart right" style="display: none">
                                 <div class="chartHeader">
                                     <h1>Command Log Statistics</h1>
                                 </div>
@@ -395,7 +395,7 @@
                             </div>
                         </div>
                     </div>
-                    <div id="divCommandLog" class="clpWrapper" style="dispay:none">
+                    <div id="divCommandLog" class="clpWrapper" style="display:none">
                         <div class="content drHeader" id="clpHeader">
                             <div class="leftShowhide">
                                 <div class="dr">
@@ -1020,7 +1020,7 @@
                         Data Replication (DR)
                         <input type="checkbox" id="DrReplicationRate" name="" value="drReplication" checked="checked" />
                     </li>
-                     <li class="pref-graph" id="liCommandLogStat" style="display:none">
+                    <li class="pref-graph" id="liCommandLogStat" style="display:none">
                         Command Log Statistics
                         <input type="checkbox" id="CommandLogStat" name="" value="commandLogStat" checked="checked" />
                     </li>
@@ -1028,9 +1028,13 @@
                         Stored Procedures
                         <input type="checkbox" id="StoredProcedures" name="" value="stored_proc" checked="checked" />
                     </li>
-                    <li class="last pref-tables" id="liTables">
+                    <li class="pref-tables" id="liTables">
                         Database Tables
                         <input type="checkbox" id="DatabaseTables" name="" value="table" checked="checked" />
+                    </li>
+                    <li class="pref-tables" id="liCommandLogTables">
+                        Command Log Tables
+                        <input type="checkbox" id="CommandLogTables" name="" value="table" checked="checked" />
                     </li>
                     <li class="pref-tables" id="liDrTables" style="display:none">
                         Data Replication Tables

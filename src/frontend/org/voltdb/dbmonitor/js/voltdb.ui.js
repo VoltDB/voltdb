@@ -136,7 +136,7 @@ $(document).ready(function () {
     $('#showHideGraphBlock').click(function () {
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
-            if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false || userPreferences["CommandLogStat"] != false) {
+            if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false || userPreferences["CommandLogStat"] != false || userPreferences["CommandLogTables"] != false) {
                 var graphState = $("#mainGraphBlock").css('display');
                 if (graphState == 'none') {
                     $(".showhideIcon").removeClass('collapsed');
@@ -747,17 +747,21 @@ var loadPage = function (serverName, portid) {
     var showHideCmdlogDataAndCharts = function (cmdLogStatus, graphView, currentTab) {
         if (cmdLogStatus == 'true') {
             $("#liCommandLogStat").show();
-            $("#divCommandLog").show();
+            $("#liCommandLogTables").show();
             var userPreference = getUserPreferences();
             if (userPreference["CommandLogStat"]) {
                 $("#chartCommandLogging").show();
 
+            }
+            if (userPreference["CommandLogTables"]) {
+                $("#divCommandLog").show();
             }
             refreshCmdLogSection(graphView, currentTab);
         } else {
             $("#liCommandLogStat").hide();
             $("#chartCommandLogging").hide();
             $("#divCommandLog").hide();
+            $("#liCommandLogTables").hide();
         }
     };
 
@@ -2116,7 +2120,7 @@ var getUserPreferences = function () {
     } catch (e) {
 
         voltDbRenderer.userPreferences = {};
-        var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime", "DrReplicationRate", "DRTables", "CommandLogStat"];
+        var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime", "DrReplicationRate", "DRTables", "CommandLogStat", "CommandLogTables"];
         for (var i = 0; i < preferencesList.length; i++) {
             voltDbRenderer.userPreferences[preferencesList[i]] = true;
         }
@@ -2188,6 +2192,11 @@ var showHideGraph = function (userpreferences) {
     else
         $("#chartCommandLogging").show();
 
+    if (userpreferences["CommandLogTables"] == false || VoltDbUI.isCommandLogEnabled == 'false')
+        $("#divCommandLog").hide();
+    else
+        $("#divCommandLog").show();
+
     adjustGraphSpacing();
     ChangeGraphLabelColor();
     ChangeTableProcedureLabelColor();
@@ -2197,7 +2206,7 @@ function ChangeGraphLabelColor() {
     if (VoltDbUI.getCookie("user-preferences") != undefined) {
         var userPreferences = $.parseJSON(VoltDbUI.getCookie("user-preferences"));
 
-        if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false || userPreferences["CommandLogStat"] != false) {
+        if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false || userPreferences["CommandLogStat"] != false || userPreferences["CommandLogStat"] != false) {
             $('#showHideGraphBlock').css('color', '#000000');
             $("#GraphBlock").removeClass("graphOpacity");
         } else {
