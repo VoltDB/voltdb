@@ -1205,7 +1205,30 @@
 
         };
 
-
+        this.GetSnapshotStatus = function (onConnectionAdded) {
+            try {
+                var processName = "SNAPSHOT_STATUS";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["SNAPSHOTSTATUS"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
     });
 
     window.VoltDBService = VoltDBService = new iVoltDbService();

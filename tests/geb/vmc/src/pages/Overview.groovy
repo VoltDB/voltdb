@@ -122,22 +122,26 @@ class Overview extends Module {
 		logSizeValue					{ $("#commandLogSegmentSize") }
 
         // EXPORT EXPANSION
-
+        
         export			            { $(class:"labelCollapsed", text:"Export") }
         exportTablesText            { $(class:"configLabel", text:"Export Tables") }
         listOfExport                { $("#lstExportTbl") }
         exportNoConfigAvailable     { $(class:"configLabel", text:"No configuration available.") }
         exportConfiguration         { $("#exportConfiguration") }
         exportConfig                { $(class:"configLabel expoStream", title:"Click to expand/collapse", number) }
-
-
+        
         // EXPORT POPUP
+        stream                      { $("#txtStream") }
         exportAddConfigPopupTitle   { $("#addConfigHeader") }
         addProperty                 { $("#lnkAddNewProperty") }
         save    			        { $("#btnAddConfigSave", text:"Save") }
         cancel                      { $("#btnAddConfigCancel", text:"Cancel") }
         
         textType        			{ $("#txtType")}
+        
+        errorStream                 { $("#errorStream") }
+                
+        //{ $("#") }
         
         // EXPORT POPUP: FILE
         type                        { $("#txtFileType") }
@@ -148,6 +152,10 @@ class Overview extends Module {
         nonceValue                  { $("#txtnonceValue") }
         outdirValue                 { $("#txtOutdirValue") }
         
+        errorFileTypeValue          { $("#errorFileTypeValue") }
+        errornonceValue             { $("#errornonceValue") }
+        errorOutdirValue            { $("#errorOutdirValue") }
+        
         // EXPORT POPUP: JDBC
         jdbcdriver                  { $("#txtJdbcDriver") }
         jdbcurl                     { $("#txtJdbcUrl") }
@@ -155,23 +163,34 @@ class Overview extends Module {
         jdbcdriverValue             { $("#txtJdbcDriverValue") }
         jdbcurlValue                { $("#txtJdbcUrlValue") }
         
+        errorJdbcDriverValue        { $("#errorJdbcDriverValue") }
+        errorJdbcUrlValue           { $("#errorJdbcUrlValue") }
+        
         // EXPORT POPUP: KAFKA
         metadatabroker              { $("#txtMetadataBrokerList") }
         
         metadatabrokerValue         { $("#txtMetadataBrokerListValue") }
+        
+        errorMetadataBrokerListValue{ $("#errorMetadataBrokerListValue") }
         
         // EXPORT POPUP: HTTP
         endpoint                    { $("#txtEndpoint") }
         
         endpointValue               { $("#txtEndpointValue") }
         
+        errorEndpointValue          { $("#errorEndpointValue") }
+        
         // EXPORT POPUP: RABBITMQ
         rabbitMq                    { $("#selectRabbitMq") }
         
         rabbitMqValue               { $("#txtRabbitMqValue") }
         
+        errorRabbitMqValue          { $("#errorRabbitMqValue") }
+        
         // EXPORT POPUP: CUSTOM
         exportConnectorClass        { $("#txtExportConnectorClass") }
+        
+        errorExportConnectorClass   { $("#errorExportConnectorClass") }
         
         // ADVANCED EXPANSION
 
