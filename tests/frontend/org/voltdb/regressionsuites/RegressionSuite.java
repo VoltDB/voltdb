@@ -412,13 +412,28 @@ public class RegressionSuite extends TestCase {
         validateTableOfScalarLongs(vt, expected);
     }
 
+    private static void dumpExpectedLongs(long[][] expected) {
+        System.out.println("row count:" + expected.length);
+        for (long[] row : expected) {
+            String prefix = "{ ";
+            for (long value : row) {
+                System.out.print(prefix + value);
+                prefix = ", ";
+            }
+            System.out.println(" }");
+        }
+    }
+
     static private void validateTableOfLongs(String messagePrefix,
             VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         if (expected.length != vt.getRowCount()) {
             if (vt.getRowCount() < m_verboseDiagnosticRowCap) {
-                System.out.println("Diagnostic dump of unexpected result:" + vt);
+                System.out.println("Diagnostic dump of unexpected result for " + messagePrefix + " : " + vt);
+                System.out.println("VS. expected : ");
+                dumpExpectedLongs(expected);
             }
+            //* enable and set breakpoint to debug multiple row count mismatches and continue */ return;
         }
         assertEquals(messagePrefix + " returned wrong number of rows.  ",
                         expected.length, vt.getRowCount());

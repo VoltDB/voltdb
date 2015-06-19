@@ -22,54 +22,16 @@ namespace voltdb {
 
 bool TupleExtractor::isNullValue(const ValueType& value) const
 {
-    if (!value.isNullTuple()){
-        int schemaSize = m_tuple.getSchema()->columnCount();
-        for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
-        {
-            if (m_tuple.isNull(columnIdx)) {
-                return true;
-            }
-        }
-        return false;
+    if (value.isNullTuple()) {
+        return true;
     }
-    return true;
-}
-
-template <>
-bool compare_tuple<CmpEq>(const TableTuple& tuple1, const TableTuple& tuple2)
-{
-    assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
-    int schemaSize = tuple1.getSchema()->columnCount();
-    CmpEq comp;
-    for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
-    {
-        if (comp.cmp(tuple1.getNValue(columnIdx), tuple2.getNValue(columnIdx)).isFalse())
-        {
-            return false;
+    int schemaSize = m_tuple.getSchema()->columnCount();
+    for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
+        if (m_tuple.isNull(columnIdx)) {
+            return true;
         }
     }
-    return true;
-}
-
-template <>
-bool compare_tuple<CmpNe>(const TableTuple& tuple1, const TableTuple& tuple2)
-{
-    // a != b <=> !(a == B)
-    return !compare_tuple<CmpEq>(tuple1, tuple2);
-}
-
-template <>
-bool compare_tuple<CmpGte>(const TableTuple& tuple1, const TableTuple& tuple2)
-{
-    // a >= b <=> !(a < b)
-    return !compare_tuple<CmpLt>(tuple1, tuple2);
-}
-
-template <>
-bool compare_tuple<CmpLte>(const TableTuple& tuple1, const TableTuple& tuple2)
-{
-    // a <= b <=> !(a > b)
-    return !compare_tuple<CmpGt>(tuple1, tuple2);
+    return false;
 }
 
 }
