@@ -441,6 +441,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
             case Types.VARBINARY:
             case Types.VARCHAR:
             case Types.NVARCHAR:
+            case Types.NULL:
                 this.parameters[parameterIndex-1] = VoltType.NULL_STRING_OR_VARBINARY;
                 break;
             default:
