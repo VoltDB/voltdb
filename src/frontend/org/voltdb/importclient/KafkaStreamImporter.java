@@ -51,7 +51,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     // Register ImportHandlerProxy service.
     @Override
     public void start(BundleContext context) throws Exception {
-        context.registerService(ImportHandlerProxy.class.getName(), this, null);
+        context.registerService(KafkaStreamImporter.class.getName(), this, null);
     }
 
     @Override

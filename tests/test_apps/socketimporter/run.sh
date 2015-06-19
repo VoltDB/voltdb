@@ -101,6 +101,17 @@ function log4j() {
     voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST
 }
 
+#all importer
+function all() {
+    jars-ifneeded
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "voltdb create -d deployment-all.xml -l $LICENSE -H $HOST"
+    echo
+    voltdb create -d deployment-all.xml -l $LICENSE -H $HOST
+}
+
 # load schema and procedures
 function init() {
     jars-ifneeded
@@ -150,7 +161,7 @@ function async-benchmark() {
         socketimporter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=2 \
-        --duration=20 \
+        --duration=190 \
         --servers=localhost \
         --sockservers=localhost:7001
 }
