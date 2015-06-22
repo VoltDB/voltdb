@@ -23,6 +23,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.ParsedUnionStmt.UnionType;
 import org.voltdb.planner.PlanningErrorException;
@@ -93,10 +94,26 @@ public class UnionPlanNode extends AbstractPlanNode {
                 }
             }
         }
+
+        assert(! hasInlineVarcharOrVarbinary());
+
         m_outputSchema = m_children.get(0).getOutputSchema();
         m_hasSignificantOutputSchema = false; // It's just the first child's
         // Then check that they have the same types
    }
+
+    private boolean hasInlineVarcharOrVarbinary() {
+        for (AbstractPlanNode child : m_children) {
+            ArrayList<SchemaColumn> columns = child.getOutputSchema().getColumns();
+
+            for (SchemaColumn scol : columns) {
+                if (AbstractExpression.hasInlineVarType(scol.getExpression())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
