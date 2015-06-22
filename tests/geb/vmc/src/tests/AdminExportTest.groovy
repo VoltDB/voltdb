@@ -320,7 +320,7 @@ class AdminExportTest extends TestBase {
         
         when: 'Expand export'
 	    page.overview.expandExport()
-	    then: 'Display the created FILE'
+	    then: 'Check for deleted'
 	    try {
 	        waitFor(waitTime) { page.overview.fileName.isDisplayed() }
 	    } catch(geb.waiting.WaitTimeoutException e) {
@@ -366,7 +366,7 @@ class AdminExportTest extends TestBase {
         
         when: 'Expand export'
 	    page.overview.expandExport()
-	    then: 'Display the created JDBC'
+	    then: 'Check for deleted'
 	    try {
 	        waitFor(waitTime) { page.overview.jdbcName.isDisplayed() }
 	    } catch(geb.waiting.WaitTimeoutException e) {
@@ -409,7 +409,7 @@ class AdminExportTest extends TestBase {
         
         when: 'Expand export'
 	    page.overview.expandExport()
-	    then: 'Display the created KAFKA'
+	    then: 'Check for deleted'
 	    try {
 	        waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
 	    } catch(geb.waiting.WaitTimeoutException e) {
@@ -453,7 +453,7 @@ class AdminExportTest extends TestBase {
         when: 'Expand export'
 
 	    page.overview.expandExport()
-	    then: 'Display the created HTTP'
+	    then: 'Check for deleted'
 	    try {
 	        waitFor(waitTime) { page.overview.httpName.isDisplayed() }
 	    } catch(geb.waiting.WaitTimeoutException e) {
@@ -495,7 +495,7 @@ class AdminExportTest extends TestBase {
         
         when: 'Expand export'
 	    page.overview.expandExport()
-	    then: 'Display the created RABBITMQ'
+	    then: 'Check for deleted'
 	    try {
 	        waitFor(waitTime) { page.overview.rabbitMqBrokerName.isDisplayed() }
 	    } catch(geb.waiting.WaitTimeoutException e) {
@@ -538,7 +538,7 @@ class AdminExportTest extends TestBase {
         
         when: 'Expand export'
 	    page.overview.expandExport()
-	    then: 'Display the created RABBITMQ'
+	    then: 'Check for deleted'
 	    try {
 	        waitFor(waitTime) { page.overview.rabbitMqAmpqName.isDisplayed() }
 	    } catch(geb.waiting.WaitTimeoutException e) {
@@ -580,7 +580,7 @@ class AdminExportTest extends TestBase {
         
         when: 'Expand export'
 	    page.overview.expandExport()
-	    then: 'Display the created CUSTOM'
+	    then: 'Check for deleted'
 	    try {
 	        waitFor(waitTime) { page.overview.customName.isDisplayed() }
 	    } catch(geb.waiting.WaitTimeoutException e) {

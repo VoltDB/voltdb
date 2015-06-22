@@ -153,6 +153,10 @@ class Overview extends Module {
         
         deleteConfiguration         { $("#deleteAddConfig > a") }
         
+        newTextField                { $("#txtName1") }
+        newValueField               { $("#txtValue1") }
+        deleteFirstProperty         { $("#deleteFirstProperty") }
+            
         // EXPORT POPUP: FILE
         type                        { $("#txtFileType") }
         nonce                       { $("#txtnonce") }
@@ -712,7 +716,7 @@ class Overview extends Module {
 	        count++
             try {
                 save.click()
-	            !save.click()
+	            !save.isDisplayed()
             } catch(geb.error.RequiredPageContentNotPresent e) {
                 break
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
@@ -725,11 +729,11 @@ class Overview extends Module {
 	        count++
             try {
                 confirmyesbtn.click()
-	            !confirmyesbtn.click()
+	            !confirmyesbtn.isDisplayed()
             } catch(geb.error.RequiredPageContentNotPresent e) {
-                break
+                
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                break
+                
             }
 	    }
     }
@@ -740,13 +744,13 @@ class Overview extends Module {
 	        count++
             try {
                 deleteConfiguration.click()
-	            !deleteConfiguration.click()
+	            !deleteConfiguration.isDisplayed()
             } catch(geb.error.RequiredPageContentNotPresent e) {
-                break
+                
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                break
+                
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
-                break
+                
             }
 	    }
 	    
@@ -755,13 +759,13 @@ class Overview extends Module {
 	        count++
             try {
                 confirmyesbtn.click()
-	            !confirmyesbtn.click()
+	            !confirmyesbtn.isDisplayed()
             } catch(geb.error.RequiredPageContentNotPresent e) {
-                break
+                
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                break
+                
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
-                break
+                
             }
 	    }
     }
