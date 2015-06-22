@@ -47,6 +47,7 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -406,7 +407,8 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected) throws Exception {
+    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, expected);
@@ -477,6 +479,12 @@ public class RegressionSuite extends TestCase {
         validateRowOfLongs("", vt, expected);
     }
 
+    static public void validateTableColumnOfScalarVarchar(Client client, String sql, String[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, 0, expected);
+    }
+
     static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
         validateTableColumnOfScalarVarchar(vt, 0, expected);
     }
@@ -495,6 +503,30 @@ public class RegressionSuite extends TestCase {
                 assertEquals(expected[i], vt.getString(col));
             }
         }
+    }
+
+
+    static public void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableColumnOfScalarVarbinary(vt, 0, expected);
+    }
+
+    static private void validateTableColumnOfScalarVarbinary(VoltTable vt, int col, String[] expected) {
+          assertNotNull(expected);
+          assertEquals(expected.length, vt.getRowCount());
+          int len = expected.length;
+          for (int i=0; i < len; i++) {
+              assertTrue(vt.advanceRow());
+              byte[] actual = vt.getVarbinary(col);
+
+              if (expected[i] == null) {
+                  assertTrue(vt.wasNull());
+                  assertEquals(null, actual);
+              } else {
+                  assertEquals(expected[i], Encoder.hexEncode(actual));
+              }
+          }
     }
 
     public void validateRowOfDecimal(VoltTable vt, BigDecimal [] expected) {
