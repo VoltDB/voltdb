@@ -246,8 +246,13 @@ public class LocalCluster implements VoltServerConfig {
         String javaLibraryPath = null;
         if (m_additionalProcessEnv != null && m_additionalProcessEnv.containsKey(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
             if (Boolean.parseBoolean(m_additionalProcessEnv.get(EELibraryLoader.USE_JAVA_LIBRARY_PATH))) {
-                // set the java lib path to the one for this process - default to obj/release/nativelibs
-                javaLibraryPath = System.getProperty("java.library.path", buildDir + "/nativelibs");
+                // set the java lib path to the one for this process - Add obj/release/nativelibs
+                javaLibraryPath = System.getProperty("java.library.path");
+                if (javaLibraryPath == null || javaLibraryPath.trim().length() == 0) {
+                    javaLibraryPath = buildDir + "/nativelibs";
+                } else {
+                    javaLibraryPath += ":" + buildDir + "/nativelibs";
+                }
             }
         }
 
