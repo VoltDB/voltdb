@@ -4,11 +4,6 @@
 -- so that NULL values no longer cause mismatches (this line removes NULLs)
 {@insertvals = "_id, _value[string], _value[int16], _value[float]"}
 
--- TODO: remove this, and change _tempsetop back to _setop below,
--- once ENG-8442 (EXISTS sub-query with INTERSECT) is fixed
-{_tempsetop |= " UNION "}
-{_tempsetop |= " UNION ALL "}
-
 --- DML: purge and regenerate random data first
 DELETE FROM @dmltable
 INSERT INTO @dmltable VALUES (@insertvals)
@@ -69,9 +64,8 @@ SELECT * FROM @fromtables A31 WHERE _maybe EXISTS (SELECT _variable[#col]       
 SELECT * FROM @fromtables A32 WHERE _maybe EXISTS (SELECT _variable[#col], @agg(_variable[#agg]) FROM @fromtables _groupbycoloptionalhavingagg)
 
 --- EXISTS using set operators (UNION, INTERSECT, EXCEPT [ALL]) in the sub-query
--- TODO: change _tempsetop back to _setop, once ENG-8442 (EXISTS sub-query with INTERSECT) is fixed
-SELECT * FROM @fromtables A33 WHERE _maybe EXISTS (SELECT _variable[#col] FROM @fromtables _tempsetop SELECT __[#col] FROM @fromtables)
-SELECT * FROM @fromtables A34 WHERE _maybe EXISTS (SELECT _variable[#col] FROM @fromtables _tempsetop SELECT __[#col] FROM @fromtables SQ WHERE SQ.__[#col] _cmp A34.__[#col])
+SELECT * FROM @fromtables A33 WHERE _maybe EXISTS (SELECT _variable[#col] FROM @fromtables _setop SELECT __[#col] FROM @fromtables)
+SELECT * FROM @fromtables A34 WHERE _maybe EXISTS (SELECT _variable[#col] FROM @fromtables _setop SELECT __[#col] FROM @fromtables SQ WHERE SQ.__[#col] _cmp A34.__[#col])
 
 --- EXISTS using an implicit join between two tables
 SELECT * FROM @fromtables A35 WHERE _maybe EXISTS (SELECT A._variable[#col], B.__[#col] FROM @fromtables A, @fromtables B WHERE A.__[#col] = B.__[#col] AND A.__[#col] _cmp A35.__[#col])
