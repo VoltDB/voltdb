@@ -44,7 +44,7 @@
                 <attribute name="Embed-Dependency" value="groupId=org.apache.kafka" />
                 <attribute name="Embedded-Artifacts" value='kafka-clients-0.8.2.1.jar;g="org.apache.kafka";a="kafka-clients";v="0.8.2.1"' />
                 <attribute name="Bundle-ClassPath" value=".,kafka-clients-0.8.2.1.jar" />
-                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer,org.voltdb.utils,org.voltdb.client,org.slf4j" />
+                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.apache.log4j,org.voltdb.importer,org.voltcore.network" />
             </manifest>
         </jar>
     </target>
