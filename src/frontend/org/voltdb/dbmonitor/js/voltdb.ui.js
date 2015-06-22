@@ -2187,15 +2187,26 @@ var showHideGraph = function (userpreferences) {
     } else {
         $("#divDrReplication").show();
     }
-    if (userpreferences["CommandLogStat"] == false || VoltDbUI.isCommandLogEnabled == 'false')
-        $("#chartCommandLogging").hide();
-    else
-        $("#chartCommandLogging").show();
 
-    if (userpreferences["CommandLogTables"] == false || VoltDbUI.isCommandLogEnabled == 'false')
+    if (VoltDbUI.isCommandLogEnabled == 'true') {
+        if (userpreferences["CommandLogStat"] == true) {
+            $("#chartCommandLogging").show();
+        } else {
+            $("#chartCommandLogging").hide();
+        }
+    } else {
+        $("#chartCommandLogging").hide();
+    }
+
+    if (VoltDbUI.isCommandLogEnabled == 'true') {
+        if (userpreferences["CommandLogTables"] == true) {
+            $("#divCommandLog").show();
+        } else {
+            $("#divCommandLog").hide();
+        }
+    } else {
         $("#divCommandLog").hide();
-    else
-        $("#divCommandLog").show();
+    }
 
     adjustGraphSpacing();
     ChangeGraphLabelColor();
