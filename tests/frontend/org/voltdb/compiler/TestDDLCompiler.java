@@ -501,7 +501,7 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE VIEW VT6 (V_D1, V_D2, CNT, MIN_VAL1, MIN_VAL2, MAX_VAL1) " + // should choose T_TREE_2
                 "AS SELECT D1, D2, COUNT(*), MIN(VAL1), MIN(VAL2), MAX(VAL1) " +
                 "FROM T " +
-                "GROUP BY D1, D2;\n" + 
+                "GROUP BY D1, D2;\n" +
 
                 "CREATE VIEW VT7 (V_D1, V_D2, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL1) " + // should choose T_TREE_10
                 "AS SELECT D1, D2, COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL1) " +
