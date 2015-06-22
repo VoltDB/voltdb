@@ -66,6 +66,13 @@ public:
     catalog::MaterializedViewInfo* getMaterializedViewInfo() {
         return m_mvInfo;
     }
+
+    // See if the index is just built on group by columns or it also includes min/max agg (ENG-6511)
+    bool minMaxIndexIncludesAggCol()
+    {
+        if ( ! m_indexForMinMax) { return false; }
+        return m_indexForMinMax->getColumnIndices().size() == m_groupByColumnCount + 1;
+    }
 private:
 
     void freeBackedTuples();
@@ -133,6 +140,10 @@ private:
     TableTuple m_searchKeyTuple;
     // storage to hold the value for the search key
     char *m_searchKeyBackingStore;
+
+    std::vector<NValue> m_minMaxSearchKeyValue;
+    TableTuple m_minMaxSearchKeyTuple;
+    char *m_minMaxSearchKeyBackingStore;
 
     // which columns in the source table
 
