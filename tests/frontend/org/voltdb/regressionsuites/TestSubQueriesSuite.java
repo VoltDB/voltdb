@@ -1225,7 +1225,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "        where ID < 104)) " +
                     "      IS NULL;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB got 0 rows
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB (ENG-8436 logical nulls) got 0 rows
 
             sql =   "select ID from R1 " +
                 "where ((WAGE, DEPT) = ANY " +
@@ -1233,39 +1233,32 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "        where ID < 104)) " +
                 "      IS NULL;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB got 0 rows
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB (ENG-8436 logical nulls) got 0 rows
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104);";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // ??? HSQL & VoltDB got 0 rows
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // ??? VoltDB got 3 rows (ENG-8436 logical nulls) HSQL got 0 rows
 
             sql =   "select ID from R1 " +
                     "where NOT (WAGE, DEPT) = ANY " +
                     "          (select WAGE, DEPT from R2 " +
                     "           where ID < 104);";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // ??? HSQL & VoltDB got 0 rows
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // ??? VoltDB got 3 rows (ENG-8436 logical nulls) HSQL got 0 rows
         }
 
         // IN should evaluate to NULL
         // when there is a null-nonmatch but no match.
         if ( ! isHSQL()) { // wrong even in HSQL.
-            sql =   "select ID from R1 " +
-                "where ((WAGE, DEPT) IN " +
-                "       (select WAGE, DEPT from R2 " +
-                "        where ID < 104)) " +
-                "      IS NULL;";
-            //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); //wrong (0 rows) for VoltDB AND HSQL? FIXME
 
             sql =   "select ID from R1 " +
                     "where NOT ((WAGE, DEPT) IN " +
                     "           (select WAGE, DEPT from R2 " +
                     "            where ID < 104));";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB AND HSQL? FIXME
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
 
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) IN " +
@@ -1273,14 +1266,14 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "        where ID < 104) " +
                     "      IS FALSE;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB AND HSQL? FIXME
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
 
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104);";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB? FIXME
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
 
             // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
             sql =   "select ID from R1 " +
@@ -1288,7 +1281,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104);";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
         }
     }
 
@@ -1368,14 +1361,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "       (select WAGE, DEPT from R2 " +
                     "        where ID = 0 or WAGE is NULL)) " +
                     "        IS NULL;";
-            validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
+            //* enable to debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{100}});
             sql =   "select ID from R1 " +
                     "where ((WAGE, DEPT) = ALL " +
                     "       (select WAGE, DEPT from R2 " +
                     "        where ID = 0 or WAGE is NULL" +
                     "        order by ID limit 6 offset 1)) " +
                     "        IS NULL;";
-            validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
+            validateTableOfLongs(client, sql, new long[][] {{100}});
         }
 
         // Focus a set of queries on the data filtered down to a NULL row.
@@ -1476,13 +1470,14 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
         // "<> ALL" and "NOT IN"
-        // should only evaluate to TRUE when there is a definite non-match.
+        // should only evaluate to TRUE when there is no definite match
+        // AND no null match OR a definite non-match.
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <> ALL " +
                 "      (select WAGE, DEPT from R2 " +
                 "       order by WAGE, DEPT limit 4 offset 1);";
-        /* enable to debug */ dumpQueryPlans(client, sql);
-        if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10},{300}}); //wrong (0 rows) for VoltDB? FIXME
+        //* enable to debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, new long[][] {{10},{300}});
 
 
         // Just run the same patterns here as the IN/ANY test...
@@ -1612,12 +1607,13 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "      (select DEPT, WAGE from R2 " +
                 "       order by ID offset 1 limit 3);";
         validateTableOfLongs(client, sql, new long[][] {{10}});
+
         if (!isHSQL()) { // HSQL erroneously matches all rows
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) <> ALL " +
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104);";
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // VoltDB gets 0 rows
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
             sql =   "select ID from R1 " +
                     "where (DEPT, WAGE) <> ALL " +
                     "      (select DEPT, WAGE from R2 " +
@@ -1627,7 +1623,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "where (WAGE, DEPT) <> ALL " +
                     "      (select WAGE, DEPT from R2 " +
                     "       order by ID offset 1 limit 3);";
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // VoltDB gets 0 rows
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
             sql =   "select ID from R1 " +
                     "where (DEPT, WAGE) <> ALL " +
                     "      (select DEPT, WAGE from R2 " +
@@ -2052,13 +2048,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // the result is FALSE
         if ( ! isHSQL()) {
             // HSQL gets this one wrong
-            // FAILING (sometimes?) due to ENG-8428 or something else?
-            // Otherwise (like VoltDB?) evaluating the =ALL to NULL instead of FALSE?
-            // PostgreSQL disagrees with us
             sql =   "select ID from R1 " +
                     "where not (WAGE = ALL " +
                     "           (select WAGE from R2));";
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); //wrong (0 rows) for VoltDB? FIXME
+            validateTableOfLongs(client, sql, new long[][] {{100}});
         }
     }
 

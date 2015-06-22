@@ -87,15 +87,13 @@ NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
             continue;
         }
         if (OP::compare_withoutNull(value1, tuple2.getNValue(columnIdx)).isTrue()) {
-            if (OP::implies_true_for_row(value1, value2) &&
-                ! fallback_result.isNull()) {
+            if (OP::implies_true_for_row(value1, value2)) {
                 // allow early return on strict inequality
                 return NValue::getTrue();
             }
         }
         else {
-            if (OP::implies_false_for_row(value1, value2) &&
-                ! fallback_result.isNull()) {
+            if (OP::implies_false_for_row(value1, value2)) {
                 // allow early return on strict inequality
                 return NValue::getFalse();
             }
@@ -160,11 +158,6 @@ struct NValueExtractor
         return m_value;
     }
 
-    bool isNullValue(const ValueType& value) const
-    {
-        return value.isNull();
-    }
-
     template<typename OP>
     NValue compare(const TableTuple& tuple) const
     {
@@ -221,10 +214,17 @@ struct TupleExtractor
 
     bool hasNullValue() const
     {
-        return isNullValue(m_tuple);
+        if (m_tuple.isNullTuple()) {
+            return true;
+        }
+        int schemaSize = m_tuple.getSchema()->columnCount();
+        for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
+            if (m_tuple.isNull(columnIdx)) {
+                return true;
+            }
+        }
+        return false;
     }
-
-    bool isNullValue(const ValueType& value) const;
 
     template<typename OP>
     NValue compare(const TableTuple& tuple) const
@@ -354,9 +354,6 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
             }
         }
         else { //  result is null
-            if (m_quantifier != QUANTIFIER_TYPE_ANY) {
-                return result;
-            }
             hasInnerNull = true;
         }
     }

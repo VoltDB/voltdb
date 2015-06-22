@@ -177,10 +177,7 @@ public:
                    OP::op_name(),
                    typeid(*(m_left)).name(),
                    typeid(*(m_right)).name(),
-                   ((lnv.isNull() || rnv.isNull()) ? "NULL" :
-                       OP::compare_withoutNull(m_left->eval(tuple1, tuple2),
-                                   m_right->eval(tuple1, tuple2)).isTrue()
-                       ? "TRUE" : "FALSE"));
+                   traceEval(tuple1, tuple2));
 
         assert(m_left != NULL);
         assert(m_right != NULL);
@@ -204,6 +201,19 @@ public:
         }*/
 
         return OP::compare_withoutNull(lnv, rnv);
+    }
+
+    inline const char* traceEval(const TableTuple *tuple1, const TableTuple *tuple2) const
+    {
+        NValue lnv;
+        NValue rnv;
+        return  (((lnv = m_left->eval(tuple1, tuple2)).isNull() ||
+                  (rnv = m_right->eval(tuple1, tuple2)).isNull()) ?
+                 "NULL" :
+                 (OP::compare_withoutNull(lnv,
+                                          rnv).isTrue() ?
+                  "TRUE" :
+                  "FALSE"));
     }
 
     std::string debugInfo(const std::string &spacer) const {
