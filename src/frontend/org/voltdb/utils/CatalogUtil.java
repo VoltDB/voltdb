@@ -130,15 +130,12 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
-<<<<<<< HEAD
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.importer.ImportDataProcessor;
-=======
->>>>>>> 9469fe1... associate kafka connector type to the new kafka export client
 
 /**
  *
