@@ -37,7 +37,9 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
@@ -444,6 +446,93 @@ public class TestDDLCompiler extends TestCase {
             // cleanup after the test
             jarOut.delete();
         }
+    }
+
+    // ENG-6511
+    public void testMinMaxViewIndexSelection() {
+        File jarOut = new File("minMaxViewIndexSelection.jar");
+        jarOut.deleteOnExit();
+
+        // boilerplate for making a project
+        final String simpleProject =
+                "<?xml version=\"1.0\"?>\n" +
+                "<project><database><schemas>" +
+                "<schema path='%s' />" +
+                "</schemas></database></project>";
+        String schema =
+                 // schema with indexes (should have no warnings)
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE INDEX T_TREE_1 ON T(D1);\n" +
+                "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
+                "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
+                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
+                "CREATE INDEX T_TREE_5 ON T(D1, D2, D3, VAL1+VAL2);\n" +
+                "CREATE INDEX T_TREE_6 ON T(D1+D2, ABS(D3)) WHERE D1 > 3;\n" +
+                "CREATE INDEX T_TREE_7 ON T(D1, D2, VAL1+VAL2) WHERE D1 > 3;\n" +
+                "CREATE INDEX T_TREE_8 ON T(D1+D2, ABS(D3), VAL1);\n" +
+                "CREATE INDEX T_TREE_9 ON T(D1, D2, D3, VAL1+VAL2) WHERE D2 > 4;\n" +
+                "CREATE INDEX T_TREE_10 ON T(D1, D2, VAL1);\n" +
+
+                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " + // should choose T_TREE_4
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;\n" +
+
+                "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " + // should choose T_TREE_5
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(VAL1 + VAL2) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;\n" +
+
+                "CREATE VIEW VT3 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " + // should choose T_TREE_8
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL1), MAX(VAL1) " +
+                "FROM T " +
+                "GROUP BY D1 + D2, ABS(D3);\n" +
+
+                "CREATE VIEW VT4 (V_D1, V_D2, CNT, MIN_VAL1_VAL2) " + // should choose T_TREE_5
+                "AS SELECT D1, D2, COUNT(*), MIN(VAL1 + VAL2)" +
+                "FROM T WHERE D1 > 3 " +
+                "GROUP BY D1, D2;\n" +
+
+                "CREATE VIEW VT5 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " + // should choose T_TREE_6
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+                "FROM T WHERE D1 > 3 " +
+                "GROUP BY D1 + D2, ABS(D3);\n" +
+
+                "CREATE VIEW VT6 (V_D1, V_D2, CNT, MIN_VAL1, MIN_VAL2, MAX_VAL1) " + // should choose T_TREE_2
+                "AS SELECT D1, D2, COUNT(*), MIN(VAL1), MIN(VAL2), MAX(VAL1) " +
+                "FROM T " +
+                "GROUP BY D1, D2;\n" + 
+
+                "CREATE VIEW VT7 (V_D1, V_D2, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL1) " + // should choose T_TREE_10
+                "AS SELECT D1, D2, COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL1) " +
+                "FROM T " +
+                "GROUP BY D1, D2;";
+
+        VoltCompiler compiler = new VoltCompiler();
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        String schemaPath = schemaFile.getPath();
+
+        File projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        String projectPath = projectFile.getPath();
+
+        // compile successfully
+        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        CatalogMap<Table> tables = compiler.getCatalogDatabase().getTables();
+        Table t = tables.get("T");
+        CatalogMap<MaterializedViewInfo> views = t.getViews();
+        assertEquals(views.get("VT1").getIndexforminmax(), "T_TREE_4");
+        assertEquals(views.get("VT2").getIndexforminmax(), "T_TREE_5");
+        assertEquals(views.get("VT3").getIndexforminmax(), "T_TREE_8");
+        assertEquals(views.get("VT4").getIndexforminmax(), "T_TREE_7");
+        assertEquals(views.get("VT5").getIndexforminmax(), "T_TREE_6");
+        assertEquals(views.get("VT6").getIndexforminmax(), "T_TREE_2");
+        assertEquals(views.get("VT7").getIndexforminmax(), "T_TREE_10");
+
+        // cleanup after the test
+        jarOut.delete();
     }
 
     public void testExportTables() {
