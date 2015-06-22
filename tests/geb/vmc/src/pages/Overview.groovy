@@ -28,7 +28,6 @@ class Overview extends Module {
         export				{ $(class:"labelCollapsed", text:"Export") }
         advanced			{ $(class:"labelCollapsed", text:"Advanced") }
 
-
         sitePerHostValue			{ $("#sitePerHost") }
         ksafetyValue				{ $("#kSafety") }
         partitionDetectionValue		{ $("#partitionDetectionLabel") }
@@ -36,7 +35,6 @@ class Overview extends Module {
         httpAccessValue				{ $("#httpAccessLabel") }
         autoSnapshotsValue			{ $("#txtAutoSnapshot") }
         commandLoggingValue			{ $("#commandLogLabel") }
-
 
         securityEdit				{ $("#securityEdit") }
         securityEditCheckbox		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-6.hasSubLabel.parent.security td.securitytd div.icheckbox_square-aero.checked.customCheckbox ins.iCheck-helper") }
@@ -48,7 +46,6 @@ class Overview extends Module {
 
         autoSnapshotsEditOk 		{ $("#btnEditAutoSnapshotOk") }
         autoSnapshotsEditCancel 	{ $("#btnEditAutoSnapshotCancel") }
-
 
         filePrefixField             { $(id:"txtPrefix") }
         frequencyField              { $(id:"txtFrequency") }
@@ -124,11 +121,14 @@ class Overview extends Module {
         // EXPORT EXPANSION
         
         export			            { $(class:"labelCollapsed", text:"Export") }
+        exportExpanded              { $(class:"labelCollapsed labelExpanded", text:"Export") }
         exportTablesText            { $(class:"configLabel", text:"Export Tables") }
         listOfExport                { $("#lstExportTbl") }
         exportNoConfigAvailable     { $(class:"configLabel", text:"No configuration available.") }
         exportConfiguration         { $("#exportConfiguration") }
         exportConfig                { $(class:"configLabel expoStream", title:"Click to expand/collapse", number) }
+        
+        editExportConfiguration     { $("#exportEdit0") }
         
         // EXPORT POPUP
         stream                      { $("#txtStream") }
@@ -140,8 +140,18 @@ class Overview extends Module {
         textType        			{ $("#txtType")}
         
         errorStream                 { $("#errorStream") }
-                
-        //{ $("#") }
+        
+        fileName                    { $(class:"labelCollapsed", text:fileTest) }
+        jdbcName                    { $(class:"labelCollapsed", text:jdbcTest) }
+        kafkaName                   { $(class:"labelCollapsed", text:kafkaTest) }
+        httpName                    { $(class:"labelCollapsed", text:httpTest) }
+        rabbitMqBrokerName          { $(class:"labelCollapsed", text:rabbitMqBrokerTest) }
+        rabbitMqAmpqName            { $(class:"labelCollapsed", text:rabbitMqAmpqTest) }
+        customName                  { $(class:"labelCollapsed", text:customTest) }
+        
+        confirmyesbtn			    { $("#btnSaveConfigOk", text:"Yes") }
+        
+        deleteConfiguration         { $("#deleteAddConfig > a") }
         
         // EXPORT POPUP: FILE
         type                        { $("#txtFileType") }
@@ -229,11 +239,20 @@ class Overview extends Module {
         errorQuery				{ $("#errorQueryTimeout") }
     }
     
+    int numberOfTrials = 10
     int waitTime = 30
     int five = 5
     int count = 0
-    String onClickValue = getName()
+    String onClickValue     = getName()
     String onClickValueNext = getNameNext()
+    
+    String fileTest             = getFileTest()
+    String jdbcTest             = getJdbcTest()
+    String kafkaTest            = getKafkaTest()
+    String httpTest             = getHttpTest()
+    String rabbitMqBrokerTest   = getRabbitmqBrokerTest()
+    String rabbitMqAmpqTest     = getRabbitmqAmpqTest()
+    String customTest           = getCustomTest()
     
     def String getName() {
     	return "addUser(1,'" + getUsernameOneForSecurity() + "','" + getRoleOneForSecurity() + "');"
@@ -241,6 +260,34 @@ class Overview extends Module {
 
 	def String getNameNext() {
     	return "addUser(1,'" + getUsernameTwoForSecurity() + "','" + getRoleTwoForSecurity() + "');"
+    }
+    
+    def String getFileTest() {
+        return getFileTestName() + " (FILE)"
+    }
+    
+    def String getJdbcTest() {
+        return getJdbcTestName() + " (JDBC)"
+    }
+    
+    def String getKafkaTest() {
+        return getKafkaTestName() + " (KAFKA)"
+    }
+    
+    def String getHttpTest() {
+        return getHttpTestName() + " (HTTP)"
+    }
+    
+    def String getRabbitmqBrokerTest() {
+        return getRabbitmqBrokerTestName() + " (RABBITMQ)"
+    }
+    
+    def String getRabbitmqAmpqTest() {
+        return getRabbitmqAmpqTestName() + " (RABBITMQ)"
+    }
+    
+    def String getCustomTest() {
+        return getCustomTestName() + " (CUSTOM)"
     }
     
     // Get usernameone for security
@@ -558,5 +605,196 @@ class Overview extends Module {
      		return false
     	}
     }
+    
+    def openAddConfigurationPopup() {
+	    waitFor(waitTime) { page.addconfig.isDisplayed() }
+	    int count = 0
+	    while(count<numberOfTrials) {
+	        count++
+	        try {
+	            page.addconfig.click()
+	            waitFor(waitTime) { page.overview.exportAddConfigPopupTitle.isDisplayed() }
+	            break
+	        } catch(geb.waiting.WaitTimeoutException e) {
+	        }
+	    }
+    }
+    
+    // For Export
+    
+    def String getFileTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	 
+    	String fileTestName
+    	 
+    	while((fileTestName = br.readLine()) != ("#fileTestName")) {}
+
+        fileTestName = br.readLine()
+
+        return fileTestName
+    }
+    
+    def String getJdbcTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	 
+    	String jdbcTestName
+    	 
+    	while((jdbcTestName = br.readLine()) != ("#jdbcTestName")) {}
+
+        jdbcTestName = br.readLine()
+
+        return jdbcTestName
+    }
+    
+    def String getKafkaTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	 
+    	String kafkaTestName
+    	 
+    	while((kafkaTestName = br.readLine()) != ("#kafkaTestName")) {}
+
+        kafkaTestName = br.readLine()
+
+        return kafkaTestName
+    }
+    
+    def String getHttpTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	 
+    	String httpTestName
+    	 
+    	while((httpTestName = br.readLine()) != ("#httpTestName")) {}
+
+        httpTestName = br.readLine()
+
+        return httpTestName
+    }
+    
+    def String getRabbitmqBrokerTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	 
+    	String rabbitmqBrokerTestName
+    	 
+    	while((rabbitmqBrokerTestName = br.readLine()) != ("#rabbitmqBrokerTest")) {}
+
+        rabbitmqBrokerTestName = br.readLine()
+
+        return rabbitmqBrokerTestName
+    }
+    
+    def String getRabbitmqAmpqTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	 
+    	String rabbitmqAmpqTestName
+    	 
+    	while((rabbitmqAmpqTestName = br.readLine()) != ("#rabbitmqAmpqTest")) {}
+
+        rabbitmqAmpqTestName = br.readLine()
+
+        return rabbitmqAmpqTestName
+    }
+    
+    def String getCustomTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	 
+    	String customTestName
+    	 
+    	while((customTestName = br.readLine()) != ("#customTestName")) {}
+
+        customTestName = br.readLine()
+
+        return customTestName
+    }
+    
+    def void clickSave() {
+        int count = 0
+	    while(count<numberOfTrials) {
+	        count++
+            try {
+                save.click()
+	            !save.click()
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                break
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                break
+            }
+	    }
+	    
+	    count = 0
+	    while(count<numberOfTrials) {
+	        count++
+            try {
+                confirmyesbtn.click()
+	            !confirmyesbtn.click()
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                break
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                break
+            }
+	    }
+    }
+    
+    def void deleteExportConfiguration() {
+        int count = 0
+	    while(count<numberOfTrials) {
+	        count++
+            try {
+                deleteConfiguration.click()
+	            !deleteConfiguration.click()
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                break
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                break
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+                break
+            }
+	    }
+	    
+	    count = 0
+	    while(count<numberOfTrials) {
+	        count++
+            try {
+                confirmyesbtn.click()
+	            !confirmyesbtn.click()
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                break
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                break
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+                break
+            }
+	    }
+    }
+    
+    /**
+     * Click export to expand, if already it is not expanded
+     */
+    def boolean expandExport() {	
+        if (checkIfExportIsExpanded() == false)
+     		export.click()
+    }
+     
+     /**
+     * Click export to collapse, if already it is expanded
+     */
+     def boolean collapseExport() {	
+     	if (checkIfExportIsExpanded() == true)
+     		export.click()
+     }
+     
+     /**
+     * Check if export is expanded or not
+     */
+     def boolean checkIfExportIsExpanded() {
+     	try {
+		 	exportExpanded.isDisplayed()
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(org.openqa.selenium.StaleElementReferenceException e) {
+     		return true
+     	}
+     }
+     
 }
 
