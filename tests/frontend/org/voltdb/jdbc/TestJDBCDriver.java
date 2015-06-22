@@ -651,9 +651,9 @@ public class TestJDBCDriver {
                 .prepareCall("{call ArbitraryDurationProc(?)}");
 
         // Now make it timeout
-        stmt.setQueryTimeout(timeout);
         stmt.setLong(1, timeQuery);
         try {
+            stmt.setQueryTimeout(timeout);
             stmt.execute();
         } catch (SQLException ex) {
             System.out.println("Query timed out: " + ex.getSQLState());
