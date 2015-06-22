@@ -3487,8 +3487,30 @@ a:hover.changePsd {
     height: 0px;
 }
 
+
+
 /*********************************************media Qu********************/
 
+@media (max-width: 300px) {
+    ul.topRightList li {
+        padding:12px 0 0 2px;
+    }
+    .refreshBtn{ margin-bottom: 10px;}
+    .slimScrollDiv {
+            margin-top: 70px;
+        }
+            .menuHome { display: none;}
+
+        ul.tabs li {
+            float: none;
+        }
+        .tabScroller { margin-top:30px}
+}
+@media (max-width: 320px) {
+    ul.topRightList li {
+        padding:12px 0 0 2px;
+    }
+}
 @media (max-width: 360px) {
     .headerAdminContent {
         height: 65px;
@@ -4092,6 +4114,7 @@ a:hover.changePsd {
 }
 
 @media (width: 320px) {
+    
 
     input.icon-search {
         width: 182px;

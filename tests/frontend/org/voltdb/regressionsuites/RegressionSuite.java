@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -381,6 +382,14 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
+    public void validateTableOfDecimal(Client c, String sql, BigDecimal[][] expected)
+            throws Exception, IOException, ProcCallException {
+        assertNotNull(expected);
+        VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfDecimal(vt, expected);
+    }
+
+
     static public void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
@@ -485,6 +494,41 @@ public class RegressionSuite extends TestCase {
             } else {
                 assertEquals(expected[i], vt.getString(col));
             }
+        }
+    }
+
+    public void validateRowOfDecimal(VoltTable vt, BigDecimal [] expected) {
+        int len = expected.length;
+        assertTrue(vt.advanceRow());
+        for (int i=0; i < len; i++) {
+            BigDecimal actual = null;
+            try {
+                actual = vt.getDecimalAsBigDecimal(i);
+            } catch (IllegalArgumentException ex) {
+                ex.printStackTrace();
+                fail();
+            }
+            if (expected[i] != null) {
+                assertNotSame(null, actual);
+                assertEquals(expected[i], actual);
+            } else {
+                if (isHSQL()) {
+                    // We don't actually use this with
+                    // HSQL.  So, just assert failure here.
+                    fail("HSQL is not used to test the Volt DECIMAL type.");
+                } else {
+                    assertTrue(vt.wasNull());
+                }
+            }
+        }
+    }
+
+    public void validateTableOfDecimal(VoltTable vt, BigDecimal[][] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            validateRowOfDecimal(vt, expected[i]);
         }
     }
 

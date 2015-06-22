@@ -198,6 +198,7 @@ function QueryUI(queryString, userName) {
         var start = (new Date()).getTime();
         var connectionQueue = connection.getQueue();
         connectionQueue.Start();
+
         for (var i = 0; i < statements.length; i++) {
             var isExplainQuery = false;
             var id = 'r' + i;
