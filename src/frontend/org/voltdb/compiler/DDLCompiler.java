@@ -2316,15 +2316,15 @@ public class DDLCompiler {
                         String predicate = Encoder.hexDecodeToString(encodedPredicate);
                         AbstractExpression matViewPredicate = AbstractExpression.fromJSONString(predicate, tableScan);
                         coveringExprs.addAll(ExpressionUtil.uncombineAny(matViewPredicate));
-                        if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
-                            // partial index does not match MatView where clause, give up this index
-                            continue;
-                        }
                     }
                 } catch (JSONException e) {
                     e.printStackTrace();
                     assert(false);
                     return null;
+                }
+                if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
+                    // partial index does not match MatView where clause, give up this index
+                    continue;
                 }
             }
             // if the index already covered group by columns and the aggCol/aggExpr,
