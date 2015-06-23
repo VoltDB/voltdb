@@ -1837,6 +1837,38 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
+    public void testExportTypes() throws Exception {
+        try {
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get exportTypes
+            String json = getUrlOverJSON("http://localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
+            JSONObject jobj = new JSONObject(json);
+            assertTrue(jobj.getString("types").contains("FILE"));
+            assertTrue(jobj.getString("types").contains("JDBC"));
+            assertTrue(jobj.getString("types").contains("KAFKA"));
+            assertTrue(jobj.getString("types").contains("HTTP"));
+            assertTrue(jobj.getString("types").contains("RABBITMQ"));
+            assertTrue(jobj.getString("types").contains("CUSTOM"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
     public void testProfile() throws Exception {
         try {
             String simpleSchema

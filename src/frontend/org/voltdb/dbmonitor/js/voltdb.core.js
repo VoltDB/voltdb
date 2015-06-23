@@ -141,12 +141,13 @@
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 }
-                var headerLength = params.replace(/'/g, "%27").length;
-                if (headerLength > 5632) {
-                    callback({ "status": -131, "statusstring": "SQL query is too long for the web interface. Use a shorter query or use the command line utility sqlcmd.", "results": [] });
-                    return;
-                }
+                
                 if (typeof (params) == 'string') {
+                    var headerLength = params.replace(/'/g, "%27").length;
+                    if (headerLength > 5632) {
+                        callback({ "status": -131, "statusstring": "SQL query is too long for the web interface. Use a shorter query or use the command line utility sqlcmd.", "results": [] });
+                        return;
+                    }
                     if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
                         if (this.authorization != null) {
@@ -224,8 +225,8 @@
                 return this;
             };
 
-            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
-                var isHighTimeout = (procedure == "@SnapshotRestore" || procedure == "@AdHoc");
+            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isLongOutput) {
+                var isHighTimeout = (procedure == "@SnapshotRestore" || isLongOutput === true);
                 this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails);
             };
 
@@ -246,8 +247,8 @@
                     return this;
                 };
 
-                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
-                    stack.push([procedure, parameters, callback, shortApiCallDetails]);
+                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails,isLongTimeOut) {
+                    stack.push([procedure, parameters, callback, shortApiCallDetails, isLongTimeOut]);
                     return this;
                 };
                 this.EndExecute = function () {
@@ -256,7 +257,7 @@
                     if (stack.length > 0 && (success || continueOnFailure)) {
                         var item = stack[0];
                         var shortApiCallDetails = item[3];
-                        var isHighTimeout = (item[0] == "@SnapshotRestore" || item[0] == "@AdHoc");
+                        var isHighTimeout = (item[0] == "@SnapshotRestore" || item[0] == "@AdHoc" || item[4] === true);
                         var callback =
                         (new callbackWrapper(
                             (function (queue, item) {

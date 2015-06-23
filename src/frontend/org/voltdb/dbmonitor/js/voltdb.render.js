@@ -359,6 +359,18 @@ function alertNodeClicked(obj) {
             }
         };
 
+
+        this.GetExportProperties = function (onInformationLoaded) {
+
+            VoltDBService.GetExportProperties(function (connection) {
+                var rawData;
+                if (connection != null)
+                    rawData = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+
+                onInformationLoaded(loadExportProperties(connection), rawData);
+            });
+        };
+
         this.GetProceduresInfo = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
@@ -505,6 +517,14 @@ function alertNodeClicked(obj) {
             VoltDBService.GetCommandLogInformation(function (connection) {
                 getCommandLogDetails(connection, cmdLogDetails);
                 onInformationLoaded(cmdLogDetails);
+            });
+        };
+
+        this.GetSnapshotStatus = function (onInformationLoaded) {
+            var snapshotDetails = {};
+            VoltDBService.GetSnapshotStatus(function (connection) {
+                getSnapshotStatus(connection, snapshotDetails);
+                onInformationLoaded(snapshotDetails);
             });
         };
 
@@ -750,6 +770,16 @@ function alertNodeClicked(obj) {
             }
 
             return adminConfigValues;
+        };
+
+        var loadExportProperties = function (connection) {
+            var exportProperties = {};
+            if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'] != null) {
+                var data = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+                exportProperties['type'] = data.types;
+            }
+
+            return exportProperties;
         };
 
 
@@ -2449,7 +2479,8 @@ function alertNodeClicked(obj) {
             }
 
             connection.Metadata['@Statistics_COMMANDLOG'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "OUTSTANDING_TXNS" || columnInfo["name"] == "TIMESTAMP")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "OUTSTANDING_TXNS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "OUTSTANDING_BYTES" || columnInfo["name"] == "SEGMENT_COUNT" ||
+                    columnInfo["name"] == "FSYNC_INTERVAL" || columnInfo["name"] == "IN_USE_SEGMENT_COUNT")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2462,6 +2493,36 @@ function alertNodeClicked(obj) {
                 }
                 cmdLogDetails[hostName]["OUTSTANDING_TXNS"] = info[colIndex["OUTSTANDING_TXNS"]];
                 cmdLogDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                cmdLogDetails[hostName]["OUTSTANDING_BYTES"] = info[colIndex["OUTSTANDING_BYTES"]];
+                cmdLogDetails[hostName]["SEGMENT_COUNT"] = info[colIndex["SEGMENT_COUNT"]];
+                cmdLogDetails[hostName]["FSYNC_INTERVAL"] = info[colIndex["FSYNC_INTERVAL"]];
+                cmdLogDetails[hostName]["IN_USE_SEGMENT_COUNT"] = info[colIndex["IN_USE_SEGMENT_COUNT"]];
+            });
+        };
+
+        var getSnapshotStatus = function (connection, snapshotDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_SNAPSHOTSTATUS'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_SNAPSHOTSTATUS'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PATH" || columnInfo["name"] == "START_TIME" || columnInfo["name"] == "END_TIME")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_SNAPSHOTSTATUS'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!snapshotDetails.hasOwnProperty(hostName)) {
+                    snapshotDetails[hostName] = {};
+                }
+                snapshotDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                snapshotDetails[hostName]["PATH"] = info[colIndex["PATH"]];
+                snapshotDetails[hostName]["START_TIME"] = info[colIndex["START_TIME"]];
+                snapshotDetails[hostName]["END_TIME"] = info[colIndex["END_TIME"]];
             });
         };
 

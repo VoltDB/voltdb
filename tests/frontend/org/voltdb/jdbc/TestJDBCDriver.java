@@ -42,9 +42,11 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.junit.AfterClass;
@@ -613,9 +615,9 @@ public class TestJDBCDriver {
         assertEquals(10, count);
     }
 
-    //Test to check Query Timeout
+    // Test to check Query without Timeout
     @Test
-    public void testQueryTimeout() throws SQLException {
+    public  void testQueryNotTimeout() throws SQLException {
         //this should not timeout at all proc will wait for 3 min before returning.
         PreparedStatement stmt = conn.prepareCall("{call ArbitraryDurationProc(?)}");
         stmt.setLong(1, 180*1000);
@@ -637,39 +639,67 @@ public class TestJDBCDriver {
             exceptionCalled = true;
         }
         assertFalse(exceptionCalled);
+    }
 
-        //Now make it timeout
-        stmt.setQueryTimeout(1);
-        stmt.setLong(1, 7000);
+    // execute a Query with a Timeout set
+    // return true if timeout (excecptionCalled)
+    public Boolean runQueryWithTimeout(int timeQuery, int timeout)
+            throws SQLException {
+        Boolean[] result = new Boolean[3];
+        boolean exceptionCalled = false;
+        PreparedStatement stmt = myconn
+                .prepareCall("{call ArbitraryDurationProc(?)}");
+
+        // Now make it timeout
+        stmt.setLong(1, timeQuery);
         try {
+            stmt.setQueryTimeout(timeout);
             stmt.execute();
         } catch (SQLException ex) {
             System.out.println("Query timed out: " + ex.getSQLState());
             exceptionCalled = true;
         }
-        assertTrue(exceptionCalled);
+        return exceptionCalled;
+    }
 
-        //redo statement with long timeout should not timeout
-        stmt.setQueryTimeout(30);
-        stmt.setLong(1, 7000);
-        exceptionCalled = false;
-        try {
-            stmt.execute();
-        } catch (SQLException ex) {
-            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
-            exceptionCalled = true;
-        }
-        assertFalse(exceptionCalled);
+    // Test to check Query Timeout with Time Unit being setup
+    @Test
+    public void testQueryTimeout() throws Exception {
+        Properties props = new Properties();
+        // Check default setting, timeout unit should be TimeUnit.SECONDS
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertTrue(runQueryWithTimeout(7000, 1));
+        assertFalse(runQueryWithTimeout(7000, 30));
+        assertTrue(runQueryWithTimeout(7000, -1));
+        myconn.close();
 
-        //Check -ve value
-        try {
-            stmt.setQueryTimeout(-1);
-        } catch (SQLException ex) {
-            //Bad value
-            exceptionCalled = true;
-        }
-        assertTrue(exceptionCalled);
+        // Check set time unit to MILLISECONDS
+        // through url
+        myconn = getJdbcConnection(
+                "jdbc:voltdb://localhost:21212?jdbc.querytimeout.unit=milliseconds",
+                props);
+        assertTrue(runQueryWithTimeout(7000, 1));
+        assertTrue(runQueryWithTimeout(7000, 30));
+        assertTrue(runQueryWithTimeout(7000, -1));
+        myconn.close();
 
+        // Check set time unit to MILLISECONDS
+        // through Java Propeties
+        props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "milliseconds");
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertTrue(runQueryWithTimeout(7000, 1));
+        assertTrue(runQueryWithTimeout(7000, 30));
+        assertTrue(runQueryWithTimeout(7000, -1));
+        myconn.close();
+
+        // Check set time unit to other unsupported unit, should by default
+        // still use TimeUnit.SECONDS
+        props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "nanoseconds");
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertTrue(runQueryWithTimeout(7000, 1));
+        assertFalse(runQueryWithTimeout(7000, 30));
+        assertTrue(runQueryWithTimeout(7000, -1));
+        myconn.close();
     }
 
     private void checkSafeMode(Connection myconn)
