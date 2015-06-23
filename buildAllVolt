@@ -1,0 +1,100 @@
+#!/bin/sh
+WORKSPACE="$HOME/src"
+VOLTNAME=voltdb
+PRONAME=pro
+JAVA_VERSION=1.7.0_79
+export JAVA_HOME=$(/usr/libexec/java_home -v "$JAVA_VERSION")
+while [ -z "$DONE" ]; do
+    case "$1" in
+	--build-pro|-A)
+	    BUILD_PRO=YES
+	    shift
+	    ;;
+	--workspace|-W)
+	    shift
+	    WORKSPACE="$1"
+	    shift
+	    ;;
+	--voltdb|-V)
+	    shift
+	    VOLTNAME="$1"
+	    shift
+	    ;;
+	--pro|-P)
+	    shift
+	    PRONAME="$1"
+	    shift
+	    ;;
+	--java-version|-V)
+	    shift
+	    JAVA_VERSION="$1"
+	    shift
+	    ;;
+	"")
+	    DONE=YES
+	    ;;
+	*)
+	    echo "$0: Unknown command line option \"$1\""
+	    exit 100
+	    ;;
+    esac
+done
+
+log() {
+    echo "::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
+    echo "::"
+    echo ":: $1"
+    echo "::"
+    echo "::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
+}
+
+export JAVA_HOME=$(/usr/libexec/java_home -v "$JAVA_VERSION")
+
+if [ ! -d "$WORKSPACE" ] ; then
+    echo "$0: Workspace \"$WORKSPACE\" does not exist."
+    exit 100
+fi
+
+cd "$WORKSPACE"
+
+log "Preparation..."
+for file in $PRONAME/template.* $VOLTNAME/template.*; do
+    dotfile=$(dirname $file)/$(echo "$file" | sed 's;.*\([.][^.]*\)$;\1;')
+    echo " $file -> $dotfile"
+    cp $file "$dotfile"
+done
+
+if [ -n "$BUILD_PRO" ] ; then
+    log "Configuring for PRO build.  Hope you have a license file handy."
+    export VOLTPRO="$(/bin/pwd)/$PRONAME"
+    export VOLTCORE="$WORKSPACE/$VOLTNAME"
+else
+    log "Configuring for a Community Build."
+    unset VOLTPRO
+    unset VOLTCORE
+fi
+
+log "Cleaning..."
+(cd $VOLTNAME; set -x; ant -f build.xml clean)
+
+log "Debug Build..."
+if ! (cd $VOLTNAME; set -x; ant -f build.xml -Dbuild=debug -Djmemcheck=NO_MEMCHECK); then
+    log "Failed to build in Debug."
+    FAILURES=DEBUG
+fi
+
+log "Release Build..."
+if ! (cd $VOLTNAME; set -x; ant -f build.xml -Dbuild=release -Djmemcheck=NO_MEMCHECK); then
+    log "Failed to build in Release."
+    if [ -z "$FAILURES" ] ; then
+	FAILURES="RELEASE"
+    else
+	FAILURES="$FAILURES+RELEASE"
+    fi
+fi
+
+if [ -n "$FAILURES" ] ; then
+    log "Failed Builds: $FAILURES."
+else
+    log "Success all around."
+fi

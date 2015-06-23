@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>voltdb_ee</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.cdt.managedbuilder.core.genmakebuilder</name>
+			<triggers>clean,full,incremental,</triggers>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>org.eclipse.cdt.managedbuilder.core.ScannerConfigBuilder</name>
+			<triggers>full,incremental,</triggers>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.eclipse.cdt.core.cnature</nature>
+		<nature>org.eclipse.cdt.core.ccnature</nature>
+		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
+		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
+	</natures>
+	<linkedResources>
+		<link>
+			<name>obj</name>
+			<type>2</type>
+			<location>/Users/liam/workspace/voltdb/obj</location>
+		</link>
+		<link>
+			<name>src</name>
+			<type>2</type>
+			<location>/Users/liam/workspace/voltdb/src/ee</location>
+		</link>
+		<link>
+			<name>tests</name>
+			<type>2</type>
+			<location>/Users/liam/workspace/voltdb/tests/ee</location>
+		</link>
+	</linkedResources>
+</projectDescription>

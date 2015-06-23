@@ -111,16 +111,29 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             if (readSize > 0) {
                 totalRead += readSize;
                 if (totalRead > bytes.length) {
-                    byte[] temp = new byte[bytes.length * 2];
+                    byte[] temp = null;
+                    //try {
+                        temp = new byte[bytes.length * 2];/*
+                    } catch (OutOfMemoryError e) {
+                        System.out.println("JVM ran out of memory. (first part!) Please allocate more.\n"
+                                + "IOException:" + e.getClass() + e.getMessage());
+                        System.exit(1);
+                    }*/
                     System.arraycopy(bytes, 0, temp, 0, bytes.length);
                     bytes = temp;
                 }
                 System.arraycopy(buffer, 0, bytes, totalRead - readSize, readSize);
             }
         }
-
-        // Trim bytes to proper size
-        byte retval[] = new byte[totalRead];
+        byte retval[] = null;
+       //  try {
+            // Trim bytes to proper size
+            retval = new byte[totalRead];
+        /*} catch (OutOfMemoryError e) {
+            System.out.println("The JVM Heap ran out of memory. Please allocate more.\n"
+                    + "IOException:" + e.getClass() + e.getMessage());
+            System.exit(1);
+        }*/
         System.arraycopy(bytes, 0, retval, 0, totalRead);
         return retval;
     }

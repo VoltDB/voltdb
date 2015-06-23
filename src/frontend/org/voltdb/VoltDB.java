@@ -864,9 +864,11 @@ public class VoltDB {
     /**
      * Entry point for the VoltDB server process.
      * @param args Requires catalog and deployment file locations.
+     * @throws InterruptedException
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
+        Thread.sleep(10000);
         Configuration config = new Configuration(args);
         try {
             if (!config.validate()) {

@@ -237,6 +237,7 @@ public class ClientThread extends BenchmarkThread {
         while (m_shouldContinue.get()) {
             try {
                 m_permits.acquire();
+                System.out.println("Starting here. ");
                 runOne();
             }
             catch (NoConnectionsException e) {
