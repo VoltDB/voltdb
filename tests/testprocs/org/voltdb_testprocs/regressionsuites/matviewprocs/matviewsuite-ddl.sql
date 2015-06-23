@@ -146,3 +146,7 @@ FROM ENG6511 GROUP BY d1+1, d2*2;
 CREATE VIEW VENG6511C (d1, d2, cnt, vmin, vmax) AS
 SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511
 WHERE v1 > 4 GROUP BY d1, d2;
+
+CREATE VIEW VENG6511TwoIndexes (d1, d2, cnt, vmin, vmax) AS
+SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(v2) AS vmax FROM ENG6511
+WHERE v1 > 4 GROUP BY d1, d2;
