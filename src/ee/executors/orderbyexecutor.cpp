@@ -51,6 +51,7 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
+#include "executors/executorutil.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
@@ -99,49 +100,6 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 
     return true;
 }
-
-class TupleComparer
-{
-public:
-    TupleComparer(const vector<AbstractExpression*>& keys,
-                  const vector<SortDirectionType>& dirs)
-        : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size())
-    {
-        assert(keys.size() == dirs.size());
-    }
-
-    bool operator()(TableTuple ta, TableTuple tb)
-    {
-        for (size_t i = 0; i < m_keyCount; ++i)
-        {
-            AbstractExpression* k = m_keys[i];
-            SortDirectionType dir = m_dirs[i];
-            int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
-            if (dir == SORT_DIRECTION_TYPE_ASC)
-            {
-                if (cmp < 0) return true;
-                if (cmp > 0) return false;
-            }
-            else if (dir == SORT_DIRECTION_TYPE_DESC)
-            {
-                if (cmp < 0) return false;
-                if (cmp > 0) return true;
-            }
-            else
-            {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "Attempted to sort using"
-                                              " SORT_DIRECTION_TYPE_INVALID");
-            }
-        }
-        return false; // ta == tb on these keys
-    }
-
-private:
-    const vector<AbstractExpression*>& m_keys;
-    const vector<SortDirectionType>& m_dirs;
-    size_t m_keyCount;
-};
 
 bool
 OrderByExecutor::p_execute(const NValueArray &params)
