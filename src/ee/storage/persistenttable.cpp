@@ -1036,13 +1036,12 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
     BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
         PersistentTable* currTarget = currView->targetTable();
 
+        // TOTO: Double check this comparison! Data types have changed.
         // found: target is alreafy set
         if (currTarget == target) {
             // The view is already up to date.
             // but still need to update the index used for min/max
-            if (currView->indexForMinMax().compare(targetMvInfo->indexForMinMax()) != 0) {
-                currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
-            }
+            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
             return;
         }
 

@@ -42,7 +42,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
                                                    PersistentTable *destTable,
                                                    catalog::MaterializedViewInfo *mvInfo)
     : m_srcTable(srcTable), m_target(destTable), m_index(destTable->primaryKeyIndex())
-    , m_indexForMinMax(NULL)
     , m_filterPredicate(parsePredicate(mvInfo))
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
@@ -70,6 +69,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     }
 
     // handle index for min / max support
+    // mvInfo->indexForMinMax() returns CatalogMap<IndexRef> now
     setIndexForMinMax(mvInfo->indexForMinMax());
 
     allocateBackedTuples();
@@ -122,22 +122,41 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     oldTarget->decrementRefcount();
 }
 
-void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
+void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax)
 {
-    m_indexForMinMax = NULL;
-    if (indexForMinOrMax.compare("") != 0) {
-        std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
-        for (int i = 0; i < candidates.size(); i++) {
-            if (indexForMinOrMax.compare(candidates[i]->getName()) == 0) {
-                m_indexForMinMax = candidates[i];
-                // If the index for min / max aggs contains the agg exprs / cols, we need to
-                // create a seprate search key value vector for it. (ENG-6511)
-                if ( minMaxIndexIncludesAggCol() ) {
-                    m_minMaxSearchKeyValue = std::vector<NValue>(m_indexForMinMax->getColumnIndices().size());
-                }
-                break;
-            }
+    // TODO: use map for faster search? Suppose you got a lot of min() / max() columns?
+    std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
+    size_t minMaxSearchKeyValueSize = 0;
+    m_minMaxSearchKeyBackingStoreSize = 0;
+    for (catalog::CatalogMap<catalog::IndexRef>::field_map_iter idxIterator = indexForMinOrMax.begin();
+         idxIterator != indexForMinOrMax.end(); idxIterator++) {
+        catalog::IndexRef *idx = idxIterator->second;
+        if (idx->name().compare("") == 0) {
+            // The min/max column doexn't have a supporting index.
+            m_indexForMinMax.push_back(NULL);
         }
+        else {
+            // The min/max column has a supporting index.
+            for (int i = 0; i < candidates.size(); i++) {
+                if (idx->name().compare(candidates[i]->getName()) == 0) {
+                    m_indexForMinMax.push_back(candidates[i]);
+                    // If the index for min / max aggs contains the agg exprs / cols, we need to
+                    // create a seprate search key value vector for it. (ENG-6511)
+                    if ( minMaxIndexIncludesAggCol(candidates[i]) ) {
+                        minMaxSearchKeyValueSize = candidates[i]->getColumnIndices().size();
+                        // Because there might be a lot of indexes, find the largest space they may consume
+                        // so that they can all share the space and use different schema. (ENG-8512)
+                        if (candidates[i]->getKeySchema()->tupleLength() + 1 > m_minMaxSearchKeyBackingStoreSize) {
+                            m_minMaxSearchKeyBackingStoreSize = candidates[i]->getKeySchema()->tupleLength() + 1;
+                        }
+                    }
+                    break;
+                }
+            } // end for
+        }
+    }
+    if (minMaxSearchKeyValueSize > 0) {
+        m_minMaxSearchKeyValue = std::vector<NValue>(minMaxSearchKeyValueSize);
     }
 }
 
@@ -165,11 +184,9 @@ void MaterializedViewMetadata::allocateBackedTuples()
 
     m_minMaxSearchKeyBackingStore = NULL;
     // If the minMaxIndex contains agg cols, need to allocate a searchKeyTuple and backing store for it. (ENG-6511)
-    if ( minMaxIndexIncludesAggCol() ) {
-        m_minMaxSearchKeyTuple = TableTuple(m_indexForMinMax->getKeySchema());
-        m_minMaxSearchKeyBackingStore = new char[m_indexForMinMax->getKeySchema()->tupleLength() + 1];
-        memset(m_minMaxSearchKeyBackingStore, 0, m_indexForMinMax->getKeySchema()->tupleLength() + 1);
-        m_minMaxSearchKeyTuple.move(m_minMaxSearchKeyBackingStore);
+    if ( m_minMaxSearchKeyBackingStoreSize > 0 ) {
+        m_minMaxSearchKeyBackingStore = new char[m_minMaxSearchKeyBackingStoreSize];
+        memset(m_minMaxSearchKeyBackingStore, 0, m_minMaxSearchKeyBackingStoreSize);
     }
 
     m_existingTuple = TableTuple(m_target->schema());
@@ -301,7 +318,8 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
                                                                 const NValue &existingValue,
                                                                 const NValue &initialNull,
                                                                 int negate_for_min,
-                                                                int aggIndex)
+                                                                int aggIndex,
+                                                                int minMaxAggIdx)
 {
     AbstractExpression *aggExpr = NULL;
     int srcColIdx = -1;
@@ -311,13 +329,16 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         srcColIdx = m_aggColIndexes[aggIndex];
     }
     NValue newVal = initialNull;
-    IndexCursor minMaxCursor(m_indexForMinMax->getTupleSchema());
+    TableIndex *selectedIndex = m_indexForMinMax[minMaxAggIdx];
+    IndexCursor minMaxCursor(selectedIndex->getTupleSchema());
 
     // Search for the min / max fallback value. use indexs differently according to their types.
     // (Does the index include min / max aggCol? - ENG-6511)
-    if ( minMaxIndexIncludesAggCol() ) {
+    if ( minMaxIndexIncludesAggCol(selectedIndex) ) {
         // Assemble the m_minMaxSearchKeyTuple and m_minMaxSearchKeyValue with
         // group-by column values and the old min/max value.
+        m_minMaxSearchKeyTuple = TableTuple(selectedIndex->getKeySchema());
+        m_minMaxSearchKeyTuple.move(m_minMaxSearchKeyBackingStore);
         for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
             NValue value = getGroupByValueFromSrcTuple(colindex, oldTuple);
             m_minMaxSearchKeyValue[colindex] = value;
@@ -330,14 +351,14 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         // Search for the new min/max value and keep it in tuple.
         if (negate_for_min == -1) {
             // min()
-            m_indexForMinMax->moveToKeyOrGreater(&m_minMaxSearchKeyTuple, minMaxCursor);
+            selectedIndex->moveToKeyOrGreater(&m_minMaxSearchKeyTuple, minMaxCursor);
         }
         else {
             // max()
-            m_indexForMinMax->moveToGreaterThanKey(&m_minMaxSearchKeyTuple, minMaxCursor);
-            m_indexForMinMax->moveToPriorEntry(minMaxCursor);
+            selectedIndex->moveToGreaterThanKey(&m_minMaxSearchKeyTuple, minMaxCursor);
+            selectedIndex->moveToPriorEntry(minMaxCursor);
         }
-        while ( ! (tuple = m_indexForMinMax->nextValue(minMaxCursor)).isNullTuple() ) {
+        while ( ! (tuple = selectedIndex->nextValue(minMaxCursor)).isNullTuple() ) {
             // If the cursor already moved out of the target group range, exit the loop.
             for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
                 NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
@@ -360,10 +381,10 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
     }
     else {
         // Use sub-optimal index (only group-by columns).
-        m_indexForMinMax->moveToKey(&m_searchKeyTuple, minMaxCursor);
-        VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
+        selectedIndex->moveToKey(&m_searchKeyTuple, minMaxCursor);
+        VOLT_TRACE("Starting to scan tuples using index %s\n", selectedIndex->debug().c_str());
         TableTuple tuple;
-        while (!(tuple = m_indexForMinMax->nextValueAtKey(minMaxCursor)).isNullTuple()) {
+        while (!(tuple = selectedIndex->nextValueAtKey(minMaxCursor)).isNullTuple()) {
             // skip the oldTuple and apply post filter
             if (tuple.equals(oldTuple) ||
                 (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
@@ -610,6 +631,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
 
     int aggOffset = (int)m_groupByColumnCount + 1;
+    int minMaxAggIdx = 0;
     // set values for the other columns
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
         NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
@@ -633,9 +655,9 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
 
                     // indexscan if an index is available, otherwise tablescan
-                    if (m_indexForMinMax) {
+                    if (m_indexForMinMax[minMaxAggIdx]) {
                         newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
-                                                                  reversedForMin, aggIndex);
+                                                                  reversedForMin, aggIndex, minMaxAggIdx);
                     } else {
                         VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
                         newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
@@ -643,6 +665,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                         VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
                     }
                 }
+                minMaxAggIdx++;
                 break;
             default:
                 assert(false); // Should have been caught when the matview was loaded.
