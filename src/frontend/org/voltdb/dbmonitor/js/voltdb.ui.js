@@ -136,7 +136,7 @@ $(document).ready(function () {
     $('#showHideGraphBlock').click(function () {
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
-            if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false || userPreferences["CommandLogStat"] != false) {
+            if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false || userPreferences["CommandLogStat"] != false || userPreferences["CommandLogTables"] != false) {
                 var graphState = $("#mainGraphBlock").css('display');
                 if (graphState == 'none') {
                     $(".showhideIcon").removeClass('collapsed');
@@ -747,21 +747,30 @@ var loadPage = function (serverName, portid) {
     var showHideCmdlogDataAndCharts = function (cmdLogStatus, graphView, currentTab) {
         if (cmdLogStatus == 'true') {
             $("#liCommandLogStat").show();
-            $("#divCommandLog").show();
+            $("#liCommandLogTables").show();
             var userPreference = getUserPreferences();
             if (userPreference["CommandLogStat"]) {
                 $("#chartCommandLogging").show();
 
+            }
+            if (userPreference["CommandLogTables"]) {
+                $("#divCommandLog").show();
             }
             refreshCmdLogSection(graphView, currentTab);
         } else {
             $("#liCommandLogStat").hide();
             $("#chartCommandLogging").hide();
             $("#divCommandLog").hide();
+            $("#liCommandLogTables").hide();
         }
     };
 
     var refreshGraphAndData = function (graphView, currentTab) {
+
+        voltDbRenderer.GetExportProperties(function (rawData) {
+            VoltDbAdminConfig.exportTypes = rawData;
+        });
+
         voltDbRenderer.getMemoryGraphInformation(function (memoryDetails) {
             MonitorGraphUI.RefreshMemory(memoryDetails, getCurrentServer(), graphView, currentTab);
         });
@@ -2121,7 +2130,7 @@ var getUserPreferences = function () {
     } catch (e) {
 
         voltDbRenderer.userPreferences = {};
-        var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime", "DrReplicationRate", "DRTables", "CommandLogStat"];
+        var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime", "DrReplicationRate", "DRTables", "CommandLogStat", "CommandLogTables"];
         for (var i = 0; i < preferencesList.length; i++) {
             voltDbRenderer.userPreferences[preferencesList[i]] = true;
         }
@@ -2188,10 +2197,26 @@ var showHideGraph = function (userpreferences) {
     } else {
         $("#divDrReplication").show();
     }
-    if (userpreferences["CommandLogStat"] == false || VoltDbUI.isCommandLogEnabled == 'false')
+
+    if (VoltDbUI.isCommandLogEnabled == 'true') {
+        if (userpreferences["CommandLogStat"] == true) {
+            $("#chartCommandLogging").show();
+        } else {
+            $("#chartCommandLogging").hide();
+        }
+    } else {
         $("#chartCommandLogging").hide();
-    else
-        $("#chartCommandLogging").show();
+    }
+
+    if (VoltDbUI.isCommandLogEnabled == 'true') {
+        if (userpreferences["CommandLogTables"] == true) {
+            $("#divCommandLog").show();
+        } else {
+            $("#divCommandLog").hide();
+        }
+    } else {
+        $("#divCommandLog").hide();
+    }
 
     adjustGraphSpacing();
     ChangeGraphLabelColor();
@@ -2202,7 +2227,7 @@ function ChangeGraphLabelColor() {
     if (VoltDbUI.getCookie("user-preferences") != undefined) {
         var userPreferences = $.parseJSON(VoltDbUI.getCookie("user-preferences"));
 
-        if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false || userPreferences["CommandLogStat"] != false) {
+        if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false || userPreferences["CommandLogStat"] != false || userPreferences["CommandLogStat"] != false) {
             $('#showHideGraphBlock').css('color', '#000000');
             $("#GraphBlock").removeClass("graphOpacity");
         } else {

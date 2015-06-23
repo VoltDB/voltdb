@@ -83,7 +83,8 @@ function loadAdminPage() {
         adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody"),
         serverSettingHeader: $('#hServerSettings'),
         lstReplicatedTables: $('#lstDrTblLink'),
-        lstExportTable: $('#lstExportTblLink')
+        lstExportTable: $('#lstExportTblLink'),
+
 
     };
 
@@ -1638,6 +1639,9 @@ function loadAdminPage() {
                 $("#addConfigHeader").text("Edit Configuration");
                 $("#deleteAddConfig").show();
             }
+
+            var exporttypes = VoltDbAdminConfig.exportTypes;
+
             $("#expotSaveConfigText").text("save").data("status", "save");
             var contents = '' +
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
@@ -1653,13 +1657,18 @@ function loadAdminPage() {
                 '<tr>' +
                 '    <td>Type </td>' +
                 '    <td>' +
-                '       <select id="txtType" name="txtType"> ' +
-                '           <option>FILE </option> ' +
-                '           <option>JDBC </option> ' +
-                '           <option>KAFKA</option> ' +
-                '           <option>HTTP</option> ' +
-                '           <option>RABBITMQ</option> ' +
-                '           <option>CUSTOM</option> ' +
+                '       <select id="txtType" name="txtType"> ';
+
+            exporttypes.type.splice(2, 1);
+
+            exporttypes.type.push("CUSTOM");
+
+
+            for (var i = 0; i <= exporttypes.type.length - 1; i++) {
+                contents = contents +
+                    "<option>" + exporttypes.type[i] + "</option> ";
+            }
+            contents = contents +
                 '       </select>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
@@ -1706,6 +1715,8 @@ function loadAdminPage() {
 
             $("#addConfigWrapper").html(contents);
 
+
+
             $("#addConfigControls").show();
             $("#saveConfigConfirmation").hide();
 
@@ -1719,9 +1730,12 @@ function loadAdminPage() {
             });
 
 
+
             $('#txtType').change(function () {
                 showHideConnectorClass();
-                addExportProperties();
+                if (typeof type === "undefined") {
+                    addExportProperties();
+                }
             });
 
 
@@ -1765,8 +1779,12 @@ function loadAdminPage() {
             });
         },
         afterOpen: function () {
+
+
+
             //For editing an existing configuration
             if (editId != "-1") {
+
                 var existingAdminConfig = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 var config = existingAdminConfig.export.configuration[editId * 1];
                 $("#txtType").val(config.type);
@@ -2108,6 +2126,7 @@ function loadAdminPage() {
                     '   <td></td>' +
                     '</tr>';
             }
+
         }
         $('#tblAddNewProperty tr.headerProperty').after(exportProperties);
 
@@ -2699,6 +2718,7 @@ function loadAdminPage() {
         };
 
         this.orgTypeValue = "";
+        this.exportTypes = [];
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -2927,6 +2947,7 @@ function loadAdminPage() {
             $('#exportConfiguration').html(result);
 
         };
+
 
         var getUserList = function (userData) {
             var result = "";
