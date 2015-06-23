@@ -766,6 +766,11 @@ var loadPage = function (serverName, portid) {
     };
 
     var refreshGraphAndData = function (graphView, currentTab) {
+
+        voltDbRenderer.GetExportProperties(function (rawData) {
+            VoltDbAdminConfig.exportTypes = rawData;
+        });
+
         voltDbRenderer.getMemoryGraphInformation(function (memoryDetails) {
             MonitorGraphUI.RefreshMemory(memoryDetails, getCurrentServer(), graphView, currentTab);
         });
