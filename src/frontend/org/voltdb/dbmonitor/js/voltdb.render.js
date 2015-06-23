@@ -359,6 +359,18 @@ function alertNodeClicked(obj) {
             }
         };
 
+
+        this.GetExportProperties = function (onInformationLoaded) {
+
+            VoltDBService.GetExportProperties(function (connection) {
+                var rawData;
+                if (connection != null)
+                    rawData = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+
+                onInformationLoaded(loadExportProperties(connection), rawData);
+            });
+        };
+
         this.GetProceduresInfo = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
@@ -758,6 +770,16 @@ function alertNodeClicked(obj) {
             }
 
             return adminConfigValues;
+        };
+
+        var loadExportProperties = function (connection) {
+            var exportProperties = {};
+            if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'] != null) {
+                var data = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+                exportProperties['type'] = data.types;
+            }
+
+            return exportProperties;
         };
 
 
@@ -2478,7 +2500,7 @@ function alertNodeClicked(obj) {
             });
         };
 
-        var getSnapshotStatus = function(connection, snapshotDetails) {
+        var getSnapshotStatus = function (connection, snapshotDetails) {
             var colIndex = {};
             var counter = 0;
 
