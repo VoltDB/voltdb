@@ -106,4 +106,31 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     return NULL;
 }
 
+bool TupleComparer::operator()(TableTuple ta, TableTuple tb) const
+{
+    for (size_t i = 0; i < m_keyCount; ++i)
+    {
+        AbstractExpression* k = m_keys[i];
+        SortDirectionType dir = m_dirs[i];
+        int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
+        if (dir == SORT_DIRECTION_TYPE_ASC)
+        {
+            if (cmp < 0) return true;
+            if (cmp > 0) return false;
+        }
+        else if (dir == SORT_DIRECTION_TYPE_DESC)
+        {
+            if (cmp < 0) return false;
+            if (cmp > 0) return true;
+        }
+        else
+        {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                            "Attempted to sort using"
+                                            " SORT_DIRECTION_TYPE_INVALID");
+        }
+    }
+    return false; // ta == tb on these keys
+}
+
 }
