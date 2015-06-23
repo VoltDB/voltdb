@@ -315,10 +315,16 @@ public class MaterializedViewBenchmark {
                 csvStr = "wo";
                 procStr = "ids";
                 break;
-            default:
+            case "minMatView":
                 systemStr = "w/ min";
                 csvStr = "w min";
                 procStr = "idsWithMinMatView";
+                break;
+            default: // "minMatViewOpt"
+                systemStr = "w/ min opt";
+                csvStr = "w min opt";
+                procStr = "idsWithMinMatViewOpt";
+                break;
         }
 
         int grp = 1;
@@ -364,7 +370,7 @@ public class MaterializedViewBenchmark {
         }
         System.out.print(HORIZONTAL_RULE);
 
-        if (!matView.equals("minMatView")) {
+        if (!matView.equals("minMatView") && !matView.equals("minMatViewOpt")) {
             // grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
             grp = 2;
 
@@ -492,6 +498,11 @@ public class MaterializedViewBenchmark {
                                      i,
                                      i,
                                      i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatViewOpt_insert",
+                                     i,
+                                     i,
+                                     i);
             }
             client.drain();
             for (int i=0; i<config.warmup; i++){
@@ -503,6 +514,9 @@ public class MaterializedViewBenchmark {
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWithMinMatView_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatViewOpt_delete",
                                      i);
             }
             client.drain();
@@ -522,6 +536,8 @@ public class MaterializedViewBenchmark {
         // reset class variables so that diff is not written to the csv file
         insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
         runHalf("minMatView", fw);
+        System.out.print(HORIZONTAL_RULE);
+        runHalf("minMatViewOpt", fw);
         benchmarkActive = false;
 
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
