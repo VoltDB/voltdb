@@ -544,9 +544,11 @@ public class TestJDBCDriver {
         }
     }
 
+    // Check that the null type is handled the same way as specifying the correct type
+    // this is for spring framework compatibility
     @Test
     public void testInsertNulls() throws SQLException {
-        // long i_id, long i_im_id, String i_name, double i_price, String i_data
+        // First inserted row contains all null values (this will cause VoltType.NULL_STRING_OR_VARBINARY to be inserted in every field)
         CallableStatement cs = conn.prepareCall("{call InsertAllTypes(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}");
         cs.setInt(1, 0);
         cs.setNull(2, Types.NULL);
@@ -559,6 +561,7 @@ public class TestJDBCDriver {
         cs.setNull(9, Types.NULL);
         cs.setNull(10, Types.NULL);
         cs.execute();
+        // Second inserted row contains the specific type of the field causing the typed nulls to be inserted
         cs = conn.prepareCall("{call InsertAllTypes(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}");
         cs.setInt(1, 1);
         cs.setNull(2, Types.TINYINT);
@@ -571,10 +574,12 @@ public class TestJDBCDriver {
         cs.setNull(9, Types.TIMESTAMP);
         cs.setNull(10, Types.DECIMAL);
         cs.execute();
+        // Call SelectC (select * from ALL_TYPES)
         cs = conn.prepareCall("{call SelectC}");
         ResultSet results = cs.executeQuery();
-        results.next();
 
+        // Retrieve the values for the first row
+        results.next();
         byte a2 = results.getByte(2);
         short a3 = results.getShort(3);
         int a4 = results.getInt(4);
@@ -584,8 +589,9 @@ public class TestJDBCDriver {
         byte[] a8 = results.getBytes(8);
         Timestamp a9 = results.getTimestamp(9);
         BigDecimal a10 = results.getBigDecimal(10);
-        results.next();
 
+        // Compare the second row values with the first row
+        results.next();
         assertEquals(results.getByte(2), a2);
         assertEquals(results.getShort(3), a3);
         assertEquals(results.getInt(4), a4);
