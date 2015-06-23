@@ -176,7 +176,6 @@ public class ImportProcessor implements ImportDataProcessor {
             m_bundles.clear();
             if (m_framework != null) {
                 m_framework.stop();
-                m_framework.uninstall();
             }
         } catch (Exception ex) {
             m_logger.error("Failed to stop the import bundles.", ex);

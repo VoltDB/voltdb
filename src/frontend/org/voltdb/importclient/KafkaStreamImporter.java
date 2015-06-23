@@ -17,9 +17,7 @@
 
 package org.voltdb.importclient;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,8 +25,10 @@ import java.util.concurrent.TimeUnit;
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
+import kafka.consumer.Whitelist;
 import kafka.javaapi.consumer.ConsumerConnector;
 import kafka.message.MessageAndMetadata;
+import kafka.utils.VerifiableProperties;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.voltdb.importer.CSVInvocation;
@@ -40,9 +40,12 @@ import org.voltdb.importer.ImportHandlerProxy;
  */
 public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
 
+    private static final int NUM_CONSUMER_THREADS = 1;
+
     private Properties m_properties;
     private String m_procedure;
     private String[] m_topic;
+    private String m_topics;
     private String m_zookeeper;
 
     private KafkaStreamConsumerConnector m_connector;
@@ -109,11 +112,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         if (m_procedure == null || m_procedure.trim().length() == 0) {
             throw new RuntimeException("Missing procedure.");
         }
-        String topics = (String )m_properties.getProperty("topic");
-        if (topics == null || topics.trim().length() == 0) {
+        //pipe seperated list of topics.
+        m_topics = (String )m_properties.getProperty("topics");
+        if (m_topics == null || m_topics.trim().length() == 0) {
             throw new RuntimeException("Missing topic(s).");
         }
-        m_topic = topics.split(",");
+        m_topic = m_topics.split("|");
         if (m_topic == null || m_topic.length == 0) {
             throw new RuntimeException("Missing topic(s).");
         }
@@ -190,23 +194,17 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     private ExecutorService getConsumerExecutor(KafkaStreamConsumerConnector consumer) throws Exception {
 
-        Map<String, Integer> topicCountMap = new HashMap<>();
-        //Get this from config or arg. Use 3 threads default.
-        ExecutorService executor = Executors.newFixedThreadPool(3 * m_topic.length);
-        for (int i = 0; i < m_topic.length; i++) {
-            topicCountMap.put(m_topic[i], 1);
-        }
-        Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.m_consumer.createMessageStreams(topicCountMap);
+        Whitelist whitelist = new Whitelist(m_topics);
+        List<KafkaStream<byte[], byte[]>> topicMessageStreams = consumer.m_consumer.createMessageStreamsByFilter(whitelist, 1);
 
-        for (int i = 0; i < m_topic.length; i++) {
-            List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(m_topic[i]);
+        // create list of 4 threads to consume from each of the partitions
+        ExecutorService executor = Executors.newFixedThreadPool(NUM_CONSUMER_THREADS);
 
-            // now launch all the threads for partitions.
-            for (final KafkaStream stream : streams) {
-                KafkaConsumer bconsumer = new KafkaConsumer(stream, m_procedure);
-                executor.submit(bconsumer);
-            }
+        // consume the messages in the threads
+        for (final KafkaStream<byte[], byte[]> stream : topicMessageStreams) {
+                executor.submit(new KafkaConsumer(stream, m_procedure));
         }
+
 
         return executor;
     }
