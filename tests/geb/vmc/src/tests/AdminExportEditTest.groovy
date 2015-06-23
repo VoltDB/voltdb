@@ -138,9 +138,9 @@ class AdminExportEditTest extends TestBase {
         then: 'Click Save'
         page.overview.clickSave()
         
-        /*
-        // Edit: Change the file type to kafka
         
+        // Edit: Change the file type to kafka
+        /*
         when: 'Edit button is displayed'
 	    waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
         then: 'Click edit button'
