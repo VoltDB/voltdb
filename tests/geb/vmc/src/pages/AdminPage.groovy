@@ -25,7 +25,6 @@ class AdminPage extends VoltDBManagementCenterPage {
         serverbutton				{ $("#serverName") }
         serverconfirmation			{ $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
 
-
         servernamelist			    {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
         servername			        {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
         mainservername			    {$("#serverListWrapperAdmin")}
@@ -93,7 +92,6 @@ class AdminPage extends VoltDBManagementCenterPage {
         clustertransactionminutesmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         clustertransactionminutesmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
-
         // Network interfaces
         title1				        { $(text:"Overview") }
         sitePerHost			        { $(class:"configLabel", text:"Sites Per Host") }
@@ -105,7 +103,6 @@ class AdminPage extends VoltDBManagementCenterPage {
         commandLogging		        { $(class:"labelCollapsed", text:"Command Logging") }
         export				        { $(class:"labelCollapsed", text:"Export") }
         advanced			        { $(class:"labelCollapsed", text:"Advanced") }
-
 
         sitePerHostValue			{ $("#sitePerHost") }
         ksafetyValue				{ $("#kSafety") }
