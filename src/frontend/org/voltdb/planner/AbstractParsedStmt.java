@@ -107,6 +107,9 @@ public abstract class AbstractParsedStmt {
     public AbstractParsedStmt m_parentStmt = null;
     boolean m_isUpsert = false;
 
+    // mark whether the statement's parent is UNION clause or not
+    private boolean m_isChildOfUnion = false;
+
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
     static final String DELETE_NODE_NAME = "delete";
@@ -689,12 +692,12 @@ public abstract class AbstractParsedStmt {
         if (!(subquery instanceof ParsedSelectStmt)) {
             return false;
         }
-        // Must not have OFFSET set
+        // Must not have OFFSET or LIMIT set
         // EXISTS (select * from T where T.X = parent.X order by T.Y offset 10 limit 5)
         //      seems to require 11 matches
         // parent.X IN (select T.X from T order by T.Y offset 10 limit 5)
         //      seems to require 1 match that has exactly 10-14 rows (matching or not) with lesser or equal values of Y.
-        return ! ((ParsedSelectStmt) subquery).hasOffset();
+        return ! ((ParsedSelectStmt) subquery).hasLimitOrOffset();
     }
 
     /**
@@ -1217,6 +1220,14 @@ public abstract class AbstractParsedStmt {
         } else {
             return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
         }
+    }
+
+    public void setParentAsUnionClause() {
+        m_isChildOfUnion = true;
+    }
+
+    public boolean isParentUnionClause() {
+        return m_isChildOfUnion;
     }
 
     public boolean hasLimitOrOffset()

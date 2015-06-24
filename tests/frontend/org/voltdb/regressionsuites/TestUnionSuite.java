@@ -685,6 +685,81 @@ public class TestUnionSuite extends RegressionSuite {
         }
     }
 
+    public void testUnionVarchar() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+
+        String state = "MA";
+        String hex = "10";
+        client.callProcedure("MY_VOTES.insert", 1,
+                state, state, state, state, state, state,
+                state, state, state, state, state, state,
+                hex, hex, hex, hex, hex, "11");
+        client.callProcedure("AREA_CODE_STATE.insert", 1803, "RI");
+        client.callProcedure("AREA_CODE_STATE.insert", 1804, "RI");
+
+        String[] columns = new String[]{"state2", "state15", "state16", "state63", "state64", "state100",
+                "state2_b", "state15_b", "state16_b", "state63_b", "state64_b", "state100_b"};
+
+        for (String col : columns) {
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union select 'MA' from area_code_state;",
+                  new String[] {"MA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union select 'VOLTDB_VOLTDB_VOLTDB_VOLTDB_VOLTDB' from area_code_state order by 1;",
+                  new String[] {"MA", "VOLTDB_VOLTDB_VOLTDB_VOLTDB_VOLTDB"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes except select 'MA' from area_code_state;",
+                  new String[] {});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union all select 'MA' from area_code_state;",
+                  new String[] {"MA","MA", "MA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union select state from area_code_state order by 1;",
+                  new String[] {"MA","RI"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" || '_USA' from my_votes union select state from area_code_state order by 1;",
+                  new String[] {"MA_USA","RI"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" from my_votes union select state || '_USA' from area_code_state order by 1;",
+                  new String[] {"MA","RI_USA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" || '_USA' from my_votes union select state || '_USA' from area_code_state order by 1;",
+                  new String[] {"MA_USA","RI_USA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" || '_USA' from my_votes union select state || '_USA' from area_code_state order by 1;",
+                  new String[] {"MA_USA","RI_USA"});
+
+            validateTableColumnOfScalarVarchar(client,
+                  "select "+ col +" || '_USA' from my_votes union select state100 || '_USA' from my_votes order by 1;",
+                  new String[] {"MA_USA"});
+        }
+
+        // varbinary
+        String[] binaryColumns = new String[]{"binary2", "binary15", "binary16", "binary63", "binary64", "binary100"};
+
+        for (String col : binaryColumns) {
+            validateTableColumnOfScalarVarbinary(client,
+                    "select "+ col +" from my_votes union select binary100 from my_votes order by 1;",
+                    col == "binary100" ? new String[] {"11"} : new String[] {"10", "11"});
+
+            validateTableColumnOfScalarVarbinary(client,
+                    "select binary100 from my_votes union select "+ col +" from my_votes order by 1;",
+                    col == "binary100" ? new String[] {"11"} : new String[] {"10", "11"});
+
+            validateTableColumnOfScalarVarbinary(client,
+                    "select "+ col +" from my_votes union select "+ col +" from my_votes order by 1;",
+                    new String[] { col == "binary100" ? "11" : "10"});
+        }
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
