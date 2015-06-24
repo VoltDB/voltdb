@@ -146,7 +146,7 @@ class Overview extends Module {
         kafkaName                   { $(class:"labelCollapsed", text:kafkaTest) }
         httpName                    { $(class:"labelCollapsed", text:httpTest) }
         rabbitMqBrokerName          { $(class:"labelCollapsed", text:rabbitMqBrokerTest) }
-        rabbitMqAmpqName            { $(class:"labelCollapsed", text:rabbitMqAmpqTest) }
+        rabbitMqAmqpName            { $(class:"labelCollapsed", text:rabbitMqAmqpTest) }
         customName                  { $(class:"labelCollapsed", text:customTest) }
         
         confirmyesbtn			    { $("#btnSaveConfigOk", text:"Yes") }
@@ -255,7 +255,7 @@ class Overview extends Module {
     String kafkaTest            = getKafkaTest()
     String httpTest             = getHttpTest()
     String rabbitMqBrokerTest   = getRabbitmqBrokerTest()
-    String rabbitMqAmpqTest     = getRabbitmqAmpqTest()
+    String rabbitMqAmqpTest     = getRabbitmqAmqpTest()
     String customTest           = getCustomTest()
     
     def String getName() {
@@ -286,8 +286,8 @@ class Overview extends Module {
         return getRabbitmqBrokerTestName() + " (RABBITMQ)"
     }
     
-    def String getRabbitmqAmpqTest() {
-        return getRabbitmqAmpqTestName() + " (RABBITMQ)"
+    def String getRabbitmqAmqpTest() {
+        return getRabbitmqAmqpTestName() + " (RABBITMQ)"
     }
     
     def String getCustomTest() {
@@ -297,78 +297,54 @@ class Overview extends Module {
     // Get usernameone for security
     def String getUsernameOneForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
-    	 
     	String username
-
         while((username = br.readLine()) != "#usernameOne") {}
-
         username = br.readLine()
-
         return username
     }
 
 	// Get usernametwo for security
     def String getUsernameTwoForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
-    	 
     	String username
-    	 
     	while((username = br.readLine()) != ("#usernameTwo")) {}
-
         username = br.readLine()
-
         return username
     }
     
     // Get passwordone for security
     def String getPasswordOneForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
-    	 
     	String password
-
         while((password = br.readLine()) != "#passwordOne") {}
-
         password = br.readLine()
-
         return password
     }
 
 	// Get passwordtwo for security
     def String getPasswordTwoForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
-    	 
     	String password
-    	 
     	while((password = br.readLine()) != ("#passwordTwo")) {}
-
         password = br.readLine()
-
         return password
     }
     
     // Get roleone for security
     def String getRoleOneForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
-    	 
     	String role
-    	 
     	while((role = br.readLine()) != ("#roleOne")) {}
-
         role = br.readLine()
-
         return role
     }
     
     // Get roletwo for security
     def String getRoleTwoForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
-    	 
     	String role
-    	 
     	while((role = br.readLine()) != ("#roleTwo")) {}
-
         role = br.readLine()
-
         return role
     }
     
@@ -378,7 +354,6 @@ class Overview extends Module {
      def boolean expandSecurity() {	
      	if (checkIfSecurityIsExpanded() == false)
      		security.click()
-     	
      }
      
      
@@ -504,7 +479,6 @@ class Overview extends Module {
      
      
     def boolean checkListForUsers(String username) {
-    	
     	try {
     		String list = getListOfUsers()
     		if(list.contains(username)) {
@@ -628,85 +602,57 @@ class Overview extends Module {
     
     def String getFileTestName() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
-    	 
     	String fileTestName
-    	 
     	while((fileTestName = br.readLine()) != ("#fileTestName")) {}
-
         fileTestName = br.readLine()
-
         return fileTestName
     }
     
     def String getJdbcTestName() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
-    	 
     	String jdbcTestName
-    	 
     	while((jdbcTestName = br.readLine()) != ("#jdbcTestName")) {}
-
         jdbcTestName = br.readLine()
-
         return jdbcTestName
     }
     
     def String getKafkaTestName() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
-    	 
     	String kafkaTestName
-    	 
     	while((kafkaTestName = br.readLine()) != ("#kafkaTestName")) {}
-
         kafkaTestName = br.readLine()
-
         return kafkaTestName
     }
     
     def String getHttpTestName() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
-    	 
     	String httpTestName
-    	 
     	while((httpTestName = br.readLine()) != ("#httpTestName")) {}
-
         httpTestName = br.readLine()
-
         return httpTestName
     }
     
     def String getRabbitmqBrokerTestName() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
-    	 
     	String rabbitmqBrokerTestName
-    	 
     	while((rabbitmqBrokerTestName = br.readLine()) != ("#rabbitmqBrokerTest")) {}
-
         rabbitmqBrokerTestName = br.readLine()
-
         return rabbitmqBrokerTestName
     }
     
-    def String getRabbitmqAmpqTestName() {
+    def String getRabbitmqAmqpTestName() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
-    	 
-    	String rabbitmqAmpqTestName
-    	 
-    	while((rabbitmqAmpqTestName = br.readLine()) != ("#rabbitmqAmpqTest")) {}
-
-        rabbitmqAmpqTestName = br.readLine()
-
-        return rabbitmqAmpqTestName
+    	String rabbitmqAmqpTestName
+    	while((rabbitmqAmqpTestName = br.readLine()) != ("#rabbitmqAmqpTest")) {}
+        rabbitmqAmqpTestName = br.readLine()
+        return rabbitmqAmqpTestName
     }
     
     def String getCustomTestName() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
-    	 
     	String customTestName
-    	 
     	while((customTestName = br.readLine()) != ("#customTestName")) {}
-
         customTestName = br.readLine()
-
         return customTestName
     }
     
@@ -718,9 +664,9 @@ class Overview extends Module {
                 save.click()
 	            !save.isDisplayed()
             } catch(geb.error.RequiredPageContentNotPresent e) {
-                break
+            
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                break
+                
             }
 	    }
 	    
@@ -800,5 +746,86 @@ class Overview extends Module {
      	}
      }
      
+     def String getFileValueOne() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String fileValueOne
+    	while((fileValueOne = br.readLine()) != ("#typeValue")) {}
+        fileValueOne = br.readLine()
+        return fileValueOne
+     }
+     
+     def String getFileValueTwo() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String fileValueTwo
+    	while((fileValueTwo = br.readLine()) != ("#nonceValue")) {}
+        fileValueTwo = br.readLine()
+        return fileValueTwo
+     }
+     
+     def String getFileValueThree() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String fileValueThree
+    	while((fileValueThree = br.readLine()) != ("#outdirValue")) {}
+        fileValueThree = br.readLine()
+        return fileValueThree
+     }
+     
+     def String getJdbcValueOne() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String jdbcValueOne
+    	while((jdbcValueOne = br.readLine()) != ("#jdbcdriverValue")) {}
+        jdbcValueOne = br.readLine()
+        return jdbcValueOne
+     }
+     
+     def String getJdbcValueTwo() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String jdbcValueTwo
+    	while((jdbcValueTwo = br.readLine()) != ("#jdbcurlValue")) {}
+        jdbcValueTwo = br.readLine()
+        return jdbcValueTwo
+     }
+     
+     def String getMetadataValue() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String metadataValue
+    	while((metadataValue = br.readLine()) != ("#metadataValue")) {}
+        metadataValue = br.readLine()
+        return metadataValue
+     }
+     
+     def String getEndValue() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String endValue
+    	while((endValue = br.readLine()) != ("#endValue")) {}
+        endValue = br.readLine()
+        return endValue
+     }
+     
+     def String getBrokerValue() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String brokerValue
+    	while((brokerValue = br.readLine()) != ("#brokerValue")) {}
+        brokerValue = br.readLine()
+        return brokerValue
+     }
+     
+     def String getAmqpValue() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String amqpValue
+    	while((amqpValue = br.readLine()) != ("#amqpValue")) {}
+        amqpValue = br.readLine()
+        return amqpValue
+    }
+     
+     def String getCustomConnectorClass() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+    	String customConnectorClass
+    	while((customConnectorClass = br.readLine()) != ("#customConnectorClass")) {}
+        customConnectorClass = br.readLine()
+        return customConnectorClass
+    }
+    
+    
 }
 

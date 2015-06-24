@@ -442,7 +442,7 @@
                 .tickFormat(d3.format(',.2f'));
 
             MonitorGraphUI.ChartCommandlog.yAxis
-                .axisLabel('(Transactions/s)')
+                .axisLabel('(Pending Transactions)')
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartCommandlog.margin({ left: 80 });
@@ -450,7 +450,7 @@
 
             MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Command Log Statistic </h3>'
-                    + '<p>' + e + ' tps at ' + y + '</p>';
+                    + '<p>' + e + ' Pending at ' + y + '</p>';
             });
 
             d3.select('#visualisationCommandLog')

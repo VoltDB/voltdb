@@ -2180,6 +2180,7 @@ function alertNodeClicked(obj) {
                 repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 repData["HOST_ID"] = info[colIndex["HOST_ID"]];
+                repData["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 repData["STATE"] = info[colIndex["STATE"]];
                 repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
                 repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;

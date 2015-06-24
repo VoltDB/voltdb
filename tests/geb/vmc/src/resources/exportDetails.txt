@@ -25,17 +25,17 @@ metadataValue
 
 #httpTestName
 httpTest
-#endpointValue
-endpointValue
+#endValue
+endValue
 
 #rabbitmqBrokerTest
 rabbitmqBrokerTest
-#rabbitmqAmpqTest
-rabbitmqAmpqTest
+#rabbitmqAmqpTest
+rabbitmqAmqpTest
 #brokerValue
 brokerValue
-#ampqValue
-ampqValue
+#amqpValue
+amqpValue
 
 #customTestName
 customTest
