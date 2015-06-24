@@ -1371,7 +1371,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
-        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
         assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpEnabled = VoltProjectBuilder.writeStringToTempFile(oneEnabledConnection);
@@ -1383,7 +1383,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
-        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
         assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(drDisabled);
