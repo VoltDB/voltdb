@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -46,6 +47,7 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -381,6 +383,14 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
+    public void validateTableOfDecimal(Client c, String sql, BigDecimal[][] expected)
+            throws Exception, IOException, ProcCallException {
+        assertNotNull(expected);
+        VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfDecimal(vt, expected);
+    }
+
+
     static public void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
@@ -397,7 +407,8 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected) throws Exception {
+    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, expected);
@@ -468,6 +479,12 @@ public class RegressionSuite extends TestCase {
         validateRowOfLongs("", vt, expected);
     }
 
+    static public void validateTableColumnOfScalarVarchar(Client client, String sql, String[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, 0, expected);
+    }
+
     static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
         validateTableColumnOfScalarVarchar(vt, 0, expected);
     }
@@ -485,6 +502,65 @@ public class RegressionSuite extends TestCase {
             } else {
                 assertEquals(expected[i], vt.getString(col));
             }
+        }
+    }
+
+
+    static public void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableColumnOfScalarVarbinary(vt, 0, expected);
+    }
+
+    static private void validateTableColumnOfScalarVarbinary(VoltTable vt, int col, String[] expected) {
+          assertNotNull(expected);
+          assertEquals(expected.length, vt.getRowCount());
+          int len = expected.length;
+          for (int i=0; i < len; i++) {
+              assertTrue(vt.advanceRow());
+              byte[] actual = vt.getVarbinary(col);
+
+              if (expected[i] == null) {
+                  assertTrue(vt.wasNull());
+                  assertEquals(null, actual);
+              } else {
+                  assertEquals(expected[i], Encoder.hexEncode(actual));
+              }
+          }
+    }
+
+    public void validateRowOfDecimal(VoltTable vt, BigDecimal [] expected) {
+        int len = expected.length;
+        assertTrue(vt.advanceRow());
+        for (int i=0; i < len; i++) {
+            BigDecimal actual = null;
+            try {
+                actual = vt.getDecimalAsBigDecimal(i);
+            } catch (IllegalArgumentException ex) {
+                ex.printStackTrace();
+                fail();
+            }
+            if (expected[i] != null) {
+                assertNotSame(null, actual);
+                assertEquals(expected[i], actual);
+            } else {
+                if (isHSQL()) {
+                    // We don't actually use this with
+                    // HSQL.  So, just assert failure here.
+                    fail("HSQL is not used to test the Volt DECIMAL type.");
+                } else {
+                    assertTrue(vt.wasNull());
+                }
+            }
+        }
+    }
+
+    public void validateTableOfDecimal(VoltTable vt, BigDecimal[][] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            validateRowOfDecimal(vt, expected[i]);
         }
     }
 

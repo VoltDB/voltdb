@@ -88,7 +88,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring,
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica {
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
@@ -483,7 +483,11 @@ ul.topRightList {
     max-width: 600px;
     overflow: auto;
 }
-.helpAboutWrap { overflow: auto;height: 380px;}
+
+.helpAboutWrap {
+    overflow: auto;
+    height: 380px;
+}
 
 .line {
     border-right: 1px solid #AAAAAA;
@@ -905,11 +909,11 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
 }
 
 .icon-procedures {
-    background-position: left -986px;
+    background-position: left -988px;
 }
 
 .icon-tables {
-    background-position: left -1043px;
+    background-position: left -1046px;
 }
 
 input.search-box {
@@ -1295,7 +1299,10 @@ ul.catalogNav {
 #tblSystemOverview tr:first-child td {
     border-top: none;
 }
-tr.trLicenseInfo td { border: none !important;}
+
+tr.trLicenseInfo td {
+    border: none !important;
+}
 
 
 .sysOverviewContent {
@@ -3200,6 +3207,7 @@ table.tblPopup {
 }
 
 /****DR *******/
+
 .drWrapper {
     margin: 20px 0 0 0;
 }
@@ -3211,6 +3219,22 @@ table.tblPopup {
 .drShowHide {
     background: #FFFFFF;
     padding: 20px;
+}
+
+.clpShowHide {
+    background: #FFFFFF;
+    padding: 20px;
+}
+
+.clpWrapper {
+    margin: 20px 0 0 0;
+}
+ .clpWrapper .content {
+        margin-bottom: 2px;
+    }
+
+ .dr {
+  padding: 4px 0 8px 0;
 }
 
 .masterWrapper {
@@ -3293,6 +3317,10 @@ tr.drSubSection td {
 
 .icon-replica {
     background-position: left -1653px;
+}
+
+.icon-command {
+    background-position: left -1701px;
 }
 
 .warningDr {
@@ -3459,8 +3487,30 @@ a:hover.changePsd {
     height: 0px;
 }
 
+
+
 /*********************************************media Qu********************/
 
+@media (max-width: 300px) {
+    ul.topRightList li {
+        padding:12px 0 0 2px;
+    }
+    .refreshBtn{ margin-bottom: 10px;}
+    .slimScrollDiv {
+            margin-top: 70px;
+        }
+            .menuHome { display: none;}
+
+        ul.tabs li {
+            float: none;
+        }
+        .tabScroller { margin-top:30px}
+}
+@media (max-width: 320px) {
+    ul.topRightList li {
+        padding:12px 0 0 2px;
+    }
+}
 @media (max-width: 360px) {
     .headerAdminContent {
         height: 65px;
@@ -4064,6 +4114,7 @@ a:hover.changePsd {
 }
 
 @media (width: 320px) {
+    
 
     input.icon-search {
         width: 182px;
