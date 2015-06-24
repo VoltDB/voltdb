@@ -2866,11 +2866,11 @@ function loadAdminPage() {
                 } else {
                     adminEditObjects.labelDrmode.text("Replica");
                 }
-                adminEditObjects.LinkDrMasterEdit.removeClass().addClass('edit');
+                
             } else {
                 adminEditObjects.labelDrmode.text("Master");
-                adminEditObjects.LinkDrMasterEdit.removeClass().addClass('editDisabled');
             }
+            adminEditObjects.LinkDrMasterEdit.removeClass().addClass('edit');
         };
 
         var getExportProperties = function (data) {
