@@ -691,7 +691,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseDisplayColumn(VoltXMLElement child, boolean isDistributed) {
         ParsedColInfo col = new ParsedColInfo();
         m_aggregationList.clear();
-        AbstractExpression colExpr = parseExpressionTree(child);;
+        AbstractExpression colExpr = parseExpressionTree(child);
         if (colExpr instanceof ConstantValueExpression) {
             assert(colExpr.getValueType() != VoltType.NUMERIC);
         }

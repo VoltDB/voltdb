@@ -1877,11 +1877,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "SELECT RATIO "
                 + "FROM R4 "
-                + "WHERE RATIO = 0.6944855793154526 "
+                + "WHERE RATIO = 6.944855793154526e-1 "
                 + "UNION "
                 + "  SELECT RATIO "
                 + "  FROM R4 "
-                + "  WHERE RATIO = 0.6944855793154526;")
+                + "  WHERE RATIO = 6.944855793154526e-1;")
                 .getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(0.6944855793154526, vt.getDouble(0), 0.000001);

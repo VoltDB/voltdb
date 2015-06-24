@@ -25,6 +25,8 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -47,6 +49,7 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
@@ -383,22 +386,14 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
-    public void validateTableOfDecimal(Client c, String sql, BigDecimal[][] expected)
-            throws Exception, IOException, ProcCallException {
-        assertNotNull(expected);
-        VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableOfDecimal(vt, expected);
-    }
-
-
-    static public void validateTableOfLongs(Client c, String sql, long[][] expected)
+    static protected void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, expected);
     }
 
-    static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
+    static protected void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
         assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
         int len = expected.length;
@@ -407,7 +402,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected)
+    static protected void validateTableOfScalarLongs(Client client, String sql, long[] expected)
             throws NoConnectionsException, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -425,7 +420,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateTableOfLongs(VoltTable vt, long[][] expected) {
+    static protected void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals("Wrong number of rows in table.  ",
                         expected.length, vt.getRowCount());
@@ -435,7 +430,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateRowOfLongs(String messagePrefix, VoltTable vt, long [] expected) {
+    static protected void validateRowOfLongs(String messagePrefix, VoltTable vt, long [] expected) {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
@@ -475,21 +470,38 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateRowOfLongs(VoltTable vt, long [] expected) {
+    static protected void validateRowOfLongs(VoltTable vt, long [] expected) {
         validateRowOfLongs("", vt, expected);
     }
 
-    static public void validateTableColumnOfScalarVarchar(Client client, String sql, String[] expected)
+    static protected void validateTableColumnOfScalarLong(VoltTable vt, int col, long[] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            assertTrue(vt.advanceRow());
+            long actual = vt.getLong(col);
+
+            if (expected[i] == Long.MIN_VALUE) {
+                assertTrue(vt.wasNull());
+                assertEquals(null, actual);
+            } else {
+                assertEquals(expected[i], actual);
+            }
+        }
+    }
+
+    static protected void validateTableColumnOfScalarVarchar(Client client, String sql, String[] expected)
             throws NoConnectionsException, IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarVarchar(vt, 0, expected);
     }
 
-    static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
+    static protected void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
         validateTableColumnOfScalarVarchar(vt, 0, expected);
     }
 
-    static public void validateTableColumnOfScalarVarchar(VoltTable vt, int col, String[] expected) {
+    static protected void validateTableColumnOfScalarVarchar(VoltTable vt, int col, String[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -506,7 +518,7 @@ public class RegressionSuite extends TestCase {
     }
 
 
-    static public void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
+    static protected void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
             throws NoConnectionsException, IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarVarbinary(vt, 0, expected);
@@ -529,7 +541,30 @@ public class RegressionSuite extends TestCase {
           }
     }
 
-    public void validateRowOfDecimal(VoltTable vt, BigDecimal [] expected) {
+    static protected void validateTableColumnOfScalarFloat(Client client, String sql, double[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableColumnOfScalarFloat(vt, 0, expected);
+    }
+
+    static protected void validateTableColumnOfScalarFloat(VoltTable vt, int col, double[] expected) {
+          assertNotNull(expected);
+          assertEquals(expected.length, vt.getRowCount());
+          int len = expected.length;
+          for (int i=0; i < len; i++) {
+              assertTrue(vt.advanceRow());
+              double actual = vt.getDouble(col);
+
+              if (expected[i] == Double.MIN_VALUE) {
+                  assertTrue(vt.wasNull());
+                  assertEquals(null, actual);
+              } else {
+                  assertEquals(expected[i], actual, 0.00001);
+              }
+          }
+    }
+
+    private void validateRowOfDecimal(VoltTable vt, BigDecimal [] expected) {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
@@ -555,7 +590,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    public void validateTableOfDecimal(VoltTable vt, BigDecimal[][] expected) {
+    protected void validateTableOfDecimal(VoltTable vt, BigDecimal[][] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -564,7 +599,81 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    public void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows) {
+    protected static int m_defaultScale = 12;
+    protected static String m_roundingEnabledProperty = "BIGDECIMAL_ROUND";
+    protected static String m_roundingModeProperty = "BIGDECIMAL_ROUND_POLICY";
+    protected static String m_defaultRoundingEnablement = "true";
+    protected static String m_defaultRoundingMode = "HALF_UP";
+
+    protected static String getRoundingString(String label) {
+        return String.format("%sRounding %senabled, mode is %s",
+                             label == null ? (label + ": ") : "",
+                             VoltDecimalHelper.isRoundingEnabled() ? "is " : "is *NOT* ",
+                             VoltDecimalHelper.getRoundingMode().toString());
+    }
+
+    /*
+     * This little helper function converts a string to
+     * a decimal, and, maybe, rounds it to the Volt default scale
+     * using the given mode.  If roundingEnabled is false, no
+     * rounding is done.
+     */
+    protected static final BigDecimal roundDecimalValue(String decimalValueString,
+                                                      boolean roundingEnabled,
+                                                      RoundingMode mode) {
+        BigDecimal bd = new BigDecimal(decimalValueString);
+        if (!roundingEnabled) {
+            return bd;
+        }
+        int precision = bd.precision();
+        int scale = bd.scale();
+        int lostScale = scale - m_defaultScale ;
+        if (lostScale <= 0) {
+            return bd;
+        }
+        int newPrecision = precision - lostScale;
+        MathContext mc = new MathContext(newPrecision, mode);
+        BigDecimal nbd = bd.round(mc);
+        assertTrue(nbd.scale() <= m_defaultScale);
+        if (nbd.scale() != m_defaultScale) {
+            nbd = nbd.setScale(m_defaultScale);
+        }
+        assertEquals(getRoundingString("Decimal Scale setting failure"), m_defaultScale, nbd.scale());
+        return nbd;
+    }
+
+    protected void validateTableOfDecimal(Client c, String sql, BigDecimal[][] expected)
+            throws Exception, IOException, ProcCallException {
+        assertNotNull(expected);
+        VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfDecimal(vt, expected);
+    }
+
+    static protected void validateTableColumnOfScalarDecimal(Client client, String sql, BigDecimal[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableColumnOfScalarDecimal(vt, 0, expected);
+    }
+
+    static protected void validateTableColumnOfScalarDecimal(VoltTable vt, int col, BigDecimal[] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            assertTrue(vt.advanceRow());
+            BigDecimal actual = vt.getDecimalAsBigDecimal(col);
+
+            if (expected[i] == null) {
+                assertTrue(vt.wasNull());
+                assertEquals(null, actual);
+            } else {
+                BigDecimal rounded = expected[i].setScale(m_defaultScale, RoundingMode.valueOf(m_defaultRoundingMode));
+                assertEquals(rounded, actual);
+            }
+        }
+  }
+
+    protected void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows) {
         assertEquals(prefix + "column count mismatch.  Expected: " + expectedRows.getColumnCount() + " actual: " + actualRows.getColumnCount(),
                 expectedRows.getColumnCount(), actualRows.getColumnCount());
 
@@ -590,15 +699,15 @@ public class RegressionSuite extends TestCase {
         assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
     }
 
-    static public void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {
+    static protected void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {
         verifyProcFails(client, expectedPattern, "@AdHoc", stmt);
     }
 
-    static public void verifyAdHocFails(Client client, String expectedPattern, Object... args) throws IOException {
+    static protected void verifyAdHocFails(Client client, String expectedPattern, Object... args) throws IOException {
         verifyProcFails(client, expectedPattern, "@AdHoc", args);
     }
 
-    static public void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
+    static protected void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
 
         String what;
         if (storedProc.compareTo("@AdHoc") == 0) {
@@ -630,7 +739,7 @@ public class RegressionSuite extends TestCase {
     // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
     // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
     // SAME METADATA.
-    static public void validateSchema(VoltTable result, VoltTable expected)
+    static protected void validateSchema(VoltTable result, VoltTable expected)
     {
         assertEquals(expected.getColumnCount(), result.getColumnCount());
         for (int i = 0; i < result.getColumnCount(); i++) {
@@ -639,11 +748,11 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validStatisticsForTableLimit(Client client, String tableName, long limit) throws Exception {
+    static protected void validStatisticsForTableLimit(Client client, String tableName, long limit) throws Exception {
         validStatisticsForTableLimitAndPercentage(client, tableName, limit, -1);
     }
 
-    static public void validStatisticsForTableLimitAndPercentage(Client client, String tableName, long limit, long percentage) throws Exception {
+    static protected void validStatisticsForTableLimitAndPercentage(Client client, String tableName, long limit, long percentage) throws Exception {
         long start = System.currentTimeMillis();
         while (true) {
             long lastLimit =-1, lastPercentage = -1;
@@ -686,7 +795,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void checkDeploymentPropertyValue(Client client, String key, String value)
+    static protected void checkDeploymentPropertyValue(Client client, String key, String value)
             throws IOException, ProcCallException, InterruptedException {
         boolean found = false;
 
@@ -701,7 +810,7 @@ public class RegressionSuite extends TestCase {
         assertTrue(found);
     }
 
-    static public void checkQueryPlan(Client client, String query, String...patterns) throws Exception {
+    static protected void checkQueryPlan(Client client, String query, String...patterns) throws Exception {
         VoltTable vt;
         assert(patterns.length >= 1);
 
