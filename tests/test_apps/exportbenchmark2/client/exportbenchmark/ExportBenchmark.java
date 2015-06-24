@@ -40,7 +40,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Selector;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -56,6 +55,7 @@ import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 /**
@@ -89,33 +89,20 @@ public class ExportBenchmark {
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
 
+    // collectors for min/max/start/stop statistics
     double min = -1;
     double max = 0;
     double start = 0;
     double end = 0;
-    // Server-side stats
-    ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
+
+    int dbInserts;
+    int exportInserts;
+
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS, serverStartTS, serverEndTS, decodeTime, partCount;
 
     static long samples = 0;
     static long sampleSum = 0;
-
-    class StatClass {
-        public Integer m_partition;
-        public Long m_transactions;
-        public Long m_decode;
-        public Long m_startTime;
-        public Long m_endTime;
-
-        StatClass (Integer partition, Long transactions, Long decode, Long startTime, Long endTime) {
-            m_partition = partition;
-            m_transactions = transactions;
-            m_decode = decode;
-            m_startTime = startTime;
-            m_endTime = endTime;
-        }
-    }
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
@@ -129,7 +116,7 @@ public class ExportBenchmark {
         long displayinterval = 1;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 300;
+        int duration = 30;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 10;
@@ -184,17 +171,18 @@ public class ExportBenchmark {
      * Establishes a client connection to a voltdb server, which should already be running
      * @param args The arguments passed to the program
      */
-    public ExportBenchmark(ExportBenchConfig config, int ratio) {
+    public ExportBenchmark(ExportBenchConfig config, int dbInserts, int exportInserts) {
         this.config = config;
-        this.ratio = ratio;
+        this.dbInserts = dbInserts;
+        this.exportInserts = exportInserts;
         samples = 0;
         sampleSum = 0;
         serverStartTS = serverEndTS = decodeTime = partCount = 0;
     }
 
     /**
-     * Prints a one line update on performance that can be printed
-     * periodically during a benchmark.
+     * Prints a one line update on performance
+     * periodically during benchmark.
      */
     public synchronized void printStatistics() {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
@@ -244,7 +232,16 @@ public class ExportBenchmark {
      */
     public void doInserts(Client client, int ratio) {
 
-        // Don't track warmup inserts
+        // Make sure DB tables are empty
+    	System.out.println("Truncating DB tables");
+    	try {
+			client.callProcedure("TruncateTables");
+		} catch (IOException | ProcCallException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+    	// Don't track warmup inserts
         System.out.println("Warming up...");
         long now = System.currentTimeMillis();
         AtomicLong rowId = new AtomicLong(0);
@@ -252,8 +249,10 @@ public class ExportBenchmark {
             try {
                 client.callProcedure(
                         new NullCallback(),
-                        "InsertExport"+ratio,
+                        "InsertExport",
                         rowId.getAndIncrement(),
+                        dbInserts,
+                        exportInserts,
                         0);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
@@ -272,15 +271,17 @@ public class ExportBenchmark {
 
         // Insert objects until we've run for long enough
         System.out.println("Running benchmark...");
-        System.out.println("Calling SP " + "InsertExport"+ratio);
+        System.out.println("Calling SP " + "InsertExport");
         now = System.currentTimeMillis();
         while (benchmarkEndTS > now) {
             try {
 
                 client.callProcedure(
                         new ExportCallback(),
-                        "InsertExport"+ratio,
+                        "InsertExport",
                         rowId.getAndIncrement(),
+                        dbInserts,
+                        exportInserts,
                         0);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
@@ -312,8 +313,6 @@ public class ExportBenchmark {
      * @throws NoConnectionsException
      */
     private void runTest() throws InterruptedException {
-
-
         // Figure out how long to run for
         benchmarkStartTS = System.currentTimeMillis();
         benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
@@ -351,25 +350,18 @@ public class ExportBenchmark {
             e.getLocalizedMessage();
         }
         ***/
-
+        // Print results & close
         System.out.println("Finished benchmark");
         System.out.println("Throughput");
         System.out.format("Start %6.0f, End %6.0f. Delta %6.2f%%%n" , start, end, (end-start)/start*100.0);
-        //System.out.println("Start\t"+ start + " End\t" + end + ". Delta " + (end-start)/start*100.0 + "%");
-
         System.out.format("Min %6.0f, Max %6.0f. Delta %6.2f%%%n", min, max, (max-min)/min*100.0);
-        //System.out.println("Min\t" + min + " Max\t" + max + ". Delta " + (max-min)/min*100.0 + "%");
 
-        // Print results & close
-        // printResults(benchmarkEndTS-benchmarkWarmupEndTS);
         try {
 			client.drain();
 		} catch (NoConnectionsException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
-
     }
 
     static void connectToOneServerWithRetry(String server) {
@@ -436,7 +428,10 @@ public class ExportBenchmark {
     public static void main(String[] args) {
         ExportBenchConfig config = new ExportBenchConfig();
         config.parse(ExportBenchmark.class.getName(), args);
-        int[] ratios = {5};
+        // set up the distinct tests -- (dbInserts, exportInserts) pairs
+        final int DBINSERTS = 0;
+        final int EXPORTINSERTS = 1;
+        int[][] tests = {{5,5}};
 
      // Connect to servers
         try {
@@ -448,10 +443,10 @@ public class ExportBenchmark {
             System.exit(1);
         }
 
-        for (int trial = 0; trial < ratios.length; trial++) {
+        for (int test = 0; test < tests.length; test++) {
             try {
-                 ExportBenchmark bench = new ExportBenchmark(config,ratios[trial]);
-                 System.out.println("Running trial " + ratios[trial]);
+                 ExportBenchmark bench = new ExportBenchmark(config,tests[test][DBINSERTS], tests[test][EXPORTINSERTS]);
+                 System.out.println("Running trial " + test + " -- DB Inserts: " + tests[test][DBINSERTS] + ", Export Inserts: " + tests[test][EXPORTINSERTS]);
                  bench.runTest();
             } catch (InterruptedException e) {
                  e.printStackTrace();
@@ -460,4 +455,3 @@ public class ExportBenchmark {
         }
     }
 }
-
