@@ -3,9 +3,9 @@
 
     <property name="voltlibext.dir"     value="../../lib/extension"/>
 
-    <property name="src.dir"     value="${basedir}/db/src"/>
-    <property name="clientsrc.dir"     value="${basedir}/client"/>
-    <property name="exportsrc.dir"     value="${basedir}/exporter"/>
+    <property name="src.dir"     value="${basedir}/db/exportbenchmark"/>
+    <property name="clientsrc.dir"     value="${basedir}/client/exportbenchmark"/>
+    <property name="exportsrc.dir"     value="${basedir}/exporter/exportbenchmark"/>
 
     <property name="build.dir"   value="build"/>
     <property name="classes.dir" value="${build.dir}/classes"/>

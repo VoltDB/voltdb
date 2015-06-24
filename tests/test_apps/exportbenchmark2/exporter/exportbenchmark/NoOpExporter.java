@@ -21,6 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
+ * Bogus comment -- fix this
  * This samples uses multiple threads to post synchronous requests to the
  * VoltDB server, simulating multiple client application posting
  * synchronous requests to the database, using the native VoltDB client

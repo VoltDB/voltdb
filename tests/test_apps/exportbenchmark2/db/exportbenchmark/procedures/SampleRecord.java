@@ -79,6 +79,18 @@ public class SampleRecord
         this.type_not_null_varchar1024  = nextVarchar(rand, 128, 1024);
     }
 
+    @Override
+    public String toString() {
+        String s = "\"" + rowid + "\",\"" + rowid_group + "\",\"" + type_null_tinyint + "\",\"" + type_not_null_tinyint +
+                "\",\"" + type_null_smallint + "\",\"" + type_not_null_smallint + "\",\"" + type_null_integer +
+                "\",\"" + type_not_null_integer + "\",\"" + type_null_bigint + "\",\"" + type_not_null_bigint +
+                "\",\"" + type_null_timestamp + "\",\"" + type_not_null_timestamp + "\",\"" + type_null_float +
+                "\",\"" + type_not_null_float + "\",\"" + type_null_decimal + "\",\"" + type_not_null_decimal +
+                "\",\"" + type_null_varchar25 + "\",\"" + type_not_null_varchar25 + "\",\"" + type_null_varchar128 +
+                "\",\"" + type_not_null_varchar128 + "\",\"" + type_null_varchar1024 + "\",\"" + type_not_null_varchar1024 + "\"";
+        return s.replace("\"null\"", "null");   // remove the quotes around NULL's so value is NULL, not a string "null"
+    }
+
     private static Object nextTinyint(Random rand)
     {
         return nextTinyint(rand, false);
