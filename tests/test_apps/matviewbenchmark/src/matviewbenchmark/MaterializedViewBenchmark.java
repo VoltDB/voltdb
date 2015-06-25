@@ -345,7 +345,8 @@ public class MaterializedViewBenchmark {
                 csvStr = "4mins";
                 procStr = "idsWith4MinMatView";
                 break;
-            default: // "4MinMatViewOpt"
+            default:
+                assertEquals(matView, "4MinMatViewOpt");
                 systemStr = "4mins opt";
                 csvStr = "4mins opt";
                 procStr = "idsWith4MinMatViewOpt";

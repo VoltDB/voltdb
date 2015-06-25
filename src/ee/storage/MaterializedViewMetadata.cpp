@@ -69,6 +69,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     }
 
     // handle index for min / max support
+    m_minMaxSearchKeyBackingStoreSize = 0;
+    m_minMaxSearchKeyBackingStore = NULL;
     setIndexForMinMax(mvInfo->indexForMinMax());
 
     allocateBackedTuples();
@@ -121,35 +123,33 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     oldTarget->decrementRefcount();
 }
 
+void MaterializedViewMetadata::setIndexForMinMax(const std::vector<TableIndex *> &indexForMinMax) {
+    m_indexForMinMax = std::vector<TableIndex *>(indexForMinMax);
+    allocateMinMaxSearchKeyTuple();
+}
+
 void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax)
 {
-    // TODO: use map for faster search? Suppose you got a lot of min() / max() columns?
     std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
-    m_minMaxSearchKeyBackingStoreSize = 0;
+    m_indexForMinMax.clear();
     for (catalog::CatalogMap<catalog::IndexRef>::field_map_iter idxIterator = indexForMinOrMax.begin();
          idxIterator != indexForMinOrMax.end(); idxIterator++) {
         catalog::IndexRef *idx = idxIterator->second;
         if (idx->name().compare("") == 0) {
-            // The min/max column doexn't have a supporting index.
+            // The min/max column doesn't have a supporting index.
             m_indexForMinMax.push_back(NULL);
         }
         else {
             // The min/max column has a supporting index.
-            for (int i = 0; i < candidates.size(); i++) {
+            for (int i = 0; i < candidates.size(); ++i) {
                 if (idx->name().compare(candidates[i]->getName()) == 0) {
                     m_indexForMinMax.push_back(candidates[i]);
-                    if ( minMaxIndexIncludesAggCol(candidates[i]) ) {
-                        // Because there might be a lot of indexes, find the largest space they may consume
-                        // so that they can all share one space and use different schemas. (ENG-8512)
-                        if (candidates[i]->getKeySchema()->tupleLength() + 1 > m_minMaxSearchKeyBackingStoreSize) {
-                            m_minMaxSearchKeyBackingStoreSize = candidates[i]->getKeySchema()->tupleLength() + 1;
-                        }
-                    }
                     break;
                 }
             } // end for
         }
     }
+    allocateMinMaxSearchKeyTuple();
 }
 
 void MaterializedViewMetadata::freeBackedTuples()
@@ -158,6 +158,30 @@ void MaterializedViewMetadata::freeBackedTuples()
     delete[] m_updatedTupleBackingStore;
     delete[] m_emptyTupleBackingStore;
     delete[] m_minMaxSearchKeyBackingStore;
+}
+
+void MaterializedViewMetadata::allocateMinMaxSearchKeyTuple()
+{
+    size_t minMaxSearchKeyBackingStoreSize = 0;
+    for (int i=0; i<m_indexForMinMax.size(); ++i) {
+        // Because there might be a lot of indexes, find the largest space they may consume
+        // so that they can all share one space and use different schemas. (ENG-8512)
+        if ( minMaxIndexIncludesAggCol(m_indexForMinMax[i]) &&
+                m_indexForMinMax[i]->getKeySchema()->tupleLength() + 1 > minMaxSearchKeyBackingStoreSize) {
+             minMaxSearchKeyBackingStoreSize = m_indexForMinMax[i]->getKeySchema()->tupleLength() + 1;
+        }
+    }
+    if (minMaxSearchKeyBackingStoreSize == m_minMaxSearchKeyBackingStoreSize) {
+        return;
+    }
+    m_minMaxSearchKeyBackingStoreSize = minMaxSearchKeyBackingStoreSize;
+    delete[] m_minMaxSearchKeyBackingStore;
+    m_minMaxSearchKeyBackingStore = NULL;
+    // If the minMaxIndex contains agg cols, need to allocate a searchKeyTuple and backing store for it. (ENG-6511)
+    if ( m_minMaxSearchKeyBackingStoreSize > 0 ) {
+        m_minMaxSearchKeyBackingStore = new char[m_minMaxSearchKeyBackingStoreSize];
+        memset(m_minMaxSearchKeyBackingStore, 0, m_minMaxSearchKeyBackingStoreSize);
+    }
 }
 
 void MaterializedViewMetadata::allocateBackedTuples()
@@ -172,13 +196,6 @@ void MaterializedViewMetadata::allocateBackedTuples()
         m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
         memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
         m_searchKeyTuple.move(m_searchKeyBackingStore);
-    }
-
-    m_minMaxSearchKeyBackingStore = NULL;
-    // If the minMaxIndex contains agg cols, need to allocate a searchKeyTuple and backing store for it. (ENG-6511)
-    if ( m_minMaxSearchKeyBackingStoreSize > 0 ) {
-        m_minMaxSearchKeyBackingStore = new char[m_minMaxSearchKeyBackingStoreSize];
-        memset(m_minMaxSearchKeyBackingStore, 0, m_minMaxSearchKeyBackingStoreSize);
     }
 
     m_existingTuple = TableTuple(m_target->schema());
@@ -655,12 +672,15 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                         VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
                     }
                 }
-                minMaxAggIdx++;
                 break;
             default:
                 assert(false); // Should have been caught when the matview was loaded.
                 /* no break */
             }
+        }
+        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_MIN ||
+            m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_MAX) {
+            minMaxAggIdx++;
         }
         VOLT_TRACE("updating matview tuple column %d\n", (int)(aggOffset+aggIndex));
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);

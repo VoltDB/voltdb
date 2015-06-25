@@ -535,7 +535,7 @@ public class TestDDLCompiler extends TestCase {
                 "FROM T " +
                 "GROUP BY D1, D2, D3;\n" +
 
-                // Test min/max with expres in group-by, single aggCol
+                // Test min/max with expression in group-by, single aggCol
                 "CREATE VIEW VT07 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +     // should choose T_TREE_9, T_TREE_9
                 "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL1), MAX(VAL1) " +
                 "FROM T " +
@@ -547,7 +547,7 @@ public class TestDDLCompiler extends TestCase {
                 "FROM T WHERE D1 > 3 " +
                 "GROUP BY D1, D2;\n" +
 
-                // Test min/max with predicate, with expr in group-by
+                // Test min/max with predicate, with expression in group-by
                 "CREATE VIEW VT09 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +     // should choose T_TREE_9, T_TREE_8
                 "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
                 "FROM T WHERE D1 > 3 " +

@@ -63,9 +63,7 @@ public:
 
     void setTargetTable(PersistentTable * target);
     void setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax);
-    void setIndexForMinMax(const std::vector<TableIndex *> &indexForMinMax) {
-        m_indexForMinMax = std::vector<TableIndex *>(indexForMinMax);
-    }
+    void setIndexForMinMax(const std::vector<TableIndex *> &indexForMinMax);
 
     catalog::MaterializedViewInfo* getMaterializedViewInfo() {
         return m_mvInfo;
@@ -81,6 +79,7 @@ private:
 
     void freeBackedTuples();
     void allocateBackedTuples();
+    void allocateMinMaxSearchKeyTuple();
 
     /** load a predicate from the catalog structure if it's there */
     static AbstractExpression* parsePredicate(catalog::MaterializedViewInfo *mvInfo);

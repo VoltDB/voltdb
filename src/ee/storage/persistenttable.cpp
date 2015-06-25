@@ -1036,7 +1036,6 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
     BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
         PersistentTable* currTarget = currView->targetTable();
 
-        // TOTO: Double check this comparison! Data types have changed.
         // found: target is alreafy set
         if (currTarget == target) {
             // The view is already up to date.
