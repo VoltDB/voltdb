@@ -26,6 +26,8 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Random;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -802,7 +804,32 @@ public class TestOrderBySuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         System.out.println(vt.toString());
         assertTrue(vt.toString().contains("O3_TREE"));
-}
+    }
+
+    private void subtestOrderByMP() throws Exception
+    {
+        Client client = getClient();
+        client.callProcedure("Truncate01");
+        List<Integer> ids = new ArrayList<Integer>();
+        Random rand = new Random();
+        int size = 100;
+        for (int i = 0; i < size; ++i) {
+            ids.add(rand.nextInt());
+        }
+        int min = Collections.min(ids);
+        int max = Collections.max(ids);
+        for (int i : ids) {
+            client.callProcedure("InsertO1", i,i,"dummy","dummy");
+        }
+
+        VoltTable vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM O1 ORDER BY PKEY DESC").getResults()[0];
+        assertEquals(size, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(max, vt.getLong(0));
+        vt = client.callProcedure("@Explain", "SELECT PKEY FROM O1 ORDER BY PKEY DESC").getResults()[0];
+        System.out.println(vt.toString());
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+    }
 
     public void testAll()
     throws Exception
@@ -820,6 +847,7 @@ public class TestOrderBySuite extends RegressionSuite {
         subtestEng4676();
         subtestEng5021();
         subtestPartialIndex();
+        subtestOrderByMP();
     }
 
     //
