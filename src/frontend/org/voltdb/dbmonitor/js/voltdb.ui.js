@@ -284,9 +284,12 @@ $(document).ready(function () {
                 shortcut.add("f6", function () {
                     $("#runBTn").button().click();
                 });
+
+
             } else {
-                shortcut.add("f5", function () {
-                    $("#runBTn").button().click();
+                shortcut.add("F5", function () {
+                    if ($("#runBTn").attr('disabled') != "disabled")
+                        $("#runBTn").button().click();
                 });
             }
         } else {
