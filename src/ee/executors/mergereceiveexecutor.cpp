@@ -195,7 +195,6 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     int loadedDeps = 0;
-    TempTable* output_table = dynamic_cast<TempTable*>(m_orderby_node->getOutputTable());
 
     // iterate over dependencies and merge them into the temp table.
     // The assumption is that the dependencies results are are sorted.
@@ -212,7 +211,7 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
 
     do {
         loadedDeps = m_engine->loadNextDependency(m_tmpInputTable);
-        int currentTupleCount = output_table->activeTupleCount();
+        int currentTupleCount = m_tmpInputTable->activeTupleCount();
         if (currentTupleCount != previousTupleCount) {
             partitionTupleCounts.push_back(currentTupleCount - previousTupleCount);
             previousTupleCount = currentTupleCount;
@@ -237,9 +236,9 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
 
     // Merge Sort
     TupleComparer comp(m_orderby_node->getSortExpressions(), m_orderby_node->getSortDirections());
-    merge_sort(xs, partitionTupleCounts, comp, limit, offset, output_table, pmp);
+    merge_sort(xs, partitionTupleCounts, comp, limit, offset, m_tmpOutputTable, pmp);
 
-    VOLT_TRACE("Result of MergeReceive:\n '%s'", output_table->debug().c_str());
+    VOLT_TRACE("Result of MergeReceive:\n '%s'", m_tmpOutputTable->debug().c_str());
 
     return true;
 }
