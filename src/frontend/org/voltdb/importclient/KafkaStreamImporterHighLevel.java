@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.importclient;
+package org.voltdb.importclient.kafka;
 
 import java.util.List;
 import java.util.Properties;
@@ -28,7 +28,6 @@ import kafka.consumer.KafkaStream;
 import kafka.consumer.Whitelist;
 import kafka.javaapi.consumer.ConsumerConnector;
 import kafka.message.MessageAndMetadata;
-import kafka.utils.VerifiableProperties;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.voltdb.importer.CSVInvocation;
@@ -38,7 +37,7 @@ import org.voltdb.importer.ImportHandlerProxy;
  * Implement a BundleActivator interface and extend ImportHandlerProxy.
  * @author akhanzode
  */
-public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
+public class KafkaStreamImporterHighLevel extends ImportHandlerProxy implements BundleActivator {
 
     private static final int NUM_CONSUMER_THREADS = 1;
 

@@ -51,7 +51,7 @@ public class ImportProcessor implements ImportDataProcessor {
         m_frameworkProps = new HashMap<String, String>();
         //Need this so that ImportContext is available.
         m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
-                + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0");
+                + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,com.google_voltpatches.common");
         // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
         m_frameworkProps.put("org.osgi.framework.storage.clean", "onFirstInit");
         m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
