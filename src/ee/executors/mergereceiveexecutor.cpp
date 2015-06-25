@@ -143,7 +143,7 @@ void merge_sort(const std::vector<TableTuple>& tuples,
         // Find the range that has the next tuple to be inserted
         range_iterator minRangeIt = min_tuple_range(partitions, comp);
         // copy the first tuple to the output
-        TableTuple tuple = *rangeIt->first;
+        TableTuple tuple = *minRangeIt->first;
         output_table->insertTupleNonVirtual(tuple);
         pmp.countdownProgress();
         // advance the iterator
