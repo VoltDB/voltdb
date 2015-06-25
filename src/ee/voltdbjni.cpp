@@ -1025,6 +1025,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
         try {
             voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
             jlong tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in);
+            env->ReleaseByteArrayElements(serialized_buffers, bytes, JNI_ABORT);
             return tuplesRemaining;
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
