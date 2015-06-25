@@ -358,9 +358,8 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         }
     }
 
-    assert(m_quantifier != QUANTIFIER_TYPE_NONE);
-    // A NULL match determines the result for a QUANTIFIER_TYPE_ANY
-    // that never had a true match.
+    // A NULL match along the way determines the result
+    // for cases that never found a definitive result.
     if (hasInnerNull) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
     }
