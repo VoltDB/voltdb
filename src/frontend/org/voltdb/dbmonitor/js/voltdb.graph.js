@@ -1190,16 +1190,17 @@
                 var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
                 var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
                 var opacity = 1;
-                if (x1 > 3 && x1 < 475 && (x2 - x1 > 0))
+                if (x1 > 3 && x1 < 475 && (x2 - x1 > 0)) {
                     opacity = ((x2 - x1) > 4) ? 0.2 : 1;
-                d3.select('#visualisationCommandLog .nv-y')
-                    .append('rect')
-                    .attr('x', x1)
-                    .attr('width', (x2 - x1))
-                    .style('fill', 'red')
-                    .style('opacity', opacity)
-                    .attr('y', 0)
-                    .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                    d3.select('#visualisationCommandLog .nv-y')
+                        .append('rect')
+                        .attr('x', x1)
+                        .attr('width', (x2 - x1))
+                        .style('fill', 'red')
+                        .style('opacity', opacity)
+                        .attr('y', 0)
+                        .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                }
             });
 
             cmdLogSecCount++;
