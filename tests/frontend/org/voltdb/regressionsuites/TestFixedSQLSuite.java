@@ -2143,11 +2143,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         //
         // operation between decimal and integer
         //
-        if (isHSQL()) {
-            // not compatible with Hsql
-            return;
-        }
-
         sql = "SELECT 0.1 + (1-0.1) + NUM FROM R1";
         runQueryGetDecimal(client, sql, 3.0);
 
@@ -2155,23 +2150,23 @@ public class TestFixedSQLSuite extends RegressionSuite {
         runQueryGetDecimal(client, sql, -1.0);
 
         sql = "SELECT 0.1 + (1-0.1) / NUM FROM R1";
-        runQueryGetDouble(client, sql, 0.55);
+        runQueryGetDecimal(client, sql, 0.55);
 
         sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
-        runQueryGetDouble(client, sql, 1.9);
+        runQueryGetDecimal(client, sql, 1.9);
 
         // reverse order
         sql = "SELECT 0.1 + NUM + (1-0.1) FROM R1";
-        runQueryGetDouble(client, sql, 3.0);
+        runQueryGetDecimal(client, sql, 3.0);
 
         sql = "SELECT 0.1 + NUM - (1-0.1) FROM R1";
-        runQueryGetDouble(client, sql, 1.2);
+        runQueryGetDecimal(client, sql, 1.2);
 
         sql = "SELECT 0.1 + NUM / (1-0.1) FROM R1";
-        runQueryGetDouble(client, sql, 2.322222222222);
+        runQueryGetDecimal(client, sql, 2.322222222222);
 
         sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
-        runQueryGetDouble(client, sql, 1.9);
+        runQueryGetDecimal(client, sql, 1.9);
     }
 
     private void nullIndexSearchKeyChecker(Client client, String sql) throws Exception {

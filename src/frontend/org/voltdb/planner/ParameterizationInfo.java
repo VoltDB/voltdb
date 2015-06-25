@@ -177,16 +177,31 @@ class ParameterizationInfo {
 
                 VoltXMLElement paramIndexNode = new VoltXMLElement("parameter");
                 paramIndexNode.attributes.put("index", String.valueOf(paramIndex));
-                String typeStr = node.attributes.get("valuetype");
-                paramIndexNode.attributes.put("valuetype", typeStr);
                 paramIndexNode.attributes.put("id", idStr);
                 paramsNode.children.add(paramIndexNode);
 
+                // handle parameter value type
+                String typeStr = node.attributes.get("valuetype");
+                VoltType vt = VoltType.typeFromString(typeStr);
+
                 String value = null;
-                if (VoltType.typeFromString(typeStr) != VoltType.NULL) {
+                if (vt != VoltType.NULL) {
                     value = node.attributes.get("value");
                 }
                 paramValues.add(value);
+
+                if (vt == VoltType.NUMERIC) {
+                    vt = VoltType.BIGINT;
+                    try {
+                        Long.parseLong(value);
+                    } catch (NumberFormatException e) {
+                        // DECIMAL probably is not bigger/smaller enough than our decimal range.
+                        vt = VoltType.DECIMAL;
+                    }
+                }
+
+                node.attributes.put("valuetype", vt.getName());
+                paramIndexNode.attributes.put("valuetype", vt.getName());
             }
 
             // Assume that all values, whether or not their ids have been seen before, can

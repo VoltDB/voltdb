@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -53,22 +54,23 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
             // Insert records into the table.
             String proc = tb + ".insert";
-            // id, wage, dept, tm
-            cr = client.callProcedure(proc, 1,  10,  1 , "2013-06-18 02:00:00.123457");
+            //                             id,wage,dept,tm
+            cr = client.callProcedure(proc, 1, 10, 1, "2013-06-18 02:00:00.123457");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            cr = client.callProcedure(proc, 2,  20,  1 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(proc, 2, 20, 1, "2013-07-18 02:00:00.123457");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            cr = client.callProcedure(proc, 3,  30,  1 , "2013-07-18 10:40:01.123457");
+            cr = client.callProcedure(proc, 3, 30, 1, "2013-07-18 10:40:01.123457");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            cr = client.callProcedure(proc, 4,  40,  2 , "2013-08-18 02:00:00.123457");
+            cr = client.callProcedure(proc, 4, 40, 2, "2013-08-18 02:00:00.123457");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            cr = client.callProcedure(proc, 5,  50,  2 , "2013-09-18 02:00:00.123457");
+            cr = client.callProcedure(proc, 5, 50, 2, "2013-09-18 02:00:00.123457");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
             if (extra) {
-                cr = client.callProcedure(proc, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+                //                             id,wage,dept,tm
+                cr = client.callProcedure(proc, 6, 10, 2, "2013-07-18 02:00:00.123457");
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-                cr = client.callProcedure(proc, 7,  40,  2 , "2013-09-18 02:00:00.123457");
+                cr = client.callProcedure(proc, 7, 40, 2, "2013-09-18 02:00:00.123457");
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             }
         }
@@ -78,28 +80,47 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * Simple sub-query
      * @throws Exception
      */
-    public void testSubSelects_Simple() throws Exception
+    public void testSimpleFromClause() throws Exception
     {
         Client client = getClient();
         loadData(false);
         String sql;
 
         for (String tb: tbs) {
+            // baseline
             sql =   "select ID, DEPT " +
-                    "from (select ID, DEPT from "+ tb +") T1 " +
+                    "from (select ID, DEPT from " + tb + ") T1 " +
+                    "order by ID;";
+            validateTableOfLongs(client, sql, new long[][] {
+                    {1, 1}, {2, 1}, {3, 1}, {4, 2}, {5, 2}});
+
+            // WHERE clause has same effect inside and outside subquery.
+            sql =   "select ID, DEPT " +
+                    "from (select ID, DEPT from " + tb + ") T1 " +
                     "where T1.ID > 4;";
             validateTableOfLongs(client, sql, new long[][] {{5, 2}});
 
             sql =   "select ID, DEPT " +
-                    "from (select ID, DEPT from "+ tb +") T1 " +
+                    "from (select ID, DEPT from " + tb +
+                    "      where ID > 4) T1;";
+            validateTableOfLongs(client, sql, new long[][] {{5, 2}});
+
+            sql =   "select ID, DEPT " +
+                    "from (select ID, DEPT from " + tb + ") T1 " +
                     "where ID < 3 " +
                     "order by ID;";
             validateTableOfLongs(client, sql, new long[][] {{1, 1}, {2, 1}});
 
+            sql =   "select ID, DEPT " +
+                    "from (select ID, DEPT from " + tb +
+                    "      where ID < 3) T1 " +
+                    "order by ID DESC;";
+            validateTableOfLongs(client, sql, new long[][] {{2, 1}, {1, 1}});
+
             // Nested
             sql =   "select A2 " +
                     "from (select A1 AS A2 " +
-                    "      from (select ID AS A1 from "+ tb +") T1 " +
+                    "      from (select ID AS A1 from " + tb + ") T1 " +
                     "      where T1.A1 - 2 > 0) T2 " +
                     "where T2.A2 < 6 " +
                     "order by A2";
@@ -107,7 +128,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
             sql =   "select A2 + 10 " +
                     "from (select A1 AS A2 " +
-                    "      from (select ID AS A1 from "+ tb +
+                    "      from (select ID AS A1 from " + tb +
                     "            where ID > 3) T1) T2 " +
                     "where T2.A2 < 6 " +
                 "order by A2";
@@ -116,10 +137,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     /**
-     * SELECT FROM SELECT FROM SELECT
+     * SELECT FROM SELECT FROM GROUP BY
      * @throws Exception
      */
-    public void testSubSelects_Aggregations() throws Exception
+    public void testFromClauseAggregation() throws Exception
     {
         Client client = getClient();
         loadData(true);
@@ -159,7 +180,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "order by a4;";
             validateTableOfLongs(client, sql, new long[][] {{4, 60}, {10, 40}});
 
-            // groupby from groupby
+            // group by agg function from group by
             sql =   "select dept_count, count(*) " +
                     "from (select dept, count(*) as dept_count " +
                     "      from R1 group by dept) T1 " +
@@ -168,14 +189,27 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(client, sql, new long[][] {{3, 1}, {4, 1}});
 
             // groupby from groupby + limit
+
+            // The limit drops the final raw row to turn the group of 4 to another group of 3.
             sql =   "select dept_count, count(*) " +
                     "from (select dept, count(*) as dept_count " +
                     "      from (select dept, id from " + tb + " " +
-                    "            order by dept limit 6) T1 " +
+                    "            order by dept, id limit 6) T1 " +
                     "      group by dept) T2 " +
                     "group by dept_count " +
                     "order by dept_count;";
             validateTableOfLongs(client, sql, new long[][] {{3, 2}});
+
+            // The limit and offset drop the first and last groups,
+            // leaving 2 groups of 1 and 1 group of 2.
+            sql =   "select wage_count, count(*) " +
+                    "from (select wage, count(*) as wage_count " +
+                    "      from (select wage, id from " + tb + ") T1 " +
+                    "      group by wage " +
+                    "      order by wage limit 3 offset 1) T2 " +
+                    "group by wage_count " +
+                    "order by wage_count;";
+            validateTableOfLongs(client, sql, new long[][] {{1, 2}, {2, 1}});
         }
     }
 
@@ -183,22 +217,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * Join two sub queries
      * @throws Exception
      */
-    public void testSubSelects_Joins() throws Exception
+    public void testJoinsOfSubselects() throws Exception
     {
         Client client = getClient();
         loadData(false);
         String sql;
 
         for (String tb: tbs) {
+            // Join parallel subqueries.
             sql =   "select newid, id " +
                     "from (select id, wage from R1) T1, " +
                     "     (select id as newid, dept " +
-                    "      from "+ tb +
+                    "      from " + tb +
                     "      where dept > 1) T2 " +
                     "where T1.id = T2.dept " +
                     "order by newid;";
             validateTableOfLongs(client, sql, new long[][] {{4, 2}, {5, 2}});
 
+            // Join replicated table with subquery.
             sql =   "select id, wage, dept_count " +
                     "from R1, (select dept, count(*) as dept_count " +
                     "          from (select dept, id " +
@@ -210,31 +246,33 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(client, sql, new long[][] {
                     {3, 30, 2}, {4, 40, 2}, {4, 40, 3},{5, 50, 2},{5, 50, 3}});
 
+            // Join parallel subqueries, fancier case.
             sql =   "select id, newid  " +
                     "from (select id, wage from R1) T1 " +
                     "     LEFT OUTER JOIN " +
                     "     (select id as newid, dept " +
-                    "      from "+ tb +
+                    "      from " + tb +
                     "      where dept > 1) T2 " +
                     "     ON T1.id = T2.dept " +
                     "order by id, newid;";
             validateTableOfLongs(client, sql, new long[][] {
                     {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
                     {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
-        }
 
-        sql =   "select T2.id " +
-                "from (select id, wage from R1) T1, R1 T2 " +
-                "order by T2.id;";
-        validateTableOfLongs(client, sql, new long[][] {
-                {1}, {1}, {1}, {1}, {1},
-                {2}, {2}, {2}, {2}, {2},
-                {3}, {3}, {3}, {3}, {3},
-                {4}, {4}, {4}, {4}, {4},
-                {5}, {5}, {5}, {5}, {5}});
+            // Join table with subquery on replicated data.
+            sql =   "select T2.id " +
+                    "from (select id, wage from R1) T1, " + tb + " T2 " +
+                    "order by T2.id;";
+            validateTableOfLongs(client, sql, new long[][] {
+                    {1}, {1}, {1}, {1}, {1},
+                    {2}, {2}, {2}, {2}, {2},
+                    {3}, {3}, {3}, {3}, {3},
+                    {4}, {4}, {4}, {4}, {4},
+                    {5}, {5}, {5}, {5}, {5}});
+        }
     }
 
-    public void testSubSelects_from_replicated() throws Exception
+    public void testFromReplicated() throws Exception
     {
         Client client = getClient();
         loadData(false);
@@ -265,9 +303,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1, 10}, {2, 20}, {3, 30}, {4, 40}, {5, 50}});
     }
 
+    // This got a wrong answer when partitioned GROUP in subquery is joined with replicated parent table
     public void testENG6276() throws Exception
     {
         Client client = getClient();
+        String sql;
 
         String[] sqlArray = {
                 "INSERT INTO P4 VALUES (0, 'EPOJbVcUPlDghTEMs', NULL, 2.90574307197424275273e-01);",
@@ -288,21 +328,17 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "INSERT INTO R4 VALUES (6, 'baYqQXVHBZHVlDRlu', 23815, 4.49837414257097889525e-01);",
                 "INSERT INTO R4 VALUES (7, 'baYqQXVHBZHVlDRlu', 23815, 4.91748197919483431839e-01);"
         };
-        // Test Default
-        for (String sql: sqlArray) {
-            sql = sql.trim();
-            if (!sql.isEmpty()) {
-                client.callProcedure("@AdHoc", sql);
-            }
-        }
+        sql = StringUtils.join(sqlArray);
+        ClientResponse cr = client.callProcedure("@AdHoc", sql);
+        assertEquals("Failed data initialization.", ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt[] = cr.getResults();
+        assertEquals("Failed data initialization.", sqlArray.length, vt.length);
 
-        String sql =
-                "select -8, A.NUM " +
-                "from R4 B, (select max(RATIO) RATIO, sum(NUM) NUM, DESC from P4 group by DESC) A " +
-                "where (A.NUM + 5 ) > 44";
-
-        //* enable for debug */ dumpQueryPlans(client, sql);
-
+        sql =   "select -8, A.NUM " +
+                "from R4 B, " +
+                "     (select max(RATIO) RATIO, sum(NUM) NUM, DESC " +
+                "      from P4 group by DESC) A " +
+                "where (A.NUM + 5) > 44";
         long[] row = new long[] {-8, 63890};
         validateTableOfLongs(client, sql, new long[][] {
                 row, row, row, row, row, row, row, row});
@@ -312,7 +348,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * Simple sub-query expression
      * @throws Exception
      */
-    public void testSubExpressions_Simple() throws Exception
+    public void testInExistsSimple() throws Exception
     {
         Client client = getClient();
         loadData(false);
@@ -320,110 +356,136 @@ public class TestSubQueriesSuite extends RegressionSuite {
         VoltTable vt;
 
         for (String tb: replicated_tbs) {
-            sql =   "select ID, DEPT from "+ tb +
-                    " where ID in " +
-                    "       (select ID from " + tb + " where ID > 3) " +
-                "order by ID;";
-            validateTableOfLongs(client, sql, new long[][] {{4,2}, {5,2}});
-
-            sql =   "select ID, DEPT from "+ tb +
-                    " where abs(ID) in " +
-                    "       (select ID from " + tb + " where DEPT = 2 " +
-                    "        order by 1 limit 1 offset 1);";
-            validateTableOfLongs(client, sql, new long[][] {{5,2}});
-
-            sql =   "select ID, DEPT from "+ tb +
-                    " where ID in " +
-                    "       (select ID from " + tb + " where ID > 2 " +
-                    "        order by ID limit 3 offset 1) " +
+            sql =   "select ID, DEPT from " + tb + " " +
+                    "where ID IN " +
+                    "      (select ID from " + tb + " where ID > 3) " +
                     "order by ID;";
-            validateTableOfLongs(client, sql, new long[][] {{4,2}, {5,2}});
+            validateTableOfLongs(client, sql, new long[][] {{4, 2}, {5, 2}});
 
-            sql =   "select ID, DEPT from "+ tb +" T1 " +
-                    "where abs(ID) in " +
+            // correlate by parent expression
+            sql =   "select ID, DEPT from " + tb + " " +
+                    "where abs(ID) IN " +
+                    "      (select ID from " + tb + " where DEPT = 2 " +
+                    "       order by 1 limit 1 offset 1);";
+            validateTableOfLongs(client, sql, new long[][] {{5, 2}});
+
+            // limit offset in subquery
+            sql =   "select ID, DEPT from " + tb + " " +
+                    "where ID IN " +
+                    "      (select ID from " + tb + " where ID > 2 " +
+                    "       order by ID limit 3 offset 1) " +
+                    "order by ID;";
+            validateTableOfLongs(client, sql, new long[][] {{4, 2}, {5, 2}});
+
+            // AND of in/exists
+            sql =   "select ID, DEPT from " + tb + " T1 " +
+                    "where abs(ID) IN " +
                     "      (select ID from " + tb + " where ID > 4) " +
                     "and exists " +
-                    "      (select 1 from " + tb + " where ID * T1.DEPT = 10) " +
+                    "    (select 1 from " + tb + " where ID * T1.DEPT = 10) " +
                     "order by ID;";
             validateTableOfLongs(client, sql, new long[][] {{5, 2}});
 
-            sql =   "select ID, DEPT from "+ tb +" T1 where " +
-                    "not exists " +
+            // not exists
+            sql =   "select ID, DEPT from " + tb + " T1 " +
+                    "where not exists " +
                     "      (select 1 from " + tb + " where ID * T1.DEPT = 10) " +
                     "and T1.ID < 3 " +
                     "order by ID;";
             validateTableOfLongs(client, sql, new long[][] {{1, 1}, {2, 1}});
 
-            sql =   "select ID, DEPT from "+ tb +" T1 " +
-                    "where (abs(ID) + 1 - 1, DEPT) in " +
-                    "      (select DEPT, WAGE/10 from " + tb + ");";
-            validateTableOfLongs(client, sql, new long[][] {{1, 1}});
+            // Subquery with user parameter
+            vt = client.callProcedure("@AdHoc",
+                    "select ID from " + tb + " T1 " +
+                    "where exists " +
+                    "      (select 1 from R2 T2 where T1.ID * T2.ID = ?);",
+                    9).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{3}});
+
+            // Subquery with parent column correlation
+            sql =   "select ID from " + tb + " T1 " +
+                    "where exists " +
+                    "      (select 1 from R2 T2 " +
+                    "       where T1.ID * T2.ID = 9);";
+            validateTableOfLongs(client, sql, new long[][] {{3}});
+
+            // Subquery with a grand-parent column correlation
+            sql =   "select ID from " + tb + " T1 " +
+                    "where exists " +
+                    "      (select 1 from R1 T2 " +
+                    "       where exists " +
+                    "             (select ID from R2 T3 " +
+                    "              where T1.ID > T3.ID" +
+                    "                and T1.ID * T3.ID = 12));";
+            validateTableOfLongs(client, sql, new long[][] {{4}});
         }
+    }
 
-        vt = client.callProcedure("@AdHoc",
-                "select ID from R1 T1 " +
-                "where exists " +
-                "      (select 1 from R2 T2 where T1.ID * T2.ID = ?);",
-                9).getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{3}});
+    public void testLhsScalarInSubquery() throws Exception
+    {
+        Client client = getClient();
+        loadData(false);
+        String sql;
+        // Non-correlated IN with a non-correlated select on the left side.
+        sql =   "select ID from R1 T1 " +
+                "where (select ID from R2 T2 " +
+                "       where ID = 5) " +
+                "      IN " +
+                "      (select ID from R2 T3 " +
+                "       where T3.ID = 5) " +
+                "order by ID;";
+        validateTableOfLongs(client, sql, new long[][] {{1}, {2}, {3}, {4}, {5}});
 
-        // Subquery with a parent parameter TVE
-        vt = client.callProcedure("@AdHoc",
-                "select ID from R1 T1 " +
-                "where exists " +
-                "      (select 1 from R2 T2 " +
-                "       where T1.ID * T2.ID = 9);").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{3}});
+        // Correlated IN with a non-correlated select on the left side.
+        sql =   "select ID from R1 T1 " +
+                "where (select ID from R2 T2 " +
+                "       where ID = 5) " +
+                "      IN " +
+                "      (select ID from R2 T3 " +
+                "       where T3.ID > T1.ID) " +
+                "order by ID;";
+        validateTableOfLongs(client, sql, new long[][] {{1}, {2}, {3}, {4}});
 
-        // Subquery with a grand-parent parameter TVE
-        vt = client.callProcedure("@AdHoc",
-                "select ID from " + tbs[0] + " T1 " +
-                "where exists " +
-                "      (select 1 from " + tbs[1] + " T2 " +
-                "       where exists " +
-                "             (select ID from "+ tbs[1] +" T3 " +
-                "              where T1.ID * T3.ID = 9));").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{3}});
-
-        //IN with the select on the left side.
-        vt = client.callProcedure("@AdHoc",
-                "select ID from R1 T1 " +
-                "where (select ID from R2 T2 where ID = 3) in " +
-                "      (select ID from R2 T3 where T3.ID = 3) " +
-                "order by ID;").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}, {4}, {5}});
+        // Correlated IN with a correlated select on the left side.
+        sql =   "select ID from R1 T1 " +
+                "where (select ID from R2 T2 " +
+                "       where T2.ID = T1.ID) " +
+                "      IN " +
+                "      (select ID from R2 T3 " +
+                "       where T3.ID <> 5 and T3.ID >= T1.ID) " +
+                "order by ID;";
+        validateTableOfLongs(client, sql, new long[][] {{1}, {2}, {3}, {4}});
 
         // Cardinality error
         try {
-            vt = client.callProcedure("@AdHoc",
-                    "select ID from R1 T1 " +
-                    "where (select ID from R2 T2) in " +
-                    "      (select 1 from R2 T3" +
-                    "       where T1.ID * T3.ID = ? " +
-                    "       order by ID limit 1 offset 1);",
-                    9).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{3}});
+            sql =   "select ID from R1 T1 " +
+                    "where (select ID from R2 T2" +
+                    "       where T2.ID <= T1.ID)" +
+                    "      IN " +
+                    "      (select ID from R2 T2" +
+                    "       where T2.ID <= T1.ID);";
+            client.callProcedure("@AdHoc", sql);
+            fail("Did not get the expected scalar subquery cardinality error");
         }
         catch (ProcCallException ex) {
             String errMsg = (isHSQL()) ? "cardinality violation" :
                 "More than one row returned by a scalar/row subquery";
             assertTrue(ex.getMessage().contains(errMsg));
         }
-
     }
 
     /**
      * Join two sub queries
      * @throws Exception
      */
-    public void testExists_Joins() throws Exception
+    public void testJoinsOfInExists() throws Exception
     {
         Client client = getClient();
         loadData(false);
         String sql;
 
         for (String tb: replicated_tbs) {
-            sql =   "select T1.id from R1 T1, " + tb +" T2 " +
+            sql =   "select T1.id from R1 T1, " + tb + " T2 " +
                     "where T1.id = T2.id " +
                     "and exists " +
                     "    (select 1 from R1 where R1.dept * 2 = T2.dept) " +
@@ -431,17 +493,18 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
 
             sql =   "select t1.id, t2.id from r1 t1, " + tb + " t2 " +
-                    "where t1.id in " +
+                    "where t1.id IN " +
                     "      (select id from r2 where t2.id = r2.id * 2) " +
                     "order by t1.id;";
             validateTableOfLongs(client, sql, new long[][] {{1,2}, {2,4}});
 
+            // Advanced mix of FROM clause subselects with exists clause subselects
             // Core dump
             if (!isHSQL()) {
                 sql =   "select id, newid " +
                         "from (select id, wage from R1) T1 " +
                         "     LEFT OUTER JOIN " +
-                        "     (select id as newid, dept from "+ tb +" where dept > 1) T2 " +
+                        "     (select id as newid, dept from " + tb + " where dept > 1) T2 " +
                         "     ON T1.id = T2.dept " +
                         "     and exists " +
                         "         (select 1 from R1 where R1.ID = T2.newid) " +
@@ -455,56 +518,78 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
 
     /**
-     * SELECT FROM SELECT FROM SELECT
+     * SELECT WHERE IN/EXISTS SELECT GROUP BY
      * @throws Exception
      */
-    public void testSubExpressions_Aggregations() throws Exception
+    public void testInExistsGroupBy() throws Exception
     {
         Client client = getClient();
-        loadData(false);
+        loadData(true);
         VoltTable vt;
         String sql;
-        ClientResponse cr;
-
-        for (String tb: tbs) {
-            cr = client.callProcedure(tb+".insert", 6,  10,  2 , "2013-07-18 02:00:00.123457");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            cr = client.callProcedure(tb+".insert", 7,  40,  2 , "2013-07-18 02:00:00.123457");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
 
         for (String tb: replicated_tbs) {
-            sql =   "select dept, sum(wage) as sw1 from " + tb +
-                    " where (id, dept + 2) in " +
-                    "       (select dept, count(dept) from " + tb +
+            // row value IN grouped result set
+            sql =   "select dept, sum(wage) as sw1 " +
+                    "from " + tb + " " +
+                    "where (id, dept + 2) IN " +
+                    "      (select dept, count(*) from " + tb +
+                    "       group by dept)" +
+                    "group by dept;";
+            validateTableOfLongs(client, sql, new long[][] {{1, 10}});
+
+            // trivial variant with inconsequential ORDER BY
+            sql =   "select dept, sum(wage) as sw1 " +
+                    "from " + tb + " " +
+                    "where (id, dept + 2) IN " +
+                    "       (select dept, count(*) from " + tb +
                     "        group by dept " +
                     // ORDER BY here is meaningless,
                     // but it used to cause serious problems, so keep the test.
                     "        order by dept DESC) " +
                     "group by dept;";
-            //* enable for debug */ System.out.println(vt);
             validateTableOfLongs(client, sql, new long[][] {{1,10}});
 
-            sql =   "select dept from " + tb + " " +
-                    "group by dept " +
-                    "having max(wage) in (select wage from R1) " +
-                    "order by dept desc";
-            // Uncomment these tests when ENG-8306 is finished
-            //            /* enable for debug */ System.out.println(vt);
-            //            validateTableOfLongs(client, sql, new long[][] {{2} ,{1}});
-            verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
-
-
-            sql =   "select dept from " + tb + " " +
-                    "group by dept " +
-                    "having max(wage) + 1 - 1 in (select wage from R1) " +
-                    "order by dept desc";
-            // Uncomment these tests when ENG-8306 is finished
-            //            validateTableOfLongs(client, sql, new long[][] {{2}, {1}});
-            verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
+            // Exists AGG with GROUP BY but with no having.
+            // It's not clear what (if any) optimizations this
+            // obscure query might be testing.
+            // Is it some kind of base case that shows that we do not
+            // over-simplify when optimizing?
+            // EXISTS (SELECT MAX(x) GROUP BY FROM ...)
+            // Is this or is this not just a perverse way to express
+            // EXISTS (SELECT 1 FROM ...)
+            // even if all x values are null?
+            sql =   "select id " +
+                    "from " + tb + " TBA " +
+                    "where exists " +
+                    "      (select max(dept) from R1 where TBA.id = R1.id " +
+                    "       group by dept) " +
+                    "order by id;";
+            validateTableOfLongs(client, sql, new long[][] {{1}, {2}, {3}, {4}, {5}, {6}, {7}});
 
             // subquery with having
-            sql =   "select id from " + tb + " TBA " +
+            sql =   "select id " +
+                    "from " + tb + " " +
+                    "where wage IN " +
+                    "       (select max(wage) from R1 " +
+                    "        group by dept " +
+                    "        having max(wage) > 30);";
+            validateTableOfLongs(client, sql, new long[][] {{5}});
+
+            // subquery with having that uses a user parameter
+            vt = client.callProcedure("@AdHoc",
+                    "select id " +
+                    "from " + tb + " TBA " +
+                    "where exists " +
+                    "      (select dept from R1 " +
+                    "       group by dept " +
+                    "       having max(wage) = ?);",
+                    3).getResults()[0];
+            validateTableOfLongs(vt, EMPTY_TABLE);
+
+            // subquery with having that uses a correlation column
+            sql =   "select id " +
+                    "from " + tb + " TBA " +
                     "where exists " +
                     "      (select dept from R1 " +
                     "       group by dept " +
@@ -512,8 +597,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "order by id;";
             validateTableOfLongs(client, sql, new long[][] {{1}, {3}, {5}, {6}});
 
-            // subquery with having and grand parent parameter TVE
-            sql =   "select id from " + tb + " TBA " +
+            // subquery with having that uses a grandparent correlation column
+            sql =   "select id " +
+                    "from " + tb + " TBA " +
                     "where exists " +
                     "      (select 1 from R2 " +
                     "       where exists " +
@@ -522,41 +608,53 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "              having max(wage) = TBA.wage) ) " +
                     "order by id;";
             validateTableOfLongs(client, sql, new long[][] {{3}, {5}});
-
-            vt = client.callProcedure("@AdHoc",
-                    "select id from " + tb + " TBA " +
-                    "where exists " +
-                    "      (select dept from R1 " +
-                    "       group by dept " +
-                    "       having max(wage) = ?);",
-                    3).getResults()[0];
-            validateTableOfLongs(vt, EMPTY_TABLE);
-
-            // having with subquery with having
-            sql =   "select id from " + tb +
-                    " where wage in " +
-                    "       (select max(wage) from R1 " +
-                    "        group by dept " +
-                    "        having max(wage) > 30);";
-            validateTableOfLongs(client, sql, new long[][] {{5}});
-
-            // subquery with group by but no having
-            sql =   "select id from " + tb + " TBA " +
-                    "where exists " +
-                    "      (select max(dept) from R1 where TBA.id = R1.id " +
-                    "       group by dept) " +
-                    "order by id;";
-            validateTableOfLongs(client, sql, new long[][] {{1}, {2}, {3}, {4}, {5}, {6}, {7}});
-
         }
-
     }
 
+
     /**
-     * SELECT FROM SELECT UNION SELECT
+     * SELECT ... HAVING ... SELECT
      * @throws Exception
      */
-    public void testSubExpressions_Unions() throws Exception
+    public void testHavingSubselect() throws Exception
+    {
+        Client client = getClient();
+        loadData(true);
+        String sql;
+
+        for (String tb: replicated_tbs) {
+            sql =   "select dept " +
+                    "from " + tb + " " +
+                    "group by dept " +
+                    "having max(wage) IN " +
+                    "       (select wage from R1) " +
+                    "order by dept desc";
+            /*/ Uncomment these tests when ENG-8306 "HAVING with subquery" is fixed
+            validateTableOfLongs(client, sql, new long[][] {{2}, {1}});
+            /*/
+            verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg); // for now
+            //*/
+
+            sql =   "select dept " +
+                    "from " + tb + " " +
+                    "group by dept " +
+                    "having max(wage) + 1 - 1 " +
+                    "       IN (select wage from R1) " +
+                    "order by dept desc";
+            /*/ Uncomment these tests when ENG-8306 "HAVING with subquery" is fixed
+            validateTableOfLongs(client, sql, new long[][] {{2}, {1}});
+            /*/
+            verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg); // for now
+            //*/
+        }
+    }
+
+
+    /**
+     * SELECT ... WHERE ... SELECT UNION SELECT
+     * @throws Exception
+     */
+    public void testUnions() throws Exception
     {
         Client client = getClient();
         loadData(false);
@@ -564,7 +662,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         for (String tb: replicated_tbs) {
             sql =   "select ID from " + tb + " " +
-                    "where ID in " +
+                    "where ID IN " +
                     "      ( (select ID from R1 where ID > 2 limit 3 offset 1) " +
                     "         UNION " +
                     "         select ID from R2 where ID <= 2" +
@@ -574,12 +672,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(client, sql, new long[][] {{1}, {4}, {5}});
 
             sql =   "select ID from " + tb + " " +
-                    "where ID in " +
+                    "where ID IN " +
                     "      (select ID from R1 where ID >= 2 " +
                     "       EXCEPT " +
                     "       select ID from R2 where ID <= 2) " +
                     "order by ID;";
-            //* enable for debug */ dumpQueryPlans(sql);
+            //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{3}, {4}, {5}});
 
             // Now let's try a correlated subquery.
@@ -593,10 +691,180 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
+    public void testRowInOrOpAnyNonNull() throws Exception
+    {
+        Client client = getClient();
+        loadData(false);
+        String sql;
+
+        // PURPOSELY repeat each query using
+        // ORDER, LIMIT, and OFFSET
+        // instead of a filter to skip the first and last row
+        // to prevent IN-to-EXISTS transformations.
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) IN " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) IN " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) IN " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) IN " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) >= ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) >= ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) >= ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) >= ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{2},{3},{4},{5}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) > ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) > ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{3},{4},{5}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <> ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <> ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <> ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <> ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4},{5}});
+
+        for (String tb: replicated_tbs) {
+            sql =   "select ID, DEPT from " + tb + " T1 " +
+                    "where (abs(ID) + 1 - 1, DEPT) IN " +
+                    "      (select DEPT, WAGE/10 from " + tb + ");";
+            validateTableOfLongs(client, sql, new long[][] {{1, 1}});
+        }
+    }
+
     /**
      * SELECT FROM WHERE OUTER OP INNER inner.
-     * If there is a match, IN evalueates to TRUE
-     * If there is no match, IN evaluates to FASLE if the INNER result set is empty
+     * If there is a match, IN evaluates to TRUE
+     * If there is no match, IN evaluates to FALSE if the INNER result set is empty
      * If there is no match, IN evaluates to NULL if the INNER result set is not empty
      *       and there are inner NULLs
      * Need to keep OFFSET for the IN expressions
@@ -604,55 +872,306 @@ public class TestSubQueriesSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testSubExpressions_InnerNull() throws Exception
+    public void testRowEqualityIsNull() throws Exception
     {
         Client client = getClient();
-        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
+        //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 101, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 102, 1001, 2, "2013-07-18 02:00:00.123457");
 
-        client.callProcedure("R2.insert", 100,  null,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 102,  1001,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 103,  1003,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 100, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102, 1001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103, 1003, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105, 1000, 2, "2013-07-18 02:00:00.123457");
         String sql;
 
-        // Inner result is NULL. The expression is NULL
-        sql =   "select ID from R1 " +
-                "where ((WAGE, DEPT) = " +
-                "       (select WAGE, DEPT from R2 where ID = 100)) is NULL " +
-                "order by ID;";
-        validateTableOfLongs(client, sql, new long[][] {{100}, {101}});
-
-        // Inner result is empty. The expression is NULL
-        sql =   "select ID from R1 " +
-                "where ((WAGE, DEPT) = " +
-                "       (select WAGE, DEPT from R2 where ID = 1000)) is NULL " +
-                "order by ID;";
-        validateTableOfLongs(client, sql, new long[][] {{100}, {101}});
-
-        // Outer result is NULL. The expression is NULL
+        // When inner result has a NULL. The equality expression is NULL
+        // HSQL-BACKEND gets mysterious
+        // java.lang.ClassCastException: java.lang.Integer cannot be cast to [Ljava.lang.Object;
         if (!isHSQL()) {
             sql =   "select ID from R1 " +
                     "where ((WAGE, DEPT) = " +
-                    "       (select WAGE, DEPT from R2 where ID = 102)) is NULL;";
+                    "       (select WAGE, DEPT from R2 " +
+                    "        where ID = R1.ID))" +
+                    "      IS NULL " +
+                    "order by ID;";
+            validateTableOfLongs(client, sql, new long[][] {{100}, {101}});
+        }
+
+        // Inner result is empty. The equality expression is always NULL
+        sql =   "select ID from R1 " +
+                "where ((WAGE, DEPT) = " +
+                "       (select WAGE, DEPT from R2 " +
+                "        where ID = 107))" +
+                "      IS NULL " +
+                "order by ID;";
+        validateTableOfLongs(client, sql, new long[][] {{100}, {101}, {102}});
+
+        // When outer result has a NULL, the expression is NULL
+        // HSQL-BACKEND gets mysterious
+        // java.lang.ClassCastException: java.lang.Integer cannot be cast to [Ljava.lang.Object;
+        if (!isHSQL()) {
+            sql =   "select ID from R1 " +
+                    "where ((WAGE, DEPT) = " +
+                    "       (select WAGE, DEPT from R2 " +
+                    "        where ID = 102))" +
+                    "       IS NULL;";
             validateTableOfLongs(client, sql, new long[][] {{101}});
         }
 
         // Outer result is empty. The expression is NULL
         sql =   "select ID from R1 " +
-                "where ((select WAGE, DEPT from R2 where ID = 1000) = " +
-                "      (select WAGE, DEPT from R2 where ID = 102)) is NULL " +
+                "where ((select WAGE, DEPT from R2 " +
+                "        where ID = 107) = " +
+                "       (select WAGE, DEPT from R2 where ID = R1.ID))" +
+                "      IS NULL " +
                 "order by ID;";
-        validateTableOfLongs(client, sql, new long[][] {{100}, {101}});
+        validateTableOfLongs(client, sql, new long[][] {{100}, {101}, {102}});
 
-        // Outer result is NULL. Inner is empty The expression is NULL
-        sql =   "select ID from R1 where  ID =101 and ((WAGE, DEPT) = " +
-                "      (select WAGE, DEPT from R2 where ID = 1000)) is NULL;";
-        validateTableOfLongs(client, sql, new long[][] {{101}});
+        // Both outer and inner are empty. The expression is NULL
+        sql =   "select ID from R1 " +
+                "where ((select WAGE, DEPT from R2 " +
+                "        where ID = 107) = " +
+                "       (select WAGE, DEPT from R2 " +
+                "        where ID = 107))" +
+                "      IS NULL " +
+                "order by ID;";
+        validateTableOfLongs(client, sql, new long[][] {{100}, {101}, {102}});
 
     }
+
+    /**
+     * SELECT FROM WHERE OUTER IN(=ANY) (SELECT INNER ...) returning inner NULL.
+     * If there is a match, IN evaluates to TRUE
+     * If there is no match, IN evaluates to FALSE if the INNER result set is empty
+     * If there is no match, IN evaluates to NULL if the INNER result set is not empty
+     *       and there are "near misses" involving NULLs
+     * @throws Exception
+     */
+    public void testRowInOrOpAnyWithInnerNull() throws Exception
+    {
+        Client client = getClient();
+        //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert",  10,  100, 1, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 300, 3000, 3, "2013-07-18 02:00:00.123457");
+
+        client.callProcedure("R2.insert", 100, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102, 1001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103, 1003, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105, 1000, 2, "2013-07-18 02:00:00.123457");
+        String sql;
+
+        // Repeat each query with the null in a different position.
+
+        // There is an exact match, IN/ANY expression evaluates to TRUE
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) IN " +
+                "      (select WAGE, DEPT from R2);";
+        validateTableOfLongs(client, sql, new long[][] {{100}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) IN " +
+                "      (select DEPT, WAGE from R2);";
+        validateTableOfLongs(client, sql, new long[][] {{100}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ANY " +
+                "      (select WAGE, DEPT from R2);";
+        validateTableOfLongs(client, sql, new long[][] {{100}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ANY " +
+                "      (select DEPT, WAGE from R2);";
+        validateTableOfLongs(client, sql, new long[][] {{100}});
+
+        // Run <> ANY for a case with one exact match
+        sql =   "select ID from R1 " +
+                "where (WAGE+3, DEPT) <> ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 103);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{300}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE+3) <> ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID = 103);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{300}});
+        sql =   "select ID from R1 " +
+                "where (WAGE+3, DEPT) <> ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 103 " +
+                "       order by ID limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{300}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE+3) <> ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID = 103 " +
+                "       order by ID limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{300}});
+
+        // When there is no match, the "IN" or "OP ANY" expression evaluates
+        // to NULL when the non-empty inner result set has a null in a critical
+        // column.
+        // Repeat each query with a different placement of the null value and
+        // with a re-expression of the subquery filter
+        // using ORDER, LIMIT, and OFFSET that skips one of the two nulls
+        // but is otherwise identical to prevent IN-to-EXISTS transformations.
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) IN " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) IN " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) IN " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) IN " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) >= ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) >= ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) >= ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) >= ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) > ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) > ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <> ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <> ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <> ANY " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <> ANY " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
+    }
+
 
     /**
      * SELECT FROM WHERE OUTER IN(=ANY) (SELECT INNER ...) returning inner NULL.
@@ -665,155 +1184,664 @@ public class TestSubQueriesSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testANYSubExpressions_InnerNull() throws Exception
+    public void testRowNotOrIsNullInOrOpAnyWithInnerNull() throws Exception
     {
         Client client = getClient();
-        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
+        //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert",  10,  100, 1, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 300, 3000, 3, "2013-07-18 02:00:00.123457");
 
-        client.callProcedure("R2.insert", 100,  null,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 102,  1001,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 103,  1003,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 100, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102, 1001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103, 1003, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105, 1000, 2, "2013-07-18 02:00:00.123457");
         String sql;
-
-        // There is an exact match, IN/ANY expression evaluates to TRUE
-        sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) in " +
-                "      (select WAGE, DEPT from R2 " +
-                "       order by WAGE, DEPT limit 6 offset 1) is true;";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
-        sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) =ANY " +
-                "      (select WAGE, DEPT from R2 " +
-                "       order by WAGE, DEPT limit 6 offset 1) is true;";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
 
         // The inner result set is empty, IN/ANY expression evaluates to FALSE
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) IN " +
-                "      (select WAGE, DEPT from R2 where ID = 0 " +
-                "       order by WAGE, DEPT limit 6 offset 1) is false;";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0)" +
+                "      IS FALSE;";
+        validateTableOfLongs(client, sql, new long[][] {{10}, {100}, {300}});
+        // That's specifically FALSE vs. NULL
         sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) =ANY " +
-                "      (select WAGE, DEPT from R2 where ID = 0 " +
-                "       order by WAGE, DEPT limit 6 offset 1) is false;";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
+                "where ((WAGE, DEPT) IN " +
+                "       (select WAGE, DEPT from R2 " +
+                "       where ID = 0))" +
+                "      IS NULL;";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        // There is no match, the "IN" or "OP ANY" expression evaluates to NULL
+        // When there is no match, the "IN" or "OP ANY" expression evaluates
+        // to NULL when the non-empty inner result set has a null in a critical
+        // column.
+        if ( ! isHSQL()) { // wrong (0 rows) even in HSQL.
+            sql =   "select ID from R1 " +
+                    "where ((WAGE, DEPT) IN " +
+                    "       (select WAGE, DEPT from R2 " +
+                    "        where ID < 104)) " +
+                    "      IS NULL;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB (ENG-8436 logical nulls) got 0 rows
+
+            sql =   "select ID from R1 " +
+                "where ((WAGE, DEPT) = ANY " +
+                "       (select WAGE, DEPT from R2 " +
+                "        where ID < 104)) " +
+                "      IS NULL;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB (ENG-8436 logical nulls) got 0 rows
+            sql =   "select ID from R1 " +
+                    "where (WAGE, DEPT) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104);";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // ??? VoltDB got 3 rows (ENG-8436 logical nulls) HSQL got 0 rows
+
+            sql =   "select ID from R1 " +
+                    "where NOT (WAGE, DEPT) = ANY " +
+                    "          (select WAGE, DEPT from R2 " +
+                    "           where ID < 104);";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // ??? VoltDB got 3 rows (ENG-8436 logical nulls) HSQL got 0 rows
+        }
+
+        // IN should evaluate to NULL
+        // when there is a null-nonmatch but no match.
+        if ( ! isHSQL()) { // wrong even in HSQL.
+
+            sql =   "select ID from R1 " +
+                    "where NOT ((WAGE, DEPT) IN " +
+                    "           (select WAGE, DEPT from R2 " +
+                    "            where ID < 104));";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+
+            sql =   "select ID from R1 " +
+                    "where (WAGE, DEPT) IN " +
+                    "       (select WAGE, DEPT from R2 " +
+                    "        where ID < 104) " +
+                    "      IS FALSE;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+
+            sql =   "select ID from R1 " +
+                    "where (WAGE, DEPT) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104);";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+
+            // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
+            sql =   "select ID from R1 " +
+                    "where (WAGE, DEPT) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104);";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+        }
+    }
+
+
+    /**
+     * SELECT FROM WHERE OUTER op ALL (SELECT INNER ...) returning inner NULL.
+     * If there is a match, IN evalueates to TRUE
+     * If there is no match, IN evaluates to FASLE if the INNER result set is empty
+     * If there is no match, IN evaluates to NULL if the INNER result set is not empty
+     *       and there are inner NULLs
+     * Need to keep OFFSET for the IN expressions
+     * to prevent IN-to-EXISTS optimization
+     *
+     * @throws Exception
+     */
+    public void testRowOpAllWithInnerNull() throws Exception
+    {
+        Client client = getClient();
+        //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert",  10,  100, 1, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 300, 3000, 3, "2013-07-18 02:00:00.123457");
+
+        client.callProcedure("R2.insert", 100, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102, 1001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103, 1003, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105, 1000, 2, "2013-07-18 02:00:00.123457");
+        String sql;
+
+        // The inner result set is empty, ALL expression evaluates to FALSE
+        // specifically vs. NULL
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0) " +
+                "      IS FALSE;";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 " +
+                "       order by ID limit 6 offset 1)" +
+                "      IS FALSE;";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where ((WAGE, DEPT) = ALL " +
+                "       (select WAGE, DEPT from R2 " +
+                "        where ID = 0))" +
+                "      IS NULL;";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where ((WAGE, DEPT) = ALL " +
+                "       (select WAGE, DEPT from R2 " +
+                "        where ID = 0 " +
+                "        order by ID limit 6 offset 1))" +
+                "      IS NULL;";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        // There is no match, the "IN" or "OP ALL" expression evaluates to NULL
         // (non-empty inner result set has a null in one of its columns).
-        //*/ From here to "// *", Ubuntu 12.04 dev build got 1 row:
         sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) IN " +
-                "      (select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL order by WAGE, DEPT limit 4 offset 1);";
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
         sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) = ANY " +
-                "      (select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL order by WAGE, DEPT limit 4 offset 1);";
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL" +
+                "       order by ID limit 6 offset 1);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
-        // */
-        sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) >= ANY " +
-                "      (select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL ORDER BY WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
-        if (!isHSQL()) {
+        if (!isHSQL()) { // HSQL erroneously matches 0 rows by returning FALSE vs. NULL
             sql =   "select ID from R1 " +
-                    "where (WAGE, DEPT) <= ANY " +
-                    "      (select WAGE, DEPT from R2 where WAGE > 1005 or WAGE is NULL );";
+                    "where ((WAGE, DEPT) = ALL " +
+                    "       (select WAGE, DEPT from R2 " +
+                    "        where ID = 0 or WAGE is NULL)) " +
+                    "        IS NULL;";
+            //* enable to debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{100}});
+            sql =   "select ID from R1 " +
+                    "where ((WAGE, DEPT) = ALL " +
+                    "       (select WAGE, DEPT from R2 " +
+                    "        where ID = 0 or WAGE is NULL" +
+                    "        order by ID limit 6 offset 1)) " +
+                    "        IS NULL;";
+            validateTableOfLongs(client, sql, new long[][] {{100}});
+        }
+
+        // Focus a set of queries on the data filtered down to a NULL row.
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) >= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) >= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL " +
+                "       order by ID limit 4 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) >= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) >= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL " +
+                "       order by ID limit 4 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL " +
+                "       order by ID limit 4 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL " +
+                "       order by ID limit 4 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) > ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) > ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL " +
+                "       order by ID limit 4 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL " +
+                "       order by ID limit 4 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL " +
+                "       order by ID limit 4 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID = 0 or WAGE is NULL " +
+                "       order by ID limit 4 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        // "<> ALL" and "NOT IN"
+        // should only evaluate to TRUE when there is no definite match
+        // AND no null match OR a definite non-match.
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <> ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by WAGE, DEPT limit 4 offset 1);";
+        //* enable to debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, new long[][] {{10},{300}});
+
+
+        // Just run the same patterns here as the IN/ANY test...
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID limit 3 offset 1);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        if (!isHSQL()) { // HSQL erroneously matches an extra row?
+            sql =   "select ID from R1 " +
+                    "where (WAGE, DEPT) >= ALL " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104);";
             validateTableOfLongs(client, sql, EMPTY_TABLE);
         }
         sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) > ANY " +
-                "      (select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL ORDER BY WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
-        if (!isHSQL()) {
+                "where (DEPT, WAGE) >= ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        if (!isHSQL()) { // HSQL erroneously matches an extra row?
             sql =   "select ID from R1 " +
-                    "where (WAGE, DEPT) < ANY " +
-                    "      (select WAGE, DEPT from R2 where WAGE > 1005 or WAGE is NULL);";
+                    "where (WAGE, DEPT) >= ALL " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       order by ID offset 1 limit 3);";
             validateTableOfLongs(client, sql, EMPTY_TABLE);
         }
-        // Repeat the above with the null in a different position
         sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) IN " +
-                "      (select DEPT, WAGE from R2 where WAGE != 1000 or WAGE is NULL ORDER BY WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
-        //*/ From here to "// *", Ubuntu 12.04 dev build got 1 row:
-        sql =   "select ID from R1 " +
-                "where (DEPT, WAGE) = ANY " +
-                "      (select DEPT, WAGE from R2 where WAGE != 1000 or WAGE is NULL ORDER BY WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
-        sql =   "select ID from R1 " +
-                "where (DEPT, WAGE) >= ANY " +
-                "      (select DEPT, WAGE from R2 where WAGE != 1000 or WAGE is NULL ORDER BY WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
-        // */
-        sql =   "select ID from R1 " +
-                "where (DEPT, WAGE) <= ANY " +
-                "      (select DEPT, WAGE from R2 where WAGE > 1005 or WAGE is NULL ORDER BY WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
-        sql =   "select ID from R1 " +
-                "where (DEPT, WAGE) > ANY " +
-                "      (select DEPT, WAGE from R2 where WAGE != 1000 or WAGE is NULL ORDER BY WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
-        sql =   "select ID from R1 " +
-                "where (DEPT, WAGE) < ANY " +
-                "      (select DEPT, WAGE from R2 where WAGE > 1005 or WAGE is NULL ORDER BY WAGE, DEPT limit 4 offset 1);";
-        validateTableOfLongs(client, sql, EMPTY_TABLE);
+                "where (DEPT, WAGE) >= ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
 
-        // There is an exact match, NOT IN evaluates to FALSE
         sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) not IN " +
-                "      (select WAGE, DEPT from R2 order by WAGE, DEPT limit 4 offset 1);";
+                "where (WAGE, DEPT) <= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{10}});
 
-        // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
-        // HSQL gets it wrong
-        if ( ! isHSQL()) {
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10}});
+
+        if (!isHSQL()) { // HSQL erroneously matches an extra row?
             sql =   "select ID from R1 " +
-                    "where (WAGE, DEPT) not IN " +
-                    "      (select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL " +
-                    "       order by WAGE, DEPT limit 4 offset 1);";
+                    "where (WAGE, DEPT) > ALL " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104);";
             validateTableOfLongs(client, sql, EMPTY_TABLE);
         }
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
+        if (!isHSQL()) { // HSQL erroneously matches an extra row?
+            sql =   "select ID from R1 " +
+                    "where (WAGE, DEPT) > ALL " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       order by ID offset 1 limit 3);";
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
+        }
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{300}});
 
-        // There is no match, the inner result set doesn't have NULLs
-        sql =   "select ID from R1 where WAGE in " +
-                "      (select WAGE from R2 where WAGE != 1000 order by WAGE limit 4 offset 1);";
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID < 104);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
-        sql =   "select ID from R1 where WAGE =ANY " +
-                "      (select WAGE from R2 where WAGE != 1000 order by WAGE limit 4 offset 1);";
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID < 104);";
+        validateTableOfLongs(client, sql, new long[][] {{10}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{10}});
+
+        if (!isHSQL()) { // HSQL erroneously matches all rows
+            sql =   "select ID from R1 " +
+                    "where (WAGE, DEPT) <> ALL " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104);";
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+            sql =   "select ID from R1 " +
+                    "where (DEPT, WAGE) <> ALL " +
+                    "      (select DEPT, WAGE from R2 " +
+                    "       where ID < 104);";
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+            sql =   "select ID from R1 " +
+                    "where (WAGE, DEPT) <> ALL " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       order by ID offset 1 limit 3);";
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+            sql =   "select ID from R1 " +
+                    "where (DEPT, WAGE) <> ALL " +
+                    "      (select DEPT, WAGE from R2 " +
+                    "       order by ID offset 1 limit 3);";
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+        }
+    }
+
+
+    /**
+     * SELECT FROM WHERE OUTER  OP ALL (SELECT INNER ...) with no NULLs.
+    *
+     * @throws Exception
+     */
+    public void testRowOpAllNoNull() throws Exception
+    {
+        Client client = getClient();
+        loadData(false);
+        String sql;
+
+        // Run the same basic query forms as testRowInOrOpAnyNonNull
+        // where we PURPOSELY repeat each query using
+        // ORDER, LIMIT, and OFFSET
+        // instead of a filter to skip the first and last row
+        // to prevent to-EXISTS transformations (are these even possible?).
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        //* enable for debug */ dumpQueryPlans(client, sql);
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) = ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        // There is a match, the inner result set doesn't have NULLs, The IN expression evaluates to FALSE
-        sql =   "select ID from R1 where WAGE in " +
-                "      (select WAGE from R2 where WAGE != 1000 order by WAGE limit 6 offset 1) is false;";
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) >= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) >= ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) >= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{4},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) >= ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{4},{5}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <= ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <= ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{2}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) > ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{5}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) > ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) > ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{5}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) < ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) < ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1}});
+
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <> ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <> ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       where ID > 1 and ID < 5);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{5}});
+        sql =   "select ID from R1 " +
+                "where (WAGE, DEPT) <> ALL " +
+                "      (select WAGE, DEPT from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{5}});
+        sql =   "select ID from R1 " +
+                "where (DEPT, WAGE) <> ALL " +
+                "      (select DEPT, WAGE from R2 " +
+                "       order by ID offset 1 limit 3);";
+        validateTableOfLongs(client, sql, new long[][] {{1},{5}});
+    }
+
+
+    public void testInExistsOrOpAnyWithInnerNull() throws Exception
+    {
+        Client client = getClient();
+        //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
+
+        client.callProcedure("R2.insert", 100, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102, 1001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103, 1003, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105, 1000, 2, "2013-07-18 02:00:00.123457");
+        String sql;
+
+        // There is a match, other than the NULLs
+        sql =   "select ID from R1 " +
+                "where WAGE IN " +
+                "      (select WAGE from R2);";
         validateTableOfLongs(client, sql, new long[][] {{100}});
-        sql =   "select ID from R1 where WAGE =ANY " +
-                "      (select WAGE from R2 where WAGE != 1000 order by WAGE limit 6 offset 1) is false;";
+
+        // There is no match, other than the NULLs
+        sql =   "select ID from R1 " +
+                "where WAGE IN " +
+                "      (select WAGE from R2 " +
+                "       where WAGE <> 1000 or WAGE is NULL);";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        // Subtle bug -- both in HSQL and VOltDB
+        // the IN expression evaluates to FALSE rather than NULL, here
+// FIXME
+//        sql =   "select ID from R1 " +
+//                "where (WAGE IN " +
+//                "       (select WAGE from R2 " +
+//                "        where WAGE <> 1000 or WAGE is NULL)) " +
+//                "      IS NULL;";
+//        validateTableOfLongs(client, sql, new long[][] {{100}});
+
+        sql =   "select ID from R1 " +
+                "where WAGE = ANY " +
+                "      (select WAGE from R2 " +
+                "       where WAGE <> 1000 or WAGE is NULL) " +
+                "      IS FALSE;";
         validateTableOfLongs(client, sql, new long[][] {{100}});
 
         // NULL row exists
         sql =   "select ID from R1 " +
-                "where exists " +
-                "      (select WAGE from R2 where WAGE is NULL);";
+                "where EXISTS " +
+                "      (select WAGE from R2 " +
+                "       where WAGE is NULL);";
         validateTableOfLongs(client, sql, new long[][] {{100}});
 
         // Rows exist
         sql =   "select ID from R1 " +
-                "where not exists " +
+                "where NOT EXISTS " +
                 "      (select WAGE, DEPT from R2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        // The NULL from R2 is eliminated by the offset
-        // HSQL gets it wrong
-        if (!isHSQL()) {
-            sql =   "select ID from R1 where R1.WAGE NOT IN " +
-                    "      (select WAGE from R2 where ID < 104 order by WAGE desc limit 1 offset 1);";
-            validateTableOfLongs(client, sql, new long[][] {{100}});
-        }
-
+        sql =   "select ID from R1 " +
+                "where R1.WAGE NOT IN " +
+                "      (select WAGE from R2 " +
+                "       where ID IN (100, 102, 103));";
     }
 
     /**
@@ -825,97 +1853,130 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * to prevent IN-to-EXISTS optimization
      * @throws Exception
      */
-    public void testANYSubExpressions_OuterNull() throws Exception
+    public void testOuterNullInOpAny() throws Exception
     {
         Client client = getClient();
-        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 101,  1001,  2 , "2013-07-18 02:00:00.123457");
+        //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 101, 1001, 2, "2013-07-18 02:00:00.123457");
 
-        client.callProcedure("R2.insert", 200,  null,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 201,  2001,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 202,  1001,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 203,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 200, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 201, 2001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 202, 1001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 203, null, 2, "2013-07-18 02:00:00.123457");
         String sql;
 
         // R2.200 - the inner result set is not empty, the IN/ANY  expression is NULL
-        sql =   "select ID from R2 where WAGE IN " +
-                "      (select WAGE from R1 order by WAGE limit 4 offset 1) is false;";
+        sql =   "select ID from R2 " +
+                "where WAGE IN " +
+                "      (select WAGE from R1 " +
+                "       order by WAGE limit 4 offset 1) is false;";
         validateTableOfLongs(client, sql, new long[][] {{201}});
-        sql =   "select ID from R2 where WAGE =ANY " +
-                "      (select WAGE from R1 order by WAGE limit 4 offset 1) is false;";
+        sql =   "select ID from R2 " +
+                "where WAGE = ANY " +
+                "      (select WAGE from R1 " +
+                "       order by WAGE limit 4 offset 1) is false;";
         validateTableOfLongs(client, sql, new long[][] {{201}});
 
         // R2.200 - the inner result set is not empty, the IN  expression is NULL
-        sql =   "select ID from R2 where WAGE IN " +
-                "      (select WAGE from R1 order by WAGE limit 4 offset 1) is true;";
+        sql =   "select ID from R2 " +
+                "where WAGE IN " +
+                "      (select WAGE from R1 " +
+                "       order by WAGE limit 4 offset 1) is true;";
         validateTableOfLongs(client, sql, new long[][] {{202}});
-        sql =   "select ID from R2 where WAGE =ANY " +
-                "      (select WAGE from R1 order by WAGE limit 4 offset 1) is true;";
+        sql =   "select ID from R2 " +
+                "where WAGE = ANY " +
+                "      (select WAGE from R1 " +
+                "       order by WAGE limit 4 offset 1) is true;";
         validateTableOfLongs(client, sql, new long[][] {{202}});
 
         // R2.200 - the inner result set is not empty, the IN  expression is NULL
-        sql =   "select ID from R2 where WAGE IN " +
-                "      (select WAGE from R1 order by WAGE limit 4 offset 1);";
+        sql =   "select ID from R2 " +
+                "where WAGE IN " +
+                "      (select WAGE from R1 " +
+                "       order by WAGE limit 4 offset 1);";
         validateTableOfLongs(client, sql, new long[][] {{202}});
 
         // R2.200 - the inner result set is not empty, the IN and not IN  expressions are NULL
-        sql =   "select ID from R2 where WAGE not IN " +
-                "      (select WAGE from R1 order by WAGE limit 4 offset 1);";
+        sql =   "select ID from R2 " +
+                "where WAGE not IN " +
+                "      (select WAGE from R1 " +
+                "       order by WAGE limit 4 offset 1);";
         validateTableOfLongs(client, sql, new long[][] {{201}});
 
         // R2.200 - the inner result set is empty, the IN expression is TRUE
-        sql =   "select ID from R2 where WAGE IN " +
-                "      (select WAGE from R1 where ID > 1000 order by WAGE limit 4 offset 1) is false order by ID;";
+        sql =   "select ID from R2 " +
+                "where WAGE IN " +
+                "      (select WAGE from R1 " +
+                "       where ID > 1000 " +
+                "       order by WAGE limit 4 offset 1) is false " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {201}, {202}, {203}});
-        sql =   "select ID from R2 where WAGE =ANY " +
-                "      (select WAGE from R1 where ID > 1000 order by WAGE limit 4 offset 1) is false order by ID;";
+        sql =   "select ID from R2 " +
+                "where WAGE = ANY " +
+                "      (select WAGE from R1 " +
+                "       where ID > 1000 " +
+                "       order by WAGE limit 4 offset 1) is false " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {201}, {202}, {203}});
 
         // R2.202 and R1.101 have the same WAGE
         sql =   "select ID from R2 " +
                 "where exists " +
-                "      (select WAGE from R1 where R1.WAGE = R2.WAGE) order by id;";
+                "      (select WAGE from R1 where R1.WAGE = R2.WAGE) " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{202}});
 
         // R2.202 and R1.101 have the same WAGE
         sql =   "select ID from R2 " +
                 "where not exists " +
-                "      (select WAGE from R1 where R1.WAGE = R2.WAGE) order by id;";
+                "      (select WAGE from R1 where R1.WAGE = R2.WAGE) " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {201}, {203}});
 
         // NULL not equal NULL, R2.200 and R2.203 have NULL WAGE
         sql =   "select ID from R2 RR2 " +
                 "where exists " +
-                "      (select 1 from R2 where RR2.WAGE = R2.WAGE) order by id;";
+                "      (select 1 from R2 where RR2.WAGE = R2.WAGE) " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{201}, {202}});
 
         // NULL not equal NULL, R2.200 and R2.203 have NULL WAGE
         sql =   "select ID from R2 RR2 where RR2.WAGE IN " +
-                "      (select WAGE from R2 order by WAGE limit 4 offset 1) order by id;";
+                "      (select WAGE from R2 order by WAGE limit 4 offset 1) " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{201}, {202}});
         sql =   "select ID from R2 RR2 where RR2.WAGE = ANY " +
-                "      (select WAGE from R2 order by WAGE limit 4 offset 1) order by id;";
+                "      (select WAGE from R2 order by WAGE limit 4 offset 1) " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{201}, {202}});
 
         sql =   "select ID from R2 " +
                 "where (WAGE IN " +
-                "      (select WAGE from R1 order by WAGE limit 4 offset 1)) is null order by id;";
+                "       (select WAGE from R1 order by WAGE limit 4 offset 1)) " +
+                "      IS NULL " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {203}});
         sql =   "select ID from R2 " +
                 "where (WAGE = ANY " +
-                "      (select WAGE from R1 order by WAGE limit 4 offset 1)) is null order by id;";
+                "       (select WAGE from R1 order by WAGE limit 4 offset 1)) " +
+                "      IS NULL " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {203}});
 
         // The outer expression is empty. The inner expression is not empty. The =ANY is NULL
         sql =   "select ID from R2 " +
                 "where ((select WAGE from R1 where ID = 0) = ANY " +
-                "      (select WAGE from R2 order by WAGE limit 4 offset 1)) is null order by id;";
+                "       (select WAGE from R2 order by WAGE limit 4 offset 1)) " +
+                "      IS NULL " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {201}, {202}, {203}});
 
         // The outer expression is empty. The inner expression is empty. The =ANY is FALSE
         sql =   "select ID from R2 " +
                 "where not (select WAGE from R1 where ID = 0) = ANY " +
-                "          (select WAGE from R1 where ID = 0 order by WAGE limit 4 offset 1) order by id;";
+                "          (select WAGE from R1 where ID = 0 order by WAGE limit 4 offset 1) " +
+                "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {201}, {202}, {203}});
     }
 
@@ -927,76 +1988,70 @@ public class TestSubQueriesSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testALLSubExpressions_InnerNull() throws Exception
+    public void testOpAllWithInnerNull() throws Exception
     {
         Client client = getClient();
-        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
+        //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
 
-        client.callProcedure("R2.insert", 100,  null,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 102,  1001,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 103,  1003,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 100, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102, 1001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103, 1003, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105, 1000, 2, "2013-07-18 02:00:00.123457");
         String sql;
-
-        // The subquery select WAGE from R1 limit 4 offset 1)) returns the empty set
-        // The expression WAGE IN (select WAGE from R1 limit 4 offset 1))
-        // Evaluates to FALSE
-        //        sql =   "select ID from R2 " +
-        //                "where (WAGE IN " +
-        //                "       (select WAGE from R1 limit 4 offset 1)) is null";
-        //        validateTableOfLongs(client, sql, new long[][] {{200}, {203}});
-        sql =   "select ID from R2 " +
-                "where not (WAGE IN " +
-                "           (select WAGE from R1 order by WAGE limit 4 offset 1)) " +
-                "order by ID;";
-        validateTableOfLongs(client, sql, new long[][] {{100}, {101}, {102}, {103}, {104}, {105}});
 
         // The inner_expr is empty => TRUE
         sql =   "select ID from R1 " +
-                "where (WAGE, DEPT) = ALL " +
-                "      (select WAGE, DEPT from R2 where ID = 1000);";
+                "where WAGE = ALL " +
+                "      (select WAGE from R2 " +
+                "       where ID > 107);";
         validateTableOfLongs(client, sql, new long[][] {{100}});
+
         sql =   "select ID from R1 " +
                 "where (select WAGE from R1) = ALL " +
-                "      (select WAGE from R2 where ID = 1000);";
+                "      (select WAGE from R2 " +
+                "       where ID > 107);";
         validateTableOfLongs(client, sql, new long[][] {{100}});
 
         // The inner set consists only of NULLs
-        sql =   "select ID from R1 where WAGE = ALL " +
-                "      (select WAGE from R2 where ID in (104, 105));";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
         sql =   "select ID from R1 " +
-                "where (WAGE,DEPT) = ALL " +
-                "      (select WAGE, DEPT from R2 where ID in (104, 105));";
+                "where WAGE = ALL " +
+                "      (select WAGE from R2 " +
+                "       where ID in (100, 101));";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+        sql =   "select ID from R1 " +
+                "where (WAGE = ALL " +
+                "       (select WAGE from R2 " +
+                "        where ID in (100, 101))) " +
+                "      IS NULL;";
         validateTableOfLongs(client, sql, new long[][] {{100}});
 
         // If inner_expr contains NULL and outer_expr OP inner_expr is TRUE
-        // for all other inner values => NULL
+        // for all other inner values
+        sql =   "select ID from R1 " +
+                "where WAGE = ALL " +
+                "      (select WAGE from R2 " +
+                "       where ID in (100, 104, 105));";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
+
         sql =   "select ID from R1 " +
                 "where (WAGE = ALL " +
-                "      (select WAGE from R2 where ID in (100, 104, 105))) is NULL;";
+                "       (select WAGE from R2 where ID in (100, 104, 105))) " +
+                "      IS NULL;";
         validateTableOfLongs(client, sql, new long[][] {{100}});
 
-        if (!isHSQL()) {
-            // I think HSQL gets this one wrong evaluating the =ALL to FALSE instead of NULL.
-            // PostgreSQL agrees with us
-            sql =   "select ID from R1 " +
-                    "where ((WAGE, DEPT) = ALL " +
-                    "       (select WAGE, DEPT from R2 where ID in (100, 104, 105))) is NULL;";
-            validateTableOfLongs(client, sql, new long[][] {{100}});
-        }
-
-        // If inner_expr contains NULL and outer_expr OP inner_expr is FALSE
-        // for some other inner values => FALSE
+        // If inner_expr contains NULL and
+        // outer_expr OP inner_expr is FALSE for some other inner values,
+        // the result is FALSE
         if ( ! isHSQL()) {
-            // I think HSQL gets this one wrong evaluating the =ALL to NULL instead of FALSE.
-            // PostgreSQL agrees with us
-            // FAILING (sometimes?) due to ENG-8428 or something else?
-            // sql =   "select ID from R1 " +
-            //         "where not (WAGE = ALL (select WAGE from R2));";
-            // validateTableOfLongs(client, sql, new long[][] {{100}});
+            // HSQL gets this one wrong
+            sql =   "select ID from R1 " +
+                    "where not (WAGE = ALL " +
+                    "           (select WAGE from R2));";
+            validateTableOfLongs(client, sql, new long[][] {{100}});
         }
     }
 
@@ -1006,50 +2061,59 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * If outer_expr is NULL and inner_expr produces any row => NULL
      * @throws Exception
      */
-    public void testALLSubExpressions_OuterNull() throws Exception
+    public void testOpAllWithOuterNull() throws Exception
     {
         Client client = getClient();
-        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 101,  1001,  2 , "2013-07-18 02:00:00.123457");
+        //                                 id, wage, dept, tm
+        client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 101, 1001, 2, "2013-07-18 02:00:00.123457");
 
-        client.callProcedure("R2.insert", 200,  null,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 201,  2001,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 202,  1001,  2 , "2013-07-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 203,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 200, null, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 201, 2001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 202, 1001, 2, "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 203, null, 2, "2013-07-18 02:00:00.123457");
         String sql;
 
         // the inner result set is empty, the =ALL  expression is TRUE
-        sql =   "select ID from R2 where WAGE =ALL " +
-                "      (select WAGE from R1 where ID = 1000) " +
+        sql =   "select ID from R2 " +
+                "where WAGE = ALL " +
+                "      (select WAGE from R1 where ID = 107) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {201}, {202}, {203}});
 
         sql =   "select ID from R2 " +
-                "where (ID,WAGE) =ALL " +
-                "      (select ID,WAGE from R1 where ID = 1000) " +
+                "where (ID, WAGE) = ALL " +
+                "      (select ID, WAGE from R1 where ID = 1000) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {201}, {202}, {203}});
 
         // the inner result set is empty, the =ALL  expression is TRUE
         sql =   "select ID from R2 " +
-                "where (select WAGE from R1 where ID = 1000) =ALL " +
-                "      (select WAGE from R1 where ID = 1000) order by ID;";
+                "where (select WAGE from R1 where ID = 1000) = ALL " +
+                "      (select WAGE from R1 where ID = 1000)" +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {201}, {202}, {203}});
 
         //  the outer_expr is NULL and inner_expr is not empty => NULL
-        sql =   "select ID from R2 where ID = 200 and (WAGE =ALL " +
-                "                                      (select WAGE from R1)) is  null ;";
-        validateTableOfLongs(client, sql, new long[][] {{200}});
+        sql =   "select ID from R2 " +
+                "where (WAGE = ALL " +
+                "       (select WAGE from R1)) " +
+                "      IS NULL;";
+        validateTableOfLongs(client, sql, new long[][] {{200}, {203}});
+
         if (!isHSQL()) {
             // I think HSQL gets this one wrong evaluating the =ALL to FALSE instead of NULL.
             // PostgreSQL agrees with us
-            sql =   "select ID from R2 where ID = 200 and ((ID,WAGE) =ALL " +
-                    "      (select ID, WAGE from R1)) is  null ;";
+            sql =   "select ID from R2 " +
+                    "where ID = 200 " +
+                    "  and ((ID,WAGE) = ALL " +
+                    "       (select ID, WAGE from R1)) " +
+                    "      IS NULL;";
             validateTableOfLongs(client, sql, new long[][] {{200}});
         }
     }
 
-    // Test subqueries on partitioned table cases
+    // Test subqueries on partitioned table cases not yet supported
     public void notestSubSelects_from_partitioned() throws Exception
     {
         Client client = getClient();
@@ -1060,153 +2124,124 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "from (select ID, DEPT from P1) T1, P2 " +
                 "where T1.ID = P2.DEPT " +
                 "order by T1.ID;";
-        validateTableOfLongs(client, sql, new long[][] {{1,1}, {1, 1}, {1, 1}, {2, 1}, {2, 1}});
+        validateTableOfLongs(client, sql, new long[][] {
+                {1, 1}, {1, 1}, {1, 1}, {2, 1}, {2, 1}});
 
         sql =   "select T1.ID, T1.DEPT " +
-                "from (select ID, DEPT from P1 where ID = 2) T1, P2 " +
+                "from (select ID, DEPT from P1 " +
+                "      where ID = 2) T1, P2 " +
                 "where T1.ID = P2.DEPT " +
                 "order by T1.ID;";
         validateTableOfLongs(client, sql, new long[][] {{2, 1}, {2, 1}});
 
         sql =   "select T1.ID, T1.DEPT " +
-                "from (select ID, DEPT from P1 where ID = 2) T1, " +
-                "       (select DEPT from P2) T2,  " +
-                "       (select ID from P3) T3  " +
+                "from (select ID, DEPT from P1 " +
+                "      where ID = 2) T1, " +
+                "     (select DEPT from P2) T2,  " +
+                "     (select ID from P3) T3  " +
                 "where T1.ID = T2.DEPT and T2.DEPT = T3.ID " +
                 "order by T1.ID;";
         validateTableOfLongs(client, sql, new long[][] {{2, 1}, {2, 1}});
 
         sql =   "select T1.ID, T1.DEPT " +
-                "from (select P1.ID, P1.DEPT from P1, P2 where P1.ID = P2.DEPT) T1, P2 " +
+                "from (select P1.ID, P1.DEPT from P1, P2 " +
+                "      where P1.ID = P2.DEPT) T1," +
+                "     P2 " +
                 "where T1.ID = P2.DEPT and P2.DEPT = 2 " +
                 "order by T1.ID;";
-        validateTableOfLongs(client, sql, new long[][] {{2, 1}, {2, 1}, {2, 1}, {2, 1}});
+        validateTableOfLongs(client, sql, new long[][] {
+                {2, 1}, {2, 1}, {2, 1}, {2, 1}});
 
 
         // Outer joins
         sql =   "select T1.ID, T1.DEPT " +
-                "from (select ID, DEPT from P1) T1 LEFT OUTER JOIN P2 " +
-                "ON T1.ID = P2.DEPT " +
+                "from (select ID, DEPT from P1) T1 " +
+                "     LEFT OUTER JOIN " +
+                "     P2 " +
+                "     ON T1.ID = P2.DEPT " +
                 "order by T1.ID;";
-        validateTableOfLongs(client, sql, new long[][] {{1,1}, {1, 1}, {1, 1},
+        validateTableOfLongs(client, sql, new long[][] {
+                {1, 1}, {1, 1}, {1, 1},
                 {2, 1}, {2, 1}, {3, 1}, {4, 2}, {5, 2}});
 
         sql =   "select T1.ID, T1.DEPT " +
-                "from (select ID, DEPT from P1) T1 LEFT OUTER JOIN P2 " +
-                "ON T1.ID = P2.DEPT where T1.ID = 3 " +
+                "from (select ID, DEPT from P1) T1 " +
+                "     LEFT OUTER JOIN " +
+                "     P2 " +
+                "     ON T1.ID = P2.DEPT " +
+                "where T1.ID = 3 " +
                 "order by T1.ID;";
         validateTableOfLongs(client, sql, new long[][] {{3, 1}});
 
         sql =   "select T1.ID, T1.DEPT, P2.WAGE " +
-                "from (select ID, DEPT from P1) T1 LEFT OUTER JOIN P2 " +
-                "ON T1.ID = P2.DEPT AND P2.DEPT = 2 " +
+                "from (select ID, DEPT from P1) T1 " +
+                "     LEFT OUTER JOIN " +
+                "     P2 " +
+                "     ON T1.ID = P2.DEPT AND P2.DEPT = 2 " +
                 "order by 1, 2, 3;";
-        validateTableOfLongs(client, sql, new long[][] {{1, 1, Long.MIN_VALUE}, {2, 1, 40}, {2, 1, 50},
-                {3, 1, Long.MIN_VALUE},{4,2, Long.MIN_VALUE}, {5,2, Long.MIN_VALUE}});
+        validateTableOfLongs(client, sql, new long[][] {
+                {1, 1, Long.MIN_VALUE}, {2, 1, 40}, {2, 1, 50},
+                {3, 1, Long.MIN_VALUE}, {4, 2, Long.MIN_VALUE}, {5,2, Long.MIN_VALUE}});
 
     }
 
     // Test scalar subqueries
-    public void testSelectScalarSubSelects() throws Exception
+    public void testSelectScalar() throws Exception
     {
         Client client = getClient();
         loadData(true);
         VoltTable vt;
         String sql;
 
-        sql =   "select R1.ID, R1.DEPT, (select ID from R2 where ID = 2) from R1 where R1.ID < 3 " +
+        // Non-correlated
+        sql =   "select R1.ID, R1.DEPT," +
+                "       (select ID from R2 " +
+                "        where ID = 2) " +
+                "from R1 " +
+                "where R1.ID < 3 " +
                 "order by R1.ID desc;";
         validateTableOfLongs(client, sql, new long[][] {{2, 1, 2}, {1, 1, 2}});
 
+        // User-parameter-correlated
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID, R1.DEPT, (select ID from R2 where ID = ?) from R1 where R1.ID < 3 " +
+                "select R1.ID, R1.DEPT, " +
+                "       (select ID from R2 " +
+                "        where ID = ?) " +
+                "from R1 " +
+                "where R1.ID < 3 " +
                 "order by R1.ID desc;",
                 2).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{2, 1, 2}, {1, 1, 2}});
 
-        sql =   "select R1.ID, R1.DEPT, (select ID from R2 where R2.ID = R1.ID and R2.WAGE = 50) from R1 where R1.ID > 3 " +
+        // Correlated
+        sql =   "select R1.ID, R1.DEPT, " +
+                "       (select ID from R2 " +
+                "        where R2.ID = R1.ID and R2.WAGE = 50) " +
+                "from R1 " +
+                "where R1.ID > 3 " +
                 "order by R1.ID desc;";
-        validateTableOfLongs(client, sql, new long[][] {{7, 2, Long.MIN_VALUE}, {6, 2, Long.MIN_VALUE}, {5, 2, 5}, {4, 2, Long.MIN_VALUE}});
+        validateTableOfLongs(client, sql, new long[][] {
+                {7, 2, Long.MIN_VALUE}, {6, 2, Long.MIN_VALUE},
+                {5, 2, 5}, {4, 2, Long.MIN_VALUE}});
 
-        // Seq scan
-        sql =   "select R1.DEPT, (select ID from R2 where R2.ID = 1) from R1 where R1.DEPT = 2;";
+        // Uncorreleted on simple seq scan
+        sql =   "select R1.DEPT, " +
+                "       (select ID from R2 " +
+                "        where R2.ID = 1) " +
+                "from R1 " +
+                "where R1.DEPT = 2;";
         validateTableOfLongs(client, sql, new long[][] {{2, 1}, {2, 1}, {2, 1}, {2, 1}});
 
-        // with group by correlated
-        // Hsqldb back end bug: ENG-8273
-        if (!isHSQL()) {
-            sql =   "select R1.DEPT, count(*), (select max(dept) from R2 where R2.wage = R1.wage) from R1 " +
-                    "group by dept, wage " +
-                    "order by dept, wage;";
-            validateTableOfLongs(client, sql, new long[][] {{1,1,2}, {1,1,1}, {1,1,1}, {2, 1, 2}, {2, 2, 2}, {2,1,2}});
-
-            sql =   "select R1.DEPT, count(*), (select sum(dept) from R2 where R2.wage > r1.dept * 10) from R1 " +
-                    "group by dept " +
-                    "order by dept;";
-            validateTableOfLongs(client, sql, new long[][] {{1,3,8}, {2, 4, 7}});
-        }
-
-        // ENG-8263: group by scalar value expression
-        sql =   "select R1.DEPT, count(*) as tag from R1 " +
-                "group by dept, (select count(dept) from R2 where R2.wage = R1.wage) " +
-                "order by dept, tag;";
-        validateTableOfLongs(client, sql, new long[][] {{1, 1}, {1, 2}, {2, 1}, {2, 3}});
-
-        sql =   "select R1.DEPT, count(*) as tag from R1 " +
-                "group by dept, (select count(dept) from R2 where R2.wage > 15) " +
-                "order by dept, tag;";
-        validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
-
-        sql =   "select R1.DEPT, abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as ct, count(*) as tag from R1 " +
-                "group by dept, ct " +
-                "order by dept, tag;";
-        validateTableOfLongs(client, sql, new long[][] {{1,2,1}, {1,1,2}, {2,1,1}, {2,3,3}});
-
-        // duplicates the subquery expression
-        sql =   "select R1.DEPT, count(*) as tag from R1 " +
-                "group by dept, " +
-                "         (select count(dept) from R2 where R2.wage > 15), " +
-                "         (select count(dept) from R2 where R2.wage > 15) " +
-                "order by dept, tag;";
-        validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
-
-        // changes a little bit on the subquery
-        sql =   "select R1.DEPT, count(*) as tag from R1 " +
-                "group by dept, " +
-                "         (select count(dept) from R2 where R2.wage > 15), " +
-                "         (select count(dept) from R2 where R2.wage > 14) " +
-                "order by dept, tag;";
-        validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
-
-        // expression with subuqery
-        sql =   "select R1.DEPT, count(*) as tag from R1 " +
-                "group by dept, (select count(dept) from R2 where R2.wage > 15), " +
-                "(1 + (select count(dept) from R2 where R2.wage > 14) ) " +
-                "order by dept, tag;";
-        validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
-
-        // duplicates the subquery expression
-        sql =   "select R1.DEPT, " +
-                "       abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as ct1, " +
-                "       abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as ct2, " +
-                "       count(*) as tag " +
-                "from R1 " +
-                "group by dept, ct1 " +
-                "order by dept, tag;";
-        validateTableOfLongs(client, sql, new long[][] {{1,2,2,1}, {1,1,1,2}, {2,1,1,1}, {2,3,3,3}});
-
-        // expression with subuqery
-        sql =   "select R1.DEPT, " +
-                "abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as ct1, " +
-                "(5 + abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3)) as ct2, " +
-                "count(*) as tag from R1 " +
-                "group by dept, ct1 " +
-                "order by dept, tag;";
-        validateTableOfLongs(client, sql, new long[][] {{1,2,7,1}, {1,1,6,2}, {2,1,6,1}, {2,3,8,3}});
+        // check for cardinality error
         try {
-            vt = client.callProcedure("@AdHoc",
-                    "select R1.ID, R1.DEPT, (select ID from R2) from R1 where R1.ID > 3 " +
-                "order by R1.ID desc;").getResults()[0];
+            sql =   "select R1.ID, R1.DEPT, " +
+                    "       (select ID from R2 " +
+                    "        where R2.ID < R1.ID) " +
+                    "from R1 " +
+                    "where R1.ID > 3 " +
+                    "order by R1.ID desc;";
+            client.callProcedure("@AdHoc", sql);
+            fail("Did not get expected cardinality error from :" + sql);
         }
         catch (ProcCallException ex) {
             String errMsg = (isHSQL()) ? "cardinality violation" :
@@ -1214,19 +2249,128 @@ public class TestSubQueriesSuite extends RegressionSuite {
             assertTrue(ex.getMessage().contains(errMsg));
         }
 
+        // scalar value expression correlated by group by column
+        // Hsqldb back end bug: ENG-8273 NPE
+        if (!isHSQL()) {
+            sql =   "select R1.DEPT, count(*), " +
+                    "       (select max(dept) from R2 " +
+                    "        where R2.wage = R1.wage) " +
+                    "from R1 " +
+                    "group by dept, wage " +
+                    "order by dept, wage;";
+            validateTableOfLongs(client, sql, new long[][] {
+                    {1, 1, 2}, {1, 1, 1}, {1, 1, 1}, {2, 1, 2}, {2, 2, 2}, {2,1,2}});
+
+            sql =   "select R1.DEPT, count(*), " +
+                    "       (select sum(dept) from R2" +
+                    "        where R2.wage > r1.dept * 10) " +
+                    "from R1 " +
+                    "group by dept " +
+                    "order by dept;";
+            validateTableOfLongs(client, sql, new long[][] {{1,3,8}, {2, 4, 7}});
+        }
+
+        subTestGroupByScalarSubquery(client);
+
         // ENG-8145
-        subTestScalarSubqueryWithOrderByOrGroupBy();
+        subTestScalarSubqueryWithParentOrderByOrGroupBy(client);
 
         //
         // ENG-8159, ENG-8160
         // test Scalar sub-query with non-integer type
         //
-        subTestScalarSubqueryWithNonIntegerType();
+        subTestScalarSubqueryWithNonIntegerType(client);
     }
 
-    private void subTestScalarSubqueryWithOrderByOrGroupBy() throws Exception {
+    private void subTestGroupByScalarSubquery(Client client) throws Exception {
         String sql;
-        Client client = getClient();
+
+        // group by scalar value expression
+        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+                "group by dept, " +
+                "         (select count(dept) from R2 " +
+                "          where R2.wage = R1.wage) " +
+                "order by dept, ct;";
+        validateTableOfLongs(client, sql, new long[][] {{1, 1}, {1, 2}, {2, 1}, {2, 3}});
+
+        // dumb edge case -- non-correlated so constant group by expression
+        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+                "group by dept, " +
+                "         (select count(dept) from R2 " +
+                "          where R2.wage > 15) " +
+                "order by dept, ct;";
+        validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
+
+        // group by scalar in a complex expression all referenced by tag
+        sql =   "select R1.DEPT, " +
+                "       abs((select count(dept) from R2 " +
+                "            where R2.wage > R1.wage) / 2 - 3) as tag," +
+                "       count(*) as ct from R1 " +
+                "group by dept, tag " +
+                "order by dept, ct;";
+        validateTableOfLongs(client, sql, new long[][] {{1,2,1}, {1,1,2}, {2,1,1}, {2,3,3}});
+
+        // duplicates the subquery expression
+        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+                "group by dept, " +
+                "         (select count(dept) from R2 where R2.wage > 15), " +
+                "         (select count(dept) from R2 where R2.wage > 15) " +
+                "order by dept, ct;";
+        validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
+
+        // changes a little bit on the subquery
+        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+                "group by dept, " +
+                "         (select count(dept) from R2 where R2.wage > 15), " +
+                "         (select count(dept) from R2 where R2.wage > 14) " +
+                "order by dept, ct;";
+        validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
+
+        // expression with subquery
+        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+                "group by dept,"
+                + "       (select count(dept) from R2 where R2.wage > 15), " +
+                "         (1 + (select count(dept) from R2 where R2.wage > 14) ) " +
+                "order by dept, ct;";
+        validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
+
+        // duplicates the subquery expression
+        sql =   "select R1.DEPT, " +
+                "       abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as tag1, " +
+                "       abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as tag2, " +
+                "       count(*) as ct " +
+                "from R1 " +
+                "group by dept, tag1 " +
+                "order by dept, ct;";
+        validateTableOfLongs(client, sql, new long[][] {{1,2,2,1}, {1,1,1,2}, {2,1,1,1}, {2,3,3,3}});
+
+        // expression with subquery
+        sql =   "select R1.DEPT, " +
+                "abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as tag1, " +
+                "(5 + abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3)) as tag2, " +
+                "count(*) as ct from R1 " +
+                "group by dept, tag1 " +
+                "order by dept, ct;";
+        validateTableOfLongs(client, sql, new long[][] {{1,2,7,1}, {1,1,6,2}, {2,1,6,1}, {2,3,8,3}});
+
+        // check for cardinality error from grouped by scalar
+        try {
+            sql =   "select max(R1.ID), R1.DEPT " +
+                    "from R1 where R1.ID > 3 " +
+                    "group by DEPT, (select ID from R2 where R2.ID < R1.ID)" +
+                    "order by R1.DEPT desc;";
+            client.callProcedure("@AdHoc", sql);
+            fail("Did not get expected cardinality error from :" + sql);
+        }
+        catch (ProcCallException ex) {
+            String errMsg = (isHSQL()) ? "cardinality violation" :
+                "More than one row returned by a scalar/row subquery";
+            assertTrue(ex.getMessage().contains(errMsg));
+        }
+    }
+
+    private void subTestScalarSubqueryWithParentOrderByOrGroupBy(Client client) throws Exception {
+        String sql;
         int len = 100;
 
         if (isValgrind()) {
@@ -1236,8 +2380,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         long[][] expected = new long[len][1];
         for (int i = 0; i < len; ++i) {
-            client.callProcedure("@AdHoc",  "insert into R_ENG8145_1 values (?, ?);", i, i * 2);
-            client.callProcedure("@AdHoc",  "insert into R_ENG8145_2 values (?, ?);", i, i * 2);
+            client.callProcedure("@AdHoc", "insert into R_ENG8145_1 values (?, ?);", i, i * 2);
+            client.callProcedure("@AdHoc", "insert into R_ENG8145_2 values (?, ?);", i, i * 2);
             long val = len - ((i * 2) + 1);
             if (val < 0)
                 val = 0;
@@ -1331,8 +2475,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         assertFalse(vt.advanceRow());
     }
 
-    private void subTestScalarSubqueryWithNonIntegerType() throws Exception {
-        Client client = getClient();
+    private void subTestScalarSubqueryWithNonIntegerType(Client client) throws Exception {
+
         client.callProcedure("@AdHoc", "truncate table R4");
         client.callProcedure("R4.insert", 1, "foo1", -1, 1.1);
         client.callProcedure("R4.insert", 2, "foo2", -1, 2.2);
@@ -1370,91 +2514,66 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         // Index Scan
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 where R1.ID = (select ID from R2 where ID = ?);",
+                "select R1.ID from R1 " +
+                "where R1.ID = " +
+                "      (select ID from R2 where ID = ?);",
                 2).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{2}});
 
-        // Subquery with limit/offset parameter
-        vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
-                "where R1.ID > ALL " +
-                "      (select ID from R2 order by ID limit ? offset ?);",
-                2, 2).getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{5}});
-
         // Index Scan correlated
-        sql =   "select R1.ID from R1 where R1.ID = (select ID/2 from R2 where ID = R1.ID * 2) " +
+        sql =   "select R1.ID from R1 " +
+                "where R1.ID = " +
+                "      (select ID/2 from R2 where ID = R1.ID * 2) " +
                 "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
         // Seq Scan
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 where R1.DEPT = (select DEPT from R2 where ID = ?) " +
+                "select R1.ID from R1 " +
+                "where R1.DEPT = " +
+                "      (select DEPT from R2 where ID = ?) " +
                 "order by id;",
                 1).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}});
 
         // Seq Scan correlated
-        sql =   "select R1.ID from R1 where R1.DEPT = (select DEPT from R2 where ID = R1.ID * 2);";
+        sql =   "select R1.ID from R1 " +
+                "where R1.DEPT = " +
+                "      (select DEPT from R2 where ID = R1.ID * 2);";
         validateTableOfLongs(client, sql, new long[][] {{1}});
 
         // Different comparison operators
-        sql =   "select R1.ID from R1 where R1.DEPT > (select DEPT from R2 where ID = 3) " +
+        sql =   "select R1.ID from R1 " +
+                "where R1.DEPT > " +
+                "      (select DEPT from R2 where ID = 3) " +
                 "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
 
         sql =   "select R1.ID from R1 " +
-                "where (select DEPT from R2 where ID = 3) != R1.DEPT " +
+                "where (select DEPT from R2 where ID = 3) != " +
+                "      R1.DEPT " +
                 "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
-
-        sql =   "select R1.ID from R1 where R1.DEPT >= ALL " +
-                "      (select DEPT from R2) " +
-                "order by id;";
-        validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
-
-        // Index scan
-        sql =   "select R1.ID from R1 where R1.ID > ALL " +
-                "      (select ID from R2 where R2.ID < 4) " +
-                "order by id;";
-        validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
-
-        sql =   "select R1.ID from R1 where R1.ID >= ALL " +
-                "      (select ID from R2 " +
-                "order by ID asc);";
-        validateTableOfLongs(client, sql, new long[][] {{5}});
-
-        sql =   "select R1.ID from R1 where R1.ID >= ALL " +
-                "      (select ID from R2 " +
-                " order by ID desc);";
-        validateTableOfLongs(client, sql, new long[][] {{5}});
-
-        sql =   "select R1.ID from R1 where R1.ID <= ALL " +
-                "      (select ID from R2 " +
-                 "order by ID desc);";
-        validateTableOfLongs(client, sql, new long[][] {{1}});
 
         // NLIJ
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID, R2.ID from R1, R2 where R1.DEPT = R2.DEPT + (select DEPT from R2 where ID = ?) " +
+                "select R1.ID, R2.ID from R1, R2 " +
+                "where R1.DEPT = " +
+                "      R2.DEPT + (select DEPT from R2 where ID = ?) " +
                 "order by R1.ID, R2.ID limit 2;",
                 1).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{4, 1}, {4, 2}});
 
         // @TODO NLIJ correlated
-        sql =   "select R2.ID, R2.ID from R1, R2 where R2.ID = (select id from R2 where ID = R1.ID) " +
+        sql =   "select R1.ID, R2.ID from R1, R2 " +
+                "where R2.ID = " +
+                "      (select ID from R2 where ID = R1.ID) " +
                 "order by R1.ID;";
         validateTableOfLongs(client, sql, new long[][] {{1, 1}, {2,2}, {3,3}, {4,4}, {5,5}});
 
-        // NLJ
-        vt = client.callProcedure("@AdHoc",
-                "select R1.ID, R2.ID from R1, R2 where R1.DEPT = R2.DEPT + (select DEPT from R2 where ID = ?) " +
-                "order by R1.ID, R2.ID limit 1;",
-                1).getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{4, 1}});
-
         // NLJ correlated
-        sql =   "select R1.ID, R2.ID from R1, R2 where R2.DEPT = (select DEPT from R2 where ID = R1.ID + 4) " +
+        sql =   "select R1.ID, R2.ID from R1, R2 " +
+                "where R2.DEPT = (select DEPT from R2 where ID = R1.ID + 4) " +
                 "order by R1.ID, R2.ID;";
         validateTableOfLongs(client, sql, new long[][] {{1, 4}, {1,5}});
 
@@ -1486,15 +2605,70 @@ public class TestSubQueriesSuite extends RegressionSuite {
         verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
         try {
-            vt = client.callProcedure("@AdHoc",
-                    "select R1.ID from R1 where R1.ID = (select ID from R2);").getResults()[0];
-            fail();
+            sql =   "select R1.ID from R1 where R1.ID = (select ID from R2);";
+            client.callProcedure("@AdHoc", sql);
+            fail("Did not get expected cardinality violation from: " + sql);
         }
         catch (ProcCallException ex) {
             String errMsg = (isHSQL()) ? "cardinality violation" :
                 "More than one row returned by a scalar/row subquery";
             assertTrue(ex.getMessage().contains(errMsg));
         }
+    }
+
+    public void testSingleColumnOpAll() throws Exception {
+        Client client = getClient();
+        loadData(false);
+        String sql;
+        VoltTable vt;
+
+        // Subquery with limit/offset parameter
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 " +
+                "where R1.ID > ALL " +
+                "      (select ID from R2 " +
+                "       order by ID limit ? offset ?);",
+                2, 2).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{5}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 " +
+                "where R1.ID > ALL " +
+                "      (select ID from R2 " +
+                "       order by ID limit ? offset ?);",
+                2, 1).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{4}, {5}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 " +
+                "where R1.ID > ALL " +
+                "      (select ID from R2 " +
+                "       order by ID limit ? offset ?);",
+                1, 2).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{4}, {5}});
+
+        sql =   "select R1.ID from R1 " +
+                "where R1.DEPT >= ALL " +
+                "      (select DEPT from R2) " +
+                "order by id;";
+        validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
+
+        // Index scan
+        sql =   "select R1.ID from R1 " +
+                "where R1.ID > ALL " +
+                "      (select ID from R2 where R2.ID < 4) " +
+                "order by id;";
+        validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
+
+        sql =   "select R1.ID from R1 " +
+                "where R1.ID >= ALL " +
+                "      (select ID from R2);";
+        validateTableOfLongs(client, sql, new long[][] {{5}});
+
+        sql =   "select R1.ID from R1 " +
+                "where R1.ID <= ALL " +
+                "      (select ID from R2);";
+        validateTableOfLongs(client, sql, new long[][] {{1}});
     }
 
     public void testWhereRowSubSelects() throws Exception
@@ -1505,24 +2679,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
 
         Client client = getClient();
-        client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
-        client.callProcedure("R1.insert", 3,  10,  2 , "2013-08-18 02:00:00.123457");
+        //                               id,wage,dept,tm
+        client.callProcedure("R1.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure("R1.insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
 
-        client.callProcedure("R2.insert", 3,   5,  1 , "2013-07-18 10:40:01.123457");
-        client.callProcedure("R2.insert", 4,  10,  1 , "2013-08-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 5,  10,  1 , "2013-08-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 6,  10,  2 , "2013-08-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 7,  50,  2 , "2013-09-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 3,  5, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure("R2.insert", 4, 10, 1, "2013-08-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 5, 10, 1, "2013-08-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 6, 10, 2, "2013-08-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 7, 50, 2, "2013-09-18 02:00:00.123457");
         String sql;
 
-        // R1 2,  10,  1 = R2 4,  10,  1
+        // R1 2, 10, 1 = R2 4, 10, 1
         sql =   "select R1.ID from R1 " +
                 "where (R1.WAGE, R1.DEPT) = " +
                 "      (select WAGE, DEPT from R2 where ID = 4);";
-        //*/ From here to "// *", Ubuntu 12.04 dev build got 3 rows:
         validateTableOfLongs(client, sql, new long[][] {{2}});
-        // */
+
         sql =   "select R1.ID from R1 " +
                 "where (R1.WAGE, R1.DEPT) != " +
                 "      (select WAGE, DEPT from R2 where ID = 4) " +
@@ -1549,29 +2723,27 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "where (R1.WAGE, R1.DEPT) <= " +
                 "      (select WAGE, DEPT from R2 where ID = 4) " +
                 "order by ID;";
-        //*/ From here to "// *", Ubuntu 12.04 dev build got 3 rows:
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
-        // R1 2,  10,  1 = R2 4,  10,  1 and 5,  10,  1
+        // R1 2, 10, 1 = R2 4, 10, 1 and 5, 10, 1
         sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) =ALL " +
+                "where (R1.WAGE, R1.DEPT) = ALL " +
                 "      (select WAGE, DEPT from R2 where ID in (4,5));";
         validateTableOfLongs(client, sql, new long[][] {{2}});
-        // */
 
         sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) =ALL " +
+                "where (R1.WAGE, R1.DEPT) = ALL " +
                 "      (select WAGE, DEPT from R2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        // R1 3,  10,  2 >= ALL R2 except R2.7
+        // R1 3, 10, 2 >= ALL R2 except R2.7
         sql =   "select R1.ID from R1 " +
                 "where ID = 3 and (R1.WAGE, R1.DEPT) >= ALL " +
                 "                 (select WAGE, DEPT from R2 where ID < 7 " +
                 "                  order by WAGE, DEPT DESC);";
         validateTableOfLongs(client, sql, new long[][] {{3}});
 
-        // R1 3,  10,  2 < R2 except R2.7 50 2
+        // R1 3, 10, 2 < R2 except R2.7 50 2
         sql =   "select R1.ID from R1 " +
                 "where (R1.WAGE, R1.DEPT) >= ALL " +
                 "      (select WAGE, DEPT from R2);";
@@ -1601,17 +2773,17 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       order by DEPT, TM DESC) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
-
     }
 
     public void testRepeatedQueriesDifferentData() throws Exception
     {
         Client client = getClient();
-        client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
-        client.callProcedure("R1.insert", 3,  15,  2 , "2013-08-18 02:00:00.123457");
+        //                               id,wage,dept,tm
+        client.callProcedure("R1.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure("R1.insert", 3, 15, 2, "2013-08-18 02:00:00.123457");
 
-        client.callProcedure("R2.insert", 1,  5,  1 , "2013-08-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 1,  5, 1, "2013-08-18 02:00:00.123457");
 
         validateTableOfScalarLongs(client, "select (select max(wage) from r1) from r2;",
                 new long[] {15});
@@ -1626,17 +2798,18 @@ public class TestSubQueriesSuite extends RegressionSuite {
     public void testSubqueryWithExceptions() throws Exception
     {
         Client client = getClient();
-        client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
-        client.callProcedure("R1.insert", 3,  15,  2 , "2013-08-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 4,  0,  2 , "2013-08-18 02:00:00.123457");
+        //                               id,wage,dept,tm
+        client.callProcedure("R1.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure("R1.insert", 3, 15, 2, "2013-08-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 4,  0, 2, "2013-08-18 02:00:00.123457");
 
-        // A divide by zero execption in the top-level query!
+        // A divide by zero exception in the top-level query!
         // Debug assertions in the EE will make this test fail
-        // if we don't to clean up temp tables for both inner and outer queries.
+        // if we don't clean up temp tables for both inner and outer queries.
         String expectedMsg = isHSQL() ? "division by zero" : "Attempted to divide 30 by 0";
-        verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage != 0) from r1 where id = 30 / wage;", expectedMsg);
-        verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage != 0) from r1 where id = 30 / wage;", expectedMsg);
+        verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage <> 0) from r1 where id = 30 / wage;", expectedMsg);
+        verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage <> 0) from r1 where id = 30 / wage;", expectedMsg);
 
         // As above, but this time the execption occurs in the inner query.
         verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
@@ -1646,8 +2819,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
     public void testSubqueriesWithArithmetic() throws Exception {
         Client client = getClient();
 
-        client.callProcedure("R1.insert", 1, 300,  1 , "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 2, 200,  1 , "2013-06-18 02:00:00.123457");
+        //                               id,wage,dept,tm
+        client.callProcedure("R1.insert", 1, 300, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2, 200, 1, "2013-06-18 02:00:00.123457");
 
         // These test cases exercise the fix for ENG-8226, in which a missing ScalarValueExpression
         // caused the result of a subquery to be seen as the subquery ID, rather than the contents
@@ -1673,9 +2847,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
     public void testExistsSimplification() throws Exception
     {
         Client client = getClient();
-        client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
-        client.callProcedure("R1.insert", 3,  10,  2 , "2013-08-18 02:00:00.123457");
+        //                               id,wage,dept,tm
+        client.callProcedure("R1.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure("R1.insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
         VoltTable vt;
         String sql;
 
@@ -1731,19 +2906,20 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // join on EXISTS(FALSE)
         sql =   "select T1.ID " +
                 "from R1 T1 join R1 T2 " +
-                "ON exists " +
-                "   (select max(ID) from R2 offset 1)" +
-                "and T1.ID = 1;";
+                "    ON exists " +
+                "       (select max(ID) from R2 offset 1)" +
+                "    and T1.ID = 1;";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
         // join on EXISTS(TRUE)
-        vt = client.callProcedure("@AdHoc",
-                "select T1.ID " +
+        sql =   "select T1.ID " +
                 "from R1 T1 join R1 T2 " +
-                "ON exists " +
-                "   (select max(ID) from R2)" +
-                "or T1.ID = 25").getResults()[0];
-        assertEquals(9, vt.getRowCount());
+                "     ON exists " +
+                "        (select max(ID) from R2)" +
+                "     or T1.ID = 25";
+        //* enable for debug */ dumpQueryResults(client, sql);
+        validateTableOfLongs(client, sql, new long[][] {
+                {1}, {1}, {1}, {2}, {2}, {2}, {3}, {3}, {3}});
 
         // having TRUE
         sql =   "select max(ID), WAGE from R1 " +
@@ -1763,16 +2939,17 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "order by max(ID) asc";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        client.callProcedure("R2.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
-        client.callProcedure("R2.insert", 3,  10,  2 , "2013-08-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure("R2.insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
 
         // EXISTS(SELECT ... OFFSET ?)
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID from R1 " +
                 "where exists " +
                 "      (select ID from R2" +
-                "       offset ?)", 4).getResults()[0];
+                "       offset ?)",
+                4).getResults()[0];
         validateTableOfLongs(vt, EMPTY_TABLE);
 
         vt = client.callProcedure("@AdHoc",
@@ -1877,11 +3054,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "SELECT RATIO "
                 + "FROM R4 "
-                + "WHERE RATIO = 0.6944855793154526 "
+                + "WHERE RATIO = 6.944855793154526e-1 "
                 + "UNION "
                 + "  SELECT RATIO "
                 + "  FROM R4 "
-                + "  WHERE RATIO = 0.6944855793154526;")
+                + "  WHERE RATIO = 6.944855793154526e-1;")
                 .getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(0.6944855793154526, vt.getDouble(0), 0.000001);
