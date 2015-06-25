@@ -1225,7 +1225,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "        where ID < 104)) " +
                     "      IS NULL;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB (ENG-8436 logical nulls) got 0 rows
+            validateTableOfLongs(client, sql, new long[][] {{100}});
 
             sql =   "select ID from R1 " +
                 "where ((WAGE, DEPT) = ANY " +
@@ -1233,20 +1233,20 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "        where ID < 104)) " +
                 "      IS NULL;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB (ENG-8436 logical nulls) got 0 rows
+            validateTableOfLongs(client, sql, new long[][] {{100}});
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104);";
-            //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // ??? VoltDB got 3 rows (ENG-8436 logical nulls) HSQL got 0 rows
+            /* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             sql =   "select ID from R1 " +
                     "where NOT (WAGE, DEPT) = ANY " +
                     "          (select WAGE, DEPT from R2 " +
                     "           where ID < 104);";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // ??? VoltDB got 3 rows (ENG-8436 logical nulls) HSQL got 0 rows
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
         }
 
         // IN should evaluate to NULL
@@ -1258,7 +1258,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "           (select WAGE, DEPT from R2 " +
                     "            where ID < 104));";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) IN " +
@@ -1266,14 +1266,14 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "        where ID < 104) " +
                     "      IS FALSE;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104);";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
             sql =   "select ID from R1 " +
@@ -1281,7 +1281,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104);";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
         }
     }
 
@@ -1808,22 +1808,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       where WAGE <> 1000 or WAGE is NULL);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        // Subtle bug -- both in HSQL and VOltDB
+        // Subtle bug in HSQL
         // the IN expression evaluates to FALSE rather than NULL, here
-// FIXME
-//        sql =   "select ID from R1 " +
-//                "where (WAGE IN " +
-//                "       (select WAGE from R2 " +
-//                "        where WAGE <> 1000 or WAGE is NULL)) " +
-//                "      IS NULL;";
-//        validateTableOfLongs(client, sql, new long[][] {{100}});
+        if (!isHSQL()) {
+            sql =   "select ID from R1 " +
+                    "where (WAGE IN " +
+                    "       (select WAGE from R2 " +
+                    "        where WAGE <> 1000 or WAGE is NULL)) " +
+                    "      IS NULL;";
+            validateTableOfLongs(client, sql, new long[][] {{100}});
 
-        sql =   "select ID from R1 " +
-                "where WAGE = ANY " +
-                "      (select WAGE from R2 " +
-                "       where WAGE <> 1000 or WAGE is NULL) " +
-                "      IS FALSE;";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
+            sql =   "select ID from R1 " +
+                    "where WAGE = ANY " +
+                    "      (select WAGE from R2 " +
+                    "       where WAGE <> 1000 or WAGE is NULL) " +
+                    "      IS FALSE;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
+        }
 
         // NULL row exists
         sql =   "select ID from R1 " +
@@ -1835,13 +1837,22 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // Rows exist
         sql =   "select ID from R1 " +
                 "where NOT EXISTS " +
-                "      (select WAGE, DEPT from R2);";
+                "          (select WAGE from R2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        sql =   "select ID from R1 " +
-                "where R1.WAGE NOT IN " +
-                "      (select WAGE from R2 " +
-                "       where ID IN (100, 102, 103));";
+        if (!isHSQL()) {
+            sql =   "select ID from R1 " +
+                    "where WAGE NOT IN " +
+                    "      (select WAGE from R2 " +
+                    "       where ID IN (100, 102, 103));";
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+            sql =   "select ID from R1 " +
+                    "where NOT WAGE IN " +
+                    "          (select WAGE from R2 " +
+                    "           where ID IN (100, 102, 103));";
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
+        }
     }
 
     /**
