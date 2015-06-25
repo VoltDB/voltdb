@@ -295,7 +295,8 @@ public class MaterializedViewBenchmark {
     }
 
     private boolean isMinMatViewCase(String matView) {
-        return matView.toLowerCase().endsWith("minmatview");
+        return matView.toLowerCase().endsWith("minmatview") ||
+               matView.toLowerCase().endsWith("minmatviewopt");
     }
 
     /**
