@@ -187,13 +187,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
+    @Override
     public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
         m_durabilityListener.setUniqueIdListener(listener);
-        // If command logging is disabled, we need to notify the listener right
-        // away that all uniqueIds are considered durable
-        if (m_cl != null && !m_cl.isEnabled()) {
-            listener.lastUniqueIdsMadeDurable(Long.MAX_VALUE, Long.MAX_VALUE);
-        }
     }
 
     public void setDRGateway(PartitionDRGateway gateway)
@@ -994,8 +990,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
-        m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), cl.isEnabled());
-        m_cl.registerDurabilityListener(m_durabilityListener);
+        if (m_cl.isEnabled()) {
+            m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), cl.isEnabled());
+            m_cl.registerDurabilityListener(m_durabilityListener);
+        }
+        else {
+
+        }
     }
 
     @Override
