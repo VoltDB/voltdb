@@ -35,6 +35,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -442,6 +443,98 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
         assertEquals(getRoundingString("Cleanup statement failure"), ClientResponse.SUCCESS, cr.getStatus());
     }
 
+    public void testEEDecimalScale() throws Exception {
+        Boolean roundIsEnabled = Boolean.valueOf(m_defaultRoundingEnablement);
+        RoundingMode roundMode = RoundingMode.valueOf(m_defaultRoundingMode);
+
+        assert(m_config instanceof LocalCluster);
+        LocalCluster localCluster = (LocalCluster)m_config;
+        Map<String, String> props = localCluster.getAdditionalProcessEnv();
+        if (props != null) {
+            roundIsEnabled = Boolean.valueOf(props.containsKey(m_roundingEnabledProperty) ? props.get(m_roundingEnabledProperty) : "true");
+            roundMode = RoundingMode.valueOf(props.containsKey(m_roundingModeProperty) ? props.get(m_roundingModeProperty) : "HALF_UP");
+        }
+        doTestEEDecimalScale(roundIsEnabled, roundMode);
+    }
+
+    private void doTestEEDecimalScale(boolean roundEnabled, RoundingMode roundMode) throws Exception {
+        // We currently only support one rounding mode in the EE, and
+        // we always round.
+        if (roundEnabled && roundMode == RoundingMode.HALF_UP) {
+            Client client = getClient();
+            ClientResponse cr;
+            String[] values = new String[] {
+                // Don't round.
+                "0.8999999999994",
+                // Do round.
+                "0.8999999999995",
+                // Do round to the left of the dot.
+                "0.9999999999995",
+                // Do round to the left of the dot with non-zero integer part.
+                "1.9999999999995",
+                // Do round to the left of the dot with more digits.
+                "99.9999999999995",
+                // Do round to the left of the dot with no more digits.
+                "98.9999999999995",
+                // Don't round, but the result is the largest
+                // representable decimal value.
+                "99999999999999999999999999.9999999999994999999",
+                // The following cases replicate the cases above,
+                // but with a sign.
+                "-0.8999999999994",
+                "-0.8999999999995",
+                "-0.9999999999995",
+                "-1.9999999999995",
+                "-99.9999999999995",
+                "-98.9999999999995",
+                "-99999999999999999999999999.9999999999994999999"
+            };
+            String[] badValues = new String[] {
+                // Too many integer digits.
+                "999999999999999999999999999999.0",
+                // Round to an unrepresentable value.
+                "99999999999999999999999999.9999999999995999999",
+                // Round to an unrepresentable value.
+                "-99999999999999999999999999.9999999999995999999"
+            };
+            // Insert some data.
+            for (String val : values) {
+                cr = client.callProcedure("EEDecimal.Insert", val);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            }
+            // Insert some bad data.
+            // We will find this is bad later on.
+            for (int idx = 0; idx < badValues.length; idx += 1) {
+                String val = badValues[idx];
+                cr = client.callProcedure("EEBadDecimal.Insert", idx, val);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            }
+            // Query the data.  Just get them all for now.
+            cr = client.callProcedure("EEDecimalFetch");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            VoltTable tbl = cr.getResults()[0];
+            while (tbl.advanceRow()) {
+                String expectedStr = tbl.getString(0);
+                BigDecimal rounded = tbl.getDecimalAsBigDecimal(1);
+                BigDecimal expected = roundDecimalValue(expectedStr, roundEnabled, roundMode);
+                assertEquals(expected, rounded);
+            }
+            // Query the data for bad values.  Get them one at a time,
+            // because they are all bad in their own way.
+            for (int idx = 0; idx < badValues.length; idx += 1) {
+                try {
+                    cr = client.callProcedure("EEBadDecimalFetch", idx);
+                    fail(String.format("Unexpected success, case %d, decimal string \"%s\"",
+                         idx, badValues[idx]));
+                } catch (ProcCallException ex) {
+                    assertTrue(true);
+                }
+            }
+        } else {
+            assertTrue(true);
+        }
+    }
+
     private final static Map<String, String> makePropertiesMap(String... entries) {
         assert(entries.length % 2 == 0);
         Map<String, String> answer = new HashMap<String, String>();
@@ -467,7 +560,7 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
         final String literalSchema =
                 "CREATE TABLE P1 ( id integer );" +
                 "CREATE TABLE DECIMALTABLE ( " +
-                "dec decimal" +
+                    "dec decimal"     +
                 ");" +
                 "CREATE PROCEDURE INSERT_DECIMAL AS " +
                 "INSERT INTO DECIMALTABLE VALUES ?;" +
@@ -475,6 +568,17 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
                 "SELECT DEC FROM DECIMALTABLE;" +
                 "CREATE PROCEDURE TRUNCATE_DECIMAL AS " +
                 "TRUNCATE TABLE DECIMALTABLE;" +
+                "create table EEDecimal (" +
+                "  valueIn    varChar(128)" +
+                ");" +
+                "create procedure EEDecimalFetch as " +
+                "select valueIn, cast(valueIn as decimal) from EEDecimal;" +
+                "create table EEBadDecimal (" +
+                "  id integer primary key not null," +
+                "  valueIn    varChar(128)" +
+                ");" +
+                "create procedure EEBadDecimalFetch as " +
+                "select valueIn, cast(valueIn as decimal) from EEBadDecimal where id = ?;" +
                 ""
                 ;
         try {
