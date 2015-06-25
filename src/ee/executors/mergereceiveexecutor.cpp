@@ -240,6 +240,8 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
 
     VOLT_TRACE("Result of MergeReceive:\n '%s'", m_tmpOutputTable->debug().c_str());
 
+    cleanupInputTempTable(m_tmpInputTable);
+
     return true;
 }
 
