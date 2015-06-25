@@ -246,10 +246,10 @@ CTX.INPUT['executors'] = """
  limitexecutor.cpp
  materializedscanexecutor.cpp
  materializeexecutor.cpp
+ mergereceiveexecutor.cpp
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
- orderbymergeexecutor.cpp
  projectionexecutor.cpp
  receiveexecutor.cpp
  sendexecutor.cpp
