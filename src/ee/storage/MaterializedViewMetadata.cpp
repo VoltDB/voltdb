@@ -126,7 +126,6 @@ void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catal
 {
     // TODO: use map for faster search? Suppose you got a lot of min() / max() columns?
     std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
-    size_t minMaxSearchKeyValueSize = 0;
     m_minMaxSearchKeyBackingStoreSize = 0;
     for (catalog::CatalogMap<catalog::IndexRef>::field_map_iter idxIterator = indexForMinOrMax.begin();
          idxIterator != indexForMinOrMax.end(); idxIterator++) {
@@ -140,10 +139,7 @@ void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catal
             for (int i = 0; i < candidates.size(); i++) {
                 if (idx->name().compare(candidates[i]->getName()) == 0) {
                     m_indexForMinMax.push_back(candidates[i]);
-                    // If the index for min / max aggs contains the agg exprs / cols, we need to
-                    // create a seprate search key value vector for it. (ENG-6511)
                     if ( minMaxIndexIncludesAggCol(candidates[i]) ) {
-                        minMaxSearchKeyValueSize = candidates[i]->getColumnIndices().size();
                         // Because there might be a lot of indexes, find the largest space they may consume
                         // so that they can all share the space and use different schema. (ENG-8512)
                         if (candidates[i]->getKeySchema()->tupleLength() + 1 > m_minMaxSearchKeyBackingStoreSize) {
@@ -154,9 +150,6 @@ void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catal
                 }
             } // end for
         }
-    }
-    if (minMaxSearchKeyValueSize > 0) {
-        m_minMaxSearchKeyValue = std::vector<NValue>(minMaxSearchKeyValueSize);
     }
 }
 
@@ -335,17 +328,15 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
     // Search for the min / max fallback value. use indexs differently according to their types.
     // (Does the index include min / max aggCol? - ENG-6511)
     if ( minMaxIndexIncludesAggCol(selectedIndex) ) {
-        // Assemble the m_minMaxSearchKeyTuple and m_minMaxSearchKeyValue with
+        // Assemble the m_minMaxSearchKeyTuple with
         // group-by column values and the old min/max value.
         m_minMaxSearchKeyTuple = TableTuple(selectedIndex->getKeySchema());
         m_minMaxSearchKeyTuple.move(m_minMaxSearchKeyBackingStore);
         for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
             NValue value = getGroupByValueFromSrcTuple(colindex, oldTuple);
-            m_minMaxSearchKeyValue[colindex] = value;
             m_minMaxSearchKeyTuple.setNValue(colindex, value);
         }
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
-        m_minMaxSearchKeyValue[(int)m_groupByColumnCount] = oldValue;
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;
         // Search for the new min/max value and keep it in tuple.
@@ -362,7 +353,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
             // If the cursor already moved out of the target group range, exit the loop.
             for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
                 NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
-                if ( value.compare(m_minMaxSearchKeyValue[colindex]) != 0 ) {
+                if ( value.compare(m_searchKeyValue[colindex]) != 0 ) {
                     return initialNull;
                 }
             }
