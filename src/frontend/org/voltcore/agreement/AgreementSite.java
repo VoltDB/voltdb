@@ -496,11 +496,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 }
                 m_recoverBeforeTxn = selectedRecoverBeforeTxn;
                 m_minTxnIdAfterRecovery = m_recoverBeforeTxn;//anything before this precedes the snapshot
-                try {
-                    m_recoverySnapshot = org.xerial.snappy.Snappy.uncompress(bpm.m_payload);
-                } catch (IOException e) {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Unable to decompress ZK snapshot", true, e);
-                }
+                m_recoverySnapshot = bpm.m_payload;
                 m_recoveryStage = RecoveryStage.RECEIVED_SNAPSHOT;
 
                 /*
@@ -581,7 +577,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         BinaryOutputArchive boa = new BinaryOutputArchive(dos);
         m_server.getZKDatabase().serializeSnapshot(boa);
         dos.flush();
-        byte databaseBytes[] = org.xerial.snappy.Snappy.compress(baos.toByteArray());
+        byte databaseBytes[] = baos.toByteArray();
         ByteBuffer metadata = ByteBuffer.allocate(9);
         metadata.put(BINARY_PAYLOAD_SNAPSHOT);
         metadata.putLong(txnId);

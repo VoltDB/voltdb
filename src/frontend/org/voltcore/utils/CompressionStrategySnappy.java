@@ -19,8 +19,6 @@ package org.voltcore.utils;
 
 import java.io.IOException;
 
-import org.xerial.snappy.Snappy;
-
 
 /**
  * Utility class for accessing a variety of com.sun.misc.Unsafe stuff
@@ -33,11 +31,11 @@ public class CompressionStrategySnappy extends CompressionStrategy {
 
     @Override
     public byte[] compress(byte data[]) throws IOException {
-        return Snappy.compress(data);
+        return data;
     }
 
     @Override
     public byte[] uncompress(byte data[]) throws IOException {
-        return Snappy.uncompress(data);
+        return data;
     }
 }

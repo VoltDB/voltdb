@@ -36,7 +36,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DBBPool.MBBContainer;
 import org.voltdb.EELibraryLoader;
-import org.xerial.snappy.Snappy;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Throwables;
@@ -511,30 +510,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     for (int ii = 0; ii < numObjects; ii++) {
                         final int nextObjectLength = readBuffer.getInt();
                         final int nextObjectFlags = readBuffer.getInt();
-                        final boolean compressed = (nextObjectFlags & PBDSegment.FLAG_COMPRESSED) != 0;
-                        final int uncompressedLength = compressed ? (int)Snappy.uncompressedLength(buffAddr + readBuffer.position(), nextObjectLength) : nextObjectLength;
+                        final int uncompressedLength = nextObjectLength;
                         objectsProcessed++;
                         //Copy the next object into a separate heap byte buffer
                         //do the old limit stashing trick to avoid buffer overflow
                         BBContainer nextObject = null;
-                        if (compressed) {
-                            decompressionBuffer.b().clear();
-                            if (decompressionBuffer.b().remaining() < uncompressedLength ) {
-                                decompressionBuffer.discard();
-                                decompressionBuffer = DBBPool.allocateDirect(uncompressedLength);
-                            }
-                            nextObject = DBBPool.dummyWrapBB(decompressionBuffer.b());
-                            final long sourceAddr = (buffAddr + readBuffer.position());
-                            final long destAddr = nextObject.address();
-                            Snappy.rawUncompress(sourceAddr, nextObjectLength, destAddr);
-                            readBuffer.position(readBuffer.position() + nextObjectLength);
-                        } else {
-                            final int oldLimit = readBuffer.limit();
-                            readBuffer.limit(readBuffer.position() + nextObjectLength);
-                            nextObject = DBBPool.dummyWrapBB(readBuffer.slice());
-                            readBuffer.position(readBuffer.limit());
-                            readBuffer.limit(oldLimit);
-                        }
+                        final int oldLimit = readBuffer.limit();
+                        readBuffer.limit(readBuffer.position() + nextObjectLength);
+                        nextObject = DBBPool.dummyWrapBB(readBuffer.slice());
+                        readBuffer.position(readBuffer.limit());
+                        readBuffer.limit(oldLimit);
                         try {
                             //Handoff the object to the truncator and await a decision
                             ByteBuffer retval = truncator.parse(nextObject.b());

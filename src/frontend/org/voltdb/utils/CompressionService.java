@@ -32,7 +32,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.xerial.snappy.Snappy;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -79,42 +78,6 @@ public final class CompressionService {
                                          CoreUtils.getThreadFactory("Compression service thread"))
             );
 
-    private static IOBuffers getBuffersForCompression(int length, boolean inputNotUsed) {
-        IOBuffers buffers = m_buffers.get();
-        BBContainer input = buffers.input;
-        BBContainer output = buffers.output;
-
-        final int maxCompressedLength = Snappy.maxCompressedLength(length);
-
-        final int inputCapacity = input.b().capacity();
-        final int outputCapacity = output.b().capacity();
-
-        /*
-         * A direct byte buffer might be provided in which case no input buffer is needed
-         */
-        boolean changedBuffer = false;
-        if (!inputNotUsed && inputCapacity < length) {
-            input.discard();
-            input = DBBPool.allocateDirect(Math.max(inputCapacity * 2, length));
-            changedBuffer = true;
-        }
-
-        if (outputCapacity < maxCompressedLength) {
-            output.discard();
-            output = DBBPool.allocateDirect(Math.max(outputCapacity * 2, maxCompressedLength));
-            changedBuffer = true;
-        }
-
-        if (changedBuffer) {
-            buffers = new IOBuffers(input, output);
-            m_buffers.set(buffers);
-        }
-        output.b().clear();
-        input.b().clear();
-
-        return buffers;
-    }
-
     public static Future<byte[]> compressBufferAsync(final ByteBuffer buffer) {
         assert(buffer.isDirect());
         return submitCompressionTask(new Callable<byte[]>() {
@@ -152,30 +115,19 @@ public final class CompressionService {
     public static int compressBuffer(ByteBuffer buffer, ByteBuffer output) throws IOException {
         assert(buffer.isDirect());
         assert(output.isDirect());
-        return Snappy.compress(buffer, output);
+        int size = buffer.remaining();
+        output.put(buffer);
+        return size;
     }
 
     public static byte[] compressBuffer(ByteBuffer buffer) throws IOException {
-        assert(buffer.isDirect());
-        IOBuffers buffers = getBuffersForCompression(buffer.remaining(), true);
-        ByteBuffer output = buffers.output.b();
-
-        final int compressedSize = Snappy.compress(buffer, output);
-        byte result[] = new byte[compressedSize];
-        output.get(result);
+        byte[] result = new byte[buffer.remaining()];
+        buffer.get(result);
         return result;
     }
 
     public static byte[] compressBytes(byte bytes[], int offset, int length) throws IOException {
-        final IOBuffers buffers = getBuffersForCompression(bytes.length, false);
-        final ByteBuffer input = buffers.input.b();
-        final ByteBuffer output = buffers.output.b();
-        input.put(bytes, offset, length);
-        input.flip();
-        final int compressedSize = Snappy.compress(input, output);
-        final byte compressed[] = new byte[compressedSize];
-        output.get(compressed);
-        return compressed;
+        return Arrays.copyOfRange(bytes, offset, offset + length);
     }
 
     public static byte[] compressBytes(byte bytes[]) throws IOException {
@@ -194,79 +146,30 @@ public final class CompressionService {
     }
 
     public static byte[] decompressBuffer(final ByteBuffer compressed) throws IOException {
-        assert(compressed.isDirect());
-        IOBuffers buffers = m_buffers.get();
-        BBContainer output = buffers.output;
-
-        final int uncompressedLength = Snappy.uncompressedLength(compressed);
-        final int outputCapacity = buffers.output.b().capacity();
-        if (outputCapacity < uncompressedLength) {
-            buffers.output.discard();
-            output = DBBPool.allocateDirect(Math.max(outputCapacity * 2, uncompressedLength));
-            buffers = new IOBuffers(buffers.input, output);
-            m_buffers.set(buffers);
-        }
-        output.b().clear();
-
-        final int actualUncompressedLength = Snappy.uncompress(compressed, output.b());
-        assert(uncompressedLength == actualUncompressedLength);
-
-        byte result[] = new byte[actualUncompressedLength];
-        output.b().get(result);
+        byte[] result = new byte[compressed.remaining()];
+        compressed.get(result);
         return result;
     }
 
     public static int maxCompressedLength(int uncompressedSize) {
-        return Snappy.maxCompressedLength(uncompressedSize);
+        return uncompressedSize;
     }
 
     public static int uncompressedLength(ByteBuffer compressed) throws IOException {
         assert(compressed.isDirect());
-        return Snappy.uncompressedLength(compressed);
+        return compressed.remaining();
     }
 
     public static int decompressBuffer(final ByteBuffer compressed, final ByteBuffer uncompressed) throws IOException {
         assert(compressed.isDirect());
         assert(uncompressed.isDirect());
-
-        return Snappy.uncompress(compressed, uncompressed);
+        int size = compressed.remaining();
+        uncompressed.put(compressed);
+        return size;
     }
 
     public static byte[] decompressBytes(byte bytes[]) throws IOException {
-        IOBuffers buffers = m_buffers.get();
-        BBContainer input = buffers.input;
-        BBContainer output = buffers.output;
-
-        final int inputCapacity = input.b().capacity();
-        if (inputCapacity < bytes.length){
-            input.discard();
-            input = DBBPool.allocateDirect(Math.max(inputCapacity * 2, bytes.length));
-            buffers = new IOBuffers(input, output);
-            m_buffers.set(buffers);
-        }
-
-        final ByteBuffer inputBuffer = input.b();
-        inputBuffer.clear();
-        inputBuffer.put(bytes);
-        inputBuffer.flip();
-
-        final int uncompressedLength = Snappy.uncompressedLength(inputBuffer);
-        final int outputCapacity = output.b().capacity();
-        if (outputCapacity < uncompressedLength) {
-            output.discard();
-            output = DBBPool.allocateDirect(Math.max(outputCapacity * 2, uncompressedLength));
-            buffers = new IOBuffers(input, output);
-            m_buffers.set(buffers);
-        }
-        final ByteBuffer outputBuffer = output.b();
-        outputBuffer.clear();
-
-        final int actualUncompressedLength = Snappy.uncompress(inputBuffer, outputBuffer);
-        assert(uncompressedLength == actualUncompressedLength);
-
-        byte result[] = new byte[actualUncompressedLength];
-        outputBuffer.get(result);
-        return result;
+        return bytes;
     }
 
 

@@ -29,7 +29,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DBBPool.MBBContainer;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
-import org.xerial.snappy.Snappy;
 
 /**
  * Objects placed in the queue are stored in file segments that are up to 64 megabytes.
@@ -223,7 +222,7 @@ class PBDMMapSegment implements PBDSegment {
         final ByteBuffer buf = cont.b();
         final int remaining = buf.remaining();
         if (remaining < 32 || !buf.isDirect()) compress = false;
-        final int maxCompressedSize = compress ? Snappy.maxCompressedLength(remaining) : remaining;
+        final int maxCompressedSize = remaining;
         final ByteBuffer mbuf = m_buf.b();
         if (mbuf.remaining() < maxCompressedSize + OBJECT_HEADER_BYTES) return false;
 
@@ -235,19 +234,12 @@ class PBDMMapSegment implements PBDSegment {
             mbuf.position(mbuf.position() + OBJECT_HEADER_BYTES);
 
             int written = maxCompressedSize;
-            if (compress) {
-                //Calculate destination pointer and compress directly to file
-                final long destAddr = m_buf.address() + mbuf.position();
-                written = (int)Snappy.rawCompress(cont.address() + buf.position(), remaining, destAddr);
-                mbuf.position(mbuf.position() + written);
-            } else {
-                mbuf.put(buf);
-            }
+            mbuf.put(buf);
 
             //Record the size of the compressed object and update buffer positions
             //and whether the object was compressed
             mbuf.putInt(objSizePosition, written);
-            mbuf.putInt(objSizePosition + 4, compress ? FLAG_COMPRESSED: NO_FLAGS);
+            mbuf.putInt(objSizePosition + 4, NO_FLAGS);
             buf.position(buf.limit());
             incrementNumEntries(remaining);
         } finally {
@@ -285,46 +277,30 @@ class PBDMMapSegment implements PBDSegment {
         final int nextFlags = m_readBuf.getInt();
 
         //Check for compression
-        final boolean compressed = (nextFlags & FLAG_COMPRESSED) != 0;
         //Determine the length of the object if uncompressed
-        final int nextUncompressedLength = compressed ? (int)Snappy.uncompressedLength(mBufAddr + m_readBuf.position(), nextCompressedLength) : nextCompressedLength;
+        final int nextUncompressedLength = nextCompressedLength;
         m_bytesRead += nextUncompressedLength;
 
         final BBContainer retcont;
-        if (compressed) {
-            //Get storage for output
-            retcont = factory.getContainer(nextUncompressedLength);
-            final ByteBuffer retbuf = retcont.b();
+        //Return a slice
+        final int oldLimit = m_readBuf.limit();
+        m_readBuf.limit(m_readBuf.position() + nextUncompressedLength);
+        ByteBuffer retbuf = m_readBuf.slice();
+        m_readBuf.position(m_readBuf.limit());
+        m_readBuf.limit(oldLimit);
 
-            //Limit to appropriate uncompressed size
-            retbuf.limit(nextUncompressedLength);
-
-            //Uncompress to output buffer
-            final long sourceAddr = mBufAddr + m_readBuf.position();
-            final long destAddr = retcont.address();
-            Snappy.rawUncompress(sourceAddr, nextCompressedLength, destAddr);
-            m_readBuf.position(m_readBuf.position() + nextCompressedLength);
-        } else {
-            //Return a slice
-            final int oldLimit = m_readBuf.limit();
-            m_readBuf.limit(m_readBuf.position() + nextUncompressedLength);
-            ByteBuffer retbuf = m_readBuf.slice();
-            m_readBuf.position(m_readBuf.limit());
-            m_readBuf.limit(oldLimit);
-
-            /*
-             * For uncompressed data, touch all the pages to make 100% sure
-             * they are available since they will be accessed directly.
-             *
-             * This code mimics MappedByteBuffer.load, but without the expensive
-             * madvise call for data we are 99% sure was already madvised.
-             *
-             * This would only ever be an issue in the unlikely event that the page cache
-             * is trashed at the wrong moment or we are very low on memory
-             */
-            retcont = DBBPool.dummyWrapBB(retbuf);
-            Bits.readEveryPage(retcont);
-        }
+        /*
+         * For uncompressed data, touch all the pages to make 100% sure
+         * they are available since they will be accessed directly.
+         *
+         * This code mimics MappedByteBuffer.load, but without the expensive
+         * madvise call for data we are 99% sure was already madvised.
+         *
+         * This would only ever be an issue in the unlikely event that the page cache
+         * is trashed at the wrong moment or we are very low on memory
+         */
+        retcont = DBBPool.dummyWrapBB(retbuf);
+        Bits.readEveryPage(retcont);
 
         return new BBContainer(retcont.b()) {
             private boolean m_discarded = false;
