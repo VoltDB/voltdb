@@ -88,7 +88,7 @@ range_iterator min_tuple_range(std::list<tuple_range>& partitions, TupleComparer
 }
 
 void merge_sort(const std::vector<TableTuple>& tuples,
-    std::vector<int>& partitionTupleCounts,
+    std::vector<int64_t>& partitionTupleCounts,
     TupleComparer comp,
     int limit,
     int offset,
@@ -99,13 +99,13 @@ void merge_sort(const std::vector<TableTuple>& tuples,
         return;
     }
 
-    int nonEmptyPartitions = partitionTupleCounts.size();
+    size_t nonEmptyPartitions = partitionTupleCounts.size();
 
     // Vector to hold pairs of iterators denoting the range of tuples
     // for a given partition
     std::list<tuple_range> partitions;
     tuple_iterator begin = tuples.begin();
-    for (int i = 0; i < nonEmptyPartitions; ++i) {
+    for (size_t i = 0; i < nonEmptyPartitions; ++i) {
         tuple_iterator end = begin + partitionTupleCounts[i];
         partitions.push_back(std::make_pair(begin, end));
         begin = end;
@@ -198,8 +198,8 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
 
     // iterate over dependencies and merge them into the temp table.
     // The assumption is that the dependencies results are are sorted.
-    int previousTupleCount = 0;
-    std::vector<int> partitionTupleCounts;
+    int64_t previousTupleCount = 0;
+    std::vector<int64_t> partitionTupleCounts;
 
     //
     // OPTIMIZATION: NESTED LIMIT
