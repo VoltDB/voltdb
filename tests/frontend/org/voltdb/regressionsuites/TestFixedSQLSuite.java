@@ -24,7 +24,9 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -2167,7 +2169,41 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
         runQueryGetDecimal(client, sql, 1.9);
+
+
+        //
+        // test Out of range decimal and float
+        //
+
+        // test overflow and any underflow decimal are rounded
+        sql = "SELECT NUM + 111111111111111111111111111111111111111.1111 FROM R1";
+        if (isHSQL()) {
+            verifyStmtFails(client, sql, "HSQL-BACKEND ERROR");
+            verifyStmtFails(client, sql, "to the left of the decimal point is 39 and the max is 26");
+        } else {
+            verifyStmtFails(client, sql, "Maximum precision exceeded. "
+                    + "Maximum of 26 digits to the left of the decimal point");
+        }
+
+        sql = "SELECT NUM + 111111.1111111111111111111111111111111111111 FROM R1";
+        runQueryGetDecimal(client, sql, 111113.1111111111111111111111111111111111111);
+
+        sql = "SELECT NUM + " + StringUtils.repeat("1", 256) + ".1111E1 FROM R1";
+        runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
+
+        sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
+        verifyStmtFails(client, sql, "java.lang.NumberFormatException");
+
+
+        // test stored procedure
+        VoltTable vt = null;
+        vt = client.callProcedure("R1_PROC1").getResults()[0];
+        validateTableColumnOfScalarDecimal(vt, 0, new BigDecimal[]{new BigDecimal(2.1)});
+
+        vt = client.callProcedure("R1_PROC2").getResults()[0];
+        validateTableColumnOfScalarFloat(vt, 0, new double[]{2.1});
     }
+
 
     private void nullIndexSearchKeyChecker(Client client, String sql) throws Exception {
         VoltTable vt;

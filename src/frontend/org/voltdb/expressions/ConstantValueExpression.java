@@ -26,6 +26,7 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltTypeUtil;
 
 /**
  *
@@ -410,12 +411,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             return;
         }
         if (columnType.isInteger()) {
-            try {
-                Long.parseLong(getValue());
-            } catch (NumberFormatException e) {
-                // DECIMAL is not OK, because the value may be bigger/smaller than our decimal range.
-                columnType = VoltType.FLOAT;
-            }
+            columnType = VoltTypeUtil.getNumericLiteralType(columnType, getValue());
+
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
         }
@@ -431,6 +428,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
         }
         // By default, constants should be treated as DECIMAL other than FLOAT to preserve the precision
         // However, the range of DECIMAL of our implementation is small
+        assert(false);
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
