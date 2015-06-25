@@ -428,7 +428,6 @@ public class ConstantValueExpression extends AbstractValueExpression {
         }
         // By default, constants should be treated as DECIMAL other than FLOAT to preserve the precision
         // However, the range of DECIMAL of our implementation is small
-        assert(false);
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
