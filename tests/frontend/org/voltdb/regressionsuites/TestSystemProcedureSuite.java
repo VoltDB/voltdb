@@ -440,7 +440,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
 
         // admin should work fine
+        admin.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
+        admin.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
         admin.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+        admin.callProcedure("@AdHoc", "DROP TABLE ddl_test1;");
 
         try {
             resp = client.callProcedure("@UpdateLogging", m_loggingConfig);
@@ -460,10 +463,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         resp = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM pause_test_tbl");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(2, resp.getResults()[0].asScalarLong());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
         resp = client.callProcedure("pauseTestCount");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(2, resp.getResults()[0].asScalarLong());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
 
         // resume
         resp = admin.callProcedure("@Resume");

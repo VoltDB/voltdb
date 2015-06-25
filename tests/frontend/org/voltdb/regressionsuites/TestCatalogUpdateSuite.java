@@ -44,6 +44,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
@@ -54,10 +55,12 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -335,7 +338,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             fail("Update catalog with procs from class should fail in PAUSE mode");
         } catch(ProcCallException e) {
             assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
-            System.out.println("Error message=" + e.getMessage());
         }
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocproc.jar");
@@ -352,6 +354,17 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         try {
             client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
             fail("Update catalog with adhoc schema change should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        InMemoryJarfile jarfile = new InMemoryJarfile();
+        VoltCompiler comp = new VoltCompiler();
+        comp.addClassToJar(jarfile, TestProc.class);
+
+        try {
+            resp = client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            fail("Update classes should fail in PAUSE mode");
         } catch(ProcCallException e) {
             assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
         }
@@ -1306,5 +1319,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     public void setUp() throws Exception {
         super.setUp();
         callbackSuccess = true;
+    }
+
+    public class TestProc extends VoltProcedure {
+
+        public long run()
+        {
+            // do nothing
+            return 0;
+        }
     }
 }
