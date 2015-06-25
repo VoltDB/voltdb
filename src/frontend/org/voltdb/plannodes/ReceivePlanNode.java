@@ -97,7 +97,7 @@ public class ReceivePlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "RECEIVE FROM ALL PARTITIONS";
+        return (m_needMerge == true) ? "MERGE RECEIVE FROM ALL PARTITIONS": "RECEIVE FROM ALL PARTITIONS";
     }
 
     @Override
