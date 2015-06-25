@@ -69,7 +69,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     }
 
     // handle index for min / max support
-    // mvInfo->indexForMinMax() returns CatalogMap<IndexRef> now
     setIndexForMinMax(mvInfo->indexForMinMax());
 
     allocateBackedTuples();
@@ -141,7 +140,7 @@ void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catal
                     m_indexForMinMax.push_back(candidates[i]);
                     if ( minMaxIndexIncludesAggCol(candidates[i]) ) {
                         // Because there might be a lot of indexes, find the largest space they may consume
-                        // so that they can all share the space and use different schema. (ENG-8512)
+                        // so that they can all share one space and use different schemas. (ENG-8512)
                         if (candidates[i]->getKeySchema()->tupleLength() + 1 > m_minMaxSearchKeyBackingStoreSize) {
                             m_minMaxSearchKeyBackingStoreSize = candidates[i]->getKeySchema()->tupleLength() + 1;
                         }
