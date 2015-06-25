@@ -17,28 +17,19 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 
+import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 
 class SpDurabilityListener implements DurabilityListener {
-    interface CompletionChecks {
-        public CompletionChecks startNewCheckList(int startSize);
-
-        public void addTask(TransactionTask task);
-
-        public int getTaskListSize();
-
-        public void processChecks();
-    }
 
     // No command logging
-    class NoCompletionChecks implements CompletionChecks {
+    class NoCompletionChecks implements CommandLog.CompletionChecks {
         NoCompletionChecks() {}
 
-        public CompletionChecks startNewCheckList(int startSize) {
+        public CommandLog.CompletionChecks startNewCheckList(int startSize) {
             return this;
         }
 
@@ -54,7 +45,7 @@ class SpDurabilityListener implements DurabilityListener {
         public void processChecks() {}
     };
 
-    class AsyncCompletionChecks implements CompletionChecks {
+    class AsyncCompletionChecks implements CommandLog.CompletionChecks {
         protected long m_lastSpUniqueId;
         protected long m_lastMpUniqueId;
 
@@ -64,7 +55,7 @@ class SpDurabilityListener implements DurabilityListener {
         }
 
         @Override
-        public CompletionChecks startNewCheckList(int startSize) {
+        public CommandLog.CompletionChecks startNewCheckList(int startSize) {
             return new AsyncCompletionChecks(m_lastSpUniqueId, m_lastMpUniqueId);
         }
 
@@ -101,7 +92,7 @@ class SpDurabilityListener implements DurabilityListener {
         }
 
         @Override
-        public CompletionChecks startNewCheckList(int startSize) {
+        public CommandLog.CompletionChecks startNewCheckList(int startSize) {
             return new SyncCompletionChecks(m_lastSpUniqueId, m_lastMpUniqueId, startSize);
         }
 
@@ -130,10 +121,7 @@ class SpDurabilityListener implements DurabilityListener {
         }
     }
 
-    final ArrayDeque<CompletionChecks> m_writingTransactionLists =
-            new ArrayDeque<CompletionChecks>(4);
-
-    private CompletionChecks m_currentCompletionChecks = null;
+    private CommandLog.CompletionChecks m_currentCompletionChecks = null;
 
     private final SpScheduler m_spScheduler;
     private final TransactionTaskQueue m_pendingTasks;
@@ -156,19 +144,15 @@ class SpDurabilityListener implements DurabilityListener {
     }
 
     @Override
-    public void onDurability() {
-        m_spScheduler.processDurabilityChecks(m_writingTransactionLists.poll());
-    }
-
-    @Override
     public void addTransaction(TransactionTask pendingTask) {
         m_currentCompletionChecks.addTask(pendingTask);
     }
 
     @Override
-    public void startNewTaskList(int nextStartTaskListSize) {
-        m_writingTransactionLists.offer(m_currentCompletionChecks);
+    public CommandLog.CompletionChecks startNewTaskList(int nextStartTaskListSize) {
+        CommandLog.CompletionChecks lastChecks = m_currentCompletionChecks;
         m_currentCompletionChecks = m_currentCompletionChecks.startNewCheckList(nextStartTaskListSize);
+        return lastChecks;
     }
 
     @Override
