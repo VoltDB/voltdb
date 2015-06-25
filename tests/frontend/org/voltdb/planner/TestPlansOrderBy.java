@@ -23,7 +23,10 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansOrderBy extends PlannerTestCase {
@@ -301,5 +304,27 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validatePlan("select T3.T_D0 from T3 where T_D2 > 3 order by T3.T_D1;", true, false, false);
         // Partial index T3_PARTIAL_IDX on T3 (T_D1) WHERE T_D2 > 3 is still used but now ORDER BY is required
         validatePlan("select T3.T_D0 from T3 where T_D2 > 3 order by T3.T_D2;", true, false, true);
+    }
+
+    public void testOrderByMP() {
+        {
+            // P_D1 index provides the right order for the coordinator. Merge Receive
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P order by P_D1");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.RECEIVE, pn.getPlanNodeType());
+            ReceivePlanNode rpn = (ReceivePlanNode) pn;
+            assertEquals(true, rpn.getNeedMerge());
+            assertNotNull(rpn.getInlinePlanNode(PlanNodeType.ORDERBY));
+        }
+        {
+            // Partitions results are unordered. Coordinator Order by
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D0 from P order by P_D0");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
     }
 }
