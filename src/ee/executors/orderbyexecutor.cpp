@@ -70,19 +70,22 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
     assert(node);
-    assert(node->getInputTableCount() == 1);
 
-    assert(node->getChildren()[0] != NULL);
+    if (!node->isInline()) {
+        assert(node->getInputTableCount() == 1);
 
-    //
-    // Our output table should look exactly like out input table
-    //
-    node->
-        setOutputTable(TableFactory::
+        assert(node->getChildren()[0] != NULL);
+
+        //
+        // Our output table should look exactly like out input table
+        //
+        node->
+            setOutputTable(TableFactory::
                        getCopiedTempTable(node->databaseId(),
                                           node->getInputTable()->name(),
                                           node->getInputTable(),
                                           limits));
+    }
 
     // pickup an inlined limit, if one exists
     limit_node =

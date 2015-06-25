@@ -32,6 +32,13 @@ public class ReceivePlanNode extends AbstractPlanNode {
 
     final static String m_nondeterminismDetail = "multi-fragment plan results can arrive out of order";
 
+    public enum Members {
+        NEED_MERGE;
+    }
+
+    // Indicator to tell whether the Receive node needs to mergesort results from individual partitions
+    private boolean m_needMerge = false;
+
     public ReceivePlanNode() {
         super();
     }
@@ -75,11 +82,17 @@ public class ReceivePlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
+        if (m_needMerge == true) {
+            stringer.key(Members.NEED_MERGE.name()).value(m_needMerge);
+        }
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
+        if (jobj.has(Members.NEED_MERGE.name())) {
+            m_needMerge = jobj.getBoolean(Members.NEED_MERGE.name());
+        }
     }
 
     @Override
@@ -116,4 +129,13 @@ public class ReceivePlanNode extends AbstractPlanNode {
         this.addAndLinkChild(child);
         return true;
     }
+
+    public void setNeedMerge(boolean needMerge) {
+        m_needMerge = needMerge;
+    }
+
+    public boolean getNeedMerge() {
+        return m_needMerge;
+    }
+
 }

@@ -52,8 +52,8 @@
 
 namespace voltdb {
 
-    class UndoLog;
-    class ReadWriteSet;
+    class TempTable;
+    class OrderByPlanNode;
     class LimitPlanNode;
 
     /**
@@ -61,9 +61,9 @@ namespace voltdb {
      * to merge-sort results from multiple partitions. The assumption is
      * that the individual partitions results are already sorted in the right order
      */
-    class OrderByMergeExecutor : public AbstractExecutor {
+    class MergeReceiveExecutor : public AbstractExecutor {
     public:
-        OrderByMergeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
@@ -71,6 +71,7 @@ namespace voltdb {
         bool p_execute(const NValueArray &params);
 
     private:
+        OrderByPlanNode* m_orderby_node;
         LimitPlanNode* m_limit_node;
 
         TempTable* m_tmpInputTable;
