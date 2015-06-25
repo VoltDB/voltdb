@@ -284,9 +284,12 @@ $(document).ready(function () {
                 shortcut.add("f6", function () {
                     $("#runBTn").button().click();
                 });
+
+
             } else {
-                shortcut.add("f5", function () {
-                    $("#runBTn").button().click();
+                shortcut.add("F5", function () {
+                    if ($("#runBTn").attr('disabled') != "disabled")
+                        $("#runBTn").button().click();
                 });
             }
         } else {
@@ -1469,7 +1472,7 @@ var loadPage = function (serverName, portid) {
             // if (!$.isEmptyObject(response)) {
             for (var key in response) {
                 htmlcontent = htmlcontent + "<tr>";
-                htmlcontent = htmlcontent + "<td>" + response[key].HOST_ID + "</td>" +
+                htmlcontent = htmlcontent + "<td>" + response[key].HOSTNAME + "</td>" +
                     "<td>" + response[key].STATE + "</td>" +
                     "<td>" + response[key].REPLICATION_RATE_1M + "</td >" +
                     "<td>" + response[key].REPLICATION_RATE_5M + "</td >";
@@ -1481,7 +1484,7 @@ var loadPage = function (serverName, portid) {
             if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
                 $("#tblDrReplica").DataTable().destroy();
             }
-            var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Host ID</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
+            var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Server</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
                                                "<th id='Th10' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
                                         "<tbody>";
             $("#drReplicaSection").find(".drReplicaContainer").html(content + htmlcontent + "</tbody></table>");
