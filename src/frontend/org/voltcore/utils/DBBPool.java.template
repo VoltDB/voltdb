@@ -350,7 +350,7 @@ public final class DBBPool {
         ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(capacity);
         if (pooledBuffers == null) {
             pooledBuffers = new ConcurrentLinkedQueue<BBContainer>();
-            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) == null) {
+            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) != null) {
                 pooledBuffers = m_pooledBuffers.get(capacity);
             }
         }
