@@ -49,7 +49,7 @@
 
 namespace voltdb {
 
-ReceivePlanNode::~ReceivePlanNode() { }
+ReceivePlanNode::ReceivePlanNode() : m_needMerge(false) { }
 
 PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
@@ -68,6 +68,11 @@ std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
     return buffer.str();
 }
 
-void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj) { }
+void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+        if (obj.hasNonNullKey("NEED_MERGE")) {
+            m_needMerge = obj.valueForKey("NEED_MERGE").asBool();
+        }
+}
 
 } // namespace voltdb

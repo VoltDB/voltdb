@@ -47,7 +47,7 @@
 #include <vector>
 #include <utility>
 
-#include "orderbymergeexecutor.h"
+#include "mergereceiveexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
@@ -153,16 +153,14 @@ void merge_sort(const std::vector<TableTuple>& tuples,
 
 }
 
-OrderByMergeExecutor::OrderByMergeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+MergeReceiveExecutor::MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
     : AbstractExecutor(engine, abstract_node), m_limit_node(NULL), m_tmpInputTable(NULL)
-    { }
+{ }
 
-bool OrderByMergeExecutor::p_init(AbstractPlanNode* abstract_node,
+bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
 {
     VOLT_TRACE("init OrderByMerge Executor");
-
-    assert(dynamic_cast<OrderByPlanNode*>(abstract_node));
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
@@ -174,13 +172,18 @@ bool OrderByMergeExecutor::p_init(AbstractPlanNode* abstract_node,
                                                               m_tmpOutputTable->getColumnNames(),
                                                               limits);
 
+    // inline OrderByPlanNode
+    m_orderby_node = dynamic_cast<OrderByPlanNode*>(abstract_node->
+                                     getInlinePlanNode(PLAN_NODE_TYPE_ORDERBY));
+    assert(m_orderby_node != NULL);
+
     // pickup an inlined limit, if one exists
-    m_limit_node = dynamic_cast<LimitPlanNode*>(abstract_node->
+    m_limit_node = dynamic_cast<LimitPlanNode*>(m_orderby_node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     #if defined(VOLT_LOG_LEVEL)
     #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
-        const std::vector<AbstractExpression*>& sortExprs = abstract_node->getSortExpressions();
+        const std::vector<AbstractExpression*>& sortExprs = m_orderby_node->getSortExpressions();
         for (int i = 0; i < sortExprs.size(); ++i) {
             VOLT_TRACE("Sort key[%d]:\n%s", i, sortExprs[i]->debug(true).c_str());
         }
@@ -190,10 +193,9 @@ bool OrderByMergeExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool OrderByMergeExecutor::p_execute(const NValueArray &params) {
+bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     int loadedDeps = 0;
-    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
-    TempTable* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
+    TempTable* output_table = dynamic_cast<TempTable*>(m_orderby_node->getOutputTable());
 
     // iterate over dependencies and merge them into the temp table.
     // The assumption is that the dependencies results are are sorted.
@@ -218,7 +220,7 @@ bool OrderByMergeExecutor::p_execute(const NValueArray &params) {
     } while (loadedDeps > 0);
 
     // Unload tuples into a vector to be merge-sorted
-    VOLT_TRACE("Running OrderByMerge '%s'", m_abstractNode->debug().c_str());
+    VOLT_TRACE("Running MergeReceive '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table PreSort:\n '%s'", m_tmpInputTable->debug().c_str());
     TableIterator iterator = m_tmpInputTable->iterator();
     TableTuple tuple(m_tmpInputTable->schema());
@@ -234,10 +236,10 @@ bool OrderByMergeExecutor::p_execute(const NValueArray &params) {
     }
 
     // Merge Sort
-    TupleComparer comp(node->getSortExpressions(), node->getSortDirections());
+    TupleComparer comp(m_orderby_node->getSortExpressions(), m_orderby_node->getSortDirections());
     merge_sort(xs, partitionTupleCounts, comp, limit, offset, output_table, pmp);
 
-    VOLT_TRACE("Result of OrderBy:\n '%s'", output_table->debug().c_str());
+    VOLT_TRACE("Result of MergeReceive:\n '%s'", output_table->debug().c_str());
 
     return true;
 }

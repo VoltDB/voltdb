@@ -53,13 +53,18 @@ namespace voltdb {
 class ReceivePlanNode : public AbstractPlanNode
 {
 public:
-    ReceivePlanNode() { }
-    ~ReceivePlanNode();
+    ReceivePlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
+    bool needMerge() const {
+        return m_needMerge;
+    }
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
+
+private:
+    bool m_needMerge;
 };
 
 } // namespace voltdb

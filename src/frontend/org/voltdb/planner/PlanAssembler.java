@@ -1574,9 +1574,30 @@ public class PlanAssembler {
             return root;
         }
 
+        // For MP queries, the coordinator's OrderBy node can be replaced with a specialized Receive node
+        // that merges individual partitions results if the they are sorted
+        // in the order matching the ORDER BY order
+        boolean canMergeReceive = false;
+        if (PlanNodeType.RECEIVE == root.getPlanNodeType()) {
+            assert(root.getChildCount() == 1);
+            assert(root.getChild(0).getChildCount() == 1);
+            AbstractPlanNode child = root.getChild(0).getChild(0);
+            if (! isOrderByNodeRequired(parsedStmt, child)) {
+                canMergeReceive = true;
+            }
+        }
+
         OrderByPlanNode orderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
-        orderByNode.addAndLinkChild(root);
-        return orderByNode;
+        if (canMergeReceive) {
+            // The root is the Receive node. We just checked it.
+            ReceivePlanNode receive = (ReceivePlanNode) root;
+            receive.setNeedMerge(true);
+            receive.addInlinePlanNode(orderByNode);
+            return receive;
+        } else {
+            orderByNode.addAndLinkChild(root);
+            return orderByNode;
+        }
     }
 
     /**
