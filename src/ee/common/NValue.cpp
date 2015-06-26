@@ -27,7 +27,6 @@
 #include <set>
 
 namespace voltdb {
-
 Pool* NValue::getTempStringPool() {
     return ExecutorContext::getTempStringPool();
 }
@@ -215,6 +214,7 @@ std::string NValue::createStringFromDecimal() const {
  *   This function does not handle scientific notation string, Java planner should convert that to plan string first.
  */
 void NValue::createDecimalFromString(const std::string &txt) {
+    std::cout << "createDecimalFromString(" << txt << ");\n";
     if (txt.length() == 0) {
         throw SQLException(SQLException::volt_decimal_serialization_error,
                                        "Empty string provided");
@@ -259,27 +259,54 @@ void NValue::createDecimalFromString(const std::string &txt) {
                            "Too many decimal points");
     }
 
-    const std::string wholeString = txt.substr( setSign ? 1 : 0, separatorPos - (setSign ? 1 : 0));
-    const std::size_t wholeStringSize = wholeString.size();
-    if (wholeStringSize > 26) {
-        throw SQLException(SQLException::volt_decimal_serialization_error,
-                           "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
-    }
-    TTInt whole(wholeString);
+    // This is set to 1 if we carry in the scale.
+    int carryScale = 0;
+    // This is set to 1 if we carry from the scale to the whole.
+    int carryWhole = 0;
+
+    // Start with the fractional part.  We need to
+    // see if we need to carry from it first.
     std::string fractionalString = txt.substr( separatorPos + 1, txt.size() - (separatorPos + 1));
     // remove trailing zeros
     while (fractionalString.size() > 0 && fractionalString[fractionalString.size() - 1] == '0')
         fractionalString.erase(fractionalString.size() - 1, 1);
     // check if too many decimal places
-    if (fractionalString.size() > 12) {
-        throw SQLException(SQLException::volt_decimal_serialization_error,
-                           "Maximum scale exceeded. Maximum of 12 digits to the right of the decimal point");
-    }
-    while(fractionalString.size() < NValue::kMaxDecScale) {
-        fractionalString.push_back('0');
+    if (fractionalString.size() > kMaxDecScale) {
+        carryScale = ('5' <= fractionalString[kMaxDecScale]) ? 1 : 0;
+        fractionalString = fractionalString.substr(0, kMaxDecScale);
+    } else {
+        while(fractionalString.size() < NValue::kMaxDecScale) {
+            fractionalString.push_back('0');
+        }
     }
     TTInt fractional(fractionalString);
 
+    // If we decided to carry above, then do it here.
+    // The fractional string is set up so that it represents
+    // 1.0e-12 * units.
+    fractional += carryScale;
+    if (TTInt((uint64_t)kMaxScaleFactor) <= fractional) {
+        // We know fractional was < kMaxScaleFactor before
+        // we rounded, since fractional is 12 digits and
+        // kMaxScaleFactor is 13.  So, if carrying makes
+        // the fractional number too big, it must be eactly
+        // too big.  That is to say, the rounded fractional
+        // number number has become zero, and we need to
+        // carry to the whole number.
+        fractional = 0;
+        carryWhole = 1;
+    }
+
+    // Process the whole number string.
+    const std::string wholeString = txt.substr( setSign ? 1 : 0, separatorPos - (setSign ? 1 : 0));
+    // We will check for oversize numbers below, so don't waste time
+    // doing it now.
+    TTInt whole(wholeString);
+    whole += carryWhole;
+    if (oversizeWholeDecimal(whole)) {
+        throw SQLException(SQLException::volt_decimal_serialization_error,
+                           "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point");
+    }
     whole *= kMaxScaleFactor;
     whole += fractional;
 
