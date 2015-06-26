@@ -115,8 +115,12 @@ public final class CompressionService {
     public static int compressBuffer(ByteBuffer buffer, ByteBuffer output) throws IOException {
         assert(buffer.isDirect());
         assert(output.isDirect());
+        int inputPos = buffer.position();
+        int outputPos = output.position();
         int size = buffer.remaining();
         output.put(buffer);
+        buffer.position(inputPos);
+        output.position(outputPos);
         return size;
     }
 
@@ -164,7 +168,11 @@ public final class CompressionService {
         assert(compressed.isDirect());
         assert(uncompressed.isDirect());
         int size = compressed.remaining();
+        int inputPos = compressed.position();
+        int outputPos = uncompressed.position();
         uncompressed.put(compressed);
+        compressed.position(inputPos);
+        uncompressed.position(outputPos);
         return size;
     }
 
