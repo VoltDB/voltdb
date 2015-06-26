@@ -1,9 +1,5 @@
 <configure-default.sql>
 
--- TODO: remove this, once ENG-8436 and its relatives (8374, 8438) are fixed,
--- so that NULL values no longer cause mismatches (this line removes NULLs)
-{@insertvals = "_id, _value[string], _value[int16], _value[float]"}
-
 --- DML: purge and regenerate random data first
 DELETE FROM @dmltable
 INSERT INTO @dmltable VALUES (@insertvals)
@@ -35,7 +31,7 @@ INSERT INTO @dmltable VALUES (@insertvals)
 {_colexpr |= "__[#col]/2"}
 
 --- Test IN/EXISTS Advanced cases
-SELECT * FROM @fromtables A01 WHERE _variable[@columntype] _maybe IN ( SELECT @agg(_variable[@columntype]) FROM @fromtables B WHERE B._variable[@columntype] _cmp A01._variable[@columntype] )
+SELECT * FROM @fromtables A01 WHERE _variable[@columntype] _maybe IN ( SELECT @agg(_variable[@comparabletype]) FROM @fromtables B WHERE B._variable[@columntype] _cmp A01._variable[@comparabletype] )
 SELECT * FROM @fromtables A02 WHERE EXISTS ( SELECT _variable[#GB]  FROM @fromtables B GROUP BY B.__[#GB] HAVING MAX(B._variable[@columntype]) _cmp  A02._variable[@columntype] )
 
 SELECT * FROM @fromtables A03 LHS _jointype JOIN @fromtables RHS_10 ON LHS.@idcol = RHS_10.@idcol where LHS._variable[@columntype] _maybe IN (SELECT _variable[@columntype] FROM @fromtables IN_TABLE)

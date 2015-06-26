@@ -536,7 +536,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "      (select dept, count(*) from " + tb +
                     "       group by dept)" +
                     "group by dept;";
-            validateTableOfLongs(client, sql, new long[][] {{1, 10}});
+            validateTableOfLongs(client, sql, new long[][] {{1,10}});
 
             // trivial variant with inconsequential ORDER BY
             sql =   "select dept, sum(wage) as sw1 " +
@@ -704,153 +704,181 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) IN " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         //* enable for debug */ dumpQueryPlans(client, sql);
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) IN " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) IN " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         //* enable for debug */ dumpQueryPlans(client, sql);
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) IN " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) = ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         //* enable for debug */ dumpQueryPlans(client, sql);
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) = ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) = ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         //* enable for debug */ dumpQueryPlans(client, sql);
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) = ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) >= ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) >= ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) >= ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) >= ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{2},{3},{4},{5}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <= ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <= ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <= ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <= ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) > ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) > ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) > ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) > ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{3},{4},{5}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) < ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) < ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) < ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) < ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <> ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <> ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <> ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <> ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2},{3},{4},{5}});
 
         for (String tb: replicated_tbs) {
@@ -992,24 +1020,28 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql =   "select ID from R1 " +
                 "where (WAGE+3, DEPT) <> ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID = 103);";
+                "       where ID = 103) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{300}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE+3) <> ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID = 103);";
+                "       where ID = 103) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{300}});
         sql =   "select ID from R1 " +
                 "where (WAGE+3, DEPT) <> ANY " +
                 "      (select WAGE, DEPT from R2 " +
                 "       where ID = 103 " +
-                "       order by ID limit 3);";
+                "       order by ID limit 3) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{300}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE+3) <> ANY " +
                 "      (select DEPT, WAGE from R2 " +
                 "       where ID = 103 " +
-                "       order by ID limit 3);";
+                "       order by ID limit 3) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{300}});
 
         // When there is no match, the "IN" or "OP ANY" expression evaluates
@@ -1089,23 +1121,27 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <= ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID < 104);";
+                "       where ID < 104) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <= ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID < 104);";
+                "       where ID < 104) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <= ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <= ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100}});
 
         sql =   "select ID from R1 " +
@@ -1132,43 +1168,51 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) < ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID < 104);";
+                "       where ID < 104) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) < ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID < 104);";
+                "       where ID < 104) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) < ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) < ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <> ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID < 104);";
+                "       where ID < 104) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <> ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID < 104);";
+                "       where ID < 104) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <> ANY " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <> ANY " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10},{100},{300}});
     }
 
@@ -1205,7 +1249,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "where (WAGE, DEPT) IN " +
                 "      (select WAGE, DEPT from R2 " +
                 "       where ID = 0)" +
-                "      IS FALSE;";
+                "      IS FALSE " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{10}, {100}, {300}});
         // That's specifically FALSE vs. NULL
         sql =   "select ID from R1 " +
@@ -1225,7 +1270,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "        where ID < 104)) " +
                     "      IS NULL;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB (ENG-8436 logical nulls) got 0 rows
+            validateTableOfLongs(client, sql, new long[][] {{100}});
 
             sql =   "select ID from R1 " +
                 "where ((WAGE, DEPT) = ANY " +
@@ -1233,20 +1278,22 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "        where ID < 104)) " +
                 "      IS NULL;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{100}}); // HSQL & VoltDB (ENG-8436 logical nulls) got 0 rows
+            validateTableOfLongs(client, sql, new long[][] {{100}});
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
-                    "       where ID < 104);";
-            //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // ??? VoltDB got 3 rows (ENG-8436 logical nulls) HSQL got 0 rows
+                    "       where ID < 104) " +
+                    "order by ID;";
+            /* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             sql =   "select ID from R1 " +
                     "where NOT (WAGE, DEPT) = ANY " +
                     "          (select WAGE, DEPT from R2 " +
-                    "           where ID < 104);";
+                    "           where ID < 104) " +
+                    "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); // ??? VoltDB got 3 rows (ENG-8436 logical nulls) HSQL got 0 rows
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
         }
 
         // IN should evaluate to NULL
@@ -1256,32 +1303,36 @@ public class TestSubQueriesSuite extends RegressionSuite {
             sql =   "select ID from R1 " +
                     "where NOT ((WAGE, DEPT) IN " +
                     "           (select WAGE, DEPT from R2 " +
-                    "            where ID < 104));";
+                    "            where ID < 104)) " +
+                    "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) IN " +
                     "       (select WAGE, DEPT from R2 " +
                     "        where ID < 104) " +
-                    "      IS FALSE;";
+                    "      IS FALSE " +
+                    "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
-                    "       where ID < 104);";
+                    "       where ID < 104) " +
+                    "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
-                    "       where ID < 104);";
+                    "       where ID < 104) " +
+                    "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
-            if (isHSQL()) validateTableOfLongs(client, sql, new long[][] {{10}, {300}}); //wrong (3 rows) for VoltDB (ENG-8436 logical nulls)
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
         }
     }
 
@@ -1475,7 +1526,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <> ALL " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by WAGE, DEPT limit 4 offset 1);";
+                "       order by WAGE, DEPT limit 4 offset 1) " +
+                "order by ID;";
         //* enable to debug */ dumpQueryPlans(client, sql);
         validateTableOfLongs(client, sql, new long[][] {{10},{300}});
 
@@ -1612,22 +1664,26 @@ public class TestSubQueriesSuite extends RegressionSuite {
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) <> ALL " +
                     "      (select WAGE, DEPT from R2 " +
-                    "       where ID < 104);";
+                    "       where ID < 104) " +
+                "order by ID;";
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
             sql =   "select ID from R1 " +
                     "where (DEPT, WAGE) <> ALL " +
                     "      (select DEPT, WAGE from R2 " +
-                    "       where ID < 104);";
+                    "       where ID < 104) " +
+                "order by ID;";
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) <> ALL " +
                     "      (select WAGE, DEPT from R2 " +
-                    "       order by ID offset 1 limit 3);";
+                    "       order by ID offset 1 limit 3) " +
+                "order by ID;";
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
             sql =   "select ID from R1 " +
                     "where (DEPT, WAGE) <> ALL " +
                     "      (select DEPT, WAGE from R2 " +
-                    "       order by ID offset 1 limit 3);";
+                    "       order by ID offset 1 limit 3) " +
+                "order by ID;";
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
         }
     }
@@ -1676,44 +1732,52 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) >= ALL " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{4},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) >= ALL " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{4},{5}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) >= ALL " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{4},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) >= ALL " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{4},{5}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <= ALL " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <= ALL " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2}});
 
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <= ALL " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <= ALL " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{2}});
 
         sql =   "select ID from R1 " +
@@ -1761,22 +1825,26 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <> ALL " +
                 "      (select WAGE, DEPT from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <> ALL " +
                 "      (select DEPT, WAGE from R2 " +
-                "       where ID > 1 and ID < 5);";
+                "       where ID > 1 and ID < 5) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{5}});
         sql =   "select ID from R1 " +
                 "where (WAGE, DEPT) <> ALL " +
                 "      (select WAGE, DEPT from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{5}});
         sql =   "select ID from R1 " +
                 "where (DEPT, WAGE) <> ALL " +
                 "      (select DEPT, WAGE from R2 " +
-                "       order by ID offset 1 limit 3);";
+                "       order by ID offset 1 limit 3) " +
+                "order by 1;";
         validateTableOfLongs(client, sql, new long[][] {{1},{5}});
     }
 
@@ -1808,22 +1876,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       where WAGE <> 1000 or WAGE is NULL);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        // Subtle bug -- both in HSQL and VOltDB
+        // Subtle bug in HSQL
         // the IN expression evaluates to FALSE rather than NULL, here
-// FIXME
-//        sql =   "select ID from R1 " +
-//                "where (WAGE IN " +
-//                "       (select WAGE from R2 " +
-//                "        where WAGE <> 1000 or WAGE is NULL)) " +
-//                "      IS NULL;";
-//        validateTableOfLongs(client, sql, new long[][] {{100}});
+        if (!isHSQL()) {
+            sql =   "select ID from R1 " +
+                    "where (WAGE IN " +
+                    "       (select WAGE from R2 " +
+                    "        where WAGE <> 1000 or WAGE is NULL)) " +
+                    "      IS NULL;";
+            validateTableOfLongs(client, sql, new long[][] {{100}});
 
-        sql =   "select ID from R1 " +
-                "where WAGE = ANY " +
-                "      (select WAGE from R2 " +
-                "       where WAGE <> 1000 or WAGE is NULL) " +
-                "      IS FALSE;";
-        validateTableOfLongs(client, sql, new long[][] {{100}});
+            sql =   "select ID from R1 " +
+                    "where WAGE = ANY " +
+                    "      (select WAGE from R2 " +
+                    "       where WAGE <> 1000 or WAGE is NULL) " +
+                    "      IS FALSE;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
+        }
 
         // NULL row exists
         sql =   "select ID from R1 " +
@@ -1835,13 +1905,22 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // Rows exist
         sql =   "select ID from R1 " +
                 "where NOT EXISTS " +
-                "      (select WAGE, DEPT from R2);";
+                "          (select WAGE from R2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        sql =   "select ID from R1 " +
-                "where R1.WAGE NOT IN " +
-                "      (select WAGE from R2 " +
-                "       where ID IN (100, 102, 103));";
+        if (!isHSQL()) {
+            sql =   "select ID from R1 " +
+                    "where WAGE NOT IN " +
+                    "      (select WAGE from R2 " +
+                    "       where ID IN (100, 102, 103));";
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+            sql =   "select ID from R1 " +
+                    "where NOT WAGE IN " +
+                    "          (select WAGE from R2 " +
+                    "           where ID IN (100, 102, 103));";
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
+        }
     }
 
     /**
@@ -2098,7 +2177,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql =   "select ID from R2 " +
                 "where (WAGE = ALL " +
                 "       (select WAGE from R1)) " +
-                "      IS NULL;";
+                "      IS NULL " +
+                "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{200}, {203}});
 
         if (!isHSQL()) {
@@ -2635,7 +2715,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "select R1.ID from R1 " +
                 "where R1.ID > ALL " +
                 "      (select ID from R2 " +
-                "       order by ID limit ? offset ?);",
+                "       order by ID limit ? offset ?) " +
+                "order by 1;",
                 2, 1).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{4}, {5}});
 
@@ -2643,7 +2724,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "select R1.ID from R1 " +
                 "where R1.ID > ALL " +
                 "      (select ID from R2 " +
-                "       order by ID limit ? offset ?);",
+                "       order by ID limit ? offset ?) " +
+                "order by 1;",
                 1, 2).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{4}, {5}});
 
@@ -2916,7 +2998,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "from R1 T1 join R1 T2 " +
                 "     ON exists " +
                 "        (select max(ID) from R2)" +
-                "     or T1.ID = 25";
+                "     or T1.ID = 25 " +
+                "order by 1;";
         //* enable for debug */ dumpQueryResults(client, sql);
         validateTableOfLongs(client, sql, new long[][] {
                 {1}, {1}, {1}, {2}, {2}, {2}, {3}, {3}, {3}});
@@ -3054,11 +3137,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "SELECT RATIO "
                 + "FROM R4 "
-                + "WHERE RATIO = 0.6944855793154526 "
+                + "WHERE RATIO = 6.944855793154526e-1 "
                 + "UNION "
                 + "  SELECT RATIO "
                 + "  FROM R4 "
-                + "  WHERE RATIO = 0.6944855793154526;")
+                + "  WHERE RATIO = 6.944855793154526e-1;")
                 .getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(0.6944855793154526, vt.getDouble(0), 0.000001);

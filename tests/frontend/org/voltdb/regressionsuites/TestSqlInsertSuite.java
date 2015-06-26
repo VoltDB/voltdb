@@ -71,6 +71,13 @@ public class TestSqlInsertSuite extends RegressionSuite {
 
         // try to insert into not null column with no default value
         verifyStmtFails(getClient(), "insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
+
+
+        verifyStmtFails(getClient(), "insert into p1  values (1, 2, 3, 4, 5, 6), (1, 2, 3, 4, 5, 6);",
+                "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
+
+        verifyStmtFails(getClient(), "insert into p1 (ccc, zzz) values (1, 2), (3, 4);",
+                "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
     }
 
     // See also tests for INSERT using DEFAULT NOW columns in TestFunctionsSuite.java
