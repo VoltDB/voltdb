@@ -126,18 +126,27 @@ public class SQLLexer extends SQLPatternFactory
             SPF.token("select")
         ).compile("PAT_SELECT_STATEMENT_PREAMBLE");
 
+    // Capture group number defns for regex below.
+    // Don't use capture labels because it is not supported in 1.6
+    // and this class needs to compile in 1.6.
+    private static final int PARENTTYPE_GROUP=1;
+    @SuppressWarnings("unused") // We don't get this group as of now
+    private static final int PARENTNAME_GROUP=2;
+    private static final int CHILDTYPE_GROUP=3;
+    @SuppressWarnings("unused") // We don't get this group as of now
+    private static final int CHILDNAME_GROUP=4;
     // Pattern for plausible ALTER...RENAME statements.
     // Keep the matching loose in order to support clear messaging.
     private static final Pattern PAT_ALTER_RENAME =
         SPF.statementLeader(
             SPF.token("alter"),
-            SPF.capture("parenttype", SPF.databaseObjectTypeName()),
-            SPF.capture("parentname", SPF.databaseObjectName()),
+            SPF.capture(SPF.databaseObjectTypeName()),
+            SPF.capture(SPF.databaseObjectName()),
             SPF.optional(
                 SPF.clause(
                     SPF.token("alter"),
-                    SPF.capture("childtype", SPF.databaseObjectTypeName()),
-                    SPF.capture("childname", SPF.databaseObjectName())
+                    SPF.capture(SPF.databaseObjectTypeName()),
+                    SPF.capture(SPF.databaseObjectName())
                 )
             ),
             SPF.token("rename"), SPF.token("to")
@@ -685,8 +694,8 @@ public class SQLLexer extends SQLPatternFactory
         @Override
         String explainMatch(Matcher matcher)
         {
-            String parentType = matcher.group("parenttype");
-            String childType = matcher.group("childtype");
+            String parentType = matcher.group(PARENTTYPE_GROUP);
+            String childType = matcher.group(CHILDTYPE_GROUP);
             // See if there's something to say about the parent object type.
             String explanation = getExplanation(parentType, childType != null);
             // If not see if there's something to say about the child type, when applicable.
