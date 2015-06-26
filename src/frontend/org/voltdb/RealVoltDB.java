@@ -102,6 +102,7 @@ import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
+import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
@@ -133,7 +134,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.voltdb.importer.ImportManager;
+import java.text.SimpleDateFormat;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -168,9 +169,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.3";
+    static final String m_defaultVersionString = "5.4";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.3\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.4\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -185,6 +186,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
     private CpuStats m_cpuStats = null;
+    private CommandLogStats m_commandLogStats = null;
     private StatsManager m_statsManager = null;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
     // These are unused locally, but they need to be registered with the StatsAgent so they're
@@ -233,7 +235,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     long m_clusterCreateTime;
     boolean m_replicationActive = false;
-    private NodeDRGateway m_nodeDRGateway = null;
+    private ProducerDRGateway m_producerDRGateway = null;
     private ConsumerDRGateway m_consumerDRGateway = null;
 
     //Only restrict recovery completion during test
@@ -324,6 +326,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
+    String m_licenseInformation = "";
     private LatencyStats m_latencyStats;
 
     private LatencyHistogramStats m_latencyHistogramStats;
@@ -331,6 +334,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Override
     public LicenseApi getLicenseApi() {
         return m_licenseApi;
+    }
+
+    @Override
+    public String getLicenseInformation() {
+        return m_licenseInformation;
     }
 
     /**
@@ -379,6 +387,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_partitionCountStats = null;
             m_ioStats = null;
             m_memoryStats = null;
+            m_commandLogStats = null;
             m_statsManager = null;
             m_restoreAgent = null;
             m_recoveryStartTime = System.currentTimeMillis();
@@ -500,6 +509,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 hostLog.fatal("Please contact sales@voltdb.com to request a license.");
                 VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
                         "See previous log message for details.", false, null);
+            }
+
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
+                JSONObject jo = new JSONObject();
+                jo.put("trial",m_licenseApi.isTrial());
+                jo.put("hostcount",m_licenseApi.maxHostcount());
+                jo.put("commandlogging", m_licenseApi.isCommandLoggingAllowed());
+                jo.put("wanreplication", m_licenseApi.isDrReplicationAllowed());
+                jo.put("expiration", sdf.format(m_licenseApi.expires().getTime()));
+                m_licenseInformation = jo.toString();
+            } catch (JSONException ex) {
+                //Ignore
             }
 
             // Create the GlobalServiceElector.  Do this here so we can register the MPI with it
@@ -647,14 +669,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
-                    ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
+                    ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
-                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
+                    m_producerDRGateway = (ProducerDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
                                                                                    m_replicationActive,
                                                                                    m_configuredNumberOfPartitions,
                                                                                    m_catalogContext.getDeployment().getCluster().getHostcount());
-                    m_nodeDRGateway.start();
-                    m_nodeDRGateway.blockOnDRStateConvergence();
+                    m_producerDRGateway.start();
+                    m_producerDRGateway.blockOnDRStateConvergence();
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
@@ -689,6 +711,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_cpuStats = new CpuStats();
             getStatsAgent().registerStatsSource(StatsSelector.CPU,
                     0, m_cpuStats);
+
+            // ENG-6321
+            m_commandLogStats = new CommandLogStats(m_commandLog);
+            getStatsAgent().registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
@@ -799,7 +825,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             getStatsAgent(),
                             m_memoryStats,
                             m_commandLog,
-                            m_nodeDRGateway,
+                            m_producerDRGateway,
                             m_consumerDRGateway,
                             iv2init != m_MPI && createMpDRGateway, // first SPI gets it
                             m_config.m_executionCoreBindings.poll());
@@ -1969,10 +1995,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 ExportManager.instance().shutdown();
 
                 // After sites are terminated, shutdown the InvocationBufferServer.
-                // The IBS is shared by all sites; don't kill it while any site is active.
-                if (m_nodeDRGateway != null) {
+                // The DRProducer is shared by all sites; don't kill it while any site is active.
+                if (m_producerDRGateway != null) {
                     try {
-                        m_nodeDRGateway.shutdown();
+                        m_producerDRGateway.shutdown();
                     } catch (InterruptedException e) {
                         hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
@@ -2020,7 +2046,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 AdHocCompilerCache.clearHashCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
-                PartitionDRGateway.gateways.clear();
+                PartitionDRGateway.m_partitionDRGateways.clear();
 
                 // probably unnecessary, but for tests it's nice because it
                 // will do the memory checking and run finalizers
@@ -2198,8 +2224,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_consumerDRGateway.updateCatalog(m_catalogContext);
             }
             // 6.1. If we are a DR master, update the DR table signature hash
-            if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.updateCatalog(m_catalogContext,
+            if (m_producerDRGateway != null) {
+                m_producerDRGateway.updateCatalog(m_catalogContext,
                         VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
             }
 
@@ -2355,7 +2381,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         e);
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
-            if (m_nodeDRGateway != null && !m_nodeDRGateway.isStarted()) {
+            if (m_producerDRGateway != null && !m_producerDRGateway.isStarted()) {
                 // Start listening on the DR ports
                 prepareReplication();
             }
@@ -2624,8 +2650,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     private void prepareReplication() {
         try {
-            if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled(),
+            if (m_producerDRGateway != null) {
+                m_producerDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled(),
                         VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
                         VoltDB.getDefaultReplicationInterface());
             }
@@ -2661,8 +2687,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                               e.getMessage());
             }
 
-            if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.setActive(active);
+            if (m_producerDRGateway != null) {
+                m_producerDRGateway.setActive(active);
             }
         }
     }
@@ -2674,9 +2700,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     @Override
-    public NodeDRGateway getNodeDRGateway()
+    public ProducerDRGateway getNodeDRGateway()
     {
-        return m_nodeDRGateway;
+        return m_producerDRGateway;
     }
 
     @Override

@@ -46,6 +46,7 @@
     <classpathentry kind="lib" path="lib/jackson-core-asl-1.9.13.jar"/>
     <classpathentry kind="lib" path="lib/jackson-mapper-asl-1.9.13.jar"/>
     <classpathentry kind="lib" path="lib/felix.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.8.2.1.jar"/>
 
     <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
         <attributes>
