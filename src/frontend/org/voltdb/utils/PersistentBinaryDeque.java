@@ -57,7 +57,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
         @Override
         public BBContainer getContainer(int minimumSize) {
-              final BBContainer origin = DBBPool.allocateUnsafeByteBuffer(minimumSize);
+              final BBContainer origin = DBBPool.allocateDirect(minimumSize);
               final BBContainer retcont = new BBContainer(origin.b()) {
                   private boolean discarded = false;
 
