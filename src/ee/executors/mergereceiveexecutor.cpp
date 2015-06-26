@@ -114,7 +114,7 @@ void merge_sort(const std::vector<TableTuple>& tuples,
 
     int tupleCnt = 0;
     int tupleSkipped = 0;
-    while (true) {
+    while (limit == -1 || tupleCnt < limit) {
         range_iterator rangeIt = partitions.begin();
         // remove partitions that are empty
         while (rangeIt != partitions.end()) {
@@ -135,6 +135,7 @@ void merge_sort(const std::vector<TableTuple>& tuples,
                     continue;
                 }
                 output_table->insertTupleNonVirtual(tuple);
+                ++tupleCnt;
                 pmp.countdownProgress();
             }
             return;
@@ -144,10 +145,14 @@ void merge_sort(const std::vector<TableTuple>& tuples,
         range_iterator minRangeIt = min_tuple_range(partitions, comp);
         // copy the first tuple to the output
         TableTuple tuple = *minRangeIt->first;
-        output_table->insertTupleNonVirtual(tuple);
-        pmp.countdownProgress();
         // advance the iterator
         ++minRangeIt->first;
+        if (tupleSkipped++ < offset) {
+            continue;
+        }
+        output_table->insertTupleNonVirtual(tuple);
+        ++tupleCnt;
+        pmp.countdownProgress();
     }
 }
 
@@ -178,7 +183,7 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_orderby_node != NULL);
 
     // pickup an inlined limit, if one exists
-    m_limit_node = dynamic_cast<LimitPlanNode*>(m_orderby_node->
+    m_limit_node = dynamic_cast<LimitPlanNode*>(abstract_node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     #if defined(VOLT_LOG_LEVEL)
