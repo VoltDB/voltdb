@@ -502,9 +502,8 @@ public final class DBBPool {
             HOST.fatal("Second:", t);
             System.exit(-1);
         }
-#else
-        nativeDeleteCharArrayMemory(pointer);
 #endif
+        nativeDeleteCharArrayMemory(pointer);
     }
 
     private static native void nativeDeleteCharArrayMemory(long pointer);
