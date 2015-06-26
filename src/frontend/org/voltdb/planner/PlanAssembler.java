@@ -43,6 +43,8 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -218,6 +220,39 @@ public class PlanAssembler {
                         return true;
                     }
                 }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean canPushDownDistinctAggregation(AggregateExpression aggExpr) {
+        assert(m_parsedSelect != null);
+
+        if ( aggExpr == null || aggExpr.isDistinct() == false ) {
+            return false;
+        }
+        if ( aggExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ) {
+            return true;
+        }
+
+        AbstractExpression aggArg = aggExpr.getLeft();
+        // constant
+        if ( aggArg instanceof ConstantValueExpression || aggArg instanceof ParameterValueExpression) {
+            return true;
+        }
+        if ( ! (aggArg instanceof TupleValueExpression)) {
+            return false;
+        }
+        TupleValueExpression tve = (TupleValueExpression) aggArg;
+        StmtTableScan scanTable = m_parsedSelect.m_tableAliasMap.get(tve.getTableAlias());
+        // table alias may be from "VOLT_TEMP_TABLE".
+        if (scanTable == null || scanTable.getPartitioningColumns() == null) {
+            return false;
+        }
+        for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
+            if  (pcol != null && pcol.getColumnName().equals(tve.getColumnName()) ) {
+                return true;
             }
         }
 
@@ -1959,11 +1994,13 @@ public class PlanAssembler {
                          *
                          * If DISTINCT is specified, don't do push-down for
                          * count() and sum() when not group by partition column.
+                         * An exception is the aggregation arguments are the partition column (ENG-4980).
                          */
                         if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                             agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
                             agg_expression_type == ExpressionType.AGGREGATE_SUM) {
-                            if (is_distinct && !m_parsedSelect.hasPartitionColumnInGroupby()) {
+                            if ( is_distinct && ! (m_parsedSelect.hasPartitionColumnInGroupby() ||
+                                                   canPushDownDistinctAggregation((AggregateExpression)rootExpr) ) ) {
                                 topAggNode = null;
                             }
                             else {
@@ -1993,7 +2030,8 @@ public class PlanAssembler {
                             /*
                              * Input column of the top aggregate node is the output column of the push-down aggregate node
                              */
-                            topAggNode.addAggregate(top_expression_type, is_distinct, outputColumnIndex, tve);
+                            boolean topDistinctFalse = false;
+                            topAggNode.addAggregate(top_expression_type, topDistinctFalse, outputColumnIndex, tve);
                         }
                     }
                 }
