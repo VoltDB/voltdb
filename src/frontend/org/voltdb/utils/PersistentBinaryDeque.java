@@ -251,10 +251,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         PBDSegment tail = m_segments.peekLast();
-        final boolean compress = object.b().isDirect();
-        if (!tail.offer(object, compress)) {
+        if (!tail.offer(object, false)) {
             tail = addSegment(tail);
-            final boolean success = tail.offer(object, compress);
+            final boolean success = tail.offer(object, false);
             if (!success) {
                 throw new IOException("Failed to offer object in PBD");
             }
