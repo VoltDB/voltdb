@@ -21,7 +21,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
+import org.osgi.framework.BundleException;
+import org.osgi.framework.Constants;
+import org.osgi.framework.launch.Framework;
+import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
@@ -46,6 +51,10 @@ public class ImportManager {
     private static ImportManager m_self;
     private final HostMessenger m_messenger;
 
+    private final FrameworkFactory m_frameworkFactory;
+    private final Map<String, String> m_frameworkProps;
+    private final Framework m_framework;
+
     /**
      * Get the global instance of the ImportManager.
      * @return The global single instance of the ImportManager.
@@ -54,8 +63,19 @@ public class ImportManager {
         return m_self;
     }
 
-    protected ImportManager(HostMessenger messenger) {
+    protected ImportManager(HostMessenger messenger) throws BundleException {
         m_messenger = messenger;
+        //create properties for osgi
+        m_frameworkProps = new HashMap<String, String>();
+        //Need this so that ImportContext is available.
+        m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
+                + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0");
+        // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
+        m_frameworkProps.put("org.osgi.framework.storage.clean", "onFirstInit");
+        m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
+        m_framework = m_frameworkFactory.newFramework(m_frameworkProps);
+        m_framework.start();
+
     }
 
     /**
@@ -63,7 +83,7 @@ public class ImportManager {
      * @param catalogContext
      * @param partitions
      */
-    public static synchronized void initialize(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) {
+    public static synchronized void initialize(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) throws BundleException {
         ImportManager em = new ImportManager(messenger);
 
         m_self = em;
@@ -81,7 +101,7 @@ public class ImportManager {
                 importLog.info("No importers specified skipping Streaming Import initialization.");
                 return;
             }
-            ImportDataProcessor newProcessor = new ImportProcessor();
+            ImportDataProcessor newProcessor = new ImportProcessor(m_framework);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);

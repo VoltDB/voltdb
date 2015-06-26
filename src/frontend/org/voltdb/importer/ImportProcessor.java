@@ -20,13 +20,10 @@ package org.voltdb.importer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.ServiceLoader;
 
 import org.osgi.framework.Bundle;
-import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.launch.Framework;
-import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
@@ -40,23 +37,12 @@ import org.osgi.framework.BundleException;
 public class ImportProcessor implements ImportDataProcessor {
 
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
-    private final FrameworkFactory m_frameworkFactory;
-    private final Map<String, String> m_frameworkProps;
     private final Map<String, BundleWrapper> m_bundles = new HashMap<String, BundleWrapper>();
     private final Map<String, BundleWrapper> m_bundlesByName = new HashMap<String, BundleWrapper>();
     private final Framework m_framework;
 
-    public ImportProcessor() throws BundleException {
-        //create properties for osgi
-        m_frameworkProps = new HashMap<String, String>();
-        //Need this so that ImportContext is available.
-        m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
-                + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,com.google_voltpatches.common");
-        // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
-        m_frameworkProps.put("org.osgi.framework.storage.clean", "onFirstInit");
-        m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
-        m_framework = m_frameworkFactory.newFramework(m_frameworkProps);
-        m_framework.start();
+    public ImportProcessor(Framework framework) throws BundleException {
+        m_framework = framework;
     }
 
     //This abstracts OSGi based and class based importers.
@@ -174,9 +160,6 @@ public class ImportProcessor implements ImportDataProcessor {
                 }
             }
             m_bundles.clear();
-            if (m_framework != null) {
-                m_framework.stop();
-            }
         } catch (Exception ex) {
             m_logger.error("Failed to stop the import bundles.", ex);
         }

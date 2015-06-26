@@ -71,6 +71,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         @Override
         public void handleResponse(ClientResponse response) {
             discard();
+            System.out.println(response.getStatusString());
             m_pendingCallbacks.remove(m_id);
         }
 

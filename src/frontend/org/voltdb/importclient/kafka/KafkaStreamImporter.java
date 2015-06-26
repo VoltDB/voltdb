@@ -30,14 +30,21 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import kafka.api.PartitionOffsetRequestInfo;
+import kafka.common.ErrorMapping;
+import kafka.common.TopicAndPartition;
+import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
-import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 
 /**
@@ -49,10 +56,20 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     private Properties m_properties;
     private String m_procedure;
-    private List<String> m_topicList;
     private String m_topics;
     private String m_brokers;
+    private int m_fetchSize;
+    private int m_consumerSocketTimeout;
+    private List<String> m_topicList;
     private List<HostAndPort> m_brokerList = new ArrayList<HostAndPort>();
+
+    private Map<String, List<TopicMetadata>> m_topicPartitionMetaData = new HashMap<String, List<TopicMetadata>>();
+    private Map<String, List<Integer>> m_topicPartitions = new HashMap<String, List<Integer>>();
+    private Map<String, String>m_topicPartitionLeader = new HashMap<String, String>();
+    private Map<String, Integer>m_topicPartitionLeaderPort = new HashMap<String, Integer>();
+    private Map<TopicPartitionFetcher, ExecutorService> m_fetchers = new HashMap<TopicPartitionFetcher, ExecutorService>();
+
+    private ExecutorService m_es;
 
     public static class HostAndPort {
         public final String host;
@@ -80,7 +97,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     }
 
     @Override
-    public synchronized void stop() {
+    public void stop() {
+        for (TopicPartitionFetcher fetcher : m_fetchers.keySet()) {
+            fetcher.shutdown();
+        }
     }
 
     /**
@@ -125,6 +145,225 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             HostAndPort hap = HostAndPort.fromString(broker);
             m_brokerList.add(hap);
         }
+        //These are defaults picked up from kafka we save them so that they are passed around.
+        m_fetchSize = Integer.parseInt(m_properties.getProperty("fetch.message.max.bytes", "65536"));
+        m_consumerSocketTimeout = Integer.parseInt(m_properties.getProperty("socket.timeout.ms", "30000"));
+    }
+
+    private void buildTopicLeaderMetadata(SimpleConsumer simpleConsumer) {
+
+        //For all topics connect and get metadata.
+        for (String topic : m_topicList) {
+            List<String> topics = Collections.singletonList(topic);
+            TopicMetadataRequest req = new TopicMetadataRequest(topics);
+            kafka.javaapi.TopicMetadataResponse resp = simpleConsumer.send(req);
+
+            List<TopicMetadata> metaData = resp.topicsMetadata();
+            m_topicPartitionMetaData.put(topic, metaData);
+            List<Integer> partitions = m_topicPartitions.get(topic);
+            if (partitions == null) {
+                partitions = new ArrayList<Integer>();
+                m_topicPartitions.put(topic, partitions);
+            }
+            for (TopicMetadata item : metaData) {
+                for (PartitionMetadata part : item.partitionsMetadata()) {
+                    partitions.add(part.partitionId());
+                    for (kafka.cluster.Broker replica : part.replicas()) {
+                        String leaderKey = topic + "-" + part.partitionId();
+                        m_topicPartitionLeader.put(leaderKey, replica.host());
+                        m_topicPartitionLeaderPort.put(leaderKey, replica.port());
+                    }
+                }
+            }
+        }
+
+        System.out.println(m_topicPartitionLeader);
+    }
+
+    private class TopicPartitionFetcher implements Runnable {
+
+        private final String m_topic;
+        private final int m_partition;
+        private final String m_leader;
+        private final int m_port;
+        private final String m_client;
+        private boolean m_shutdown = false;
+        private final int m_fetchSize;
+        private final List<HostAndPort> m_brokers;
+        private final int m_consumerSocketTimeout;
+        private CountDownLatch m_latch;
+
+        public TopicPartitionFetcher(List<HostAndPort> brokers, String topic, int partition, String leader, int port, int fetchSize, int consumerSocketTimeout) {
+            m_brokers = brokers;
+            m_topic = topic;
+            m_partition = partition;
+            m_leader = leader;
+            m_port = port;
+            m_fetchSize = fetchSize;
+            m_consumerSocketTimeout = consumerSocketTimeout;
+            m_client = "voltdb-importer";
+        }
+
+        public void setLatch(CountDownLatch latch) {
+            m_latch = latch;
+        }
+
+        private PartitionMetadata findLeader() {
+            PartitionMetadata returnMetaData = null;
+            loop:
+            for (HostAndPort broker : m_brokers) {
+                SimpleConsumer consumer = null;
+                try {
+                    consumer = new SimpleConsumer(broker.host, broker.port, m_consumerSocketTimeout, m_fetchSize, "findLeader");
+
+                    List<String> topics = Collections.singletonList(m_topic);
+                    TopicMetadataRequest req = new TopicMetadataRequest(topics);
+                    kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
+
+                    List<TopicMetadata> metaData = resp.topicsMetadata();
+
+                    for (TopicMetadata item : metaData) {
+                        for (PartitionMetadata part : item.partitionsMetadata()) {
+                            if (part.partitionId() == m_partition) {
+                                returnMetaData = part;
+                                break loop;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("Error communicating with Broker [" + broker.host + "] to find Leader for [" + m_topic
+                            + ", " + m_partition + "] Reason: " + e);
+                } finally {
+                    if (consumer != null) {
+                        consumer.close();
+                    }
+                }
+            }
+            return returnMetaData;
+        }
+
+        //Find leader for this topic partition.
+        private String findNewLeader() {
+            for (int i = 0; i < 3; i++) {
+                boolean shouldSleep = false;
+                PartitionMetadata metadata = findLeader();
+                if (metadata == null) {
+                    shouldSleep = true;
+                } else if (metadata.leader() == null) {
+                    shouldSleep = true;
+                } else if (m_leader.equalsIgnoreCase(metadata.leader().host()) && i == 0) {
+                    // first time through if the leader hasn't changed give ZooKeeper a second to recover
+                    // second time, assume the broker did recover before failover, or it was a non-Broker issue
+                    shouldSleep = true;
+                } else {
+                    return metadata.leader().host();
+                }
+                if (shouldSleep) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ie) {
+                    }
+                }
+            }
+            //Unable to find return null for recheck.
+            return null;
+        }
+
+        //Just set shutdown flag fetcher timeout will then exit the thread.
+        public void shutdown() {
+            m_shutdown = true;
+            m_latch.countDown();
+        }
+
+        private long getLastOffset(SimpleConsumer consumer) {
+            TopicAndPartition topicAndPartition = new TopicAndPartition(m_topic, m_partition);
+            Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
+            requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1));
+            kafka.javaapi.OffsetRequest request = new kafka.javaapi.OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(),m_client);
+            OffsetResponse response = consumer.getOffsetsBefore(request);
+
+            if (response.hasError()) {
+                info("Failed fetching data Offset Data the Broker will retry. Reason: " + response.errorCode(m_topic, m_partition) );
+                return -1;
+            }
+            long[] offsets = response.offsets(m_topic, m_partition);
+            return offsets[0];
+        }
+
+        @Override
+        public void run() {
+            SimpleConsumer consumer = null;
+            try {
+                long readOffset = 0;
+                //Startwith the starting leader.
+                String leaderBroker = m_leader;
+                while (!m_shutdown) {
+                    if (consumer == null) {
+                        consumer = new SimpleConsumer(leaderBroker, m_port, m_consumerSocketTimeout, m_fetchSize, m_client);
+                        readOffset = getLastOffset(consumer);
+                    }
+                    long currentFetchCount = 0;
+                    if (readOffset >= 0) {
+                        FetchRequest req = new FetchRequestBuilder()
+                                .clientId("voltdb-importer")
+                                .addFetch(m_topic, m_partition, readOffset, m_fetchSize)
+                                .build();
+                        FetchResponse fetchResponse = consumer.fetch(req);
+
+                        if (fetchResponse.hasError()) {
+                            // Something went wrong!
+                            short code = fetchResponse.errorCode(m_topic, m_partition);
+                            if (code == ErrorMapping.OffsetOutOfRangeCode())  {
+                                // We asked for an invalid offset. For simple case ask for the last element to reset
+                                readOffset = getLastOffset(consumer);
+                                continue;
+                            }
+                            consumer.close();
+                            consumer = null;
+                            leaderBroker = findNewLeader();
+                            if (leaderBroker == null) {
+                                //point to original leader which will fail and we fall back again here.
+                                leaderBroker = m_leader;
+                            }
+
+                            continue;
+                        }
+
+                        for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topic, m_partition)) {
+                            long currentOffset = messageAndOffset.offset();
+                            if (currentOffset < readOffset) {
+                                info("Found an old offset: " + currentOffset + " Expecting: " + readOffset);
+                                continue;
+                            }
+                            readOffset = messageAndOffset.nextOffset();
+                            ByteBuffer payload = messageAndOffset.message().payload();
+
+                            byte[] bytes = new byte[payload.limit()];
+                            payload.get(bytes);
+                            String line = new String(bytes);
+                            CSVInvocation invocation = new CSVInvocation(m_procedure, line);
+                            callProcedure(invocation);
+                            currentFetchCount++;
+                        }
+                    }
+
+                    if (currentFetchCount == 0) {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ie) {
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                if (consumer != null) {
+                    consumer.close();
+                }
+            }
+
+        }
+
     }
 
     /**
@@ -136,55 +375,33 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             info("Configured and ready with properties: " + m_properties);
             SimpleConsumer simpleConsumer = new SimpleConsumer(m_brokerList.get(0).host,
                     m_brokerList.get(0).port, 0, 4096, "voltdb-importer");
-
-            //For all topics connect and get metadata.
-            Map<String, List<TopicMetadata>> topicPartitionMetaData = new HashMap<String, List<TopicMetadata>>();
-            Map<String, List<Integer>> topicPartitions = new HashMap<String, List<Integer>>();
-            for (String topic : m_topicList) {
-                List<String> topics = Collections.singletonList(topic);
-                TopicMetadataRequest req = new TopicMetadataRequest(topics);
-                kafka.javaapi.TopicMetadataResponse resp = simpleConsumer.send(req);
-
-                List<TopicMetadata> metaData = resp.topicsMetadata();
-                topicPartitionMetaData.put(topic, metaData);
-                List<Integer> partitions = topicPartitions.get(topic);
-                if (partitions == null) {
-                    partitions = new ArrayList<Integer>();
-                    topicPartitions.put(topic, partitions);
-                }
-                for (TopicMetadata item : metaData) {
-
-                    for (PartitionMetadata part : item.partitionsMetadata()) {
-                        partitions.add(part.partitionId());
-                        //We found partitions.
-                        System.out.println("Topic partition metadata: " + part);
-                        for (kafka.cluster.Broker replica : part.replicas()) {
-//                            topicPartitionLeader.add(replica.host());
-                        }
-                    }
-                }
-            }
+            buildTopicLeaderMetadata(simpleConsumer);
 
             Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
             for (String topic : m_topicList) {
                 topicMap.put(topic, Collections.singletonList(0));
             }
-            FetchRequest req = new FetchRequestBuilder()
-                    .clientId("voltdb-importer")
-                    .addFetch("foo", 0, 0L, 100)
-                    .build();
-            FetchResponse fetchResponse = simpleConsumer.fetch(req);
-            for ( Map.Entry<String, List<Integer>> entry : topicMap.entrySet() ) {
-              String topic = entry.getKey();
-              for ( Integer offset : entry.getValue()) {
-                ByteBufferMessageSet bbmsg = fetchResponse.messageSet(topic, offset);
-                for(MessageAndOffset messageAndOffset: bbmsg) {
-                    ByteBuffer payload = messageAndOffset.message().payload();
-                    byte[] bytes = new byte[payload.limit()];
-                    payload.get(bytes);
-                    System.out.println(new String(bytes, "UTF-8"));
+            long ts = System.currentTimeMillis();
+            for (String topic : m_topicList) {
+                List<Integer> topicPartitions = m_topicPartitions.get(topic);
+                for (int partition : topicPartitions) {
+                    String leaderKey = topic + "-" + partition;
+                    TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, topic, partition,
+                            m_topicPartitionLeader.get(leaderKey),
+                            m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize , m_consumerSocketTimeout);
+                    ExecutorService es = CoreUtils.getListeningExecutorService("KafkaImporter Topic " + leaderKey + " - " + ts, 1);
+                    m_fetchers.put(fetcher, es);
                 }
-              }
+            }
+            //Submit all tasks and wait.
+            CountDownLatch cdl = new CountDownLatch(m_fetchers.size());
+            for (TopicPartitionFetcher fetcher : m_fetchers.keySet()) {
+                fetcher.setLatch(cdl);
+                m_fetchers.get(fetcher).submit(fetcher);
+            }
+            cdl.await();
+            for (TopicPartitionFetcher fetcher : m_fetchers.keySet()) {
+                m_fetchers.get(fetcher).shutdownNow();
             }
         } catch (Exception ex) {
             ex.printStackTrace();
