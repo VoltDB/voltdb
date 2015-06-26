@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 /**
  * Objects placed in the deque are stored in file segments that are up to 64 megabytes.
@@ -33,8 +34,15 @@ import java.nio.ByteBuffer;
  * to insert an object that exceeds the remaining space is made. A segment can be used
  * for reading and writing, but not both at the same time.
  */
-public class PBDRegularSegment extends PBDSegment {
+public class PBDRegularSegment implements PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
+
+    //Avoid unecessary sync with this flag
+    private boolean m_syncedSinceLastEdit = true;
+    private final File m_file;
+    private RandomAccessFile m_ras;
+    private FileChannel m_fc;
+    private boolean m_closed = true;
 
     //Index of the next object to read, not an offset into the file
     private int m_objectReadIndex = 0;
@@ -52,8 +60,8 @@ public class PBDRegularSegment extends PBDSegment {
     private DBBPool.BBContainer m_tmpHeaderBuf = null;
 
     public PBDRegularSegment(Long index, File file) {
-        super(file);
         m_index = index;
+        m_file = file;
         reset();
     }
 
@@ -117,12 +125,6 @@ public class PBDRegularSegment extends PBDSegment {
     @Override
     public void open(boolean forWrite) throws IOException
     {
-        open(forWrite, forWrite);
-    }
-
-    @Override
-    protected void open(boolean forWrite, boolean emptyFile) throws IOException
-    {
         if (!m_closed) {
             throw new IOException("Segment is already opened");
         }
@@ -138,18 +140,17 @@ public class PBDRegularSegment extends PBDSegment {
         m_fc = m_ras.getChannel();
         m_tmpHeaderBuf = DBBPool.allocateDirect(SEGMENT_HEADER_BYTES);
 
-        if (emptyFile) {
-            initNumEntries(0, 0);
+        if (forWrite) {
+            initNumEntries();
         }
         m_fc.position(SEGMENT_HEADER_BYTES);
 
         m_closed = false;
     }
 
-    @Override
-    protected void initNumEntries(int count, int size) throws IOException {
-        m_numOfEntries = count;
-        m_size = size;
+    private void initNumEntries() throws IOException {
+        m_numOfEntries = 0;
+        m_size = 0;
 
         m_tmpHeaderBuf.b().clear();
         m_tmpHeaderBuf.b().putInt(m_numOfEntries);
@@ -399,35 +400,5 @@ public class PBDRegularSegment extends PBDSegment {
     public int uncompressedBytesToRead() {
         if (m_closed) throw new RuntimeException("Segment closed");
         return m_size - m_bytesRead;
-    }
-
-    @Override
-    protected long readOffset()
-    {
-        return m_readOffset;
-    }
-
-    @Override
-    protected void rewindReadOffset(int byBytes)
-    {
-        m_readOffset -= byBytes;
-    }
-
-    @Override
-    protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int length) throws IOException
-    {
-        int written = 0;
-        final DBBPool.BBContainer partialCont = DBBPool.allocateDirect(length);
-        try {
-            written += entry.writeTruncatedObject(partialCont.b());
-            partialCont.b().flip();
-
-            while (partialCont.b().hasRemaining()) {
-                m_fc.write(partialCont.b());
-            }
-        } finally {
-            partialCont.discard();
-        }
-        return written;
     }
 }

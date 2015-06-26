@@ -199,7 +199,7 @@ public class PlannerTestCase extends TestCase {
         }
         catch (Exception ex) {
             ex.printStackTrace();
-            fail(ex.getMessage());
+            fail();
         }
         assertTrue(pns.get(0) != null);
         return pns.get(0);

@@ -28,6 +28,7 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -58,7 +59,7 @@ public class PartitionDRGateway {
         }
     }
 
-    public static final Map<Integer, PartitionDRGateway> m_partitionDRGateways = new NonBlockingHashMap<>();
+    public static final Map<Integer, PartitionDRGateway> gateways = new NonBlockingHashMap<Integer, PartitionDRGateway>();
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -68,7 +69,7 @@ public class PartitionDRGateway {
      * @return Instance of PartitionDRGateway
      */
     public static PartitionDRGateway getInstance(int partitionId,
-                                                 ProducerDRGateway producerGateway,
+                                                 NodeDRGateway nodeGateway,
                                                  StartAction startAction)
     {
         final VoltDBInterface vdb = VoltDB.instance();
@@ -78,7 +79,7 @@ public class PartitionDRGateway {
         // if this is a primary cluster in a DR-enabled scenario
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToDR && producerGateway != null) {
+        if (licensedToDR && nodeGateway != null) {
             pdrg = tryToLoadProVersion();
         }
         if (pdrg == null) {
@@ -87,11 +88,11 @@ public class PartitionDRGateway {
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, producerGateway, startAction);
+            pdrg.init(partitionId, nodeGateway, startAction);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
-        m_partitionDRGateways.put(partitionId,  pdrg);
+        gateways.put(partitionId,  pdrg);
 
         return pdrg;
     }
@@ -111,7 +112,7 @@ public class PartitionDRGateway {
 
     // empty methods for community edition
     protected void init(int partitionId,
-                        ProducerDRGateway producerGateway,
+                        NodeDRGateway gateway,
                         StartAction startAction) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
                                           StoredProcedureInvocation spi,
@@ -150,7 +151,7 @@ public class PartitionDRGateway {
             AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
             buf.order(ByteOrder.LITTLE_ENDIAN);
             //Magic header space for Java for implementing zero copy stuff
-            buf.position(8 /* stream block header */ + 69 /* txn metadata padding */);
+            buf.position(8 + 65 + (partitionId == MpInitiator.MP_INIT_PID ? 0 : 4));
             while (buf.hasRemaining()) {
                 int startPosition = buf.position();
                 byte version = buf.get();
@@ -179,7 +180,7 @@ public class PartitionDRGateway {
                     }
                     buf.position(buf.position() + lengthPrefix);
                     checksum = buf.getInt();
-                    log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
+                    log.trace("Version " + version + " type " + recordType + "table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
                               (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
                     break;
                 }
@@ -228,7 +229,7 @@ public class PartitionDRGateway {
             }
         }
 
-        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
+        final PartitionDRGateway pdrg = gateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }

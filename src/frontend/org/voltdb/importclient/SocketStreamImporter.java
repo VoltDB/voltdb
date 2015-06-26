@@ -24,7 +24,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Properties;
-
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.voltdb.importer.CSVInvocation;
@@ -122,7 +121,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                         //You should convert your data to params here.
                         if (line == null) break;
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        if (!callProcedure(invocation)) {
+                        if (!callProcedure(m_importHandlerProxy, invocation)) {
                             System.out.println("Inserted failed: " + line);
                         }
                     }

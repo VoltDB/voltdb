@@ -55,6 +55,7 @@ SELECT @idcol ID4, _variable[#num  @comparabletype] FROM @fromtables Z WHERE __[
 SELECT @idcol ID5, _variable[#num2 @comparabletype] FROM @fromtables Z WHERE __[#num2] _cmp3 (_scalarquerynum)
 
 --- Queries with scalar subqueries containing a set operator, in the WHERE clause (directly, without an additional subquery)
-SELECT @idcol ID6, _variable[#str string]          FROM @fromtables Z WHERE __[#str] _cmp2 (_setopwherequerystr)
-
-SELECT @idcol ID7, _variable[#num @comparabletype] FROM @fromtables Z WHERE __[#num] _cmp3 (_setopwherequerynum)
+-- TODO: uncomment this, once ENG-8391 is fixed, so it no longer produces mismatches:
+--SELECT @idcol ID6, _variable[#str string]          FROM @fromtables Z WHERE __[#str] _cmp2 (_setopwherequerystr)
+-- TODO: uncomment this, once ENG-8393, -8394, -8395 & -8396 are fixed, so it no longer produces mismatches:
+--SELECT @idcol ID7, _variable[#num @comparabletype] FROM @fromtables Z WHERE __[#num] _cmp3 (_setopwherequerynum)

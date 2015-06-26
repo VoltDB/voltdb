@@ -315,44 +315,6 @@ public class TestLimitOffsetSuite extends RegressionSuite {
             fail("cannot get data from table c");
         }
     }
-    public void testSubqueryLimit() throws Exception {
-        Client client = getClient();
-
-        ClientResponse cr;
-        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (8, 'nSAFoccWXxEGXR', -3364, 7.76005886643784892343e-01);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (9, 'nSAFoccWXxEGXR', -3364, 8.65086522017155634678e-01);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (10, 'nSAFoccWXxEGXR', 11411, 3.49977104648325210157e-01);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (11, 'nSAFoccWXxEGXR', 11411, 4.96260220021031761561e-01);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (12, 'ebWfhdmIZfYhRC', NULL, 3.94021683247165688257e-01);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (13, 'ebWfhdmIZfYhRC', NULL, 2.97950296374613898820e-02);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (14, 'ebWfhdmIZfYhRC', 23926, 8.56241324965489991605e-01);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (15, 'ebWfhdmIZfYhRC', 23926, 3.61291695704730075889e-01); ");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        String selectStmt = "select NUM from R1 where NUM in (select NUM from R1 where NUM <> 12 order by NUM limit 4);";
-        cr = client.callProcedure("@AdHoc", selectStmt);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        VoltTable tbl;
-        cr = client.callProcedure("@AdHoc", selectStmt);
-        tbl = cr.getResults()[0];
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(tbl, new long[][]{{-3364L}, {-3364}, {11411}, {11411}});
-    }
 
     static public junit.framework.Test suite()
     {

@@ -63,18 +63,10 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "Overview" tab is currently open.
      */
     def boolean isSchemaPageOverviewTabOpen() {
-        int count = 0
-        while (count<10) {
-            count++
-            try {
-                if (isSchemaPageOpen() && overviewTab.attr('class') == 'active') {
-                    return true
-                } else {
-                    return false
-                }
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
-            }
+        if (isSchemaPageOpen() && overviewTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
         }
     }
 
@@ -85,18 +77,10 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "Schema" tab is currently open.
      */
     def boolean isSchemaPageSchemaTabOpen() {
-        int count = 0
-        while (count<10) {
-            count++
-            try {
-                if (isSchemaPageOpen() && schemaSubTab.attr('class') == 'active') {
-                    return true
-                } else {
-                    return false
-                }
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
-            }
+        if (isSchemaPageOpen() && schemaSubTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
         }
     }
 
@@ -108,18 +92,10 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "Procedures & SQL" tab is currently open.
      */
     def boolean isSchemaPageProceduresAndSqlTabOpen() {
-        int count = 0
-        while (count<10) {
-            count++
-            try {
-                if (isSchemaPageOpen() && proceduresTab.attr('class') == 'active') {
-                    return true
-                } else {
-                    return false
-                }
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
-            }
+        if (isSchemaPageOpen() && proceduresTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
         }
     }
 
@@ -131,18 +107,10 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "Size Worksheet" tab is currently open.
      */
     def boolean isSchemaPageSizeWorksheetTabOpen() {
-        int count = 0
-        while (count<10) {
-            count++
-            try {
-                if (isSchemaPageOpen() && sizeTab.attr('class') == 'active') {
-                    return true
-                } else {
-                    return false
-                }
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
-            }
+        if (isSchemaPageOpen() && sizeTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
         }
     }
 
@@ -154,18 +122,10 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "DDL Source" tab is currently open.
      */
     def boolean isSchemaPageDdlSourceTabOpen() {
-        int count = 0
-        while (count<10) {
-            count++
-            try {
-                if (isSchemaPageOpen() && ddlTab.attr('class') == 'active') {
-                    return true
-                } else {
-                    return false
-                }
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
-            }
+        if (isSchemaPageOpen() && ddlTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
         }
     }
 

@@ -24,13 +24,12 @@ class Header extends Module {
         tabSQLQuery               	{ $("#navSqlQuery") }
         usernameInHeader            { $("#btnlogOut") }
         logout                    	{ $(class:"user", title:"Log Out") }
-        showHelp                 	{ $("#showMyHelp") }
-        help                        { $("#userSection > li:nth-child(4) > div > ul > li > a") }
+        help                      	{ $("#showMyHelp") }
         popup                     	{ $(class:"popup_content10") }
-        popupTitle                	{ $(class:"overlay-title helpIcon ") }
+        popupTitle                	{ $(class:"overlay-title helpIcon ", text:"Help") }
         popupClose                	{ $(class:"popup_close") }
         logoutPopup               	{ $(class:"popup_content2") }
-        logoutPopupTitle          	{ $(class:"overlay-title ") }
+        logoutPopupTitle          	{ $(class:"overlay-contentError errorMsg") }
         logoutPopupOkButton       	{ $("#A1") }
         logoutPopupCancelButton   	{ $("#btnCancel") }
     }
@@ -59,18 +58,4 @@ class Header extends Module {
         return password
     }
 
-    def boolean checkShowHelp() {
-        waitFor(30) { help.isDisplayed() }
-        help.click()
-        waitFor(30) { showHelp.isDisplayed() }
-    }
-    
-    def boolean checkIfHelpIsOpen() {
-        checkShowHelp()
-        showHelp.click()
-        
-        popupTitle.isDisplayed()
-        popupClose.isDisplayed()
-        popupTitle.text().toLowerCase().contains("help".toLowerCase());
-    }
 }

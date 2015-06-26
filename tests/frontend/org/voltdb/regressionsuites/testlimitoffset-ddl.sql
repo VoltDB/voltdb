@@ -38,13 +38,3 @@ CREATE PROCEDURE GetTopScores AS
  SELECT user_id, score_value 
  FROM score WHERE score_date > ? AND score_date <= ? 
  ORDER BY score_value DESC, user_id DESC LIMIT ?;
- 
--- This is used to test "V IN (subquery with limits)"
-CREATE TABLE R1 (
-  ID INTEGER NOT NULL,
-  DESC VARCHAR(300),
-  NUM INTEGER,
-  RATIO FLOAT,
-  PRIMARY KEY (ID)
-);
- 

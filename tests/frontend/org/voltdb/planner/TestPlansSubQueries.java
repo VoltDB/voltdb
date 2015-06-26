@@ -2067,7 +2067,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = upn.getChild(2);
         checkSeqScan(pn, "R3", "A", "C");
 
-        String message = "Join of multiple partitioned tables has insufficient join criteria";
+
+        String message = "This join of multiple partitioned tables is too complex";
         failToCompile("select * FROM " +
                 "(SELECT A, COUNT(*) FROM P1 GROUP BY A " +
                 "UNION " +

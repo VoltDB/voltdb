@@ -31,7 +31,6 @@ bool isNumeric(ValueType type) {
       case (VALUE_TYPE_SMALLINT):
       case (VALUE_TYPE_INTEGER):
       case (VALUE_TYPE_BIGINT):
-      case (VALUE_TYPE_DECIMAL):
       case (VALUE_TYPE_DOUBLE):
         return true;
       break;
@@ -39,6 +38,7 @@ bool isNumeric(ValueType type) {
       case (VALUE_TYPE_VARBINARY):
       case (VALUE_TYPE_TIMESTAMP):
       case (VALUE_TYPE_NULL):
+      case (VALUE_TYPE_DECIMAL):   // test assumes castAsBigInt() makes sense if isNumeric()
       case (VALUE_TYPE_INVALID):
       case (VALUE_TYPE_ARRAY):
         return false;

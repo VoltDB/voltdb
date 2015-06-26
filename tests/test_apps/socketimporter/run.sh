@@ -126,10 +126,9 @@ function async-benchmark() {
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         socketimporter.AsyncBenchmark \
         --displayinterval=5 \
-        --warmup=2 \
-        --duration=20 \
-        --servers=localhost \
-        --sockservers=localhost:7001
+        --warmup=5 \
+        --duration=120 \
+        --servers=localhost:7001
 }
 
 # The following two demo functions are used by the Docker package. Don't remove.

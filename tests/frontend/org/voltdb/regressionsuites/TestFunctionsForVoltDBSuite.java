@@ -85,13 +85,53 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123, 'abc') from P1 where ID = 0");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
-        // negative tests
-        verifyStmtFails(client, "select SQL_ERROR(123, 'abc') from P1", "abc");
-        verifyStmtFails(client, "select SQL_ERROR('abc') from P1", "abc");
-        verifyStmtFails(client, "select SQL_ERROR(123, 123) from P1", ".*SQL ERROR\n.*VARCHAR.*");
+        boolean caught = false;
 
-        verifyStmtFails(client, "select SQL_ERROR(123.5) from P1", "Type DECIMAL can't be cast as BIGINT");
-        verifyStmtFails(client, "select SQL_ERROR(123.5E-2) from P1", "Type FLOAT can't be cast as BIGINT");
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123, 'abc') from P1");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("abc") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123.5) from P1");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("Type FLOAT can't be cast as BIGINT") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select SQL_ERROR('abc') from P1");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("abc") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            // This wants to be a statement compile-time error.
+            cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123, 123) from P1");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.matches(".*SQL ERROR\n.*VARCHAR.*"));
+            caught = true;
+        }
+        assertTrue(caught);
+
     }
 
     public void testOctetLength() throws NoConnectionsException, IOException, ProcCallException {

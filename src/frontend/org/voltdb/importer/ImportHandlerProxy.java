@@ -17,8 +17,8 @@
 
 package org.voltdb.importer;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -28,27 +28,47 @@ import java.util.concurrent.TimeUnit;
  * has lot of server code dependencies and not really helpful for the import bundle builder.
  * @author akhanzode
  */
-public abstract class ImportHandlerProxy implements ImportContext {
+public class ImportHandlerProxy implements ImportContext {
 
     private Object m_handler = null;
-    private Method m_callProcMethod;
-    private Method m_hasTableMethod;
+    private Method m_invoker;
     private Method m_info_log;
     private Method m_error_log;
+
+    /**
+     * These must be implemented in tghe bundle even if you are not using any properties.
+     * @param p
+     */
+    @Override
+    public void configure(Properties p) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    /**
+     * This must be implemented in bundle if ready for data returns the importer will stop.
+     */
+    @Override
+    public void readyForData() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public String getName() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    /**
+     * This is called to cleanup the bundle and must be implemented. Its also invoked when the
+     * catalog or deployment is updated.
+     */
+    @Override
+    public void stop() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 
     @Override
     public boolean canContinue() {
         return true;
-    }
-
-    public boolean hasTable(String name) {
-        try {
-            return (Boolean) m_hasTableMethod.invoke(m_handler, name);
-        } catch(InvocationTargetException e) { // this shouldn't happen
-            throw new RuntimeException(e);
-        } catch(IllegalAccessException e) { // this shouldn't happen
-            throw new RuntimeException(e);
-        }
     }
 
     /**
@@ -59,19 +79,19 @@ public abstract class ImportHandlerProxy implements ImportContext {
      * @return
      */
     @Override
-    public boolean callProcedure(String proc, Object... fieldList) {
+    public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
         try {
-            return (Boolean )m_callProcMethod.invoke(m_handler, this, proc, fieldList);
+            return (Boolean )m_invoker.invoke(m_handler, ic, proc, fieldList);
         } catch (Exception ex) {
             return false;
         }
     }
 
     @Override
-    public boolean callProcedure(Invocation invocation) {
+    public boolean callProcedure(ImportContext ic, Invocation invocation) {
         try {
             Object params[] = invocation.getParams();
-            return (Boolean )m_callProcMethod.invoke(m_handler, this, invocation.getProcedure(), params);
+            return (Boolean )m_invoker.invoke(m_handler, ic, invocation.getProcedure(), params);
         } catch (Exception ex) {
             return false;
         }
@@ -80,8 +100,7 @@ public abstract class ImportHandlerProxy implements ImportContext {
     @Override
     public void setHandler(Object handler) throws Exception {
         m_handler = handler;
-        m_callProcMethod = m_handler.getClass().getMethod("callProcedure", ImportContext.class, String.class, Object[].class);
-        m_hasTableMethod = m_handler.getClass().getMethod("hasTable", String.class);
+        m_invoker = m_handler.getClass().getMethod("callProcedure", ImportContext.class, String.class, Object[].class);
         m_info_log = m_handler.getClass().getMethod("info", String.class);
         m_error_log = m_handler.getClass().getMethod("error", String.class);
     }

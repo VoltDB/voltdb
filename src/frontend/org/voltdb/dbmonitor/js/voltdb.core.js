@@ -141,13 +141,7 @@
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 }
-                
                 if (typeof (params) == 'string') {
-                    var headerLength = params.replace(/'/g, "%27").length;
-                    if (headerLength > 5632) {
-                        callback({ "status": -131, "statusstring": "SQL query is too long for the web interface. Use a shorter query or use the command line utility sqlcmd.", "results": [] });
-                        return;
-                    }
                     if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
                         if (this.authorization != null) {
@@ -225,8 +219,8 @@
                 return this;
             };
 
-            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isLongOutput) {
-                var isHighTimeout = (procedure == "@SnapshotRestore" || isLongOutput === true);
+            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
+                var isHighTimeout = (procedure == "@SnapshotRestore" || procedure == "@AdHoc");
                 this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails);
             };
 
@@ -247,8 +241,8 @@
                     return this;
                 };
 
-                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails,isLongTimeOut) {
-                    stack.push([procedure, parameters, callback, shortApiCallDetails, isLongTimeOut]);
+                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
+                    stack.push([procedure, parameters, callback, shortApiCallDetails]);
                     return this;
                 };
                 this.EndExecute = function () {
@@ -257,7 +251,7 @@
                     if (stack.length > 0 && (success || continueOnFailure)) {
                         var item = stack[0];
                         var shortApiCallDetails = item[3];
-                        var isHighTimeout = (item[0] == "@SnapshotRestore" || item[0] == "@AdHoc" || item[4] === true);
+                        var isHighTimeout = (item[0] == "@SnapshotRestore" || item[0] == "@AdHoc");
                         var callback =
                         (new callbackWrapper(
                             (function (queue, item) {
@@ -517,7 +511,7 @@
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" || processName == "GET_HOST_SITE_COUNT" ? "_" + processName : "";
+                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION"  || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" ? "_" + processName : "";
 
                         if (processName == "SYSTEMINFORMATION_STOPSERVER") {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;

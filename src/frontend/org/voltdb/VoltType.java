@@ -518,10 +518,6 @@ public enum VoltType {
         return "VoltType." + name();
     }
 
-    public String getName() {
-        return name();
-    }
-
     /**
      * Get the number of bytes required to store the type for types
      * with fixed length.

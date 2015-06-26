@@ -1065,30 +1065,4 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     public abstract String explain(String impliedTableName);
 
-    public static boolean hasInlineVarType(AbstractExpression expr) {
-        VoltType type = expr.getValueType();
-        int size = expr.getValueSize();
-        boolean inBytes = expr.getInBytes();
-
-        switch(type) {
-        case STRING:
-            if (inBytes && size < 64) {
-                return true;
-            }
-            if (!inBytes && size < 16) {
-                return true;
-            }
-            break;
-        case VARBINARY:
-            if (size < 64) {
-                return true;
-            }
-            break;
-        default:
-            break;
-        }
-
-        return false;
-    }
-
 }

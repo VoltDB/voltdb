@@ -75,21 +75,37 @@ public class VoltXMLElement {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        append(sb, "");
+        append(sb, 0);
         return sb.toString();
     }
 
-    private void append(StringBuilder sb, String indent) {
-        sb.append(indent).append("ELEMENT: ").append(name).append("\n");
+    private String indentString(int indent) {
+        final int indentSize = 4;
+        final String indentString = "...|";
+        StringBuffer sb = new StringBuffer(indent);
+        int idx;
+        for (idx = 0; (idx + indentSize) <= indent; idx += indentSize) {
+            sb.append(indentString);
+        }
+        for (;idx < indent; idx += 1) {
+            sb.append(".");
+        }
+        return sb.toString();
+    }
+    private void append(StringBuilder sb, int indent) {
+        String is = indentString(indent);
+        String is2 = indentString(indent+3);
+        sb.append(is).append("ELEMENT: ").append(name).append("\n");
         for (Entry<String, String> e : attributes.entrySet()) {
-            sb.append(indent).append(" ").append(e.getKey());
+            sb.append(is2).append(e.getKey());
             sb.append(" = ").append(e.getValue()).append("\n");
         }
         if ( ! children.isEmpty()) {
-            sb.append(indent).append("[").append("\n");
+            sb.append(is).append("[\n");
             for (VoltXMLElement e : children) {
-                e.append(sb, indent + "   ");
+                e.append(sb, indent + 3);
             }
+            sb.append(is).append("]\n");
         }
     }
 

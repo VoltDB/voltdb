@@ -420,9 +420,6 @@ public class StatsAgent extends OpsAgent
         case DRCONSUMERPARTITION:
             stats = collectDRConsumerPartitionStats();
             break;
-        case COMMANDLOG:
-            stats = collectCommandLogStats();
-            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -741,19 +738,6 @@ public class StatsAgent extends OpsAgent
         if (mStats != null) {
             stats = new VoltTable[1];
             stats[0] = mStats;
-        }
-        return stats;
-    }
-
-    // TODO
-    private VoltTable[] collectCommandLogStats()
-    {
-        Long now = System.currentTimeMillis();
-        VoltTable[] stats = null;
-        VoltTable commandLogStats = getStatsAggregate(StatsSelector.COMMANDLOG, false, now);
-        if (commandLogStats != null) {
-            stats = new VoltTable[1];
-            stats[0] = commandLogStats;
         }
         return stats;
     }

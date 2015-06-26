@@ -62,46 +62,28 @@
 
 namespace voltdb {
 
-// Compares two tuples column by column using lexicographical compare.
+// Compares two tuples column by column using lexicographical compare. The OP predicate
+// must satisfy the following condition
+// X and Y are equivalent if both OP(x, y) and OP(y, x) are false
+// CmpEq, CmpNe, CmpGte, and CmpLte are specialized because they don't satisfy the above requirement.
 template<typename OP>
-NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
+bool compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
 {
     assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
-    NValue fallback_result = OP::includes_equality() ? NValue::getTrue() : NValue::getFalse();
     int schemaSize = tuple1.getSchema()->columnCount();
-    for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
-        NValue value1 = tuple1.getNValue(columnIdx);
-        if (value1.isNull()) {
-            fallback_result = NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-            if (OP::implies_null_for_row()) {
-                return fallback_result;
-            }
-            continue;
+    OP comp;
+    for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
+    {
+        if (comp.cmp(tuple1.getNValue(columnIdx), tuple2.getNValue(columnIdx)).isTrue())
+        {
+            return true;
         }
-        NValue value2 = tuple2.getNValue(columnIdx);
-        if (value2.isNull()) {
-            fallback_result = NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-            if (OP::implies_null_for_row()) {
-                return fallback_result;
-            }
-            continue;
-        }
-        if (OP::compare_withoutNull(value1, tuple2.getNValue(columnIdx)).isTrue()) {
-            if (OP::implies_true_for_row(value1, value2)) {
-                // allow early return on strict inequality
-                return NValue::getTrue();
-            }
-        }
-        else {
-            if (OP::implies_false_for_row(value1, value2)) {
-                // allow early return on strict inequality
-                return NValue::getFalse();
-            }
+        if (comp.cmp(tuple2.getNValue(columnIdx), tuple1.getNValue(columnIdx)).isTrue())
+        {
+            return false;
         }
     }
-    // The only cases that have not already short-circuited involve all equal columns.
-    // Each op either includes or excludes that particular case.
-    return fallback_result;
+    return false;
 }
 
 //Assumption - quantifier is on the right
@@ -158,23 +140,22 @@ struct NValueExtractor
         return m_value;
     }
 
-    template<typename OP>
-    NValue compare(const TableTuple& tuple) const
+    bool isNullValue(const ValueType& value) const
     {
-        assert(tuple.getSchema()->columnCount() == 1);
-        return compare<OP>(tuple.getNValue(0));
+        return value.isNull();
     }
 
     template<typename OP>
-    NValue compare(const NValue& nvalue) const
+    bool compare(const TableTuple& tuple) const
     {
-        if (m_value.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
-        if (nvalue.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
-        return OP::compare_withoutNull(m_value, nvalue);
+        assert(tuple.getSchema()->columnCount() == 1);
+        return OP().cmp(m_value, tuple.getNValue(0)).isTrue();
+    }
+
+    template<typename OP>
+    bool compare(OP comp, const NValue& nvalue) const
+    {
+        return OP().cmp(m_value, nvalue).isTrue();
     }
 
     std::string debug() const
@@ -214,36 +195,22 @@ struct TupleExtractor
 
     bool hasNullValue() const
     {
-        if (m_tuple.isNullTuple()) {
-            return true;
-        }
-        int schemaSize = m_tuple.getSchema()->columnCount();
-        for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
-            if (m_tuple.isNull(columnIdx)) {
-                return true;
-            }
-        }
-        return false;
+        return isNullValue(m_tuple);
     }
 
+    bool isNullValue(const ValueType& value) const;
+
     template<typename OP>
-    NValue compare(const TableTuple& tuple) const
+    bool compare(const TableTuple& tuple) const
     {
         return compare_tuple<OP>(m_tuple, tuple);
     }
 
     template<typename OP>
-    NValue compare(const NValue& nvalue) const
+    bool compare(const NValue& nvalue) const
     {
         assert(m_tuple.getSchema()->columnCount() == 1);
-        NValue lvalue = m_tuple.getNValue(0);
-        if (lvalue.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
-        if (nvalue.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
-        return OP::compare_withoutNull(lvalue, nvalue);
+        return OP().cmp(m_tuple.getNValue(0), nvalue).isTrue();
     }
 
     std::string debug() const
@@ -298,7 +265,8 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     // in case of the row expression on the left side
     NValue lvalue = m_left->eval(tuple1, tuple2);
     ValueExtractorOuter outerExtractor(lvalue);
-    if (outerExtractor.resultSize() > 1) {
+    if (outerExtractor.resultSize() > 1)
+    {
         // throw runtime exception
         char message[256];
         snprintf(message, 256, "More than one row returned by a scalar/row subquery");
@@ -308,63 +276,65 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     // Evaluate the inner_expr. The return value is a subquery id or a value as well
     NValue rvalue = m_right->eval(tuple1, tuple2);
     ValueExtractorInner innerExtractor(rvalue);
-    if (m_quantifier == QUANTIFIER_TYPE_NONE && innerExtractor.resultSize() > 1) {
+    if (m_quantifier == QUANTIFIER_TYPE_NONE && innerExtractor.resultSize() > 1)
+    {
         // throw runtime exception
         char message[256];
         snprintf(message, 256, "More than one row returned by a scalar/row subquery");
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
-    if (innerExtractor.resultSize() == 0) {
-        switch (m_quantifier) {
-        case QUANTIFIER_TYPE_NONE: {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+    if (innerExtractor.resultSize() == 0)
+    {
+        NValue retval = NValue::getFalse();
+        if (m_quantifier == QUANTIFIER_TYPE_NONE)
+        {
+            retval.setNull();
         }
-        case QUANTIFIER_TYPE_ANY: {
-            return NValue::getFalse();
+        else if (m_quantifier == QUANTIFIER_TYPE_ALL)
+        {
+            retval = NValue::getTrue();
         }
-        case QUANTIFIER_TYPE_ALL: {
-            return NValue::getTrue();
-        }
-        }
+        return retval;
     }
 
-    assert (innerExtractor.resultSize() > 0);
     if (!outerExtractor.hasNext() || outerExtractor.hasNullValue()) {
-        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        assert (innerExtractor.resultSize() > 0);
+        NValue retval = NValue::getFalse();
+        retval.setNull();
+        return retval;
     }
 
     //  Iterate over the inner results until
     //  no qualifier - the first match ( single row at most)
     //  ANY qualifier - the first match
     //  ALL qualifier - the first mismatch
+    int tuple_ctr = 0;
     bool hasInnerNull = false;
-    NValue result;
-    while (innerExtractor.hasNext()) {
+    while (innerExtractor.hasNext())
+    {
+        ++tuple_ctr;
         typename ValueExtractorInner::ValueType innerValue = innerExtractor.next();
-        result = outerExtractor.template compare<OP>(innerValue);
-        if (result.isTrue()) {
-            if (m_quantifier != QUANTIFIER_TYPE_ALL) {
-                return result;
-            }
-        }
-        else if (result.isFalse()) {
-            if (m_quantifier != QUANTIFIER_TYPE_ANY) {
-                return result;
-            }
-        }
-        else { //  result is null
+        if (innerExtractor.isNullValue(innerValue))
+        {
             hasInnerNull = true;
+            continue;
+        }
+        if (outerExtractor.template compare<OP>(innerValue)) {
+            if (m_quantifier != QUANTIFIER_TYPE_ALL) {
+                return NValue::getTrue();
+            }
+        } else if (m_quantifier == QUANTIFIER_TYPE_ALL) {
+            return NValue::getFalse();
         }
     }
 
-    // A NULL match along the way determines the result
-    // for cases that never found a definitive result.
-    if (hasInnerNull) {
-        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+    NValue retval = (m_quantifier == QUANTIFIER_TYPE_ALL) ? NValue::getTrue() : NValue::getFalse();
+    if (hasInnerNull == true)
+    {
+        retval.setNull();
     }
-    // Otherwise, return the unanimous result. false for ANY, true for ALL.
-    return result;
+    return retval;
 }
 
 }

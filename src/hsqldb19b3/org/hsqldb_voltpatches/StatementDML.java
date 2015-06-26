@@ -1732,10 +1732,6 @@ public class StatementDML extends StatementDMQL {
             assert(insertExpression != null || queryExpression != null);
 
             if (queryExpression == null) {
-            if (insertExpression.nodes.length > 1) {
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
-            }
                 voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
             } else {
                 voltAppendTargetColumns(session, insertColumnMap, null, xml);

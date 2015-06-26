@@ -306,15 +306,13 @@ public abstract class VoltTypeUtil {
 
         // The lower 6 digits of the microsecond timestamp (including the "double-counted" millisecond digits)
         // must be scaled up to get the 9-digit (rounded) nanosecond value.
-        int remaining = (int) (timestamp % 1000000);
-
-        // timestamp after epoch or timestamp without fractional seconds
-        if (timestamp >= 0 || remaining == 0) {
+        if (timestamp >= 0) {
             result = new java.sql.Timestamp(timestamp/1000);
-            result.setNanos(remaining*1000);
+            result.setNanos(((int) (timestamp % 1000000))*1000);
         } else {
-            // timestamp before epoch that has fractional seconds
             result = new java.sql.Timestamp((timestamp/1000000 - 1) * 1000);
+
+            int remaining = (int) (timestamp % 1000000);
             result.setNanos((remaining+1000000) * 1000 );
         }
 
@@ -355,23 +353,5 @@ public abstract class VoltTypeUtil {
             }
             return value;
         }
-    }
-
-    /**
-     * If the type is NUMERIC from hsqldb, VoltDB has to decide its real type.
-     * It's either INTEGER or DECIMAL according to the SQL Standard.
-     * Thanks for Hsqldb 1.9, FLOAT literal values have been handled well with E sign.
-     * @param vt
-     * @param value
-     * @return
-     */
-    public static VoltType getNumericLiteralType(VoltType vt, String value) {
-        try {
-            Long.parseLong(value);
-        } catch (NumberFormatException e) {
-            // Our DECIMAL may not be bigger/smaller enough to store the constant value
-            return VoltType.DECIMAL;
-        }
-        return vt;
     }
 }

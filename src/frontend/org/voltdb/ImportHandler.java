@@ -17,24 +17,20 @@
 
 package org.voltdb;
 
-import static org.voltdb.ClientInterface.getPartitionForProcedure;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
+import static org.voltdb.ClientInterface.getPartitionForProcedure;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Table;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
-
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -112,14 +108,6 @@ public class ImportHandler {
         return DBBPool.allocateDirectAndPool(sz);
     }
 
-    /**
-     * Returns true if a table with the given name exists in the server catalog.
-     */
-    public boolean hasTable(String name) {
-        Table table = m_catalogContext.tables.get(name);
-        return (table!=null);
-    }
-
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
@@ -133,24 +121,10 @@ public class ImportHandler {
         }
 
         if (catProc == null) {
-            if (proc.equals("@AdHoc")) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(proc);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-            if (catProc == null) {
-                m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
-                m_failedCount.incrementAndGet();
-                return false;
-            }
+            m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
+            m_failedCount.incrementAndGet();
+            return false;
         }
-
         int counter = 1;
         int maxSleepNano = 100000;
         long start = System.nanoTime();
@@ -176,8 +150,8 @@ public class ImportHandler {
         final BBContainer tcont = getBuffer(sz);
         final ByteBuffer taskbuf = tcont.b();
         try {
-            taskbuf.put(ProcedureInvocationType.ORIGINAL.getValue());
-            taskbuf.putInt(proc.length());
+            taskbuf.put((byte )ProcedureInvocationType.ORIGINAL.getValue());
+            taskbuf.putInt((int )proc.length());
             taskbuf.put(proc.getBytes());
             taskbuf.putLong(m_adapter.connectionId());
             pset.flattenToBuffer(taskbuf);

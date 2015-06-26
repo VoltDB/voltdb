@@ -24,7 +24,6 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -142,9 +141,9 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
          subtest2AdHocParameters(client);
 
-         subtest3AdHocParameterTypes(client);
+         subtest3AdHocBadParameters(client);
 
-         subtest4AdvancedParameterTypes(client);
+         subtest4AdvancedBadParameters(client);
 
          subtest5ExplainPlans(client);
 
@@ -160,18 +159,22 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         // No constants AdHoc queries
         //
         sql = "SELECT ID FROM R1 sub1 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{1, 2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
         checkPlannerCache(client, CACHE_MISS2_ADD1);
 
-        validateTableOfScalarLongs(client, sql, new long[]{1, 2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
         checkPlannerCache(client, CACHE_HIT1);
 
-        validateTableOfScalarLongs(client, sql, new long[]{1, 2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
         checkPlannerCache(client, CACHE_HIT1);
 
         // rename table alias
         sql = "SELECT ID FROM R1 sub1_C order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{1, 2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
         checkPlannerCache(client, CACHE_MISS2_ADD1);
 
 
@@ -179,14 +182,17 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         // Contain constants AdHoc Queries
         //
         sql = "SELECT ID FROM R1 sub1 WHERE ID > 1 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
         checkPlannerCache(client, CACHE_MISS2_ADD1);
 
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
         checkPlannerCache(client, CACHE_HIT1);
 
         sql = "SELECT ID FROM R1 sub1 WHERE ID > 2 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
         checkPlannerCache(client, CACHE_HIT2_ADD1);
 
 
@@ -324,44 +330,38 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         checkPlannerCache(client, CACHE_SKIPPED);
     }
 
-    public void subtest3AdHocParameterTypes(Client client) throws IOException, ProcCallException {
-        System.out.println("subtest3AdHocParameterTypes...");
+    public void subtest3AdHocBadParameters(Client client) throws IOException, ProcCallException {
+        System.out.println("subtest3AdHocBadParameters...");
 
         String sql;
         VoltTable vt;
 
-        // decimal constants
+        // Integer <-> Float
         sql = "SELECT ID FROM R1 sub3 WHERE ID > 1.8 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        checkPlannerCache(client, CACHE_MISS1);
 
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
         checkPlannerCache(client, CACHE_HIT1);
 
-        sql = "SELECT ID FROM R1 sub3 WHERE ID > 1.9 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        // same query but use Integer constants
-        // Then it's a completely new sql pattern to the cache,
-        // as the cache is parameter type sensitive now.
         sql = "SELECT ID FROM R1 sub3 WHERE ID > 1 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
         checkPlannerCache(client, CACHE_MISS2_ADD1);
 
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
         checkPlannerCache(client, CACHE_HIT1);
 
         sql = "SELECT ID FROM R1 sub3 WHERE ID > 2 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
         checkPlannerCache(client, CACHE_HIT2_ADD1);
 
-        //
-        // query with user parameters
-        //
         sql = "SELECT ID FROM R1 sub3 WHERE ID > ? order by ID;";
         String errorMsg = "java.lang.Double is not a match or is out of range for the target parameter type: long";
-        // TODO: the message should say: decimal not able to be converted to integer ?
         verifyAdHocFails(client, errorMsg, sql, 1.8);
         checkPlannerCache(client, CACHE_MISS2);
 
@@ -373,139 +373,28 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[]{3});
         checkPlannerCache(client, CACHE_HIT2);
 
-        // user parameter with CAST operation
-        sql = "SELECT ID FROM R1 sub3 WHERE ID > cast(? as float) order by ID;";
-        vt = client.callProcedure("@AdHoc", sql, 1.8).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{2,3});
-        checkPlannerCache(client, CACHE_MISS2);
-
-        vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{3});
-        checkPlannerCache(client, CACHE_HIT2);
-
-        vt = client.callProcedure("@AdHoc", sql, 1.5).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{2,3});
-        checkPlannerCache(client, CACHE_HIT2);
-
-        //
         // change the where clause to get the new query pattern
-        //
 
         // try the normal integer value first
         sql = "SELECT ID FROM R1 sub3 WHERE NUM > 0 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{3});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
         checkPlannerCache(client, CACHE_MISS2_ADD1);
 
-        // try the decimal value second, it has bad parameterization
+        // try the float value second, it has bad parameterization
         sql = "SELECT ID FROM R1 sub3 WHERE NUM > 0.8 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{3});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS1);
 
         sql = "SELECT ID FROM R1 sub3 WHERE NUM > 0.9 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{3});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-
-        //
-        // test the AVG function
-        //
-        sql = "SELECT AVG(ID) + 0.1 FROM R1 sub3;";
-        validateTableColumnOfScalarDecimal(client, sql, new BigDecimal[]{new BigDecimal(2.1)});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        validateTableColumnOfScalarDecimal(client, sql, new BigDecimal[]{new BigDecimal(2.1)});
-        checkPlannerCache(client, CACHE_HIT1);
-
-        sql = "SELECT AVG(ID) + 0.2 FROM R1 sub3;";
-        validateTableColumnOfScalarDecimal(client, sql, new BigDecimal[]{new BigDecimal(2.2)});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        // integer constants is a new SQL pattern to the planner cache
-        sql = "SELECT AVG(ID) + 2 FROM R1 sub3;";
-        validateTableOfScalarLongs(client, sql, new long[]{4});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        validateTableOfScalarLongs(client, sql, new long[]{4});
-        checkPlannerCache(client, CACHE_HIT1);
-
-        sql = "SELECT AVG(ID) + 3 FROM R1 sub3;";
-        validateTableOfScalarLongs(client, sql, new long[]{5});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        // float constants is a new SQL pattern to the planner cache
-        sql = "SELECT AVG(ID) + 1.0e-1 FROM R1 sub3;";
-        validateTableColumnOfScalarFloat(client, sql, new double[]{2.1});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        validateTableColumnOfScalarFloat(client, sql, new double[]{2.1});
-        checkPlannerCache(client, CACHE_HIT1);
-
-        sql = "SELECT AVG(ID) + 2.0e-1 FROM R1 sub3;";
-        validateTableColumnOfScalarFloat(client, sql, new double[]{2.2});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        //
-        // change the table alias to get a completely new base line
-        //
-        sql = "SELECT AVG(ID) + 2 FROM R1 sub3_1;";
-        validateTableOfScalarLongs(client, sql, new long[]{4});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        validateTableOfScalarLongs(client, sql, new long[]{4});
-        checkPlannerCache(client, CACHE_HIT1);
-
-        sql = "SELECT AVG(ID) + 3 FROM R1 sub3_1;";
-        validateTableOfScalarLongs(client, sql, new long[]{5});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        // decimal constants is a new SQL pattern to the planner cache
-        sql = "SELECT AVG(ID) + 0.1 FROM R1 sub3_1;";
-        validateTableColumnOfScalarDecimal(client, sql, new BigDecimal[]{new BigDecimal(2.1)});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-
-        // change the table name for new baseline
-        //
-        // float constants
-        //
-        sql = "SELECT ID FROM R1 sub3_2 WHERE ID > 0.18E1 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_HIT1);
-
-        sql = "SELECT ID FROM R1 sub3_2 WHERE ID > 0.19E1 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        // same query but use Integer constants
-        sql = "SELECT ID FROM R1 sub3_2 WHERE ID > 1 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_HIT1);
-
-        sql = "SELECT ID FROM R1 sub3_2 WHERE ID > 2 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{3});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        // same query but use Decimal constants
-        sql = "SELECT ID FROM R1 sub3_2 WHERE ID > 1.8 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_HIT1);
-
-        sql = "SELECT ID FROM R1 sub3_2 WHERE ID > 1.9 order by ID;";
-        validateTableOfScalarLongs(client, sql, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS1);
     }
 
-    public void subtest4AdvancedParameterTypes(Client client) throws IOException, ProcCallException {
-        System.out.println("subtest4AdvancedParameterTypes...");
+    public void subtest4AdvancedBadParameters(Client client) throws IOException, ProcCallException {
+        System.out.println("subtest4AdvancedBadParameters...");
 
         String sql;
         VoltTable vt;
@@ -592,100 +481,6 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
         verifyAdHocFails(client, String.format(pattern, 2, 0), sql);
         checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
-
-
-        //
-        // ENG-8238: AVG with decimal operation truncated to integer
-        // FIXED in V5.4.
-        //
-
-        // start with decimal first
-        sql = "select ID, (select AVG(ID) + 0.1 from R1) from R1 sub4;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarDecimal(vt, 1,
-                new BigDecimal[]{new BigDecimal(2.1), new BigDecimal(2.1), new BigDecimal(2.1)});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 1 from R1) from R1 sub4;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarLong(vt, 1, new long[]{3, 3, 3});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 2 from R1) from R1 sub4;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarLong(vt, 1, new long[]{4, 4, 4});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 0.2 from R1) from R1 sub4;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarDecimal(vt, 1,
-                new BigDecimal[]{new BigDecimal(2.2), new BigDecimal(2.2), new BigDecimal(2.2)});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 2.0E-1 from R1) from R1 sub4;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarFloat(vt, 1, new double[]{2.2, 2.2, 2.2});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 3.0E-1 from R1) from R1 sub4;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarFloat(vt, 1, new double[]{2.3, 2.3, 2.3});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        // new SQL pattern with new alias
-
-        // start with integer first
-        sql = "select ID, (select AVG(ID) + 1 from R1) from R1 sub4_1;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarLong(vt, 1, new long[]{3, 3, 3});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 0.1 from R1) from R1 sub4_1;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarDecimal(vt, 1,
-                new BigDecimal[]{new BigDecimal(2.1), new BigDecimal(2.1), new BigDecimal(2.1)});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 2 from R1) from R1 sub4_1;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarLong(vt, 1, new long[]{4, 4, 4});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 0.2 from R1) from R1 sub4_1;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarDecimal(vt, 1,
-                new BigDecimal[]{new BigDecimal(2.2), new BigDecimal(2.2), new BigDecimal(2.2)});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-
-        // new SQL pattern with new alias
-
-        // start with float first
-        sql = "select ID, (select AVG(ID) + 1.0E-1 from R1) from R1 sub4_2;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarFloat(vt, 1, new double[]{2.1, 2.1, 2.1});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 1 from R1) from R1 sub4_2;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarLong(vt, 1, new long[]{3, 3, 3});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 2 from R1) from R1 sub4_2;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarLong(vt, 1, new long[]{4, 4, 4});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 3.0E-1 from R1) from R1 sub4_2;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarFloat(vt, 1, new double[]{2.3, 2.3, 2.3});
-        checkPlannerCache(client, CACHE_HIT2_ADD1);
-
-        sql = "select ID, (select AVG(ID) + 0.2 from R1) from R1 sub4_2;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        validateTableColumnOfScalarDecimal(vt, 1,
-                new BigDecimal[]{new BigDecimal(2.2), new BigDecimal(2.2), new BigDecimal(2.2)});
-        checkPlannerCache(client, CACHE_MISS2_ADD1);
     }
 
     public void subtest5ExplainPlans(Client client) throws IOException, ProcCallException {
@@ -805,7 +600,8 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         assertTrue(vt.toString().contains("ABSIDX"));
         checkPlannerCache(client, CACHE_MISS2_ADD1);
 
-        validateTableOfScalarLongs(client, sql, new long[]{1, 2});
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1, 2});
         checkPlannerCache(client, CACHE_HIT1);
     }
 

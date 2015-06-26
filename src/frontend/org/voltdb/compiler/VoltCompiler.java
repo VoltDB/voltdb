@@ -1455,6 +1455,7 @@ public class VoltCompiler {
             }
         } else {
             String complexGroupbyJson = mvi.getGroupbyexpressionsjson();
+            assert(complexGroupbyJson != null && complexGroupbyJson.length() > 0);
             if (complexGroupbyJson.length() > 0) {
                 int partitionColIndex =  partitionColumn.getIndex();
 

@@ -25,29 +25,25 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
-import java.util.concurrent.CountDownLatch;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.net.SocketAppender;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
-import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.Socket;
+import java.util.concurrent.CountDownLatch;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.regressionsuites.RegressionSuite;
 
 /**
  * End to end Import tests using the injected socket importer.
@@ -55,11 +51,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 
 public class TestImportSuite extends RegressionSuite {
-    private static final Logger s_testSocketLogger = Logger.getLogger("testSocketLogger");
-    private static final Level[] s_levels =
-        { Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.TRACE, Level.WARN };
-
-    private Boolean m_socketHandlerInitialized = false;
 
     @Override
     public void setUp() throws Exception
@@ -67,22 +58,7 @@ public class TestImportSuite extends RegressionSuite {
         VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
-
         super.setUp();
-    }
-
-    private void setupLog4jSocketHandler() {
-        synchronized(m_socketHandlerInitialized) {
-            if (m_socketHandlerInitialized) return;
-
-            SocketAppender appender = new SocketAppender("localhost", 6060);
-            appender.setReconnectionDelay(50);
-            s_testSocketLogger.setAdditivity(false);
-            s_testSocketLogger.removeAllAppenders();
-            s_testSocketLogger.setLevel(Level.ALL);
-            s_testSocketLogger.addAppender(appender);
-            m_socketHandlerInitialized = true;
-        }
     }
 
     @Override
@@ -90,120 +66,41 @@ public class TestImportSuite extends RegressionSuite {
         super.tearDown();
     }
 
-    abstract class DataPusher extends Thread {
+    class DataPusher extends Thread {
+        private final String m_server;
+        private final int m_port;
         private final int m_count;
         private final CountDownLatch m_latch;
 
-        public DataPusher(int count, CountDownLatch latch) {
+        public DataPusher(String server, int port, int count, CountDownLatch latch) {
+            m_server = server;
+            m_port = port;
             m_count = count;
             m_latch = latch;
         }
 
-        protected abstract void initialize();
-        protected abstract void close();
-        protected abstract void pushData(String str) throws Exception;
-
         @Override
         public void run() {
-            initialize();
+            OutputStream sout = connectToOneServerWithRetry(m_server, m_port);
 
+            System.out.printf("Connected to VoltDB socket importer at: %s.\n", m_server + ":" + m_port);
             try {
                 for (int icnt = 0; icnt < m_count; icnt++) {
                     String s = String.valueOf(System.nanoTime() + icnt) + "," + System.currentTimeMillis() + "\n";
-                    pushData(s);
+                    sout.write(s.getBytes());
                     Thread.sleep(0, 1);
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
-                close();
+                try {
+                    sout.flush();
+                } catch (IOException ex) {
+                }
                 m_latch.countDown();
             }
         }
 
-    }
-
-    class SocketDataPusher extends DataPusher {
-        private final String m_server;
-        private final int m_port;
-        private OutputStream m_sout;
-
-        public SocketDataPusher(String server, int port, int count, CountDownLatch latch) {
-            super(count, latch);
-            m_server = server;
-            m_port = port;
-        }
-
-        @Override
-        protected void initialize() {
-            m_sout = connectToOneServerWithRetry(m_server, m_port);
-            System.out.printf("Connected to VoltDB socket importer at: %s.\n", m_server + ":" + m_port);
-        }
-
-        @Override
-        protected void pushData(String str) throws Exception {
-            m_sout.write(str.getBytes());
-        }
-
-        @Override
-        protected void close() {
-            try {
-                m_sout.flush();
-                m_sout.close();
-            } catch (IOException ex) {
-            }
-        }
-    }
-
-    class Log4jDataPusher extends DataPusher {
-
-        private final Random random = new Random();
-
-        public Log4jDataPusher(int count, CountDownLatch latch) {
-            super(count, latch);
-        }
-
-        @Override
-        protected void initialize() {
-            TestImportSuite.this.setupLog4jSocketHandler();
-        }
-
-        @Override
-        protected void pushData(String str) throws Exception {
-            s_testSocketLogger.log(s_levels[random.nextInt(s_levels.length)], str);
-        }
-
-        @Override
-        protected void close() {
-        }
-    }
-
-    private void pushDataToImporters(int count, int loops) throws Exception {
-        CountDownLatch latch = new CountDownLatch(2*loops);
-        for (int i=0; i<loops; i++) {
-            (new SocketDataPusher("localhost", 7001, count, latch)).start();
-            (new Log4jDataPusher(count, latch)).start();
-        }
-        latch.await();
-    }
-
-    private void verifyData(Client client, int count) throws Exception {
-        verifyData(client, count, -1);
-    }
-
-    private void verifyData(Client client, int count, int min) throws Exception {
-        ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from importTable");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            assertEquals(count, response.getResults()[0].asScalarLong());
-
-        response = client.callProcedure("@AdHoc", "select count(*) from log_events");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        if (min<0) {
-            assertEquals(count, response.getResults()[0].asScalarLong());
-        } else {
-            long result = response.getResults()[0].asScalarLong();
-            assertTrue(result + " not between " + min + " and " + count, result>=min && result<=count);
-        }
     }
 
     public void testImportSimpleData() throws Exception {
@@ -214,8 +111,13 @@ public class TestImportSuite extends RegressionSuite {
             System.out.println("Waiting for hashinator to be initialized...");
         }
 
-        pushDataToImporters(100, 1);
-        verifyData(client, 100);
+        CountDownLatch latch = new CountDownLatch(1);
+        (new DataPusher("localhost", 7001, 100, latch)).start();
+        latch.await();
+        ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from importTable");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(100, response.getResults()[0].asScalarLong());
+
         client.close();
     }
 
@@ -227,13 +129,20 @@ public class TestImportSuite extends RegressionSuite {
             System.out.println("Waiting for hashinator to be initialized...");
         }
 
-        pushDataToImporters(100, 1);
-        verifyData(client, 100);
+        CountDownLatch latch = new CountDownLatch(1);
+        (new DataPusher("localhost", 7001, 100, latch)).start();
+        latch.await();
+        ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from importTable");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(100, response.getResults()[0].asScalarLong());
 
         Thread.sleep(0, 1);
-
-        pushDataToImporters(100, 1);
-        verifyData(client, 200);
+        latch = new CountDownLatch(1);
+        (new DataPusher("localhost", 7001, 100, latch)).start();
+        latch.await();
+        response = client.callProcedure("@AdHoc", "select count(*) from importTable");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(200, response.getResults()[0].asScalarLong());
 
         client.close();
     }
@@ -246,8 +155,14 @@ public class TestImportSuite extends RegressionSuite {
             System.out.println("Waiting for hashinator to be initialized...");
         }
 
-        pushDataToImporters(100, 2);
-        verifyData(client, 100*2);
+        CountDownLatch latch = new CountDownLatch(2);
+        (new DataPusher("localhost", 7001, 100, latch)).start();
+        (new DataPusher("localhost", 7001, 100, latch)).start();
+        latch.await();
+        ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from importTable");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(200, response.getResults()[0].asScalarLong());
+
         client.close();
     }
 
@@ -259,15 +174,27 @@ public class TestImportSuite extends RegressionSuite {
             System.out.println("Waiting for hashinator to be initialized...");
         }
 
-        pushDataToImporters(1000, 3);
-        verifyData(client, 3000);
+        CountDownLatch latch = new CountDownLatch(3);
+        (new DataPusher("localhost", 7001, 1000, latch)).start();
+        (new DataPusher("localhost", 7001, 1000, latch)).start();
+        (new DataPusher("localhost", 7001, 1000, latch)).start();
+        latch.await();
+        ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from importTable");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(3000, response.getResults()[0].asScalarLong());
 
-        ClientResponse response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
+        response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
-        pushDataToImporters(1000, 4);
-        // log4j will lose some events because of reconnection delay
-        verifyData(client, 7000, 3001);
+        latch = new CountDownLatch(4);
+        (new DataPusher("localhost", 7001, 1000, latch)).start();
+        (new DataPusher("localhost", 7001, 1000, latch)).start();
+        (new DataPusher("localhost", 7001, 1000, latch)).start();
+        (new DataPusher("localhost", 7001, 1000, latch)).start();
+        latch.await();
+        response = client.callProcedure("@AdHoc", "select count(*) from importTable");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(7000, response.getResults()[0].asScalarLong());
 
         client.close();
     }
@@ -313,7 +240,6 @@ public class TestImportSuite extends RegressionSuite {
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
 
-        // configure socket importer
         Properties props = new Properties();
         props.putAll(ImmutableMap.<String, String>of(
                 "port", "7001",
@@ -321,13 +247,6 @@ public class TestImportSuite extends RegressionSuite {
                 "procedure", "importTable.insert"));
         project.addImport(true, "custom", "csv", "org.voltdb.importclient.SocketStreamImporter", props);
         project.addPartitionInfo("importTable", "PKEY");
-
-        // configure log4j socket handler importer
-        props = new Properties();
-        props.putAll(ImmutableMap.<String, String>of(
-                "port", "6060",
-                "log-event-table", "log_events"));
-        project.addImport(true, "custom", null, "org.voltdb.importclient.Log4jSocketHandlerImporter", props);
 
         /*
          * compile the catalog all tests start with

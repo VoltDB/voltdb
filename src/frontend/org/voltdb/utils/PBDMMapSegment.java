@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
 import org.voltcore.logging.VoltLogger;
@@ -38,9 +39,14 @@ import org.xerial.snappy.Snappy;
  * for reading and writing, but not both at the same time.
  *
  */
-class PBDMMapSegment extends PBDSegment {
+class PBDMMapSegment implements PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
+    //Avoid unecessary sync with this flag
+    private boolean m_syncedSinceLastEdit;
+    final File m_file;
+    private RandomAccessFile m_ras;
+    private FileChannel m_fc;
     private MBBContainer m_buf;
     private ByteBuffer m_readBuf;
 
@@ -63,8 +69,8 @@ class PBDMMapSegment extends PBDSegment {
     private int m_discardCount;
 
     public PBDMMapSegment(Long index, File file) {
-        super(file);
         m_index = index;
+        m_file = file;
         reset();
         if (LOG.isDebugEnabled()) {
             LOG.debug("Creating Segment: " + file.getName() + " At Index: " + m_index);
@@ -96,7 +102,8 @@ class PBDMMapSegment extends PBDSegment {
             open(false);
         }
         if (m_fc.size() > SEGMENT_HEADER_BYTES) {
-            return m_buf.b().getInt(COUNT_OFFSET);
+            final int numEntries = m_buf.b().getInt(0);
+            return numEntries;
         } else {
             return 0;
         }
@@ -112,11 +119,10 @@ class PBDMMapSegment extends PBDSegment {
         return m_objectReadIndex;
     }
 
-    @Override
-    protected void initNumEntries(int count, int size) throws IOException {
+    private void initNumEntries() throws IOException {
         final ByteBuffer buf = m_buf.b();
-        buf.putInt(0, count);
-        buf.putInt(4, size);
+        buf.putInt(0, 0);
+        buf.putInt(4, 0);
         m_syncedSinceLastEdit = false;
     }
 
@@ -130,11 +136,6 @@ class PBDMMapSegment extends PBDSegment {
 
     @Override
     public void open(boolean forWrite) throws IOException {
-        open(forWrite, forWrite);
-    }
-
-    @Override
-    protected void open(boolean forWrite, boolean truncate) throws IOException {
         if (!m_closed) {
             throw new IOException("Segment is already opened");
         }
@@ -151,9 +152,7 @@ class PBDMMapSegment extends PBDSegment {
             m_buf = DBBPool.wrapMBB(m_fc.map(MapMode.READ_WRITE, 0, CHUNK_SIZE));
             m_buf.b().position(SIZE_OFFSET + 4);
             m_readBuf = m_buf.b().duplicate();
-            if (truncate) {
-                initNumEntries(0, 0);
-            }
+            initNumEntries();
         } else {
             //If it isn't for write, map read only to the actual size and put the write buf position at the end
             //so size is reported correctly
@@ -367,23 +366,5 @@ class PBDMMapSegment extends PBDSegment {
     public int uncompressedBytesToRead() {
         if (m_closed) throw new RuntimeException("closed");
         return Math.max(0, m_buf.b().getInt(SIZE_OFFSET) - m_bytesRead);
-    }
-
-    @Override
-    protected long readOffset()
-    {
-        return m_readBuf.position();
-    }
-
-    @Override
-    protected void rewindReadOffset(int byBytes)
-    {
-        m_readBuf.position(m_readBuf.position() - byBytes);
-    }
-
-    @Override
-    protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int length) throws IOException
-    {
-        return entry.writeTruncatedObject(m_readBuf);
     }
 }

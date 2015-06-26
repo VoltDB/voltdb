@@ -18,10 +18,10 @@
     background-position: 0 2px;
 }
     .icheckbox_square-aero.hover {
-        background-position: -24px 1px;
+        background-position: -24px 2px;
     }
     .icheckbox_square-aero.checked {
-        background-position: -48px 1px;
+        background-position: -48px 2px;
     }
     .icheckbox_square-aero.disabled {
         background-position: -72px 0;

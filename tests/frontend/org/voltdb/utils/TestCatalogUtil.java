@@ -1581,38 +1581,6 @@ public class TestCatalogUtil extends TestCase {
         assertFalse(cluster.getJsonapi());
     }
 
-    public void testDefaultFileExportType() throws Exception {
-        if (!MiscUtils.isPro()) { return; } // not supported in community
-
-        final String withDefault =
-                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
-                + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
-                + "            <property name=\"foo\">false</property>"
-                + "            <property name=\"with-schema\">false</property>"
-                + "            <property name=\"nonce\">pre-fix</property>"
-                + "            <property name=\"outdir\">exportdata</property>"
-                + "        </configuration>"
-                + "    </export>"
-                + "</deployment>";
-        final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_data;";
-
-        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
-
-        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(withDefault);
-        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
-
-        VoltCompiler compiler = new VoltCompiler();
-        String x[] = {tmpDdl.getAbsolutePath()};
-        Catalog cat = compiler.compileCatalogFromDDL(x);
-
-        String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
-        assertNull("deployment should compile with missing file export type", msg);
-    }
 
     @SafeVarargs
     private final void verifyDeserializedDRTableSignature(String schema, Pair<String, String>... signatures) throws IOException

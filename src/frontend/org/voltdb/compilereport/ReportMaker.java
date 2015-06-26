@@ -1062,8 +1062,8 @@ public class ReportMaker {
         report = report.replace("##RESOURCES-->", "");
 
         // inject the cluster overview
-        //String clusterStr = "<h4>System Overview</h4>\n<p>" + getLiveSystemOverview() + "</p><br/>\n";
-        //report = report.replace("<!--##CLUSTER##-->", clusterStr);
+        String clusterStr = "<h4>System Overview</h4>\n<p>" + getLiveSystemOverview() + "</p><br/>\n";
+        report = report.replace("<!--##CLUSTER##-->", clusterStr);
 
         // inject the running system platform properties
         PlatformProperties pp = PlatformProperties.getPlatformProperties();

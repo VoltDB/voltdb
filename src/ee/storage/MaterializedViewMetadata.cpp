@@ -82,15 +82,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
             processTupleInsert(scannedTuple, false);
         }
     }
-    /* If there is no group by column and the target table is still empty
-     * even after catching up with pre-existing source tuples, we should initialize the
-     * target table with a row of default values.
-     * COUNT() functions should have value 0, other aggregation functions should have value NULL.
-     * See ENG-7872
-     */
-    if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
-        initializeTupleHavingNoGroupBy();
-    }
     VOLT_TRACE("Finish initialization...");
 }
 
@@ -130,11 +121,6 @@ void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
         for (int i = 0; i < candidates.size(); i++) {
             if (indexForMinOrMax.compare(candidates[i]->getName()) == 0) {
                 m_indexForMinMax = candidates[i];
-                // If the index for min / max aggs contains the agg exprs / cols, we need to
-                // create a seprate search key value vector for it. (ENG-6511)
-                if ( minMaxIndexIncludesAggCol() ) {
-                    m_minMaxSearchKeyValue = std::vector<NValue>(m_indexForMinMax->getColumnIndices().size());
-                }
                 break;
             }
         }
@@ -146,31 +132,14 @@ void MaterializedViewMetadata::freeBackedTuples()
     delete[] m_searchKeyBackingStore;
     delete[] m_updatedTupleBackingStore;
     delete[] m_emptyTupleBackingStore;
-    delete[] m_minMaxSearchKeyBackingStore;
 }
 
 void MaterializedViewMetadata::allocateBackedTuples()
 {
-    // The materialized view will have no index if there is no group by column.
-    // In this case, we will not allocate space for m_searchKeyBackingStore (ENG-7872)
-    if (m_groupByColumnCount == 0) {
-        m_searchKeyBackingStore = NULL;
-    }
-    else {
-        m_searchKeyTuple = TableTuple(m_index->getKeySchema());
-        m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
-        memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
-        m_searchKeyTuple.move(m_searchKeyBackingStore);
-    }
-
-    m_minMaxSearchKeyBackingStore = NULL;
-    // If the minMaxIndex contains agg cols, need to allocate a searchKeyTuple and backing store for it. (ENG-6511)
-    if ( minMaxIndexIncludesAggCol() ) {
-        m_minMaxSearchKeyTuple = TableTuple(m_indexForMinMax->getKeySchema());
-        m_minMaxSearchKeyBackingStore = new char[m_indexForMinMax->getKeySchema()->tupleLength() + 1];
-        memset(m_minMaxSearchKeyBackingStore, 0, m_indexForMinMax->getKeySchema()->tupleLength() + 1);
-        m_minMaxSearchKeyTuple.move(m_minMaxSearchKeyBackingStore);
-    }
+    m_searchKeyTuple = TableTuple(m_index->getKeySchema());
+    m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
+    memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
+    m_searchKeyTuple.move(m_searchKeyBackingStore);
 
     m_existingTuple = TableTuple(m_target->schema());
 
@@ -313,77 +282,29 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
     NValue newVal = initialNull;
     IndexCursor minMaxCursor(m_indexForMinMax->getTupleSchema());
 
-    // Search for the min / max fallback value. use indexs differently according to their types.
-    // (Does the index include min / max aggCol? - ENG-6511)
-    if ( minMaxIndexIncludesAggCol() ) {
-        // Assemble the m_minMaxSearchKeyTuple and m_minMaxSearchKeyValue with
-        // group-by column values and the old min/max value.
-        for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-            NValue value = getGroupByValueFromSrcTuple(colindex, oldTuple);
-            m_minMaxSearchKeyValue[colindex] = value;
-            m_minMaxSearchKeyTuple.setNValue(colindex, value);
+    m_indexForMinMax->moveToKey(&m_searchKeyTuple, minMaxCursor);
+    VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
+    TableTuple tuple;
+    while (!(tuple = m_indexForMinMax->nextValueAtKey(minMaxCursor)).isNullTuple()) {
+        // skip the oldTuple and apply post filter
+        if (tuple.equals(oldTuple) ||
+            (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
+            continue;
         }
-        NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
-        m_minMaxSearchKeyValue[(int)m_groupByColumnCount] = oldValue;
-        m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
-        TableTuple tuple;
-        // Search for the new min/max value and keep it in tuple.
-        if (negate_for_min == -1) {
-            // min()
-            m_indexForMinMax->moveToKeyOrGreater(&m_minMaxSearchKeyTuple, minMaxCursor);
+        VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
+        NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
+        if (current.isNull()) {
+            continue;
         }
-        else {
-            // max()
-            m_indexForMinMax->moveToGreaterThanKey(&m_minMaxSearchKeyTuple, minMaxCursor);
-            m_indexForMinMax->moveToPriorEntry(minMaxCursor);
-        }
-        while ( ! (tuple = m_indexForMinMax->nextValue(minMaxCursor)).isNullTuple() ) {
-            // If the cursor already moved out of the target group range, exit the loop.
-            for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-                NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
-                if ( value.compare(m_minMaxSearchKeyValue[colindex]) != 0 ) {
-                    return initialNull;
-                }
-            }
-            // skip the oldTuple and apply post filter
-            if (tuple.equals(oldTuple) ||
-                (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
-                continue;
-            }
-            NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
-            if (current.isNull()) {
-                return initialNull;
-            }
+        if (current.compare(existingValue) == 0) {
             newVal = current;
+            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
             break;
         }
-    }
-    else {
-        // Use sub-optimal index (only group-by columns).
-        m_indexForMinMax->moveToKey(&m_searchKeyTuple, minMaxCursor);
-        VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
-        TableTuple tuple;
-        while (!(tuple = m_indexForMinMax->nextValueAtKey(minMaxCursor)).isNullTuple()) {
-            // skip the oldTuple and apply post filter
-            if (tuple.equals(oldTuple) ||
-                (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
-                continue;
-            }
-            VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
-            NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
-            if (current.isNull()) {
-                continue;
-            }
-            if (current.compare(existingValue) == 0) {
-                newVal = current;
-                VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
-                break;
-            }
-            VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
-            if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
-                newVal = current;
-                VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
-            }
+        VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
+        if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
+            newVal = current;
+            VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
         }
     }
     return newVal;
@@ -449,26 +370,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
     }
     VOLT_TRACE("\tFinal: new best %s\n", newVal.debug().c_str());
     return newVal;
-}
-
-void MaterializedViewMetadata::initializeTupleHavingNoGroupBy()
-{
-    // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
-    // COUNT(*) column will be zero.
-    m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
-    int aggOffset = (int)m_groupByColumnCount + 1;
-    NValue newValue;
-    for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
-            newValue = ValueFactory::getBigIntValue(0);
-        }
-        else {
-            newValue = ValueFactory::getNullValue();
-        }
-        m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
-    }
-    m_target->insertPersistentTuple(m_updatedTuple, true);
 }
 
 void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bool fallible)
@@ -589,11 +490,6 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     // check if we should remove the tuple
     if (count.isZero()) {
         m_target->deleteTuple(m_existingTuple, fallible);
-        // If there is no group by column, the count() should remain 0 and other functions should
-        // have value null. See ENG-7872.
-        if (m_groupByColumnCount == 0) {
-            initializeTupleHavingNoGroupBy();
-        }
         return;
     }
     // assume from here that we're just updating the existing row
@@ -662,14 +558,6 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
 
 bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
 {
-    // For the case where is no grouping column, like SELECT COUNT(*) FROM T;
-    // We directly return the only row in the view. See ENG-7872.
-    if (m_groupByColumnCount == 0) {
-        TableIterator iterator = m_target->iteratorDeletingAsWeGo();
-        iterator.next(m_existingTuple);
-        return ! m_existingTuple.isNullTuple();
-    }
-
     // find the key for this tuple (which is the group by columns)
     for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
         NValue value = getGroupByValueFromSrcTuple(colindex, tuple);

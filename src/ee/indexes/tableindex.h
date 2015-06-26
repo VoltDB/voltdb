@@ -304,11 +304,6 @@ public:
         throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
     }
 
-    virtual void moveToPriorEntry(IndexCursor& cursor) const
-    {
-        throwFatalException("Invoked TableIndex virtual method moveToPriorEntry which has no implementation");
-    }
-
     /**
      * This method moves to the beginning or the end of the indexes.
      * Use this with nextValue().

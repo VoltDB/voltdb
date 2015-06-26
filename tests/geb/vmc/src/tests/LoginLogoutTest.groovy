@@ -17,16 +17,16 @@ class LoginLogoutTest extends TestBase {
         expect: 'to be on VMC page'
         at VoltDBManagementCenterPage
         
-        while(count<numberOfTrials) {
+        while(count<10) {
         	count++
         	try {
 				when:
-				waitFor(waitTime) {
+				waitFor(30) {
 					page.header.logout.click()
 					page.header.logoutPopupOkButton.isDisplayed()
 				}
 				
-				waitFor(waitTime) {
+				waitFor(30) {
 					page.header.logoutPopupOkButton.click()
 					!page.header.logoutPopupOkButton.isDisplayed()
 				}
@@ -67,16 +67,16 @@ class LoginLogoutTest extends TestBase {
         expect: 'to be on VMC page'
         at VoltDBManagementCenterPage
         
-        while(count<numberOfTrials) {
+        while(count<10) {
         	count++
         	try {
 				when:
-				waitFor(waitTime) {
+				waitFor(30) {
 					page.header.logout.click()
 					page.header.logoutPopupOkButton.isDisplayed()
 				}
 				
-				waitFor(waitTime) {
+				waitFor(30) {
 					page.header.logoutPopupOkButton.click()
 					!page.header.logoutPopupOkButton.isDisplayed()
 				}
@@ -123,16 +123,16 @@ class LoginLogoutTest extends TestBase {
         at VoltDBManagementCenterPage
         
         
-        while(count<numberOfTrials) {
+        while(count<10) {
         	count++
         	try {
 				when:
-				waitFor(waitTime) {
+				waitFor(30) {
 					page.header.logout.click()
 					page.header.logoutPopupOkButton.isDisplayed()
 				}
 				
-				waitFor(waitTime) {
+				waitFor(30) {
 					page.header.logoutPopupOkButton.click()
 					!page.header.logoutPopupOkButton.isDisplayed()
 				}

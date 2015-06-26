@@ -159,6 +159,7 @@ public class MaterializedViewFixInfo {
                 }
             }
         }
+        assert(numOfGroupByColumns > 0);
         m_mvTableScan = mvTableScan;
 
         Set<String> mvDDLGroupbyColumnNames = new HashSet<String>();

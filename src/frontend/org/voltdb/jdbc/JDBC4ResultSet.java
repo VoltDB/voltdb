@@ -45,7 +45,6 @@ import javax.sql.rowset.serial.SerialClob;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.utils.Encoder;
 
 // TODO: NString, (N)Clob, AsciiStream, (N)CharacterStream all feel dubious to me.  VoltDB stores data in UTF-8 - somewhere along the lines there should be a conversion.
 // TODO: Blob, Bytes, BinaryStream are debatable.  Here as well, I merely grab a varchar field's binary data.  With the internal conversion to UTF-8, this isn't going to work very well... Maybe embed Base64 encoding until binary field support is available?
@@ -791,14 +790,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public String getString(int columnIndex) throws SQLException {
         checkColumnBounds(columnIndex);
         try {
-            VoltType type = table.getColumnType(columnIndex - 1);
-            if (type == VoltType.STRING)
-                return table.getString(columnIndex - 1);
-            if (type == VoltType.TIMESTAMP)
-                return getTimestamp(columnIndex).toString();
-            if (type == VoltType.VARBINARY)
-                return Encoder.hexEncode(table.getVarbinary(columnIndex-1));
-            return table.get(columnIndex - 1, type).toString();
+            return table.getString(columnIndex - 1);
         } catch (Exception x) {
             throw SQLError.get(x);
         }

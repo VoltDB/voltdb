@@ -99,14 +99,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             String sql, Object[] userParams, boolean singlePartition, CatalogContext context,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
-        return makeStoredProcAdHocPlannerWork(replySiteId, sql, userParams, singlePartition, context, completionHandler, false);
-    }
-    public static AdHocPlannerWork makeStoredProcAdHocPlannerWork(long replySiteId,
-            String sql, Object[] userParams, boolean singlePartition, CatalogContext context,
-            AsyncCompilerWorkCompletionHandler completionHandler,
-            boolean isAdmin)
-    {
-        return new AdHocPlannerWork(replySiteId, 0, 0, isAdmin, null,
+        return new AdHocPlannerWork(replySiteId, 0, 0, false, null,
             sql, new String[] { sql },
             userParams, context, ExplainMode.NONE,
             // ??? The settings passed here for the single partition stored proc caller

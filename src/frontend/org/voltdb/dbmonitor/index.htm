@@ -81,21 +81,7 @@
                             </a>
                         </li>
                         <li class="line" id="userLine"></li>
-                        <li>
-                            <div class="menuHome">
-                                <ul class="menuHomeList">
-                                    <li>
-                                        <a href="#" style="float:left">Help</a>
-                                        <div class="helpDrop"></div>
-                                        <div class="clear"></div>
-                                        <ul>
-                                            <li><a href="#help" id="showMyHelp">DB Monitor Help</a></li>
-                                            <li><a href="#About" id="ShowAbout">About</a></li>
-                                        </ul>
-                                    </li>
-                                </ul>
-                            </div>
-                        </li>
+                        <li class="help"><a href="#help" id="showMyHelp">Help</a></li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
                     </ul>
                 </div>
@@ -224,12 +210,6 @@
                                 </div>
                                 <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg>
                             </div>
-                            <div id="chartCommandLogging" class="chart right" style="display: none">
-                                <div class="chartHeader">
-                                    <h1>Command Log Statistics</h1>
-                                </div>
-                                <svg id="visualisationCommandLog" width="100%" height="400"></svg>
-                            </div>
                             <div class="clear"></div>
                         </div>
                     </div>
@@ -323,13 +303,14 @@
                                 </ul>
                                 <ul class="drList">
                                     <!-- <li>State</li>
-                                        <li class="drArrow">On</li>-->
+                                     <li class="drArrow">On</li>-->
                                     <li class="alertIcon warningDr" style="display: none">
                                         <a id="drWarning" href="#drPartitionWarning" class="drWarning">
                                             <span style="margin:0 0 0 24px">Warning</span>
                                         </a>
                                     </li>
                                 </ul>
+
                                 <div class="clear"></div>
                             </div>
                             <div class="clear"></div>
@@ -343,6 +324,7 @@
                                         <div class="clear"></div>
                                     </div>
                                     <div class="clear"></div>
+
                                     <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate">
                                         <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
                                         <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
@@ -365,14 +347,16 @@
                                     </div>
                                 </div>
                             </div>
+
                             <div id="drReplicaSection" class="replicaWrapper" style="display:block">
                                 <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
                                         <div class="drTitle icon-replica">Replica</div>
-                                        <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                        <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onblur="" placeholder="Search Host ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
                                     <div class="clear"></div>
+
                                     <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate">
                                         <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
                                         <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
@@ -382,7 +366,7 @@
                                         <table width="100%" border="0" cellspacing="0" id="tblDrReplica" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">
                                             <thead>
                                                 <tr>
-                                                    <th id="Th7" width="25%" data-name="none">Server</th>
+                                                    <th id="Th7" width="25%" data-name="none">Host ID</th>
                                                     <th id="Th8" width="25%" data-name="none">Status</th>
                                                     <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>
                                                     <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>
@@ -394,50 +378,8 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div id="divCommandLog" class="clpWrapper" style="display:none">
-                        <div class="content drHeader" id="clpHeader">
-                            <div class="leftShowhide">
-                                <div class="dr">
-                                    <h1 class="headText1">
-                                        <a href="javascript:void(0);" id="showHideCLPBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Command Log Performance</a>
-                                    </h1>
-                                </div>
-                            </div>
-                            <div class="clear"></div>
-                        </div>
-                        <div id="clpSection" class="clpShowHide" style="display:none;">
-                            <!--<div id="drMasterSection" class="masterWrapper" style="display:block;">-->
-                            <div id="tblCmdLog_wrapper" class="dataTables_wrapper no-footer">
-                                <div class="tabs-filter-wrapperDR">
-                                    <div class="drTitle icon-command">Command Log</div>
-                                    <div class="filter"><input name="filter" id="filterServer" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchServer" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
-                                    <div class="clear"></div>
-                                </div>
-                                <div class="clear"></div>
-                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblCmdLog_paginate">
-                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
-                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
-                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
-                                </div>
-                                <div class="cmdLogContainer">
-                                    <table width="100%" border="0" cellspacing="0" id="tblCmdLog" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblCmdLog_info" role="grid">
-                                        <thead>
-                                            <tr role="row">
-                                                <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Server: activate to sort column ascending">Server</th>
-                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Pending (in bytes): activate to sort column ascending">Pending (in bytes)</th>
-                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Pending (in transactions): activate to sort column ascending">Pending (in transactions)</th>
-                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Total segments: activate to sort column ascending">Total segments</th>
-                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Segments in use: activate to sort column ascending">Segments in use</th>
-                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Fsyncinterval: activate to sort column ascending">Fsyncinterval</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <!--</div>-->
-                        </div>
+
+
                     </div>
                 </div>
             </div>
@@ -459,6 +401,7 @@
                                 <li><a href="#restorePop" id="restoreConfirmation" class="restoreConfirmationDisable">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
                             </ul>
+
                         </div>
                         <div class="clear"></div>
                     </div>
@@ -686,17 +629,6 @@
                                         <a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
-                                <tr class="child-row-4 subLabelRow">
-                                    <td class="configLabel">Export Tables</td>
-                                    <td align="right">
-                                        &nbsp;
-                                    </td>
-                                    <td></td>
-                                    <td>
-                                        <a href="javascript:void(0);" id="lstExportTbl" class="drTblBtn" style="display: block;" title="List of Export Tables">Export Tables</a>
-                                        <a href="#exportTablePopup" id="lstExportTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
-                                    </td>
-                                </tr>
                                 <tbody id="exportConfiguration" data-status="value" style="display: none;"></tbody>
                                 <tr class="hasSubLabel parent" id="row-5">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
@@ -815,12 +747,16 @@
                                         <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
                                         <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
                                     </tr>
-                                    <tr>
-                                        <td class="configLabel">DR Tables</td>
-                                        <td></td>
-                                        <td><a href="#replicatedTablePopup" id="lstDrTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a></td>
-                                        <td align="right"><a href="javascript:void(0);" id="lstDrTbl" class="drTblBtn" style="display: block;" title="List of DR Tables">DR Tables</a></td>
-                                    </tr>
+                                    <!--<tr class="child-row-8 subLabelRow" id="Tr1">
+                                        <td class="configLabel">Source </td>
+                                        <td align="right" class="">
+                                            <div id="loadingDrSource" class="loading-small" style="display: none;"></div>
+                                            <span id="drSourceSpan">serverBz</span>
+                                            <input id="txtDrSource" name="txtDrSource" class="exitableTxtDr" value="serverBz" type="text" style="display: none" />
+                                        </td>
+                                        <td>&nbsp;</td>
+                                        <td>&nbsp;</td>
+                                    </tr>-->
                                 </table>
                             </div>
                         </div>
@@ -1020,21 +956,13 @@
                         Data Replication (DR)
                         <input type="checkbox" id="DrReplicationRate" name="" value="drReplication" checked="checked" />
                     </li>
-                    <li class="pref-graph" id="liCommandLogStat" style="display:none">
-                        Command Log Statistics
-                        <input type="checkbox" id="CommandLogStat" name="" value="commandLogStat" checked="checked" />
-                    </li>
                     <li class="pref-storedProc">
                         Stored Procedures
                         <input type="checkbox" id="StoredProcedures" name="" value="stored_proc" checked="checked" />
                     </li>
-                    <li class="pref-tables" id="liTables">
+                    <li class="last pref-tables" id="liTables">
                         Database Tables
                         <input type="checkbox" id="DatabaseTables" name="" value="table" checked="checked" />
-                    </li>
-                    <li class="pref-tables" id="liCommandLogTables">
-                        Command Log Tables
-                        <input type="checkbox" id="CommandLogTables" name="" value="table" checked="checked" />
                     </li>
                     <li class="pref-tables" id="liDrTables" style="display:none">
                         Data Replication Tables
@@ -1235,90 +1163,7 @@
             </div>
         </div>
     </div>
-    <!--help popup ends-->
-    <!--About popup-->
-    <div id="About" style="display: none">
-        <div class="overlay-title helpIcon ">System Overview</div>
-        <div class="clear"></div>
-        <div class="overlay-contentAbout helpAboutWrap">
-            <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
-            <div class="dataBlock">
-                <div class="dataBlockContent systemOver" style="padding:0;">
-                    <table id="tblSystemOverview" class="table table-condensed">
-                        <tbody>
-                            <tr>
-                                <td>Mode</td>
-                                <td id="mode"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>VoltDB Version</td>
-                                <td id="voltdbVersion"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>Buildstring</td>
-                                <td id="buildString"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>Cluster Composition</td>
-                                <td id="clusterComposition"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>Running Since</td>
-                                <td id="runningSince"></td>
-                                <td></td>
-                            </tr>
-                            <tr class="trLicenseInfo">
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td style="font-weight: bold">License Information:</td>
-                                <td></td>
-                                <td></td>
-                            </tr>
-                            <tr id="tdLicenseInfo" style="display: none">
-                                <td>Community Edition</td>
-                                <td></td>
-                                <td></td>
-                            </tr>
-                            <tr class="licenseInfo" style="display: none">
-                                <td>Host Count</td>
-                                <td id="tdHostCount"></td>
-                                <td></td>
-                            </tr>
-                            <tr class="licenseInfo" style="display: none">
-                                <td>WAN Replication</td>
-                                <td id="tdWanReplication"></td>
-                                <td></td>
-                            </tr>
-                            <tr class="licenseInfo" style="display: none">
-                                <td>Expiration</td>
-                                <td id="tdExpiration"></td>
-                                <td></td>
-                            </tr>
-                            <tr class="licenseInfo" style="display: none">
-                                <td>Command Logging</td>
-                                <td id="tdCommandLogging"></td>
-                                <td></td>
-                            </tr>
-                            <tr class="licenseInfo" style="display: none">
-                                <td>Trial</td>
-                                <td id="tdTrial"></td>
-                                <td></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p></p>
-                </div>
-            </div>
-        </div>
-    </div>
-    </div>
+
     <!--help popup ends-->
     <!-- POPUP shutDownConfirmationPop -->
     <div id="shutDownConfirmationPop" style="display: none">
@@ -1711,22 +1556,6 @@
                 <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
             </div>
         </div>
-    </div>
-    <div id="replicatedTablePopup" style="display:none">
-        <div class="overlay-title icon-alert">DR Tables</div>
-        <div class="overlay-content resizeCon">
-            <div id="drPopup" class="repliWrapper">
-            </div>
-        </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
-    </div>
-    <div id="exportTablePopup" style="display:none">
-        <div class="overlay-title icon-alert">Export Tables</div>
-        <div class="overlay-content resizeCon">
-            <div id="exportPopup" class="repliWrapper">
-            </div>
-        </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
     </div>
     <!--Add Configuration Popup-->
     <!-- Query error because of Paused Database Popup-->

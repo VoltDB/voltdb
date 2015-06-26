@@ -314,18 +314,12 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         m_hasReceiveNode = true;
-        if (m_subqueryStmt instanceof ParsedUnionStmt) {
+        ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;
+        if (selectStmt == null) {
             // Union are just returned
             assert(m_subqueryStmt instanceof ParsedUnionStmt);
             return root;
         }
-
-        if (m_subqueryStmt instanceof ParsedSelectStmt == false) {
-            throw new PlanningErrorException("Unsupported subquery found in FROM clause:" + m_subqueryStmt.toString());
-        }
-
-        ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;
-        assert(selectStmt != null);
 
         // Now If query has LIMIT/OFFSET/DISTINCT on a replicated table column,
         // we should get rid of the receive node.

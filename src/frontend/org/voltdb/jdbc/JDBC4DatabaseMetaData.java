@@ -1203,31 +1203,10 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves whether this database supports the JDBC scalar function CONVERT for conversions between the JDBC types fromType and toType.
     @Override
-    public boolean supportsConvert(int fromType, int toType) throws SQLException {
+    public boolean supportsConvert(int fromType, int toType) throws SQLException
+    {
         checkClosed();
-        switch (fromType) {
-        /*
-         * ALL types can be converted to VARCHAR /VoltType.String
-         */
-        case java.sql.Types.TINYINT:
-        case java.sql.Types.SMALLINT:
-        case java.sql.Types.INTEGER:
-        case java.sql.Types.BIGINT:
-        case java.sql.Types.FLOAT:
-        case java.sql.Types.DECIMAL:
-        case java.sql.Types.VARCHAR:
-        case java.sql.Types.VARBINARY:
-        case java.sql.Types.TIMESTAMP:
-            switch (toType) {
-            case java.sql.Types.VARCHAR:
-                return true;
-
-            default:
-                return false;
-            }
-        default:
-            return false;
-        }
+        return false;
     }
 
     // Retrieves whether this database supports the ODBC Core SQL grammar.
