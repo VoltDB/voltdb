@@ -535,7 +535,23 @@ public final class DBBPool {
         if (!buf.isDirect()) return;
         final DirectBuffer dbuf = (DirectBuffer) buf;
         final Cleaner cleaner = dbuf.cleaner();
-        if (cleaner != null) cleaner.clean();
-        else deleteCharArrayMemory(dbuf.address());
+        if (cleaner != null) {
+#ifdef MEMCHECK_FULL
+            final long pointer = dbuf.address();
+            Throwable t = m_allocatedStuff.get(pointer);
+            if (t != null) {
+                Throwable t2 = new Throwable("Thread \"" + Thread.currentThread().getName() + 
+                    "\" called cleanByteBuffer " + Long.toHexString(pointer) + 
+                    " but failed to call deleteCharArrayMemory(..) at time: " + System.currentTimeMillis());
+                HOST.fatal("Original:", t);
+                HOST.fatal("Second:", t2);
+                System.exit(-1);
+            }
+#endif // MEMCHECK_FULL
+            cleaner.clean();
+        }
+        else {
+            deleteCharArrayMemory(dbuf.address());
+        }
     }
 }
