@@ -398,9 +398,6 @@ public class FunctionSQL extends Expression {
             case FUNC_MOD :
                 name      = Tokens.T_MOD;
                 parseList = doubleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             case FUNC_LN :
@@ -464,8 +461,13 @@ public class FunctionSQL extends Expression {
                 };
                 parseListAlt = new short[] {
                     Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
-                    Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA,
-                    Tokens.QUESTION, Tokens.CLOSEBRACKET
+                    // A VoltDB extension to make the third parameter optional
+                    /* disable 1 line ...
+                    Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                    ... disabled 1 line */
+                    Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION,
+                    // End of VoltDB extension
+                    Tokens.CLOSEBRACKET
                 };
                 break;
 
@@ -879,12 +881,17 @@ public class FunctionSQL extends Expression {
                     return null;
                 }
 
-                // result type is the same as nodes[1]
-                Object value = ((NumberType) nodes[0].dataType).modulo(session,
-                    data[0], data[1], nodes[0].dataType);
+                // non-integral arguments are accepted with conversion
 
-                return dataType.convertToType(session, value,
-                                              nodes[0].dataType);
+                /** @todo - check if widening has an effect */
+                // A VoltDB extension to customize the SQL function set support
+                Object value =
+                        ((NumberType) nodes[0].dataType).mod(data[0],
+                                data[1]);
+                // End of VoltDB extension
+                // result type is the same as argList[1]
+                return ((NumberType) dataType).convertToTypeLimits(session,
+                        value);
             }
             case FUNC_LN : {
                 if (data[0] == null) {
@@ -923,6 +930,15 @@ public class FunctionSQL extends Expression {
                 double base     = ((Number) data[0]).doubleValue();
                 double exponent = ((Number) data[1]).doubleValue();
                 double val;
+
+                // A VoltDB extension to tweak compliance with standard sql error handling
+                //VOLTDB's HSQL_BACKEND doesn't object to negative exponents -- why should it?
+                /* disable 3 lines ...
+                if (exponent < 0) {
+                    throw Error.error(ErrorCode.X_2201F);
+                }
+                ... disabled 2 lines */
+                // End of VoltDB extension
 
                 if (base == 0) {
                     if (exponent < 0) {
@@ -1547,6 +1563,11 @@ public class FunctionSQL extends Expression {
                         || !nodes[1].dataType.isNumberType()) {
                     throw Error.error(ErrorCode.X_42563);
                 }
+                // A VoltDB extension
+                if (!nodes[0].dataType.isIntegralType() || !nodes[1].dataType.isIntegralType()) {
+                    throw new RuntimeException("unsupported non-integral type for SQL MOD function");
+                }
+                // End of VoltDB extension
 
                 nodes[0].dataType =
                     ((NumberType) nodes[0].dataType).getIntegralType();
@@ -1561,20 +1582,24 @@ public class FunctionSQL extends Expression {
             }
             case FUNC_POWER : {
                 if (nodes[0].dataType == null) {
-                    // A VoltDB extension to swap out this odd propagation of unrelated types.
+                    // A VoltDB extension to customize the SQL function set support
+                    // VoltDB swapped out this odd propagation of nulls.
                     // VoltDB simply gives missing types the benefit of the doubt.
                     nodes[0].dataType = Type.SQL_DOUBLE;
                     // For VoltDB, the retest for null below is now redundant.
                     /* disable 1 line ...
-                    nodes[0].dataType = nodes[1].dataType;
+                    nodes[1].dataType = nodes[0].dataType;
                     ... disabled 1 line */
                     // End of VoltDB extension
                 }
 
                 if (nodes[1].dataType == null) {
-                    // A VoltDB extension swapped out this odd propagation of unrelated types.
+                    // VoltDB swapped out this odd propagation of nulls.
+                    // ORIGINAL HSQL CODE: nodes[0].dataType = nodes[1].dataType;
                     // VoltDB simply gives missing types the benefit of the doubt.
                     nodes[1].dataType = Type.SQL_DOUBLE;
+                    // A VoltDB extension to customize the SQL function set support
+                    // VoltDB swapped out this odd propagation of nulls.
                     /* disable 1 line ...
                     nodes[1].dataType = nodes[0].dataType;
                     ... disabled 1 line */

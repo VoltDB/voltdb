@@ -34,7 +34,7 @@ import vmcTest.pages.*
  * This class contains tests of the 'SQL Query' tab of the VoltDB Management
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
-class SqlQueriesTestExport extends TestBase {
+class SqlQueriesExportTest extends TestBase {
 	def setup() {
         when: 'click the SQL Query link (if needed)'
         openSqlQueryPage()

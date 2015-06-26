@@ -123,7 +123,7 @@ function QueryUI(queryString, userName) {
 
     //TODO: Apply reasonable coding standards to the code below...
 
-    function executeCallback(format, target, id) {
+    function executeCallback(format, target, id, isExplainQuery) {
         var Format = format;
         var targetHtml = target.find('#resultHtml');
         var targetCsv = target.find('#resultCsv');
@@ -135,14 +135,14 @@ function QueryUI(queryString, userName) {
 
         function callback(response) {
 
-            var processResponseForAllViews = function() {
-                processResponse('HTML', targetHtml, Id + '_html', response);
-                processResponse('CSV', targetCsv, Id + '_csv', response);
-                processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
+            var processResponseForAllViews = function () {
+                processResponse('HTML', targetHtml, Id + '_html', response, isExplainQuery);
+                processResponse('CSV', targetCsv, Id + '_csv', response, isExplainQuery);
+                processResponse('MONOSPACE', targetMonospace, Id + '_mono', response, isExplainQuery);
             };
-            
+
             var handlePortSwitchingOption = function (isPaused) {
-                
+
                 if (isPaused) {
                     //Show error message with an option to allow admin port switching
                     $("#queryDatabasePausedErrorPopupLink").click();
@@ -150,22 +150,22 @@ function QueryUI(queryString, userName) {
                     processResponseForAllViews();
                 }
             };
-            
+
             //Handle the case when Database is paused
             if (response.status == -5 && VoltDbAdminConfig.isAdmin && !SQLQueryRender.useAdminPortCancelled) {
 
                 if (!VoltDbAdminConfig.isDbPaused) {
 
                     //Refresh cluster state to display latest status.
-                    var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
+                    var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues) {
                         VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
                         handlePortSwitchingOption(VoltDbAdminConfig.isDbPaused);
                     };
-                    voltDbRenderer.GetSystemInformation(function() {}, loadAdminTabPortAndOverviewDetails, function(data) {});
+                    voltDbRenderer.GetSystemInformation(function () { }, loadAdminTabPortAndOverviewDetails, function (data) { });
                 } else {
                     handlePortSwitchingOption(true);
                 }
-                
+
             } else {
                 processResponseForAllViews();
             }
@@ -198,26 +198,35 @@ function QueryUI(queryString, userName) {
         var start = (new Date()).getTime();
         var connectionQueue = connection.getQueue();
         connectionQueue.Start();
+
         for (var i = 0; i < statements.length; i++) {
+
+            var isExplainQuery = false;
             var id = 'r' + i;
-            var callback = new executeCallback(format, target, id);
-            if (/^execute /i.test(statements[i]))
+            if (statements[i].toLowerCase().indexOf('@explain') >= 0) {
+                isExplainQuery = true;
+            }
+            var callback = new executeCallback(format, target, id, isExplainQuery);
+            if (/^execute /i.test(statements[i])) {
                 statements[i] = 'exec ' + statements[i].substr(8);
+            }
             if (/^exec /i.test(statements[i])) {
+                statements[i] = statements[i].replace(/\n/g, '');
+                statements[i] = statements[i].trim();
                 var params = CommandParser.parseProcedureCallParameters(statements[i].substr(5));
                 var procedure = params.splice(0, 1)[0];
-                connectionQueue.BeginExecute(procedure, params, callback.Callback);
+                connectionQueue.BeginExecute(procedure, params, callback.Callback, null, true);
             }
             else
                 if (/^explain /i.test(statements[i])) {
-                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                 }
                 else
                     if (/^explainproc /i.test(statements[i])) {
-                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                     }
                     else {
-                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                     }
         }
 
@@ -236,11 +245,11 @@ function QueryUI(queryString, userName) {
         connectionQueue.End(atEnd, start);
     }
 
-    function processResponse(format, target, id, response) {
+    function processResponse(format, target, id, response, isExplainQuery) {
         if (response.status == 1) {
             var tables = response.results;
             for (var j = 0; j < tables.length; j++)
-                printResult(format, target, id + '_' + j, tables[j]);
+                printResult(format, target, id + '_' + j, tables[j], isExplainQuery);
 
         } else {
             // This inline encoder hack is intended to use html's &#nnnn; character encoding to
@@ -250,21 +259,21 @@ function QueryUI(queryString, userName) {
             // rendered as invisible meaningless html tags.
             // See http://stackoverflow.com/questions/18749591/encode-html-entities-in-javascript#18750001
             var encodedStatus = response.statusstring.replace(/[\u00A0-\u9999<>\&]/gim,
-                function(i) { return '&#'+i.charCodeAt(0)+';'; });
+                function (i) { return '&#' + i.charCodeAt(0) + ';'; });
             target.append('<span class="errorValue">Error: ' + encodedStatus + '\r\n</span>');
         }
     }
 
-    function printResult(format, target, id, table) {
+    function printResult(format, target, id, table, isExplainQuery) {
         switch (format.toUpperCase()) {
             case 'CSV'.toUpperCase():
-                printCSV(target, id, table);
+                printCSV(target, id, table, isExplainQuery);
                 break;
             case 'MONOSPACE':
-                printMonoSpace(target, id, table);
-                 break;
+                printMonoSpace(target, id, table, isExplainQuery);
+                break;
             default:
-                printGrid(target, id, table);
+                printGrid(target, id, table, isExplainQuery);
                 break;
         }
     }
@@ -278,7 +287,7 @@ function QueryUI(queryString, userName) {
         if (null != val && val.replace != null) {
             val = val.replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
             val = val.replace(/ /g, '&nbsp;');
-            val = val.replace(/\n/g, '<br>');
+            val = val.replace(/\n/g, '&lt;br&gt;');
         }
         return val;
     }
@@ -292,13 +301,14 @@ function QueryUI(queryString, userName) {
         return v;
     }
 
-    function printGrid(target, id, table) {
-        var src = '<table id="table_'+id+'" width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl sortable tablesorter" id="queryResultTbl"><thead class="ui-widget-header noborder"><tr>';
+
+    function printGrid(target, id, table, isExplainQuery) {
+        var src = '<table id="table_' + id + '" width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl sortable tablesorter" id="queryResultTbl"><thead class="ui-widget-header noborder"><tr>';
         if (isUpdateResult(table))
             src += '<th>modified_tuples</th>';
         else {
             for (var j = 0; j < table.schema.length; j++)
-                src += '<th width="' + 100/table.schema.length + '%">' + (table.schema[j].name == "" ? ("Column " + (j + 1)) : table.schema[j].name) + '</th>';
+                src += '<th width="' + 100 / table.schema.length + '%">' + (table.schema[j].name == "" ? ("Column " + (j + 1)) : table.schema[j].name) + '</th>';
         }
         src += '</tr></thead><tbody>';
         for (var j = 0; j < table.data.length; j++) {
@@ -318,14 +328,16 @@ function QueryUI(queryString, userName) {
                         + lPadZero((dt.getUTCMilliseconds()) * 1000 + us, 6);
                     typ = 9;  //code for varchar
                 }
-                val = applyFormat(val);
-                src += '<td align="left">' + val + '</td>';
+                if (isExplainQuery == true) {
+                    val = applyFormat(val);
+                }
+                src += '<td align="left">' + htmlEncode(val, isExplainQuery) + '</td>';
             }
             src += '</tr>';
         }
         src += '</tbody></table>';
         $(target).append(src);
-        sorttable.makeSortable(document.getElementById('table_'+id));
+        sorttable.makeSortable(document.getElementById('table_' + id));
     }
 
     function printMonoSpace(target, id, table) {
@@ -342,7 +354,7 @@ function QueryUI(queryString, userName) {
         for (var j = 0; j < table.data.length; j++) {
             for (var k = 0; k < table.data[j].length; k++) {
                 if (k > 0) src += '\t';
-                src += table.data[j][k];
+                src += htmlEncode(table.data[j][k]);
             }
             src += '</br>\r\n';
         }
@@ -365,12 +377,21 @@ function QueryUI(queryString, userName) {
         for (var j = 0; j < table.data.length; j++) {
             for (var k = 0; k < table.data[j].length; k++) {
                 if (k > 0) src += ', ';
-                src += table.data[j][k];
+                src += htmlEncode(table.data[j][k]);
             }
             src += '</br>\r\n';
         }
         src += '</br>\r\n(' + j + ' row(s) affected)\r\n\r\n</pr></br></br>';
         $(target).append(src);
+    }
+
+
+    function htmlEncode(value, isExplainQuery) {
+        if (isExplainQuery == true) {
+            return $('<div/>').html(value).text();
+        } else {
+            return $('<div/>').text(value).html();
+        }
     }
 
     this.execute = executeMethod;

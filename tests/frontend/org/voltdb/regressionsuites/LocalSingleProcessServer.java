@@ -54,6 +54,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     protected String m_pathToDeployment;
     private File m_pathToVoltRoot = null;
     private EEProcess m_siteProcess = null;
+    private int m_adminPort;
 
     public LocalSingleProcessServer(String jarFileName, int siteCount,
                                     BackendTarget target)
@@ -115,11 +116,17 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         if (m_compiled) {
             return true;
         }
+        m_adminPort = adminPort;
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
                                      adminPort, adminOnStartup);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 
+    }
+
+    @Override
+    public int getListenerCount() {
+        return 1;
     }
 
     @Override
@@ -137,6 +144,13 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         if (m_server == null)
             return null;
         return "localhost";
+    }
+
+    @Override
+    public String getAdminAddress(int hostId) {
+        if (m_server == null)
+            return null;
+        return "localhost:" + m_adminPort;
     }
 
     @Override

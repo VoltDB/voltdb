@@ -35,6 +35,7 @@ import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
@@ -43,9 +44,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
     public static final String COMMIT_THROW_EXCEPTION = "jdbc.committhrowexception";
     public static final String ROLLBACK_THROW_EXCEPTION = "jdbc.rollbackthrowexception";
+    public static final String QUERYTIMEOUT_UNIT = "jdbc.querytimeout.unit";
 
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
+    protected TimeUnit queryTimeOutUnit = TimeUnit.SECONDS;
     private boolean isClosed = false;
     private Properties props;
     private boolean autoCommit = true;
@@ -55,6 +58,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         this.NativeConnection = connection;
         this.props = props;
         this.User = this.props.getProperty("user", "");
+        if (this.props.getProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "Seconds").equalsIgnoreCase("milliseconds")) {
+            this.queryTimeOutUnit = TimeUnit.MILLISECONDS;
+        }
     }
 
     private void checkClosed() throws SQLException

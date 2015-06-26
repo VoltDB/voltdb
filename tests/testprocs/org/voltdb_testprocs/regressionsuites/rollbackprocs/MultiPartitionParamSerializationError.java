@@ -38,7 +38,7 @@ public class MultiPartitionParamSerializationError extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO ALL_TYPES (ID, MONEY) VALUES (?, ?);");
 
     public VoltTable[] run(int id) {
-        final BigDecimal killer = new BigDecimal(BigInteger.valueOf(7700000000000L), 20);
+        final BigDecimal killer = new BigDecimal("99999999999999999999999999999999999999.999999999");
         voltQueueSQL(insert, id, killer);
         voltExecuteSQL();
         return null;

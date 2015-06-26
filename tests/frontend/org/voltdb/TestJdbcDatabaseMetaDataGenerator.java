@@ -30,6 +30,7 @@ import java.util.Map;
 import junit.framework.TestCase;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
@@ -96,10 +97,10 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals(null, tables.get("REMARKS", VoltType.STRING));
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "View1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("VIEW"));
-        assertTrue(tables.get("REMARKS", VoltType.STRING).equals("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}"));
+        assertTrue(tables.get("REMARKS", VoltType.STRING).equals(new JSONObject("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}").toString()));
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "View2"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("VIEW"));
-        assertTrue(tables.get("REMARKS", VoltType.STRING).equals("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}"));
+        assertTrue(tables.get("REMARKS", VoltType.STRING).equals(new JSONObject("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}").toString()));
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Export1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("EXPORT"));
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Export2"));
