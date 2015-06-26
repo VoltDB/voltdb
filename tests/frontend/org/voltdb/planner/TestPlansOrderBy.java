@@ -25,7 +25,10 @@ package org.voltdb.planner;
 
 import java.util.List;
 
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.types.PlanNodeType;
 
@@ -313,18 +316,54 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P order by P_D1");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.RECEIVE, pn.getPlanNodeType());
-            ReceivePlanNode rpn = (ReceivePlanNode) pn;
-            assertEquals(true, rpn.getNeedMerge());
-            assertNotNull(rpn.getInlinePlanNode(PlanNodeType.ORDERBY));
+            validateMergeReceive(pn, false, new int[] {0});
         }
         {
-            // Partitions results are unordered. Coordinator Order by
+            // P_D1 index provides the right order for the coordinator. Merge Receive with LIMIT
             List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D0 from P order by P_D0");
+                    "select P_D1 from P order by P_D1 limit 3");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            validateMergeReceive(pn, true, new int[] {0});
+        }
+        {
+            // Partitions results are unordered. Merge Receive and partitions ORDER BY
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1, P_D2 from P order by P_D2");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateMergeReceive(pn, false, new int[] {1});
+            AbstractPlanNode partitionPn = frags.get(1).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, partitionPn.getPlanNodeType());
+        }
+        {
+            // Partitions results are unordered. Coordinator Order by with LIMIT
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1, P_D2  from P order by P_D2 limit 3");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateMergeReceive(pn, true, new int[] {1});
+        }
+
+//       List<AbstractPlanNode> frags =  compileToFragments("select T_D0, max(T_D2) from T2 group by T_D0 order by T_D0");
+//        select indexed_non_partition_key, max(col)
+//        from partitioned
+//        group by indexed_non_partition_key
+//        order by indexed_non_partition_key;"
+    }
+
+    private void validateMergeReceive(AbstractPlanNode pn, boolean hasLimit, int[] sortColumnIdx) {
+        assertEquals(PlanNodeType.RECEIVE, pn.getPlanNodeType());
+        ReceivePlanNode rpn = (ReceivePlanNode) pn;
+        assertEquals(true, rpn.getNeedMerge());
+        assertNotNull(rpn.getInlinePlanNode(PlanNodeType.ORDERBY));
+        assertEquals(hasLimit, rpn.getInlinePlanNode(PlanNodeType.LIMIT) != null);
+        OrderByPlanNode opn = (OrderByPlanNode) rpn.getInlinePlanNode(PlanNodeType.ORDERBY);
+        List<AbstractExpression> ses = opn.getSortExpressions();
+        assertEquals(sortColumnIdx.length, ses.size());
+        int idx = 0;
+        for (AbstractExpression se : ses) {
+            assertEquals(sortColumnIdx[idx++], ((TupleValueExpression) se).getColumnIndex());
         }
     }
 }
