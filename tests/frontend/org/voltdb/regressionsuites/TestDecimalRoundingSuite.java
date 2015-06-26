@@ -25,7 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,15 +35,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.types.VoltDecimalHelper;
 
 public class TestDecimalRoundingSuite extends RegressionSuite {
-
-    private static int m_defaultScale = 12;
-    private static String m_roundingEnabledProperty = "BIGDECIMAL_ROUND";
-    private static String m_roundingModeProperty = "BIGDECIMAL_ROUND_POLICY";
-    private static String m_defaultRoundingEnablement = "true";
-    private static String m_defaultRoundingMode = "HALF_UP";
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -53,13 +45,6 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
         super(name);
     }
 
-
-    private static String getRoundingString(String label) {
-        return String.format("%sRounding %senabled, mode is %s",
-                             label == null ? (label + ": ") : "",
-                             VoltDecimalHelper.isRoundingEnabled() ? "is " : "is *NOT* ",
-                             VoltDecimalHelper.getRoundingMode().toString());
-    }
     private void validateInsertStmt(boolean expectSuccess, String insertStmt, BigDecimal... expectedValues) throws Exception {
         Client client = getClient();
 
@@ -98,36 +83,6 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
                               roundIsEnabled.toString(), roundMode.toString());
         }
         doTestDecimalScaleInsertion(roundIsEnabled, roundMode);
-    }
-
-    /*
-     * This little helper function converts a string to
-     * a decimal, and, maybe, rounds it to the Volt default scale
-     * using the given mode.  If roundingEnabled is false, no
-     * rounding is done.
-     */
-    private static final BigDecimal roundDecimalValue(String  decimalValueString,
-                                                      boolean roundingEnabled,
-                                                      RoundingMode mode) {
-        BigDecimal bd = new BigDecimal(decimalValueString);
-        if (!roundingEnabled) {
-            return bd;
-        }
-        int precision = bd.precision();
-        int scale = bd.scale();
-        int lostScale = scale - m_defaultScale ;
-        if (lostScale <= 0) {
-            return bd;
-        }
-        int newPrecision = precision - lostScale;
-        MathContext mc = new MathContext(newPrecision, mode);
-        BigDecimal nbd = bd.round(mc);
-        assertTrue(nbd.scale() <= m_defaultScale);
-        if (nbd.scale() != m_defaultScale) {
-            nbd = nbd.setScale(m_defaultScale);
-        }
-        assertEquals(getRoundingString("Decimal Scale setting failure"), m_defaultScale, nbd.scale());
-        return nbd;
     }
 
     private void doTestDecimalScaleInsertion(boolean roundingEnabled,

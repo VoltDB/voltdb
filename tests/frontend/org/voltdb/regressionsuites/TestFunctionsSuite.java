@@ -3467,13 +3467,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
 
         bitwiseFunctionChecker(21, Long.MAX_VALUE, Long.MIN_VALUE);
-
-        try {
-            bitwiseFunctionChecker(22, Long.MIN_VALUE, Long.MAX_VALUE);
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Constant value underflows BIGINT type"));
-        }
+        bitwiseFunctionChecker(22, Long.MIN_VALUE, Long.MAX_VALUE);
 
         // try the out of range exception
         client.callProcedure("@AdHoc", "insert into NUMBER_TYPES(INTEGERNUM, bignum) values(50, ?);", Long.MIN_VALUE + 1);
