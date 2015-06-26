@@ -77,6 +77,13 @@ public class ReceivePlanNode extends AbstractPlanNode {
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
+
+        if (m_needMerge) {
+            AbstractPlanNode pn = getInlinePlanNode(PlanNodeType.ORDERBY);
+            assert(pn != null && pn instanceof OrderByPlanNode);
+            OrderByPlanNode opn = (OrderByPlanNode) pn;
+            opn.resolveSortIndexesUsingSchema(input_schema);
+        }
     }
 
     @Override

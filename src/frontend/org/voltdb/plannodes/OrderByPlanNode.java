@@ -122,6 +122,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
         }
         m_outputSchema.sortByTveIndex();
 
+        resolveSortIndexesUsingSchema(input_schema);
+    }
+
+    public void resolveSortIndexesUsingSchema(NodeSchema input_schema) {
+
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
         List<TupleValueExpression> sort_tves =

@@ -1577,22 +1577,35 @@ public class PlanAssembler {
         // For MP queries, the coordinator's OrderBy node can be replaced with a specialized Receive node
         // that merges individual partitions results if the they are sorted
         // in the order matching the ORDER BY order
-        boolean canMergeReceive = false;
-        if (PlanNodeType.RECEIVE == root.getPlanNodeType()) {
-            assert(root.getChildCount() == 1);
-            assert(root.getChild(0).getChildCount() == 1);
-            AbstractPlanNode child = root.getChild(0).getChild(0);
-            if (! isOrderByNodeRequired(parsedStmt, child)) {
-                canMergeReceive = true;
+        List<AbstractPlanNode> receives = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+        boolean isMPPlan = !receives.isEmpty();
+        boolean needPushDown = false;
+        if (isMPPlan) {
+            assert(receives.size() == 1);
+            AbstractPlanNode receive = receives.get(0);
+            assert(receive.getChildCount() == 1);
+            assert(receive.getChild(0).getChildCount() == 1);
+            AbstractPlanNode partitionRoot = receive.getChild(0).getChild(0);
+            if (isOrderByNodeRequired(parsedStmt, partitionRoot)) {
+                needPushDown = true;
             }
         }
 
         OrderByPlanNode orderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
-        if (canMergeReceive) {
-            // The root is the Receive node. We just checked it.
-            ReceivePlanNode receive = (ReceivePlanNode) root;
+if (isMPPlan && !isOrderByNodeRequired(parsedStmt, root)) {
+//        if (isMPPlan) {
+            ReceivePlanNode receive = (ReceivePlanNode)receives.get(0);
             receive.setNeedMerge(true);
             receive.addInlinePlanNode(orderByNode);
+//            if (needPushDown) {
+//// Need projection between SEND and partitionOrderByNode nodes
+//                OrderByPlanNode partitionOrderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
+//                AbstractPlanNode send = receive.getChild(0);
+//                AbstractPlanNode partitionRoot = send.getChild(0);
+//                partitionRoot.clearParents();
+//                partitionOrderByNode.addAndLinkChild(partitionRoot);
+//                send.replaceChild(partitionRoot, partitionOrderByNode);
+//            }
             return receive;
         } else {
             orderByNode.addAndLinkChild(root);
@@ -1722,6 +1735,11 @@ public class PlanAssembler {
         if (pn instanceof OrderByPlanNode ||
             pn.getPlanNodeType() == PlanNodeType.AGGREGATE) {
             return true;
+        } else if (pn instanceof ReceivePlanNode) {
+            ReceivePlanNode rpn = (ReceivePlanNode) pn;
+            if (rpn.getNeedMerge() == true) {
+                return true;
+            }
         }
         return false;
     }
