@@ -1258,7 +1258,7 @@ public abstract class CatalogUtil {
      * or deployment file, do the irritating exception crash test, jam the bytes in,
      * and get the SHA-1 hash.
      */
-    public static byte[] makeCatalogOrDeploymentHash(byte[] inbytes)
+    public static byte[] makeDeploymentHash(byte[] inbytes)
     {
         MessageDigest md = null;
         try {
@@ -1294,8 +1294,14 @@ public abstract class CatalogUtil {
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
-        versionAndBytes.put(makeCatalogOrDeploymentHash(catalogBytes));
-        versionAndBytes.put(makeCatalogOrDeploymentHash(deploymentBytes));
+        try {
+            versionAndBytes.put((new InMemoryJarfile(catalogBytes)).getSha1Hash());
+        }
+        catch (IOException ioe) {
+            VoltDB.crashLocalVoltDB("Unable to build InMemoryJarfile from bytes, should never happen.",
+                    true, ioe);
+        }
+        versionAndBytes.put(makeDeploymentHash(deploymentBytes));
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
         versionAndBytes.putInt(deploymentBytes.length);

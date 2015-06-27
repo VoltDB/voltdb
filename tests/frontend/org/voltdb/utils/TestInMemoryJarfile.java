@@ -31,6 +31,7 @@ import java.io.LineNumberReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.Arrays;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
@@ -159,6 +160,9 @@ public class TestInMemoryJarfile extends TestCase {
         long crc1 = new InMemoryJarfile(m_jarPath).getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertEquals(crc1, crc2);
+        byte[] sha1 = new InMemoryJarfile(m_jarPath).getSha1Hash();
+        byte[] sha2 = new InMemoryJarfile("testout-dupe.jar").getSha1Hash();
+        assertTrue(Arrays.equals(sha1, sha2));
     }
 
     public void testDifferentJarContentsDontMatchCRCs()
@@ -172,6 +176,9 @@ public class TestInMemoryJarfile extends TestCase {
         long crc1 = new InMemoryJarfile("testout.jar").getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertFalse(crc1 == crc2);
+        byte[] sha1 = new InMemoryJarfile(m_jarPath).getSha1Hash();
+        byte[] sha2 = new InMemoryJarfile("testout-dupe.jar").getSha1Hash();
+        assertFalse(Arrays.equals(sha1, sha2));
     }
 
     public void testIdenticalJarContentsWithGroupsMatchCRCs()

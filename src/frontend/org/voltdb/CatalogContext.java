@@ -32,7 +32,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
@@ -100,7 +99,7 @@ public class CatalogContext {
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            this.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
+            this.catalogHash = m_jarfile.getSha1Hash();
         }
         else {
             throw new RuntimeException("Can't create CatalogContext with null catalog bytes.");
