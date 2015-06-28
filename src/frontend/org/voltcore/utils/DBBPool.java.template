@@ -20,6 +20,8 @@ package org.voltcore.utils;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
+import java.util.LinkedList;
+import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -549,6 +551,44 @@ public final class DBBPool {
                 System.err.printf("Freed: %x, %d bytes\n", dbuf.address(), buf.capacity());
             }
             deleteCharArrayMemory(dbuf.address());
+        }
+    }
+
+
+    private static final long[] sizes = new long[]{256 * 1024, 1024 * 1024, 2 * 1024 * 1024};
+    public static void main(String[] args) throws Exception {
+        if (args.length != 2) {
+            return;
+        }
+
+        final int poolSize = Integer.parseInt(args[0]);
+        final boolean useUnsafe = Boolean.parseBoolean(args[1]);
+        final Random r = new Random();
+        final List<BBContainer> stuff = new LinkedList<BBContainer>();
+
+        long count = 0;
+        while (true) {
+            if (stuff.size() == poolSize) {
+                stuff.remove(r.nextInt(stuff.size())).discard();
+            }
+
+            if (count++ % 1000 == 0) {
+                System.out.printf("Total allocations %d\n", count);
+                for (final BBContainer c : stuff) {
+                    System.out.printf("%d\tbytes\n", c.b().capacity());
+                }
+                System.out.println();
+                Thread.sleep(10000);
+            }
+
+            final long nextSize = sizes[r.nextInt(sizes.length)];
+            final BBContainer cont;
+            if (useUnsafe) {
+                cont = allocateUnsafeByteBuffer(nextSize);
+            } else {
+                cont = allocateDirect((int) nextSize);
+            }
+            stuff.add(cont);
         }
     }
 }
