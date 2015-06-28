@@ -590,6 +590,14 @@ public final class DBBPool {
             } else {
                 cont = allocateDirect((int) nextSize);
             }
+
+            // Dirty some bytes
+            if (cont.b().capacity() > 8) {
+                cont.b().putInt(r.nextInt());
+                cont.b().putInt(r.nextInt());
+                cont.b().flip();
+            }
+
             stuff.add(cont);
             totalAllocInRound += nextSize;
         }
