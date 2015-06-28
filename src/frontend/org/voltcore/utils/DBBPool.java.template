@@ -549,14 +549,15 @@ public final class DBBPool {
 
     private static final long[] sizes = new long[]{256 * 1024, 1024 * 1024, 2 * 1024 * 1024};
     public static void main(String[] args) throws Exception {
-        if (args.length != 2) {
+        if (args.length != 3) {
             return;
         }
 
         System.loadLibrary("voltdb-4.9.3.1");
 
         final int poolSize = Integer.parseInt(args[0]);
-        final boolean useUnsafe = Boolean.parseBoolean(args[1]);
+        final int roundSize = Integer.parseInt(args[1]);
+        final boolean useUnsafe = Boolean.parseBoolean(args[2]);
         final Random r = new Random();
         final List<BBContainer> stuff = new LinkedList<BBContainer>();
 
@@ -567,7 +568,7 @@ public final class DBBPool {
                 stuff.remove(r.nextInt(stuff.size())).discard();
             }
 
-            if (count++ % 1000 == 0) {
+            if (count++ % roundSize == 0) {
                 long liveBytes = 0;
                 System.out.printf("Total allocations %d\n", count);
                 for (final BBContainer c : stuff) {
@@ -580,7 +581,7 @@ public final class DBBPool {
 
                 totalAllocInRound = 0;
 
-                Thread.sleep(10000);
+                Thread.sleep(5000);
             }
 
             final long nextSize = r.nextInt(2 * 1024 * 1024);
