@@ -580,7 +580,7 @@ public final class DBBPool {
                 Thread.sleep(10000);
             }
 
-            final long nextSize = sizes[r.nextInt(sizes.length)];
+            final long nextSize = r.nextInt(2 * 1024 * 1024);
             final BBContainer cont;
             if (useUnsafe) {
                 cont = allocateUnsafeByteBuffer(nextSize);
