@@ -31,8 +31,6 @@ import org.voltcore.logging.VoltLogger;
 import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
 
-import org.voltdb.EELibraryLoader;
-
 #ifndef NO_MEMCHECK
 import java.util.List;
 import java.util.ArrayList;
@@ -563,7 +561,7 @@ public final class DBBPool {
             return;
         }
 
-        EELibraryLoader.loadExecutionEngineLibrary(true);
+        System.loadLibrary("voltdb-4.9.3.1");
 
         final int poolSize = Integer.parseInt(args[0]);
         final boolean useUnsafe = Boolean.parseBoolean(args[1]);
