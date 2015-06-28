@@ -560,6 +560,7 @@ public final class DBBPool {
         final Random r = new Random();
         final List<BBContainer> stuff = new LinkedList<BBContainer>();
 
+        long totalAllocInRound = 0;
         long count = 0;
         while (true) {
             if (stuff.size() == poolSize) {
@@ -571,7 +572,11 @@ public final class DBBPool {
                 for (final BBContainer c : stuff) {
                     System.out.printf("%d\tbytes\n", c.b().capacity());
                 }
+                System.out.printf("Total: %d bytes\n", totalAllocInRound);
                 System.out.println();
+
+                totalAllocInRound = 0;
+
                 Thread.sleep(10000);
             }
 
@@ -583,6 +588,7 @@ public final class DBBPool {
                 cont = allocateDirect((int) nextSize);
             }
             stuff.add(cont);
+            totalAllocInRound += nextSize;
         }
     }
 }
