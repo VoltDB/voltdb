@@ -468,7 +468,6 @@ public final class DBBPool {
     }
 #ifdef MEMCHECK_FULL
 
-    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
     private static NonBlockingHashMap<Long, Throwable> m_allocatedStuff = new NonBlockingHashMap<Long, Throwable>();
 #endif
 
@@ -499,13 +498,6 @@ public final class DBBPool {
             System.exit(-1);
         }
         m_allocatedStuff.remove(pointer);
-        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis())) != null) {
-            m_deletedStuff.get(pointer).printStackTrace();
-            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice at " + System.currentTimeMillis());
-            HOST.fatal("Original:", m_deletedStuff.get(pointer));
-            HOST.fatal("Second:", t);
-            System.exit(-1);
-        }
 #endif
         nativeDeleteCharArrayMemory(pointer);
     }
