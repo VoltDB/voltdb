@@ -558,6 +558,10 @@ public final class DBBPool {
         final int poolSize = Integer.parseInt(args[0]);
         final int roundSize = Integer.parseInt(args[1]);
         final boolean useUnsafe = Boolean.parseBoolean(args[2]);
+
+        final Runnable r = new Runnable() {
+            @Override
+            public void run() {
         final Random r = new Random();
         final List<BBContainer> stuff = new LinkedList<BBContainer>();
 
@@ -581,7 +585,7 @@ public final class DBBPool {
 
                 totalAllocInRound = 0;
 
-                Thread.sleep(5000);
+                try {Thread.sleep(5000);} catch (Exception e) {}
             }
 
             final long nextSize = r.nextInt(2 * 1024 * 1024);
@@ -601,5 +605,13 @@ public final class DBBPool {
             stuff.add(cont);
             totalAllocInRound += nextSize;
         }
+        }
+        };
+
+        for (int i = 0; i < 8; i++) {
+            new Thread(r).start();
+        }
+
+        Thread.sleep(100000000l);
     }
 }
