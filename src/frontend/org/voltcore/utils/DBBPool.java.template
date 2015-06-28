@@ -45,7 +45,7 @@ import java.util.ArrayList;
  */
 public final class DBBPool {
 
-    public static volatile boolean printTrace = false;
+    public static volatile boolean printTrace = Boolean.getBoolean("DBB_PRINT_TRACE");
 
     private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
     private static final VoltLogger HOST = new VoltLogger("DBBPOOL");
