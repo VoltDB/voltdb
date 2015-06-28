@@ -596,7 +596,6 @@ public final class DBBPool {
             if (cont.b().capacity() > 8) {
                 cont.b().putInt(r.nextInt());
                 cont.b().putInt(r.nextInt());
-                cont.b().flip();
             }
 
             stuff.add(cont);
