@@ -27,15 +27,11 @@ from SQLCoverageReport import generate_html_reports
 from StandardNormalizer import StandardNormalizer
 
 def normalize(table, sql):
-    """Normalizes the result tuples of ORDER BY statements in the default
-       manner, without sorting SQL NULL (Python None) values at all; in some
-       cases, this could lead to mismatches between HSqlDB, which always sorts
-       NULL values first, and VoltDB, which sorts NULL values as if they were
-       the lowest value (first with ORDER BY ASC, last with ORDER BY DESC), in
-       which case you could use a different normalizer, such as
-       nulls-lowest-normalizer.py.
+    """Normalizes the result tuples of ORDER BY statements, sorting SQL NULL
+       (Python None) values as if they were the lowest values, i.e., first
+       when using ORDER BY col1 ASC, but last when using ORDER BY col1 DESC.
     """
-    return StandardNormalizer.normalize(table, sql, SortNulls.never)
+    return StandardNormalizer.normalize(table, sql, SortNulls.lowest)
 
 def safecmp(x, y):
     """Calls the 'standard' safecmp function, which performs a comparison
