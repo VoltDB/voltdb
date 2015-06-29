@@ -699,12 +699,24 @@
                                 </tr>
                                 <tbody id="exportConfiguration" data-status="value" style="display: none;"></tbody>
                                 <tr class="hasSubLabel parent" id="row-5">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Import</a></td>
+                                    <td align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>
+                                        <!--<a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>-->
+                                        <div id="loadingImportConfig" class="loading-small loadImport" style="display: none"></div>
+                                        <!--<a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>-->
+                                    </td>
+                                </tr>
+
+                                <tbody id="importConfiguration" data-status="value" style="display: none;"></tbody>
+                                <tr class="hasSubLabel parent" id="row-6">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="child-row-5 subLabelRow">
+                                <tr class="child-row-6 subLabelRow">
                                     <td class="configLabel">Max Java Heap </td>
                                     <td align="right">
                                         <span id="maxJavaHeap"></span>
@@ -714,7 +726,7 @@
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="child-row-5 subLabelRow" id="heartbeatTimeoutRow">
+                                <tr class="child-row-6 subLabelRow" id="heartbeatTimeoutRow">
                                     <td class="configLabel">Heartbeat Timeout </td>
                                     <td align="right" class="heartbeattd">
                                         <form id="formHeartbeatTimeout" method="get" action="">
@@ -728,7 +740,7 @@
                                     <td>&nbsp;</td>
                                     <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
-                                <tr class="child-row-5 subLabelRow" id="queryTimoutRow">
+                                <tr class="child-row-6 subLabelRow" id="queryTimoutRow">
                                     <td class="configLabel">Query Timeout</td>
                                     <td align="right" class="queryTimeOut">
                                         <form id="formQueryTimeout" method="get" action="">
@@ -742,7 +754,7 @@
                                     <td>&nbsp;</td>
                                     <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
-                                <tr class="child-row-5 subLabelRow">
+                                <tr class="child-row-6 subLabelRow">
                                     <td class="configLabel">Max Temp Table Memory</td>
                                     <td align="right">
                                         <span id="temptablesmaxsize"></span>
@@ -751,7 +763,7 @@
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="child-row-5 subLabelRow">
+                                <tr class="child-row-6 subLabelRow">
                                     <td class="configLabel">Snapshot Priority</td>
                                     <td id="snapshotpriority" align="right"></td>
                                     <td>&nbsp;</td>
