@@ -202,7 +202,7 @@
     "index-scan": {"schema": "index-scan-schema.py",
         "ddl": "index-DDL.sql",
         "template": "index-scan.sql",
-        "normalizer": "normalizer.py"},
+        "normalizer": "nulls-lowest-normalizer.py"},
 
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.
