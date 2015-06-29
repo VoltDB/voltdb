@@ -489,15 +489,17 @@ public class TestDDLCompiler extends TestCase {
         String schema =
 
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE INDEX T_TREE_1 ON T(    D1,       D2                         );\n" +
-                "CREATE INDEX T_TREE_2 ON T(    D1,       D2,       VAL1             );\n" +
-                "CREATE INDEX T_TREE_3 ON T(    D1,       D2,  VAL1+VAL2             ) WHERE D1 > 3;\n" +
-                "CREATE INDEX T_TREE_4 ON T(    D1,       D2,         D3             );\n" +
-                "CREATE INDEX T_TREE_5 ON T(    D1,       D2,         D3,  VAL1+VAL2 );\n" +
-                "CREATE INDEX T_TREE_6 ON T(    D1,       D2,         D3,  VAL1+VAL2 ) WHERE D2 > 4;\n" +
-                "CREATE INDEX T_TREE_7 ON T( D1+D2,  ABS(D3)                         );\n" +
-                "CREATE INDEX T_TREE_8 ON T( D1+D2,  ABS(D3)                         ) WHERE D1 > 3;\n" +
-                "CREATE INDEX T_TREE_9 ON T( D1+D2,  ABS(D3),       VAL1             );\n" +
+                "CREATE INDEX T_TREE_01 ON T(      D1,       D2                         );\n" +
+                "CREATE INDEX T_TREE_02 ON T(      D1,       D2,       VAL1             );\n" +
+                "CREATE INDEX T_TREE_03 ON T(      D1,       D2,  VAL1+VAL2             ) WHERE D1 > 3;\n" +
+                "CREATE INDEX T_TREE_04 ON T(      D1,       D2,         D3             );\n" +
+                "CREATE INDEX T_TREE_05 ON T(      D1,       D2,         D3,  VAL1+VAL2 );\n" +
+                "CREATE INDEX T_TREE_06 ON T(      D1,       D2,         D3,  VAL1+VAL2 ) WHERE D2 > 4;\n" +
+                "CREATE INDEX T_TREE_07 ON T(   D1+D2,  ABS(D3)                         );\n" +
+                "CREATE INDEX T_TREE_08 ON T(   D1+D2,  ABS(D3)                         ) WHERE D1 > 3;\n" +
+                "CREATE INDEX T_TREE_09 ON T(   D1+D2,  ABS(D3),       VAL1             );\n" +
+                "CREATE INDEX T_TREE_10 ON T(   D1+D2                                   );\n" +
+                "CREATE INDEX T_TREE_11 ON T( ABS(D3)                                   );\n" +
 
                 // Test no min/max
                 "CREATE VIEW VT01 (V_D1, V_D2, CNT, SUM_VAL1_VAL2, COUNT_VAL3) " +           // should have no index for min/max
@@ -506,57 +508,62 @@ public class TestDDLCompiler extends TestCase {
                 "GROUP BY D1, D2;\n" +
 
                 // Test one single min/max
-                "CREATE VIEW VT02 (V_D1, V_D2, V_D3, CNT, MIN_VAL1) " +                      // should choose T_TREE_4
+                "CREATE VIEW VT02 (V_D1, V_D2, V_D3, CNT, MIN_VAL1) " +                      // should choose T_TREE_04
                 "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1) " +
                 "FROM T " +
                 "GROUP BY D1, D2, D3;\n" +
 
                 // Test repeated min/max, single aggCol
-                "CREATE VIEW VT03 (V_D1, V_D2, CNT, MIN_VAL1, MAX_VAL1, MIN_VAL1_DUP) " +    // should choose T_TREE_2, T_TREE_2, T_TREE_2
+                "CREATE VIEW VT03 (V_D1, V_D2, CNT, MIN_VAL1, MAX_VAL1, MIN_VAL1_DUP) " +    // should choose T_TREE_02, T_TREE_02, T_TREE_02
                 "AS SELECT D1, D2, COUNT(*), MIN(VAL1), MAX(VAL1), MIN(VAL1) " +
                 "FROM T " +
                 "GROUP BY D1, D2;\n" +
 
                 // Test min/max with different aggCols
-                "CREATE VIEW VT04 (V_D1, V_D2, CNT, MIN_VAL1, MAX_VAL1, MIN_VAL2) " +        // should choose T_TREE_2, T_TREE_2, T_TREE_1
+                "CREATE VIEW VT04 (V_D1, V_D2, CNT, MIN_VAL1, MAX_VAL1, MIN_VAL2) " +        // should choose T_TREE_02, T_TREE_02, T_TREE_01
                 "AS SELECT D1, D2, COUNT(*), MIN(VAL1), MAX(VAL1), MIN(VAL2) " +
                 "FROM T " +
                 "GROUP BY D1, D2;\n" +
 
                 // Test min/max with single arithmetic aggExpr
-                "CREATE VIEW VT05 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +   // should choose T_TREE_5, T_TREE_5
+                "CREATE VIEW VT05 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +   // should choose T_TREE_05, T_TREE_05
                 "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(VAL1 + VAL2) " +
                 "FROM T " +
                 "GROUP BY D1, D2, D3;\n" +
 
                 // Test min/max with different aggExprs
-                "CREATE VIEW VT06 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +   // should choose T_TREE_5, T_TREE_4
+                "CREATE VIEW VT06 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +   // should choose T_TREE_05, T_TREE_04
                 "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX( ABS(VAL3) ) " +
                 "FROM T " +
                 "GROUP BY D1, D2, D3;\n" +
 
                 // Test min/max with expression in group-by, single aggCol
-                "CREATE VIEW VT07 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +     // should choose T_TREE_9, T_TREE_9
+                "CREATE VIEW VT07 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +     // should choose T_TREE_09, T_TREE_09
                 "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL1), MAX(VAL1) " +
                 "FROM T " +
                 "GROUP BY D1 + D2, ABS(D3);\n" +
 
                 // Test min/max with predicate (partial index)
-                "CREATE VIEW VT08 (V_D1, V_D2, CNT, MIN_VAL1_VAL2) " +                       // should choose T_TREE_3
+                "CREATE VIEW VT08 (V_D1, V_D2, CNT, MIN_VAL1_VAL2) " +                       // should choose T_TREE_03
                 "AS SELECT D1, D2, COUNT(*), MIN(VAL1 + VAL2)" +
                 "FROM T WHERE D1 > 3 " +
                 "GROUP BY D1, D2;\n" +
 
                 // Test min/max with predicate, with expression in group-by
-                "CREATE VIEW VT09 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +     // should choose T_TREE_9, T_TREE_8
+                "CREATE VIEW VT09 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +     // should choose T_TREE_09, T_TREE_08
                 "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
                 "FROM T WHERE D1 > 3 " +
                 "GROUP BY D1 + D2, ABS(D3);\n" +
 
-                "CREATE VIEW VT10 (V_D1, V_D2, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL1) " +        // should choose T_TREE_2, T_TREE_2
+                "CREATE VIEW VT10 (V_D1, V_D2, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL1) " +        // should choose T_TREE_02, T_TREE_02
                 "AS SELECT D1, D2, COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL1) " +
                 "FROM T " +
-                "GROUP BY D1, D2;";
+                "GROUP BY D1, D2;" + 
+
+                // Test min/max with no group by.
+                "CREATE VIEW VT11 (CNT, MIN_D1_D2, MAX_ABS_VAL3) " +                         // should choose T_TREE_10, T_TREE_11
+                "AS SELECT COUNT(*), MIN(D1+D2), MAX(ABS(D3)) " +
+                "FROM T;";
 
         VoltCompiler compiler = new VoltCompiler();
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
@@ -574,15 +581,16 @@ public class TestDDLCompiler extends TestCase {
         Table t = tables.get("T");
         CatalogMap<MaterializedViewInfo> views = t.getViews();
         assertIndexSelectionResult( views.get("VT01").getIndexforminmax() );
-        assertIndexSelectionResult( views.get("VT02").getIndexforminmax(), "T_TREE_4" );
-        assertIndexSelectionResult( views.get("VT03").getIndexforminmax(), "T_TREE_2", "T_TREE_2", "T_TREE_2" );
-        assertIndexSelectionResult( views.get("VT04").getIndexforminmax(), "T_TREE_2", "T_TREE_2", "T_TREE_1" );
-        assertIndexSelectionResult( views.get("VT05").getIndexforminmax(), "T_TREE_5", "T_TREE_5" );
-        assertIndexSelectionResult( views.get("VT06").getIndexforminmax(), "T_TREE_5", "T_TREE_4" );
-        assertIndexSelectionResult( views.get("VT07").getIndexforminmax(), "T_TREE_9", "T_TREE_9" );
-        assertIndexSelectionResult( views.get("VT08").getIndexforminmax(), "T_TREE_3" );
-        assertIndexSelectionResult( views.get("VT09").getIndexforminmax(), "T_TREE_9", "T_TREE_8" );
-        assertIndexSelectionResult( views.get("VT10").getIndexforminmax(), "T_TREE_2", "T_TREE_2" );
+        assertIndexSelectionResult( views.get("VT02").getIndexforminmax(), "T_TREE_04" );
+        assertIndexSelectionResult( views.get("VT03").getIndexforminmax(), "T_TREE_02", "T_TREE_02", "T_TREE_02" );
+        assertIndexSelectionResult( views.get("VT04").getIndexforminmax(), "T_TREE_02", "T_TREE_02", "T_TREE_01" );
+        assertIndexSelectionResult( views.get("VT05").getIndexforminmax(), "T_TREE_05", "T_TREE_05" );
+        assertIndexSelectionResult( views.get("VT06").getIndexforminmax(), "T_TREE_05", "T_TREE_04" );
+        assertIndexSelectionResult( views.get("VT07").getIndexforminmax(), "T_TREE_09", "T_TREE_09" );
+        assertIndexSelectionResult( views.get("VT08").getIndexforminmax(), "T_TREE_03" );
+        assertIndexSelectionResult( views.get("VT09").getIndexforminmax(), "T_TREE_09", "T_TREE_08" );
+        assertIndexSelectionResult( views.get("VT10").getIndexforminmax(), "T_TREE_02", "T_TREE_02" );
+        assertIndexSelectionResult( views.get("VT11").getIndexforminmax(), "T_TREE_10", "T_TREE_11" );
 
         // cleanup after the test
         jarOut.delete();
