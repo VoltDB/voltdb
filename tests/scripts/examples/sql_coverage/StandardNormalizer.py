@@ -262,10 +262,6 @@ class StandardNormalizer:
         # Ignore ORDER BY clause only in a sub-query
         last_paren_index = sql_upper.rfind(')')  # will often be -1
         sort_cols = parse_sql(sql_upper[last_paren_index+1:])
-        # TODO: temp debug!
-        print "\nsql:\n  ", sql
-        print "  last_paren_index:", last_paren_index
-        print "  sort_cols:", sort_cols
         indices = []
         desc = []
         if sort_cols:
@@ -277,9 +273,6 @@ class StandardNormalizer:
                         indices.append(j)
                         desc.append(parse_for_order_by_desc(sql_upper[last_paren_index+1:], sort_cols[i]))
                         break
-        # TODO: temp debug!
-        print "  indices:", indices
-        print "  desc:", desc
 
         # Make sure if there is an ORDER BY clause, the order by columns appear in
         # the result table. Otherwise all the columns will be sorted by the
