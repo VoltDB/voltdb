@@ -124,6 +124,30 @@ public class TestPushDownAggregates extends PlannerTestCase {
                                               ExpressionType.AGGREGATE_MAX});
     }
 
+    //ENG-4980
+    public void testAggregatesOnDistinctPKey() {
+        List<AbstractPlanNode> pn =
+                compileToFragments("SELECT count(distinct PKEY), sum(distinct PKEY), min(distinct PKEY), max(distinct PKEY), avg(distinct PKEY)" +
+                    " FROM T1;");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_COUNT},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM},
+                                              true);
+    }
+
     public void testAllAggregates() {
         List<AbstractPlanNode> pn =
             compileToFragments("SELECT count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
