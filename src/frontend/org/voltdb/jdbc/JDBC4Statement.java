@@ -780,12 +780,14 @@ public class JDBC4Statement implements java.sql.Statement
         }
     }
 
-    @Override
+    // No @Override because this has to compile with source 1.6.
+    // Method not there in the interface in 1.6.
     public void closeOnCompletion() throws SQLException {
         throw SQLError.noSupport();
     }
 
-    @Override
+    // No @Override because this has to compile with source 1.6.
+    // Method not there in the interface in 1.6.
     public boolean isCloseOnCompletion() throws SQLException {
         throw SQLError.noSupport();
     }

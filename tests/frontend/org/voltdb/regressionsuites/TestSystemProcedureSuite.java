@@ -421,6 +421,31 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
         }
         try {
+            client.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
+            fail("AdHoc create did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+        try {
+            client.callProcedure("@AdHoc", "DROP TABLE pause_test_tbl;");
+            fail("AdHoc drop did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+        try {
+            client.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+            fail("AdHoc create proc did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+
+        // admin should work fine
+        admin.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
+        admin.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
+        admin.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+        admin.callProcedure("@AdHoc", "DROP TABLE ddl_test1;");
+
+        try {
             resp = client.callProcedure("@UpdateLogging", m_loggingConfig);
             fail();
         } catch(ProcCallException e) {
@@ -438,10 +463,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         resp = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM pause_test_tbl");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(2, resp.getResults()[0].asScalarLong());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
         resp = client.callProcedure("pauseTestCount");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(2, resp.getResults()[0].asScalarLong());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
 
         // resume
         resp = admin.callProcedure("@Resume");
@@ -496,6 +521,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         "  TEST_ID SMALLINT DEFAULT '0' NOT NULL\n" +
                         ");\n");
 
+        project.setUseDDLSchema(true);
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
