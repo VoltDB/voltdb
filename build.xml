@@ -650,10 +650,10 @@ DISTRIBUTION
     </condition>
 
     <!-- copy the native library to a common location -->
-    <exec dir='.' executable="/usr/bin/env" failonerror='true' os='Mac OS X'>
+    <exec dir='.' executable="/usr/bin/env" failonerror='true'>
         <arg value='bash' />
         <arg value='tools/copy-lib.sh'/>
-        <arg value='${newversion}' />
+        <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
     </exec>
 
     <copy todir="${jar.nativelib.dir}">
