@@ -1781,12 +1781,14 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
         return row;
     }
 
-    @Override
+    // No @Override because this has to compile with source 1.6.
+    // Method not there in the interface in 1.6.
     public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
         throw SQLError.noSupport();
     }
 
-    @Override
+    // No @Override because this has to compile with source 1.6.
+    // Method not there in the interface in 1.6.
     public <T> T getObject(String columnLabel, Class<T> type)
             throws SQLException {
         throw SQLError.noSupport();

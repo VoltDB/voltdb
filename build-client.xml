@@ -22,6 +22,7 @@
         <javac
             target="1.6"
             source="1.6"
+            bootclasspath="${vendor.lib.dir}/classes-java1.6.jar"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
