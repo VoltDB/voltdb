@@ -3436,6 +3436,20 @@ a:hover.changePsd {
             padding: 0;
             float: left;
         }
+.cmdLogLegend {
+    margin: 0 0 0 90px;
+}
+
+    .cmdLogLegend ul {
+        margin: 0 0 0 10px;
+        padding: 0;
+    }
+
+        .cmdLogLegend ul li {
+            margin: 0 10px;
+            padding: 0;
+            float: left;
+        }
 
 .dotGray {
     background-color: #D3D3D3;
@@ -3477,6 +3491,27 @@ a:hover.changePsd {
     right: 14px;
 }
 
+.dotRed {
+    background-color: #FEACAC;
+    border-radius: 50%;
+    height: 12px;
+    position: relative;
+    top: 11px;
+    width: 12px;
+    right: 14px;
+}
+
+.dotLightBlue {
+    background-color: #4D9ECF;
+    border-radius: 50%;
+    height: 12px;
+    position: relative;
+    top: 11px;
+    width: 12px;
+    right: 14px;
+
+}
+
 .partitionHeight {
     width: 90%;
     height: 358px;
@@ -3485,6 +3520,10 @@ a:hover.changePsd {
 .partitionHeightDisplay {
     width: 90%;
     height: 0px;
+}
+.logHeight {
+       width: 90%;
+    height: 364px;
 }
 
 
@@ -3595,6 +3634,7 @@ a:hover.changePsd {
 }
 
 @media (max-width: 699px) {
+    .logHeight {height: 364px;}
 
     ul.topRightList li.responsiveMenuPlaceHolder {
         display: block;
@@ -3917,6 +3957,9 @@ a:hover.changePsd {
         height: 350px;
         margin-top: 30px;
     }
+    .logHeight {
+        height: 364px;
+    }
 }
 
 @media (min-width: 320px) and (max-width: 479px) {
@@ -3930,6 +3973,10 @@ a:hover.changePsd {
     .partitionHeight {
         height: 300px;
         margin-top: 30px;
+    }
+    .logHeight {
+        height: 330px;
+
     }
 
 
@@ -4150,10 +4197,33 @@ a:hover.changePsd {
     }
 }
 
+
 @media (min-width: 300px) and (max-width:438px) {
     .partitionHeight {
         height: 300px;
     }
+     .logHeight {
+          height: 364px;
+          position: relative;
+          top: -19px;
+    }
+}
+
+@media (min-width: 768px) and (max-width:1023px) {
+ .logHeight {
+        height: 364px;
+        position: relative;
+        top: -22px;
+     }
+
+}
+
+@media (width: 1024px) {
+    .logHeight {
+        height: 364px;
+        position: relative;
+        top: -7px;
+     }
 }
 
 
@@ -4161,6 +4231,7 @@ a:hover.changePsd {
     .partitionHeight {
         height: 310px;
     }
+     
 
     .drScroll {
         overflow: visible !important;

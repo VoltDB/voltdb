@@ -205,7 +205,7 @@
                                 </div>
                                 <svg id="visualisationTransaction" width="100%" height="400"></svg>
                             </div>
-                            <div id="chartPartitionIdleTime" class="chart left">
+                            <div id="chartPartitionIdleTime" class="chart">
                                 <div class="chartHeader">
                                     <h1>Partition Idle Time</h1>
                                 </div>
@@ -218,17 +218,23 @@
                                 </div>
                                 <svg id="visualisationPartitionIdleTime" class="partitionHeight"></svg>
                             </div>
-                            <div id="ChartDrReplicationRate" class="chart right" style="display: none">
+                            <div id="ChartDrReplicationRate" class="chart" style="display: none">
                                 <div class="chartHeader">
                                     <h1>Database Replication (DR)</h1>
                                 </div>
                                 <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg>
                             </div>
-                            <div id="chartCommandLogging" class="chart right" style="display: none">
+                            <div id="chartCommandLogging" class="chart" style="display: none">
                                 <div class="chartHeader">
                                     <h1>Command Log Statistics</h1>
                                 </div>
-                                <svg id="visualisationCommandLog" width="100%" height="400"></svg>
+                                <div class="cmdLogLegend" style="display:none;">
+                                    <ul>
+                                        <li><div class="dotLightBlue"></div>Command Log Statistics</li>
+                                        <li><div class="dotRed"></div>Snapshot Overlay</li>
+                                    </ul>
+                                </div>
+                                <svg id="visualisationCommandLog"  class="logHeight"></svg>
                             </div>
                             <div class="clear"></div>
                         </div>

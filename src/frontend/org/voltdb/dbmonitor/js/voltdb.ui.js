@@ -2270,7 +2270,7 @@ function ChangeTableProcedureLabelColor() {
 
 // Graph Spacing adjustment on preference change
 var adjustGraphSpacing = function () {
-    var graphList = [$("#chartServerCPU"), $("#chartServerRAM"), $("#chartClusterLatency"), $("#chartClusterTransactions"), $("#chartPartitionIdleTime")];
+    var graphList = [$("#chartServerCPU"), $("#chartServerRAM"), $("#chartClusterLatency"), $("#chartClusterTransactions"), $("#chartPartitionIdleTime"), $('#ChartDrReplicationRate'), $('#chartCommandLogging')];
 
     var css = "left";
 
