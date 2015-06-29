@@ -135,7 +135,7 @@ function run_benchmark() {
     java -classpath :$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --duration=30 \
-        --servers=localhost \
+        --servers=volt3f \
 	--statsfile=exportbench.csv
 }
 

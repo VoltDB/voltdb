@@ -233,15 +233,15 @@ public class ExportBenchmark {
     public void doInserts(Client client, int ratio) {
 
         // Make sure DB tables are empty
-    	System.out.println("Truncating DB tables");
-    	try {
-			client.callProcedure("TruncateTables");
-		} catch (IOException | ProcCallException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
+        System.out.println("Truncating DB tables");
+        try {
+            client.callProcedure("TruncateTables");
+        } catch (IOException | ProcCallException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
 
-    	// Don't track warmup inserts
+        // Don't track warmup inserts
         System.out.println("Warming up...");
         long now = System.currentTimeMillis();
         AtomicLong rowId = new AtomicLong(0);
@@ -357,11 +357,11 @@ public class ExportBenchmark {
         System.out.format("Min %6.0f, Max %6.0f. Delta %6.2f%%%n", min, max, (max-min)/min*100.0);
 
         try {
-			client.drain();
-		} catch (NoConnectionsException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+            client.drain();
+        } catch (NoConnectionsException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     static void connectToOneServerWithRetry(String server) {

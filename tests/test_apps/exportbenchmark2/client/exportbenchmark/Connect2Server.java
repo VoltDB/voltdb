@@ -30,13 +30,13 @@ import org.voltdb.client.Client;
 
 public class Connect2Server {
     final static Client client = null;
-	/**
+    /**
      * Connect to a single server with retry. Limited exponential backoff.
      * No timeout. This will run until the process is killed if it's not
      * able to connect.
      *
      * @param server hostname:port or just hostname (hostname can be ip).
-	 * @return
+     * @return
      */
 
     static void connectToOneServerWithRetry(String server) {

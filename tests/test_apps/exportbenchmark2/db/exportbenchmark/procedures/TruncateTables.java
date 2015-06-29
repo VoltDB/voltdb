@@ -31,7 +31,7 @@ import org.voltdb.VoltProcedure;
 public class TruncateTables extends VoltProcedure {
     public final SQLStmt truncTable1 = new SQLStmt("TRUNCATE TABLE ALL_VALUES1");
     public final SQLStmt truncTable2 = new SQLStmt("TRUNCATE TABLE ALL_VALUES2");
-    
+
     public long run()
     {
             voltQueueSQL(truncTable1);

@@ -42,7 +42,7 @@ public class InsertExport extends VoltProcedure {
     public final SQLStmt exportInsert2 = new SQLStmt("INSERT INTO ALL_VALUES_EXPORT2 " + sqlBase);
     public final SQLStmt dbInsert1 = new SQLStmt("INSERT INTO ALL_VALUES1 " + sqlBase);
     public final SQLStmt dbInsert2 = new SQLStmt("INSERT INTO ALL_VALUES2 " + sqlBase);
-    
+
     public long run(long rowid, int dbInserts, int exportInserts, int reversed)
     {
         @SuppressWarnings("deprecation")
@@ -56,7 +56,7 @@ public class InsertExport extends VoltProcedure {
 
         // Insert into DB
        for (int row = 0; row < dbInserts; row++) {
-        	SampleRecord record = new SampleRecord(rowid, rand);
+            SampleRecord record = new SampleRecord(rowid, rand);
             voltQueueSQL(dbInsert1, txid, rowid, record.rowid_group,
                 record.type_null_tinyint, record.type_not_null_tinyint,
                 record.type_null_smallint, record.type_not_null_smallint,
@@ -81,11 +81,11 @@ public class InsertExport extends VoltProcedure {
                 record.type_null_varchar25, record.type_not_null_varchar25,
                 record.type_null_varchar128, record.type_not_null_varchar128,
                 record.type_null_varchar1024, record.type_not_null_varchar1024);
-        	}
+            }
 
         // Insert in export table
         for (int row = 0; row < exportInserts; row++) {
-        	SampleRecord record = new SampleRecord(rowid, rand);
+            SampleRecord record = new SampleRecord(rowid, rand);
             voltQueueSQL(exportInsert1, txid, rowid, record.rowid_group,
                 record.type_null_tinyint, record.type_not_null_tinyint,
                 record.type_null_smallint, record.type_not_null_smallint,
@@ -100,7 +100,7 @@ public class InsertExport extends VoltProcedure {
                 record.type_null_varchar1024,
                 record.type_not_null_varchar1024);
 
-        	record = new SampleRecord(rowid, rand);
+            record = new SampleRecord(rowid, rand);
             voltQueueSQL(exportInsert2, txid, rowid, record.rowid_group,
                 record.type_null_tinyint, record.type_not_null_tinyint,
                 record.type_null_smallint, record.type_not_null_smallint,
