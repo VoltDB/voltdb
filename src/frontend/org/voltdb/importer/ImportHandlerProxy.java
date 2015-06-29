@@ -21,6 +21,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.voltdb.client.ProcedureCallback;
 
 
 /**
@@ -32,6 +33,7 @@ public abstract class ImportHandlerProxy implements ImportContext {
 
     private Object m_handler = null;
     private Method m_callProcMethod;
+    private Method m_asyncCallProcMethod;
     private Method m_hasTableMethod;
     private Method m_info_log;
     private Method m_error_log;
@@ -78,9 +80,20 @@ public abstract class ImportHandlerProxy implements ImportContext {
     }
 
     @Override
+    public boolean callProcedure(ProcedureCallback cb, Invocation invocation) {
+        try {
+            Object params[] = invocation.getParams();
+            return (Boolean )m_asyncCallProcMethod.invoke(m_handler, this, cb, invocation.getProcedure(), params);
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    @Override
     public void setHandler(Object handler) throws Exception {
         m_handler = handler;
         m_callProcMethod = m_handler.getClass().getMethod("callProcedure", ImportContext.class, String.class, Object[].class);
+        m_asyncCallProcMethod = m_handler.getClass().getMethod("callProcedure", ImportContext.class, ProcedureCallback.class, String.class, Object[].class);
         m_hasTableMethod = m_handler.getClass().getMethod("hasTable", String.class);
         m_info_log = m_handler.getClass().getMethod("info", String.class);
         m_error_log = m_handler.getClass().getMethod("error", String.class);

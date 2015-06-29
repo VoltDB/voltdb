@@ -14,14 +14,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.voltdb.importclient.kafka;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
-import kafka.javaapi.FetchResponse;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,9 +29,19 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
+import kafka.api.FetchRequest;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.ErrorMapping;
+import kafka.common.OffsetAndMetadata;
+import kafka.common.OffsetMetadataAndError;
 import kafka.common.TopicAndPartition;
+import kafka.javaapi.FetchResponse;
+import kafka.javaapi.OffsetCommitRequest;
+import kafka.javaapi.OffsetCommitResponse;
+import kafka.javaapi.OffsetFetchRequest;
+import kafka.javaapi.OffsetFetchResponse;
+import kafka.javaapi.OffsetRequest;
 import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
@@ -44,12 +51,14 @@ import kafka.message.MessageAndOffset;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 
 /**
- * Based on SimpleConsumer
- * Implement a BundleActivator interface and extend ImportHandlerProxy.
+ * Based on SimpleConsumer Implement a BundleActivator interface and extend ImportHandlerProxy.
+ *
  * @author akhanzode
  */
 public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
@@ -61,23 +70,27 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private int m_fetchSize;
     private int m_consumerSocketTimeout;
     private List<String> m_topicList;
-    private List<HostAndPort> m_brokerList = new ArrayList<HostAndPort>();
+    private final List<HostAndPort> m_brokerList = new ArrayList<HostAndPort>();
+    private static final String GROUP_ID = "voltdb";
+    private static final String CLIENT_ID = "voltdb-importer";
 
     private Map<String, List<TopicMetadata>> m_topicPartitionMetaData = new HashMap<String, List<TopicMetadata>>();
     private Map<String, List<Integer>> m_topicPartitions = new HashMap<String, List<Integer>>();
-    private Map<String, String>m_topicPartitionLeader = new HashMap<String, String>();
-    private Map<String, Integer>m_topicPartitionLeaderPort = new HashMap<String, Integer>();
+    private Map<String, String> m_topicPartitionLeader = new HashMap<String, String>();
+    private Map<String, Integer> m_topicPartitionLeaderPort = new HashMap<String, Integer>();
     private Map<TopicPartitionFetcher, ExecutorService> m_fetchers = new HashMap<TopicPartitionFetcher, ExecutorService>();
 
-    private ExecutorService m_es;
-
+    //Simple Host and Port abstraction....dont want to use our big stuff here.
     public static class HostAndPort {
+
         public final String host;
         public final int port;
+
         public HostAndPort(String h, int p) {
             host = h;
             port = p;
         }
+
         public static HostAndPort fromString(String hap) {
             String s[] = hap.split(":");
             int p = Integer.parseInt(s[1]);
@@ -105,6 +118,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     /**
      * Return a name for VoltDB to log with friendly name.
+     *
      * @return name of the importer.
      */
     @Override
@@ -113,19 +127,19 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     }
 
     /**
-     * This is called with the properties that are supplied in the deployment.xml
-     * Do any initialization here.
+     * This is called with the properties that are supplied in the deployment.xml Do any initialization here.
+     *
      * @param p
      */
     @Override
     public void configure(Properties p) {
         m_properties = (Properties) p.clone();
-        m_procedure = (String )m_properties.get("procedure");
+        m_procedure = (String) m_properties.get("procedure");
         if (m_procedure == null || m_procedure.trim().length() == 0) {
             throw new RuntimeException("Missing procedure.");
         }
         //pipe seperated list of topics.
-        m_topics = (String )m_properties.getProperty("topics");
+        m_topics = (String) m_properties.getProperty("topics");
         if (m_topics == null || m_topics.trim().length() == 0) {
             throw new RuntimeException("Missing topic(s).");
         }
@@ -133,7 +147,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         if (m_topicList == null || m_topicList.isEmpty()) {
             throw new RuntimeException("Missing topic(s).");
         }
-        m_brokers = (String )m_properties.getProperty("brokers");
+        m_brokers = (String) m_properties.getProperty("brokers");
         if (m_brokers == null || m_brokers.trim().length() == 0) {
             throw new RuntimeException("Missing kafka broker");
         }
@@ -180,18 +194,20 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         System.out.println(m_topicPartitionLeader);
     }
 
+    //Per topic per partition that we are responsible for.
     private class TopicPartitionFetcher implements Runnable {
 
         private final String m_topic;
         private final int m_partition;
         private final String m_leader;
         private final int m_port;
-        private final String m_client;
         private boolean m_shutdown = false;
         private final int m_fetchSize;
         private final List<HostAndPort> m_brokers;
         private final int m_consumerSocketTimeout;
         private CountDownLatch m_latch;
+        private final AtomicLong m_currentOffset = new AtomicLong(0);
+        private final Map<Long, TopicPartitionInvocationCallback> m_pendingCallbacksByOffset = new HashMap<Long, TopicPartitionInvocationCallback>();
 
         public TopicPartitionFetcher(List<HostAndPort> brokers, String topic, int partition, String leader, int port, int fetchSize, int consumerSocketTimeout) {
             m_brokers = brokers;
@@ -201,13 +217,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             m_port = port;
             m_fetchSize = fetchSize;
             m_consumerSocketTimeout = consumerSocketTimeout;
-            m_client = "voltdb-importer";
         }
 
         public void setLatch(CountDownLatch latch) {
             m_latch = latch;
         }
 
+        //Find leader for the topic+partition.
         private PartitionMetadata findLeader() {
             PartitionMetadata returnMetaData = null;
             loop:
@@ -231,8 +247,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         }
                     }
                 } catch (Exception e) {
-                    System.out.println("Error communicating with Broker [" + broker.host + "] to find Leader for [" + m_topic
-                            + ", " + m_partition + "] Reason: " + e);
+                    e.printStackTrace();
                 } finally {
                     if (consumer != null) {
                         consumer.close();
@@ -275,47 +290,113 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             m_latch.countDown();
         }
 
+        //Return offset last committed if -1 means error.
         private long getLastOffset(SimpleConsumer consumer) {
-            TopicAndPartition topicAndPartition = new TopicAndPartition(m_topic, m_partition);
-            Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
-            requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1));
-            kafka.javaapi.OffsetRequest request = new kafka.javaapi.OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(),m_client);
-            OffsetResponse response = consumer.getOffsetsBefore(request);
 
-            if (response.hasError()) {
-                info("Failed fetching data Offset Data the Broker will retry. Reason: " + response.errorCode(m_topic, m_partition) );
+            final int correlationId = m_partition;
+            final short version = 1;
+            TopicAndPartition topicAndPartition = new TopicAndPartition(m_topic, m_partition);
+
+            OffsetFetchRequest offsetFetchRequest
+                    = new OffsetFetchRequest(GROUP_ID, Arrays.asList(topicAndPartition), version, correlationId, CLIENT_ID);
+            OffsetFetchResponse offsetFetchResponse = consumer.fetchOffsets(offsetFetchRequest);
+            OffsetMetadataAndError ofmd = offsetFetchResponse.offsets().get(topicAndPartition);
+            short code = ofmd.error();
+            // this means that an offset has yet to be committed
+            if (code == ErrorMapping.UnknownTopicOrPartitionCode()) {
+                PartitionOffsetRequestInfo partitionOffsetRequestInfo
+                        = new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.EarliestTime(), 1);
+                Map<TopicAndPartition, PartitionOffsetRequestInfo> reqMap = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
+                reqMap.put(topicAndPartition, partitionOffsetRequestInfo);
+                OffsetRequest offsetRequest = new OffsetRequest(reqMap, kafka.api.OffsetRequest.CurrentVersion(), null);
+                OffsetResponse offsetResponse = consumer.getOffsetsBefore(offsetRequest);
+                if (offsetResponse.hasError()) {
+                    return -1;
+                }
+                return offsetResponse.offsets(m_topic, m_partition)[0];
+            } else if (code == ErrorMapping.NoError()) {
+                return ofmd.offset() + 1;
+            } else {
                 return -1;
             }
-            long[] offsets = response.offsets(m_topic, m_partition);
-            return offsets[0];
+        }
+
+        //Callback for each invocation we have submitted.
+        private class TopicPartitionInvocationCallback implements ProcedureCallback {
+
+            private final long m_offset;
+            private final long m_nextOffset;
+            private final SimpleConsumer m_consumer;
+            private final TopicAndPartition m_topicAndPartition;
+
+            public TopicPartitionInvocationCallback(SimpleConsumer consumer, long offset, long noffset) {
+                m_consumer = consumer;
+                m_offset = offset;
+                m_nextOffset = noffset;
+                m_topicAndPartition = new TopicAndPartition(m_topic, m_partition);
+            }
+
+            public boolean commitOffset(long offset) {
+
+                final int correlationId = m_partition;
+                final short version = 1;
+
+                OffsetAndMetadata offsetMetdata = new OffsetAndMetadata(offset, "commitRequest", ErrorMapping.NoError());
+                Map<TopicAndPartition, OffsetAndMetadata> reqMap = new HashMap<TopicAndPartition, OffsetAndMetadata>();
+                reqMap.put(m_topicAndPartition, offsetMetdata);
+                OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(GROUP_ID, reqMap, correlationId, CLIENT_ID, version);
+                OffsetCommitResponse offsetCommitResponse = null;
+                try {
+                    offsetCommitResponse = m_consumer.commitOffsets(offsetCommitRequest);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return false;
+                }
+                final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+
+                return code == ErrorMapping.NoError();
+            }
+
+            @Override
+            public void clientCallback(ClientResponse response) throws Exception {
+                System.out.println(response.getStatusString());
+                m_pendingCallbacksByOffset.remove(m_offset);
+                //This message offset is already committed we just remove from pending and move on.
+                if (m_nextOffset < m_currentOffset.get()) {
+                    return;
+                }
+                if (commitOffset(m_nextOffset)) {
+                    //Update the offset to read to next offset.
+                    m_currentOffset.set(m_nextOffset);
+                }
+            }
+
         }
 
         @Override
         public void run() {
             SimpleConsumer consumer = null;
             try {
-                long readOffset = 0;
                 //Startwith the starting leader.
                 String leaderBroker = m_leader;
                 while (!m_shutdown) {
                     if (consumer == null) {
-                        consumer = new SimpleConsumer(leaderBroker, m_port, m_consumerSocketTimeout, m_fetchSize, m_client);
-                        readOffset = getLastOffset(consumer);
+                        consumer = new SimpleConsumer(leaderBroker, m_port, m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
+                        m_currentOffset.set(getLastOffset(consumer));
                     }
                     long currentFetchCount = 0;
-                    if (readOffset >= 0) {
-                        FetchRequest req = new FetchRequestBuilder()
-                                .clientId("voltdb-importer")
-                                .addFetch(m_topic, m_partition, readOffset, m_fetchSize)
+                    if (m_currentOffset.get() >= 0) {
+                        FetchRequest req = new FetchRequestBuilder().clientId(CLIENT_ID)
+                                .addFetch(m_topic, m_partition, m_currentOffset.get(), m_fetchSize)
                                 .build();
                         FetchResponse fetchResponse = consumer.fetch(req);
 
                         if (fetchResponse.hasError()) {
                             // Something went wrong!
                             short code = fetchResponse.errorCode(m_topic, m_partition);
-                            if (code == ErrorMapping.OffsetOutOfRangeCode())  {
+                            if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                                 // We asked for an invalid offset. For simple case ask for the last element to reset
-                                readOffset = getLastOffset(consumer);
+                                m_currentOffset.set(getLastOffset(consumer));
                                 continue;
                             }
                             consumer.close();
@@ -325,24 +406,26 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 //point to original leader which will fail and we fall back again here.
                                 leaderBroker = m_leader;
                             }
-
                             continue;
                         }
 
                         for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topic, m_partition)) {
                             long currentOffset = messageAndOffset.offset();
-                            if (currentOffset < readOffset) {
-                                info("Found an old offset: " + currentOffset + " Expecting: " + readOffset);
+                            if (currentOffset < m_currentOffset.get() || m_pendingCallbacksByOffset.containsKey(currentOffset)) {
+                                info("Found an old offset: " + currentOffset + " Expecting: " + m_currentOffset.get());
                                 continue;
                             }
-                            readOffset = messageAndOffset.nextOffset();
                             ByteBuffer payload = messageAndOffset.message().payload();
 
                             byte[] bytes = new byte[payload.limit()];
                             payload.get(bytes);
                             String line = new String(bytes);
                             CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                            callProcedure(invocation);
+                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(consumer, currentOffset, messageAndOffset.nextOffset());
+                            m_pendingCallbacksByOffset.put(currentOffset, cb);
+                            if (!callProcedure(cb, invocation)) {
+                                m_pendingCallbacksByOffset.remove(currentOffset);
+                            }
                             currentFetchCount++;
                         }
                     }
@@ -374,7 +457,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         try {
             info("Configured and ready with properties: " + m_properties);
             SimpleConsumer simpleConsumer = new SimpleConsumer(m_brokerList.get(0).host,
-                    m_brokerList.get(0).port, 0, 4096, "voltdb-importer");
+                    m_brokerList.get(0).port, 0, 4096, CLIENT_ID);
             buildTopicLeaderMetadata(simpleConsumer);
 
             Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
@@ -388,7 +471,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     String leaderKey = topic + "-" + partition;
                     TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, topic, partition,
                             m_topicPartitionLeader.get(leaderKey),
-                            m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize , m_consumerSocketTimeout);
+                            m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize, m_consumerSocketTimeout);
                     ExecutorService es = CoreUtils.getListeningExecutorService("KafkaImporter Topic " + leaderKey + " - " + ts, 1);
                     m_fetchers.put(fetcher, es);
                 }

@@ -19,6 +19,7 @@ package org.voltdb.importer;
 
 import java.util.Properties;
 import java.util.Set;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  *
@@ -62,6 +63,14 @@ public interface ImportContext {
      * @return true if successfully accepted the work.
      */
     public boolean callProcedure(Invocation invocation);
+
+    /**
+     * Call this to get the ingested data passed to procedure.
+     * @param cb callback for results.
+     * @param invocation indicating what kind of data is passed in for this.
+     * @return true if successfully accepted the work.
+     */
+    public boolean callProcedure(ProcedureCallback cb, Invocation invocation);
 
     /**
      * Returns max time in nanoseconds a call to callProcedure waits in backpressure.

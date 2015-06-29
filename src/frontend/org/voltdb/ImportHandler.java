@@ -35,6 +35,8 @@ import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -120,7 +122,17 @@ public class ImportHandler {
         return (table!=null);
     }
 
+    public class NullCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+        }
+    }
+
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
+        return callProcedure(ic, new NullCallback(), proc, fieldList);
+    }
+
+    public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
             m_logger.warn("Server is paused and is currently unavailable - please try again later.");
@@ -207,7 +219,7 @@ public class ImportHandler {
         boolean success;
         //Synchronize this to create good handles across all ImportHandlers
         synchronized(ImportHandler.class) {
-            success = m_adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
+            success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
         }
         if (!success) {
             tcont.discard();
