@@ -431,6 +431,7 @@
         });
         
         nv.addGraph(function () {
+            MonitorGraphUI.ChartCommandlog.showLegend(false);
             MonitorGraphUI.ChartCommandlog.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format('%X')(new Date(d));
@@ -1151,6 +1152,9 @@
             cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
             cmdLogData.push({ "x": new Date(timeStamp), "y": outStandingTxn });
             MonitorGraphUI.Monitors.cmdLogData = cmdLogData;
+            if (monitor.cmdLogFirstData) {
+                $(".cmdLogLegend").css("display", "block");
+            }
             monitor.cmdLogFirstData = false;
 
             if (graphView == 'Minutes')
