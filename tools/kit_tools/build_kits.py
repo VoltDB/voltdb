@@ -4,6 +4,7 @@ import os, sys, shutil, datetime
 from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
 from fabric.context_managers import shell_env
+from fabric.utils import abort
 
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
