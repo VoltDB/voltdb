@@ -4,6 +4,7 @@ import os, sys, shutil, datetime
 from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
 from fabric.context_managers import shell_env
+from fabric.utils import abort
 
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
@@ -28,17 +29,17 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
         run("git clone git@github.com:VoltDB/voltdb.git")
         result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
         if result.failed:
-            message = "VoltDB checkout branch %s failed." % rbmqExportGit
+            message = "VoltDB checkout failed. Missing branch %s." % rbmqExportGit
 
         run("git clone git@github.com:VoltDB/pro.git")
         result = run("cd pro; git checkout %s" % proGit, warn_only=True)
         if result.failed:
-            message += "\nPro checkout branch %s failed." % rbmqExportGit
+            message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
 
         run("git clone git@github.com:VoltDB/export-rabbitmq.git")
         result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
         if result.failed:
-            message += "\nExport-rabbitmg checkout branch %s failed." % rbmqExportGit
+            message += "\nExport-rabbitmg checkout failed. Missing branch %s." % rbmqExportGit
 
         if len(message) > 0:
             abort(message)
