@@ -25,12 +25,12 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
         # all 3 repos so user gets all the bad news at once
         message = ""
         run("git clone git@github.com:VoltDB/voltdb.git")
-        run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
+        result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
         if result.failed:
             message = "VoltDB checkout branch %s failed." % rbmqExportGit
 
         run("git clone git@github.com:VoltDB/pro.git")
-        run("cd pro; git checkout %s" % proGit, warn_only=True)
+        result = run("cd pro; git checkout %s" % proGit, warn_only=True)
         if result.failed:
             message += "\nPro checkout branch %s failed." % rbmqExportGit
 
