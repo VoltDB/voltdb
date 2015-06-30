@@ -16,6 +16,8 @@
  */
 package org.voltdb.importclient.kafka;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import kafka.api.FetchRequestBuilder;
@@ -27,6 +29,8 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
@@ -80,7 +84,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private final Map<String, String> m_topicPartitionLeader = new HashMap<String, String>();
     private final Map<String, Integer> m_topicPartitionLeaderPort = new HashMap<String, Integer>();
     private final Map<TopicPartitionFetcher, ExecutorService> m_fetchers = new HashMap<TopicPartitionFetcher, ExecutorService>();
-    private final List<String> m_availableChannels = new ArrayList<String>();
+    private Set<URI> m_availableChannels = new TreeSet<URI>();
 
     //Simple Host and Port abstraction....dont want to use our big stuff here orgi bundle import nastiness.
     public static class HostAndPort {
@@ -110,6 +114,69 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     public void stop(BundleContext context) throws Exception {
         //Do any bundle related cleanup.
     }
+
+    @Override
+    public boolean isRunEveryWhere() {
+        return false;
+    }
+
+    private Set<URI> buildTopicLeaderMetadata(SimpleConsumer simpleConsumer) throws URISyntaxException {
+
+        //For all topics connect and get metadata.
+        Set<URI> availableResources = new TreeSet<URI>();
+        for (String topic : m_topicList) {
+            List<String> topics = Collections.singletonList(topic);
+            TopicMetadataRequest req = new TopicMetadataRequest(topics);
+            kafka.javaapi.TopicMetadataResponse resp = simpleConsumer.send(req);
+
+            List<TopicMetadata> metaData = resp.topicsMetadata();
+            m_topicPartitionMetaData.put(topic, metaData);
+            List<Integer> partitions = m_topicPartitions.get(topic);
+            if (partitions == null) {
+                partitions = new ArrayList<Integer>();
+                m_topicPartitions.put(topic, partitions);
+            }
+            for (TopicMetadata item : metaData) {
+                for (PartitionMetadata part : item.partitionsMetadata()) {
+                    partitions.add(part.partitionId());
+                    for (kafka.cluster.Broker replica : part.replicas()) {
+                        String leaderKey = topic + "-" + part.partitionId();
+                        m_topicPartitionLeader.put(leaderKey, replica.host());
+                        m_topicPartitionLeaderPort.put(leaderKey, replica.port());
+                        URI uri = new URI("kafka:/" + topic + "/partition/" + part.partitionId());
+                        availableResources.add(uri);
+                    }
+                }
+            }
+        }
+
+        info("Available Channels are: " + availableResources);
+        return availableResources;
+    }
+
+    @Override
+    public Set<URI> getAllResponsibleResources() {
+        SimpleConsumer simpleConsumer = null;
+        Set<URI> availableResources = new TreeSet<URI>();
+        try {
+            simpleConsumer = new SimpleConsumer(m_brokerList.get(0).host, m_brokerList.get(0).port, 0, 4096, CLIENT_ID);
+            //Build all available topic URIs
+            availableResources = buildTopicLeaderMetadata(simpleConsumer);
+        } catch (Exception ex) {
+            //Handle
+        } finally {
+            if (simpleConsumer != null) {
+                simpleConsumer.close();
+            }
+        }
+        return availableResources;
+    }
+
+    @Override
+    public void setAllocatedResources(Set<URI> allocated) {
+        m_availableChannels = allocated;
+    }
+
 
     @Override
     public void stop() {
@@ -165,37 +232,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //These are defaults picked up from kafka we save them so that they are passed around.
         m_fetchSize = Integer.parseInt(m_properties.getProperty("fetch.message.max.bytes", "65536"));
         m_consumerSocketTimeout = Integer.parseInt(m_properties.getProperty("socket.timeout.ms", "30000"));
-    }
-
-    private void buildTopicLeaderMetadata(SimpleConsumer simpleConsumer) {
-
-        //For all topics connect and get metadata.
-        for (String topic : m_topicList) {
-            List<String> topics = Collections.singletonList(topic);
-            TopicMetadataRequest req = new TopicMetadataRequest(topics);
-            kafka.javaapi.TopicMetadataResponse resp = simpleConsumer.send(req);
-
-            List<TopicMetadata> metaData = resp.topicsMetadata();
-            m_topicPartitionMetaData.put(topic, metaData);
-            List<Integer> partitions = m_topicPartitions.get(topic);
-            if (partitions == null) {
-                partitions = new ArrayList<Integer>();
-                m_topicPartitions.put(topic, partitions);
-            }
-            for (TopicMetadata item : metaData) {
-                for (PartitionMetadata part : item.partitionsMetadata()) {
-                    partitions.add(part.partitionId());
-                    for (kafka.cluster.Broker replica : part.replicas()) {
-                        String leaderKey = topic + "-" + part.partitionId();
-                        m_topicPartitionLeader.put(leaderKey, replica.host());
-                        m_topicPartitionLeaderPort.put(leaderKey, replica.port());
-                        m_availableChannels.add("kafka:/" + topic + "/partition/" + part.partitionId());
-                    }
-                }
-            }
-        }
-
-        info("Available Channels are: " + m_availableChannels);
     }
 
     //Per topic per partition that we are responsible for.
@@ -440,6 +476,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(consumer, currentOffset, messageAndOffset.nextOffset());
                             m_pendingCallbacksByOffset.put(currentOffset, cb);
                             if (!callProcedure(cb, invocation)) {
+                                m_currentOffset.set(messageAndOffset.nextOffset());
                                 m_pendingCallbacksByOffset.remove(currentOffset);
                             }
                             currentFetchCount++;
@@ -472,9 +509,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     public void readyForData() {
         try {
             info("Configured and ready with properties: " + m_properties);
-            SimpleConsumer simpleConsumer = new SimpleConsumer(m_brokerList.get(0).host,
-                    m_brokerList.get(0).port, 0, 4096, CLIENT_ID);
-            buildTopicLeaderMetadata(simpleConsumer);
 
             Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
             for (String topic : m_topicList) {
@@ -485,11 +519,17 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 List<Integer> topicPartitions = m_topicPartitions.get(topic);
                 for (int partition : topicPartitions) {
                     String leaderKey = topic + "-" + partition;
-                    TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, topic, partition,
-                            m_topicPartitionLeader.get(leaderKey),
-                            m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize, m_consumerSocketTimeout);
-                    ExecutorService es = CoreUtils.getListeningExecutorService("KafkaImporter Topic " + leaderKey + " - " + ts, 1);
-                    m_fetchers.put(fetcher, es);
+                    URI assignedKey = new URI("kafka:/" + topic + "/partition/" + partition);
+                    if (m_availableChannels.contains(assignedKey)) {
+                        info("Channel " + assignedKey + " mastership is assigned to this node.");
+                        TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, topic, partition,
+                                m_topicPartitionLeader.get(leaderKey),
+                                m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize, m_consumerSocketTimeout);
+                        ExecutorService es = CoreUtils.getListeningExecutorService("KafkaImporter Topic " + leaderKey + " - " + ts, 1);
+                        m_fetchers.put(fetcher, es);
+                    } else {
+                        info("Channel " + assignedKey + " is not available on this node.");
+                    }
                 }
             }
             //Submit all tasks and wait.

@@ -22,7 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceLoader;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
@@ -54,6 +57,9 @@ public class ImportManager {
     private final FrameworkFactory m_frameworkFactory;
     private final Map<String, String> m_frameworkProps;
     private final Framework m_framework;
+    private final int m_myHostId;
+    private final ChannelDistributer m_distributer;
+    private BlockingDeque<ChannelAssignment> m_queue = new LinkedBlockingDeque<ChannelAssignment>();
 
     /**
      * Get the global instance of the ImportManager.
@@ -63,8 +69,11 @@ public class ImportManager {
         return m_self;
     }
 
-    protected ImportManager(HostMessenger messenger) throws BundleException {
+    protected ImportManager(int myHostId, HostMessenger messenger) throws BundleException {
+        m_myHostId = myHostId;
         m_messenger = messenger;
+        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId), m_queue);
+
         //create properties for osgi
         m_frameworkProps = new HashMap<String, String>();
         //Need this so that ImportContext is available.
@@ -80,14 +89,12 @@ public class ImportManager {
 
     /**
      * Create the singleton ImportManager and initialize.
-     * @param catalogContext
-     * @param partitions
      */
-    public static synchronized void initialize(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) throws BundleException {
-        ImportManager em = new ImportManager(messenger);
+    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) throws BundleException {
+        ImportManager em = new ImportManager(myHostId, messenger);
 
         m_self = em;
-        em.create(catalogContext);
+        em.create(myHostId, m_self.m_distributer, catalogContext, messenger.getZK());
     }
 
     /**
@@ -95,13 +102,13 @@ public class ImportManager {
      * @param catalogContext
      * @param partitions
      */
-    private synchronized void create(CatalogContext catalogContext) {
+    private synchronized void create(int myHostId, ChannelDistributer distributer, CatalogContext catalogContext, ZooKeeper zk) {
         try {
             if (catalogContext.getDeployment().getImport() == null) {
                 importLog.info("No importers specified skipping Streaming Import initialization.");
                 return;
             }
-            ImportDataProcessor newProcessor = new ImportProcessor(m_framework);
+            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, distributer, m_framework);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
@@ -112,6 +119,12 @@ public class ImportManager {
     }
 
     public synchronized void shutdown() {
+        close();
+        //Shutdown channel distributer as we are shutting down the node.
+        m_distributer.shutdown();
+    }
+
+    public synchronized void close() {
         //If no processor set we dont have any import configuration
         if (m_processor.get() == null) {
             return;
@@ -123,9 +136,9 @@ public class ImportManager {
 
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
         //Shutdown and recreate.
-        m_self.shutdown();
+        m_self.close();
         assert(m_processor.get() == null);
-        m_self.create(catalogContext);
+        m_self.create(m_myHostId, m_distributer, catalogContext, messenger.getZK());
         m_self.readyForData(catalogContext, messenger);
     }
 
@@ -137,6 +150,5 @@ public class ImportManager {
         //Tell import processors and in turn ImportHandlers that we are ready to take in data.
         m_processor.get().readyForData(catalogContext, messenger);
     }
-
 
 }

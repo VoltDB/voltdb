@@ -32,6 +32,8 @@ import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import java.net.URI;
+import java.util.Set;
 import org.osgi.framework.BundleException;
 
 public class ImportProcessor implements ImportDataProcessor {
@@ -40,9 +42,11 @@ public class ImportProcessor implements ImportDataProcessor {
     private final Map<String, BundleWrapper> m_bundles = new HashMap<String, BundleWrapper>();
     private final Map<String, BundleWrapper> m_bundlesByName = new HashMap<String, BundleWrapper>();
     private final Framework m_framework;
+    private final ChannelDistributer m_distributer;
 
-    public ImportProcessor(Framework framework) throws BundleException {
+    public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework) throws BundleException {
         m_framework = framework;
+        m_distributer = distributer;
     }
 
     //This abstracts OSGi based and class based importers.
@@ -51,11 +55,16 @@ public class ImportProcessor implements ImportDataProcessor {
         public final Properties m_properties;
         public final ImportHandlerProxy m_handlerProxy;
         private ImportHandler m_handler;
+        private ChannelDistributer m_channelDistributer;
 
         public BundleWrapper(ImportHandlerProxy handler, Properties properties, Bundle bundle) {
             m_bundle = bundle;
             m_handlerProxy = handler;
             m_properties = properties;
+        }
+
+        public void setChannelDistributer(ChannelDistributer distributer) {
+            m_channelDistributer = distributer;
         }
 
         public void setHandler(ImportHandler handler) throws Exception {
@@ -73,6 +82,9 @@ public class ImportProcessor implements ImportDataProcessor {
                 m_handler.stop();
                 if (m_bundle != null) {
                     m_bundle.stop();
+                }
+                if (m_channelDistributer != null) {
+                    m_channelDistributer.registerChannels(m_handlerProxy.getName(), null);
                 }
             } catch (Exception ex) {
                 m_logger.error("Failed to stop the import bundles.", ex);
@@ -138,6 +150,17 @@ public class ImportProcessor implements ImportDataProcessor {
                 ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, catContext);
                 //Set the internal handler
                 bw.setHandler(importHandler);
+                if (!bw.m_handlerProxy.isRunEveryWhere()) {
+                    //This is a distributed and fault tolerant importer so get the resources.
+                    Set<URI> allResources = bw.m_handlerProxy.getAllResponsibleResources();
+
+                    bw.setChannelDistributer(m_distributer);
+                    m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
+
+                    m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
+                    //Here set the callback handler for the importer to get notified of resources.
+                    bw.m_handlerProxy.setAllocatedResources(allResources);
+                }
                 importHandler.readyForData();
                 m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
             } catch (Exception ex) {

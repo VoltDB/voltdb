@@ -17,6 +17,7 @@
 
 package org.voltdb.importer;
 
+import java.net.URI;
 import java.util.Properties;
 import java.util.Set;
 import org.voltdb.client.ProcedureCallback;
@@ -106,7 +107,7 @@ public interface ImportContext {
      * @return list of resources identifier that will be persisted in Volt ZK for watching.
      * TODO make sure to get correct naming.
      */
-    public Set<String> getAllResponsibleResources();
+    public Set<URI> getAllResponsibleResources();
 
     /**
      * This is called after importer system has allocated part of the responsible resources to the importer running on this node.
@@ -114,7 +115,7 @@ public interface ImportContext {
      * @param allocated
      * TODO make sure to get correct naming.
      */
-    public void setAllocatedResources(Set<String> allocated);
+    public void setAllocatedResources(Set<URI> allocated);
 
     /**
      * log info message

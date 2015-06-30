@@ -19,6 +19,7 @@ package org.voltdb.importer;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.voltdb.client.ProcedureCallback;
@@ -129,13 +130,13 @@ public abstract class ImportHandlerProxy implements ImportContext {
     }
 
     @Override
-    public Set<String> getAllResponsibleResources() {
-        return null;
+    public Set<URI> getAllResponsibleResources() {
+        throw new UnsupportedOperationException("For Distributed Importer this must be implemented.");
     }
 
     @Override
-    public void setAllocatedResources(Set<String> allocated) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void setAllocatedResources(Set<URI> allocated) {
+        throw new UnsupportedOperationException("For Distributed Importer this must be implemented.");
     }
 
 }
