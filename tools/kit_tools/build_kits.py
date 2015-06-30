@@ -3,6 +3,7 @@
 import os, sys, shutil, datetime
 from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
+from fabric.context_managers import shell_env
 
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
@@ -71,7 +72,6 @@ def versionHasZipTarget():
 
 def buildCommunity():
     with cd(builddir + "/voltdb"):
-        fabric.context_managers.shell_env(BUILD_ID=os.getenv("BUILD_ID",""))
         run("pwd")
         run("git status")
         run("git describe --dirty")
@@ -83,7 +83,6 @@ def buildCommunity():
 
 def buildPro():
     with cd(builddir + "/pro"):
-        fabric.context_managers.shell_env(BUILD_ID=os.getenv("BUILD_ID",""))
         run("pwd")
         run("git status")
         run("git describe --dirty")

@@ -13,20 +13,13 @@ fi
     
 OS=`uname`
 
-if [ -z "$BUILD_ID" ]; then
-    # no build id -- fail the build or go on without
-    # the single kit capability?
-    echo "No BUILD_ID: not single kit build -- unsuccessful"
-    exit 0
-fi
-
 echo $1 | ssh volt3f "cat > libs/arg"
 if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb*.jnilib ]
 then
     # the Mac case...
-    tar cf - obj/release/nativelibs/ | ssh volt3e "mkdir -p libs/$BUILD_ID; cd libs/$BUILD_ID; tar xf -"
+    tar cf - obj/release/nativelibs/ | ssh volt3e "cd libs; tar xf -"
 else
     # the Linux case...
    mkdir -p $1
-   cp ~/libs/$BUILD_ID/obj/release/nativelibs/* $1
+   cp ~/libs/obj/release/nativelibs/* $1
 fi
