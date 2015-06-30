@@ -18,6 +18,7 @@ if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb*.jnilib ]
 then
     # the Mac case...
     tar cf - obj/release/nativelibs/ | ssh volt3e "cd libs; tar xf -"
+    exit 0
 else
     # the Linux case...
     
@@ -25,7 +26,9 @@ else
     if [ -e ~/libs/obj/release/nativelibs/* ]; then
         mkdir -p $1
         cp ~/libs/obj/release/nativelibs/* $1
+        exit 0
     else
         echo "++++++++++++++nativelibs not found!"
+        exit 0
     fi
 fi
