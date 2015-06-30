@@ -22,36 +22,24 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from NotANormalizer import NotANormalizer
 from SQLCoverageReport import generate_html_reports
 
-import types
-
-# A compare function which can handle datetime to None comparisons
-# -- where the standard cmp gets a TypeError.
 def safecmp(x, y):
-    # iterate over lists -- just like cmp does,
-    # but compare in a way that avoids a TypeError
-    # when a None value and datetime are corresponding members of the list.
-    for (xn, yn) in zip(x, y):
-        if xn is None:
-            if yn is None:
-                continue
-            return -1
-        if yn is None:
-            return 1
-        rn = cmp(xn, yn)
-        if rn:
-            return rn  # return first difference
-    # With all elements the same, return 0
-    # unless one list is longer, but even that is not an expected local
-    # use case
-    return cmp(len(x), len(y))
+    """Calls the 'standard' safecmp function, which performs a comparison
+       similar to cmp, including iterating over lists, but two None values
+       are considered equal, and a TypeError is avoided when a None value
+       and a datetime are corresponding members of a list.
+    """
+    return NotANormalizer.safecmp(x,y)
 
 def normalize(table, sql):
-    """Do nothing other than returning the table
+    """Do nothing other than returning the table.
     """
-    return table
+    return NotANormalizer.normalize(table, sql)
 
 def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all, extra_stats):
+    """Just calls SQLCoverageReport.generate_html_reports(...).
+    """
     return generate_html_reports(suite, seed, statements_path, hsql_path,
-            jni_path, output_dir, report_all, extra_stats, True)
+                                 jni_path, output_dir, report_all, extra_stats, True)
