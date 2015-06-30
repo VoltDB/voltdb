@@ -20,6 +20,11 @@ then
     tar cf - obj/release/nativelibs/ | ssh volt3e "cd libs; tar xf -"
 else
     # the Linux case...
-   mkdir -p $1
-   cp ~/libs/obj/release/nativelibs/* $1
+    
+    echo "++++++++++++++Linux side"
+    if [ -e ~/libs/obj/release/nativelibs/* ]; then
+        mkdir -p $1
+        cp ~/libs/obj/release/nativelibs/* $1
+    else
+        echo "++++++++++++++nativelibs not found!"
 fi
