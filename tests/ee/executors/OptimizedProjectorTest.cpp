@@ -516,7 +516,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    assert (ExecutorContext::getExecutorContext() == NULL);
+    assert (voltdb::ExecutorContext::getExecutorContext() == NULL);
 
     boost::scoped_ptr<voltdb::Pool> testPool(new voltdb::Pool());
     voltdb::UndoQuantum* wantNoQuantum = NULL;
