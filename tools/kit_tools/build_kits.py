@@ -71,6 +71,7 @@ def versionHasZipTarget():
 
 def buildCommunity():
     with cd(builddir + "/voltdb"):
+        fabric.context_managers.shell_env(BUILD_ID=os.getenv("BUILD_ID",""))
         run("pwd")
         run("git status")
         run("git describe --dirty")
@@ -82,6 +83,7 @@ def buildCommunity():
 
 def buildPro():
     with cd(builddir + "/pro"):
+        fabric.context_managers.shell_env(BUILD_ID=os.getenv("BUILD_ID",""))
         run("pwd")
         run("git status")
         run("git describe --dirty")
