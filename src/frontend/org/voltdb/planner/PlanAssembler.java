@@ -1574,39 +1574,38 @@ public class PlanAssembler {
             return root;
         }
 
-        // For MP queries, the coordinator's OrderBy node can be replaced with a specialized Receive node
-        // that merges individual partitions results if the they are sorted
-        // in the order matching the ORDER BY order
+        // For MP queries, the coordinator's OrderBy node can be replaced with
+        // a specialized Receive node that merges individual partitions results
+        // into a final result set. The preconditions for that are:
+        //  - partition result set is sorted in the order matching the ORDER BY order
+        //  - no aggregation at the coordinator node
         List<AbstractPlanNode> receives = root.findAllNodesOfType(PlanNodeType.RECEIVE);
         boolean isMPPlan = !receives.isEmpty();
-        boolean needPushDown = false;
+        boolean isPartitionSorted = false;
+        boolean noCoordinatorAggregation = true;
         if (isMPPlan) {
-            assert(receives.size() == 1);
             AbstractPlanNode receive = receives.get(0);
             assert(receive.getChildCount() == 1);
             assert(receive.getChild(0).getChildCount() == 1);
             AbstractPlanNode partitionRoot = receive.getChild(0).getChild(0);
-            if (isOrderByNodeRequired(parsedStmt, partitionRoot)) {
-                needPushDown = true;
+            isPartitionSorted = !isOrderByNodeRequired(parsedStmt, partitionRoot);
+            if (isPartitionSorted) {
+                List<AbstractPlanNode> aggs = root.findAllNodesOfClass(AggregatePlanNode.class);
+                for(AbstractPlanNode agg : aggs) {
+                    if (((AggregatePlanNode)agg).m_isCoordinatingAggregator) {
+                        noCoordinatorAggregation = false;
+                        break;
+                    }
+                }
             }
         }
 
         OrderByPlanNode orderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
-if (isMPPlan && !isOrderByNodeRequired(parsedStmt, root)) {
-//        if (isMPPlan) {
+        if (isMPPlan && isPartitionSorted && noCoordinatorAggregation) {
             ReceivePlanNode receive = (ReceivePlanNode)receives.get(0);
             receive.setNeedMerge(true);
             receive.addInlinePlanNode(orderByNode);
-//            if (needPushDown) {
-//// Need projection between SEND and partitionOrderByNode nodes
-//                OrderByPlanNode partitionOrderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
-//                AbstractPlanNode send = receive.getChild(0);
-//                AbstractPlanNode partitionRoot = send.getChild(0);
-//                partitionRoot.clearParents();
-//                partitionOrderByNode.addAndLinkChild(partitionRoot);
-//                send.replaceChild(partitionRoot, partitionOrderByNode);
-//            }
-            return receive;
+            return root;
         } else {
             orderByNode.addAndLinkChild(root);
             return orderByNode;

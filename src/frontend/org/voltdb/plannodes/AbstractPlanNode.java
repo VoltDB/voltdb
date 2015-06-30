@@ -671,11 +671,22 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public ArrayList<AbstractPlanNode> findAllNodesOfType(PlanNodeType type) {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
         ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
-        findAllNodesOfType_recurse(type, collected, visited);
+        findAllNodesOfType_recurse(type, null, collected, visited);
         return collected;
     }
 
-    private void findAllNodesOfType_recurse(PlanNodeType type,ArrayList<AbstractPlanNode> collected,
+    /**
+     * @param pnClass plan node class to search for
+     * @return a list of nodes that are eventual successors of this node of the desired class
+     */
+    public ArrayList<AbstractPlanNode> findAllNodesOfClass(Class< ? extends AbstractPlanNode> pnClass) {
+        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        findAllNodesOfType_recurse(null, pnClass, collected, visited);
+        return collected;
+    }
+
+    private void findAllNodesOfType_recurse(PlanNodeType type, Class< ? extends AbstractPlanNode> pnClass, ArrayList<AbstractPlanNode> collected,
         HashSet<AbstractPlanNode> visited)
     {
         if (visited.contains(this)) {
@@ -683,14 +694,17 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             return;
         }
         visited.add(this);
-        if (getPlanNodeType() == type)
+        if (getPlanNodeType() == type) {
+                collected.add(this);
+        } else if (pnClass != null && pnClass.isAssignableFrom(getClass())) {
             collected.add(this);
+        }
 
         for (AbstractPlanNode child : m_children)
-            child.findAllNodesOfType_recurse(type, collected, visited);
+            child.findAllNodesOfType_recurse(type, pnClass, collected, visited);
 
         for (AbstractPlanNode inlined : m_inlineNodes.values())
-            inlined.findAllNodesOfType_recurse(type, collected, visited);
+            inlined.findAllNodesOfType_recurse(type, pnClass, collected, visited);
     }
 
     /**
@@ -742,6 +756,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         for (AbstractPlanNode inlined : m_inlineNodes.values()) {
             if (inlined.hasAnyNodeOfType(type)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param pnClass plan node class to search for
+     * @return whether a node of that type is contained in the plan tree
+     */
+    public boolean hasAnyNodeOfClass(Class< ? extends AbstractPlanNode> pnClass) {
+        if (pnClass.isAssignableFrom(getClass())) {
+            return true;
+        }
+
+        for (AbstractPlanNode n : m_children) {
+            if (n.hasAnyNodeOfClass(pnClass)) {
+                return true;
+            }
+        }
+
+        for (AbstractPlanNode inlined : m_inlineNodes.values()) {
+            if (inlined.hasAnyNodeOfClass(pnClass)) {
                 return true;
             }
         }
