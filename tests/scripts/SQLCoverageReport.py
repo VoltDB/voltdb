@@ -296,14 +296,8 @@ def generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
                 mismatches.append(statement)
             if ('NullPointerException' in str(jni)):
                 voltdb_npes.append(statement)
-                # TODO: temp debug!!!
-                print 'statement:', statement
-                print 'jni:', jni
             if ('NullPointerException' in str(hsql)):
                 hsqldb_npes.append(statement)
-                # TODO: temp debug!!!
-                print 'statement:', statement
-                print 'hsql:', hsql
             if report_all:
                 all_results.append(statement)
 
