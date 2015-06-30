@@ -17,21 +17,10 @@
 
 package org.voltdb;
 
-import static org.voltdb.ClientInterface.getPartitionForProcedure;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Table;
-import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -45,26 +34,20 @@ public class ImportHandler {
 
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
 
-    // Atomically allows the catalog reference to change between access
-    private final CatalogContext m_catalogContext;
-    private final AtomicLong m_failedCount = new AtomicLong();
-    private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
+    private final InternalConnectionHandler m_internalConnectionHandler;
     private boolean m_stopped = false;
 
-    private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
-
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
-
     // The real handler gets created for each importer.
-    public ImportHandler(ImportContext importContext, CatalogContext catContext) {
-        m_catalogContext = catContext;
+    public ImportHandler(InternalConnectionHandler internalConnectionHandler,
+                         ImportContext importContext,
+                         CatalogContext catContext) {
+        m_internalConnectionHandler = internalConnectionHandler;
 
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
         m_importContext = importContext;
-        VoltDB.instance().getClientInterface().bindAdapter(m_adapter, null);
     }
 
     /**
@@ -107,115 +90,15 @@ public class ImportHandler {
         }
     }
 
-    //Allocate and pool similar row sizes will reuse the buffers.
-    private BBContainer getBuffer(int sz) {
-        return DBBPool.allocateDirectAndPool(sz);
-    }
-
     /**
      * Returns true if a table with the given name exists in the server catalog.
      */
     public boolean hasTable(String name) {
-        Table table = m_catalogContext.tables.get(name);
-        return (table!=null);
+        return m_internalConnectionHandler.hasTable(name);
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
-        // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
-            m_logger.warn("Server is paused and is currently unavailable - please try again later.");
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-        Procedure catProc = m_catalogContext.procedures.get(proc);
-        if (catProc == null) {
-            catProc = m_catalogContext.m_defaultProcs.checkForDefaultProcedure(proc);
-        }
-
-        if (catProc == null) {
-            if (proc.equals("@AdHoc")) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(proc);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-            if (catProc == null) {
-                m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
-                m_failedCount.incrementAndGet();
-                return false;
-            }
-        }
-
-        int counter = 1;
-        int maxSleepNano = 100000;
-        long start = System.nanoTime();
-        while (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS) {
-            try {
-                int nanos = 500 * counter++;
-                Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
-                if (m_stopped) {
-                    return false;
-                }
-                //We have reached max timeout.
-                if (System.nanoTime() - start > ic.getBackpressureTimeout()) {
-                    return false;
-                }
-            } catch (InterruptedException ex) { }
-        }
-        final long nowNanos = System.nanoTime();
-        StoredProcedureInvocation task = new StoredProcedureInvocation();
-        ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
-        //type + procname(len + name) + connectionId (long) + params
-        int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
-        //This is released in callback from adapter side.
-        final BBContainer tcont = getBuffer(sz);
-        final ByteBuffer taskbuf = tcont.b();
-        try {
-            taskbuf.put(ProcedureInvocationType.ORIGINAL.getValue());
-            taskbuf.putInt(proc.length());
-            taskbuf.put(proc.getBytes());
-            taskbuf.putLong(m_adapter.connectionId());
-            pset.flattenToBuffer(taskbuf);
-            taskbuf.flip();
-            task.initFromBuffer(taskbuf);
-        } catch (IOException ex) {
-            m_failedCount.incrementAndGet();
-            m_logger.error("Failed to serialize parameters for stream: " + proc, ex);
-            tcont.discard();
-            return false;
-        }
-
-        final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)catProc.getAttachment();
-
-        int partition = -1;
-        if (catProc.getSinglepartition()) {
-            try {
-                partition = getPartitionForProcedure(ppi.index, ppi.type, task);
-            } catch (Exception e) {
-                m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
-                m_failedCount.incrementAndGet();
-                tcont.discard();
-                return false;
-            }
-        }
-
-        boolean success;
-        //Synchronize this to create good handles across all ImportHandlers
-        synchronized(ImportHandler.class) {
-            success = m_adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
-        }
-        if (!success) {
-            tcont.discard();
-            m_failedCount.incrementAndGet();
-        } else {
-            m_submitSuccessCount.incrementAndGet();
-        }
-        return success;
+        return m_internalConnectionHandler.callProcedure(ic.getBackpressureTimeout(), proc, fieldList);
     }
 
     /**

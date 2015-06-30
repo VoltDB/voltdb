@@ -32,6 +32,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ImportHandler;
+import org.voltdb.InternalConnectionHandler;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -44,6 +45,7 @@ public class ImportProcessor implements ImportDataProcessor {
     private final Map<String, String> m_frameworkProps;
     private final Map<String, BundleWrapper> m_bundles = new HashMap<String, BundleWrapper>();
     private final Map<String, BundleWrapper> m_bundlesByName = new HashMap<String, BundleWrapper>();
+    private final InternalConnectionHandler m_internalConnectionHandler;
 
     public ImportProcessor() {
         //create properties for osgi
@@ -54,6 +56,8 @@ public class ImportProcessor implements ImportDataProcessor {
         // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
         //m_frameworkProps.put("felix.cache.rootdir", "/tmp"); ?? Should this be under voltdbroot?
         m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
+
+        m_internalConnectionHandler = new InternalConnectionHandler();
     }
 
     //This abstracts OSGi based and class based importers.
@@ -165,7 +169,8 @@ public class ImportProcessor implements ImportDataProcessor {
         synchronized (this) {
             for (BundleWrapper bw : m_bundles.values()) {
                 try {
-                    ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, catContext);
+                    ImportHandler importHandler = new ImportHandler(m_internalConnectionHandler,
+                                                                    bw.m_handlerProxy, catContext);
                     //Set the internal handler
                     bw.setHandler(importHandler);
                     importHandler.readyForData();

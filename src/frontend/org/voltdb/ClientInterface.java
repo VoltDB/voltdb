@@ -152,7 +152,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
-    public static final long IMPORTER_CID               = Long.MIN_VALUE + 5;
+    public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
@@ -171,6 +171,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
+    private final InternalClientResponseAdapter m_internalAdapter;
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
@@ -1204,6 +1205,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+
+        m_internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
+        bindAdapter(m_internalAdapter, null);
+    }
+
+    public InternalClientResponseAdapter getInternalAdapter() {
+        return m_internalAdapter;
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {

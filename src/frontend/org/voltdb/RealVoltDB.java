@@ -35,6 +35,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -134,7 +135,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.text.SimpleDateFormat;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -145,6 +145,8 @@ import java.text.SimpleDateFormat;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
+    // interval between resource monitor runs in seconds
+    private static final int resourceMonitorInterval = Integer.getInteger("RESOURCE_MONITOR_INTERVAL", 60);
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
@@ -379,7 +381,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
             m_messenger = null;
-            m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_snapshotCompletionMonitor = null;
@@ -1332,6 +1333,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES));
+
+        // Checks and acts, if the server runs out of resources
+        //TODO: use configured value for this
+        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
+        if (resMonitor.hasResourceLimitsConfigured()) {
+            m_periodicWorks.add(scheduleWork(resMonitor, resourceMonitorInterval,
+                    resourceMonitorInterval, TimeUnit.SECONDS));
+        }
+
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 

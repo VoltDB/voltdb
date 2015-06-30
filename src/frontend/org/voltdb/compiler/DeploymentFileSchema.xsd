@@ -132,6 +132,12 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="memoryLimitType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- <systemsettings> -->
   <xs:complexType name="systemSettingsType">
     <xs:all>
@@ -154,6 +160,11 @@
         <xs:element name="query" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="timeout" type="latencyType" default="0"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="size" type="memoryLimitType" default="0"/>
             </xs:complexType>
         </xs:element>
 

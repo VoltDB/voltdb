@@ -15,14 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.importer;
-
-import org.voltdb.*;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.client.ClientResponse;
+package org.voltdb;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -30,16 +23,22 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 
 /**
- * A very simple adapter for import handler that deserializes bytes into client responses. It calls
+ * A very simple adapter for internal txn requests that deserializes bytes into client responses. It calls
  * crashLocalVoltDB() if the deserialization fails, which should only happen if there's a bug.
  */
-public class ImportClientResponseAdapter implements Connection, WriteStream {
+public class InternalClientResponseAdapter implements Connection, WriteStream {
     public static interface Callback {
         public void handleResponse(ClientResponse response);
     }
@@ -47,13 +46,13 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
-    private final Map<Long, ImportCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, ImportCallback>());
+    private final Map<Long, InternalCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, InternalCallback>());
 
-    private class ImportCallback implements Callback {
+    private class InternalCallback implements Callback {
 
         private DBBPool.BBContainer m_cont;
         private long m_id;
-        public ImportCallback(final DBBPool.BBContainer cont) {
+        public InternalCallback(final DBBPool.BBContainer cont) {
             m_cont = cont;
         }
 
@@ -82,7 +81,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     public boolean createTransaction(Procedure catProc, StoredProcedureInvocation task,
             DBBPool.BBContainer tcont, int partition, long nowNanos) {
-            ImportCallback cb = new ImportCallback(tcont);
+            InternalCallback cb = new InternalCallback(tcont);
             long cbhandle = registerCallback(cb);
             cb.setId(cbhandle);
             task.setClientHandle(cbhandle);
@@ -99,7 +98,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      *                        node.
      * @param name            Human readable name identifying the adapter, will stand in for hostname
      */
-    public ImportClientResponseAdapter(long connectionId, String name) {
+    public InternalClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
     }
 
@@ -131,7 +130,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             }
             enqueue(buf);
         } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, e);
+            VoltDB.crashLocalVoltDB("enqueue() in IClientResponseAdapter throw an exception", true, e);
         }
     }
 
@@ -149,7 +148,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         }
         catch (IOException e)
         {
-            throw new RuntimeException("Unable to deserialize ClientResponse in ImportClientResponseAdapter", e);
+            throw new RuntimeException("Unable to deserialize ClientResponse in InternalClientResponseAdapter", e);
         }
     }
 
@@ -159,7 +158,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         if (b.length == 1) {
             enqueue(b[0]);
         } else {
-            throw new UnsupportedOperationException("Buffer chains not supported in Import invocation adapter");
+            throw new UnsupportedOperationException("Buffer chains not supported in internal invocation adapter");
         }
     }
 
@@ -205,12 +204,12 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public String getHostnameAndIPAndPort() {
-        return "ImportAdapter";
+        return "InternalAdapter";
     }
 
     @Override
     public String getHostnameOrIP() {
-        return "ImportAdapter";
+        return "InternalAdapter";
     }
 
     @Override
