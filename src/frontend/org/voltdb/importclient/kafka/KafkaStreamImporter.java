@@ -58,6 +58,7 @@ import org.voltdb.importer.ImportHandlerProxy;
 
 /**
  * Based on SimpleConsumer Implement a BundleActivator interface and extend ImportHandlerProxy.
+ * For each partition for a topic a thread is launched to pull data and submit transactions.
  *
  * @author akhanzode
  */
@@ -74,13 +75,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private static final String GROUP_ID = "voltdb";
     private static final String CLIENT_ID = "voltdb-importer";
 
-    private Map<String, List<TopicMetadata>> m_topicPartitionMetaData = new HashMap<String, List<TopicMetadata>>();
-    private Map<String, List<Integer>> m_topicPartitions = new HashMap<String, List<Integer>>();
-    private Map<String, String> m_topicPartitionLeader = new HashMap<String, String>();
-    private Map<String, Integer> m_topicPartitionLeaderPort = new HashMap<String, Integer>();
-    private Map<TopicPartitionFetcher, ExecutorService> m_fetchers = new HashMap<TopicPartitionFetcher, ExecutorService>();
+    private final Map<String, List<TopicMetadata>> m_topicPartitionMetaData = new HashMap<String, List<TopicMetadata>>();
+    private final Map<String, List<Integer>> m_topicPartitions = new HashMap<String, List<Integer>>();
+    private final Map<String, String> m_topicPartitionLeader = new HashMap<String, String>();
+    private final Map<String, Integer> m_topicPartitionLeaderPort = new HashMap<String, Integer>();
+    private final Map<TopicPartitionFetcher, ExecutorService> m_fetchers = new HashMap<TopicPartitionFetcher, ExecutorService>();
+    private final List<String> m_availableChannels = new ArrayList<String>();
 
-    //Simple Host and Port abstraction....dont want to use our big stuff here.
+    //Simple Host and Port abstraction....dont want to use our big stuff here orgi bundle import nastiness.
     public static class HostAndPort {
 
         public final String host;
@@ -111,6 +113,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     @Override
     public void stop() {
+        //Stop all the fetchers.
         for (TopicPartitionFetcher fetcher : m_fetchers.keySet()) {
             fetcher.shutdown();
         }
@@ -186,12 +189,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         String leaderKey = topic + "-" + part.partitionId();
                         m_topicPartitionLeader.put(leaderKey, replica.host());
                         m_topicPartitionLeaderPort.put(leaderKey, replica.port());
+                        m_availableChannels.add("kafka:/" + topic + "/partition/" + part.partitionId());
                     }
                 }
             }
         }
 
-        System.out.println(m_topicPartitionLeader);
+        info("Available Channels are: " + m_availableChannels);
     }
 
     //Per topic per partition that we are responsible for.
@@ -208,6 +212,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private CountDownLatch m_latch;
         private final AtomicLong m_currentOffset = new AtomicLong(0);
         private final Map<Long, TopicPartitionInvocationCallback> m_pendingCallbacksByOffset = new HashMap<Long, TopicPartitionInvocationCallback>();
+        private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 500);
 
         public TopicPartitionFetcher(List<HostAndPort> brokers, String topic, int partition, String leader, int port, int fetchSize, int consumerSocketTimeout) {
             m_brokers = brokers;
@@ -254,6 +259,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                 }
             }
+            if (returnMetaData == null) {
+                error("Failed to find Leader for topic " + m_topic + " and partition " + m_partition);
+            }
             return returnMetaData;
         }
 
@@ -275,7 +283,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
                 if (shouldSleep) {
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(5000);
                     } catch (InterruptedException ie) {
                     }
                 }
@@ -302,10 +310,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             OffsetFetchResponse offsetFetchResponse = consumer.fetchOffsets(offsetFetchRequest);
             OffsetMetadataAndError ofmd = offsetFetchResponse.offsets().get(topicAndPartition);
             short code = ofmd.error();
+
             // this means that an offset has yet to be committed
             if (code == ErrorMapping.UnknownTopicOrPartitionCode()) {
-                PartitionOffsetRequestInfo partitionOffsetRequestInfo
-                        = new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.EarliestTime(), 1);
+                PartitionOffsetRequestInfo partitionOffsetRequestInfo = new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.EarliestTime(), 1);
                 Map<TopicAndPartition, PartitionOffsetRequestInfo> reqMap = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
                 reqMap.put(topicAndPartition, partitionOffsetRequestInfo);
                 OffsetRequest offsetRequest = new OffsetRequest(reqMap, kafka.api.OffsetRequest.CurrentVersion(), null);
@@ -359,7 +367,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                System.out.println(response.getStatusString());
                 m_pendingCallbacksByOffset.remove(m_offset);
                 //This message offset is already committed we just remove from pending and move on.
                 if (m_nextOffset < m_currentOffset.get()) {
@@ -379,13 +386,15 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             try {
                 //Startwith the starting leader.
                 String leaderBroker = m_leader;
+                int failedCount = 0;
                 while (!m_shutdown) {
                     if (consumer == null) {
                         consumer = new SimpleConsumer(leaderBroker, m_port, m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
                         m_currentOffset.set(getLastOffset(consumer));
                     }
                     long currentFetchCount = 0;
-                    if (m_currentOffset.get() >= 0) {
+                    //Build fetch request of we have a valid offset and not too many are pending.
+                    if (m_currentOffset.get() >= 0 && m_pendingCallbacksByOffset.size() < m_perTopicPendingLimit) {
                         FetchRequest req = new FetchRequestBuilder().clientId(CLIENT_ID)
                                 .addFetch(m_topic, m_partition, m_currentOffset.get(), m_fetchSize)
                                 .build();
@@ -394,21 +403,28 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         if (fetchResponse.hasError()) {
                             // Something went wrong!
                             short code = fetchResponse.errorCode(m_topic, m_partition);
+                            if (++failedCount > 5) {
+                                error("Failed to fetch messages for topic " + m_topic + " and partition " + m_partition);
+                                return;
+                            }
                             if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                                 // We asked for an invalid offset. For simple case ask for the last element to reset
                                 m_currentOffset.set(getLastOffset(consumer));
                                 continue;
                             }
+                            error("Failed to fetch messages for topic " + m_topic + " and partition " + m_partition);
                             consumer.close();
                             consumer = null;
                             leaderBroker = findNewLeader();
                             if (leaderBroker == null) {
                                 //point to original leader which will fail and we fall back again here.
+                                error("Failed to find leader for " + m_topic + " and partition " + m_partition);
                                 leaderBroker = m_leader;
                             }
+                            info("Found new leader for topic " + m_topic + " and partition " + m_partition + " New Leader: " + leaderBroker);
                             continue;
                         }
-
+                        failedCount = 0;
                         for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topic, m_partition)) {
                             long currentOffset = messageAndOffset.offset();
                             if (currentOffset < m_currentOffset.get() || m_pendingCallbacksByOffset.containsKey(currentOffset)) {

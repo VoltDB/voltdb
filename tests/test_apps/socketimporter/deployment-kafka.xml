@@ -8,7 +8,7 @@
         <configuration module="kafkastream.jar" type="custom" enabled="true">
             <property name="zookeeper">kafka2:2181</property>
             <property name="brokers">kafka2:9092</property>
-            <property name="topics">foo,bar2</property>
+            <property name="topics">bar2</property>
             <property name="procedure">importTable.insert</property>
         </configuration>
     </import>
