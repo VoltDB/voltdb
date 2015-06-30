@@ -261,6 +261,20 @@ CentosSSHInfo = getSSHInfoForHost("volt5f")
 MacSSHInfo = getSSHInfoForHost("voltmini")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
+try:
+# build kits on the mini
+    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
+        assert versionCentos == versionMac
+        buildCommunity()
+        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+        buildPro()
+        buildRabbitMQExport(versionMac)
+        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+except Exception as e:
+    print "Coult not build MAC kit: " + str(e)
+    build_errors=True
+
 # build kits on 5f
 try:
     with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
@@ -287,20 +301,6 @@ try:
 
 except Exception as e:
     print "Coult not build LINUX kit: " + str(e)
-    build_errors=True
-
-try:
-# build kits on the mini
-    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
-        assert versionCentos == versionMac
-        buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-        buildPro()
-        buildRabbitMQExport(versionMac)
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
-except Exception as e:
-    print "Coult not build MAC kit: " + str(e)
     build_errors=True
 
 # build debian kit
