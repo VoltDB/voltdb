@@ -528,7 +528,7 @@ public class VoltDB {
                 isValid = false;
                 hostLog.fatal("VoltDB Community Edition only supports the \"create\" start action.");
                 String msg = m_startAction.featureNameForErrorString();
-                msg += " is an Enterprise Edition feature. An evaluation edition is availibale at http://voltdb.com.";
+                msg += " is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.";
                 hostLog.fatal(msg);
             }
 
