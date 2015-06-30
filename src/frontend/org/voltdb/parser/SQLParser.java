@@ -66,6 +66,21 @@ public class SQLParser extends SQLPatternFactory
     //========== Private Parsing Data ==========
 
     /**
+     * Pattern: SET <KEY> <VALUE>
+     *
+     * Capture groups:
+     *  (1) key
+     *  (2) value
+     */
+    private static final Pattern SET_KEY_VALUE = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "SET" +                             // SET
+            "\\s+(\\w+)" +                      // (1) KEY
+            "\\s*=\\s*(\\w+)" +                 // (2) VALUE
+            "\\s*;\\z"                          // (end statement)
+            );
+    /**
      * Pattern: PARTITION PROCEDURE|TABLE ...
      *
      * Capture groups:
