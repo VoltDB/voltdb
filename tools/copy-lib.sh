@@ -27,4 +27,5 @@ else
         cp ~/libs/obj/release/nativelibs/* $1
     else
         echo "++++++++++++++nativelibs not found!"
+    fi
 fi
