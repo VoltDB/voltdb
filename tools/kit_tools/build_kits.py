@@ -21,13 +21,27 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
     run("mkdir -p " + builddir)
     # change to it
     with cd(builddir):
-        # do the checkouts
+        # do the checkouts, collect checkout errors on
+        # all 3 repos so user gets all the bad news at once
+        message = ""
         run("git clone git@github.com:VoltDB/voltdb.git")
-        run("cd voltdb; git checkout %s" % voltdbGit)
+        run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
+        if result.failed:
+            message = "VoltDB checkout branch %s failed." % rbmqExportGit
+
         run("git clone git@github.com:VoltDB/pro.git")
-        run("cd pro; git checkout %s" % proGit)
+        run("cd pro; git checkout %s" % proGit, warn_only=True)
+        if result.failed:
+            message += "\nPro checkout branch %s failed." % rbmqExportGit
+
         run("git clone git@github.com:VoltDB/export-rabbitmq.git")
-        run("cd export-rabbitmq; git checkout %s" % rbmqExportGit)
+        result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
+        if result.failed:
+            message += "\nExport-rabbitmg checkout branch %s failed." % rbmqExportGit
+
+        if len(message) > 0:
+            abort(message)
+
         return run("cat voltdb/version.txt").strip()
 
 ################################################
