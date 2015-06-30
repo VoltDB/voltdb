@@ -303,10 +303,6 @@ except Exception as e:
     print "Coult not build MAC kit: " + str(e)
     build_errors=True
 
-# pull in native library from mac build for inclusion in single voltdb-<rel>.jar
-
-
-
 # build debian kit
 try:
     with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
