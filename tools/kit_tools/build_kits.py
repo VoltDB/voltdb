@@ -27,17 +27,17 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
         message = ""
         run("git clone git@github.com:VoltDB/voltdb.git")
         result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
-        if result.failed:
+        if result.return_code != 0:
             message = "VoltDB checkout branch %s failed." % rbmqExportGit
 
         run("git clone git@github.com:VoltDB/pro.git")
         result = run("cd pro; git checkout %s" % proGit, warn_only=True)
-        if result.failed:
+        if result.return_code != 0:
             message += "\nPro checkout branch %s failed." % rbmqExportGit
 
         run("git clone git@github.com:VoltDB/export-rabbitmq.git")
         result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
-        if result.failed:
+        if result.return_code != 0:
             message += "\nExport-rabbitmg checkout branch %s failed." % rbmqExportGit
 
         if len(message) > 0:
@@ -278,6 +278,7 @@ UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 try:
 # build kits on the mini
+    print "++++++++++++starting the Mac-side build"
     with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
         versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
         assert versionCentos == versionMac
