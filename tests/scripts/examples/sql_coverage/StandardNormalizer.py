@@ -33,6 +33,7 @@ import math
 import re
 import types
 
+from NotANormalizer import NotANormalizer
 from SortNulls import SortNulls
 from SQLCoverageReport import generate_html_reports
 from voltdbclient import FastSerializer
@@ -131,7 +132,7 @@ def sort(rows, sorted_cols, desc, sort_nulls=SortNulls.never):
         vice versa), as specified.
     """
     if not sorted_cols:
-        rows.sort(cmp=safecmp)
+        rows.sort(cmp=StandardNormalizer.safecmp)
         return
 
     begin = 0
@@ -143,12 +144,12 @@ def sort(rows, sorted_cols, desc, sort_nulls=SortNulls.never):
         if prev != tmp:
             if prev:
                 # Sort a complete "group", with matching ORDER BY column values
-                rows[begin:i] = sorted(rows[begin:i], cmp=safecmp, key=unsorteds)
+                rows[begin:i] = sorted(rows[begin:i], cmp=StandardNormalizer.safecmp, key=unsorteds)
             prev = tmp
             begin = i
 
     # Sort the final "group" (of rows with matching ORDER BY column values)
-    rows[begin:] = sorted(rows[begin:], cmp=safecmp, key=unsorteds)
+    rows[begin:] = sorted(rows[begin:], cmp=StandardNormalizer.safecmp, key=unsorteds)
 
     # Sort SQL NULL (Python None) values, in ORDER BY columns, in the
     # specified order (if any)
@@ -214,7 +215,7 @@ def parse_for_order_by_desc(sql, col_name):
     else:
         return False
 
-class StandardNormalizer:
+class StandardNormalizer(NotANormalizer):
     """This class contains a standard normalizer ('normalize' static method)
        that normalizes the result tuples of ORDER BY statements, sorting SQL
        NULL (Python None) values in the ORDER BY columns in the specified
@@ -224,31 +225,6 @@ class StandardNormalizer:
        from other modules; it could also serve as the base class for other
        normalizers.
     """
-
-    # A compare function which can handle datetime to None comparisons
-    # -- where the standard cmp gets a TypeError.
-    @staticmethod
-    def safecmp(x, y):
-        """A safe comparison (static) method, which performs a comparison
-           similar to cmp, including iterating over lists, but two None values
-           are considered equal, and a TypeError is avoided when a None value
-           and a datetime are corresponding members of a list. Like cmp,
-           returns 0 if the two objects are equal, negative if the first
-           object is less, positive if it is greater.
-        """
-        for (xn, yn) in zip(x, y):
-            if xn is None:
-                if yn is None:
-                    continue
-                return -1
-            if yn is None:
-                return 1
-            rn = cmp(xn, yn)
-            if rn:
-                return rn  # return first difference
-        # With all elements the same, return 0 unless one list is longer,
-        # though that is not an expected local use case
-        return cmp(len(x), len(y))
 
     @staticmethod
     def normalize(table, sql, sort_nulls=SortNulls.never):
@@ -280,8 +256,3 @@ class StandardNormalizer:
         sort(table.tuples, indices, desc, sort_nulls)
 
         return table
-
-def safecmp(x, y):
-    """Simply calls StandardNormalizer.safecmp(x, y).
-    """
-    return StandardNormalizer.safecmp(x, y)
