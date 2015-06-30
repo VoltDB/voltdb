@@ -814,14 +814,15 @@ public class TestOrderBySuite extends RegressionSuite {
         Random rand = new Random();
         int size = 100;
         for (int i = 0; i < size; ++i) {
-            ids.add(rand.nextInt());
+            int val = rand.nextInt();
+            ids.add(val);
+            client.callProcedure("InsertO1", val,val,"dummy","dummy");
         }
-        int min = Collections.min(ids);
-        int max = Collections.max(ids);
-        for (int i : ids) {
-            client.callProcedure("InsertO1", i,i,"dummy","dummy");
-        }
+        Collections.sort(ids);
+        int max = ids.get(ids.size() - 1);
+        int maxOffset3 = ids.get(ids.size() - 4);
 
+        // Partitions Result sets are ordered by index. No LIMIT/OFFEST
         VoltTable vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM O1 ORDER BY PKEY DESC").getResults()[0];
         assertEquals(size, vt.getRowCount());
         vt.advanceRow();
@@ -829,6 +830,28 @@ public class TestOrderBySuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", "SELECT PKEY FROM O1 ORDER BY PKEY DESC").getResults()[0];
         System.out.println(vt.toString());
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        // Partitions Result sets are ordered by index with LIMIT/OFFSET
+        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3 OFFSET 3").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(maxOffset3, vt.getLong(0));
+
+        // Partitions Result sets are unordered. No LIMIT/OFFSET
+        vt = client.callProcedure("@AdHoc", "SELECT A_INT FROM O1 ORDER BY A_INT DESC").getResults()[0];
+        assertEquals(size, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(max, vt.getLong(0));
+        vt = client.callProcedure("@Explain", "SELECT A_INT FROM O1 ORDER BY A_INT DESC").getResults()[0];
+        System.out.println(vt.toString());
+        assertTrue(!vt.toString().contains("MERGE RECEIVE"));
+
+        // Partitions Result sets are unordered with LIMIT/OFFSET
+        vt = client.callProcedure("@AdHoc", "SELECT A_INT FROM O1 ORDER BY A_INT DESC  LIMIT 3 OFFSET 3").getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(maxOffset3, vt.getLong(0));
+
     }
 
     public void testAll()
