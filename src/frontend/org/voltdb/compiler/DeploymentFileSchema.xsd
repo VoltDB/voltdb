@@ -384,6 +384,7 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="enabled" type="xs:boolean" default="true" />
   </xs:complexType>
 
   <!-- restriction on id -->

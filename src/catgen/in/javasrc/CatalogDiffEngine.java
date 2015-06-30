@@ -634,6 +634,8 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
             return null;
+        if (suspect instanceof Cluster && field.equals("drConsumerEnabled"))
+            return null;
         if (suspect instanceof Connector && "enabled".equals(field))
             return null;
         if (suspect instanceof Connector && "loaderclass".equals(field))
