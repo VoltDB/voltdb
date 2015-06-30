@@ -278,6 +278,7 @@ UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 try:
 # build kits on the mini
+    print "++++++++++++starting the Mac-side build"
     with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
         versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
         assert versionCentos == versionMac
