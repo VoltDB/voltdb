@@ -353,7 +353,6 @@ function alertNodeClicked(obj) {
                     var rawData;
                     if (connection != null)
                         rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
-
                     onInformationLoaded(loadAdminDeploymentInformation(connection), rawData);
                 });
             }
@@ -375,7 +374,6 @@ function alertNodeClicked(obj) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-
                 setKFactor(connection);
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
@@ -766,6 +764,12 @@ function alertNodeClicked(obj) {
                     adminConfigValues['drId'] = data.dr.id;
                     adminConfigValues['drListen'] = data.dr.listen;
                     adminConfigValues['drPort'] = data.dr.port;
+                }
+
+                //import
+
+                if (data.import != null) {
+                    adminConfigValues['importConfiguration'] = data.import.configuration;
                 }
             }
 
