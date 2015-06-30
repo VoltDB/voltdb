@@ -21,10 +21,12 @@ if [ -z "$BUILD_ID" ]; then
 fi
 
 echo $1 | ssh volt3f "cat > libs/arg"
-if [ "$OS" = "Darwin" -a -e "obj/release/nativelibs/libvoltdb*.jnilib" ]
+if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb*.jnilib ]
 then
-    tar cf - obj/release/nativelibs/ | ssh volt3e "mkdir -p libs/$BUILD_ID: cd libs/$BUILD_ID; tar xf -"
+    # the Mac case...
+    tar cf - obj/release/nativelibs/ | ssh volt3e "mkdir -p libs/$BUILD_ID; cd libs/$BUILD_ID; tar xf -"
 else
+    # the Linux case...
    mkdir -p $1
    cp ~/libs/$BUILD_ID/obj/release/nativelibs/* $1
 fi
