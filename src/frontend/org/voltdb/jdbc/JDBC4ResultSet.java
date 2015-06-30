@@ -282,10 +282,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
                 throw new IllegalArgumentException("Cannot get BigDecimal value for column type '" + type + "'");
             }
 
-            if (table.wasNull()) {
-                decimalValue = null;
-            }
-            return decimalValue;
+            return table.wasNull() ? null : decimalValue;
         } catch (Exception x) {
             throw SQLError.get(x);
         }
@@ -354,9 +351,9 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
         return getBlob(findColumn(columnLabel));
     }
 
-    private Long getInteger(int columnIndex) throws SQLException {
+    private Long getPrivateInteger(int columnIndex) throws SQLException {
         final VoltType type = table.getColumnType(columnIndex - 1);
-        Long longValue = new Long(0);
+        Long longValue = null;
         switch(type) {
         case TINYINT:
             longValue = new Long(table.getLong(columnIndex - 1));
@@ -376,7 +373,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
                 longValue = retDouble.longValue();
                 break;
             }
-            throw new IllegalArgumentException("getByte() called on non-integral column.");
+            throw new IllegalArgumentException("Cannot get integer value from: " + retDouble);
         case DECIMAL:
             final BigDecimal retDec = table.getDecimalAsBigDecimal(columnIndex - 1);
             if (retDec == null)
@@ -385,16 +382,13 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
                 longValue = new Long(retDec.longValueExact());
                 break;
             } catch (ArithmeticException e) {
-                throw new IllegalArgumentException("getByte() called on non-integral column.");
+                throw new IllegalArgumentException("Cannot get integer value from: " + retDec.toString());
             }
         default:
-            throw new IllegalArgumentException("Cannot get integral value for column type '" + type + "'");
+            throw new IllegalArgumentException("Cannot get integer value for column type '" + type + "'");
         }
 
-        if (table.wasNull()) {
-            longValue = new Long(0);
-        }
-        return longValue;
+        return table.wasNull() ? new Long(0) : longValue;
     }
 
     // Retrieves the value of the designated column in the current row of this
@@ -424,7 +418,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public byte getByte(int columnIndex) throws SQLException {
         checkColumnBounds(columnIndex);
         try {
-            Long longValue = getInteger(columnIndex);
+            Long longValue = getPrivateInteger(columnIndex);
             if (longValue > Byte.MAX_VALUE || longValue < Byte.MIN_VALUE) {
                 throw new SQLException("Value out of byte range");
             }
@@ -575,7 +569,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
         checkColumnBounds(columnIndex);
         try {
             final VoltType type = table.getColumnType(columnIndex - 1);
-            Double doubleValue = new Double(0);
+            Double doubleValue = null;
             switch(type) {
             case TINYINT:
                 doubleValue = new Double(table.getLong(columnIndex - 1));
@@ -599,10 +593,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
                 throw new IllegalArgumentException("Cannot get double value for column type '" + type + "'");
             }
 
-            if (table.wasNull()) {
-                doubleValue = new Double(0);
-            }
-            return doubleValue;
+            return table.wasNull() ? new Double(0) : doubleValue;
         } catch (Exception x) {
             throw SQLError.get(x);
         }
@@ -634,7 +625,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
         checkColumnBounds(columnIndex);
         try {
             final VoltType type = table.getColumnType(columnIndex - 1);
-            Double doubleValue = new Double(0);
+            Double doubleValue = null;
             switch(type) {
             case TINYINT:
                 doubleValue = new Double(table.getLong(columnIndex - 1));
@@ -688,7 +679,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public int getInt(int columnIndex) throws SQLException {
         checkColumnBounds(columnIndex);
         try {
-            Long longValue = getInteger(columnIndex);
+            Long longValue = getPrivateInteger(columnIndex);
             if (longValue > Integer.MAX_VALUE || longValue < Integer.MIN_VALUE) {
                 throw new SQLException("Value out of int range");
             }
@@ -711,7 +702,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public long getLong(int columnIndex) throws SQLException {
         checkColumnBounds(columnIndex);
         try {
-            Long longValue = getInteger(columnIndex);
+            Long longValue = getPrivateInteger(columnIndex);
             return longValue;
         } catch (Exception x) {
             throw SQLError.get(x);
@@ -889,7 +880,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public short getShort(int columnIndex) throws SQLException {
         checkColumnBounds(columnIndex);
         try {
-            Long longValue = getInteger(columnIndex);
+            Long longValue = getPrivateInteger(columnIndex);
             if (longValue > Short.MAX_VALUE || longValue < Short.MIN_VALUE) {
                 throw new SQLException("Value out of short range");
             }
