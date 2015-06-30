@@ -36,6 +36,7 @@ import java.util.concurrent.Future;
 import junit.framework.TestCase;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.catalog.DatabaseConfiguration;
 
 public class TestSqlCommandParserInteractive extends TestCase {
 
@@ -487,5 +488,17 @@ public class TestSqlCommandParserInteractive extends TestCase {
         System.out.println("RESULT: " + result.get());
         assertEquals(1, result.get().size());
         assertEquals(create, result.get().get(0));
+    }
+
+    public void testSetDatabaseConfig() throws Exception
+    {
+        CommandStuff cmd = new CommandStuff();
+        Future<List<String>> result = cmd.openQuery();
+        String set = "set " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE;
+        cmd.submitText(set + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(set, result.get().get(0));
     }
 }
