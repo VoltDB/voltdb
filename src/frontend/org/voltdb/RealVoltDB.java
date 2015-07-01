@@ -1334,15 +1334,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
         }, 0, 6, TimeUnit.MINUTES));
 
-        // Checks and acts, if the server runs out of resources
+        GCInspector.instance.start(m_periodicPriorityWorkThread);
+    }
+
+    private void startResourceUsageMonitor() {
+        // Checks and acts, if the server runs out of resources.
         //TODO: use configured value for this
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
         if (resMonitor.hasResourceLimitsConfigured()) {
             m_periodicWorks.add(scheduleWork(resMonitor, resourceMonitorInterval,
                     resourceMonitorInterval, TimeUnit.SECONDS));
         }
-
-        GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
     int readDeploymentAndCreateStarterCatalogContext() {
@@ -2396,6 +2398,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 prepareReplication();
             }
         }
+        startResourceUsageMonitor();
 
         try {
             if (m_adminListener != null) {
@@ -2570,6 +2573,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // Start listening on the DR ports
             prepareReplication();
+            startResourceUsageMonitor();
         }
 
         try {
