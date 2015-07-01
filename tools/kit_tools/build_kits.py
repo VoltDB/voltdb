@@ -161,7 +161,7 @@ def copyTrialLicenseToReleaseDir(releaseDir):
 
 def copyEnterpriseZipToReleaseDir(releaseDir, version, operatingsys):
     get("%s/pro/obj/pro/voltdb-ent-%s.zip" % (builddir, version),
-        "%s/%s-voltdb-ent-%s.zip" % (releaseDir, operatingsys, version))
+        "%s/voltdb-ent-%s.zip" % (releaseDir, version))
 
 def copyMavenJarsToReleaseDir(releaseDir, version):
     #The .jars and upload file must be in a directory called voltdb - it is the projectname
@@ -330,12 +330,12 @@ try:
         with cd(debbuilddir):
             put ("tools/voltdb-install.py",".")
 
-            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
+            commbld = "voltdb-%s.tar.gz" % (versionCentos)
             put("%s/%s" % (releaseDir, commbld),".")
             run ("sudo python voltdb-install.py -D " + commbld)
             get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
 
-            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
+            entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
             put("%s/%s" % (releaseDir, entbld),".")
             run ("sudo python voltdb-install.py -D " + entbld)
             get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
@@ -353,12 +353,12 @@ try:
         with cd(rpmbuilddir):
             put ("tools/voltdb-install.py",".")
 
-            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
+            commbld = "voltdb-%s.tar.gz" % (versionCentos)
             put("%s/%s" % (releaseDir, commbld),".")
             run ("python2.6 voltdb-install.py -R " + commbld)
             get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
-            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
+            entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
             put("%s/%s" % (releaseDir, entbld),".")
             run ("python2.6 voltdb-install.py -R " + entbld)
             get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
