@@ -102,24 +102,25 @@ def project_unsorted(row, sorted_cols):
 def move_rows(rows, start, end, moveto):
     """Given a list of rows, moves the rows beginning with index 'start'
        (inclusive) and ending with index 'end' (exclusive) to a position
-       just before index 'moveto', and returns the result.
+       just before index 'moveto', and modifies the rows arg accordingly.
     """
+    newrows = []
     if start < 0 or end < 0 or start > len(rows) or end > len(rows) or start > end:
         raise ValueError('Illegal value of start (%d) or end (%d): negative, greater than len(rows) (%d), or start > end' % (start, end, len(rows)))
-    elif moveto < 0 or (moveto > start and moveto < end) or moveto > len(rows):
+    elif moveto < 0 or moveto > len(rows) or (moveto > start and moveto < end):
         raise ValueError('Illegal value of moveto (%d): negative, greater than len(rows) (%d), or between start (%d) and end (%d)' % (moveto, len(rows), start, end))
     elif moveto == start or moveto == end:
         return
-
-    newrows = []
-    newrows.extend(rows[0:min(moveto, start)])
-    if moveto < start:
+    elif moveto < start:
+        newrows.extend(rows[0:moveto])
         newrows.extend(rows[start:end])
         newrows.extend(rows[moveto:start])
-    elif moveto > end:
+        newrows.extend(rows[end:len(rows)])
+    else:  # moveto > end: (only remaining possibility here)
+        newrows.extend(rows[0:start])
         newrows.extend(rows[end:moveto])
         newrows.extend(rows[start:end])
-    newrows.extend(rows[max(moveto, end):len(rows)])
+        newrows.extend(rows[moveto:len(rows)])
     rows[0:len(newrows)] = newrows[0:len(newrows)]
 
 def sort(rows, sorted_cols, desc, sort_nulls=SortNulls.never):
@@ -151,38 +152,73 @@ def sort(rows, sorted_cols, desc, sort_nulls=SortNulls.never):
     # Sort the final "group" (of rows with matching ORDER BY column values)
     rows[begin:] = sorted(rows[begin:], cmp=StandardNormalizer.safecmp, key=unsorteds)
 
-    # Sort SQL NULL (Python None) values, in ORDER BY columns, in the
-    # specified order (if any)
+    # Sort SQL NULL (Python None) values, in ORDER BY columns
+    # (i.e. sorted_cols), in the specified order (if any)
     if sort_nulls != SortNulls.never:
+        sorted_col_values = lambda row, last_sorted_col : project_sorted(rows[row], sorted_cols[0:last_sorted_col])
+        # Look for NULL values in each the of the ORDER BY columns
         for i in xrange(len(sorted_cols)):
             begin = 0
             prev = None
+            # Loop through each row, plus one extra, so you can grab
+            # the final block of identical values
             for j in xrange(len(rows) + 1):
-                tmp = []
+                tmp = []  # for j = len(rows) case
                 if j < len(rows):
-                    tmp = project_sorted(rows[j], sorted_cols[0:i + 1])
+                    # For the current row, we're interested in the values of
+                    # ORDER BY columns, including the current column, and all
+                    # the ones before it (but not after)
+                    tmp = sorted_col_values(j, i+1)
                 if prev != tmp:
+                    # We've reached the end of a block of rows with identical
+                    # values of the current set of ORDER BY columns
                     if prev and prev[i] is None:
+                        # ... and the current column is NULL, in that block
                         if (sort_nulls == SortNulls.first or
                               (sort_nulls == SortNulls.highest and desc[i]) or
                               (sort_nulls == SortNulls.lowest  and not desc[i])):
                             if i == 0:  # first ORDER BY column, so don't need to check others
+                                # Move the current block of rows to the very beginning
                                 move_rows(rows, begin, j, 0)
                                 break
-                            ref = project_sorted(rows[begin], sorted_cols[0:i])
+                            # Get the values of the ORDER BY columns before the
+                            # current one, for the current block of rows
+                            ref = sorted_col_values(begin, i)
+                            # Look for a block of rows before the current block,
+                            # which has the identical values of the ORDER BY
+                            # columns before the current column, but non-null
+                            # values of the current column; start k as the row
+                            # before the current block, and go backwards: if
+                            # you find a non-identical row, or go beyond the
+                            # first row, you're done
                             for k in range(begin - 1, -2, -1):
-                                if (k < 0 or ref != project_sorted(rows[k], sorted_cols[0:i])):
+                                if (k < 0 or ref != sorted_col_values(k, i)):
+                                    # If you found such a block of rows (possibly
+                                    # empty), move the current block before it
                                     move_rows(rows, begin, j, k + 1)
                                     break
-                        elif (sort_nulls == SortNulls.last or
-                              (sort_nulls == SortNulls.lowest  and desc[i]) or
-                              (sort_nulls == SortNulls.highest and not desc[i])):
+                        # remaining possibilities: sort_nulls == SortNulls.last or
+                        #     (sort_nulls == SortNulls.lowest  and desc[i]) or
+                        #     (sort_nulls == SortNulls.highest and not desc[i])):
+                        else:
                             if i == 0:  # first ORDER BY column, so don't need to check others
+                                # Move the current block of rows to the very end
                                 move_rows(rows, begin, j, len(rows))
                                 break
-                            ref = project_sorted(rows[begin], sorted_cols[0:i])
+                            # Get the values of the ORDER BY columns before the
+                            # current one, for the current block of rows
+                            ref = sorted_col_values(begin, i)
+                            # Look for a block of rows after the current block,
+                            # which has the identical values of the ORDER BY
+                            # columns before the current column, but non-null
+                            # values of the current column; start k as the row
+                            # after the current block, and go forward: if you
+                            # find a non-identical row, or go beyond the last
+                            # row, you're done
                             for k in range(j, len(rows) + 1):
-                                if (k >= len(rows) or ref != project_sorted(rows[k], sorted_cols[0:i])):
+                                if (k >= len(rows) or ref != sorted_col_values(k, i)):
+                                    # If you found such a block of rows (possibly
+                                    # empty), move the current block before it
                                     move_rows(rows, begin, j, k)
                                     break
                     prev = tmp
@@ -243,9 +279,9 @@ class StandardNormalizer(NotANormalizer):
         if sort_cols:
             # gets the ORDER BY column indices, in the order used in that clause
             for i in xrange(len(sort_cols)):
-                # Find the table column name that matches the ORDER BY column name
+                # Find the table column name or index that matches the ORDER BY column name
                 for j in xrange(len(table.columns)):
-                    if sort_cols[i] == table.columns[j].name:
+                    if sort_cols[i] == table.columns[j].name or sort_cols[i] == str(j+1):
                         indices.append(j)
                         desc.append(parse_for_order_by_desc(sql_upper[last_paren_index+1:], sort_cols[i]))
                         break
