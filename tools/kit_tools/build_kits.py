@@ -139,7 +139,7 @@ def makeMavenJars():
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/voltdb/obj/release/voltdb-%s.tar.gz" % (builddir, version),
-        "%s/%s-voltdb-%s.tar.gz" % (releaseDir, operatingsys, version))
+        "%s/voltdb-%s.tar.gz" % (releaseDir, version))
     get("%s/voltdb/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
         "%s/voltdb-client-java-%s.tar.gz" % (releaseDir, version))
     get("%s/voltdb/obj/release/voltdb-tools-%s.tar.gz" % (builddir, version),
@@ -153,7 +153,7 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
 
 def copyEnterpriseFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/pro/obj/pro/voltdb-ent-%s.tar.gz" % (builddir, version),
-        "%s/%s-voltdb-ent-%s.tar.gz" % (releaseDir, operatingsys, version))
+        "%s/voltdb-ent-%s.tar.gz" % (releaseDir, version))
 
 def copyTrialLicenseToReleaseDir(releaseDir):
     get("%s/pro/trial_*.xml" % (builddir),
