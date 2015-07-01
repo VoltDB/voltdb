@@ -2139,7 +2139,6 @@ public class DDLCompiler {
                     Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
                     IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
                     if (found != null) {
-                        System.out.println("View " + matviewinfo.getTypeName() + " min/max column " + i + " uses index " + found.getTypeName());
                         refFound.setName(found.getTypeName());
                     } else {
                         refFound.setName("");

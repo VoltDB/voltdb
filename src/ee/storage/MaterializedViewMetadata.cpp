@@ -45,6 +45,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     , m_filterPredicate(parsePredicate(mvInfo))
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
+    , m_minMaxSearchKeyBackingStore(NULL)
+    , m_minMaxSearchKeyBackingStoreSize(0)
     , m_aggColumnCount(parseAggregation(mvInfo))
 {
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
@@ -69,8 +71,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     }
 
     // handle index for min / max support
-    m_minMaxSearchKeyBackingStoreSize = 0;
-    m_minMaxSearchKeyBackingStore = NULL;
     setIndexForMinMax(mvInfo->indexForMinMax());
 
     allocateBackedTuples();
@@ -123,11 +123,6 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     oldTarget->decrementRefcount();
 }
 
-void MaterializedViewMetadata::setIndexForMinMax(const std::vector<TableIndex *> &indexForMinMax) {
-    m_indexForMinMax = std::vector<TableIndex *>(indexForMinMax);
-    allocateMinMaxSearchKeyTuple();
-}
-
 void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax)
 {
     std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
@@ -163,12 +158,12 @@ void MaterializedViewMetadata::freeBackedTuples()
 void MaterializedViewMetadata::allocateMinMaxSearchKeyTuple()
 {
     size_t minMaxSearchKeyBackingStoreSize = 0;
-    for (int i=0; i<m_indexForMinMax.size(); ++i) {
+    BOOST_FOREACH(TableIndex *index, m_indexForMinMax) {
         // Because there might be a lot of indexes, find the largest space they may consume
         // so that they can all share one space and use different schemas. (ENG-8512)
-        if ( minMaxIndexIncludesAggCol(m_indexForMinMax[i]) &&
-                m_indexForMinMax[i]->getKeySchema()->tupleLength() + 1 > minMaxSearchKeyBackingStoreSize) {
-             minMaxSearchKeyBackingStoreSize = m_indexForMinMax[i]->getKeySchema()->tupleLength() + 1;
+        if ( minMaxIndexIncludesAggCol(index) &&
+                index->getKeySchema()->tupleLength() + 1 > minMaxSearchKeyBackingStoreSize) {
+             minMaxSearchKeyBackingStoreSize = index->getKeySchema()->tupleLength() + 1;
         }
     }
     if (minMaxSearchKeyBackingStoreSize == m_minMaxSearchKeyBackingStoreSize) {

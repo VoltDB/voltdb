@@ -63,7 +63,6 @@ public:
 
     void setTargetTable(PersistentTable * target);
     void setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax);
-    void setIndexForMinMax(const std::vector<TableIndex *> &indexForMinMax);
 
     catalog::MaterializedViewInfo* getMaterializedViewInfo() {
         return m_mvInfo;
