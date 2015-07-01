@@ -284,12 +284,13 @@ try:
         versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
         assert versionCentos == versionMac
         buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-        buildPro()
-        buildRabbitMQExport(versionMac)
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+        # copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+        # buildPro()
+        # buildRabbitMQExport(versionMac)
+        # copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
 except Exception as e:
-    print "Coult not build MAC kit: " + str(e)
+    print "Could not build MAC kit. Exception: " + str(e)
+    print "Type " + type(e)
     build_errors=True
 
 # build kits on 5f
@@ -317,7 +318,9 @@ try:
         copyMavenJarsToReleaseDir(releaseDir, versionCentos)
 
 except Exception as e:
-    print "Coult not build LINUX kit: " + str(e)
+    print "Could not build LINUX kit: " + str(e)
+    print "Could not build MAC kit. Exception: " + str(e)
+    print "Type " + type(e)
     build_errors=True
 
 # build debian kit
@@ -340,7 +343,9 @@ try:
             run ("sudo python voltdb-install.py -D " + entbld)
             get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
 except Exception as e:
-    print "Coult not build debian kit: " + str(e)
+    print "Could not build debian kit: " + str(e)
+    print "Could not build MAC kit. Exception: " + str(e)
+    print "Type " + type(e)
     build_errors=True
 
 try:
@@ -364,7 +369,9 @@ try:
             get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
 except Exception as e:
-    print "Coult not build rpm kit: " + str(e)
+    print "Could not build rpm kit: " + str(e)
+    print "Could not build MAC kit. Exception: " + str(e)
+    print "Type " + type(e)
     build_errors=True
 
 computeChecksums(releaseDir)
