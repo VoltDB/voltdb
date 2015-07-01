@@ -71,7 +71,12 @@ class JDBCTypes {
         hStringJDBCtypes.put(new Integer(java.sql.Types.CHAR), "CHAR");
         hStringJDBCtypes.put(new Integer(java.sql.Types.DATE), "DATE");
         hStringJDBCtypes.put(new Integer(java.sql.Types.DECIMAL), "DECIMAL");
+        // A VoltDB extension to alias FLOAT to DOUBLE
         hStringJDBCtypes.put(new Integer(java.sql.Types.DOUBLE), "FLOAT");
+        /* disable 1 line ...
+        hStringJDBCtypes.put(new Integer(java.sql.Types.DOUBLE), "DOUBLE");
+        ... disabled 1 line */
+        // End of VoltDB extension
         hStringJDBCtypes.put(new Integer(java.sql.Types.FLOAT), "FLOAT");
         hStringJDBCtypes.put(new Integer(java.sql.Types.INTEGER), "INTEGER");
         hStringJDBCtypes.put(new Integer(java.sql.Types.LONGVARBINARY),
@@ -108,7 +113,12 @@ class JDBCTypes {
         hIntJDBCtypes.put("CHAR", new Integer(java.sql.Types.CHAR));
         hIntJDBCtypes.put("DATE", new Integer(java.sql.Types.DATE));
         hIntJDBCtypes.put("DECIMAL", new Integer(java.sql.Types.DECIMAL));
+        // A VoltDB extension to alias FLOAT to DOUBLE
         hIntJDBCtypes.put("FLOAT", new Integer(java.sql.Types.DOUBLE));
+        /* disable 1 line ...
+        hIntJDBCtypes.put("DOUBLE", new Integer(java.sql.Types.DOUBLE));
+        ... disabled 1 line */
+        // End of VoltDB extension
         hIntJDBCtypes.put("FLOAT", new Integer(java.sql.Types.FLOAT));
         hIntJDBCtypes.put("INTEGER", new Integer(java.sql.Types.INTEGER));
         hIntJDBCtypes.put("LONGVARBINARY",

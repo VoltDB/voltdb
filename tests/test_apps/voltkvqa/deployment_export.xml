@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="2" kfactor="0" schema="catalog" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export enabled="true">
+        <onserver exportto="file">
+            <configuration>
+                <property name="type">tsv</property>
+                <property name="with-schema">true</property>
+                <property name="batched">true</property>
+                <property name="nonce">zohan</property>
+                <property name="period">10</property>
+            </configuration>
+        </onserver>
+<!--        <onserver exportto="jdbc">
+            <configuration>
+                <property name="jdbcurl">jdbc:postgresql://localhost/exporttest</property>
+                <property name="jdbcurl">jdbc:mysql://localhost/test</property>
+                <property name="jdbcuser">voltdb</property>
+                <property name="jdbcpassword">voltdb</property>
+                <property name="schema">public</property>
+            </configuration>
+        </onserver>-->
+    </export>
+</deployment>

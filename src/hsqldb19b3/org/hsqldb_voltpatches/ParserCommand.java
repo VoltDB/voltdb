@@ -59,7 +59,7 @@ public class ParserCommand extends ParserDDL {
         Statement cs = compilePart();
 
         if (token.tokenType == Tokens.X_ENDPARSE) {
-            if (cs.getSchemaName() == null) {
+            if (cs.getSchemalName() == null) {
                 cs.setSchemaHsqlName(session.getCurrentSchemaHsqlName());
             }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,7 +32,8 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.procedures.FloatParamToGetNiceComplaint;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRONonSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicROSeqProc;
-import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRWProc;
+import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRWProc1;
+import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRWProc2;
 import org.voltdb_testprocs.regressionsuites.failureprocs.NondeterministicROProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.NondeterministicRWProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate1;
@@ -81,11 +82,17 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
             "ival bigint default 0 not null, " +
             "sval varchar(255) not null" +
             ");" +
-            "create table indexed_blah (" +
+            "create table indexed_replicated_blah (" +
             "ival bigint default 0 not null, " +
             "sval varchar(255) not null, " +
             "PRIMARY KEY(ival)" +
-            ");";
+            ");" +
+            "create table indexed_partitioned_blah (" +
+            "ival bigint default 0 not null, " +
+            "sval varchar(255) not null, " +
+            "PRIMARY KEY(ival)" +
+            ");" +
+            "";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         ByteArrayOutputStream capturer = new ByteArrayOutputStream();
@@ -93,7 +100,8 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.setCompilerDebugPrintStream(capturing);
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
-        // Note: indexed_blah is left as a replicated table.
+        builder.addPartitionInfo("indexed_partitioned_blah", "ival");
+        // Note: indexed_replicated_blah is left as a replicated table.
         builder.addStmtProcedure("Insert",
                 // Include lots of filthy whitespace to test output cleanup.
                 "insert                            into\t \tblah values\n\n(? \t ,\t\t\t?)                           ;", null);
@@ -101,7 +109,8 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addProcedures(NondeterministicRWProc.class);
         builder.addProcedures(DeterministicRONonSeqProc.class);
         builder.addProcedures(DeterministicROSeqProc.class);
-        builder.addProcedures(DeterministicRWProc.class);
+        builder.addProcedures(DeterministicRWProc1.class);
+        builder.addProcedures(DeterministicRWProc2.class);
 
         builder.addProcedures(ProcSPcandidate1.class);
         builder.addProcedures(ProcSPcandidate2.class);
@@ -121,58 +130,62 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addStmtProcedure("StmtSPcandidate1", "select count(*) from blah where ival = ?", null);
         builder.addStmtProcedure("StmtSPcandidate2", "select count(*) from blah where ival = 12345678", null);
         builder.addStmtProcedure("StmtSPcandidate3",
-                                 "select count(*) from blah, indexed_blah " +
-                                 "where indexed_blah.sval = blah.sval and blah.ival = 12345678", null);
+                                 "select count(*) from blah, indexed_replicated_blah " +
+                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = 12345678", null);
         builder.addStmtProcedure("StmtSPcandidate4",
-                                 "select count(*) from blah, indexed_blah " +
-                                 "where indexed_blah.sval = blah.sval and blah.ival = abs(1)+1", null);
+                                 "select count(*) from blah, indexed_replicated_blah " +
+                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = abs(1)+1", null);
         builder.addStmtProcedure("StmtSPcandidate5", "select count(*) from blah where sval = ? and ival = 12345678", null);
         builder.addStmtProcedure("StmtSPcandidate6", "select count(*) from blah where sval = ? and ival = ?", null);
         builder.addStmtProcedure("StmtSPNoncandidate1", "select count(*) from blah where sval = ?", null);
         builder.addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'", null);
-        builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_blah where ival = ?", null);
-
+        builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_replicated_blah where ival = ?", null);
+        builder.addStmtProcedure("FullIndexScan", "select ival, sval from indexed_replicated_blah", null);
 
 
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
         assert(success);
         String captured = capturer.toString("UTF-8");
+        System.out.println(captured);
         String[] lines = captured.split("\n");
 
-        assertTrue(foundLineMatching(lines, ".*\\[RO].*NondeterministicROProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RO].*NondeterministicROProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RO].*DeterministicRONonSeqProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RO].*\\[Seq].*DeterministicROSeqProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RW].*Insert.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RW].*BLAH.insert.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RW].*NondeterministicRWProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RW].*DeterministicRWProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[READ].*NondeterministicROProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[READ].*NondeterministicROProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[READ].*DeterministicRONonSeqProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[READ].*DeterministicROSeqProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[WRITE].*Insert.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[WRITE].*NondeterministicRWProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[WRITE].*DeterministicRWProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[TABLE SCAN].*select ival, sval from indexed_replicated_blah.*"));
 
-        assertTrue(countLinesMatching(lines, ".*\\[NDC].*NDC=true.*") == 2);
+        assertEquals(1, countLinesMatching(lines, ".*\\[NDC].*NDC=true.*"));
 
         assertFalse(foundLineMatching(lines, ".*\\[NDC].*NDC=false.*"));
 
-        assertFalse(foundLineMatching(lines, ".*\\[RW].*NondeterministicROProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RW].*DeterministicRONonSeqProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RW].*\\[Seq].*DeterministicROSeqProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[Seq].*DeterministicRONonSeqProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RO].*Insert.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RO].*BLAH.insert.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[Seq].*Insert.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[Seq].*BLAH.insert.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RO].*NondeterministicRWProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RO].*DeterministicRWProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[WRITE].*NondeterministicROProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[WRITE].*DeterministicRONonSeqProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[WRITE].*DeterministicROSeqProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[TABLE SCAN].*DeterministicRONonSeqProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[READ].*Insert.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[READ].*BLAH.insert.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[TABLE SCAN].*Insert.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[TABLE SCAN].*BLAH.insert.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[READ].*NondeterministicRWProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[READ].*DeterministicRWProc.*"));
+
+        assertFalse(foundLineMatching(lines, ".*DeterministicRWProc.*non-deterministic.*"));
 
         // test SP improvement warnings
+        String absPattern = "abs\\s*\\(\\s*1\\s*\\)\\s*\\+\\s*1"; // Pattern for abs(1) + 1, with whitespace between tokens
         assertEquals(4, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:0.*")); // StmtSPcandidates 1,2,3,4
         assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*partitioninfo=BLAH\\.IVAL:0.*")); // 2, 3
-        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*abs.*partitioninfo=BLAH\\.IVAL:0.*")); // just 4
+        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*" + absPattern + ".*partitioninfo=BLAH\\.IVAL:0.*")); // just 4
         assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*partitioninfo=BLAH\\.IVAL:1.*")); // just 5
         assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:1.*")); // 5, 6
 
         assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 0 .*")); // ProcSPcandidate 1
         assertEquals(4, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*87654321.*")); // 2, 3, 5, 6
-        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*abs.*")); // just 4
+        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*" + absPattern + ".*")); // just 4
         assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 1 .*")); // 7
 
         // Non-candidates disqualify themselves by various means.

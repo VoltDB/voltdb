@@ -19,7 +19,11 @@ else
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+CLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -44,7 +48,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -54,9 +58,27 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
+
+
+# run the voltdb server locally
+function secure-server() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment-secure.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+function masked-server() {
+    $VOLTDB mask deployment-secure.xml deployment-masked.xml
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment-masked.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+
 
 # run the client that drives the example
 function client() {
@@ -77,14 +99,29 @@ function async-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
-        --voter=905000000 \
         --maxvotes=2 \
         --ratelimit=100000 \
         --autotune=false \
         --latencytarget=10
 }
+
+function secure-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.AsyncBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --contestants=6 \
+        --maxvotes=2 \
+        --ratelimit=100000 \
+        --autotune=false \
+        --username=myuser \
+        --password=voltdbuser \
+        --latencytarget=10
+}
+
 
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
@@ -101,7 +138,6 @@ function sync-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
         --maxvotes=2
 }
@@ -121,7 +157,6 @@ function jdbc-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
         --maxvotes=2
 }

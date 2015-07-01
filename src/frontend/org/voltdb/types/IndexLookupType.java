@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,18 +25,17 @@ import java.util.Map;
  * Specifies how to lookup on Table Index.
  */
 public enum IndexLookupType {
-    INVALID (0),
-    EQ      (1),
-    GT      (2),
-    GTE     (3),
-    LT      (4),
-    LTE     (5),
-    GT_LT   (6),
-    GTE_LT  (7),
-    GTL_TE  (8),
-    GTE_LTE (9);
+    INVALID (0, "?"),
+    EQ      (1, "="),
+    GT      (2, ">"),
+    GTE     (3, ">="),
+    LT      (4, "<"),
+    LTE     (5, "<=");
 
-    IndexLookupType(int val) {
+    private final String m_symbol;
+
+    IndexLookupType(int val, String symbol) {
+        m_symbol = symbol;
         assert (this.ordinal() == val) :
             "Enum element " + this.name() +
             " in position " + this.ordinal() +
@@ -45,6 +44,10 @@ public enum IndexLookupType {
 
     public int getValue() {
         return this.ordinal();
+    }
+
+    public String getSymbol() {
+        return m_symbol;
     }
 
     protected static final Map<Integer, IndexLookupType> idx_lookup = new HashMap<Integer, IndexLookupType>();

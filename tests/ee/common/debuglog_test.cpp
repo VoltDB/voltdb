@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -51,6 +51,7 @@
 
 #include "harness.h"
 
+#undef VOLT_LOG_LEVEL
 #define VOLT_LOG_LEVEL 200 //test DEBUG level
 #include "common/debuglog.h"
 

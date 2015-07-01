@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,8 +37,8 @@ import org.voltdb.types.ExpressionType;
 
 public class TestScanPlanNode extends TestCase
 {
-    static final String TABLE1 = "table1";
-    static final String[] COLS = { "col0", "col1", "col2", "col3", "col4" };
+    static final String TABLE1 = "TABLE1";
+    static final String[] COLS = { "COL0", "COL1", "COL2", "COL3", "COL4" };
     static final VoltType[] COLTYPES = { VoltType.INTEGER, VoltType.TINYINT,
                                          VoltType.TIMESTAMP, VoltType.FLOAT,
                                          VoltType.BIGINT };
@@ -66,8 +66,7 @@ public class TestScanPlanNode extends TestCase
     // a scan node is the schema of the table
     public void testOutputSchemaNoScanColumns()
     {
-        AbstractScanPlanNode dut = new SeqScanPlanNode();
-        dut.setTargetTableName(TABLE1);
+        AbstractScanPlanNode dut = new SeqScanPlanNode(TABLE1, TABLE1);
 
         dut.generateOutputSchema(m_voltdb.getDatabase());
         NodeSchema dut_schema = dut.getOutputSchema();
@@ -75,7 +74,7 @@ public class TestScanPlanNode extends TestCase
         assertEquals(COLS.length, dut_schema.size());
         for (int i = 0; i < COLS.length; ++i)
         {
-            SchemaColumn col = dut_schema.find(TABLE1, COLS[i], COLS[i]);
+            SchemaColumn col = dut_schema.find(TABLE1, TABLE1, COLS[i], COLS[i]);
             assertNotNull(col);
             assertEquals(col.getExpression().getExpressionType(),
                          ExpressionType.VALUE_TUPLE);
@@ -88,40 +87,28 @@ public class TestScanPlanNode extends TestCase
     // a scan node consists of those columns
     public void testOutputSchemaSomeScanColumns()
     {
-        AbstractScanPlanNode dut = new SeqScanPlanNode();
-        dut.setTargetTableName(TABLE1);
-
         int[] scan_col_indexes = { 1, 3 };
         ArrayList<SchemaColumn> scanColumns = new ArrayList<SchemaColumn>();
-        for (int index : scan_col_indexes)
-        {
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setTableName(TABLE1);
-            tve.setColumnName(COLS[index]);
-            tve.setColumnAlias(COLS[index]);
+        for (int index : scan_col_indexes) {
+            TupleValueExpression tve = new TupleValueExpression(TABLE1, TABLE1, COLS[index], COLS[index]);
             tve.setValueType(COLTYPES[index]);
             tve.setValueSize(COLTYPES[index].getLengthInBytesForFixedTypes());
-            SchemaColumn col = new SchemaColumn(TABLE1, COLS[index],
-                                                COLS[index], tve);
+            SchemaColumn col = new SchemaColumn(TABLE1, TABLE1, COLS[index], COLS[index], tve);
             scanColumns.add(col);
         }
-        dut.setScanColumns(scanColumns);
+        AbstractScanPlanNode dut = SeqScanPlanNode.createDummyForTest(TABLE1, scanColumns);
 
         // Should be able to do this safely and repeatably multiple times
-        for (int i = 0; i < 3; i++)
-        {
+        for (int i = 0; i < 3; i++) {
             dut.generateOutputSchema(m_voltdb.getDatabase());
             NodeSchema dut_schema = dut.getOutputSchema();
             System.out.println(dut_schema.toString());
             assertEquals(scan_col_indexes.length, dut_schema.size());
-            for (int index : scan_col_indexes)
-            {
-                SchemaColumn col = dut_schema.find(TABLE1, COLS[index], "");
+            for (int index : scan_col_indexes) {
+                SchemaColumn col = dut_schema.find(TABLE1, TABLE1, COLS[index], "");
                 assertNotNull(col);
-                assertEquals(col.getExpression().getExpressionType(),
-                             ExpressionType.VALUE_TUPLE);
-                assertEquals(col.getExpression().getValueType(),
-                             COLTYPES[index]);
+                assertEquals(col.getExpression().getExpressionType(), ExpressionType.VALUE_TUPLE);
+                assertEquals(col.getExpression().getValueType(), COLTYPES[index]);
             }
         }
     }
@@ -133,8 +120,7 @@ public class TestScanPlanNode extends TestCase
     // before it attempts to update them
     public void testOutputSchemaOverriddenProjection()
     {
-        AbstractScanPlanNode dut = new SeqScanPlanNode();
-        dut.setTargetTableName(TABLE1);
+        AbstractScanPlanNode dut = new SeqScanPlanNode(TABLE1, TABLE1);
 
         // Create an output schema like we might see for an inlined projection
         // generated for update.  We'll have 4 output columns, the first will
@@ -145,7 +131,7 @@ public class TestScanPlanNode extends TestCase
         String[] cols = new String[4];
 
         TupleAddressExpression col1_exp = new TupleAddressExpression();
-        proj_schema.addColumn(new SchemaColumn("", "tuple_address",
+        proj_schema.addColumn(new SchemaColumn("", "", "tuple_address",
                                                "tuple_address",
                                                col1_exp));
         cols[0] = "tuple_address";
@@ -157,7 +143,7 @@ public class TestScanPlanNode extends TestCase
         col2_exp.setValueSize(COLTYPES[1].getLengthInBytesForFixedTypes());
         // XXX I'm not sure what to do with the name for the updated column yet.
         // I think it should be an alias and not the original table name/col name
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[1], COLS[1],
+        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[1], COLS[1],
                                                col2_exp));
         cols[1] = COLS[1];
 
@@ -166,7 +152,7 @@ public class TestScanPlanNode extends TestCase
         col3_exp.setValueType(COLTYPES[3]);
         col3_exp.setValueSize(COLTYPES[3].getLengthInBytesForFixedTypes());
         col3_exp.setValue("3.14159");
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[3], COLS[3],
+        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[3], COLS[3],
                                                col3_exp));
         cols[2] = COLS[3];
 
@@ -175,21 +161,15 @@ public class TestScanPlanNode extends TestCase
         col4_exp.setValueType(COLTYPES[4]);
         col4_exp.setValueSize(COLTYPES[4].getLengthInBytesForFixedTypes());
         col4_exp.setExpressionType(ExpressionType.OPERATOR_PLUS);
-        TupleValueExpression left = new TupleValueExpression();
-        left.setTableName(TABLE1);
-        left.setColumnName(COLS[0]);
-        left.setColumnAlias(COLS[0]);
+        TupleValueExpression left = new TupleValueExpression(TABLE1, TABLE1, COLS[0], COLS[0]);
         left.setValueType(COLTYPES[0]);
         left.setValueSize(COLTYPES[0].getLengthInBytesForFixedTypes());
-        TupleValueExpression right = new TupleValueExpression();
-        right.setTableName(TABLE1);
-        right.setColumnName(COLS[2]);
-        right.setColumnAlias(COLS[2]);
+        TupleValueExpression right = new TupleValueExpression(TABLE1, TABLE1, COLS[2], COLS[2]);
         right.setValueType(COLTYPES[2]);
         right.setValueSize(COLTYPES[2].getLengthInBytesForFixedTypes());
         col4_exp.setLeft(left);
         col4_exp.setRight(right);
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[4], "C1",
+        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[4], "C1",
                                                col4_exp));
         cols[3] = COLS[4];
 
@@ -207,11 +187,11 @@ public class TestScanPlanNode extends TestCase
             SchemaColumn col = null;
             if (i == 0)
             {
-                col = dut_schema.find("", cols[i], cols[i]);
+                col = dut_schema.find("", "", cols[i], cols[i]);
             }
             else
             {
-                col = dut_schema.find(TABLE1, cols[i], cols[i]);
+                col = dut_schema.find(TABLE1, TABLE1, cols[i], cols[i]);
             }
             assertNotNull(col);
             assertEquals(col.getExpression().getExpressionType(),

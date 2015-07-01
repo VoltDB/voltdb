@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,8 +25,6 @@ public class AgreementTxnIdSafetyState {
     private class SiteState {
         public long hsId;
         public long newestConfirmedTxnId;
-        @SuppressWarnings("unused")
-        public long lastSentTxnId;
     }
 
     Map<Long, SiteState> m_stateBySite = new LinkedHashMap<Long, SiteState>();
@@ -52,11 +50,16 @@ public class AgreementTxnIdSafetyState {
             return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
         }
         assert(ss.hsId == agreementHSId);
-        ss.lastSentTxnId = m_newestConfirmedTxnId;
         return ss.newestConfirmedTxnId;
     }
 
-    public void updateLastSeenTxnIdFromExecutorBySiteId(long agreementHSId, long lastSeenTxnId, boolean shouldRespond) {
+    public long getNewestGloballySafeTxnId()
+    {
+        return m_newestConfirmedTxnId;
+    }
+
+    public void updateLastSeenTxnIdFromExecutorBySiteId(long agreementHSId, long lastSeenTxnId)
+    {
         // ignore these by convention
         if (lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID)
             return;
@@ -84,16 +87,6 @@ public class AgreementTxnIdSafetyState {
 
             m_newestConfirmedTxnId = min;
         }
-
-        // see if the sent message is out of date
-        /*if (shouldRespond) {
-            HeartbeatMessage hb = new HeartbeatMessage(m_siteId, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID, ss.partition.newestConfirmedTxnId);
-            try {
-                m_mailbox.send(executorSiteId, VoltDB.DTXN_MAILBOX_ID, hb);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
-        }*/
     }
 
     /**
@@ -117,7 +110,6 @@ public class AgreementTxnIdSafetyState {
         ss = new SiteState();
         ss.hsId = agreementHSId;
         ss.newestConfirmedTxnId = m_newestConfirmedTxnId;
-        ss.lastSentTxnId = m_newestConfirmedTxnId;
         m_stateBySite.put(agreementHSId, ss);
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -57,7 +57,7 @@ public class EEProcess {
     public static final List<String> m_valgrindErrors = Collections
             .synchronizedList(new ArrayList<String>());
 
-    EEProcess(final BackendTarget target, String logfile) {
+    EEProcess(final BackendTarget target, int siteCount, String logfile) {
         if (target != BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             return;
         }
@@ -67,6 +67,7 @@ public class EEProcess {
         }
         final ArrayList<String> args = new ArrayList<String>();
         final String voltdbIPCPath = System.getenv("VOLTDBIPC_PATH");
+
         args.add("valgrind");
         args.add("--leak-check=full");
         args.add("--show-reachable=yes");
@@ -82,6 +83,7 @@ public class EEProcess {
             args.add("--log-file=" + logfile);
         }
         args.add(voltdbIPCPath == null ? "./voltdbipc" : voltdbIPCPath);
+        args.add(String.valueOf(siteCount));
 
         final ProcessBuilder pb = new ProcessBuilder(args);
         //pb.redirectErrorStream(true);
@@ -111,6 +113,8 @@ public class EEProcess {
                                                                                m_eeProcess.getInputStream()));
         try {
             boolean failure = false;
+
+            // expecting "==NUMBER==" to be line 1, where NUMBER is the C++ process's PID
             String pidString = stdout.readLine();
             if (pidString == null) {
                 failure = true;
@@ -123,6 +127,21 @@ public class EEProcess {
                 m_eePID = pidString;
             }
 
+            // expecting "==NUMBER==" to be line 2, where NUMBER is expected EE threads
+            String siteCountString = stdout.readLine();
+            if (siteCountString == null) {
+                failure = true;
+            } else {
+                if (verbose) {
+                    System.out.println("Site count string \"" + siteCountString + "\"");
+                }
+                siteCountString = siteCountString.substring(2);
+                siteCountString = siteCountString.substring(0, siteCountString.indexOf("="));
+                int siteCount2 = Integer.valueOf(siteCountString);
+                assert(siteCount2 == siteCount);
+            }
+
+            // expecting "==NUMBER==" to be line 3, where NUMBER is listening port
             String portString = stdout.readLine();
             if (portString == null) {
                 failure = true;

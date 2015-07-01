@@ -44,21 +44,26 @@ import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.Date;
-import java.sql.NClob;
-import java.sql.ParameterMetaData;
 import java.sql.PreparedStatement;
 import java.sql.Ref;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
-import java.sql.RowId;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
-import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 
+//#ifdef JAVA4
+import java.sql.ParameterMetaData;
+
+//#endif JAVA4
+//#ifdef JAVA6
+import java.sql.NClob;
+import java.sql.RowId;
+import java.sql.SQLXML;
+
+//#endif JAVA6
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
@@ -212,7 +217,7 @@ import org.hsqldb_voltpatches.types.Type;
  * version 1.1.x
  * <em>Java Runtime Environment</em><sup><font size="-2">TM</font></sup>.
  * However, in addition to this technique requiring explicit casts to the
- * org.hsqldb.jdbc.* classes, some of these method calls require
+ * org.hsqldb_voltpatches.jdbc.* classes, some of these method calls require
  * <code>int</code> values that are defined only in the JDBC 2 or greater
  * version of the {@link java.sql.ResultSet ResultSet} interface.  For this
  * reason these values are defined in {@link JDBCResultSet JDBCResultSet}.<p>
@@ -454,7 +459,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setFloat(int parameterIndex,
                                       float x) throws SQLException {
-        setDouble(parameterIndex, x);
+        setDouble(parameterIndex, (double) x);
     }
 
     /**
@@ -754,7 +759,6 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
 
 //#ifdef DEPRECATEDJDBC
-    @Deprecated
     public synchronized void setUnicodeStream(int parameterIndex,
             java.io.InputStream x, int length) throws SQLException {
 
@@ -1569,7 +1573,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 millis     += zoneOffset;
                 zoneOffset = 0;
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_TIME_WITH_TIME_ZONE :
                 break;
             default :
@@ -1641,7 +1645,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 millis     += zoneOffset;
                 zoneOffset = 0;
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
                 parameterValues[i] = new TimestampData(millis / 1000,
                         x.getNanos(), zoneOffset / 1000);
@@ -1651,7 +1655,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 millis     += zoneOffset;
                 zoneOffset = 0;
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_TIME_WITH_TIME_ZONE :
                 parameterValues[i] = new TimeData((int) (millis / 1000),
                         x.getNanos(), zoneOffset / 1000);
@@ -1824,7 +1828,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         int[]           updateCounts = new int[navigator.getSize()];
 
         for (int i = 0; i < updateCounts.length; i++) {
-            Object[] data = navigator.getNext();
+            Object[] data = (Object[]) navigator.getNext();
 
             updateCounts[i] = ((Integer) data[0]).intValue();
         }
@@ -3894,7 +3898,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 }
                 Util.throwError(Error.error(ErrorCode.X_42565));
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
                 if (o instanceof byte[]) {
@@ -3944,7 +3948,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 }
             }
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.TINYINT :
             case Types.SQL_SMALLINT :
             case Types.SQL_INTEGER :
@@ -3969,7 +3973,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                     Util.throwError(e);
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 try {
                     o = outType.convertToDefaultType(connection.sessionProxy,
@@ -4303,6 +4307,8 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     /** Is part of a Result. */
     protected final boolean isResult;
 
+    /************************* Volt DB Extensions *************************/
+
     public void closeOnCompletion() throws SQLException {
         throw new SQLException();
     }
@@ -4310,4 +4316,5 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public boolean isCloseOnCompletion() throws SQLException {
         throw new SQLException();
     }
+    /**********************************************************************/
 }

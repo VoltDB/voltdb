@@ -2,7 +2,7 @@
 
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -82,12 +82,20 @@ else
 fi
 
 JAVA=`which java`
-JAVA_HEAP_MAX=-Xmx1024m
+if [ x"$JAVA_HEAP_MAX" = "x" ]
+then
+    JAVA_HEAP_MAX=-Xmx2048m
+fi
 
 # some Java parameters
 if [ "$JAVA_HOME" != "" ]; then
   #echo "run java in $JAVA_HOME"
   JAVA=$JAVA_HOME/bin/java
+fi
+
+if [ "$JAVA" = "" ]; then
+  echo "Couldn't find java version to run (make sure JAVA_HOME is set)."
+  exit 1
 fi
 
 # check envvars to see if a user overrides log4j conf
@@ -102,7 +110,7 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   fi
 fi
 
-VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
+VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-[0-9].*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=$VOLTDBJAR
 else
@@ -118,7 +126,7 @@ done
 CLASSPATH=${CLASSPATH}
 
 # run it
-export CMDVAL="$JAVA -Xmx512m $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
-export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.utils.CSVLoader $@"
-# echo $CMDVAL
-exec $CMDVAL
+export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
+export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.utils.CSVLoader"
+#echo $CMDVAL "$@"
+exec $CMDVAL "$@"

@@ -500,7 +500,14 @@ final class RangeVariable {
      */
     void addIndexCondition(Expression[] exprList, Index index, int colCount,
                            boolean isJoin) {
-
+// VoltDB extension
+        if (rangeIndex == index && isJoinIndex && (!isJoin) &&
+                (multiColumnCount > 0) && (colCount == 0)) {
+            // This is one particular set of conditions which broke the classification of
+            // ON and WHERE clauses.
+            return;
+        }
+// End of VoltDB extension
         rangeIndex  = index;
         isJoinIndex = isJoin;
 
@@ -677,10 +684,12 @@ final class RangeVariable {
             isBeforeFirst      = true;
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -702,26 +711,32 @@ final class RangeVariable {
             }
         }
 
+        @Override
         public Row getCurrentRow() {
             return currentRow;
         }
 
+        @Override
         public Object[] getCurrent() {
             return currentData;
         }
 
+        @Override
         public long getRowid() {
             return currentRow == null ? 0
                                       : currentRow.getId();
         }
 
+        @Override
         public Object getRowidObject() {
             return currentRow == null ? null
                                       : Long.valueOf(currentRow.getId());
         }
 
+        @Override
         public void remove() {}
 
+        @Override
         public void reset() {
 
             if (it != null) {
@@ -733,6 +748,7 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
+        @Override
         public int getRangePosition() {
             return rangePosition;
         }
@@ -766,10 +782,12 @@ final class RangeVariable {
             }
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -785,8 +803,10 @@ final class RangeVariable {
             return findNext();
         }
 
+        @Override
         public void remove() {}
 
+        @Override
         public void reset() {
 
             if (it != null) {
@@ -800,6 +820,7 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
+        @Override
         public int getRangePosition() {
             return rangeVar.rangePosition;
         }
@@ -1025,8 +1046,10 @@ final class RangeVariable {
             it                 = rangeVar.rangeIndex.firstRow(session, store);
         }
 
+        @Override
         protected void initialiseIterator() {}
 
+        @Override
         protected boolean findNext() {
 
             boolean result;
@@ -1082,10 +1105,12 @@ final class RangeVariable {
             this.rangeIterators = rangeIterators;
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             while (currentIndex >= 0) {
@@ -1122,11 +1147,11 @@ final class RangeVariable {
             return false;
         }
 
+        @Override
         public void reset() {}
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -1136,92 +1161,125 @@ final class RangeVariable {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session)
-    throws HSQLParseException
+    VoltXMLElement voltGetRangeVariableXML(Session session)
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         Index        index;
         Index        primaryIndex;
-        int[]        primaryKey;
-        boolean      isSeqScan;
 
         index        = rangeIndex;
         primaryIndex = rangeTable.getPrimaryIndex();
-        primaryKey   = rangeTable.getPrimaryKey();
-        isSeqScan    = indexCondition == null;
 
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
         if (index == null)
             index = primaryIndex;
 
-        // check if this is a sequential scan
-        if (index == primaryIndex && primaryKey.length == 0)
-            isSeqScan = true;
-
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        // output metadata
-        if (isSeqScan)
-            scan.attributes.put("type", "sequential");
-        else
-            scan.attributes.put("type", "index");
+        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+            if (rangeTable instanceof TableDerived) {
+                if (tableAlias == null || tableAlias.name == null) {
+                    // VoltDB require derived sub select table with user specified alias
+                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                            "SQL Syntax error: Every derived table must have its own alias.");
+                }
+                scan.attributes.put("table", tableAlias.name.toUpperCase());
 
-        scan.attributes.put("table", rangeTable.getName().name);
-
-        if ((index != null) && (isSeqScan == false)) {
-            String indexName = (index.getName() == null ? "UNNAMED" : index.getName().name);
-            scan.attributes.put("index", indexName);
+                VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
+                scan.children.add(subQuery);
+            }
+        } else {
+            scan.attributes.put("table", rangeTable.getName().name.toUpperCase());
         }
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
-            scan.attributes.put("alias", tableAlias.name);
+            scan.attributes.put("tablealias", tableAlias.name.toUpperCase());
         }
 
         // note if this is an outer join
-        if (isLeftJoin || isRightJoin) {
-            scan.attributes.put("isouterjoin", "true");
+        if (isLeftJoin && isRightJoin) {
+            scan.attributes.put("jointype", "full");
+        } else if (isLeftJoin) {
+            scan.attributes.put("jointype", "left");
+        } else if (isRightJoin) {
+            scan.attributes.put("jointype", "right");
+        } else {
+            scan.attributes.put("jointype", "inner");
         }
 
-        // start with the indexCondition
-        Expression cond = indexCondition;
-        // then go to the indexEndCondition
-        if (indexEndCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, indexEndCondition);
-            } else {
-                cond = indexEndCondition;
+        Expression joinCond = null;
+        Expression whereCond = null;
+        // if isJoinIndex and indexCondition are set then indexCondition is join condition
+        // else if indexCondition is set then it is where condition
+        if (isJoinIndex == true) {
+            joinCond = indexCondition;
+            if (indexEndCondition != null) {
+                if (joinCond != null) {
+                    joinCond = new ExpressionLogical(OpTypes.AND, joinCond, indexEndCondition);
+                } else {
+                    joinCond = indexEndCondition;
+                }
             }
+            // then go to the nonIndexJoinCondition
+            if (nonIndexJoinCondition != null) {
+                if (joinCond != null) {
+                    joinCond = new ExpressionLogical(OpTypes.AND, joinCond, nonIndexJoinCondition);
+                } else {
+                    joinCond = nonIndexJoinCondition;
+                }
+            }
+            // then go to the nonIndexWhereCondition
+            whereCond = nonIndexWhereCondition;
+        } else {
+            joinCond = nonIndexJoinCondition;
+
+            whereCond = indexCondition;
+            if (indexEndCondition != null) {
+                if (whereCond != null) {
+                    whereCond = new ExpressionLogical(OpTypes.AND, whereCond, indexEndCondition);
+                } else {
+                    whereCond = indexEndCondition;
+                }
+            }
+            // then go to the nonIndexWhereCondition
+            if (nonIndexWhereCondition != null) {
+                if (whereCond != null) {
+                    whereCond = new ExpressionLogical(OpTypes.AND, whereCond, nonIndexWhereCondition);
+                } else {
+                    whereCond = nonIndexWhereCondition;
+                }
+            }
+
         }
-        // then go to the nonIndexJoinCondition
-        if (nonIndexJoinCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, nonIndexJoinCondition);
-            } else {
-                cond = nonIndexJoinCondition;
-            }
-        }
-        // then go to the nonIndexWhereCondition
-        if (nonIndexWhereCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, nonIndexWhereCondition);
-            } else {
-                cond = nonIndexWhereCondition;
-            }
+        if (joinCond != null) {
+            joinCond = joinCond.eliminateDuplicates(session);
+            VoltXMLElement joinCondEl = new VoltXMLElement("joincond");
+            joinCondEl.children.add(joinCond.voltGetXML(session));
+            scan.children.add(joinCondEl);
         }
 
-        //
-        // END EXPRESSION
-        //
-        if (indexEndCondition != null) {
-            VoltXMLElement postexp = new VoltXMLElement("postexp");
-            scan.children.add(postexp);
-            assert(postexp != null);
-            VoltXMLElement postexpchild = cond.voltGetXML(session);
-            postexp.children.add(postexpchild);
-            assert(postexpchild != null);
+        if (whereCond != null) {
+            whereCond = whereCond.eliminateDuplicates(session);
+            VoltXMLElement whereCondEl = new VoltXMLElement("wherecond");
+            whereCondEl.children.add(whereCond.voltGetXML(session));
+            scan.children.add(whereCondEl);
         }
 
         return scan;
     }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        String name = "";
+        if (rangeTable != null) {
+            name = ":" + rangeTable.getName().name;
+        }
+        return super.toString() + name;
+    }
+    /**********************************************************************/
 }

@@ -34,24 +34,17 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.Quotas;
-import org.apache.zookeeper_voltpatches.StatsTrack;
-import org.apache.zookeeper_voltpatches.WatchedEvent;
-import org.apache.zookeeper_voltpatches.Watcher;
-import org.apache.zookeeper_voltpatches.ZooDefs;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.ZooKeeperMain;
 import org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.data.ACL;
 import org.apache.zookeeper_voltpatches.data.Id;
 import org.apache.zookeeper_voltpatches.data.Stat;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
+
 /**
  * The command line client to ZooKeeper.
- * 
+ *
  */
 public class ZooKeeperMain {
     private static final Logger LOG = Logger.getLogger(ZooKeeperMain.class);
@@ -100,6 +93,7 @@ public class ZooKeeperMain {
     }
 
     private class MyWatcher implements Watcher {
+        @Override
         public void process(WatchedEvent event) {
             if (getPrintWatches()) {
                 ZooKeeperMain.printMessage("WATCHER::");
@@ -152,7 +146,7 @@ public class ZooKeeperMain {
 
     /**
      * A storage class for both command line options and shell commands.
-     * 
+     *
      */
     static private class MyCommandOptions {
 
@@ -161,7 +155,7 @@ public class ZooKeeperMain {
         private String command = null;
 
         public MyCommandOptions() {
-            options.put("server", "localhost:2181");
+            options.put("server", "localhost:7181");
             options.put("timeout", "30000");
         }
 
@@ -188,7 +182,7 @@ public class ZooKeeperMain {
         /**
          * Parses a command line that may contain one or more flags before an
          * optional command string
-         * 
+         *
          * @param args
          *            command line arguments
          * @return true if parsing succeeded, false otherwise.
@@ -226,7 +220,7 @@ public class ZooKeeperMain {
 
         /**
          * Breaks a string into command + arguments.
-         * 
+         *
          * @param cmdstring
          *            string of form "cmd arg1 arg2..etc"
          * @return true if parsing succeeded.
@@ -245,7 +239,7 @@ public class ZooKeeperMain {
     /**
      * Makes a list of possible completions, either for commands or for zk nodes
      * if the token to complete begins with /
-     * 
+     *
      */
 
     protected void addToHistory(int i, String cmd) {
@@ -272,7 +266,7 @@ public class ZooKeeperMain {
         }
         host = newHost;
         zk = new ZooKeeper(host, Integer.parseInt(cl.getOption("timeout")),
-                new MyWatcher());
+                new MyWatcher(), ImmutableSet.<Long>of());
     }
 
     public static void main(String args[]) throws KeeperException, IOException,
@@ -368,6 +362,7 @@ public class ZooKeeperMain {
 
     private static DataCallback dataCallback = new DataCallback() {
 
+        @Override
         public void processResult(int rc, String path, Object ctx, byte[] data,
                 Stat stat) {
             System.out.println("rc = " + rc + " path = " + path + " data = "
@@ -379,7 +374,7 @@ public class ZooKeeperMain {
 
     /**
      * trim the quota tree to recover unwanted tree elements in the quota's tree
-     * 
+     *
      * @param zk
      *            the zookeeper client
      * @param path
@@ -407,7 +402,7 @@ public class ZooKeeperMain {
 
     /**
      * this method deletes quota for a node.
-     * 
+     *
      * @param zk
      *            the zookeeper client
      * @param path
@@ -491,7 +486,7 @@ public class ZooKeeperMain {
 
     /**
      * this method creates a quota node for the path
-     * 
+     *
      * @param zk
      *            the ZooKeeper client
      * @param path

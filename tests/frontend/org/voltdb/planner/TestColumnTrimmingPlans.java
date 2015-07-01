@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,69 +22,28 @@
  */
 package org.voltdb.planner;
 
-import java.util.List;
-
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 
-import junit.framework.TestCase;
-
-public class TestColumnTrimmingPlans extends TestCase
+public class TestColumnTrimmingPlans extends PlannerTestCase
 {
-    private PlannerTestAideDeCamp aide;
-
-    private AbstractPlanNode compile(String sql, int paramCount,
-                                     boolean singlePartition)
-    {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn =  aide.compile(sql, paramCount, singlePartition);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
-    }
-
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestColumnTrimmingPlans.class.getResource("testplans-trimming-ddl.sql"),
-                                         "testtrimmingplans");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
+        boolean inferPartitioning = true;
+        setupSchema(inferPartitioning, TestColumnTrimmingPlans.class.getResource("testplans-trimming-ddl.sql"),
+                    "testtrimmingplans");
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     public void testEng585Plan()
     {
         AbstractPlanNode pn = null;
-        pn =
-            compile("select max(s.int2) as foo from s, t where s.s_pk = t.s_pk and t.t_pk1 = ?;",
-                    1, true);
-        if (pn != null)
-        {
-            System.out.println(pn.toJSONString());
-        }
+        pn = compile("select max(s.int2) as foo from s, t where s.s_pk = t.s_pk and t.t_pk1 = ?;");
+        // TODO: To actually detect ENG-585 regression, we'd have to program a check that the join is
+        // materializing narrow rows of fewer than 5 columns. Yeah.
+        System.out.println(pn.toJSONString());
     }
 }

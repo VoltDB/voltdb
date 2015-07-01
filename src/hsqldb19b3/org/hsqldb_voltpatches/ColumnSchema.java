@@ -31,10 +31,10 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
+import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -77,12 +77,10 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return columnName;
     }
 
-    @Override
     public String getNameString() {
         return columnName.name;
     }
 
-    @Override
     public String getTableNameString() {
         return columnName.parent == null ? null
                                          : columnName.parent.name;
@@ -92,7 +90,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return columnName.schema;
     }
 
-    @Override
     public String getSchemaNameString() {
         return columnName.schema == null ? null
                                          : columnName.schema.name;
@@ -103,7 +100,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
                                          : columnName.schema.schema;
     }
 
-    @Override
     public String getCatalogNameString() {
 
         return columnName.schema == null ? null
@@ -156,7 +152,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return sb.toString();
     }
 
-    @Override
     public void setType(Type type) {
         this.dataType = type;
     }
@@ -184,7 +179,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      *
      * @return boolean
      */
-    @Override
     public boolean isNullable() {
 
         boolean isNullable = super.isNullable();
@@ -198,7 +192,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return isNullable;
     }
 
-    @Override
     public byte getNullability() {
         return isPrimaryKey ? SchemaObject.Nullability.NO_NULLS
                             : super.getNullability();
@@ -217,17 +210,14 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      *
      * @return boolean
      */
-    @Override
     public boolean isWriteable() {
         return !isGenerated();
     }
 
-    @Override
     public void setWriteable(boolean value) {
         throw Error.runtimeError(ErrorCode.U_S0500, "");
     }
 
-    @Override
     public boolean isSearchable() {
         return Types.isSearchable(dataType.typeCode);
     }
@@ -325,7 +315,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return copy;
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -335,39 +325,48 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetColumnXML(Session session)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement column = new VoltXMLElement("column");
 
         // output column metadata
         column.attributes.put("name", columnName.name);
         String typestring = Types.getTypeName(dataType.typeCode);
-        column.attributes.put("type", typestring);
+        column.attributes.put("valuetype", typestring);
         column.attributes.put("nullable", String.valueOf(isNullable()));
         column.attributes.put("size", String.valueOf(dataType.precision));
 
-        if ((typestring.compareTo("VARCHAR") == 0) &&
-            (dataType.precision > 1048576)) {
-            String msg = "VARCHAR column size for column ";
+        if (dataType.precision > 1048576) {
+            String msg = typestring + " column size for column ";
             msg += getTableNameString() + "." + columnName.name;
             msg += " is > 1048576 char maximum.";
-            throw new HSQLParseException(msg);
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(msg);
+        }
+
+        if (typestring.compareTo("VARCHAR") == 0) {
+            assert(dataType instanceof CharacterType);
+            CharacterType ct = (CharacterType)dataType;
+            column.attributes.put("bytes", String.valueOf(ct.inBytes));
         }
 
         // see if there is a default value for the column
         Expression exp = getDefaultExpression();
 
         // if there is a default value for the column
+        // and the column value is not NULL. (Ignore "DEFAULT NULL" in DDL)
         if (exp != null) {
-            exp.dataType = dataType;
+            if (exp.valueData != null || (exp instanceof FunctionSQL && ((FunctionSQL)exp).isValueFunction)) {
+                exp.dataType = dataType;
 
-            // add default value to body of column element
-            VoltXMLElement defaultElem = new VoltXMLElement("default");
-            column.children.add(defaultElem);
-            assert(defaultElem != null);
-            defaultElem.children.add(exp.voltGetXML(session));
+                // add default value to body of column element
+                VoltXMLElement defaultElem = new VoltXMLElement("default");
+                column.children.add(defaultElem);
+                defaultElem.children.add(exp.voltGetXML(session));
+            }
         }
 
         return column;
     }
+    /**********************************************************************/
 }

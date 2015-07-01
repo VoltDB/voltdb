@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,13 +22,21 @@
 
 namespace voltdb {
 
+TupleSchema* TupleSchema::createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
+                                            const std::vector<int32_t> columnSizes,
+                                            const std::vector<bool> allowNull)
+{
+    const std::vector<bool> columnInBytes (allowNull.size(), false);
+    return TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, columnInBytes);
+}
+
 TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnTypes,
                                             const std::vector<int32_t> columnSizes,
                                             const std::vector<bool> allowNull,
-                                            bool allowInlinedObjects)
+                                            const std::vector<bool> columnInBytes)
 {
     const uint16_t uninlineableObjectColumnCount =
-      TupleSchema::countUninlineableObjectColumns(columnTypes, columnSizes, allowInlinedObjects);
+      TupleSchema::countUninlineableObjectColumns(columnTypes, columnSizes, columnInBytes);
     const uint16_t columnCount = static_cast<uint16_t>(columnTypes.size());
     // big enough for any data members plus big enough for tupleCount + 1 "ColumnInfo"
     //  fields. We need CI+1 because we get the length of a column by offset subtraction
@@ -43,7 +51,6 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnT
 
     // clear all the offset values
     memset(retval, 0, memSize);
-    retval->m_allowInlinedObjects = allowInlinedObjects;
     retval->m_columnCount = columnCount;
     retval->m_uninlinedObjectColumnCount = uninlineableObjectColumnCount;
 
@@ -52,7 +59,8 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnT
         const ValueType type = columnTypes[ii];
         const uint32_t length = columnSizes[ii];
         const bool columnAllowNull = allowNull[ii];
-        retval->setColumnMetaData(ii, type, length, columnAllowNull, uninlinedObjectColumnIndex);
+        const bool inBytes = columnInBytes[ii];
+        retval->setColumnMetaData(ii, type, length, columnAllowNull, uninlinedObjectColumnIndex, inBytes);
     }
 
     return retval;
@@ -111,31 +119,36 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
     std::vector<ValueType> columnTypes;
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(combinedColumnCount, true);
+    std::vector<bool> columnInBytes(combinedColumnCount, false);
     std::vector<uint16_t>::const_iterator iter;
     for (iter = firstSet.begin(); iter != firstSet.end(); iter++) {
-        columnTypes.push_back(first->columnType(*iter));
-        columnLengths.push_back(first->columnLength(*iter));
-        columnAllowNull[*iter] = first->columnAllowNull(*iter);
+        const TupleSchema::ColumnInfo *columnInfo = first->getColumnInfo(*iter);
+        columnTypes.push_back(columnInfo->getVoltType());
+        columnLengths.push_back(columnInfo->length);
+        columnAllowNull[*iter] = columnInfo->allowNull;
+        columnInBytes[*iter] = columnInfo->inBytes;
     }
     for (iter = secondSet.begin(); second && iter != secondSet.end(); iter++) {
-        columnTypes.push_back(second->columnType(*iter));
-        columnLengths.push_back(second->columnLength(*iter));
-        columnAllowNull[offset + *iter] = second->columnAllowNull(*iter);
+        const TupleSchema::ColumnInfo *columnInfo = second->getColumnInfo(*iter);
+        columnTypes.push_back(columnInfo->getVoltType());
+        columnLengths.push_back(columnInfo->length);
+        columnAllowNull[offset + *iter] = columnInfo->allowNull;
+        columnInBytes[offset + *iter] = columnInfo->inBytes;
     }
 
     TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
                                                          columnLengths,
                                                          columnAllowNull,
-                                                         true);
+                                                         columnInBytes);
 
     // Remember to set the inlineability of each column correctly.
     for (iter = firstSet.begin(); iter != firstSet.end(); iter++) {
         ColumnInfo *info = schema->getColumnInfo(*iter);
-        info->inlined = first->columnIsInlined(*iter);
+        info->inlined = first->getColumnInfo(*iter)->inlined;
     }
     for (iter = secondSet.begin(); second && iter != secondSet.end(); iter++) {
         ColumnInfo *info = schema->getColumnInfo((int)offset + *iter);
-        info->inlined = second->columnIsInlined(*iter);
+        info->inlined = second->getColumnInfo(*iter)->inlined;
     }
 
     return schema;
@@ -146,9 +159,9 @@ void TupleSchema::freeTupleSchema(TupleSchema *schema) {
 }
 
 void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_t length, bool allowNull,
-                                    uint16_t &uninlinedObjectColumnIndex)
+                                    uint16_t &uninlinedObjectColumnIndex, bool inBytes)
 {
-    assert(length <= 1048576);
+    assert(length <= COLUMN_MAX_VALUE_LENGTH);
     uint32_t offset = 0;
 
     // set the type
@@ -156,14 +169,38 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     columnInfo->type = static_cast<char>(type);
     columnInfo->allowNull = (char)(allowNull ? 1 : 0);
     columnInfo->length = length;
-    if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
-        if (length < UNINLINEABLE_OBJECT_LENGTH && m_allowInlinedObjects) {
+    columnInfo->inBytes = inBytes;
+
+    if ((type == VALUE_TYPE_VARCHAR && inBytes) || type == VALUE_TYPE_VARBINARY) {
+        if (length == 0) {
+            throwFatalLogicErrorStreamed("Zero length for object type " << valueToString((ValueType)type));
+        }
+        if (length < UNINLINEABLE_OBJECT_LENGTH) {
             /*
              * Inline the string if it is less then UNINLINEABLE_OBJECT_LENGTH bytes.
              */
             columnInfo->inlined = true;
             // One byte to store the size
             offset = static_cast<uint32_t>(length + SHORT_OBJECT_LENGTHLENGTH);
+        } else {
+            /*
+             * Set the length to the size of a String pointer since it won't be inlined.
+             */
+            offset = static_cast<uint32_t>(NValue::getTupleStorageSize(type));
+            columnInfo->inlined = false;
+            setUninlinedObjectColumnInfoIndex(uninlinedObjectColumnIndex++, index);
+        }
+    } else if (type == VALUE_TYPE_VARCHAR) {
+        if (length == 0) {
+            throwFatalLogicErrorStreamed("Zero length for object type " << valueToString((ValueType)type));
+        }
+        if (length < UNINLINEABLE_CHARACTER_LENGTH) {
+            /*
+             * Inline the string if it is less then UNINLINEABLE_CHARACTER_LENGTH characters.
+             */
+            columnInfo->inlined = true;
+            // One byte to store the size
+            offset = static_cast<uint32_t>(length * 4 + SHORT_OBJECT_LENGTHLENGTH);
         } else {
             /*
              * Set the length to the size of a String pointer since it won't be inlined.
@@ -191,37 +228,65 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
 std::string TupleSchema::debug() const {
     std::ostringstream buffer;
 
-    buffer << "Schema has " << columnCount() << " columns, allowInlinedObjects = " << allowInlinedObjects()
-           << ", length = " << tupleLength() <<  ", uninlinedObjectColumns "  << m_uninlinedObjectColumnCount
-           << std::endl;
+    buffer << "Schema has " << columnCount() << " columns, length = " << tupleLength()
+           <<  ", uninlinedObjectColumns "  << m_uninlinedObjectColumnCount << std::endl;
 
     for (uint16_t i = 0; i < columnCount(); i++) {
-        buffer << " column " << i << ": type = " << getTypeName(columnType(i));
-        buffer << ", length = " << columnLength(i) << ", nullable = ";
-        buffer << (columnAllowNull(i) ? "true" : "false") << ", isInlined = " << columnIsInlined(i) <<  std::endl;
+        const TupleSchema::ColumnInfo *columnInfo = getColumnInfo(i);
+
+        buffer << " column " << i << ": type = " << getTypeName(columnInfo->getVoltType());
+        buffer << ", length = " << columnInfo->length << ", nullable = ";
+        buffer << (columnInfo->allowNull ? "true" : "false") << ", isInlined = " << columnInfo->inlined <<  std::endl;
     }
 
     std::string ret(buffer.str());
     return ret;
 }
 
-bool TupleSchema::equals(const TupleSchema *other) const {
+bool TupleSchema::isCompatibleForCopy(const TupleSchema *other) const
+{
+    if (this == other) {
+        return true;
+    }
     if (other->m_columnCount != m_columnCount ||
         other->m_uninlinedObjectColumnCount != m_uninlinedObjectColumnCount ||
-        other->m_allowInlinedObjects != m_allowInlinedObjects) {
+        other->tupleLength() != tupleLength()) {
         return false;
     }
 
     for (int ii = 0; ii < m_columnCount; ii++) {
         const ColumnInfo *columnInfo = getColumnInfo(ii);
         const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
-        if (columnInfo->allowNull != ocolumnInfo->allowNull ||
-                columnInfo->offset != ocolumnInfo->offset ||
-                columnInfo->type != ocolumnInfo->type) {
+        if (columnInfo->offset != ocolumnInfo->offset ||
+                columnInfo->type != ocolumnInfo->type ||
+                columnInfo->inlined != ocolumnInfo->inlined) {
             return false;
         }
     }
 
+    return true;
+}
+
+bool TupleSchema::equals(const TupleSchema *other) const
+{
+    // First check for structural equality.
+    if ( ! isCompatibleForCopy(other)) {
+        return false;
+    }
+    // Finally, rule out behavior differences.
+    for (int ii = 0; ii < m_columnCount; ii++) {
+        const ColumnInfo *columnInfo = getColumnInfo(ii);
+        const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
+        if (columnInfo->allowNull != ocolumnInfo->allowNull) {
+            return false;
+        }
+        // The declared column length for an out-of-line object is a behavior difference
+        // that has no effect on tuple format.
+        if (( ! columnInfo->inlined) &&
+                (columnInfo->length != ocolumnInfo->length)) {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -231,14 +296,18 @@ bool TupleSchema::equals(const TupleSchema *other) const {
 uint16_t TupleSchema::countUninlineableObjectColumns(
         const std::vector<ValueType> columnTypes,
         const std::vector<int32_t> columnSizes,
-        bool allowInlineObjects) {
+        const std::vector<bool> columnInBytes)
+{
     const uint16_t numColumns = static_cast<uint16_t>(columnTypes.size());
     uint16_t numUninlineableObjects = 0;
     for (int ii = 0; ii < numColumns; ii++) {
-        if ((columnTypes[ii] == VALUE_TYPE_VARCHAR) || ((columnTypes[ii] == VALUE_TYPE_VARBINARY))) {
-            if (!allowInlineObjects) {
-                numUninlineableObjects++;
-            } else if (columnSizes[ii] >= UNINLINEABLE_OBJECT_LENGTH) {
+        ValueType vt = columnTypes[ii];
+        if (vt == VALUE_TYPE_VARCHAR || vt == VALUE_TYPE_VARBINARY) {
+            if (columnInBytes[ii] || vt == VALUE_TYPE_VARBINARY) {
+                if (columnSizes[ii] >= UNINLINEABLE_OBJECT_LENGTH) {
+                    numUninlineableObjects++;
+                }
+            } else if (columnSizes[ii] >= UNINLINEABLE_CHARACTER_LENGTH) {
                 numUninlineableObjects++;
             }
         }

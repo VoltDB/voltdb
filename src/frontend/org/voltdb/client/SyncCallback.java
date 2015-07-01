@@ -1,34 +1,38 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.client;
+
 import java.util.concurrent.Semaphore;
 
 /**
- * A utility class that allows a client to queue a stored procedure invocation asynchronously and then poll
+ * <p>A utility class that allows a client to queue a stored procedure invocation asynchronously and then poll
  * or join on the response. Useful when invoking multiple stored procedures synchronously
  * from a single thread. Queue each of the invocations asynchronously with a different <code>SyncCallback</code> and
- * then call {@link #waitForResponse} on each of the <code>SyncCallback</code>s to join on the responses.
+ * then call {@link #waitForResponse} on each of the <code>SyncCallback</code>s to join on the responses.</p>
  *
  */
 public final class SyncCallback extends AbstractProcedureArgumentCacher implements ProcedureCallback {
     private final Semaphore m_lock;
     private ClientResponse m_response;
 
+    /**
+     * Create a SyncCallback instance.
+     */
     public SyncCallback() {
         m_response = null;
         m_lock = new Semaphore(1);
@@ -42,8 +46,9 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     }
 
     /**
-     * Non-blocking poll method that checks for the response to the invocation associated with this callback.
-     * Call getResponse to retrieve the response or result() to retrieve the just the results.
+     * <p>Non-blocking poll method that checks for the response to the invocation associated with this callback.
+     * Call getResponse to retrieve the response or result() to retrieve the just the results.</p>
+     *
      * @return True if the response is available, false otherwise
      */
     public boolean checkForResponse() {
@@ -51,7 +56,8 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     }
 
     /**
-     * Retrieve the ClientResponse returned for this procedure invocation
+     * <p>Retrieve the ClientResponse returned for this procedure invocation.</p>
+     *
      * @return ClientResponse for this invocation
      */
     public ClientResponse getResponse() {
@@ -59,9 +65,10 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     }
 
     /**
-     * Block until a response has been received for the invocation associated with this callback. Call getResponse
-     * to retrieve the response or result() to retrieve the just the results.
-     * @throws InterruptedException
+     * <p>Block until a response has been received for the invocation associated with this callback. Call getResponse
+     * to retrieve the response or result() to retrieve the just the results.</p>
+     *
+     * @throws InterruptedException on interruption.
      */
     public void waitForResponse() throws InterruptedException {
         m_lock.acquire();
@@ -69,7 +76,7 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     }
 
     /**
-     * Return the arguments provided with the procedure invocation
+     * <p>Return the arguments provided with the procedure invocation.</p>
      * @return Object array containing procedure arguments
      */
     @Override

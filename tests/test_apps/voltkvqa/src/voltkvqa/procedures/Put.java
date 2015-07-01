@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -70,7 +70,8 @@ public class Put extends VoltProcedure
         else {
             // Get the old count from 1st 8 bytes, increment it, stuff it
             // back in
-            ByteBuffer bb = ByteBuffer.wrap(queryresults[0].fetchRow(0).getVarbinary(1));
+            queryresults[0].advanceRow();
+            ByteBuffer bb = ByteBuffer.wrap(queryresults[0].getVarbinary(1));
             putCounter = bb.getLong(0);
             putCounter++;
             bb.putLong(0, putCounter);

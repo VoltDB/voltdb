@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -45,53 +45,29 @@
 
 #include "receivenode.h"
 
-#include "storage/table.h"
-
 #include <sstream>
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
-ReceivePlanNode::ReceivePlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-    // Do nothing
-}
+ReceivePlanNode::~ReceivePlanNode() { }
 
-ReceivePlanNode::ReceivePlanNode() : AbstractPlanNode()
-{
-    // Do nothing
-}
+PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
-ReceivePlanNode::~ReceivePlanNode()
+std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
 {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-PlanNodeType
-ReceivePlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_RECEIVE;
-}
-string
-ReceivePlanNode::debugInfo(const string& spacer) const
-{
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "Incoming Table Columns["
            << getOutputSchema().size() << "]:\n";
-    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++)
-    {
+    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++) {
         SchemaColumn* col = getOutputSchema()[ctr];
         buffer << spacer << "  [" << ctr << "] ";
         buffer << "name=" << col->getColumnName() << " : ";
-        buffer << "size=" << col->getSize() << " : ";
-        buffer << "type=" << col->getType() << "\n";
+        buffer << "size=" << col->getExpression()->getValueSize() << " : ";
+        buffer << "type=" << col->getExpression()->getValueType() << "\n";
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
-void
-ReceivePlanNode::loadFromJSONObject(json_spirit::Object& obj)
-{
-    // This space intentionally left blank.
-}
+void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj) { }
+
+} // namespace voltdb

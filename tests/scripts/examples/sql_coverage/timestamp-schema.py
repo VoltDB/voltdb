@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -23,7 +23,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "P1": {
+    "P_TIMESTAMP": {
         "columns": (("PAST", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("FUTURE", FastSerializer.VOLTTYPE_TIMESTAMP),
@@ -31,7 +31,7 @@
         "partitions": (),
         "indexes": ("ID")
         },
-    "R1": {
+    "R_TIMESTAMP": {
         "columns": (("PAST", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("FUTURE", FastSerializer.VOLTTYPE_TIMESTAMP),

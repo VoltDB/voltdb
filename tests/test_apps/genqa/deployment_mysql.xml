@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="catalog" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export enabled="true" target="jdbc">
+        <configuration>
+            <property name="jdbcurl">jdbc:mysql://localhost:3306/mysql?zeroDateTimeBehavior=convertToNull</property>
+            <property name="jdbcuser">root</property>
+            <property name="schema">vexport</property>
+        </configuration>
+    </export>
+</deployment>

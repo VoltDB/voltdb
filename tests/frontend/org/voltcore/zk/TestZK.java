@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,22 +28,17 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.zk.LeaderElector;
-import org.apache.zookeeper_voltpatches.*;
-import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
-import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.data.Stat;
-
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException.BadVersionException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -132,6 +127,7 @@ public class TestZK extends ZKTestBase {
         assertEquals(zk.getData("/foo", false, null).length, 0);
         System.out.println("Created node");
         failSite(0);
+        Thread.sleep(1000);
         assertEquals(zk.getData("/foo", false, null).length, 0);
     }
 
@@ -167,7 +163,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testWatches() throws Exception {
+    public void testChildWatches() throws Exception {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
         final Semaphore sem = new Semaphore(0);
@@ -200,6 +196,94 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
+    public void testDataWatches() throws Exception {
+        ZooKeeper zk = getClient(0);
+        ZooKeeper zk2 = getClient(1);
+        final Semaphore sem = new Semaphore(0);
+        zk2.create("/foo", new byte[1], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.getData("/foo", new Watcher() {
+            @Override
+            public void process(WatchedEvent event) {
+                if (event.getType() == EventType.NodeDataChanged) {
+                    sem.release();
+                    System.out.println(event);
+                }
+            }
+        }, null);
+
+        zk2.setData("/foo", new byte[2], -1);
+
+        Stat stat = new Stat();
+        zk.getData("/foo", false, stat);
+
+        boolean threwException = false;
+        try {
+            zk2.setData("/foo", new byte[3], stat.getVersion());
+            zk.setData("/foo", new byte[3], stat.getVersion());
+        } catch (BadVersionException e) {
+            threwException = true;
+            e.printStackTrace();
+        }
+        assertTrue(threwException);
+    }
+
+    private Thread getThread(final ZooKeeper zk, final int count) {
+        return new Thread() {
+            @Override
+            public void run() {
+                try {
+                    for (int ii = 0; ii < count; ii++) {
+                        while (true) {
+                            Stat stat = new Stat();
+                            ByteBuffer buf = ByteBuffer.wrap(zk.getData("/foo", false, stat));
+                            int value = buf.getInt();
+                            value++;
+                            buf.clear();
+                            buf.putInt(value);
+                            try {
+                                zk.setData("/foo", buf.array(), stat.getVersion());
+                            } catch (BadVersionException e) {
+                                continue;
+                            }
+                            //System.out.println("CASed " + value);
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+    }
+
+    @Test
+    public void testCAS() throws Exception {
+        ZooKeeper zk = getClient(0);
+        ZooKeeper zk2 = getClient(1);
+        ZooKeeper zk3 = getClient(2);
+        ZooKeeper zk4 = getClient(3);
+
+        zk2.create("/foo", new byte[4], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        final int count = 100;
+        Thread t1 = getThread(zk, count);
+        Thread t2 = getThread(zk2, count);
+        Thread t3 = getThread(zk3, count);
+        Thread t4 = getThread(zk4, count);
+        t1.start();
+        t2.start();
+        t3.start();
+        t4.start();
+        t1.join();
+        t2.join();
+        t3.join();
+        t4.join();
+
+        ByteBuffer buf = ByteBuffer.wrap(zk.getData("/foo", false, null));
+        assertEquals(count * 4 , buf.getInt());
+    }
+
+    @Test
     public void testNullVsZeroLengthData() throws Exception {
         ZooKeeper zk = getClient(0);
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -229,7 +313,7 @@ public class TestZK extends ZKTestBase {
         nodes.add("/a/b/node0000000000");
         nodes.add("/a/b/node0000010234");
         nodes.add("/a/b/node0000000234");
-        ZKUtil.sortSequentialNodes(nodes);
+        Collections.sort(nodes);
 
         Iterator<String> iter = nodes.iterator();
         assertEquals("/a/b/node0000000000", iter.next());
@@ -280,6 +364,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem2.release();
             }
+
+            @Override
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
         final Semaphore sem3 = new Semaphore(0);
         LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
@@ -287,6 +374,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem3.release();
             }
+
+            @Override
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
@@ -301,18 +391,173 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector3.isLeader());
 
         // 2 should become the leader
-        zk.close();
+        elector1.shutdown(); zk.close();
         assertTrue(sem2.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector2.isLeader());
         assertEquals(0, sem3.availablePermits());
 
         // 3 should become the leader now
-        zk2.close();
+        elector2.shutdown(); zk2.close();
         assertTrue(sem3.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector3.isLeader());
 
-        zk3.close();
+        elector3.shutdown(); zk3.close();
     }
+
+    @Test
+    public void testLeaderFailoverHarder() throws Exception {
+        // as above but put multiple failed nodes between the new and previous?
+        ZooKeeper zk = getClient(0);
+        ZooKeeper zk2 = getClient(1);
+        ZooKeeper zk3 = getClient(2);
+        ZooKeeper zk4 = getClient(3);
+
+        zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        final Semaphore sem2 = new Semaphore(0);
+        LeaderNoticeHandler r2 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem2.release();
+            }
+
+            @Override
+            public void noticedTopologyChange(boolean added, boolean removed) {}
+        };
+        final Semaphore sem3 = new Semaphore(0);
+        LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem3.release();
+            }
+
+            @Override
+            public void noticedTopologyChange(boolean added, boolean removed) {}
+        };
+        final Semaphore sem4 = new Semaphore(0);
+        LeaderNoticeHandler r4 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem4.release();
+            }
+
+            @Override
+            public void noticedTopologyChange(boolean added, boolean removed) {}
+        };
+
+        LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", new byte[0], r2);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", new byte[0], r3);
+        LeaderElector elector4 = new LeaderElector(zk4, "/election", "node", new byte[0], r4);
+        elector1.start(true);
+        elector2.start(true);
+        elector3.start(true);
+        elector4.start(true);
+
+        assertTrue(elector1.isLeader());
+        assertFalse(elector2.isLeader());
+        assertFalse(elector3.isLeader());
+        assertFalse(elector4.isLeader());
+
+        // 4 should become the leader
+        elector3.shutdown(); zk3.close();
+        elector2.shutdown(); zk2.close();
+        elector1.shutdown(); zk.close();
+
+
+        assertTrue(sem4.tryAcquire(5, TimeUnit.SECONDS));
+        assertTrue(elector4.isLeader());
+
+        // cleanup.
+        elector4.shutdown(); zk4.close();
+    }
+
+    @Test
+    public void testLeaderFailoverHoles() throws Exception {
+        // as above but put multiple failed nodes between the new and previous?
+        ZooKeeper zk0 = getClient(0);
+        ZooKeeper zk1 = getClient(1);
+        ZooKeeper zk2 = getClient(2);
+        ZooKeeper zk3 = getClient(3);
+        ZooKeeper zk4 = getClient(4);
+        ZooKeeper zk5 = getClient(5);
+        ZooKeeper zk6 = getClient(6);
+        ZooKeeper zk7 = getClient(7);
+
+        zk0.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        final Semaphore sem1 = new Semaphore(0);
+        LeaderNoticeHandler r1 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem1.release();
+            }
+
+            @Override
+            public void noticedTopologyChange(boolean added, boolean removed) {
+            }
+        };
+        final Semaphore sem7 = new Semaphore(0);
+        LeaderNoticeHandler r7 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem7.release();
+            }
+
+            @Override
+            public void noticedTopologyChange(boolean added, boolean removed) {
+            }
+        };
+
+        LeaderElector elector0 = new LeaderElector(zk0, "/election", "node", new byte[0], null);
+        LeaderElector elector1 = new LeaderElector(zk1, "/election", "node", new byte[0], r1);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", new byte[0], null);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", new byte[0], null);
+        LeaderElector elector4 = new LeaderElector(zk4, "/election", "node", new byte[0], null);
+        LeaderElector elector5 = new LeaderElector(zk5, "/election", "node", new byte[0], null);
+        LeaderElector elector6 = new LeaderElector(zk6, "/election", "node", new byte[0], null);
+        LeaderElector elector7 = new LeaderElector(zk7, "/election", "node", new byte[0], r7);
+
+        elector0.start(true);
+        elector1.start(true);
+        elector2.start(true);
+        elector3.start(true);
+        elector4.start(true);
+        elector5.start(true);
+        elector6.start(true);
+        elector7.start(true);
+
+        assertTrue(elector0.isLeader());
+        assertFalse(elector1.isLeader());
+        assertFalse(elector2.isLeader());
+        assertFalse(elector3.isLeader());
+        assertFalse(elector4.isLeader());
+        assertFalse(elector5.isLeader());
+        assertFalse(elector6.isLeader());
+        assertFalse(elector7.isLeader());
+
+        // 4 should become the leader
+        elector6.shutdown(); zk6.close();
+        elector4.shutdown(); zk4.close();
+        elector2.shutdown(); zk2.close();
+        elector0.shutdown(); zk0.close();
+
+        assertTrue(sem1.tryAcquire(5, TimeUnit.SECONDS));
+        assertTrue(elector1.isLeader());
+        assertFalse(elector3.isLeader());
+        assertFalse(elector5.isLeader());
+        assertFalse(elector7.isLeader());
+
+        elector5.shutdown(); zk5.close();
+        elector3.shutdown(); zk3.close();
+        elector1.shutdown(); zk1.close();
+        assertTrue(sem7.tryAcquire(5, TimeUnit.SECONDS));
+        assertTrue(elector7.isLeader());
+
+        // cleanup.
+        elector7.shutdown(); zk7.close();
+    }
+
 
     @Test
     public void testNonLeaderFailure() throws Exception {
@@ -328,6 +573,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem3.release();
             }
+
+            @Override
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
@@ -342,17 +590,17 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector3.isLeader());
 
         // 1 is still the leader
-        zk2.close();
+        elector2.shutdown(); zk2.close();
         assertTrue(elector1.isLeader());
         assertFalse(elector3.isLeader());
 
         // 3 should become the leader now
-        zk.close();
+        elector1.shutdown(); zk.close();
         assertTrue(sem3.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector3.isLeader());
         assertEquals(0, sem3.availablePermits());
 
-        zk3.close();
+        elector3.shutdown(); zk3.close();
     }
 
     @Test
@@ -363,5 +611,17 @@ public class TestZK extends ZKTestBase {
         zk.create("/bar", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         zk.create("/foo", bytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         zk.getData("/foo", false, null);
+    }
+
+    @Test
+    public void testRecursivelyDelete() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        zk.create("/a", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create("/a/b", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create("/a/b/c", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        ZKUtil.deleteRecursively(zk, "/a");
+        assertNull(zk.exists("/a", false));
     }
 }

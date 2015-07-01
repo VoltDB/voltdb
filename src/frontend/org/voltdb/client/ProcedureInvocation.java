@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -21,9 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  * Client stored procedure invocation object. Server uses an internal
@@ -38,24 +36,30 @@ public class ProcedureInvocation {
 
     // used for replicated procedure invocations
     private final long m_originalTxnId;
+    private final long m_originalUniqueId;
     private final ProcedureInvocationType m_type;
 
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
-        this(-1, handle, procName, parameters);
+        this(-1, -1, handle, procName, parameters);
     }
 
-    ProcedureInvocation(long originalTxnId, long handle,
+    ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
                         String procName, Object... parameters) {
         super();
         m_originalTxnId = originalTxnId;
+        m_originalUniqueId = originalUniqueId;
         m_clientHandle = handle;
         m_procName = procName;
-        m_parameters = new ParameterSet();
-        m_parameters.setParameters(parameters);
+        m_parameters = (parameters != null
+                            ? ParameterSet.fromArrayWithCopy(parameters)
+                            : ParameterSet.emptyParameterSet());
 
         // auto-set the type if both txn IDs are set
-        m_type = (m_originalTxnId == -1 ? ProcedureInvocationType.ORIGINAL
-                                        : ProcedureInvocationType.REPLICATED);
+        if (m_originalTxnId == -1 && m_originalUniqueId == -1) {
+            m_type = ProcedureInvocationType.ORIGINAL;
+        } else {
+            m_type = ProcedureInvocationType.REPLICATED;
+        }
     }
 
     /** return the clientHandle value */
@@ -72,17 +76,26 @@ public class ProcedureInvocation {
             m_procNameBytes = m_procName.getBytes("UTF-8");
         } catch (Exception e) {/*No UTF-8? Really?*/}
         int size =
-            1 + (m_type == ProcedureInvocationType.REPLICATED ? 8 : 0) +
+            1 + (m_type == ProcedureInvocationType.REPLICATED ? 16 : 0) +
             m_procNameBytes.length + 4 + 8 + m_parameters.getSerializedSize();
         return size;
+    }
+
+    public int getPassedParamCount() {
+        return m_parameters.size();
+    }
+
+    public Object getPartitionParamValue(int index) {
+        return m_parameters.getParam(index);
     }
 
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(m_type.getValue());//Version
         if (m_type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(m_originalTxnId);
+            buf.putLong(m_originalUniqueId);
         }
-        FastSerializer.writeString(m_procNameBytes, buf);
+        SerializationHelper.writeVarbinary(m_procNameBytes, buf);
         buf.putLong(m_clientHandle);
         m_parameters.flattenToBuffer(buf);
         return buf;

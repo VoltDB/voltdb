@@ -52,19 +52,19 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="JOIN">
-        <level value="INFO"/>
-    </logger -->
-
     <!-- logger name="COMPILER">
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHOCPLANNERTHREAD">
+    <!-- logger name="ADHOC">
         <level value="INFO"/>
     </logger -->
 
     <!-- logger name="EXPORT">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="IMPORT">
         <level value="INFO"/>
     </logger -->
 
@@ -76,24 +76,42 @@
         <level value="TRACE"/>
     </logger -->
 
-    <!-- Always let dragent to write to the console. -->
-    <logger name="DRAGENT">
+    <!-- logger name="TM">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="REJOIN">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="SNAPSHOT">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="GC">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="DRAGENT">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="DR">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="DBBPOOL">
+        <level value="TRACE"/>
+    </logger -->
+
+    <!-- Always let CSVLoader and its ilk to write to the console. -->
+    <logger name="CSVLOADER">
         <level value="INFO"/>
         <appender-ref ref="console"/>
     </logger>
 
-    <!-- Always let dragent to write to the console. -->
-    <logger name="DRSTATS">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-
-    <logger name="TM">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-
-    <logger name="REJOIN">
+    <!-- Always let the bulk loader and its ilk to write to the console. -->
+    <logger name="LOADER">
         <level value="INFO"/>
         <appender-ref ref="console"/>
     </logger>

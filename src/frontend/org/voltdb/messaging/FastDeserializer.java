@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,9 +25,8 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -69,9 +68,15 @@ public class FastDeserializer implements DataInput {
         assert(buffer.order() == ByteOrder.BIG_ENDIAN);
     }
 
-    /** Reset this FastDeserializer and make it ready for more reads. */
+    /**
+     *  Reset this FastDeserializer and make it ready for more reads. This will set the first 4 bytes to 0
+     *  so that you can differentiate between no results and the last set of results that were placed
+     *  in the buffer used by this FastDeserializer
+     **/
     public void clear() {
+        //Don't rely on the EE to set the value to 0 when there are no results
         buffer.clear();
+        buffer.putInt(0, 0);
     }
 
     /** @return The byte buffer contained in this object. */
@@ -99,18 +104,11 @@ public class FastDeserializer implements DataInput {
      * @return A derserialized object.
      * @throws IOException Rethrows any IOExceptions thrown.
      */
-    @SuppressWarnings("unchecked")
     public <T extends FastSerializable> T readObject(final Class<T> expectedType) throws IOException {
         assert(expectedType != null);
         T obj = null;
         try {
-            // Since VoltTable has no empty ctor, special case it
-            if (expectedType == VoltTable.class) {
-                obj = (T) PrivateVoltTableFactory.createUninitializedVoltTable();
-            }
-            else {
-                obj = expectedType.newInstance();
-            }
+            obj = expectedType.newInstance();
             obj.readExternal(this);
         } catch (final InstantiationException e) {
             e.printStackTrace();
@@ -182,30 +180,24 @@ public class FastDeserializer implements DataInput {
      * @throws IOException Rethrows any IOExceptions.
      */
     public String readString() throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
-
         final int len = readInt();
 
         // check for null string
-        if (len == NULL_STRING_INDICATOR)
+        if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
-        assert len >= 0;
+        }
 
-        if (len < NULL_STRING_INDICATOR) {
+        if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("String length is negative " + len);
+        }
+        if (len > buffer.remaining()) {
+            throw new IOException("String length is bigger than total buffer " + len);
         }
 
         // now assume not null
         final byte[] strbytes = new byte[len];
         readFully(strbytes);
-        String retval = null;
-        try {
-            retval = new String(strbytes, "UTF-8");
-        } catch (final UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-
-        return retval;
+        return new String(strbytes, Constants.UTF8ENCODING);
     }
 
     /**
@@ -216,17 +208,19 @@ public class FastDeserializer implements DataInput {
      * @throws IOException Rethrows any IOExceptions.
      */
     public byte[] readVarbinary() throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
-
         final int len = readInt();
 
         // check for null string
-        if (len == NULL_STRING_INDICATOR)
+        if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
+        }
         assert len >= 0;
 
-        if (len < NULL_STRING_INDICATOR) {
+        if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("Varbinary length is negative " + len);
+        }
+        if (len > buffer.remaining()) {
+            throw new IOException("Varbinary length is bigger than total buffer " + len);
         }
 
         // now assume not null
@@ -241,7 +235,7 @@ public class FastDeserializer implements DataInput {
      * @throws IOException
      */
     public BigDecimal readBigDecimal() throws IOException {
-        return VoltDecimalHelper.deserializeBigDecimal(this);
+        return VoltDecimalHelper.deserializeBigDecimal(buffer);
     }
 
     /**

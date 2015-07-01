@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,6 +31,7 @@ import java.io.LineNumberReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.Arrays;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
@@ -41,6 +42,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.InMemoryJarfile.JarLoader;
 
 public class TestInMemoryJarfile extends TestCase {
 
@@ -48,7 +50,7 @@ public class TestInMemoryJarfile extends TestCase {
     protected Catalog m_catalog;
     protected Database m_catalogDb;
 
-    private Catalog createTestJarFile(String jarFileName, boolean adhoc)
+    private Catalog createTestJarFile(String jarFileName, boolean adhoc, String elemPfx)
     {
         String schemaPath = "";
         try {
@@ -58,31 +60,36 @@ public class TestInMemoryJarfile extends TestCase {
             e.printStackTrace();
             System.exit(-1);
         }
-        String simpleProject =
+        String simpleProjectTmpl =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             "<database name='database'>" +
-            "<groups>" +
-            "<group adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='true'/>" +
-            "</groups>" +
+            "<%ss>" +
+            "<%s adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='false'/>" +
+            "</%ss>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
             "<partitions><partition table='WAREHOUSE' column='W_ID' /></partitions>" +
             "</database>" +
             "</project>";
+        String simpleProject = String.format(simpleProjectTmpl, elemPfx, elemPfx, elemPfx);
         System.out.println(simpleProject);
         File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
         String projectPath = projectFile.getPath();
         VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compile(projectPath, jarFileName));
+        assertTrue(compiler.compileWithProjectXML(projectPath, jarFileName));
         return compiler.getCatalog();
+    }
+
+    private Catalog createTestJarFile(String jarFileName, boolean adhoc) {
+        return createTestJarFile(jarFileName, adhoc, "role");
     }
 
     @Override
     protected void setUp() throws Exception {
         System.out.print("START: " + System.currentTimeMillis());
         super.setUp();
-        m_catalog = createTestJarFile("testout.jar", true);
+        m_catalog = createTestJarFile("testout.jar", true, "role");
         assertNotNull(m_catalog);
         m_catalogDb = m_catalog.getClusters().get("cluster").getDatabases().get("database");
         assertNotNull(m_catalogDb);
@@ -137,23 +144,15 @@ public class TestInMemoryJarfile extends TestCase {
         // Create a second jarfile with identical contents
         // Sleep for 5 seconds so the timestamps will differ
         // and cause different global CRCs
+        // Use "group*" element names for backward compatibility test.
         Thread.sleep(5000);
         createTestJarFile("testout-dupe.jar", true);
-        long crc1 = new InMemoryJarfile("testout.jar").getCRC();
+        long crc1 = new InMemoryJarfile(m_jarPath).getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertEquals(crc1, crc2);
-
-        // Check the modification times and make sure
-        // that they differ in the two jars
-        JarInputStream j_in = new JarInputStream(new FileInputStream("testout.jar"));
-        JarEntry entry = j_in.getNextJarEntry();
-        long time1 = entry.getTime();
-        j_in.close();
-
-        j_in = new JarInputStream(new FileInputStream("testout-dupe.jar"));
-        entry = j_in.getNextJarEntry();
-        long time2 = entry.getTime();
-        assertFalse(time1 == time2);
+        byte[] sha1 = new InMemoryJarfile(m_jarPath).getSha1Hash();
+        byte[] sha2 = new InMemoryJarfile("testout-dupe.jar").getSha1Hash();
+        assertTrue(Arrays.equals(sha1, sha2));
     }
 
     public void testDifferentJarContentsDontMatchCRCs()
@@ -167,5 +166,28 @@ public class TestInMemoryJarfile extends TestCase {
         long crc1 = new InMemoryJarfile("testout.jar").getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertFalse(crc1 == crc2);
+        byte[] sha1 = new InMemoryJarfile(m_jarPath).getSha1Hash();
+        byte[] sha2 = new InMemoryJarfile("testout-dupe.jar").getSha1Hash();
+        assertFalse(Arrays.equals(sha1, sha2));
+    }
+
+    public void testJarfileRemoveClassRemovesInnerClasses() throws Exception
+    {
+        InMemoryJarfile dut = new InMemoryJarfile();
+        // Add a class file that we know has inner classes
+        // Someday this seems like it should be an operation directly on InMemoryJarfile
+        VoltCompiler comp = new VoltCompiler();
+        // This will pull in all the inner classes (currently 4 of them), but check anyway
+        comp.addClassToJar(dut, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+        JarLoader loader = dut.getLoader();
+        assertEquals(5, loader.getClassNames().size());
+        System.out.println(loader.getClassNames());
+        assertTrue(loader.getClassNames().contains("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerNotPublic"));
+        assertTrue(dut.get("org/voltdb_testprocs/updateclasses/InnerClassesTestProc$InnerNotPublic.class") != null);
+
+        // Now, remove the outer class and verify that all the inner classes go away.
+        dut.removeClassFromJar("org.voltdb_testprocs.updateclasses.InnerClassesTestProc");
+        assertTrue(loader.getClassNames().isEmpty());
+        assertTrue(dut.get("org/voltdb_testprocs/updateclasses/InnerClassesTestProc$InnerNotPublic.class") == null);
     }
 }

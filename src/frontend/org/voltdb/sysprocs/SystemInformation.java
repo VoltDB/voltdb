@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,28 +19,40 @@ package org.voltdb.sysprocs;
 
 import java.io.File;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.log4j.Logger;
+import org.apache.log4j.net.SocketHubAppender;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * Access key/value tables of cluster info that correspond to the REST
@@ -91,7 +103,7 @@ public class SystemInformation extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             if (context.isLowestSiteId())
             {
-                result = populateOverviewTable(context);
+                result = populateOverviewTable();
             }
             else
             {
@@ -104,7 +116,7 @@ public class SystemInformation extends VoltSystemProcedure
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationOverviewAggregate)
         {
-            VoltTable result = unionTables(dependencies.get(DEP_DISTRIBUTE));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_DISTRIBUTE));
             return new DependencyPair(DEP_AGGREGATE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationDeployment)
@@ -114,7 +126,7 @@ public class SystemInformation extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             if (context.isLowestSiteId())
             {
-                result = populateDeploymentProperties(context);
+                result = populateDeploymentProperties(context.getCluster(), context.getDatabase());
             }
             else
             {
@@ -264,7 +276,7 @@ public class SystemInformation extends VoltSystemProcedure
         spf[0].outputDepId = DEP_DISTRIBUTE;
         spf[0].inputDepIds = new int[] {};
         spf[0].multipartition = true;
-        spf[0].parameters = new ParameterSet();
+        spf[0].parameters = ParameterSet.emptyParameterSet();
 
         spf[1] = new SynthesizedPlanFragment();
         spf[1] = new SynthesizedPlanFragment();
@@ -272,7 +284,7 @@ public class SystemInformation extends VoltSystemProcedure
         spf[1].outputDepId = DEP_AGGREGATE;
         spf[1].inputDepIds = new int[] { DEP_DISTRIBUTE };
         spf[1].multipartition = false;
-        spf[1].parameters = new ParameterSet();
+        spf[1].parameters = ParameterSet.emptyParameterSet();
 
         return executeSysProcPlanFragments(spf, DEP_AGGREGATE);
     }
@@ -286,8 +298,7 @@ public class SystemInformation extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_systemInformationDeployment;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        //pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         // create a work fragment to aggregate the results.
         pfs[0] = new SynthesizedPlanFragment();
@@ -295,7 +306,7 @@ public class SystemInformation extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_systemInformationAggregate;
         pfs[0].inputDepIds = new int[]{DEP_systemInformationDeployment};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -316,35 +327,96 @@ public class SystemInformation extends VoltSystemProcedure
      * This function does the real work. Everything else is
      * boilerplate sysproc stuff.
      */
-    private VoltTable populateOverviewTable(SystemProcedureExecutionContext context) {
+    static public VoltTable populateOverviewTable()
+    {
         VoltTable vt = constructOverviewTable();
         int hostId = VoltDB.instance().getHostMessenger().getHostId();
 
+        // try to get the external interface first, if none was set, use local addresses
+        InetAddress addr = null;
+        String clientInterface = null;
+        int clientPort = VoltDB.DEFAULT_PORT;
+        String adminInterface = null;
+        int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
+        String httpInterface = null;
+        int httpPort = VoltDB.DEFAULT_HTTP_PORT;
+        String internalInterface = null;
+        int internalPort = VoltDB.DEFAULT_INTERNAL_PORT;
+        String zkInterface = null;
+        int zkPort = VoltDB.DEFAULT_ZK_PORT;
+        String drInterface = null;
+        int drPort = VoltDB.DEFAULT_DR_PORT;
+        String publicInterface = null;
+        try {
+            String localMetadata = VoltDB.instance().getLocalMetadata();
+            JSONObject jsObj = new JSONObject(localMetadata);
+            JSONArray interfaces = jsObj.getJSONArray("interfaces");
+            String iface = interfaces.getString(0);
+            addr = InetAddress.getByName(iface);
+            clientPort = jsObj.getInt("clientPort");
+            clientInterface = jsObj.getString("clientInterface");
+            adminPort = jsObj.getInt("adminPort");
+            adminInterface = jsObj.getString("adminInterface");
+            httpPort = jsObj.getInt("httpPort");
+            httpInterface = jsObj.getString("httpInterface");
+            internalPort = jsObj.getInt("internalPort");
+            internalInterface = jsObj.getString("internalInterface");
+            zkPort = jsObj.getInt("zkPort");
+            zkInterface = jsObj.getString("zkInterface");
+            drPort = jsObj.getInt("drPort");
+            drInterface = jsObj.getString("drInterface");
+            publicInterface = jsObj.getString("publicInterface");
+        } catch (JSONException e) {
+            hostLog.info("Failed to get local metadata, falling back to first resolvable IP address.");
+        } catch (UnknownHostException e) {
+            hostLog.info("Failed to determine hostname, falling back to first resolvable IP address.");
+        }
+
         // host name and IP address.
-        InetAddress addr = org.voltcore.utils.CoreUtils.getLocalAddress();
+        if (addr == null) {
+            addr = org.voltcore.utils.CoreUtils.getLocalAddress();
+        }
         vt.addRow(hostId, "IPADDRESS", addr.getHostAddress());
-        vt.addRow(hostId, "HOSTNAME", addr.getHostName());
+        vt.addRow(hostId, "HOSTNAME", CoreUtils.getHostnameOrAddress());
+        vt.addRow(hostId, "CLIENTINTERFACE", clientInterface);
+        vt.addRow(hostId, "CLIENTPORT", Integer.toString(clientPort));
+        vt.addRow(hostId, "ADMININTERFACE", adminInterface);
+        vt.addRow(hostId, "ADMINPORT", Integer.toString(adminPort));
+        vt.addRow(hostId, "HTTPINTERFACE", httpInterface);
+        vt.addRow(hostId, "HTTPPORT", Integer.toString(httpPort));
+        vt.addRow(hostId, "INTERNALINTERFACE", internalInterface);
+        vt.addRow(hostId, "INTERNALPORT", Integer.toString(internalPort));
+        vt.addRow(hostId, "ZKINTERFACE", zkInterface);
+        vt.addRow(hostId, "ZKPORT", Integer.toString(zkPort));
+        vt.addRow(hostId, "DRINTERFACE", drInterface);
+        vt.addRow(hostId, "DRPORT", Integer.toString(drPort));
+        vt.addRow(hostId, "PUBLICINTERFACE", publicInterface);
 
         // build string
         vt.addRow(hostId, "BUILDSTRING", VoltDB.instance().getBuildString());
 
         // version
         vt.addRow(hostId, "VERSION", VoltDB.instance().getVersionString());
-
         // catalog path
         String path = VoltDB.instance().getConfig().m_pathToCatalog;
-        if (!path.startsWith("http"))
+        if (path != null && !path.startsWith("http"))
             path = (new File(path)).getAbsolutePath();
         vt.addRow(hostId, "CATALOG", path);
 
         // deployment path
         path = VoltDB.instance().getConfig().m_pathToDeployment;
-        if (!path.startsWith("http"))
+        if (path != null && !path.startsWith("http"))
             path = (new File(path)).getAbsolutePath();
         vt.addRow(hostId, "DEPLOYMENT", path);
 
         String cluster_state = VoltDB.instance().getMode().toString();
         vt.addRow(hostId, "CLUSTERSTATE", cluster_state);
+        // INITIALIZED, used by VEM to determine the spinny icon state.
+        org.voltdb.OperationMode mode = VoltDB.instance().getMode();
+        String areInitialized = Boolean.toString(!VoltDB.instance().rejoining() &&
+                (mode == org.voltdb.OperationMode.RUNNING ||
+                        mode == org.voltdb.OperationMode.PAUSED));
+        vt.addRow(hostId, "INITIALIZED", areInitialized);
 
         String replication_role = VoltDB.instance().getReplicationRole().toString();
         vt.addRow(hostId, "REPLICATIONROLE", replication_role);
@@ -354,43 +426,53 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "CATALOGCRC",
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
-        if (VoltDB.instance().isIV2Enabled()) {
-            vt.addRow(hostId, "IV2ENABLED", "true");
+        vt.addRow(hostId, "IV2ENABLED", "true");
+        long startTimeMs = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
+        vt.addRow(hostId, "STARTTIME", Long.toString(startTimeMs));
+        vt.addRow(hostId, "UPTIME", MiscUtils.formatUptime(VoltDB.instance().getClusterUptime()));
+
+        SocketHubAppender hubAppender =
+            (SocketHubAppender) Logger.getRootLogger().getAppender("hub");
+        int port = 0;
+        if (hubAppender != null)
+            port = hubAppender.getPort();
+        vt.addRow(hostId, "LOG4JPORT", Integer.toString(port));
+        //Add license information
+        if (MiscUtils.isPro()) {
+            vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
 
         return vt;
     }
 
-    private VoltTable
-    populateDeploymentProperties(SystemProcedureExecutionContext context)
+    static public VoltTable populateDeploymentProperties(Cluster cluster, Database database)
     {
         VoltTable results = new VoltTable(clusterInfoSchema);
         // it would be awesome if these property names could come
         // from the RestApiDescription.xml (or the equivalent thereof) someday --izzy
-        results.addRow("voltdbroot", context.getCluster().getVoltroot());
+        results.addRow("voltdbroot", cluster.getVoltroot());
 
-        Deployment deploy = context.getCluster().getDeployment().get("deployment");
+        Deployment deploy = cluster.getDeployment().get("deployment");
         results.addRow("hostcount", Integer.toString(deploy.getHostcount()));
         results.addRow("kfactor", Integer.toString(deploy.getKfactor()));
         results.addRow("sitesperhost", Integer.toString(deploy.getSitesperhost()));
 
         String http_enabled = "false";
-        int http_port = context.getCluster().getHttpdportno();
-        if (http_port != -1)
-        {
+        int http_port = VoltDB.instance().getConfig().m_httpPort;
+        if (http_port != -1 && http_port != Integer.MAX_VALUE) {
             http_enabled = "true";
             results.addRow("httpport", Integer.toString(http_port));
         }
         results.addRow("httpenabled", http_enabled);
 
         String json_enabled = "false";
-        if (context.getCluster().getJsonapi())
+        if (cluster.getJsonapi())
         {
             json_enabled = "true";
         }
         results.addRow("jsonenabled", json_enabled);
 
-        SnapshotSchedule snaps = context.getDatabase().getSnapshotschedule().get("default");
+        SnapshotSchedule snaps = database.getSnapshotschedule().get("default");
         String snap_enabled = "false";
         if (snaps != null && snaps.getEnabled())
         {
@@ -403,23 +485,25 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("snapshotenabled", snap_enabled);
 
-        Connector export_conn = context.getDatabase().getConnectors().get("0");
         String export_enabled = "false";
-        if (export_conn != null && export_conn.getEnabled())
-        {
-            export_enabled = "true";
-            results.addRow("exportoverflowpath", context.getCluster().getExportoverflow());
+        for (Connector export_conn : database.getConnectors()) {
+            if (export_conn != null && export_conn.getEnabled())
+            {
+                export_enabled = "true";
+                results.addRow("exportoverflowpath", cluster.getExportoverflow());
+                break;
+            }
         }
         results.addRow("export", export_enabled);
 
         String partition_detect_enabled = "false";
-        if (context.getCluster().getNetworkpartition())
+        if (cluster.getNetworkpartition())
         {
             partition_detect_enabled = "true";
             String partition_detect_snapshot_path =
-                context.getCluster().getFaultsnapshots().get("CLUSTER_PARTITION").getPath();
+                cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPath();
             String partition_detect_snapshot_prefix =
-                context.getCluster().getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
+                cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
             results.addRow("snapshotpath",
                            partition_detect_snapshot_path);
             results.addRow("partitiondetectionsnapshotprefix",
@@ -427,11 +511,11 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("partitiondetection", partition_detect_enabled);
 
-        results.addRow("heartbeattimeout", Integer.toString(context.getCluster().getHeartbeattimeout()));
+        results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
 
-        results.addRow("adminport", Integer.toString(context.getCluster().getAdminport()));
+        results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
         String adminstartup = "false";
-        if (context.getCluster().getAdminstartup())
+        if (cluster.getAdminstartup())
         {
             adminstartup = "true";
         }
@@ -439,7 +523,7 @@ public class SystemInformation extends VoltSystemProcedure
 
         String command_log_enabled = "false";
         // log name is MAGIC, you knoooow
-        CommandLog command_log = context.getCluster().getLogconfig().get("log");
+        CommandLog command_log = cluster.getLogconfig().get("log");
         if (command_log.getEnabled())
         {
             command_log_enabled = "true";
@@ -463,7 +547,7 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("commandlogenabled", command_log_enabled);
 
         String users = "";
-        for (User user : context.getDatabase().getUsers())
+        for (User user : database.getUsers())
         {
             users += addEscapes(user.getTypeName());
             if (user.getGroups() != null && user.getGroups().size() > 0)
@@ -480,10 +564,19 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("users", users);
 
+        // Add system setting information also
+        // the attribute names follows the above naming rule
+        Systemsettings sysSettings = deploy.getSystemsettings().get("systemsettings");
+        results.addRow("elasticduration", Integer.toString(sysSettings.getElasticduration()));
+        results.addRow("elasticthroughput", Integer.toString(sysSettings.getElasticthroughput()));
+        results.addRow("snapshotpriority", Integer.toString(sysSettings.getSnapshotpriority()));
+        results.addRow("temptablesmaxsize", Integer.toString(sysSettings.getTemptablemaxsize()));
+        results.addRow("querytimeout", Integer.toString(sysSettings.getQuerytimeout()));
+
         return results;
     }
 
-    private String addEscapes(String name)
+    static private String addEscapes(String name)
     {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < name.length(); i++)

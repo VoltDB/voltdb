@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,25 +23,17 @@
 
 package org.voltdb;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.UnknownHostException;
-
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.MiscUtils;
 
 public class TestHSQLBackend extends TestCase {
-
+/*
     public void testAdHocEmptyQuery() throws Exception {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
@@ -140,18 +132,58 @@ public class TestHSQLBackend extends TestCase {
         server.join();
         client.close();
     }
-
+*/
     public void testVarbinary() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
-            "b varbinary default null, " +
+            "b varbinary(1) default null, " +
             "PRIMARY KEY(ival));";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("hsqldbbin.jar"), 1, 1, 0);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("hsqldbbin.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("hsqldbbin.xml");
+        config.m_backend = BackendTarget.HSQLDB_BACKEND;
+        config.m_noLoadLibVOLTDB = true;
+        ServerThread localServer = new ServerThread(config);
+        localServer.start();
+        localServer.waitForInitialization();
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a' });
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        // stop execution
+        VoltDB.instance().shutdown(localServer);
+    }
+/*
+    public void testTimestamp() throws Exception {
+        // ts1_millis is used for the default value, ts2_millis is inserted directly.
+        long ts1_millis = 1346794571099L;
+        long ts2_millis = 8503056615029L;
+
+        // The schema default timestamp value is specified as millis.
+        String simpleSchema = String.format(
+            "create table blah (" +
+            "ival bigint default 0 not null, " +
+            "ts timestamp default %d, " +
+            "PRIMARY KEY(ival));", ts1_millis);
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addPartitionInfo("blah", "ival");
+        builder.addStmtProcedure("InsertFull", "insert into blah values (?, ?);", null);
+        builder.addStmtProcedure("InsertDefault", "insert into blah (ival) values (?);", null);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("hsqldbbin.jar"), 1, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
@@ -167,10 +199,29 @@ public class TestHSQLBackend extends TestCase {
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
 
-        ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a' });
+        ClientResponse cr;
+        VoltTable vt;
+
+        // Note: All direct HSQL input and output timestamp values are in nanos.
+
+        cr = client.callProcedure("InsertDefault", 1);
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        cr = client.callProcedure("InsertFull", 2, ts2_millis * 1000);
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        cr = client.callProcedure("@AdHoc", "SELECT ts FROM blah WHERE ival = 1;");
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        assertEquals(ts1_millis * 1000, vt.getTimestampAsLong(0));
+
+        cr = client.callProcedure("@AdHoc", "SELECT ts FROM blah WHERE ival = 2;");
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        assertEquals(ts2_millis * 1000, vt.getTimestampAsLong(0));
 
         // stop execution
         VoltDB.instance().shutdown(localServer);
-    }
+    }*/
 }

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,12 +19,13 @@ package org.voltdb.compiler;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.common.Constants;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.CorePlan;
 
 /**
  * Holds the plan and original SQL source for a single statement.
@@ -32,127 +33,75 @@ import org.voltdb.planner.CompiledPlan;
  * Will typically be contained by AdHocPlannedStmtBatch. Both this class and the batch extend
  * AsyncCompilerResult to allow working at either the batch or the individual statement level.
  */
-public class AdHocPlannedStatement implements Cloneable {
-    public byte[] sql;
-    public byte[] aggregatorFragment = null;
-    public byte[] collectorFragment = null;
-    public boolean isReplicatedTableDML;
-    public boolean isNonDeterministic;
-    public boolean readOnly;
-    public int catalogVersion;
-    public VoltType[] parameterTypes;
-    public ParameterSet extractedParamValues;
-    public Object partitionParam; // not serialized
-
-    AdHocPlannedStatement(CompiledPlan plan) {
-        sql = plan.sql.getBytes(VoltDB.UTF8ENCODING);
-        aggregatorFragment = CompiledPlan.bytesForPlan(plan.rootPlanGraph);
-        collectorFragment = CompiledPlan.bytesForPlan(plan.subPlanGraph);
-        isReplicatedTableDML = plan.replicatedTableDML;
-        isNonDeterministic = (!plan.isContentDeterministic()) || (!plan.isOrderDeterministic());
-        catalogVersion = -1;
-        parameterTypes = plan.parameters;
-        extractedParamValues = plan.extractedParamValues;
-        readOnly = plan.readOnly;
-        partitionParam = plan.getPartitioningKey();
-
-        validate();
-    }
+public class AdHocPlannedStatement {
+    public final CorePlan core;
+    public final byte[] sql;
+    private final ParameterSet extractedParamValues;
+    private final int[] boundParamIndexes;
+    private String[] boundParamStrings;
 
     /***
      * Constructor
      *
-     * @param sql                       SQL statement source
-     * @param aggregatorFragment        planned aggregator fragment
-     * @param collectorFragment         planned collector fragment
-     * @param isReplicatedTableDML      replication flag
-     * @param isNonDeterministic        non-deterministic SQL flag
-     * @param isReadOnly                does it write
-     * @param paramTypes                parameter type array
+     * @param sql                       bytes of sql string (utf-8)
+     * @param core                      core immutable plan
      * @param extractedParamValues      params extracted from constant values
-     * @param catalogVersion            catalog version
+     * @param partitionParam            value used for partitioning
      */
-    public AdHocPlannedStatement(byte[] sql,
-                                 byte[] aggregatorFragment,
-                                 byte[] collectorFragment,
-                                 boolean isReplicatedTableDML,
-                                 boolean isNonDeterministic,
-                                 boolean isReadOnly,
-                                 VoltType[] paramTypes,
-                                 ParameterSet extractedParamValues,
-                                 int catalogVersion) {
+    AdHocPlannedStatement(byte[] sql,
+                          CorePlan core,
+                          ParameterSet extractedParamValues,
+                          int[] boundParamIndexes) {
         this.sql = sql;
-        this.aggregatorFragment = aggregatorFragment;
-        this.collectorFragment = collectorFragment;
-        this.isReplicatedTableDML = isReplicatedTableDML;
-        this.isNonDeterministic = isNonDeterministic;
-        this.readOnly = isReadOnly;
-        this.parameterTypes = paramTypes;
+        this.core = core;
         this.extractedParamValues = extractedParamValues;
-        this.catalogVersion = catalogVersion;
-
-        // as this constructor is used for deserializaton on the proc-running side,
-        // no partitioning param object is needed
+        this.boundParamIndexes = boundParamIndexes;
 
         validate();
     }
 
-    private void validate() {
-        assert(aggregatorFragment != null);
+    AdHocPlannedStatement(CompiledPlan plan, CorePlan coreIn) {
+        this(plan.sql.getBytes(Constants.UTF8ENCODING), coreIn,
+             plan.extractedParamValues(), plan.boundParamIndexes());
+    }
 
-        // nondet => readonly
-        assert((isNonDeterministic == false) || (readOnly == true));
+    AdHocPlannedStatement(AdHocPlannedStatement original, CorePlan coreIn) {
+        this(original.sql, coreIn, original.extractedParamValues, null);
+    }
+
+    private void validate() {
+        assert(core != null);
+        assert(core.aggregatorFragment != null);
 
         // dml => !readonly
-        assert((isReplicatedTableDML == false) || (readOnly == false));
+        assert((core.isReplicatedTableDML == false) || (core.readOnly == false));
 
         // repdml => 2partplan
-        assert((isReplicatedTableDML == false) || (collectorFragment != null));
+        assert((core.isReplicatedTableDML == false) || (core.collectorFragment != null));
 
         // zero param types => null extracted params
         // nonzero param types => param types and extracted params have same size
-        assert(parameterTypes != null);
+        assert(core.parameterTypes != null);
         assert(extractedParamValues != null);
         // any extracted params => extracted param size == param type array size
-        assert((extractedParamValues.size() == 0) || (extractedParamValues.size() == parameterTypes.length));
+        assert((extractedParamValues.size() == 0) ||
+                (extractedParamValues.size() == core.parameterTypes.length));
     }
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("COMPILED PLAN {\n");
-        sb.append("  SQL: ").append((sql != null) ? new String(sql, VoltDB.UTF8ENCODING) : "null").append("\n");
-        sb.append("  ONE: ").append(aggregatorFragment == null ? "null" : new String(aggregatorFragment, VoltDB.UTF8ENCODING)).append("\n");
-        sb.append("  ALL: ").append(collectorFragment == null ? "null" : new String(collectorFragment, VoltDB.UTF8ENCODING)).append("\n");
-        sb.append("  RTD: ").append(isReplicatedTableDML ? "true" : "false").append("\n");
-        sb.append("}");
-        return sb.toString();
-    }
-
-    @Override
-    public Object clone() {
-        try {
-            return super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
-        }
+        return core.toString();
     }
 
     public int getSerializedSize() {
-        int size = 2 + sql.length;
-        size += 4 + aggregatorFragment.length;
-        if (collectorFragment != null) {
-            size += 4 + collectorFragment.length;
-        }
-        else {
-            size += 4;
-        }
-        size += 3; // booleans
-        size += 4; // catalog version
+        // plan
+        int size = core.getSerializedSize();
 
-        size += 2; // params count
-        size += parameterTypes.length;
+        // sql bytes
+        size += 2;
+        size += sql.length;
 
+        // params
         size += extractedParamValues.getSerializedSize();
 
         return size;
@@ -161,73 +110,111 @@ public class AdHocPlannedStatement implements Cloneable {
     void flattenToBuffer(ByteBuffer buf) throws IOException {
         validate(); // assertions for extra safety
 
+        // plan
+        core.flattenToBuffer(buf);
+
+        // sql bytes
         buf.putShort((short) sql.length);
         buf.put(sql);
 
-        buf.putInt(aggregatorFragment.length);
-        buf.put(aggregatorFragment);
-
-        if (collectorFragment == null) {
-            buf.putInt(-1);
-        }
-        else {
-            buf.putInt(collectorFragment.length);
-            buf.put(collectorFragment);
-        }
-
-        buf.put((byte) (isReplicatedTableDML ? 1 : 0));
-        buf.put((byte) (isNonDeterministic ? 1 : 0));
-        buf.put((byte) (readOnly ? 1 : 0));
-
-        buf.putInt(catalogVersion);
-
-        buf.putShort((short) parameterTypes.length);
-        for (VoltType type : parameterTypes) {
-            buf.put(type.getValue());
-        }
-
+        // params
         extractedParamValues.flattenToBuffer(buf);
     }
 
     public static AdHocPlannedStatement fromBuffer(ByteBuffer buf) throws IOException {
-        byte[] sql = new byte[buf.getShort()];
+        // plan
+        CorePlan core = CorePlan.fromBuffer(buf);
+
+        // sql bytes
+        short sqlLength = buf.getShort();
+        if (sqlLength < 0) {
+            throw new RuntimeException("AdHoc SQL text exceeds the length limitation " + Short.MAX_VALUE);
+        }
+
+        byte[] sql = new byte[sqlLength];
         buf.get(sql);
 
-        byte[] aggregatorFragment = new byte[buf.getInt()];
-        buf.get(aggregatorFragment);
+        // params
+        ParameterSet parameterSet = ParameterSet.fromByteBuffer(buf);
 
-        byte[] collectorFragment = null;
-        int cflen = buf.getInt();
-        if (cflen >= 0) {
-            collectorFragment = new byte[cflen];
-            buf.get(collectorFragment);
+        return new AdHocPlannedStatement(sql, core, parameterSet, null);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     * Mostly for debugging and testing.
+     * Not zippy for the fast path.
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof AdHocPlannedStatement)) {
+            return false;
+        }
+        AdHocPlannedStatement other = (AdHocPlannedStatement) obj;
+
+        if (!Arrays.equals(sql, other.sql)) {
+            return false;
+        }
+        if (!core.equals(other.core)) {
+            return false;
+        }
+        if (!extractedParamValues.equals(other.extractedParamValues)) {
+            return false;
         }
 
-        boolean isReplicatedTableDML = buf.get() == 1;
-        boolean isNonDeterministic = buf.get() == 1;
-        boolean isReadOnly = buf.get() == 1;
+        return true;
+    }
 
-        int catalogVersion = buf.getInt();
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        assert false : "hashCode not designed";
+        return 42; // any arbitrary constant will do
+    }
 
-        short paramCount = buf.getShort();
-        VoltType[] paramTypes = new VoltType[paramCount];
-        for (int i = 0; i < paramCount; ++i) {
-            paramTypes[i] = VoltType.get(buf.get());
+    public String[] parameterBindings(String[] extractedParamStrings) {
+        if (boundParamStrings != null) {
+            return boundParamStrings;
         }
+        if (extractedParamStrings == null) {
+            return null;
+        }
+        if (boundParamIndexes == null || boundParamIndexes.length == 0) {
+            return null;
+        }
+        boundParamStrings = new String[extractedParamValues.size()];
+        for (int paramIndex : boundParamIndexes) {
+            boundParamStrings[paramIndex] = extractedParamStrings[paramIndex];
+        }
+        return boundParamStrings;
+    }
 
-        ParameterSet parameterSet = new ParameterSet();
-        FastDeserializer fds = new FastDeserializer(buf);
-        parameterSet.readExternal(fds);
+    void setBoundConstants(String[] boundConstants) {
+        boundParamStrings = boundConstants;
+    }
 
-        return new AdHocPlannedStatement(
-                sql,
-                aggregatorFragment,
-                collectorFragment,
-                isReplicatedTableDML,
-                isNonDeterministic,
-                isReadOnly,
-                paramTypes,
-                parameterSet,
-                catalogVersion);
+    public Object[] extractedParamArray() {
+        return extractedParamValues.toArray();
+    }
+
+    public boolean hasExtractedParams() {
+        return extractedParamValues.size() > 0;
+    }
+
+    int getPartitioningParameterIndex() { return core.getPartitioningParamIndex(); }
+
+    Object getPartitioningParameterValue() {
+        int paramIndex = core.getPartitioningParamIndex();
+        if (paramIndex != -1 && extractedParamValues != null && extractedParamValues.size() > paramIndex ) {
+            return extractedParamValues.toArray()[paramIndex];
+        } else {
+            return core.getPartitioningParamValue();
+        }
+    }
+
+    public VoltType getPartitioningParameterType() {
+        return core.getPartitioningParamType();
     }
 }

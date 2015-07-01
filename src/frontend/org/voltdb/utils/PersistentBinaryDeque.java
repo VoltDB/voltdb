@@ -1,442 +1,336 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb.utils;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.RandomAccessFile;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Deque;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
-import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.MBBContainer;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.EELibraryLoader;
+import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
+import org.xerial.snappy.Snappy;
+
+import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * A deque that specializes in providing persistence of binary objects to disk. Any object placed
- * in the deque will be persisted to disk asynchronously. Objects placed in the queue can
+ * in the deque will be persisted to disk asynchronously. Objects placed in the deque can
  * be persisted synchronously by invoking sync. The files backing this deque all start with a nonce
  * provided at construction time followed by a segment index that is stored in the filename. Files grow to
  * a maximum size of 64 megabytes and then a new segment is created. The index starts at 0. Segments are deleted
  * once all objects from the segment have been polled and all the containers returned by poll have been discarded.
- * Push is implemented by creating new segments at the head of the queue containing the objects to be pushed.
+ * Push is implemented by creating new segments at the head of the deque containing the objects to be pushed.
  *
  */
 public class PersistentBinaryDeque implements BinaryDeque {
+    private static final VoltLogger LOG = new VoltLogger("HOST");
+
+    public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
+        @Override
+        public BBContainer getContainer(int minimumSize) {
+              final BBContainer origin = DBBPool.allocateUnsafeByteBuffer(minimumSize);
+              final BBContainer retcont = new BBContainer(origin.b()) {
+                  private boolean discarded = false;
+
+                  @Override
+                  public synchronized void discard() {
+                      final ByteBuffer buf = checkDoubleFree();
+                      if (discarded) {
+                          LOG.error("Avoided double discard in PBD");
+                          return;
+                      }
+                      discarded = true;
+                      origin.discard();
+                  }
+              };
+              return retcont;
+        }
+    }
+
+    public static final OutputContainerFactory UNSAFE_CONTAINER_FACTORY = new UnsafeOutputContainerFactory();
 
     /**
      * Processors also log using this facility.
      */
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private final VoltLogger m_usageSpecificLog;
 
     private final File m_path;
     private final String m_nonce;
-    private java.util.concurrent.atomic.AtomicLong m_sizeInBytes =
-        new java.util.concurrent.atomic.AtomicLong(0);
-
-    /**
-     * Objects placed in the deque are stored in file segments that are up to 64 megabytes.
-     * Segments only support appending objects. A segment will throw an IOException if an attempt
-     * to insert an object that exceeds the remaining space is made. A segment can be used
-     * for reading and writing, but not both at the same time.
-     *
-     */
-    private class DequeSegment {
-        //Avoid unecessary sync with this flag
-        private boolean m_syncedSinceLastEdit = true;
-        private final File m_file;
-        private RandomAccessFile m_ras;
-        private FileChannel m_fc;
-
-        //Index of the next object to read, not an offset into the file
-        //The offset is maintained by the ByteBuffer. Used to determine if there is another object
-        private int m_objectReadIndex = 0;
-
-        //ID of this segment
-        private final Long m_index;
-        private static final int m_chunkSize = (1024 * 1024) * 64;
-
-        //How many entries that have been polled have from this file have been discarded.
-        //Once this == the number of entries the segment can close and delete itself
-        private int m_discardsUntilDeletion = 0;
-
-        public DequeSegment(Long index, File file) {
-            m_index = index;
-            m_file = file;
-        }
-
-        private final ByteBuffer m_bufferForNumEntries = ByteBuffer.allocateDirect(4);
-
-        private int getNumEntries() throws IOException {
-            if (m_fc == null) {
-                open();
-            }
-            if (m_fc.size() > 0) {
-                m_bufferForNumEntries.clear();
-                while (m_bufferForNumEntries.hasRemaining()) {
-                    int read = m_fc.read(m_bufferForNumEntries, 0);
-                    if (read == -1) {
-                        throw new EOFException();
-                    }
-                }
-                m_bufferForNumEntries.flip();
-                return m_bufferForNumEntries.getInt();
-            } else {
-                return 0;
-            }
-        }
-
-        private void initNumEntries() throws IOException {
-            m_bufferForNumEntries.clear();
-            m_bufferForNumEntries.putInt(0).flip();
-            while (m_bufferForNumEntries.hasRemaining()) {
-                m_fc.write(m_bufferForNumEntries, 0);
-            }
-            m_syncedSinceLastEdit = false;
-        }
-
-        private void incrementNumEntries() throws IOException {
-            //First read the existing amount
-            m_bufferForNumEntries.clear();
-            while (m_bufferForNumEntries.hasRemaining()) {
-                int read = m_fc.read(m_bufferForNumEntries, 0);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-            m_bufferForNumEntries.flip();
-
-            //Then write the incremented value
-            int numEntries = m_bufferForNumEntries.getInt();
-            m_bufferForNumEntries.flip();
-            m_bufferForNumEntries.putInt(++numEntries).flip();
-            while (m_bufferForNumEntries.hasRemaining()) {
-                m_fc.write(m_bufferForNumEntries, 0);
-            }
-            m_syncedSinceLastEdit = false;
-
-            //For when this buffer is eventually finished and starts being polled
-            //Stored on disk and in memory
-            m_discardsUntilDeletion++;
-        }
-
-        /**
-         * Bytes of space available for inserting more entries
-         * @return
-         */
-        private int remaining() throws IOException {
-            //Subtract 4 for the length prefix
-            return (int)(m_chunkSize - m_fc.position()) - 4;
-        }
-
-        private void open() throws IOException {
-            if (!m_file.exists()) {
-                m_syncedSinceLastEdit = false;
-            }
-            if (m_ras != null) {
-                throw new IOException(m_file + " was already opened");
-            }
-            m_ras = new RandomAccessFile( m_file, "rw");
-            m_fc = m_ras.getChannel();
-            m_fc.position(4);
-            if (m_fc.size() >= 4) {
-                m_discardsUntilDeletion = getNumEntries();
-            }
-        }
-
-        private void closeAndDelete() throws IOException {
-            close();
-            m_sizeInBytes.addAndGet(-sizeInBytes());
-            m_file.delete();
-        }
-
-        private void close() throws IOException {
-            if (m_fc != null) {
-                m_fc.close();
-                m_ras = null;
-                m_fc = null;
-            }
-        }
-
-        private void sync() throws IOException {
-            if (!m_syncedSinceLastEdit) {
-                m_fc.force(true);
-            }
-            m_syncedSinceLastEdit = true;
-        }
-
-        private BBContainer poll() throws IOException {
-            if (m_fc == null) {
-                open();
-            }
-
-            //No more entries to read
-            if (m_objectReadIndex >= getNumEntries()) {
-                return null;
-            }
-
-            m_objectReadIndex++;
-
-            //If this is the last object to read from this segment
-            //increment the poll segment index so that the next poll
-            //selects the correct segment
-            if (m_objectReadIndex >= getNumEntries()) {
-                m_currentPollSegmentIndex++;
-            }
-
-            //Get the length prefix and then read the object
-            m_bufferForNumEntries.clear();
-            while (m_bufferForNumEntries.hasRemaining()) {
-                int read = m_fc.read(m_bufferForNumEntries);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-            m_bufferForNumEntries.flip();
-            int length = m_bufferForNumEntries.getInt();
-            if (length < 1) {
-                throw new IOException("Read an invalid length");
-            }
-
-            ByteBuffer resultBuffer = ByteBuffer.allocate(length);
-            while (resultBuffer.hasRemaining()) {
-                int read = m_fc.read(resultBuffer);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-            resultBuffer.flip();
-
-            return new BBContainer( resultBuffer, 0L) {
-                private boolean discarded = false;
-
-                private final Throwable t = new Throwable();
-                @Override
-                public void discard() {
-                    if (!discarded) {
-                        discarded = true;
-                        m_discardsUntilDeletion--;
-                        if (m_discardsUntilDeletion == 0) {
-                            m_finishedSegments.remove(m_index);
-                            try {
-                                closeAndDelete();
-                            } catch (IOException e) {
-                                exportLog.error(e);
-                            }
-                        }
-                    } else {
-                        exportLog.error("An export buffer was discarded multiple times");
-                    }
-                }
-
-                @Override
-                public void finalize() {
-                    if (!discarded && !m_closed) {
-                        exportLog.error(m_file + " had a buffer that was finalized without being discarded");
-                        StringWriter sw  = new StringWriter();
-                        PrintWriter pw = new PrintWriter(sw);
-                        t.printStackTrace(pw);
-                        exportLog.error(sw.toString());
-                        discard();
-                    }
-                }
-            };
-        }
-
-        private void offer(BBContainer objects[]) throws IOException {
-            int length = 0;
-            for (BBContainer obj : objects ) {
-                length += obj.b.remaining();
-            }
-
-            if (remaining() < length) {
-                throw new IOException(m_file + " has insufficient space");
-            }
-
-            m_bufferForNumEntries.clear();
-            m_bufferForNumEntries.putInt(length).flip();
-            while (m_bufferForNumEntries.hasRemaining()) {
-                m_fc.write(m_bufferForNumEntries);
-            }
-
-            int objectIndex = 0;
-            for (BBContainer obj : objects ) {
-                boolean success = false;
-                try {
-                    while (obj.b.hasRemaining()) {
-                        m_fc.write(obj.b);
-                    }
-                    obj.discard();
-                    success = true;
-                    objectIndex++;
-                } finally {
-                    if (!success) {
-                        for (int ii = objectIndex; ii < objects.length; ii++) {
-                            objects[ii].discard();
-                        }
-                    }
-                }
-            }
-            m_sizeInBytes.addAndGet(4 + length);
-            incrementNumEntries();
-        }
-
-        //A white lie, don't include the object count prefix
-        //so that the size is 0 when there is no user data
-        private long sizeInBytes() {
-            return m_file.length() - 4;
-        }
-    }
+    private boolean m_initializedFromExistingFiles = false;
 
     //Segments that are no longer being written to and can be polled
     //These segments are "immutable". They will not be modified until deletion
-    private final TreeMap<Long, DequeSegment> m_finishedSegments = new TreeMap<Long, DequeSegment>();
-
-    //The current segment being written to
-    private DequeSegment m_writeSegment = null;
-
-    //Index of the segment being polled
-    private Long m_currentPollSegmentIndex = 0L;
-
+    private final Deque<PBDSegment> m_segments = new ArrayDeque<PBDSegment>();
+    private int m_numObjects = 0;
     private volatile boolean m_closed = false;
 
     /**
-     * Create a persistent binary deque with the specified nonce and storage back at the specified path.
-     * Existing files will
+     * Create a persistent binary deque with the specified nonce and storage
+     * back at the specified path. Existing files will
+     *
      * @param nonce
      * @param path
+     * @param logger
      * @throws IOException
      */
-    public PersistentBinaryDeque(final String nonce, final File path) throws IOException {
+    public PersistentBinaryDeque(final String nonce, final File path, VoltLogger logger) throws IOException {
+        this(nonce, path, logger, true);
+    }
+
+    /**
+     * Create a persistent binary deque with the specified nonce and storage back at the specified path.
+     * This is convenient method for test so that
+     * poll with delete can be tested.
+     *
+     * @param nonce
+     * @param path
+     * @param deleteEmpty
+     * @throws IOException
+     */
+    public PersistentBinaryDeque(final String nonce, final File path, VoltLogger logger, final boolean deleteEmpty) throws IOException {
+        EELibraryLoader.loadExecutionEngineLibrary(true);
         m_path = path;
         m_nonce = nonce;
+        m_usageSpecificLog = logger;
 
         if (!path.exists() || !path.canRead() || !path.canWrite() || !path.canExecute() || !path.isDirectory()) {
             throw new IOException(path + " is not usable ( !exists || !readable " +
                     "|| !writable || !executable || !directory)");
         }
 
+        final TreeMap<Long, PBDSegment> segments = new TreeMap<Long, PBDSegment>();
         //Parse the files in the directory by name to find files
         //that are part of this deque
-        path.listFiles(new FileFilter() {
+        try {
+            path.listFiles(new FileFilter() {
 
-            @Override
-            public boolean accept(File pathname) {
-                String name = pathname.getName();
-                if (name.startsWith(nonce) && name.endsWith(".pbd")) {
-                    if (pathname.length() == 4) {
-                        //Doesn't have any objects, just the object count
-                        pathname.delete();
-                        return false;
+                @Override
+                public boolean accept(File pathname) {
+                    // PBD file names have three parts: nonce.seq.pbd
+                    // nonce may contain '.', seq is a sequence number.
+                    String[] parts = pathname.getName().split("\\.");
+                    String parsedNonce = null;
+                    String seqNum = null;
+                    String extension = null;
+
+                    // If more than 3 parts, it means nonce contains '.', assemble them.
+                    if (parts.length > 3) {
+                        Joiner joiner = Joiner.on('.').skipNulls();
+                        parsedNonce = joiner.join(Arrays.asList(parts).subList(0, parts.length - 2));
+                        seqNum = parts[parts.length - 2];
+                        extension = parts[parts.length - 1];
+                    } else if (parts.length == 3) {
+                        parsedNonce = parts[0];
+                        seqNum = parts[1];
+                        extension = parts[2];
                     }
-                    Long index = Long.valueOf(name.substring( nonce.length() + 1, name.length() - 4));
-                    DequeSegment ds = new DequeSegment( index, pathname);
-                    m_finishedSegments.put( index, ds);
-                    m_sizeInBytes.addAndGet(ds.sizeInBytes());
-                }
-                return false;
-            }
 
-        });
+                    if (nonce.equals(parsedNonce) && "pbd".equals(extension)) {
+                        if (pathname.length() == 4) {
+                            //Doesn't have any objects, just the object count
+                            pathname.delete();
+                            return false;
+                        }
+                        Long index = Long.valueOf(seqNum);
+                        PBDSegment qs = newSegment( index, pathname );
+                        try {
+                            qs.open(false);
+                            m_initializedFromExistingFiles = true;
+                            if (deleteEmpty) {
+                                if (qs.getNumEntries() == 0) {
+                                    LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + pathname.getName());
+                                    qs.closeAndDelete();
+                                    return false;
+                                }
+                            }
+                            m_numObjects += qs.getNumEntries();
+                            qs.close();
+                            segments.put( index, qs);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    return false;
+                }
+
+            });
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException) {
+                throw new IOException(e);
+            }
+            Throwables.propagate(e);
+        }
 
         Long lastKey = null;
-        for (Long key : m_finishedSegments.keySet()) {
+        for (Map.Entry<Long, PBDSegment> e : segments.entrySet()) {
+            final Long key = e.getKey();
             if (lastKey == null) {
                 lastKey = key;
             } else {
                 if (lastKey + 1 != key) {
+                    try {
+                        for (PBDSegment pbds : segments.values()) {
+                            pbds.close();
+                        }
+                    } catch (Exception ex) {}
                     throw new IOException("Missing " + nonce +
                             " pbd segments between " + lastKey + " and " + key + " in directory " + path +
                             ". The data files found in the export overflow directory were inconsistent.");
                 }
                 lastKey = key;
             }
+            m_segments.offer(e.getValue());
         }
+
         //Find the first and last segment for polling and writing (after)
         Long writeSegmentIndex = 0L;
         try {
-            m_currentPollSegmentIndex = m_finishedSegments.firstKey();
-            writeSegmentIndex = m_finishedSegments.lastKey() + 1;
+            writeSegmentIndex = segments.lastKey() + 1;
         } catch (NoSuchElementException e) {}
 
-        m_writeSegment =
-            new DequeSegment(
+        PBDSegment writeSegment =
+            newSegment(
                     writeSegmentIndex,
                     new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
-        m_writeSegment.open();
-        m_writeSegment.initNumEntries();
+        m_segments.offer(writeSegment);
+        writeSegment.open(true);
+        assertions();
+    }
+
+    private static final boolean USE_MMAP = Boolean.getBoolean("PBD_USE_MMAP");
+    private PBDSegment newSegment(long segmentId, File file) {
+        if (USE_MMAP) {
+            return new PBDMMapSegment(segmentId, file);
+        } else {
+            return new PBDRegularSegment(segmentId, file);
+        }
+    }
+
+    /**
+     * Close the tail segment if it's not being read from currently, then offer the new segment.
+     * @throws IOException
+     */
+    private void closeTailAndOffer(PBDSegment newSegment) throws IOException {
+        final PBDSegment last = m_segments.peekLast();
+        if (last != null && !last.isBeingPolled()) {
+            last.close();
+        }
+        m_segments.offer(newSegment);
     }
 
     @Override
-    public synchronized void offer(BBContainer[] objects) throws IOException {
-        if (m_writeSegment == null) {
-            throw new IOException("Closed");
-        }
-        int needed = 0;
-        for (BBContainer b : objects) {
-            needed +=  b.b.remaining();
-        }
-
-        if (needed > DequeSegment.m_chunkSize - 4) {
-            throw new IOException("Maxiumum object size is " + (DequeSegment.m_chunkSize - 4));
-        }
-
-        if (m_writeSegment.remaining() < needed) {
-            openNewWriteSegment();
-        }
-
-        m_writeSegment.offer(objects);
+    public synchronized void offer(BBContainer object) throws IOException {
+        offer(object, true);
     }
 
     @Override
-    public synchronized void push(BBContainer[][] objects) throws IOException {
-        if (m_writeSegment == null) {
+    public synchronized void offer(BBContainer object, boolean allowCompression) throws IOException {
+        assertions();
+        if (m_closed) {
             throw new IOException("Closed");
         }
-        if (!m_finishedSegments.isEmpty()) {
-            assert(m_finishedSegments.firstKey().equals(m_currentPollSegmentIndex));
+
+        PBDSegment tail = m_segments.peekLast();
+        final boolean compress = object.b().isDirect() && allowCompression;
+        if (!tail.offer(object, compress)) {
+            tail = addSegment(tail);
+            final boolean success = tail.offer(object, compress);
+            if (!success) {
+                throw new IOException("Failed to offer object in PBD");
+            }
         }
-        ArrayDeque<ArrayDeque<BBContainer[]>> segments = new ArrayDeque<ArrayDeque<BBContainer[]>>();
-        ArrayDeque<BBContainer[]> currentSegment = new ArrayDeque<BBContainer[]>();
+        incrementNumObjects();
+        assertions();
+    }
+
+    @Override
+    public synchronized int offer(DeferredSerialization ds) throws IOException {
+        assertions();
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
+
+        PBDSegment tail = m_segments.peekLast();
+        int written = tail.offer(ds);
+        if (written < 0) {
+            tail = addSegment(tail);
+            written = tail.offer(ds);
+            if (written < 0) {
+                throw new IOException("Failed to offer object in PBD");
+            }
+        }
+        incrementNumObjects();
+        assertions();
+        return written;
+    }
+
+    private PBDSegment addSegment(PBDSegment tail) throws IOException {
+        //Check to see if the tail is completely consumed so we can close and delete it
+        if (!tail.hasMoreEntries() && tail.isEmpty()) {
+            m_segments.pollLast();
+            tail.closeAndDelete();
+        }
+        Long nextIndex = tail.segmentId() + 1;
+        tail = newSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
+        tail.open(true);
+        closeTailAndOffer(tail);
+        return tail;
+    }
+
+    @Override
+    public synchronized void push(BBContainer objects[]) throws IOException {
+        assertions();
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
+
+        ArrayDeque<ArrayDeque<BBContainer>> segments = new ArrayDeque<ArrayDeque<BBContainer>>();
+        ArrayDeque<BBContainer> currentSegment = new ArrayDeque<BBContainer>();
 
         //Take the objects that were provided and separate them into deques of objects
         //that will fit in a single write segment
-        int available = DequeSegment.m_chunkSize - 4;
-        for (BBContainer object[] : objects) {
-            int needed = 4;
-            for (BBContainer obj : object) {
-                needed += obj.b.remaining();
-            }
+        int available = PBDSegment.CHUNK_SIZE - 4;
+        for (BBContainer object : objects) {
+            int needed = PBDSegment.OBJECT_HEADER_BYTES + object.b().remaining();
 
             if (available - needed < 0) {
-                if (needed > DequeSegment.m_chunkSize - 4) {
-                    throw new IOException("Maximum object size is " + (DequeSegment.m_chunkSize - 4));
+                if (needed > PBDSegment.CHUNK_SIZE - 4) {
+                    throw new IOException("Maximum object size is " + (PBDSegment.CHUNK_SIZE - 4));
                 }
                 segments.offer( currentSegment );
-                currentSegment = new ArrayDeque<BBContainer[]>();
-                available = DequeSegment.m_chunkSize - 4;
+                currentSegment = new ArrayDeque<BBContainer>();
+                available = PBDSegment.CHUNK_SIZE - 4;
             }
             available -= needed;
             currentSegment.add(object);
@@ -449,89 +343,113 @@ public class PersistentBinaryDeque implements BinaryDeque {
         //This will be the index before the first segment available for read or
         //before the write segment if there are no finished segments
         Long nextIndex = 0L;
-        if (m_finishedSegments.size() > 0) {
-            nextIndex = m_finishedSegments.firstKey() - 1;
-        } else {
-            nextIndex = m_writeSegment.m_index - 1;
+        if (m_segments.size() > 0) {
+            nextIndex = m_segments.peek().segmentId() - 1;
         }
 
         while (segments.peek() != null) {
-            ArrayDeque<BBContainer[]> currentSegmentContents = segments.poll();
-            DequeSegment writeSegment =
-                new DequeSegment(
+            ArrayDeque<BBContainer> currentSegmentContents = segments.poll();
+            PBDSegment writeSegment =
+                newSegment(
                         nextIndex,
                         new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
-            m_currentPollSegmentIndex = nextIndex;
-            writeSegment.open();
-            writeSegment.initNumEntries();
+            writeSegment.open(true);
             nextIndex--;
 
             while (currentSegmentContents.peek() != null) {
-                writeSegment.offer(currentSegmentContents.pollFirst());
+                writeSegment.offer(currentSegmentContents.pollFirst(), false);
+                incrementNumObjects();
             }
 
-            writeSegment.m_fc.position(4);
-            m_finishedSegments.put(writeSegment.m_index, writeSegment);
-        }
-    }
+            // Don't close the last one, it'll be used for writes
+            if (!m_segments.isEmpty()) {
+                writeSegment.close();
+            }
 
-    private void openNewWriteSegment() throws IOException {
-        if (m_writeSegment == null) {
-            throw new IOException("Closed");
+            m_segments.push(writeSegment);
         }
-        m_writeSegment.m_fc.position(4);
-        m_finishedSegments.put(m_writeSegment.m_index, m_writeSegment);
-        Long nextIndex = m_writeSegment.m_index + 1;
-        m_writeSegment =
-            new DequeSegment(
-                    nextIndex,
-                    new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
-        m_writeSegment.open();
-        m_writeSegment.initNumEntries();
+        assertions();
     }
 
     @Override
-    public synchronized BBContainer poll() throws IOException {
-        if (m_writeSegment == null) {
+    public synchronized BBContainer poll(OutputContainerFactory ocf) throws IOException {
+        assertions();
+        if (m_closed) {
             throw new IOException("Closed");
         }
-        DequeSegment segment = m_finishedSegments.get(m_currentPollSegmentIndex);
-        if (segment == null) {
-            assert(m_writeSegment.m_index.equals(m_currentPollSegmentIndex));
-            //See if we can steal the write segment, otherwise return null
-            if (m_writeSegment.getNumEntries() > 0) {
-                openNewWriteSegment();
-                return poll();
-            } else {
-                return null;
+
+        BBContainer retcont = null;
+        PBDSegment segment = null;
+
+        for (PBDSegment s : m_segments) {
+            if (s.isClosed()) {
+                s.open(false);
+            }
+
+            if (s.hasMoreEntries()) {
+                segment = s;
+                retcont = segment.poll(ocf);
+                break;
             }
         }
-        return segment.poll();
+
+        if (retcont == null) {
+            return null;
+        }
+
+        decrementNumObjects();
+        assertions();
+        assert (retcont.b() != null);
+        return wrapRetCont(segment, retcont);
+    }
+
+    private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
+        return new BBContainer(retcont.b()) {
+            @Override
+            public void discard() {
+                checkDoubleFree();
+                retcont.discard();
+                assert(m_closed || m_segments.contains(segment));
+
+                //Don't do anything else if we are closed
+                if (m_closed) {
+                    return;
+                }
+
+                //Segment is potentially ready for deletion
+                try {
+                    if (segment.isEmpty()) {
+                        if (segment != m_segments.peekLast()) {
+                            m_segments.remove(segment);
+                            segment.closeAndDelete();
+                        }
+                    }
+                } catch (IOException e) {
+                    LOG.error("Exception closing and deleting PBD segment", e);
+                }
+            }
+        };
     }
 
     @Override
     public synchronized void sync() throws IOException {
-        if (m_writeSegment == null) {
+        if (m_closed) {
             throw new IOException("Closed");
         }
-        m_writeSegment.sync();
-        for (DequeSegment segment : m_finishedSegments.values()) {
-            segment.sync();
+        for (PBDSegment segment : m_segments) {
+            if (!segment.isClosed()) {
+                segment.sync();
+            }
         }
     }
 
     @Override
     public synchronized void close() throws IOException {
-        if (m_writeSegment == null) {
-            throw new IOException("Closed");
+        if (m_closed) {
+            return;
         }
-        if (m_writeSegment.getNumEntries() > 0) {
-            m_finishedSegments.put(m_writeSegment.m_index, m_writeSegment);
-        } else {
-            m_writeSegment.closeAndDelete();
-        }
-        m_writeSegment = null;
-        for (DequeSegment segment : m_finishedSegments.values()) {
+        m_closed = true;
+        for (PBDSegment segment : m_segments) {
             segment.close();
         }
         m_closed = true;
@@ -539,147 +457,133 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public synchronized boolean isEmpty() throws IOException {
-        if (m_writeSegment == null) {
+        assertions();
+        if (m_closed) {
             throw new IOException("Closed");
         }
-        DequeSegment segment = m_finishedSegments.get(m_currentPollSegmentIndex);
-        if (segment == null) {
-            assert(m_writeSegment.m_index.equals(m_currentPollSegmentIndex));
-            //See if we can steal the write segment, otherwise return null
-            if (m_writeSegment.getNumEntries() > 0) {
-                return false;
-            } else {
-                return true;
+
+        for (PBDSegment s : m_segments) {
+            final boolean wasClosed = s.isClosed();
+            try {
+                if (wasClosed) s.open(false);
+                if (s.hasMoreEntries()) return false;
+            } finally {
+                if (wasClosed) {
+                    s.close();
+                }
             }
         }
-        return segment.m_objectReadIndex >= segment.getNumEntries();
+        return true;
     }
 
+    /*
+     * Don't use size in bytes to determine empty, could potentially
+     * diverge from object count on crash or power failure
+     * although incredibly unlikely
+     */
     @Override
-    public long sizeInBytes() {
-        return m_sizeInBytes.get();
+    public long sizeInBytes() throws IOException {
+        assertions();
+        long size = 0;
+        for (PBDSegment segment : m_segments) {
+            final boolean wasClosed = segment.isClosed();
+            if (wasClosed) segment.open(false);
+            size += segment.uncompressedBytesToRead();
+            if (wasClosed) {
+                segment.close();
+            }
+        }
+        return size;
     }
 
     @Override
     public synchronized void closeAndDelete() throws IOException {
-        m_writeSegment.closeAndDelete();
-        for (DequeSegment ds : m_finishedSegments.values()) {
-            ds.closeAndDelete();
+        if (m_closed) return;
+        m_closed = true;
+        for (PBDSegment qs : m_segments) {
+            qs.closeAndDelete();
         }
+    }
+
+    public static class ByteBufferTruncatorResponse extends TruncatorResponse {
+        private final ByteBuffer m_retval;
+
+        public ByteBufferTruncatorResponse(ByteBuffer retval) {
+            super(Status.PARTIAL_TRUNCATE);
+            assert retval.remaining() > 0;
+            m_retval = retval;
+        }
+
+        @Override
+        public int writeTruncatedObject(ByteBuffer output) {
+            int objectSize = m_retval.remaining();
+            output.putInt(objectSize);
+            output.putInt(PBDSegment.NO_FLAGS);
+            output.put(m_retval);
+            return objectSize;
+        }
+    }
+
+    public static class DeferredSerializationTruncatorResponse extends TruncatorResponse {
+        public static interface Callback {
+            public void bytesWritten(int bytes);
+        }
+
+        private final DeferredSerialization m_ds;
+        private final Callback m_truncationCallback;
+
+        public DeferredSerializationTruncatorResponse(DeferredSerialization ds, Callback truncationCallback) {
+            super(Status.PARTIAL_TRUNCATE);
+            m_ds = ds;
+            m_truncationCallback = truncationCallback;
+        }
+
+        @Override
+        public int writeTruncatedObject(ByteBuffer output) throws IOException {
+            int bytesWritten = PBDUtils.writeDeferredSerialization(output, m_ds);
+            if (m_truncationCallback != null) {
+                m_truncationCallback.bytesWritten(bytesWritten);
+            }
+            return bytesWritten;
+        }
+    }
+
+    public static TruncatorResponse fullTruncateResponse() {
+        return new TruncatorResponse(Status.FULL_TRUNCATE);
     }
 
     @Override
     public synchronized void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
-        if (m_finishedSegments.isEmpty()) {
-            exportLog.debug("PBD " + m_nonce + " has no finished segments");
+        assertions();
+        if (m_segments.isEmpty()) {
+            m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
             return;
         }
-        //+16 because I am not sure if the max chunk size is enforced right
-        ByteBuffer readBuffer = ByteBuffer.allocateDirect(DequeSegment.m_chunkSize + 16);
+
+        // Close the last write segment for now, will reopen after truncation
+        m_segments.getLast().close();
 
         /*
          * Iterator all the objects in all the segments and pass them to the truncator
          * When it finds the truncation point
          */
         Long lastSegmentIndex = null;
-        for (Map.Entry<Long, DequeSegment> entry : m_finishedSegments.entrySet()) {
-            readBuffer.clear();
-            DequeSegment segment = entry.getValue();
-            long segmentIndex = entry.getKey();
+        for (PBDSegment segment : m_segments) {
+            final long segmentIndex = segment.segmentId();
 
-            File segmentFile = segment.m_file;
-            RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
-            FileChannel fc = ras.getChannel();
-            try {
-                /*
-                 * Read the entire segment into memory
-                 */
-                while (readBuffer.hasRemaining()) {
-                    int read = fc.read(readBuffer);
-                    if (read == -1) {
-                        break;
-                    }
-                }
-                readBuffer.flip();
+            final int truncatedEntries = segment.parseAndTruncate(truncator);
 
-                //Get the number of objects and then iterator over them
-                int numObjects = readBuffer.getInt();
-                exportLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
-                for (int ii = 0; ii < numObjects; ii++) {
-                    final int nextObjectLength = readBuffer.getInt();
-                    //Copy the next object into a separate heap byte buffer
-                    //do the old limit stashing trick to avoid buffer overflow
-                    ByteBuffer nextObject = ByteBuffer.allocate(nextObjectLength);
-                    final int oldLimit = readBuffer.limit();
-                    readBuffer.limit(readBuffer.position() + nextObjectLength);
-
-                    nextObject.put(readBuffer).flip();
-
-                    //Put back the original limit
-                    readBuffer.limit(oldLimit);
-
-                    //Handoff the object to the truncator and await a decision
-                    ByteBuffer retval = truncator.parse(nextObject);
-                    if (retval == null) {
-                        //Nothing to do, leave the object alone and move to the next
-                        continue;
-                    } else {
-                        long startSize = fc.size();
-                        //If the returned bytebuffer is empty, remove the object and truncate the file
-                        if (retval.remaining() == 0) {
-                            if (ii == 0) {
-                                /*
-                                 * If truncation is occuring at the first object
-                                 * Whammo! Delete the file. Do it by setting the lastSegmentIndex
-                                 * to 1 previous. We may end up with an empty finished segment
-                                 * set.
-                                 */
-                                lastSegmentIndex = segmentIndex - 1;
-                            } else {
-                                //Don't forget to update the number of entries in the file
-                                ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
-                                numObjectsBuffer.putInt(0, ii);
-                                fc.position(0);
-                                while (numObjectsBuffer.hasRemaining()) {
-                                    fc.write(numObjectsBuffer);
-                                }
-                                fc.truncate(readBuffer.position() - (nextObjectLength + 4));
-                            }
-
-                        } else {
-                            readBuffer.position(readBuffer.position() - (nextObjectLength + 4));
-                            readBuffer.putInt(retval.remaining());
-                            readBuffer.put(retval);
-                            readBuffer.flip();
-
-                            readBuffer.putInt(0, ii + 1);
-                            /*
-                             * SHOULD REALLY make a copy of the original and then swap them with renaming
-                             */
-                            fc.position(0);
-                            fc.truncate(0);
-
-                            while (readBuffer.hasRemaining()) {
-                                fc.write(readBuffer);
-                            }
-                        }
-                        long endSize = fc.size();
-                        m_sizeInBytes.addAndGet(endSize - startSize);
-                        //Set last segment and break the loop over this segment
-                        if (lastSegmentIndex == null) {
-                            lastSegmentIndex = segmentIndex;
-                        }
-                        break;
-                    }
-                }
-
-                //If this is set the just processed segment was the last one
-                if (lastSegmentIndex != null) {
-                    break;
-                }
-            } finally {
-                fc.close();
+            if (truncatedEntries == -1) {
+                lastSegmentIndex = segmentIndex - 1;
+                break;
+            } else if (truncatedEntries > 0) {
+                addToNumObjects(-truncatedEntries);
+                //Set last segment and break the loop over this segment
+                lastSegmentIndex = segmentIndex;
+                break;
             }
+            // truncatedEntries == 0 means nothing is truncated in this segment,
+            // should move on to the next segment.
         }
 
         /*
@@ -687,44 +591,86 @@ public class PersistentBinaryDeque implements BinaryDeque {
          * Return and the parseAndTruncate is a noop.
          */
         if (lastSegmentIndex == null)  {
+            // Reopen the last segment for write
+            m_segments.getLast().open(true);
             return;
         }
         /*
          * Now truncate all the segments after the truncation point
          */
-        Iterator<Map.Entry<Long, DequeSegment>> iterator = m_finishedSegments.entrySet().iterator();
+        Iterator<PBDSegment> iterator = m_segments.descendingIterator();
         while (iterator.hasNext()) {
-            Map.Entry<Long, DequeSegment> entry = iterator.next();
-            if (entry.getKey() <= lastSegmentIndex) {
-                continue;
+            PBDSegment segment = iterator.next();
+            if (segment.segmentId() <= lastSegmentIndex) {
+                break;
             }
-            DequeSegment ds = entry.getValue();
+            addToNumObjects(-segment.getNumEntries());
             iterator.remove();
-            ds.closeAndDelete();
+            segment.closeAndDelete();
         }
-
-        //The write segment may have the wrong index, delete it
-        m_writeSegment.closeAndDelete();
 
         /*
          * Reset the poll and write segments
          */
         //Find the first and last segment for polling and writing (after)
-        m_currentPollSegmentIndex = 0L;
-        Long writeSegmentIndex = 0L;
-        try {
-            m_currentPollSegmentIndex = m_finishedSegments.firstKey();
-            writeSegmentIndex = m_finishedSegments.lastKey() + 1;
-        } catch (NoSuchElementException e) {}
+        Long newSegmentIndex = 0L;
+        if (m_segments.peekLast() != null) newSegmentIndex = m_segments.peekLast().segmentId() + 1;
 
-        m_writeSegment =
-            new DequeSegment(
-                    writeSegmentIndex,
-                    new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
-        m_writeSegment.open();
-        m_writeSegment.initNumEntries();
-        if (m_finishedSegments.isEmpty()) {
-            assert(m_writeSegment.m_index.equals(m_currentPollSegmentIndex));
+        PBDSegment newSegment = newSegment(newSegmentIndex, new VoltFile(m_path, m_nonce + "." + newSegmentIndex + ".pbd"));
+        newSegment.open(true);
+        m_segments.offer(newSegment);
+        assertions();
+    }
+
+    private void addToNumObjects(int num) {
+        assert(m_numObjects >= 0);
+        m_numObjects += num;
+    }
+    private void incrementNumObjects() {
+        assert(m_numObjects >= 0);
+         m_numObjects++;
+    }
+
+    private void decrementNumObjects() {
+        m_numObjects--;
+        assert(m_numObjects >= 0);
+    }
+
+    @Override
+    public int getNumObjects() {
+        return m_numObjects;
+    }
+
+    @Override
+    public boolean initializedFromExistingFiles() {
+        return m_initializedFromExistingFiles;
+    }
+
+    private static final boolean assertionsOn;
+    static {
+        boolean assertOn = false;
+        assert(assertOn = true);
+        assertionsOn = assertOn;
+    }
+
+    private void assertions() {
+        if (!assertionsOn || m_closed) return;
+        int numObjects = 0;
+        for (PBDSegment segment : m_segments) {
+            final boolean wasClosed = segment.isClosed();
+            try {
+                numObjects += segment.getNumEntries() - segment.readIndex();
+            } catch (Exception e) {
+                Throwables.propagate(e);
+            }
+            if (wasClosed) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
+        assert numObjects == m_numObjects : numObjects + " != " + m_numObjects;
     }
 }

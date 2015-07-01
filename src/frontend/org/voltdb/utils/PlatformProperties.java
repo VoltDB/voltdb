@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -42,6 +42,7 @@ public class PlatformProperties implements Serializable {
     public final int coreCount;
     public final int socketCount;
     public final String cpuDesc;
+    public final boolean isCoreReportedByJava;
 
     // operating system
     public final String osArch;
@@ -70,8 +71,7 @@ public class PlatformProperties implements Serializable {
         HardwareInfo hw = new HardwareInfo();
 
         hw.hardwareThreads = CoreUtils.availableProcessors();
-
-        String result = ShellTools.cmd("/usr/sbin/system_profiler -detailLevel mini SPHardwareDataType").trim();
+        String result = ShellTools.local_cmd("/usr/sbin/system_profiler -detailLevel mini SPHardwareDataType").trim();
         String[] lines = result.split("\n");
         for (String line : lines) {
             line = line.trim();
@@ -187,14 +187,21 @@ public class PlatformProperties implements Serializable {
             hw = getLinuxHardwareInfo();
         }
         else {
-            System.err.println("Unable to determine operating system. Exiting.");
-            System.exit(-1);
+            hostLog.warn("Unable to determine supported operating system. Hardware info such as Memory,CPU will be incorrectly reported.");
+            hw = new HardwareInfo();
         }
 
         // hardware
         ramInMegabytes = hw.ramInMegabytes;
         hardwareThreads = hw.hardwareThreads;
-        coreCount = hw.coreCount;
+        if (hw.coreCount == -1) {
+            // some VMs don't provide cpu core count
+            coreCount = Runtime.getRuntime().availableProcessors();
+            isCoreReportedByJava = true;
+        } else {
+            coreCount = hw.coreCount;
+            isCoreReportedByJava = false;
+        }
         socketCount = hw.socketCount;
         cpuDesc = hw.cpuDesc;
 
@@ -222,8 +229,9 @@ public class PlatformProperties implements Serializable {
     public String toLogLines() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append(String.format("CPU INFO:         %d Cores, %d Sockets, %d Hardware Threads\n",
-                                coreCount, socketCount, hardwareThreads));
+        sb.append(String.format("CPU INFO:         %d Cores%s, %d Sockets, %d Hardware Threads\n",
+                                coreCount, isCoreReportedByJava ? " (Reported by Java)" : "",
+                                socketCount, hardwareThreads));
         sb.append(String.format("CPU DESC:         %s\n", cpuDesc));
         sb.append(String.format("HOST MEMORY (MB): %d\n", ramInMegabytes));
 
@@ -234,6 +242,27 @@ public class PlatformProperties implements Serializable {
         sb.append(String.format("JAVA RUNTIME:     %s\n", javaRuntime));
         sb.append(String.format("JAVA VM:          %s\n", javaVMInfo));
 
+        return sb.toString();
+    }
+
+    public String toHTML() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<tt>");
+
+        sb.append(String.format("CPU INFO:         %d Cores%s, %d Sockets, %d Hardware Threads<br/>\n",
+                                coreCount, isCoreReportedByJava ? " (Reported by Java)" : "",
+                                socketCount, hardwareThreads));
+        sb.append(String.format("CPU DESC:         %s<br/>\n", cpuDesc));
+        sb.append(String.format("HOST MEMORY (MB): %d<br/>\n", ramInMegabytes));
+
+        sb.append(String.format("OS PROFILE:       %s %s %s %s<br/>\n",
+                                osName, osVersion, osArch, locale));
+
+        sb.append(String.format("JAVA VERSION:     %s<br/>\n", javaVersion));
+        sb.append(String.format("JAVA RUNTIME:     %s<br/>\n", javaRuntime));
+        sb.append(String.format("JAVA VM:          %s<br/>\n", javaVMInfo));
+
+        sb.append("</tt>");
 
         return sb.toString();
     }

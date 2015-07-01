@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,10 +26,10 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestSPBasecaseSuite extends RegressionSuite {
@@ -127,7 +127,7 @@ public class TestSPBasecaseSuite extends RegressionSuite {
             // a partitioned table that should not generate procedures (pkey not partition key)
             project.addLiteralSchema(
                     "CREATE TABLE p3(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
-                    "CREATE UNIQUE INDEX p3_tree_idx ON p3(a1);"
+                    "CREATE ASSUMEUNIQUE INDEX p3_tree_idx ON p3(a1);"
             );
             project.addPartitionInfo("p3", "a2");
 
@@ -157,13 +157,6 @@ public class TestSPBasecaseSuite extends RegressionSuite {
         config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
-        builder.addServerConfig(config);
-
-        // IV2 CLUSTER
-        config = new LocalCluster("sqltypes-iv2cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
-                false, true); // LocalCluster constructor to enable IV2.  We have to drag along the isRejoinTest arg
-        boolean t3 = config.compile(project);
-        assertTrue(t3);
         builder.addServerConfig(config);
 
         return builder;

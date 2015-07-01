@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2011 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,7 +37,7 @@ import org.voltdb.VoltTable;
 public class SelectBids extends VoltProcedure {
 
     public final SQLStmt select = new SQLStmt(
-            "SELECT * FROM BID ORDER BY BIDID;");
+            "SELECT * FROM BID ORDER BY BIDID,ITEMID;");
 
     /**
      *

@@ -374,6 +374,16 @@ public class SetFunction implements Serializable {
             return Type.SQL_INTEGER;
         }
 
+        // A VoltDB extension to handle aggfnc(*) syntax errors.
+        // If the argument node does not have
+        // a data type, it may be '*'.  If the
+        // operation is COUNT (optype == 71) this is
+        // just fine.  But if it's anything else this
+        // is a syntax error.
+        if (type == null) {
+            throw Error.error(ErrorCode.U_S0500);
+        }
+        // End of VoltDB extension
         int dataType = type.isIntervalType() ? Types.SQL_INTERVAL
                                              : type.typeCode;
 
@@ -407,9 +417,7 @@ public class SetFunction implements Serializable {
                         return Type.SQL_BIGINT;
 
                     case Types.SQL_BIGINT :
-                        // hack by voltdb team to avoid using giant types in sums
-                        //return Type.SQL_DECIMAL_BIGINT_SQR;
-                        return Type.SQL_BIGINT;
+                        return Type.SQL_DECIMAL_BIGINT_SQR;
 
                     case Types.SQL_REAL :
                     case Types.SQL_FLOAT :

@@ -33,16 +33,17 @@ package org.hsqldb_voltpatches.types;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.lib.HashSet;
 
 /**
  * Base class for type objects.<p>
@@ -72,7 +73,6 @@ public abstract class Type implements SchemaObject, Cloneable {
     }
 
     // interface specific methods
-    @Override
     public final int getType() {
 
         if (userTypeModifier == null) {
@@ -82,7 +82,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getType();
     }
 
-    @Override
     public final HsqlName getName() {
 
         if (userTypeModifier == null) {
@@ -92,7 +91,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getName();
     }
 
-    @Override
     public final HsqlName getCatalogName() {
 
         if (userTypeModifier == null) {
@@ -102,7 +100,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSchemaName().schema;
     }
 
-    @Override
     public final HsqlName getSchemaName() {
 
         if (userTypeModifier == null) {
@@ -112,7 +109,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSchemaName();
     }
 
-    @Override
     public final Grantee getOwner() {
 
         if (userTypeModifier == null) {
@@ -122,7 +118,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getOwner();
     }
 
-    @Override
     public final OrderedHashSet getReferences() {
 
         if (userTypeModifier == null) {
@@ -132,7 +127,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getReferences();
     }
 
-    @Override
     public final OrderedHashSet getComponents() {
 
         if (userTypeModifier == null) {
@@ -142,7 +136,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getComponents();
     }
 
-    @Override
     public final void compile(Session session) {
 
         if (userTypeModifier == null) {
@@ -159,7 +152,6 @@ public abstract class Type implements SchemaObject, Cloneable {
      * @return the SQL character sequence required to (re)create the
      *  trigger
      */
-    @Override
     public String getSQL() {
 
         if (userTypeModifier == null) {
@@ -430,7 +422,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         throw Error.runtimeError(ErrorCode.U_S0500, "Type");
     }
 
-    @Override
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -447,7 +438,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return false;
     }
 
-    @Override
     public int hashCode() {
         return typeCode + (int) precision << 8 + scale << 16;
     }
@@ -499,22 +489,60 @@ public abstract class Type implements SchemaObject, Cloneable {
                        0);
     public static final NumberType SQL_DECIMAL =
         new NumberType(Types.SQL_DECIMAL, NumberType.defaultNumericPrecision,
+    // VoltDB BEGIN Cherry-picked code change from hsqldb-2.2.8
                        7);
+    public static final NumberType SQL_DECIMAL_DEFAULT =
+            new NumberType(Types.SQL_DECIMAL, NumberType.defaultNumericPrecision,
+                           NumberType.defaultNumericScale);
+    /* disable 1 line ...
+                       0);
+    ... disabled 1 line */
+    // VoltDB END Cherry-picked code change from hsqldb-2.2.8
     public static final NumberType SQL_DECIMAL_BIGINT_SQR =
+        // A VoltDB extension to disable use of giant types in sums
+        new NumberType(Types.SQL_BIGINT, NumberType.bigintPrecision, 8);
+        /* disable 2 lines ...
         new NumberType(Types.SQL_DECIMAL,
                        NumberType.bigintSquareNumericPrecision, 0);
+        ... disabled 2 lines */
+        // End of VoltDB extension
     public static final NumberType SQL_DOUBLE =
+        // A VoltDB extension -- mysterious
         new NumberType(Types.SQL_DOUBLE, NumberType.doublePrecision, 8);
+        /* disable 1 line ...
+        new NumberType(Types.SQL_DOUBLE, 0, 0);
+        ... disabled 1 line */
+        // End of VoltDB extension
 
     //
     public static final NumberType TINYINT = new NumberType(Types.TINYINT,
+        // A VoltDB extension -- mysterious
         NumberType.tinyintPrecision, 1);
+        /* disable 1 line ...
+        NumberType.tinyintPrecision, 0);
+        ... disabled 1 line */
+        // End of VoltDB extension
     public static final NumberType SQL_SMALLINT =
+        // A VoltDB extension -- mysterious
         new NumberType(Types.SQL_SMALLINT, NumberType.smallintPrecision, 2);
+        /* disable 1 line ...
+        new NumberType(Types.SQL_SMALLINT, NumberType.smallintPrecision, 0);
+        ... disabled 1 line */
+        // End of VoltDB extension
     public static final NumberType SQL_INTEGER =
+        // A VoltDB extension -- mysterious
         new NumberType(Types.SQL_INTEGER, NumberType.integerPrecision, 4);
+        /* disable 1 line ...
+        new NumberType(Types.SQL_INTEGER, NumberType.integerPrecision, 0);
+        ... disabled 1 line */
+        // End of VoltDB extension
     public static final NumberType SQL_BIGINT =
+        // A VoltDB extension -- mysterious
         new NumberType(Types.SQL_BIGINT, NumberType.bigintPrecision, 8);
+        /* disable 1 line ...
+        new NumberType(Types.SQL_BIGINT, NumberType.bigintPrecision, 0);
+        ... disabled 1 line */
+        // End of VoltDB extension
 
     // date time
     public static final DateTimeType SQL_DATE =
@@ -527,7 +555,7 @@ public abstract class Type implements SchemaObject, Cloneable {
                          DTIType.defaultTimeFractionPrecision);
     public static final DateTimeType SQL_TIMESTAMP =
         new DateTimeType(Types.SQL_TIMESTAMP, Types.SQL_TIMESTAMP,
-                         8);
+                         DTIType.defaultTimestampFractionPrecision);
     public static final DateTimeType SQL_TIMESTAMP_WITH_TIME_ZONE =
         new DateTimeType(Types.SQL_TIMESTAMP,
                          Types.SQL_TIMESTAMP_WITH_TIME_ZONE,
@@ -842,7 +870,7 @@ public abstract class Type implements SchemaObject, Cloneable {
                     throw Error.error(ErrorCode.X_42592, "" + precision);
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_REAL :
             case Types.SQL_DOUBLE :
                 return SQL_DOUBLE;
@@ -853,7 +881,10 @@ public abstract class Type implements SchemaObject, Cloneable {
                     precision = NumberType.defaultNumericPrecision;
                 }
 
-                return NumberType.getNumberType(type, precision, 12);
+                // A VoltDB extension to disable variable scale decimals
+                scale = 12;
+                // End of VoltDB extension
+                return NumberType.getNumberType(type, precision, scale);
 
             case Types.SQL_BOOLEAN :
                 return SQL_BOOLEAN;
@@ -917,7 +948,24 @@ public abstract class Type implements SchemaObject, Cloneable {
     static {
         typeNames = new IntValueHashMap(37);
 
-        /*typeNames.put("CHARACTER", Types.SQL_CHAR);
+        // A VoltDB extension to disable unsupported types
+        typeNames.put("TINYINT", Types.TINYINT);
+        typeNames.put("SMALLINT", Types.SQL_SMALLINT);
+        typeNames.put("INTEGER", Types.SQL_INTEGER);
+        typeNames.put("BIGINT", Types.SQL_BIGINT);
+        typeNames.put("FLOAT", Types.SQL_DOUBLE);
+        typeNames.put("DECIMAL", Types.SQL_DECIMAL);
+        typeNames.put("VARCHAR", Types.SQL_VARCHAR);
+        typeNames.put("TIMESTAMP", Types.SQL_TIMESTAMP);
+        typeNames.put("VARBINARY", Types.SQL_VARBINARY);
+
+        typeAliases = new IntValueHashMap(64);
+
+        typeAliases.put("INT", Types.SQL_INTEGER);
+        typeAliases.put("REAL", Types.SQL_DOUBLE);
+        typeAliases.put("CHARACTER", Types.SQL_CHAR);
+        /* disable 28 lines ...
+        typeNames.put("CHARACTER", Types.SQL_CHAR);
         typeNames.put("VARCHAR", Types.SQL_VARCHAR);
         typeNames.put("VARCHAR_IGNORECASE", Types.VARCHAR_IGNORECASE);
         typeNames.put("DATE", Types.SQL_DATE);
@@ -939,42 +987,28 @@ public abstract class Type implements SchemaObject, Cloneable {
         typeNames.put("CLOB", Types.SQL_CLOB);
         typeNames.put("BLOB", Types.SQL_BLOB);
         typeNames.put("BIT", Types.SQL_BIT);
-        typeNames.put("OTHER", Types.OTHER);*/
-
-        // VOLTDB CODE
-        typeNames.put("TINYINT", Types.TINYINT);
-        typeNames.put("SMALLINT", Types.SQL_SMALLINT);
-        typeNames.put("INTEGER", Types.SQL_INTEGER);
-        typeNames.put("BIGINT", Types.SQL_BIGINT);
-        //typeNames.put("FLOAT", Types.SQL_FLOAT);
-        typeNames.put("FLOAT", Types.SQL_DOUBLE);
-        typeNames.put("DECIMAL", Types.SQL_DECIMAL);
-        // typeNames.put("CHAR", Types.SQL_CHAR);
-        typeNames.put("VARCHAR", Types.SQL_VARCHAR);
-        typeNames.put("TIMESTAMP", Types.SQL_TIMESTAMP);
-        typeNames.put("VARBINARY", Types.SQL_VARBINARY);
-
+        typeNames.put("OTHER", Types.OTHER);
 
         //
         typeAliases = new IntValueHashMap(64);
 
-        //typeAliases.put("CHAR", Types.SQL_CHAR);
-        /*
+        typeAliases.put("CHAR", Types.SQL_CHAR);
+        ... disabled 28 lines */
+        // End of VoltDB extension
+/*
         typeAliases.put("CHAR VARYING", Types.SQL_VARCHAR);
         typeAliases.put("CHARACTER VARYING", Types.SQL_VARCHAR);
         typeAliases.put("CHARACTER LARGE OBJECT", Types.SQL_CLOB);
-         */
-        /*typeAliases.put("INT", Types.SQL_INTEGER);
+*/
+        /* disable 6 lines ...
+        typeAliases.put("INT", Types.SQL_INTEGER);
         typeAliases.put("DEC", Types.SQL_DECIMAL);
         typeAliases.put("LONGVARCHAR", Types.SQL_VARCHAR);
         typeAliases.put("DATETIME", Types.SQL_TIMESTAMP);
         typeAliases.put("LONGVARBINARY", Types.SQL_VARBINARY);
-        typeAliases.put("OBJECT", Types.OTHER);*/
-
-        // VOLTDB CODE
-        typeAliases.put("INT", Types.SQL_INTEGER);
-        typeAliases.put("REAL", Types.SQL_DOUBLE);
-        typeAliases.put("CHARACTER", Types.SQL_CHAR);
+        typeAliases.put("OBJECT", Types.OTHER);
+        ... disabled 6 lines */
+        // End of VoltDB extension
 
         //
         basicTypes = new HashSet(37);

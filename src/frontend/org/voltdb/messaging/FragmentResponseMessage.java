@@ -1,29 +1,29 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
 
@@ -151,7 +151,7 @@ public class FragmentResponseMessage extends VoltMessage {
         return m_dependencies.get(index);
     }
 
-    public RuntimeException getException() {
+    public SerializableException getException() {
         return m_exception;
     }
 
@@ -172,10 +172,15 @@ public class FragmentResponseMessage extends VoltMessage {
         // one int per dependency ID
         msgsize += 4 * m_dependencyCount;
 
+        // one byte to indicate null dependency result table
+        msgsize += m_dependencies.size();
+
         // Add the actual result lengths
         for (VoltTable dep : m_dependencies)
         {
-            msgsize += dep.getSerializedSize();
+            if (dep != null) {
+                msgsize += dep.getSerializedSize();
+            }
         }
 
         if (m_exception != null) {
@@ -206,7 +211,13 @@ public class FragmentResponseMessage extends VoltMessage {
 
         for (int i = 0; i < m_dependencyCount; i++)
         {
-            m_dependencies.get(i).flattenToBuffer(buf);
+            VoltTable dep = m_dependencies.get(i);
+            if (dep == null) {
+                buf.put((byte) 0);
+            } else {
+                buf.put((byte) 1);
+                dep.flattenToBuffer(buf);
+            }
         }
 
         if (m_exception != null) {
@@ -232,12 +243,11 @@ public class FragmentResponseMessage extends VoltMessage {
         for (int i = 0; i < m_dependencyCount; i++)
             m_dependencyIds.add(buf.getInt());
         for (int i = 0; i < m_dependencyCount; i++) {
-            FastDeserializer fds = new FastDeserializer(buf);
-            try {
-                m_dependencies.add(fds.readObject(VoltTable.class));
-            } catch (IOException e) {
-                e.printStackTrace();
-                assert(false);
+            boolean isNull = buf.get() == 0 ? true : false;
+            if (isNull) {
+                m_dependencies.add(null);
+            } else {
+                m_dependencies.add(PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf));
             }
         }
         m_exception = SerializableException.deserializeFromBuffer(buf);

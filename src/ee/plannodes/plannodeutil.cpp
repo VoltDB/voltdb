@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -43,19 +43,42 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
 #include "plannodes/plannodeutil.h"
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/FatalException.hpp"
-#include "plannodes/nodes.h"
+#include "plannodes/aggregatenode.h"
+#include "plannodes/deletenode.h"
+#include "plannodes/indexscannode.h"
+#include "plannodes/indexcountnode.h"
+#include "plannodes/tablecountnode.h"
+#include "plannodes/insertnode.h"
+#include "plannodes/limitnode.h"
+#include "plannodes/materializenode.h"
+#include "plannodes/materializedscanplannode.h"
+#include "plannodes/nestloopnode.h"
+#include "plannodes/nestloopindexnode.h"
+#include "plannodes/projectionnode.h"
+#include "plannodes/orderbynode.h"
+#include "plannodes/receivenode.h"
+#include "plannodes/sendnode.h"
+#include "plannodes/seqscannode.h"
+#include "plannodes/tuplescannode.h"
+#include "plannodes/unionnode.h"
+#include "plannodes/updatenode.h"
+
+#include <sstream>
 
 namespace plannodeutil {
 
 voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
-    VOLT_TRACE("Creating an empty PlanNode of type '%s'", plannodeutil::getTypeName(type).c_str());
+    VOLT_TRACE("Creating an empty PlanNode of type '%s'", planNodeToString(type).c_str());
     voltdb::AbstractPlanNode* ret = NULL;
     switch (type) {
+        case (voltdb::PLAN_NODE_TYPE_INVALID): {
+            throwFatalException("INVALID plan node type");
+        }
+            break;
         // ------------------------------------------------------------------
         // SeqScan
         // ------------------------------------------------------------------
@@ -67,6 +90,30 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_INDEXSCAN):
             ret = new voltdb::IndexScanPlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // IndexCount
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_INDEXCOUNT):
+            ret = new voltdb::IndexCountPlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // TableCount
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_TABLECOUNT):
+            ret = new voltdb::TableCountPlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // MaterializedScanPlanNode
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_MATERIALIZEDSCAN):
+            ret = new voltdb::MaterializedScanPlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // TupleScanPlanNode
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_TUPLESCAN):
+            ret = new voltdb::TupleScanPlanNode();
             break;
         // ------------------------------------------------------------------
         // NestLoop
@@ -103,6 +150,7 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_HASHAGGREGATE):
         case (voltdb::PLAN_NODE_TYPE_AGGREGATE):
+        case (voltdb::PLAN_NODE_TYPE_PARTIALAGGREGATE):
             ret = new voltdb::AggregatePlanNode(type);
             break;
         // ------------------------------------------------------------------
@@ -142,141 +190,21 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::LimitPlanNode();
             break;
         // ------------------------------------------------------------------
-        // Distinct
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_DISTINCT):
-            ret = new voltdb::DistinctPlanNode();
-            break;
-        // ------------------------------------------------------------------
         // Receive
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_RECEIVE):
             ret = new voltdb::ReceivePlanNode();
             break;
+        // default: Don't provide a default, let the compiler enforce complete coverage.
+    }
 
-        // ------------------------------------------------------------------
-        // UNKNOWN
-        // ------------------------------------------------------------------
-        default: {
-            throwFatalException("Invalid PlanNode type '%d'", type);
-        }
+    // ------------------------------------------------------------------
+    // UNKNOWN
+    // ------------------------------------------------------------------
+    if (!ret) {
+        throwFatalException("Undefined plan node type '%d'", (int)type);
     }
     //VOLT_TRACE("created plannode : %s ", typeid(*ret).name());
-    return (ret);
-}
-
-std::string getTypeName(voltdb::PlanNodeType type) {
-    std::string ret;
-    switch (type) {
-        // ------------------------------------------------------------------
-        // SeqScan
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_SEQSCAN):
-            ret = "SEQSCAN";
-            break;
-        // ------------------------------------------------------------------
-        // IndexScan
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_INDEXSCAN):
-            ret = "INDEXSCAN";
-            break;
-        // ------------------------------------------------------------------
-        // NestLoop
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_NESTLOOP):
-            ret = "NESTLOOP";
-            break;
-        // ------------------------------------------------------------------
-        // NestLoopIndex
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_NESTLOOPINDEX):
-            ret = "NESTLOOPINDEX";
-            break;
-        // ------------------------------------------------------------------
-        // Update
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_UPDATE):
-            ret = "UPDATE";
-            break;
-        // ------------------------------------------------------------------
-        // Insert
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_INSERT):
-            ret = "INSERT";
-            break;
-        // ------------------------------------------------------------------
-        // Delete
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_DELETE):
-            ret = "DELETE";
-            break;
-        // ------------------------------------------------------------------
-        // Send
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_SEND):
-            ret = "SEND";
-            break;
-        // ------------------------------------------------------------------
-        // Receive
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_RECEIVE):
-            ret = "RECEIVE";
-            break;
-        // ------------------------------------------------------------------
-        // Aggregate
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_AGGREGATE):
-            ret = "AGGREGATE";
-            break;
-        // ------------------------------------------------------------------
-        // HashAggregate
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_HASHAGGREGATE):
-            ret = "HASHAGGREGATE";
-            break;
-        // ------------------------------------------------------------------
-        // Union
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_UNION):
-            ret = "UNION";
-            break;
-        // ------------------------------------------------------------------
-        // OrderBy
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_ORDERBY):
-            ret = "ORDERBY";
-            break;
-        // ------------------------------------------------------------------
-        // Projection
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_PROJECTION):
-            ret = "PROJECTION";
-            break;
-        // ------------------------------------------------------------------
-        // Materialize
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_MATERIALIZE):
-            ret = "MATERIALIZE";
-            break;
-        // ------------------------------------------------------------------
-        // Limit
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_LIMIT):
-            ret = "LIMIT";
-            break;
-        // ------------------------------------------------------------------
-        // Distinct
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_DISTINCT):
-            ret = "DISTINCT";
-            break;
-        // ------------------------------------------------------------------
-        // UNKNOWN
-        // ------------------------------------------------------------------
-        default: {
-            throwFatalException( "Invalid PlanNode type '%d'", type);
-        }
-    }
     return (ret);
 }
 
@@ -294,7 +222,7 @@ std::string debug(const voltdb::AbstractPlanNode* node, std::string spacer) {
     assert(node);
     std::ostringstream buffer;
     //VOLT_ERROR("%s", node->getId().debug().c_str());
-    buffer <<  spacer << "->" << getTypeName(node->getPlanNodeType());
+    buffer <<  spacer << "->" << planNodeToString(node->getPlanNodeType());
     buffer << "[" << node->getPlanNodeId() << "]:\n";
     //VOLT_ERROR("%s", buffer.str().c_str());
 

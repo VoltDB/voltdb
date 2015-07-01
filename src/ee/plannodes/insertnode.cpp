@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -42,25 +42,44 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "insertnode.h"
 
 #include <sstream>
-#include "insertnode.h"
-#include "common/common.h"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
 
 namespace voltdb {
 
-void InsertPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
+PlanNodeType InsertPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INSERT; }
+
+void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     AbstractOperationPlanNode::loadFromJSONObject(obj);
-    json_spirit::Value multiPartitionValue = json_spirit::find_value(obj, "MULTI_PARTITION");
-    if (multiPartitionValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "InsertPlanNode::loadFromJSONObject:"
-                                      " Can't find MULTI_PARTITION value");
+    m_multiPartition = obj.valueForKey("MULTI_PARTITION").asBool();
+    if (obj.hasNonNullKey("FIELD_MAP")) {
+        PlannerDomValue fieldMap = obj.valueForKey("FIELD_MAP");
+        for (int i = 0; i < fieldMap.arrayLen(); ++i) {
+          m_fieldMap.push_back(fieldMap.valueAtIndex(i).asInt());
+        }
     }
-    m_multiPartition = multiPartitionValue.get_bool();
+    m_isUpsert = false;
+    if (obj.hasNonNullKey("UPSERT")) {
+        m_isUpsert = true;
+    }
+    m_sourceIsPartitioned = false;
+    if (obj.hasNonNullKey("SOURCE_IS_PARTITIONED")) {
+        m_sourceIsPartitioned = true;
+    }
 }
 
+void InsertPlanNode::initTupleWithDefaultValues(VoltDBEngine* engine,
+                                                Pool *pool,
+                                                const std::set<int>& fieldsExplicitlySet,
+                                                TableTuple& templateTuple,
+                                                std::vector<int>& nowFields) {
+    m_tcd->initTupleWithDefaultValues(pool,
+                                      engine->getCatalogTable(getTargetTableName()),
+                                      fieldsExplicitlySet,
+                                      templateTuple,
+                                      nowFields);
 }
+
+} // namespace voltdb

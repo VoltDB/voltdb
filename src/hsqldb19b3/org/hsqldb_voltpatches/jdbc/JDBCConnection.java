@@ -31,29 +31,39 @@
 
 package org.hsqldb_voltpatches.jdbc;
 
-import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.NClob;
 import java.sql.PreparedStatement;
-import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
-import java.sql.SQLXML;
-import java.sql.Savepoint;
 import java.sql.Statement;
-import java.sql.Struct;
 import java.util.Calendar;
 import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.Executor;
 
+//#ifdef JAVA4
+import java.sql.Savepoint;
+
+//#endif JAVA4
+//#ifdef JAVA6
+import java.sql.Array;
+import java.sql.SQLClientInfoException;
+import java.sql.NClob;
+import java.sql.SQLXML;
+import java.sql.Struct;
+import java.util.Properties;
+
+//#endif JAVA6
 import org.hsqldb_voltpatches.DatabaseManager;
 import org.hsqldb_voltpatches.DatabaseURL;
+// A VoltDB extension to disable a subpackage dependency
+/* disable 2 lines ...
+import org.hsqldb_voltpatches.ClientConnection;
+import org.hsqldb_voltpatches.ClientConnectionHTTP;
+... disabled 2 lines */
+// End of VoltDB extension
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
@@ -63,6 +73,10 @@ import org.hsqldb_voltpatches.lib.StringUtil;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
+
+import java.sql.SQLData;
+import java.sql.SQLOutput;
+import java.sql.SQLInput;
 
 /* $Id: JDBCConnection.java 3001 2009-06-04 12:31:11Z fredt $ */
 
@@ -178,7 +192,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  *
  * <b>Network Server Database Connections:</b> <p>
  *
- * The {@link org.hsqldb.server.Server Server} database connection <b>&lt;url&gt;</b>
+ * The {@link org.hsqldb_voltpatches.server.Server Server} database connection <b>&lt;url&gt;</b>
  * takes one of the two following forms: <p>
  *
  * <div class="GeneralExample">
@@ -190,7 +204,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * </ol>
  * </div> <p>
  *
- * The {@link org.hsqldb.server.WebServer WebServer} database connection <b>&lt;url&gt;</b>
+ * The {@link org.hsqldb_voltpatches.server.WebServer WebServer} database connection <b>&lt;url&gt;</b>
  * takes one of two following forms: <p>
  *
  * <div class="GeneralExample">
@@ -211,7 +225,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  *
  * For more information on server configuration regarding mounting multiple
  * databases and assigning them <b>&lt;alias&gt;</b> values, please read the
- * Java API documentation for {@link org.hsqldb.server.Server Server} and related
+ * Java API documentation for {@link org.hsqldb_voltpatches.server.Server Server} and related
  * chapters in the general documentation, especially the <em>Advanced Users
  * Guide</em>. <p>
  *
@@ -418,10 +432,10 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * component of the <b>res:</b> database connection <b>&lt;url&gt;</b> is always
  * taken to be relative to the default package and resource URL resolution is
  * always performed using the ClassLoader that loads the
- * org.hsqldb.persist.Logger class. That is, if the <b>&lt;path&gt;</b>
+ * org.hsqldb_voltpatches.persist.Logger class. That is, if the <b>&lt;path&gt;</b>
  * component does not start with '/', then'/' is prepended when obtaining the
  * resource URLs used to read the database files, and only the effective class
- * path of org.hsqldb.persist.Logger's ClassLoader is searched. <p>
+ * path of org.hsqldb_voltpatches.persist.Logger's ClassLoader is searched. <p>
  *
  * <hr>
  *
@@ -443,7 +457,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * all JDBC 2 methods can be called while executing under the version 1.1.x
  * <em>Java Runtime Environment</em><sup><font size="-2">TM</font></sup>.
  * However, in addition to this technique requiring explicit casts to the
- * org.hsqldb.jdbc.* classes, some of the method calls also require
+ * org.hsqldb_voltpatches.jdbc.* classes, some of the method calls also require
  * <code>int</code> values that are defined only in the JDBC 2 or greater
  * version of the {@link java.sql.ResultSet ResultSet} interface.  For this
  * reason, when the product is compiled under JDK 1.1.x, these values are
@@ -479,7 +493,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * When built under a Java runtime that supports JDBC 4.0, HSQLDB distribution
  * jars containing the Driver implementatiton also include the file
  * <code>META-INF/services/java.sql.Driver</code>. This file contains the fully
- * qualified class name ('org.hsqldb.jdbc.JDBCDriver') of the HSQLDB implementation
+ * qualified class name ('org.hsqldb_voltpatches.jdbc.JDBCDriver') of the HSQLDB implementation
  * of <code>java.sql.Driver</code>. <p>
  *
  * Hence, under JDBC 4.0 or greater, applications no longer need to explictly
@@ -660,7 +674,7 @@ public class JDBCConnection implements Connection {
      *
      * Starting with 1.7.2, the support for and behaviour of
      * CallableStatement has changed.  Please read the introductory section
-     * of the documentation for org.hsqldb.jdbc.JDBCCallableStatement.
+     * of the documentation for org.hsqldb_voltpatches.jdbc.JDBCCallableStatement.
      *
      * </div> <!-- end release-specific documentation -->
      *
@@ -3208,6 +3222,20 @@ public class JDBCConnection implements Connection {
                  */
                 sessionProxy = DatabaseManager.newSession(connType, database,
                         user, password, props, zoneSeconds);
+            // A VoltDB extension to disable a module dependencies?
+            /* disable 10 lines ...
+            } else if (connType == DatabaseURL.S_HSQL
+                       || connType == DatabaseURL.S_HSQLS) {
+                sessionProxy = new ClientConnection(host, port, path,
+                        database, isTLS, user, password, zoneSeconds);
+                isNetConn = true;
+            } else if (connType == DatabaseURL.S_HTTP
+                       || connType == DatabaseURL.S_HTTPS) {
+                sessionProxy = new ClientConnectionHTTP(host, port, path,
+                        database, isTLS, user, password, zoneSeconds);
+                isNetConn = true;
+            ... disabled 10 lines */
+            // End of VoltDB extension
             } else {    // alias: type not yet implemented
                 throw Util.invalidArgument(connType);
             }
@@ -3474,6 +3502,8 @@ public class JDBCConnection implements Connection {
         return i;
     }
 
+    /************************* Volt DB Extensions *************************/
+
     public void setSchema(String schema) throws SQLException {
         throw new SQLException();
     }
@@ -3482,11 +3512,11 @@ public class JDBCConnection implements Connection {
         throw new SQLException();
     }
 
-    public void abort(Executor executor) throws SQLException {
+    public void abort(java.util.concurrent.Executor executor) throws SQLException {
         throw new SQLException();
     }
 
-    public void setNetworkTimeout(Executor executor, int milliseconds)
+    public void setNetworkTimeout(java.util.concurrent.Executor executor, int milliseconds)
             throws SQLException {
         throw new SQLException();
     }
@@ -3494,4 +3524,5 @@ public class JDBCConnection implements Connection {
     public int getNetworkTimeout() throws SQLException {
         throw new SQLException();
     }
+    /**********************************************************************/
 }

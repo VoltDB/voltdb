@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -70,7 +70,7 @@ public class IndexOverflowDebugTool extends TestCase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("indexoverflow.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("indexoverflow.xml");
         config.m_backend = BackendTarget.NATIVE_EE_IPC;
-        config.m_ipcPorts.add(10001);
+        config.m_ipcPort = 10001;
         ServerThread localServer = new ServerThread(config);
         localServer.start();
         localServer.waitForInitialization();

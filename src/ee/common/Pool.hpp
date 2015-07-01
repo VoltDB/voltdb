@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -27,6 +27,8 @@
 #include "common/FatalException.hpp"
 
 namespace voltdb {
+static const size_t TEMP_POOL_CHUNK_SIZE = 262144;
+
 #ifndef MEMCHECK
 /**
  * Description of a chunk of memory allocated on the heap
@@ -76,19 +78,9 @@ class Pool {
 public:
 
     Pool() :
-        m_allocationSize(262144), m_maxChunkCount(1), m_currentChunkIndex(0)
+        m_allocationSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(1), m_currentChunkIndex(0)
     {
-#ifdef USE_MMAP
-        char *storage =
-                static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-        if (storage == MAP_FAILED) {
-            std::cout << strerror( errno ) << std::endl;
-            throwFatalException("Failed mmap");
-        }
-#else
-        char *storage = new char[m_allocationSize];
-#endif
-        m_chunks.push_back(Chunk(m_allocationSize, storage));
+        init();
     }
 
     Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
@@ -100,6 +92,10 @@ public:
         m_maxChunkCount(static_cast<std::size_t>(maxChunkCount)),
         m_currentChunkIndex(0)
     {
+        init();
+    }
+
+    void init() {
 #ifdef USE_MMAP
         char *storage =
                 static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
@@ -110,7 +106,7 @@ public:
 #else
         char *storage = new char[m_allocationSize];
 #endif
-        m_chunks.push_back(Chunk(allocationSize, storage));
+        m_chunks.push_back(Chunk(m_allocationSize, storage));
     }
 
     ~Pool() {
@@ -163,10 +159,9 @@ public:
                 char *storage = new char[size];
 #endif
                 m_oversizeChunks.push_back(Chunk(nexthigher(size), storage));
-                Chunk *newChunk = &(*(m_oversizeChunks.end()));
-                newChunk->m_offset = size;
-
-                return newChunk->m_chunkData;
+                Chunk &newChunk = m_oversizeChunks.back();
+                newChunk.m_offset = size;
+                return newChunk.m_chunkData;
             }
 
             /*
@@ -196,9 +191,9 @@ public:
                 char *storage = new char[m_allocationSize];
 #endif
                 m_chunks.push_back(Chunk(m_allocationSize, storage));
-                currentChunk = &(*(m_chunks.rbegin()));
-                currentChunk->m_offset = size;
-                return currentChunk->m_chunkData;
+                Chunk &newChunk = m_chunks.back();
+                newChunk.m_offset = size;
+                return newChunk.m_chunkData;
             }
         }
 
@@ -206,7 +201,7 @@ public:
          * Get the offset into the current chunk. Then increment the
          * offset counter by the amount being allocated.
          */
-        void *retval = &currentChunk->m_chunkData[currentChunk->m_offset];
+        void *retval = currentChunk->m_chunkData + currentChunk->m_offset;
         currentChunk->m_offset += size;
 
         //Ensure 8 byte alignment of future allocations
@@ -217,6 +212,11 @@ public:
 
         return retval;
     }
+
+    /*
+     * Allocate a continous block of memory of the specified size conveniently initialized to 0s
+     */
+    inline void* allocateZeroes(std::size_t size) { return ::memset(allocate(size), 0, size); }
 
     inline void purge() {
         /*
@@ -304,10 +304,7 @@ public:
     }
 
     ~Pool() {
-        for (std::size_t ii = 0; ii < m_allocations.size(); ii++) {
-            delete [] m_allocations[ii];
-        }
-        m_allocations.clear();
+        purge();
     }
 
     /*
@@ -319,6 +316,11 @@ public:
         m_memTotal += size;
         return retval;
     }
+
+    /*
+     * Allocate a continous block of memory of the specified size conveniently initialized to 0s
+     */
+    inline void* allocateZeroes(std::size_t size) { return ::memset(allocate(size), 0, size); }
 
     inline void purge() {
         for (std::size_t ii = 0; ii < m_allocations.size(); ii++) {

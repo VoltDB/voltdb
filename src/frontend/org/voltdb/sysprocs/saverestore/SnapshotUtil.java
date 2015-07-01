@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,7 +19,7 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.BufferedInputStream;
 import java.io.CharArrayWriter;
-import java.io.EOFException;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -31,7 +31,9 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,36 +42,87 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.Exchanger;
-import java.util.concurrent.Future;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
-import java.util.zip.CRC32;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.SimpleClientResponseAdapter;
+import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotInitiationInfo;
+import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
+
 public class SnapshotUtil {
+
+    public final static String HASH_EXTENSION = ".hash";
+    public final static String COMPLETION_EXTENSION = ".finished";
+
+    public static final String JSON_PATH = "path";
+    public static final String JSON_NONCE = "nonce";
+    public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
+    public static final String JSON_HASHINATOR = "hashinator";
+
+    public static final ColumnInfo nodeResultsColumns[] =
+    new ColumnInfo[] {
+        new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
+        new ColumnInfo("HOSTNAME", VoltType.STRING),
+        new ColumnInfo("TABLE", VoltType.STRING),
+        new ColumnInfo("RESULT", VoltType.STRING),
+        new ColumnInfo("ERR_MSG", VoltType.STRING)
+    };
+
+    public static final ColumnInfo partitionResultsColumns[] =
+    new ColumnInfo[] {
+        new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
+        new ColumnInfo("HOSTNAME", VoltType.STRING),
+        new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID),
+        new ColumnInfo("RESULT", VoltType.STRING),
+        new ColumnInfo("ERR_MSG", VoltType.STRING)
+    };
+
+    public static final VoltTable constructNodeResultsTable()
+    {
+        return new VoltTable(nodeResultsColumns);
+    }
+
+    public static final VoltTable constructPartitionResultsTable()
+    {
+        return new VoltTable(partitionResultsColumns);
+    }
 
     /**
      * Create a digest for a snapshot
@@ -88,7 +141,14 @@ public class SnapshotUtil {
         String nonce,
         List<Table> tables,
         int hostId,
-        Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers)
+        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+        Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+        Map<Integer, Long> partitionTransactionIds,
+        Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+        InstanceId instanceId,
+        long timestamp,
+        long clusterCreateTime,
+        int newPartitionCount)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -97,72 +157,234 @@ public class SnapshotUtil {
                 throw new IOException("Unable to write table list file " + f);
             }
         }
-        final FileOutputStream fos = new FileOutputStream(f);
-        StringWriter sw = new StringWriter();
-        JSONStringer stringer = new JSONStringer();
+        boolean success = false;
         try {
-            stringer.object();
-            stringer.key("version").value(1);
-            stringer.key("txnId").value(txnId);
-            stringer.key("tables").array();
-            for (int ii = 0; ii < tables.size(); ii++) {
-                stringer.value(tables.get(ii).getTypeName());
-            }
-            stringer.endArray();
-            stringer.key("exportSequenceNumbers").array();
-            for (Map.Entry<String, List<Pair<Integer, Long>>> entry : exportSequenceNumbers.entrySet()) {
+            final FileOutputStream fos = new FileOutputStream(f);
+            StringWriter sw = new StringWriter();
+            JSONStringer stringer = new JSONStringer();
+            try {
                 stringer.object();
-
-                stringer.key("exportTableName").value(entry.getKey());
-
-                stringer.key("sequenceNumberPerPartition").array();
-                for (Pair<Integer, Long> sequenceNumber : entry.getValue()) {
+                stringer.key("version").value(1);
+                stringer.key("txnId").value(txnId);
+                stringer.key("timestamp").value(timestamp);
+                stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
+                stringer.key("newPartitionCount").value(newPartitionCount);
+                stringer.key("tables").array();
+                for (int ii = 0; ii < tables.size(); ii++) {
+                    stringer.value(tables.get(ii).getTypeName());
+                }
+                stringer.endArray();
+                stringer.key("exportSequenceNumbers").array();
+                for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : exportSequenceNumbers.entrySet()) {
                     stringer.object();
-                    stringer.key("partition").value(sequenceNumber.getFirst());
-                    stringer.key("exportSequenceNumber").value(sequenceNumber.getSecond());
+
+                    stringer.key("exportTableName").value(entry.getKey());
+
+                    stringer.key("sequenceNumberPerPartition").array();
+                    for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
+                        stringer.object();
+                        stringer.key("partition").value(sequenceNumber.getKey());
+                        //First value is the ack offset which matters for pauseless rejoin, but not persistence
+                        stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
+                        stringer.endObject();
+                    }
+                    stringer.endArray();
+
                     stringer.endObject();
                 }
                 stringer.endArray();
 
+                stringer.key("partitionTransactionIds").object();
+                for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
+                    stringer.key(entry.getKey().toString()).value(entry.getValue());
+                }
                 stringer.endObject();
+
+                stringer.key("catalogCRC").value(catalogCRC);
+                stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+                stringer.key("clusterCreateTime").value(clusterCreateTime);
+
+                stringer.key("remoteDCLastIds");
+                stringer.object();
+                for (Map.Entry<Integer, Map<Integer, Pair<Long, Long>>> e : remoteDCLastIds.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    for (Map.Entry<Integer, Pair<Long, Long>> e2 : e.getValue().entrySet()) {
+                        stringer.key(e2.getKey().toString());
+                        stringer.object();
+                        stringer.key("drId").value(e2.getValue().getFirst());
+                        stringer.key("uniqueId").value(e2.getValue().getSecond());
+                        stringer.endObject();
+                    }
+                    stringer.endObject();
+                }
+                stringer.endObject();
+                stringer.key("drTupleStreamStateInfo");
+                stringer.object();
+                for (Map.Entry<Integer, Pair<Long, Long>> e : drTupleStreamInfo.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    stringer.key("sequenceNumber").value(e.getValue().getFirst());
+                    stringer.key("uniqueId").value(e.getValue().getSecond());
+                    stringer.endObject();
+                }
+                stringer.endObject();
+                stringer.endObject();
+            } catch (JSONException e) {
+                throw new IOException(e);
             }
-            stringer.endArray();
-            stringer.key("catalogCRC").value(catalogCRC);
-            stringer.endObject();
-        } catch (JSONException e) {
-            throw new IOException(e);
-        }
 
-        sw.append(stringer.toString());
+            sw.append(stringer.toString());
 
-        final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
-        final CRC32 crc = new CRC32();
-        crc.update(tableListBytes);
-        ByteBuffer fileBuffer = ByteBuffer.allocate(tableListBytes.length + 4);
-        fileBuffer.putInt((int)crc.getValue());
-        fileBuffer.put(tableListBytes);
-        fileBuffer.flip();
-        fos.getChannel().write(fileBuffer);
-        return new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    fos.getChannel().force(true);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } finally {
+            final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
+            final PureJavaCrc32 crc = new PureJavaCrc32();
+            crc.update(tableListBytes);
+            ByteBuffer fileBuffer = ByteBuffer.allocate(tableListBytes.length + 4);
+            fileBuffer.putInt((int)crc.getValue());
+            fileBuffer.put(tableListBytes);
+            fileBuffer.flip();
+            fos.getChannel().write(fileBuffer);
+            success = true;
+            return new Runnable() {
+                @Override
+                public void run() {
                     try {
-                        fos.close();
+                        fos.getChannel().force(true);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
+                    } finally {
+                        try {
+                            fos.close();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
                     }
                 }
+            };
+        } finally {
+            if (!success) {
+                f.delete();
             }
-        };
+        }
+    }
+
+    /**
+     * Write the hashinator config file for a snapshot
+     * @param instId    instance ID
+     * @param path      path to which snapshot files will be written
+     * @param nonce     nonce used to distinguish this snapshot
+     * @param hostId    host ID where this is happening
+     * @param hashData  serialized hash configuration data
+     * @return  Runnable object for asynchronous write flushing
+     * @throws IOException
+     */
+    public static Runnable writeHashinatorConfig(
+        InstanceId instId,
+        String path,
+        String nonce,
+        int hostId,
+        HashinatorSnapshotData hashData)
+    throws IOException
+    {
+        final File file = new VoltFile(path, constructHashinatorConfigFilenameForNonce(nonce, hostId));
+        if (file.exists()) {
+            if (!file.delete()) {
+                throw new IOException("Unable to replace existing hashinator config " + file);
+            }
+        }
+
+        boolean success = false;
+        try {
+            final FileOutputStream fos = new FileOutputStream(file);
+            ByteBuffer fileBuffer = hashData.saveToBuffer(instId);
+            fos.getChannel().write(fileBuffer);
+            success = true;
+            return new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try {
+                        fos.getChannel().force(true);
+                    }
+                    catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    finally {
+                        try {
+                            fos.close();
+                        }
+                        catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            };
+        }
+        finally {
+            if (!success) {
+                file.delete();
+            }
+        }
+    }
+
+    /**
+     * Get the nonce from the filename of the digest file.
+     * @param filename The filename of the digest file
+     * @return The nonce
+     */
+    public static String parseNonceFromDigestFilename(String filename) {
+        if (filename == null || !filename.endsWith(".digest")) {
+            throw new IllegalArgumentException("Bad digest filename: " + filename);
+        }
+
+        return parseNonceFromSnapshotFilename(filename);
+    }
+
+    /**
+     * Get the nonce from the filename of the hashinator config file.
+     * @param filename The filename of the hashinator config file
+     * @return The nonce
+     */
+    public static String parseNonceFromHashinatorConfigFilename(String filename) {
+        if (filename == null || !filename.endsWith(HASH_EXTENSION)) {
+            throw new IllegalArgumentException("Bad hashinator config filename: " + filename);
+        }
+
+        return parseNonceFromSnapshotFilename(filename);
+    }
+
+    /**
+     * Get the nonce from any snapshot-related file.
+     */
+    public static String parseNonceFromSnapshotFilename(String filename)
+    {
+        if (filename == null) {
+            throw new IllegalArgumentException("Bad snapshot filename: " + filename);
+        }
+
+        // For the snapshot catalog
+        if (filename.endsWith(".jar")) {
+            return filename.substring(0, filename.indexOf(".jar"));
+        }
+        // for everything else valid in new format or volt1.2 or earlier table files
+        else if (filename.indexOf("-") > 0) {
+           return filename.substring(0, filename.indexOf("-"));
+        }
+        // volt 1.2 and earlier digest filename
+        else if (filename.endsWith(".digest")) {
+            return filename.substring(0, filename.indexOf(".digest"));
+        }
+        // Hashinator config filename.
+        else if (filename.endsWith(HASH_EXTENSION)) {
+            return filename.substring(0, filename.indexOf(HASH_EXTENSION));
+        }
+
+        throw new IllegalArgumentException("Bad snapshot filename: " + filename);
     }
 
     public static List<JSONObject> retrieveDigests(String path,
-            String nonce) throws Exception {
+            String nonce, VoltLogger logger) throws Exception {
         VoltFile directoryWithDigest = new VoltFile(path);
         ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
         if (directoryWithDigest.listFiles() == null) {
@@ -171,10 +393,57 @@ public class SnapshotUtil {
         for (File f : directoryWithDigest.listFiles()) {
             if ( f.getName().equals(nonce + ".digest") || //old style digest name
                     (f.getName().startsWith(nonce + "-host_") && f.getName().endsWith(".digest"))) {//new style
-                digests.add(CRCCheck(f));
+                JSONObject retval = CRCCheck(f, logger);
+                if (retval != null) {
+                    digests.add(retval);
+                }
             }
         }
         return digests;
+    }
+
+    /**
+     * Read hashinator snapshots into byte buffers.
+     * @param path base snapshot path
+     * @param nonce unique snapshot name
+     * @param maxConfigs max number of good configs to return (0 for all)
+     * @param logger log writer
+     * @return byte buffers for each host
+     * @throws IOException
+     */
+    public static List<ByteBuffer> retrieveHashinatorConfigs(
+        String path,
+        String nonce,
+        int maxConfigs,
+        VoltLogger logger) throws IOException
+   {
+        VoltFile directory = new VoltFile(path);
+        ArrayList<ByteBuffer> configs = new ArrayList<ByteBuffer>();
+        if (directory.listFiles() == null) {
+            return configs;
+        }
+        for (File file : directory.listFiles()) {
+            if (file.getName().startsWith(nonce + "-host_") && file.getName().endsWith(HASH_EXTENSION)) {
+                byte[] rawData = new byte[(int) file.length()];
+                FileInputStream fis = null;
+                DataInputStream dis = null;
+                try {
+                    fis = new FileInputStream(file);
+                    dis = new DataInputStream(fis);
+                    dis.readFully(rawData);
+                    configs.add(ByteBuffer.wrap(rawData));
+                }
+                finally {
+                    if (dis != null) {
+                        dis.close();
+                    }
+                    if (fis != null) {
+                        fis.close();
+                    }
+                }
+            }
+        }
+        return configs;
     }
 
     /**
@@ -192,8 +461,31 @@ public class SnapshotUtil {
         catch (IOException ioe)
         {
             throw new IOException("Unable to write snapshot catalog to file: " +
-                                  path + File.separator + filename);
+                                  path + File.separator + filename, ioe);
         }
+    }
+
+    /**
+     * Write the .complete file for finished snapshot
+     */
+    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId, final VoltLogger logger) throws IOException {
+
+        final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
+        if (f.exists()) {
+            if (!f.delete()) {
+                throw new IOException("Failed to replace existing " + f.getName());
+            }
+        }
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    f.createNewFile();
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
+                }
+            }
+        };
     }
 
     /**
@@ -210,15 +502,16 @@ public class SnapshotUtil {
      * @throws IOException
      *             If CRC does not match
      */
-    public static JSONObject CRCCheck(File f) throws IOException {
+    public static JSONObject CRCCheck(File f, VoltLogger logger) throws IOException {
         final FileInputStream fis = new FileInputStream(f);
         try {
             final BufferedInputStream bis = new BufferedInputStream(fis);
             ByteBuffer crcBuffer = ByteBuffer.allocate(4);
             if (4 != bis.read(crcBuffer.array())) {
-                throw new EOFException(
+                logger.warn(
                         "EOF while attempting to read CRC from snapshot digest " + f +
                         " on host " + CoreUtils.getHostnameOrAddress());
+                return null;
             }
             final int crc = crcBuffer.getInt();
             final InputStreamReader isr = new InputStreamReader(bis, "UTF-8");
@@ -257,12 +550,13 @@ public class SnapshotUtil {
             if (obj == null) {
                 String tableList = caw.toString();
                 byte tableListBytes[] = tableList.getBytes("UTF-8");
-                CRC32 tableListCRC = new CRC32();
+                PureJavaCrc32 tableListCRC = new PureJavaCrc32();
                 tableListCRC.update(tableListBytes);
                 tableListCRC.update("\n".getBytes("UTF-8"));
                 final int calculatedValue = (int)tableListCRC.getValue();
                 if (crc != calculatedValue) {
-                    throw new IOException("CRC of snapshot digest did not match digest contents");
+                    logger.warn("CRC of snapshot digest " + f + " did not match digest contents");
+                    return null;
                 }
 
                 String tableNames[] = tableList.split(",");
@@ -276,7 +570,8 @@ public class SnapshotUtil {
                         obj.append("tables", tableNames[ii]);
                     }
                 } catch (JSONException e) {
-                    throw new IOException(e);
+                    logger.warn("Exception parsing JSON of digest " + f, e);
+                    return null;
                 }
                 return obj;
             } else {
@@ -285,14 +580,18 @@ public class SnapshotUtil {
                  */
                 String tableList = caw.toString();
                 byte tableListBytes[] = tableList.getBytes("UTF-8");
-                CRC32 tableListCRC = new CRC32();
+                PureJavaCrc32 tableListCRC = new PureJavaCrc32();
                 tableListCRC.update(tableListBytes);
                 final int calculatedValue = (int)tableListCRC.getValue();
                 if (crc != calculatedValue) {
-                    throw new IOException("CRC of snapshot digest did not match digest contents");
+                    logger.warn("CRC of snapshot digest " + f + " did not match digest contents");
+                    return null;
                 }
                 return obj;
             }
+        } catch (Exception e) {
+            logger.warn("Exception while parsing snapshot digest " + f, e);
+            return null;
         } finally {
             try {
                 if (fis != null)
@@ -305,9 +604,57 @@ public class SnapshotUtil {
      * Storage for information about files that are part of a specific snapshot
      */
     public static class Snapshot {
+        public Snapshot(String nonce)
+        {
+            m_nonce = nonce;
+            m_txnId = Long.MIN_VALUE;
+        }
+
+        public void setInstanceId(InstanceId id)
+        {
+            if (m_instanceId == null) {
+                m_instanceId = id;
+            }
+            else if (!m_instanceId.equals(id)) {
+                throw new RuntimeException("Snapshot named " + m_nonce +
+                        " has digests with conflicting cluster instance IDs." +
+                        " Please ensure that there is only one snapshot named " + m_nonce + " in your" +
+                        " cluster nodes' VOLTDBROOT directories and try again.");
+            }
+        }
+
+        public InstanceId getInstanceId()
+        {
+            return m_instanceId;
+        }
+
+        public void setTxnId(long txnId)
+        {
+            if (m_txnId != Long.MIN_VALUE) {
+                assert(txnId == m_txnId);
+            }
+            m_txnId = txnId;
+        }
+
+        public long getTxnId()
+        {
+            return m_txnId;
+        }
+
+        public String getNonce()
+        {
+            return m_nonce;
+        }
+
         public final List<File> m_digests = new ArrayList<File>();
+        public File m_hashConfig = null;
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
+        public File m_catalogFile = null;
+
+        private final String m_nonce;
+        private InstanceId m_instanceId = null;
+        private long m_txnId;
     }
 
     /**
@@ -338,6 +685,12 @@ public class SnapshotUtil {
             if (pathname.getName().endsWith(".digest") || pathname.getName().endsWith(".vpt")) {
                 return true;
             }
+            if (pathname.getName().endsWith(".jar")) {
+                return true;
+            }
+            if (pathname.getName().endsWith(HASH_EXTENSION)) {
+                return true;
+            }
             return false;
         }
     };
@@ -363,13 +716,37 @@ public class SnapshotUtil {
             }
 
             for (String snapshotName : snapshotNames) {
+                // izzy: change this to use parseNonceFromSnapshotFilename at some point
                 if (pathname.getName().startsWith(snapshotName + "-")  ||
-                        pathname.getName().equals(snapshotName + ".digest")) {
+                    pathname.getName().equals(snapshotName + ".digest") ||
+                    pathname.getName().equals(snapshotName + HASH_EXTENSION) ||
+                    pathname.getName().equals(snapshotName + ".jar")) {
                     return true;
                 }
             }
 
             return false;
+        }
+    }
+
+    /**
+     * Convenience class to manage the named snapshot map for retrieveSnapshotFiles().
+     */
+    private static class NamedSnapshots {
+
+        private final Map<String, Snapshot> m_map;
+
+        public NamedSnapshots(Map<String, Snapshot> map) {
+            m_map = map;
+        }
+
+        public Snapshot get(String nonce) {
+            Snapshot named_s = m_map.get(nonce);
+            if (named_s == null) {
+                named_s = new Snapshot(nonce);
+                m_map.put(nonce, named_s);
+            }
+            return named_s;
         }
     }
 
@@ -380,18 +757,31 @@ public class SnapshotUtil {
      * @param directory
      * @param snapshots
      * @param filter
-     * @param recursion
      * @param validate
      */
     public static void retrieveSnapshotFiles(
             File directory,
-            Map<Long, Snapshot> snapshots,
+            Map<String, Snapshot> namedSnapshotMap,
             FileFilter filter,
-            int recursion,
-            boolean validate) {
+            boolean validate,
+            VoltLogger logger) {
+
+        NamedSnapshots namedSnapshots = new NamedSnapshots(namedSnapshotMap);
+        retrieveSnapshotFilesInternal(directory, namedSnapshots, filter, validate, logger, 0);
+    }
+
+    private static void retrieveSnapshotFilesInternal(
+            File directory,
+            NamedSnapshots namedSnapshots,
+            FileFilter filter,
+            boolean validate,
+            VoltLogger logger,
+            int recursion) {
+
         if (recursion == 32) {
             return;
         }
+
         if (!directory.exists()) {
             System.err.println("Error: Directory " + directory.getPath() + " doesn't exist");
             return;
@@ -411,7 +801,7 @@ public class SnapshotUtil {
                     System.err.println("Warning: Skipping directory " + f.getPath()
                             + " due to lack of read permission");
                 } else {
-                    retrieveSnapshotFiles( f, snapshots, filter, recursion++, validate);
+                    retrieveSnapshotFilesInternal(f, namedSnapshots, filter, validate, logger, recursion++);
                 }
                 continue;
             }
@@ -430,23 +820,49 @@ public class SnapshotUtil {
 
             try {
                 if (f.getName().endsWith(".digest")) {
-                    JSONObject digest = CRCCheck(f);
+                    JSONObject digest = CRCCheck(f, logger);
+                    if (digest == null) continue;
                     Long snapshotTxnId = digest.getLong("txnId");
-                    Snapshot s = snapshots.get(snapshotTxnId);
-                    if (s == null) {
-                        s = new Snapshot();
-                        snapshots.put(snapshotTxnId, s);
+                    String nonce = parseNonceFromSnapshotFilename(f.getName());
+                    Snapshot named_s = namedSnapshots.get(nonce);
+                    named_s.setTxnId(snapshotTxnId);
+                    InstanceId iid = new InstanceId(0,0);
+                    if (digest.has("instanceId")) {
+                        iid = new InstanceId(digest.getJSONObject("instanceId"));
                     }
+                    named_s.setInstanceId(iid);
                     TreeSet<String> tableSet = new TreeSet<String>();
                     JSONArray tables = digest.getJSONArray("tables");
                     for (int ii = 0; ii < tables.length(); ii++) {
                         tableSet.add(tables.getString(ii));
                     }
-                    s.m_digestTables.add(tableSet);
-                    s.m_digests.add(f);
+                    named_s.m_digestTables.add(tableSet);
+                    named_s.m_digests.add(f);
+                } else if (f.getName().endsWith(".jar")) {
+                    String nonce = parseNonceFromSnapshotFilename(f.getName());
+                    Snapshot named_s = namedSnapshots.get(nonce);
+                    named_s.m_catalogFile = f;
+                } else if (f.getName().endsWith(HASH_EXTENSION)) {
+                    String nonce = parseNonceFromSnapshotFilename(f.getName());
+                    Snapshot named_s = namedSnapshots.get(nonce);
+                    if (validate) {
+                        try {
+                            // Retrieve hashinator config data for validation only.
+                            // Throws IOException when the CRC check fails.
+                            HashinatorSnapshotData hashData = new HashinatorSnapshotData();
+                            hashData.restoreFromFile(f);
+                            named_s.m_hashConfig = f;
+                        }
+                        catch (IOException e) {
+                            logger.warn(String.format("Skipping bad hashinator snapshot file '%s'",
+                                                      f.getPath()));
+                            // Skip bad hashinator files.
+                            continue;
+                        }
+                    }
                 } else {
                     HashSet<Integer> partitionIds = new HashSet<Integer>();
-                    TableSaveFile saveFile = new TableSaveFile(fis.getChannel(), 1, null, true);
+                    TableSaveFile saveFile = new TableSaveFile(fis, 1, null, true);
                     try {
                         for (Integer partitionId : saveFile.getPartitionIds()) {
                             partitionIds.add(partitionId);
@@ -460,22 +876,19 @@ public class SnapshotUtil {
                             }
                         }
                         partitionIds.removeAll(saveFile.getCorruptedPartitionIds());
-                        Snapshot s = snapshots.get(saveFile.getTxnId());
-                        if (s == null) {
-                            s = new Snapshot();
-                            snapshots.put(saveFile.getTxnId(), s);
+                        String nonce = parseNonceFromSnapshotFilename(f.getName());
+                        Snapshot named_s = namedSnapshots.get(nonce);
+                        named_s.setTxnId(saveFile.getTxnId());
+                        TableFiles namedTableFiles = named_s.m_tableFiles.get(saveFile.getTableName());
+                        if (namedTableFiles == null) {
+                            namedTableFiles = new TableFiles(saveFile.isReplicated());
+                            named_s.m_tableFiles.put(saveFile.getTableName(), namedTableFiles);
                         }
-
-                        TableFiles tableFiles = s.m_tableFiles.get(saveFile.getTableName());
-                        if (tableFiles == null) {
-                            tableFiles = new TableFiles(saveFile.isReplicated());
-                            s.m_tableFiles.put(saveFile.getTableName(), tableFiles);
-                        }
-                        tableFiles.m_files.add(f);
-                        tableFiles.m_completed.add(saveFile.getCompleted());
-                        tableFiles.m_validPartitionIds.add(partitionIds);
-                        tableFiles.m_corruptParititionIds.add(saveFile.getCorruptedPartitionIds());
-                        tableFiles.m_totalPartitionCounts.add(saveFile.getTotalPartitions());
+                        namedTableFiles.m_files.add(f);
+                        namedTableFiles.m_completed.add(saveFile.getCompleted());
+                        namedTableFiles.m_validPartitionIds.add(partitionIds);
+                        namedTableFiles.m_corruptParititionIds.add(saveFile.getCorruptedPartitionIds());
+                        namedTableFiles.m_totalPartitionCounts.add(saveFile.getTotalPartitions());
                     } finally {
                         saveFile.close();
                     }
@@ -504,6 +917,18 @@ public class SnapshotUtil {
      * @param snapshot
      */
     public static Pair<Boolean, String> generateSnapshotReport(Long snapshotTxnId, Snapshot snapshot) {
+        return generateSnapshotReport(snapshotTxnId, snapshot, true);
+    }
+
+    /**
+     * Returns a detailed report and a boolean indicating whether the snapshot can be successfully loaded
+     * The implementation supports disabling the hashinator check, e.g. for old snapshots in tests.
+     * @param snapshotTime
+     * @param snapshot
+     * @param expectHashinator
+     */
+    public static Pair<Boolean, String> generateSnapshotReport(
+            Long snapshotTxnId, Snapshot snapshot, boolean expectHashinator) {
         CharArrayWriter caw = new CharArrayWriter();
         PrintWriter pw = new PrintWriter(caw);
         boolean snapshotConsistent = true;
@@ -512,6 +937,7 @@ public class SnapshotUtil {
         pw.println(indentString + "Date: " +
                 new Date(
                         org.voltdb.TransactionIdManager.getTimestampFromTransactionId(snapshotTxnId)));
+
         pw.println(indentString + "Digests:");
         indentString = "\t";
         TreeSet<String> digestTablesSeen = new TreeSet<String>();
@@ -584,6 +1010,19 @@ public class SnapshotUtil {
                 pw.print(table);
             }
             pw.print("\n");
+        }
+
+        /*
+         * Check the hash data (if expected).
+         */
+        if (expectHashinator) {
+            pw.print(indentString + "Hash configuration: ");
+            if (snapshot.m_hashConfig != null) {
+                pw.println(indentString + "present");
+            } else {
+                pw.println(indentString + "not present");
+                snapshotConsistent = false;
+            }
         }
 
         /*
@@ -777,6 +1216,19 @@ public class SnapshotUtil {
     }
 
     /**
+     * Generates the hashinator config filename for the given nonce.
+     * @param nonce
+     * @param hostId
+     */
+    public static final String constructHashinatorConfigFilenameForNonce(String nonce, int hostId) {
+        return (nonce + "-host_" + hostId + HASH_EXTENSION);
+    }
+
+    public static final String constructCompletionFilenameForNonce(String nonce, int hostId) {
+        return (nonce + "-host_" + hostId + COMPLETION_EXTENSION);
+    }
+
+    /**
      * Generates the catalog filename for the given nonce.
      * @param nonce
      */
@@ -818,21 +1270,33 @@ public class SnapshotUtil {
         return save_files;
     }
 
-    public static boolean didSnapshotRequestSucceed(VoltTable results[]) {
+    public static String didSnapshotRequestFailWithErr(VoltTable results[]) {
+        if (results.length < 1) return "HAD NO RESULT TABLES";
         final VoltTable result = results[0];
         result.resetRowPosition();
+        //Crazy old code would return one column with an error message.
+        //Not sure any of it exists anymore
         if (result.getColumnCount() == 1) {
-            return false;
+            if (result.advanceRow()) {
+                return result.getString(0);
+            } else {
+                return "UNKNOWN ERROR WITH ONE COLUMN NO ROW RESULT TABLE";
+            }
         }
 
         //assert(result.getColumnName(1).equals("TABLE"));
-        boolean success = true;
+        String err = null;
         while (result.advanceRow()) {
             if (!result.getString("RESULT").equals("SUCCESS")) {
-                success = false;
+                err = result.getString("ERR_MSG");
             }
         }
-        return success;
+        result.resetRowPosition();
+        return err;
+    }
+
+    public static boolean didSnapshotRequestSucceed(VoltTable result[]) {
+        return didSnapshotRequestFailWithErr(result) == null;
     }
 
     public static boolean isSnapshotInProgress(VoltTable results[]) {
@@ -878,6 +1342,42 @@ public class SnapshotUtil {
         public void handleResponse(ClientResponse resp);
     }
 
+    /*
+     * fatalSnapshotResponseHandler is called when a SnapshotUtil.requestSnapshot response occurs.
+     * This callback runs on the snapshot daemon thread.
+     */
+    public static final SnapshotUtil.SnapshotResponseHandler fatalSnapshotResponseHandler =
+        new SnapshotUtil.SnapshotResponseHandler() {
+            @Override
+            public void handleResponse(ClientResponse resp)
+            {
+                if (resp == null) {
+                    VoltDB.crashLocalVoltDB("Failed to initiate snapshot", false, null);
+                } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                    final String statusString = resp.getStatusString();
+                    if (statusString != null && statusString.contains("Failure while running system procedure @SnapshotSave")) {
+                        VoltDB.crashLocalVoltDB("Failed to initiate snapshot due to node failure, aborting", false, null);
+                    }
+                    VoltDB.crashLocalVoltDB("Failed to initiate snapshot: "
+                                            + resp.getStatusString(), true, null);
+                }
+
+                assert resp != null;
+                VoltTable[] results = resp.getResults();
+                if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                    String appStatus = resp.getAppStatusString();
+                    if (appStatus == null) {
+                        VoltDB.crashLocalVoltDB("Snapshot request failed: "
+                                                + resp.getStatusString(), false, null);
+                    }
+                    // else success
+                } else {
+                    VoltDB.crashLocalVoltDB("Snapshot request failed: " + results[0].toJSONString(),
+                                            false, null);
+                }
+            }
+        };
+
     /**
      * Request a new snapshot. It will retry for a couple of times. If it
      * doesn't succeed in the specified time, an error response will be sent to
@@ -902,101 +1402,21 @@ public class SnapshotUtil {
                                        final SnapshotFormat format,
                                        final String data,
                                        final SnapshotResponseHandler handler,
-                                       final boolean notifyChanges) {
-        final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
-        final Connection c = new Connection() {
+                                       final boolean notifyChanges)
+    {
+        final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
+        final SimpleClientResponseAdapter adapter =
+                new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter", true);
+        final LinkedBlockingQueue<ClientResponse> responses = new LinkedBlockingQueue<ClientResponse>();
+        adapter.registerCallback(clientHandle, new SimpleClientResponseAdapter.Callback() {
             @Override
-            public WriteStream writeStream() {
-                return new WriteStream() {
-
-                    @Override
-                    public void enqueue(DeferredSerialization ds) {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public void enqueue(ByteBuffer b) {
-                        ClientResponseImpl resp = new ClientResponseImpl();
-                        try {
-                            b.position(4);
-                            resp.initFromBuffer(b);
-                            responseExchanger.exchange(resp);
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-
-                    @Override
-                    public void enqueue(ByteBuffer[] b)
-                    {
-                        if (b.length != 1)
-                        {
-                            throw new RuntimeException("Cannot use ByteBuffer chaining in enqueue");
-                        }
-                        enqueue(b[0]);
-                    }
-
-                    @Override
-                    public int calculatePendingWriteDelta(long now) {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public boolean isEmpty() {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public int getOutstandingMessageCount() {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public boolean hadBackPressure() {
-                        throw new UnsupportedOperationException();
-                    }
-
-                };
+            public void handleResponse(ClientResponse response)
+            {
+                responses.offer(response);
             }
+        });
 
-            @Override
-            public NIOReadStream readStream() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void disableReadSelection() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void enableReadSelection() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public String getHostnameOrIP() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public long connectionId() {
-                return Long.MIN_VALUE + 2;
-            }
-
-            @Override
-            public Future<?> unregister() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void queueTask(Runnable r) {
-                throw new UnsupportedOperationException();
-            }
-
-        };
-
-        final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
+        final SnapshotDaemon sd = VoltDB.instance().getClientInterface().getSnapshotDaemon();
         Runnable work = new Runnable() {
             @Override
             public void run() {
@@ -1004,15 +1424,22 @@ public class SnapshotUtil {
                 // abort if unable to succeed in 2 hours
                 final long startTime = System.currentTimeMillis();
                 boolean hasRequested = false;
-                while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
+                while (System.currentTimeMillis() - startTime <= TimeUnit.HOURS.toMillis(2)) {
                     try {
                         if (!hasRequested) {
-                            sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking,
-                                                         format, data, notifyChanges);
+                            sd.createAndWatchRequestNode(clientHandle, adapter, snapInfo, notifyChanges);
                             hasRequested = true;
                         }
 
-                        response = responseExchanger.exchange(null);
+                        try {
+                            response = responses.poll(
+                                    TimeUnit.HOURS.toMillis(2) - (System.currentTimeMillis() - startTime),
+                                    TimeUnit.MILLISECONDS);
+                            if (response == null) break;
+                        } catch (InterruptedException e) {
+                            VoltDB.crashLocalVoltDB("Should never happen", true, e);
+                        }
+
                         VoltTable[] results = response.getResults();
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             break;
@@ -1023,15 +1450,22 @@ public class SnapshotUtil {
                             hasRequested = false;
                             continue;
                         } else if (isSnapshotQueued(results) && notifyChanges) {
-                            // retry after a second
-                            Thread.sleep(1000);
+                            //Wait for an update on the queued state via ZK
                             continue;
                         } else {
                             // other errors are not recoverable
                             break;
                         }
                     } catch (ForwardClientException e) {
-                        break;
+                        //This happens when something goes wrong in the snapshot daemon
+                        //I think it will always be that there was an existing snapshot request
+                        //It should eventually terminate and then we can submit one.
+                        try {
+                            Thread.sleep(5000);
+                        } catch (InterruptedException e1) {}
+                        new VoltLogger("SNAPSHOT").warn("Partition detection was unable to submit a snapshot request" +
+                                "because one already existed. Retrying.");
+                        continue;
                     } catch (InterruptedException ignore) {}
                 }
 
@@ -1043,5 +1477,133 @@ public class SnapshotUtil {
         ThreadFactory factory = CoreUtils.getThreadFactory("Snapshot Request - " + nonce);
         Thread workThread = factory.newThread(work);
         workThread.start();
+    }
+
+    public static String formatHumanReadableDate(long timestamp) {
+        SimpleDateFormat sdf = new SimpleDateFormat(Constants.ODBC_DATE_FORMAT_STRING + "z");
+        sdf.setTimeZone(VoltDB.VOLT_TIMEZONE);
+        return sdf.format(new Date(timestamp));
+    }
+
+    public static byte[] OutputBuffersToBytes(Collection<BBContainer> outputContainers)
+    {
+        ByteBuffer buf = ByteBuffer.allocate(4 + // buffer count
+                                             (8 + 4 + 4) * outputContainers.size()); // buffer info
+
+        buf.putInt(outputContainers.size());
+        for (DBBPool.BBContainer container : outputContainers) {
+            buf.putLong(container.address());
+            buf.putInt(container.b().position());
+            buf.putInt(container.b().remaining());
+        }
+
+        return buf.array();
+    }
+
+    /**
+     * Watch for the completion of a snapshot
+     * @param nonce    The snapshot nonce to watch for
+     * @return A future that will return the SnapshotCompletionEvent
+     */
+    public static ListenableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent>
+    watchSnapshot(final String nonce)
+    {
+        final SettableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent> result =
+            SettableFuture.create();
+
+        SnapshotCompletionInterest interest = new SnapshotCompletionInterest() {
+            @Override
+            public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
+            {
+                if (event.nonce.equals(nonce) && event.didSucceed) {
+                    VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
+                    result.set(event);
+                }
+                return null;
+            }
+        };
+        VoltDB.instance().getSnapshotCompletionMonitor().addInterest(interest);
+
+        return result;
+    }
+
+    /**
+     * Retrieve hashinator config for restore.
+     * @param path snapshot base directory
+     * @param nonce unique snapshot ID
+     * @param hostId host ID
+     * @return hashinator shapshot data
+     * @throws Exception
+     */
+    public static HashinatorSnapshotData retrieveHashinatorConfig(
+            String path, String nonce, int hostId, VoltLogger logger) throws IOException {
+        HashinatorSnapshotData hashData = null;
+        String expectedFileName = constructHashinatorConfigFilenameForNonce(nonce, hostId);
+        File[] files = new VoltFile(path).listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.getName().equals(expectedFileName)) {
+                    hashData = new HashinatorSnapshotData();
+                    hashData.restoreFromFile(file);
+                    break;
+                }
+            }
+        }
+        if (hashData == null && TheHashinator.getConfiguredHashinatorType() == HashinatorType.ELASTIC) {
+            throw new IOException("Missing hashinator data in snapshot");
+        }
+        return hashData;
+    }
+
+    /*
+     * Do parameter checking for the pre-JSON version of @SnapshotRestore old version
+     */
+    public static ClientResponseImpl transformRestoreParamsToJSON(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length == 1) {
+            return null;
+        } else if (params.length == 2) {
+            if (params[0] == null) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                              new VoltTable[0],
+                                              "@SnapshotRestore parameter 0 was null",
+                                              task.getClientHandle());
+            }
+            if (params[1] == null) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                              new VoltTable[0],
+                                              "@SnapshotRestore parameter 1 was null",
+                                              task.getClientHandle());
+            }
+            if (!(params[0] instanceof String)) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                              new VoltTable[0],
+                                              "@SnapshotRestore param 0 (path) needs to be a string, but was type "
+                                              + params[0].getClass().getSimpleName(),
+                                              task.getClientHandle());
+            }
+            if (!(params[1] instanceof String)) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                              new VoltTable[0],
+                                              "@SnapshotRestore param 1 (nonce) needs to be a string, but was type "
+                                              + params[1].getClass().getSimpleName(),
+                                              task.getClientHandle());
+            }
+            JSONObject jsObj = new JSONObject();
+            try {
+                jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
+                jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
+            } catch (JSONException e) {
+                Throwables.propagate(e);
+            }
+            task.setParams( jsObj.toString() );
+            return null;
+        } else {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                          new VoltTable[0],
+                                          "@SnapshotRestore supports a single json document parameter or two parameters (path, nonce), " +
+                                          params.length + " parameters provided",
+                                          task.getClientHandle());
+        }
     }
 }

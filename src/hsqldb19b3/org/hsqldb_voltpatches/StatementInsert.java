@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
@@ -97,7 +96,6 @@ public class StatementInsert extends StatementDML {
      *
      * @return the result of executing the statement
      */
-    @Override
     Result getResult(Session session) {
 
         Table           table              = baseTable;
@@ -178,7 +176,7 @@ public class StatementInsert extends StatementDML {
 
         while (nav.hasNext()) {
             Object[] data       = baseTable.getNewRowData(session);
-            Object[] sourceData = nav.getNext();
+            Object[] sourceData = (Object[]) nav.getNext();
 
             for (int i = 0; i < columnMap.length; i++) {
                 int  j          = columnMap[i];
@@ -232,73 +230,5 @@ public class StatementInsert extends StatementDML {
         }
 
         return newData;
-    }
-
-
-    /*************** VOLTDB *********************/
-
-    private void voltAppendInsertColumns(Session session, VoltXMLElement xml)
-    throws HSQLParseException
-    {
-        VoltXMLElement columns = new VoltXMLElement("columns");
-        xml.children.add(columns);
-        assert(columns != null);
-
-        for (int i = 0; i < insertColumnMap.length; i++)
-        {
-            VoltXMLElement col = new VoltXMLElement("column");
-            columns.children.add(col);
-            col.attributes.put("table", targetTable.tableName.name);
-            col.attributes.put("name", targetTable.getColumn(insertColumnMap[i]).getName().name);
-            col.children.add(insertExpression.nodes[0].nodes[i].voltGetXML(session));
-        }
-    }
-
-    private void voltAppendParameters(Session session, VoltXMLElement xml) {
-
-        VoltXMLElement params = new VoltXMLElement("parameters");
-        xml.children.add(params);
-        assert(params != null);
-
-        for (int i = 0; i < parameters.length; i++) {
-            VoltXMLElement parameter = new VoltXMLElement("parameter");
-            params.children.add(parameter);
-
-            parameter.attributes.put("index", String.valueOf(i));
-            Expression param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId(session));
-            parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
-        }
-    }
-
-    /**
-     * VoltDB added method to get a non-catalog-dependent
-     * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
-     * some names.
-     * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
-     */
-    @Override
-    VoltXMLElement voltGetXML(Session session)
-    throws HSQLParseException
-    {
-        VoltXMLElement insert = new VoltXMLElement("insert");
-
-        switch (type) {
-
-            case StatementTypes.INSERT :
-                insert.attributes.put("table", targetTable.getName().name);
-
-                voltAppendInsertColumns(session, insert);
-                voltAppendParameters(session, insert);
-                break;
-
-            default :
-                insert.name = "unknown";
-                break;
-        }
-
-        return insert;
     }
 }

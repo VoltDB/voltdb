@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,22 +24,29 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.Random;
 
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
+
+    private static int SITES = 3;
+    private static int HOSTS = MiscUtils.isPro() ? 2 : 1;
+    private static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
+    private static boolean hasLocalServer = false;
 
     static final Class<?>[] PROCEDURES =
     {
@@ -54,6 +61,46 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr = client.callProcedure("@Ping");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    private void checkProSysprocError(Client client, String name, int paramCount)
+            throws NoConnectionsException, IOException
+    {
+        // make some dummy params... real ones aren't needed for this test
+        Object[] params = new Object[paramCount];
+        for (int i = 0; i < paramCount; i++) {
+            params[i] = i;
+        }
+
+        try {
+            client.callProcedure(name, params);
+            fail();
+        }
+        catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            if (!e.getClientResponse().getStatusString().contains("Enterprise Edition")) {
+                System.out.println("sup");
+                System.out.println("MESSAGE: " + e.getClientResponse().getStatusString());
+            }
+            assertTrue(e.getClientResponse().getStatusString().contains("Enterprise"));
+        }
+    }
+
+    public void testProSysprocErrorOnCommunity() throws Exception {
+        // this test only applies to community edition
+        if (MiscUtils.isPro()) {
+            return;
+        }
+
+        Client client = getClient();
+
+        checkProSysprocError(client, "@SnapshotSave", 3);
+        checkProSysprocError(client, "@SnapshotRestore", 2);
+        checkProSysprocError(client, "@SnapshotStatus", 0);
+        checkProSysprocError(client, "@SnapshotScan", 2);
+        checkProSysprocError(client, "@SnapshotDelete", 2);
+        // Turns out we don't flag @Promote as enterprise.  Not touching that right now. --izzy
+        //checkProSysprocError(client, "@Promote", 0);
     }
 
     public void testInvalidProcedureName() throws IOException {
@@ -103,150 +150,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             fail();
         }
         catch (ProcCallException pce) {
-            assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
         }
     }
-
-    public void testStatistics() throws Exception {
-        Client client  = getClient();
-
-        //
-        // initiator selector
-        //
-        VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test initiators table: " + results[0].toString());
-        assertEquals(1, results[0].getRowCount());
-        VoltTableRow resultRow = results[0].fetchRow(0);
-        assertNotNull(resultRow);
-        assertEquals("@Statistics", resultRow.getString("PROCEDURE_NAME"));
-        assertEquals( 1, resultRow.getLong("INVOCATIONS"));
-
-        //
-        // invalid selector
-        //
-        try {
-            // No selector at all.
-            client.callProcedure("@Statistics");
-            fail();
-        }
-        catch (ProcCallException ex) {
-            // All badness gets turned into ProcCallExceptions, so we need
-            // to check specifically for this error, otherwise things that
-            // crash the cluster also turn into ProcCallExceptions and don't
-            // trigger failure (ENG-2347)
-            assertEquals("VOLTDB ERROR: PROCEDURE Statistics EXPECTS 3 PARAMS, BUT RECEIVED 1",
-                         ex.getMessage());
-        }
-        try {
-            // Invalid selector
-            client.callProcedure("@Statistics", "garbage", 0);
-            fail();
-        }
-        catch (ProcCallException ex) {}
-
-        //
-        // Partition count
-        //
-        results = client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name(), 0).getResults();
-        assertEquals( 1, results.length);
-        assertTrue( results[0] != null);
-        assertEquals( 1, results[0].getRowCount());
-        assertEquals( 1, results[0].getColumnCount());
-        assertEquals( VoltType.INTEGER, results[0].getColumnType(0));
-        assertTrue( results[0].advanceRow());
-        final int columnCount = (int)results[0].getLong(0);
-        assertTrue (columnCount == 3);
-
-        //
-        // table
-        //
-        results = client.callProcedure("@Statistics", "table", 0).getResults();
-        // one aggregate table returned
-        assertTrue(results.length == 1);
-        // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-        assertEquals(18, results[0].getRowCount());
-
-        System.out.println("Test statistics table: " + results[0].toString());
-
-        results = client.callProcedure("@Statistics", "index", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-
-        //
-        // memory
-        //
-        // give time to seed the stats cache?
-        Thread.sleep(1000);
-        results = client.callProcedure("@Statistics", "memory", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Node memory statistics table: " + results[0].toString());
-        // alternate form
-        results = client.callProcedure("@Statistics", "nodememory", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Node memory statistics table: " + results[0].toString());
-
-        //
-        // procedure
-        //
-        // 3 seconds translates to 3 billion nanos, which overflows internal
-        // values (ENG-1039)
-        results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
-        results = client.callProcedure("@Statistics", "procedure", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test procedures table: " + results[0].toString());
-
-        VoltTable stats = results[0];
-        stats.advanceRow();
-        // Check for overflow
-        long min_time = (Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT);
-        long max_time = (Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT);
-        long avg_time = (Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT);
-        assertTrue("Failed MIN_EXECUTION_TIME > 0, value was: " + min_time,
-                   min_time > 0);
-        assertTrue("Failed MAX_EXECUTION_TIME > 0, value was: " + max_time,
-                   max_time > 0);
-        assertTrue("Failed AVG_EXECUTION_TIME > 0, value was: " + avg_time,
-                   avg_time > 0);
-
-        // check for reasonable values
-        assertTrue("Failed MIN_EXECUTION_TIME > 2,400,000,000ns, value was: " +
-                   min_time,
-                   min_time > 2400000000L);
-        assertTrue("Failed MAX_EXECUTION_TIME > 2,400,000,000ns, value was: " +
-                   max_time,
-                   max_time > 2400000000L);
-        assertTrue("Failed AVG_EXECUTION_TIME > 2,400,000,000ns, value was: " +
-                   avg_time,
-                   avg_time > 2400000000L);
-
-        //
-        // iostats
-        //
-        results = client.callProcedure("@Statistics", "iostats", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test iostats table: " + results[0].toString());
-    }
-
-    //public void testShutdown() {
-    //    running @shutdown kills the JVM.
-    //    not sure how to test this.
-    // }
-
-    // covered by TestSystemInformationSuite
-    /*public void testSystemInformation() throws IOException, ProcCallException {
-        Client client = getClient();
-        VoltTable results[] = client.callProcedure("@SystemInformation").getResults();
-        assertEquals(1, results.length);
-        System.out.println(results[0]);
-    }*/
 
     // Pretty lame test but at least invoke the procedure.
     // "@Quiesce" is used more meaningfully in TestExportSuite.
@@ -258,8 +164,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTable() throws IOException {
+    public void testLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
         Client client = getClient();
+
+        /*
+         * Load a little partitioned data for the mispartitioned check
+         */
+        Random r = new Random(0);
+        for (int ii = 0; ii < 50; ii++) {
+            client.callProcedure(new NullCallback(), "@AdHoc",
+                    "INSERT INTO new_order values (" + (short)(r.nextDouble() * Short.MAX_VALUE) + ");");
+        }
 
         // try the failure case first
         try {
@@ -319,13 +234,27 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             } catch (ProcCallException e) {}
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
                                  replicated_table);
-            VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
 
-            int foundItem = 0;
+            // 20 rows per site for the replicated table.  Wait for it...
+            int rowcount = 0;
+            VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
+            while (rowcount != (20 * SITES * HOSTS)) {
+                rowcount = 0;
+                results = client.callProcedure("@Statistics", "table", 0).getResults();
+                // Check that tables loaded correctly
+                while(results[0].advanceRow()) {
+                    if (results[0].getString("TABLE_NAME").equals("ITEM"))
+                    {
+                        rowcount += results[0].getLong("TUPLE_COUNT");
+                    }
+                }
+            }
 
             System.out.println(results[0]);
 
             // Check that tables loaded correctly
+            int foundItem = 0;
+            results = client.callProcedure("@Statistics", "table", 0).getResults();
             while(results[0].advanceRow()) {
                 if (results[0].getString("TABLE_NAME").equals("ITEM"))
                 {
@@ -334,7 +263,75 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     assertEquals(20, results[0].getLong("TUPLE_COUNT"));
                 }
             }
-            assertEquals(6, foundItem);
+            assertEquals(MiscUtils.isPro() ? 6 : 3, foundItem);
+
+            // Table finally loaded fully should mean that index is okay on first read.
+            VoltTable indexStats =
+                    client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            System.out.println(indexStats);
+            long memorySum = 0;
+            while (indexStats.advanceRow()) {
+                memorySum += indexStats.getLong("MEMORY_ESTIMATE");
+            }
+
+            /*
+             * It takes about a minute to spin through this 1000 times.
+             * Should definitely give a 1 second tick time to fire
+             */
+            long indexMemorySum = 0;
+            for (int ii = 0; ii < 1000; ii++) {
+                indexMemorySum = 0;
+                indexStats = client.callProcedure("@Statistics", "MEMORY", 0).getResults()[0];
+                System.out.println(indexStats);
+                while (indexStats.advanceRow()) {
+                    indexMemorySum += indexStats.getLong("INDEXMEMORY");
+                }
+                boolean success = indexMemorySum != 120;//That is a row count, not memory usage
+                if (success) {
+                    success = memorySum == indexMemorySum;
+                    if (success) {
+                        break;
+                    }
+                }
+                Thread.sleep(1);
+            }
+            assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
+            assertEquals(memorySum, indexMemorySum);
+
+            /*
+             * Test once using the current correct hash function,
+             * expect no mispartitioned rows
+             */
+            ClientResponse cr = client.callProcedure("@ValidatePartitioning", 0, null);
+
+            VoltTable hashinatorMatches = cr.getResults()[1];
+            while (hashinatorMatches.advanceRow()) {
+                assertEquals(1L, hashinatorMatches.getLong("HASHINATOR_MATCHES"));
+            }
+
+            VoltTable validateResult = cr.getResults()[0];
+            System.out.println(validateResult);
+            while (validateResult.advanceRow()) {
+                assertEquals(0L, validateResult.getLong("MISPARTITIONED_ROWS"));
+            }
+
+            /*
+             * Test again with a bad hash function, expect mispartitioned rows
+             */
+            cr = client.callProcedure("@ValidatePartitioning", 0, new byte[] { 0, 0, 0, 9 });
+
+            hashinatorMatches = cr.getResults()[1];
+            while (hashinatorMatches.advanceRow()) {
+                assertEquals(0L, hashinatorMatches.getLong("HASHINATOR_MATCHES"));
+            }
+
+            validateResult = cr.getResults()[0];
+            System.out.println(validateResult);
+            while (validateResult.advanceRow()) {
+                if (validateResult.getString("TABLE").equals("NEW_ORDER")) {
+                    assertTrue(validateResult.getLong("MISPARTITIONED_ROWS") > 0);
+                }
+            }
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -400,6 +397,87 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertTrue(true);
     }
 
+    public void testPause() throws Exception {
+        Client client = getClient();
+        VoltTable[] results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
+        for (VoltTable result : results) {
+            assertEquals(0, result.asScalarLong());
+        }
+
+        ClientResponse resp = client.callProcedure("pauseTestInsert");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (10);");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        // pause
+        Client admin = getAdminClient();
+        resp = admin.callProcedure("@Pause");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        try {
+            client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
+            fail("AdHoc insert did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        try {
+            client.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
+            fail("AdHoc create did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+        try {
+            client.callProcedure("@AdHoc", "DROP TABLE pause_test_tbl;");
+            fail("AdHoc drop did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+        try {
+            client.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+            fail("AdHoc create proc did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+
+        // admin should work fine
+        admin.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
+        admin.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
+        admin.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+        admin.callProcedure("@AdHoc", "DROP TABLE ddl_test1;");
+
+        try {
+            resp = client.callProcedure("@UpdateLogging", m_loggingConfig);
+            fail();
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        try {
+            resp = client.callProcedure("pauseTestInsert");
+            fail();
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        resp = client.callProcedure("@Ping");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        resp = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM pause_test_tbl");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
+        resp = client.callProcedure("pauseTestCount");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
+
+        // resume
+        resp = admin.callProcedure("@Resume");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
+        for (VoltTable result : results) {
+            assertEquals(0, result.asScalarLong());
+        }
+    }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
@@ -438,11 +516,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         ");\n" +
                         "CREATE TABLE NEW_ORDER (\n" +
                         "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
+                        ");\n" +
+                        "CREATE TABLE PAUSE_TEST_TBL (\n" +
+                        "  TEST_ID SMALLINT DEFAULT '0' NOT NULL\n" +
                         ");\n");
 
+        project.setUseDDLSchema(true);
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
+        project.addStmtProcedure("pauseTestCount", "SELECT COUNT(*) FROM pause_test_tbl");
+        project.addStmtProcedure("pauseTestInsert", "INSERT INTO pause_test_tbl VALUES (1)");
 
         /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
                                   BackendTarget.NATIVE_EE_JNI);
@@ -453,10 +537,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("sysproc-cluster.jar", 3, 2, 1,
+        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.SITES, TestSystemProcedureSuite.HOSTS, TestSystemProcedureSuite.KFACTOR,
                                   BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(false);
-        boolean success = config.compile(project);
+        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
+        //boolean success = config.compile(project);
+        boolean success = config.compileWithAdminMode(project, VoltDB.DEFAULT_ADMIN_PORT, false);
         assertTrue(success);
         builder.addServerConfig(config);
 

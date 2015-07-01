@@ -31,9 +31,6 @@
 
 package org.hsqldb_voltpatches.dbinfo;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.LineNumberReader;
 import java.lang.reflect.Method;
 
 import org.hsqldb_voltpatches.Collation;
@@ -44,6 +41,7 @@ import org.hsqldb_voltpatches.Expression;
 import org.hsqldb_voltpatches.ExpressionColumn;
 import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.HsqlNameManager;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.NumberSequence;
 import org.hsqldb_voltpatches.Routine;
 import org.hsqldb_voltpatches.RoutineSchema;
@@ -57,13 +55,10 @@ import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.TriggerDef;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.View;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.FileUtil;
-import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.Iterator;
-import org.hsqldb_voltpatches.lib.LineGroupReader;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.lib.WrapperIterator;
@@ -77,12 +72,21 @@ import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.rights.Right;
 import org.hsqldb_voltpatches.scriptio.ScriptWriterBase;
 import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Charset;
 import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+
+import java.io.InputStream;
+import java.io.LineNumberReader;
+
+import org.hsqldb_voltpatches.lib.LineGroupReader;
+
+import java.io.InputStreamReader;
+
+import org.hsqldb_voltpatches.lib.HashMappedList;
+import org.hsqldb_voltpatches.types.CharacterType;
 
 // fredt@users - 1.7.2 - structural modifications to allow inheritance
 // boucherb@users - 1.7.2 - 20020225
@@ -152,7 +156,6 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
      * @param tableIndex index identifying the system table to generate
      * @return the system table corresponding to the specified index
      */
-    @Override
     protected Table generateTable(int tableIndex) {
 
         switch (tableIndex) {
@@ -885,7 +888,7 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
             row[ireadonly] = ValuePool.getBoolean(s.isReadOnlyDefault());
             row[imaxrows]  = ValuePool.getInt(s.getSQLMaxRows());
             row[ilast_id] =
-                ValuePool.getLong((s.getLastIdentity()).longValue());
+                ValuePool.getLong(((Number) s.getLastIdentity()).longValue());
             row[it_size]   = ValuePool.getInt(s.getTransactionSize());
             row[it_schema] = s.getCurrentSchemaHsqlName().name;
 
@@ -6253,7 +6256,7 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
             if (table.isView()
                     && session.getGrantee().isFullyAccessibleByRole(table)) {
 
-                // fall through
+                // $FALL-THROUGH$
             } else {
                 continue;
             }
@@ -6378,7 +6381,7 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
             if (table.isView()
                     && session.getGrantee().isFullyAccessibleByRole(table)) {
 
-                // fall through
+                // $FALL-THROUGH$
             } else {
                 continue;
             }
@@ -6497,7 +6500,7 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
             if (table.isView()
                     && session.getGrantee().isFullyAccessibleByRole(table)) {
 
-                // fall through
+                // $FALL-THROUGH$
             } else {
                 continue;
             }

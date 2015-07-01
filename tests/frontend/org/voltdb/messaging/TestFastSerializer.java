@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -65,9 +65,12 @@ public class TestFastSerializer extends TestCase {
 
     @Override
     public void tearDown() {
+        heapOut.discard();
+        directOut.discard();
         heapOut = null;
         directOut = null;
         System.gc();
+        System.runFinalization();
     }
 
     public void testHugeMessage() throws IOException {
@@ -97,11 +100,15 @@ public class TestFastSerializer extends TestCase {
         out.write(huge);
         out.writeInt(0x01020304);
 
-        byte[] bytes = out.getBBContainer().b.array();
-        assertEquals(0x01, bytes[huge.length]);
-        assertEquals(0x02, bytes[huge.length+1]);
-        assertEquals(0x03, bytes[huge.length+2]);
-        assertEquals(0x04, bytes[huge.length+3]);
+        try {
+            byte[] bytes = out.getBBContainer().b().array();
+            assertEquals(0x01, bytes[huge.length]);
+            assertEquals(0x02, bytes[huge.length+1]);
+            assertEquals(0x03, bytes[huge.length+2]);
+            assertEquals(0x04, bytes[huge.length+3]);
+        } finally {
+            out.discard();
+        }
     }
 
     public void testClear() throws IOException {
@@ -118,11 +125,9 @@ public class TestFastSerializer extends TestCase {
     }
 
     public void testDirect() throws IOException {
-        directOut = new FastSerializer(false, true);
-        assertTrue(directOut.getBBContainer().b.isDirect());
+        assertTrue(directOut.getBBContainer().b().isDirect());
         testHugeMessage();
         // Should still be direct after resizing.
-        assertTrue(directOut.getBBContainer().b.isDirect());
-        directOut.getBBContainer().discard();
+        assertTrue(directOut.getBBContainer().b().isDirect());
     }
 }

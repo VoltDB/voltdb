@@ -1,39 +1,46 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb;
 
 import java.io.File;
-import java.io.PrintStream;
 import java.io.PrintWriter;
-import java.nio.charset.Charset;
+import java.lang.reflect.InvocationTargetException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
+import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -44,29 +51,26 @@ public class VoltDB {
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
-    public static final int DEFAULT_ZK_PORT = 2181;
+    public static final int DEFAULT_ZK_PORT = 7181;
+    public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
+    public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
     public static final int INITIATOR_SITE_ID = 0;
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
-    // Utility to calculate whether Iv2 is enabled or not for test cases.
-    // There are several ways to enable Iv2, of course. Ideally, use a cluster
-    // command line flag (enableiv2). Second best, use the VOLT_ENABLEIV2
-    // environment variable.
-    //
-    // IMPORTANT: To determine if Iv2 is enabled at runtime,
-    // call RealVoltDB.isIV2Enabled();
-    public static boolean checkTestEnvForIv2()
+    // Utility to try to figure out if this is a test case.  Various junit targets in
+    // build.xml set this environment variable to give us a hint
+    public static boolean isThisATest()
     {
-        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-        if (iv2 == null) {
-            iv2 = System.getProperty("VOLT_ENABLEIV2");
+        String test = System.getenv().get("VOLT_JUSTATEST");
+        if (test == null) {
+            test = System.getProperty("VOLT_JUSTATEST");
         }
-        if (iv2 != null && iv2.equalsIgnoreCase("true")) {
+        if (test != null && test.equalsIgnoreCase("YESYESYES")) {
             return true;
         }
         else {
@@ -77,28 +81,35 @@ public class VoltDB {
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
-    public enum START_ACTION {
-        CREATE, RECOVER, START, REJOIN, LIVE_REJOIN
-    }
+    //The GMT time zone you know and love
+    public static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT+0");
 
-    public static Charset UTF8ENCODING = Charset.forName("UTF-8");
+    //The time zone Volt is actually using, currently always GMT
+    public static final TimeZone VOLT_TIMEZONE = GMT_TIMEZONE;
+
+    //Whatever the default timezone was for this locale before we replaced it
+    public static final TimeZone REAL_DEFAULT_TIMEZONE;
 
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
-        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+        TimeZone.setDefault(GMT_TIMEZONE);
     }
+
     static {
+        REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
     }
 
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
 
-        public List<Integer> m_ipcPorts = Collections.synchronizedList(new LinkedList<Integer>());
+        public int m_ipcPort = DEFAULT_IPC_PORT;
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-        /** use normal JNI backend or optional IPC or HSQLDB backends */
+        /** select normal JNI backend.
+         *  IPC, Valgrind, and HSQLDB are the other options.
+         */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
         /** leader hostname */
@@ -109,9 +120,10 @@ public class VoltDB {
 
         /** name of the deployment file */
         public String m_pathToDeployment = null;
+        public boolean m_deploymentDefault = false;
 
         /** name of the license file, for commercial editions */
-        public String m_pathToLicense = "license.xml";
+        public String m_pathToLicense = null;
 
         /** false if voltdb.so shouldn't be loaded (for example if JVM is
          *  started by voltrun).
@@ -122,12 +134,15 @@ public class VoltDB {
 
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
+        public String m_clientInterface = "";
 
         /** override for the admin port number in the deployment file */
         public int m_adminPort = -1;
+        public String m_adminInterface = "";
 
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = DEFAULT_INTERNAL_PORT;
+        public String m_internalPortInterface = DEFAULT_INTERNAL_INTERFACE;
 
         /** interface to listen to clients on (default: any) */
         public String m_externalInterface = DEFAULT_EXTERNAL_INTERFACE;
@@ -137,17 +152,22 @@ public class VoltDB {
 
         /** port number to use for DR channel (override in the deployment file) */
         public int m_drAgentPortStart = -1;
+        public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
-        public int m_httpPort = Integer.MAX_VALUE;
+        public int m_httpPort = Constants.HTTP_PORT_DISABLED;
+        public String m_httpPortInterface = "";
+
+        public String m_publicInterface = "";
 
         /** running the enterprise version? */
         public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
 
-        public int m_deadHostTimeoutMS = 10000;
+        public int m_deadHostTimeoutMS =
+            org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
 
         /** start up action */
-        public START_ACTION m_startAction = START_ACTION.START;
+        public StartAction m_startAction = null;
 
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
@@ -180,15 +200,31 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        /** set to true to run with iv2 initiation. Good Luck! */
-        public boolean m_enableIV2 = false;
+        public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
+        public String m_commandLogBinding = null;
+
+        /**
+         * Allow a secret CLI config option to test multiple versions of VoltDB running together.
+         * This is used to test online upgrade (currently, for hotfixes).
+         * Also used to test error conditons like incompatible versions running together.
+         */
+        public String m_versionStringOverrideForTest = null;
+        public String m_versionCompatibilityRegexOverrideForTest = null;
+        public String m_buildStringOverrideForTest = null;
 
         public Configuration() {
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
+            // Set start action create.  The cmd line validates that an action is specified, however,
+            // defaulting it to create for local cluster test scripts
+            m_startAction = StartAction.CREATE;
         }
 
         /** Behavior-less arg used to differentiate command lines from "ps" */
         public String m_tag;
+
+        /** Force catalog upgrade even if version matches. */
+        public static boolean m_forceCatalogUpgrade = false;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
@@ -197,18 +233,17 @@ public class VoltDB {
         public Configuration(PortGenerator ports) {
             // Default iv2 configuration to the environment settings.
             // Let explicit command line override the environment.
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
             m_zkInterface = "127.0.0.1:" + ports.next();
+            // Set start action create.  The cmd line validates that an action is specified, however,
+            // defaulting it to create for local cluster test scripts
+            m_startAction = StartAction.CREATE;
         }
 
         public Configuration(String args[]) {
             String arg;
-
-            // let the command line override the environment setting for enable iv2.
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
@@ -221,7 +256,12 @@ public class VoltDB {
 
                 // Handle request for help/usage
                 if (arg.equalsIgnoreCase("-h") || arg.equalsIgnoreCase("--help")) {
-                    usage(System.out);
+                    // We used to print usage here but now we have too many ways to start
+                    // VoltDB to offer help that isn't possibly quite wrong.
+                    // You can probably get here using the legacy voltdb3 script. The usage
+                    // is now a comment in that file.
+                    System.out.println("Please refer to VoltDB documentation for command line usage.");
+                    System.out.flush();
                     System.exit(-1);
                 }
 
@@ -246,33 +286,64 @@ public class VoltDB {
                 }
                 // handle from the command line as two strings <catalog> <filename>
                 else if (arg.equals("port")) {
-                    m_port = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("port ")) {
-                    m_port = Integer.parseInt(arg.substring("port ".length()));
-                }
-                else if (arg.equals("adminport")) {
-                    m_adminPort = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("adminport ")) {
-                    m_adminPort = Integer.parseInt(arg.substring("adminport ".length()));
-                }
-                else if (arg.equals("internalport")) {
-                    m_internalPort = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("internalport ")) {
-                    m_internalPort = Integer.parseInt(arg.substring("internalport ".length()));
-                }
-                else if (arg.equals("replicationport")) {
-                    m_drAgentPortStart = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("replicationport ")) {
-                    m_drAgentPortStart = Integer.parseInt(arg.substring("replicationport ".length()));
-                }
-                else if (arg.startsWith("zkport")) {
-                    m_zkInterface = "127.0.0.1:" + args[++i];
-                }
-                else if (arg.equals("externalinterface")) {
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_port);
+                        m_clientInterface = hap.getHostText();
+                        m_port = hap.getPort();
+                    } else {
+                        m_port = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("adminport")) {
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ADMIN_PORT);
+                        m_adminInterface = hap.getHostText();
+                        m_adminPort = hap.getPort();
+                    } else {
+                        m_adminPort = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("internalport")) {
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_internalPort);
+                        m_internalPortInterface = hap.getHostText();
+                        m_internalPort = hap.getPort();
+                    } else {
+                        m_internalPort = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("replicationport")) {
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_DR_PORT);
+                        m_drInterface = hap.getHostText();
+                        m_drAgentPortStart = hap.getPort();
+                    } else {
+                        m_drAgentPortStart = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("httpport")) {
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_HTTP_PORT);
+                        m_httpPortInterface = hap.getHostText();
+                        m_httpPort = hap.getPort();
+                    } else {
+                        m_httpPort = Integer.parseInt(portStr);
+                    }
+                } else if (arg.startsWith("zkport")) {
+                    //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ZK_PORT);
+                        m_zkInterface = hap.getHostText() + ":" + hap.getPort();
+                    } else {
+                        m_zkInterface = "127.0.0.1:" + portStr.trim();
+                    }
+                } else if (arg.equals("publicinterface")) {
+                    m_publicInterface = args[++i].trim();
+                } else if (arg.startsWith("publicinterface ")) {
+                    m_publicInterface = arg.substring("publicinterface ".length()).trim();
+                } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
                 else if (arg.startsWith("externalinterface ")) {
@@ -283,6 +354,30 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
+                } else if (arg.startsWith("networkbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_networkCoreBindings.offer(core);
+                    }
+                    System.out.println("Network bindings are " + m_networkCoreBindings);
+                }
+                else if (arg.startsWith("computationbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_computationCoreBindings.offer(core);
+                    }
+                    System.out.println("Computation bindings are " + m_computationCoreBindings);
+                }
+                else if (arg.startsWith("executionbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_executionCoreBindings.offer(core);
+                    }
+                    System.out.println("Execution bindings are " + m_executionCoreBindings);
+                } else if (arg.startsWith("commandlogbinding")) {
+                    String binding = args[++i];
+                    if (binding.split(",").length > 1) {
+                        throw new RuntimeException("Command log only supports a single set of bindings");
+                    }
+                    m_commandLogBinding = binding;
+                    System.out.println("Commanglog binding is " + m_commandLogBinding);
                 }
                 else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();
@@ -293,26 +388,31 @@ public class VoltDB {
                 }
                 // synonym for "rejoin host" for backward compatibility
                 else if (arg.equals("rejoinhost")) {
-                    m_startAction = START_ACTION.REJOIN;
+                    m_startAction = StartAction.REJOIN;
                     m_leader = args[++i].trim();
                 }
                 else if (arg.startsWith("rejoinhost ")) {
-                    m_startAction = START_ACTION.REJOIN;
+                    m_startAction = StartAction.REJOIN;
                     m_leader = arg.substring("rejoinhost ".length()).trim();
                 }
 
                 else if (arg.equals("create")) {
-                    m_startAction = START_ACTION.CREATE;
+                    m_startAction = StartAction.CREATE;
                 } else if (arg.equals("recover")) {
-                    m_startAction = START_ACTION.RECOVER;
-                } else if (arg.equals("start")) {
-                    m_startAction = START_ACTION.START;
+                    m_startAction = StartAction.RECOVER;
+                    if (   args.length > i + 1
+                        && args[i+1].trim().equals("safemode")) {
+                        m_startAction = StartAction.SAFE_RECOVER;
+                        i += 1;
+                    }
                 } else if (arg.equals("rejoin")) {
-                    m_startAction = START_ACTION.REJOIN;
+                    m_startAction = StartAction.REJOIN;
                 } else if (arg.startsWith("live rejoin")) {
-                    m_startAction = START_ACTION.LIVE_REJOIN;
+                    m_startAction = StartAction.LIVE_REJOIN;
                 } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
-                    m_startAction = START_ACTION.LIVE_REJOIN;
+                    m_startAction = StartAction.LIVE_REJOIN;
+                } else if (arg.startsWith("add")) {
+                    m_startAction = StartAction.JOIN;
                 }
 
                 else if (arg.equals("replica")) {
@@ -347,27 +447,49 @@ public class VoltDB {
                 }
                 else if (arg.equals("deployment")) {
                     m_pathToDeployment = args[++i];
-                } else if (arg.equals("license")) {
+                }
+                else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("ipcports")) {
-                    String portList = args[++i];
-                    String ports[] = portList.split(",");
-                    for (String port : ports) {
-                        m_ipcPorts.add(Integer.valueOf(port));
-                    }
-                } else if (arg.equals("enableiv2")) {
-                    m_enableIV2 = true;
-                } else {
+                }
+                else if (arg.equalsIgnoreCase("ipcport")) {
+                    String portStr = args[++i];
+                    m_ipcPort = Integer.valueOf(portStr);
+                }
+                else if (arg.equals("forcecatalogupgrade")) {
+                    hostLog.info("Forced catalog upgrade will occur due to command line option.");
+                    m_forceCatalogUpgrade = true;
+                }
+                // version string override for testing online upgrade
+                else if (arg.equalsIgnoreCase("versionoverride")) {
+                    m_versionStringOverrideForTest = args[++i].trim();
+                    m_versionCompatibilityRegexOverrideForTest = args[++i].trim();
+                }
+                else if (arg.equalsIgnoreCase("buildstringoverride"))
+                    m_buildStringOverrideForTest = args[++i].trim();
+                else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
-                    usage();
+                    System.out.println("Please refer to VoltDB documentation for command line usage.");
+                    System.out.flush();
                     System.exit(-1);
                 }
+            }
+
+            if (!m_publicInterface.isEmpty()) {
+                m_httpPortInterface = m_publicInterface;
+            }
+
+            // If no action is specified, issue an error.
+            if (null == m_startAction) {
+                hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
+                System.out.println("Please refer to VoltDB documentation for command line usage.");
+                System.out.flush();
+                System.exit(-1);
             }
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
             // acts as 'recover' and other times as 'create'.
-            if (m_startAction == START_ACTION.RECOVER && m_pathToCatalog != null) {
+            if (m_startAction.doesRecover() && m_pathToCatalog != null) {
                 hostLog.warn("Catalog is ignored for 'recover' action.");
             }
 
@@ -377,8 +499,7 @@ public class VoltDB {
              * only valid leader value ("localhost").
              */
             if (m_leader == null && m_pathToDeployment == null &&
-                (m_startAction != START_ACTION.REJOIN &&
-                 m_startAction != START_ACTION.LIVE_REJOIN)) {
+                !m_startAction.doesRejoin()) {
                 m_leader = "localhost";
             }
         }
@@ -392,81 +513,36 @@ public class VoltDB {
         public boolean validate() {
             boolean isValid = true;
 
-            if (m_startAction == START_ACTION.CREATE &&
-                m_pathToCatalog == null) {
-                isValid = false;
-                hostLog.fatal("The catalog location is missing.");
-            }
+            if (m_startAction == null) {
+                    isValid = false;
+                    hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
+                }
 
             if (m_leader == null) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
             }
 
-            if (m_backend.isIPC) {
-                if (m_ipcPorts.isEmpty()) {
-                    isValid = false;
-                    hostLog.fatal("Specified an IPC backend but did not supply a , " +
-                            " separated list of ports via ipcports param");
-                }
+            // check if start action is not valid in community
+            if ((!m_isEnterprise) && (m_startAction.isEnterpriseOnly())) {
+                isValid = false;
+                hostLog.fatal("VoltDB Community Edition only supports the \"create\" start action.");
+                String msg = m_startAction.featureNameForErrorString();
+                msg += " is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.";
+                hostLog.fatal(msg);
             }
 
             // require deployment file location
-            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
+            if (m_startAction != StartAction.REJOIN && m_startAction != StartAction.LIVE_REJOIN
+                    && m_startAction != StartAction.JOIN) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
                     hostLog.fatal("The deployment file location is empty.");
                 }
-
-                if (m_replicationRole == ReplicationRole.REPLICA) {
-                    if (m_startAction == START_ACTION.RECOVER) {
-                        isValid = false;
-                        hostLog.fatal("Replica cluster only supports create database");
-                    } else {
-                        m_startAction = START_ACTION.CREATE;
-                    }
-                }
-            } else {
-                if (!m_isEnterprise && m_startAction == START_ACTION.LIVE_REJOIN) {
-                    // pauseless rejoin is only available in pro
-                    isValid = false;
-                    hostLog.fatal("Live rejoin is only available in the Enterprise Edition");
-                }
             }
 
             return isValid;
-        }
-
-        /**
-         * Prints a usage message on stderr.
-         */
-        public void usage() { usage(System.err); }
-
-        /**
-         * Prints a usage message on the designated output stream.
-         */
-        public void usage(PrintStream os) {
-            // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
-            // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
-            // GettingStarted.pdf).
-            String message = "";
-            if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
-                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb replica [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
-                        + "       voltdb [live] rejoin host <hostname>\n";
-            } else {
-                message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>\n"
-                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb rejoin host <hostname>\n";
-            }
-            os.print(message);
-            // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
-            hostLog.info(message);
-            // Don't bother logging these for log4j, only dump them to the designated stream.
-            os.println("If action is not specified the default is to 'recover' the database if a snapshot is present otherwise 'create'.");
-            os.println("If no deployment is specified, a default 1 node cluster deployment will be configured.");
         }
 
         /**
@@ -482,13 +558,18 @@ public class VoltDB {
         }
 
         public static String getPathToCatalogForTest(String jarname) {
-            String answer = jarname;
 
             // first try to get the "right" place to put the thing
             if (System.getenv("TEST_DIR") != null) {
-                answer = System.getenv("TEST_DIR") + File.separator + jarname;
+                File testDir = new File(System.getenv("TEST_DIR"));
+                // Create the folder as needed so that "ant junitclass" works when run before
+                // testobjects is created.
+                if (!testDir.exists()) {
+                    boolean created = testDir.mkdirs();
+                    assert(created);
+                }
                 // returns a full path, like a boss
-                return new File(answer).getAbsolutePath();
+                return testDir.getAbsolutePath() + File.separator + jarname;
             }
 
             // try to find an obj directory
@@ -532,117 +613,212 @@ public class VoltDB {
         return m_config.m_backend;
     }
 
-    /**
-     * Exit the process with an error message, optionally with a stack trace.
+    /*
+     * Create a file that starts with the supplied message that contains
+     * human readable stack traces for all java threads in the current process.
      */
-    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
-        wasCrashCalled = true;
-        crashMessage = errMsg;
-        if (ignoreCrash) {
-            throw new AssertionError("Faux crash of VoltDB successful.");
+    public static void dropStackTrace(String message) {
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a stack trace during a junit test.");
+            return;
         }
-
-        List<String> throwerStacktrace = null;
-        if (thrown != null) {
-            throwerStacktrace = new ArrayList<String>();
-            throwerStacktrace.add("Stack trace of thrown exception: " + thrown.toString());
-            for (StackTraceElement ste : thrown.getStackTrace()) {
-                throwerStacktrace.add(ste.toString());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
+        String dateString = sdf.format(new Date());
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+        HostMessenger hm = VoltDB.instance().getHostMessenger();
+        int hostId = 0;
+        if (hm != null) {
+            hostId = hm.getHostId();
+        }
+        String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+        try {
+            PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
+            writer.println(message);
+            printStackTraces(writer);
+            writer.flush();
+            writer.close();
+        } catch (Exception e) {
+            try
+            {
+                VoltLogger log = new VoltLogger("HOST");
+                log.error("Error while dropping stack trace for \"" + message + "\"", e);
+            }
+            catch (RuntimeException rt_ex)
+            {
+                e.printStackTrace();
             }
         }
+    }
 
-        // Even if the logger is null, don't stop.  We want to log the stack trace and
-        // any other pertinent information to a .dmp file for crash diagnosis
-        List<String> currentStacktrace = new ArrayList<String>();
-        currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
+    /*
+     * Print stack traces for all java threads in the current process to the supplied writer
+     */
+    public static void printStackTraces(PrintWriter writer) {
+        printStackTraces(writer, null);
+    }
+
+    /*
+     * Print stack traces for all threads in the process to the supplied writer.
+     * If a List is supplied then the stack frames for the current thread will be placed in it
+     */
+    public static void printStackTraces(PrintWriter writer, List<String> currentStacktrace) {
+        if (currentStacktrace == null) {
+            currentStacktrace = new ArrayList<String>();
+        }
+
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
         StackTraceElement[] myTrace = traces.get(Thread.currentThread());
         for (StackTraceElement ste : myTrace) {
             currentStacktrace.add(ste.toString());
         }
 
-        // Create a special dump file to hold the stack trace
-        try
+        writer.println();
+        writer.println("****** Current Thread ****** ");
+        for (String currentStackElem : currentStacktrace) {
+            writer.println(currentStackElem);
+        }
+
+        writer.println("****** All Threads ******");
+        Iterator<Thread> it = traces.keySet().iterator();
+        while (it.hasNext())
         {
-            TimestampType ts = new TimestampType(new java.util.Date());
-            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-            String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
-            PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
-            writer.println("Time: " + ts);
-            writer.println("Message: " + errMsg);
-
+            Thread key = it.next();
             writer.println();
-            writer.println("Platform Properties:");
-            PlatformProperties pp = PlatformProperties.getPlatformProperties();
-            String[] lines = pp.toLogLines().split("\n");
-            for (String line : lines) {
-                writer.println(line.trim());
-            }
+            StackTraceElement[] st = traces.get(key);
+            writer.println("****** " + key + " ******");
+            for (StackTraceElement ste : st)
+                writer.println(ste);
+        }
+    }
 
-            if (thrown != null) {
-                writer.println();
-                writer.println("****** Exception Thread ****** ");
-                for (String throwerStackElem : throwerStacktrace) {
-                    writer.println(throwerStackElem);
+    public static void crashLocalVoltDB(String errMsg) {
+        crashLocalVoltDB(errMsg, false, null);
+    }
+
+    /**
+     * Exit the process with an error message, optionally with a stack trace.
+     */
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        try {
+            OnDemandBinaryLogger.flush();
+        } catch (Throwable e) {}
+
+        /*
+         * InvocationTargetException suppresses information about the cause, so unwrap until
+         * we get to the root cause
+         */
+        while (thrown instanceof InvocationTargetException) {
+            thrown = ((InvocationTargetException)thrown).getCause();
+        }
+
+        // for test code
+        wasCrashCalled = true;
+        crashMessage = errMsg;
+        if (ignoreCrash) {
+            throw new AssertionError("Faux crash of VoltDB successful.");
+        }
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a crash file during a junit test.");
+        }
+        // end test code
+
+        // try/finally block does its best to ensure death, no matter what context this
+        // is called in
+        try {
+            // slightly less important than death, this try/finally block protects code that
+            // prints a message to stdout
+            try {
+
+                // Even if the logger is null, don't stop.  We want to log the stack trace and
+                // any other pertinent information to a .dmp file for crash diagnosis
+                List<String> currentStacktrace = new ArrayList<String>();
+                currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
+
+                // Create a special dump file to hold the stack trace
+                try
+                {
+                    TimestampType ts = new TimestampType(new java.util.Date());
+                    CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+                    String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+                    PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
+                    writer.println("Time: " + ts);
+                    writer.println("Message: " + errMsg);
+
+                    writer.println();
+                    writer.println("Platform Properties:");
+                    PlatformProperties pp = PlatformProperties.getPlatformProperties();
+                    String[] lines = pp.toLogLines().split("\n");
+                    for (String line : lines) {
+                        writer.println(line.trim());
+                    }
+
+                    if (thrown != null) {
+                        writer.println();
+                        writer.println("****** Exception Thread ****** ");
+                        thrown.printStackTrace(writer);
+                    }
+
+                    printStackTraces(writer, currentStacktrace);
+                    writer.close();
                 }
-            }
+                catch (Throwable err)
+                {
+                    // shouldn't fail, but..
+                    err.printStackTrace();
+                }
 
-            writer.println();
-            writer.println("****** Current Thread ****** ");
-            for (String currentStackElem : currentStacktrace) {
-                writer.println(currentStackElem);
-            }
+                VoltLogger log = null;
+                try
+                {
+                    log = new VoltLogger("HOST");
+                }
+                catch (RuntimeException rt_ex)
+                { /* ignore */ }
 
-            writer.println("****** All Threads ******");
-            Iterator<Thread> it = traces.keySet().iterator();
-            while (it.hasNext())
-            {
-                Thread key = it.next();
-                writer.println();
-                StackTraceElement[] st = traces.get(key);
-                writer.println("****** " + key + " ******");
-                for (StackTraceElement ste : st)
-                    writer.println(ste);
-            }
-            writer.close();
-        }
-        catch (Throwable err)
-        {
-            // shouldn't fail, but..
-            err.printStackTrace();
-        }
-
-        VoltLogger log = null;
-        try
-        {
-            log = new VoltLogger("HOST");
-        }
-        catch (RuntimeException rt_ex)
-        { /* ignore */ }
-
-        if (log != null)
-        {
-            if (thrown != null) {
-                if (stackTrace) {
-                    for (String throwerStackElem : throwerStacktrace) {
-                        log.fatal(throwerStackElem);
+                if (log != null)
+                {
+                    log.fatal(errMsg);
+                    if (thrown != null) {
+                        if (stackTrace) {
+                            log.fatal("Fatal exception", thrown);
+                        } else {
+                            log.fatal(thrown.toString());
+                        }
+                    } else {
+                        if (stackTrace) {
+                            for (String currentStackElem : currentStacktrace) {
+                                log.fatal(currentStackElem);
+                            }
+                        }
                     }
                 } else {
-                    log.fatal(thrown.toString());
-                }
-            } else {
-                log.fatal(errMsg);
-                if (stackTrace) {
-                    for (String currentStackElem : currentStacktrace) {
-                        log.fatal(currentStackElem);
+                    System.err.println(errMsg);
+                    if (thrown != null) {
+                        if (stackTrace) {
+                            thrown.printStackTrace();
+                        } else {
+                            System.err.println(thrown.toString());
+                        }
+                    } else {
+                        if (stackTrace) {
+                            for (String currentStackElem : currentStacktrace) {
+                                System.err.println(currentStackElem);
+                            }
+                        }
                     }
                 }
             }
+            finally {
+                System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
+                System.err.println("The log may contain additional information.");
+            }
         }
-
-        System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
-        System.err.println("The log may contain additional information.");
-        System.exit(-1);
+        finally {
+            ShutdownHooks.useOnlyCrashHooks();
+            System.exit(-1);
+        }
     }
 
     /*
@@ -660,18 +836,29 @@ public class VoltDB {
      * Also notify all connected peers that the node is going down.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
+        // for test code
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
+        // end test code
+
         try {
+            // instruct the rest of the cluster to die
             instance().getHostMessenger().sendPoisonPill(errMsg);
+            // give the pill a chance to make it through the network buffer
+            Thread.sleep(500);
         } catch (Exception e) {
             e.printStackTrace();
+            // sleep even on exception in case the pill got sent before the exception
+            try { Thread.sleep(500); } catch (InterruptedException e2) {}
         }
-        try { Thread.sleep(500); } catch (InterruptedException e) {}
-        crashLocalVoltDB(errMsg, stackTrace, t);
+        // finally block does its best to ensure death, no matter what context this
+        // is called in
+        finally {
+            crashLocalVoltDB(errMsg, stackTrace, t);
+        }
     }
 
     /**
@@ -681,10 +868,8 @@ public class VoltDB {
     public static void main(String[] args) {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
         Configuration config = new Configuration(args);
-
         try {
             if (!config.validate()) {
-                config.usage();
                 System.exit(-1);
             } else {
                 initialize(config);
@@ -726,6 +911,33 @@ public class VoltDB {
      */
     public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance) {
         singleton = testInstance;
+    }
+
+    /**
+     * Selects the a specified m_drInterface over a specified m_externalInterface from m_config
+     * @return an empty string when neither are specified
+     */
+    public static String getDefaultReplicationInterface() {
+        if (m_config.m_drInterface == null || m_config.m_drInterface.isEmpty()) {
+            if (m_config.m_externalInterface == null) {
+                return "";
+            }
+            else {
+                return m_config.m_externalInterface;
+            }
+        }
+        else {
+            return m_config.m_drInterface;
+        }
+    }
+
+    public static int getReplicationPort(int deploymentFilePort) {
+        if (m_config.m_drAgentPortStart != -1) {
+            return m_config.m_drAgentPortStart;
+        }
+        else {
+            return deploymentFilePort;
+        }
     }
 
     @Override

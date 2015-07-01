@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -84,6 +84,42 @@ class ProcedureStatsCollector extends SiteStatsSource {
     private long m_lastFailureCount = 0;
 
     /**
+     * Smallest result size
+     */
+    private int m_minResultSize = Integer.MAX_VALUE;
+    private int m_lastMinResultSize = Integer.MAX_VALUE;
+
+    /**
+     * Largest result size
+     */
+    private int m_maxResultSize = Integer.MIN_VALUE;
+    private int m_lastMaxResultSize = Integer.MIN_VALUE;
+
+    /**
+     * Total result size for calculating averages
+     */
+    private long m_totalResultSize = 0;
+    private long m_lastTotalResultSize = 0;
+
+    /**
+     * Smallest parameter set size
+     */
+    private long m_minParameterSetSize = Long.MAX_VALUE;
+    private long m_lastMinParameterSetSize = Long.MAX_VALUE;
+
+    /**
+     * Largest parameter set size
+     */
+    private long m_maxParameterSetSize = Long.MIN_VALUE;
+    private long m_lastMaxParameterSetSize = Long.MIN_VALUE;
+
+    /**
+     * Total parameter set size for calculating averages
+     */
+    private long m_totalParameterSetSize = 0;
+    private long m_lastTotalParameterSetSize = 0;
+
+    /**
      * Whether to return results in intervals since polling or since the beginning
      */
     private boolean m_interval = false;
@@ -113,8 +149,14 @@ class ProcedureStatsCollector extends SiteStatsSource {
      * Called after a procedure is finished executing. Compares the start and end time and calculates
      * the statistics.
      */
-    public final void endProcedure(boolean aborted, boolean failed) {
+    public final void endProcedure(
+            boolean aborted,
+            boolean failed,
+            VoltTable[] results,
+            ParameterSet parameterSet) {
         if (m_currentStartTime > 0) {
+            // This is a sampled invocation.
+            // Update timings and size statistics.
             final long endTime = System.nanoTime();
             final long delta = endTime - m_currentStartTime;
             if (delta < 0)
@@ -130,10 +172,32 @@ class ProcedureStatsCollector extends SiteStatsSource {
             {
                 m_totalTimedExecutionTime += delta;
                 m_timedInvocations++;
+
+                // sampled timings
                 m_minExecutionTime = Math.min( delta, m_minExecutionTime);
                 m_maxExecutionTime = Math.max( delta, m_maxExecutionTime);
                 m_lastMinExecutionTime = Math.min( delta, m_lastMinExecutionTime);
                 m_lastMaxExecutionTime = Math.max( delta, m_lastMaxExecutionTime);
+
+                // sampled size statistics
+                int resultSize = 0;
+                if (results != null) {
+                    for (VoltTable result : results ) {
+                        resultSize += result.getSerializedSize();
+                    }
+                }
+                m_totalResultSize += resultSize;
+                m_minResultSize = Math.min(resultSize, m_minResultSize);
+                m_maxResultSize = Math.max(resultSize, m_maxResultSize);
+                m_lastMinResultSize = Math.min(resultSize, m_lastMinResultSize);
+                m_lastMaxResultSize = Math.max(resultSize, m_lastMaxResultSize);
+                long parameterSetSize = (
+                        parameterSet != null ? parameterSet.getSerializedSize() : 0);
+                m_totalParameterSetSize += parameterSetSize;
+                m_minParameterSetSize = Math.min(parameterSetSize, m_minParameterSetSize);
+                m_maxParameterSetSize = Math.max(parameterSetSize, m_maxParameterSetSize);
+                m_lastMinParameterSetSize = Math.min(parameterSetSize, m_lastMinParameterSetSize);
+                m_lastMaxParameterSetSize = Math.max(parameterSetSize, m_lastMaxParameterSetSize);
             }
             m_currentStartTime = -1;
         }
@@ -164,7 +228,12 @@ class ProcedureStatsCollector extends SiteStatsSource {
         long maxExecutionTime = m_maxExecutionTime;
         long abortCount = m_abortCount;
         long failureCount = m_failureCount;
-
+        int minResultSize = m_minResultSize;
+        int maxResultSize = m_maxResultSize;
+        long totalResultSize = m_totalResultSize;
+        long minParameterSetSize = m_minParameterSetSize;
+        long maxParameterSetSize = m_maxParameterSetSize;
+        long totalParameterSetSize = m_totalParameterSetSize;
 
         if (m_interval) {
             invocations = m_invocations - m_lastInvocations;
@@ -186,6 +255,17 @@ class ProcedureStatsCollector extends SiteStatsSource {
             maxExecutionTime = m_lastMaxExecutionTime;
             m_lastMinExecutionTime = Long.MAX_VALUE;
             m_lastMaxExecutionTime = Long.MIN_VALUE;
+
+            minResultSize = m_lastMinResultSize;
+            maxResultSize = m_lastMaxResultSize;
+            m_lastMinResultSize = Integer.MAX_VALUE;
+            m_lastMaxResultSize = Integer.MIN_VALUE;
+
+            totalResultSize = m_totalResultSize - m_lastTotalResultSize;
+            m_lastTotalResultSize = m_totalResultSize;
+
+            totalParameterSetSize = m_totalParameterSetSize - m_lastTotalParameterSetSize;
+            m_lastTotalParameterSetSize = m_totalParameterSetSize;
         }
 
         rowValues[columnNameToIndex.get("INVOCATIONS")] = invocations;
@@ -195,11 +275,21 @@ class ProcedureStatsCollector extends SiteStatsSource {
         if (timedInvocations != 0) {
             rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] =
                  (totalTimedExecutionTime / timedInvocations);
+            rowValues[columnNameToIndex.get("AVG_RESULT_SIZE")] =
+                    (totalResultSize / timedInvocations);
+            rowValues[columnNameToIndex.get("AVG_PARAMETER_SET_SIZE")] =
+                    (totalParameterSetSize / timedInvocations);
         } else {
             rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = 0L;
+            rowValues[columnNameToIndex.get("AVG_RESULT_SIZE")] = 0L;
+            rowValues[columnNameToIndex.get("AVG_PARAMETER_SET_SIZE")] = 0L;
         }
         rowValues[columnNameToIndex.get("ABORTS")] = abortCount;
         rowValues[columnNameToIndex.get("FAILURES")] = failureCount;
+        rowValues[columnNameToIndex.get("MIN_RESULT_SIZE")] = minResultSize;
+        rowValues[columnNameToIndex.get("MAX_RESULT_SIZE")] = maxResultSize;
+        rowValues[columnNameToIndex.get("MIN_PARAMETER_SET_SIZE")] = minParameterSetSize;
+        rowValues[columnNameToIndex.get("MAX_PARAMETER_SET_SIZE")] = maxParameterSetSize;
     }
 
     /**
@@ -216,6 +306,12 @@ class ProcedureStatsCollector extends SiteStatsSource {
         columns.add(new VoltTable.ColumnInfo("MIN_EXECUTION_TIME", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("MAX_EXECUTION_TIME", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("AVG_EXECUTION_TIME", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("MIN_RESULT_SIZE", VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo("MAX_RESULT_SIZE", VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo("AVG_RESULT_SIZE", VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo("MIN_PARAMETER_SET_SIZE", VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo("MAX_PARAMETER_SET_SIZE", VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("ABORTS", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("FAILURES", VoltType.BIGINT));
     }
@@ -227,11 +323,12 @@ class ProcedureStatsCollector extends SiteStatsSource {
             boolean givenNext = false;
             @Override
             public boolean hasNext() {
-                if (!m_interval) {
-                    if (m_invocations == 0) {
+                if (!getInterval()) {
+                    if (getInvocations() == 0) {
                         return false;
                     }
-                } else if (m_invocations - m_lastInvocations == 0){
+                }
+                else if (getInvocations() - getLastInvocations() == 0) {
                     return false;
                 }
                 return !givenNext;
@@ -255,5 +352,29 @@ class ProcedureStatsCollector extends SiteStatsSource {
     @Override
     public String toString() {
         return m_catProc.getTypeName();
+    }
+
+    /**
+     * Accessor
+     * @return the m_interval
+     */
+    public boolean getInterval() {
+        return m_interval;
+    }
+
+    /**
+     * Accessor
+     * @return the m_invocations
+     */
+    public long getInvocations() {
+        return m_invocations;
+    }
+
+    /**
+     * Accessor
+     * @return the m_lastInvocations
+     */
+    public long getLastInvocations() {
+        return m_lastInvocations;
     }
 }

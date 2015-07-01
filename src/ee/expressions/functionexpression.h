@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -24,9 +24,9 @@
 #include "expressions/abstractexpression.h"
 
 // IMPORTANT: These FUNC_... values must be kept synchronized with those listed in the following hsql parser source files:
-// FunctionsSQL.java       -- standard SQL functions
-// FunctionsCustom.java    -- JDBC (Open Group SQL) functions
-// FunctionsForVoltDB.java -- VoltDB extensions
+// FunctionSQL.java       -- standard SQL functions
+// FunctionCustom.java    -- JDBC (Open Group SQL) functions
+// FunctionForVoltDB.java -- VoltDB extensions
 
 // Note that function names and function IDs need not correspond one-to-one.
 // A function name (especially one in the Custom/JDBC/OpenGroup category) may be just an alias for another function,
@@ -138,10 +138,13 @@ static const int FUNC_SUBSTR           = 139;
 static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 
-// Specializations of EXTRACT.
-// They are based on various sets of constants and need to be adjusted by a constant offset
-// to prevent conflict with the other FUNC_ definitions
+// Function ID offsets for specializations of EXTRACT and TRIM.
+// Individual ID values are based on various Tokens.java constants
+// and need to be adjusted by these constant offsets to avoid overlap
+// with other sources of Function ID constants.
+// These are from FunctionSQL.java
 static const int SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
+static const int SQL_TRIM_VOLT_FUNC_OFFSET = 2000;
 
 // These are from DTIType.java
 static const int SQL_TYPE_NUMBER_LIMIT = 256;
@@ -163,6 +166,7 @@ static const int SQL_DAY_OF_MONTH     = 610;
 static const int SQL_DAY_OF_YEAR      = 611;
 static const int SQL_WEEK_OF_YEAR     = 592;
 static const int SQL_QUARTER          = 609;
+static const int SQL_WEEKDAY          = 741;
 
 // These are from Types.java.
 static const int SQL_INTERVAL_YEAR             = 101;
@@ -196,19 +200,68 @@ static const int FUNC_EXTRACT_INTERVAL_DAY              = SQL_EXTRACT_VOLT_FUNC_
 static const int FUNC_EXTRACT_INTERVAL_HOUR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_HOUR;
 static const int FUNC_EXTRACT_INTERVAL_MINUTE           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_MINUTE;
 static const int FUNC_EXTRACT_INTERVAL_SECOND           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_SECOND;
+static const int FUNC_EXTRACT_WEEKDAY                   = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_WEEKDAY;
 
 // VoltDB aliases (optimized implementations for existing HSQL functions)
 static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
 
 // VoltDB-specific functions
 static const int FUNC_VOLT_SQL_ERROR                   = 20000;
+static const int FUNC_DECODE                           = 20001;
+static const int FUNC_VOLT_FIELD                       = 20002;
+static const int FUNC_VOLT_ARRAY_ELEMENT               = 20003;
+static const int FUNC_VOLT_ARRAY_LENGTH                = 20004;
+static const int FUNC_SINCE_EPOCH                      = 20005;
+static const int FUNC_SINCE_EPOCH_SECOND               = 20006;
+static const int FUNC_SINCE_EPOCH_MILLISECOND          = 20007;
+static const int FUNC_SINCE_EPOCH_MICROSECOND          = 20008;
+static const int FUNC_TO_TIMESTAMP                     = 20009;
+static const int FUNC_TO_TIMESTAMP_SECOND              = 20010;
+static const int FUNC_TO_TIMESTAMP_MILLISECOND         = 20011;
+static const int FUNC_TO_TIMESTAMP_MICROSECOND         = 20012;
+
+// VoltDB truncate timestamp function
+static const int FUNC_TRUNCATE_TIMESTAMP               = 20013; // FUNC_TRUNCATE is defined as 80 already
+static const int FUNC_TRUNCATE_YEAR                    = 20014;
+static const int FUNC_TRUNCATE_QUARTER                 = 20015;
+static const int FUNC_TRUNCATE_MONTH                   = 20016;
+static const int FUNC_TRUNCATE_DAY                     = 20017;
+static const int FUNC_TRUNCATE_HOUR                    = 20018;
+static const int FUNC_TRUNCATE_MINUTE                  = 20019;
+static const int FUNC_TRUNCATE_SECOND                  = 20020;
+static const int FUNC_TRUNCATE_MILLISECOND             = 20021;
+static const int FUNC_TRUNCATE_MICROSECOND             = 20022;
+
+static const int FUNC_VOLT_FROM_UNIXTIME               = 20023;
+
+static const int FUNC_VOLT_SET_FIELD                   = 20024;
+
+static const int FUNC_VOLT_FORMAT_CURRENCY             = 20025;
+
+static const int FUNC_VOLT_BITNOT                      = 20026;
+static const int FUNC_VOLT_BIT_SHIFT_LEFT              = 20027;
+static const int FUNC_VOLT_BIT_SHIFT_RIGHT             = 20028;
+static const int FUNC_VOLT_HEX                         = 20029;
+static const int FUNC_VOLT_BIN                         = 20030;
+
+// From Tokens.java.
+static const int SQL_TRIM_LEADING                     = 149;
+static const int SQL_TRIM_TRAILING                    = 284;
+static const int SQL_TRIM_BOTH                        = 22;
+
+static const int FUNC_TRIM_LEADING_CHAR               = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_LEADING;
+static const int FUNC_TRIM_TRAILING_CHAR              = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_TRAILING;
+static const int FUNC_TRIM_BOTH_CHAR                  = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_BOTH;
 
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions
 // (FUNC_... constants and ...FunctionExpressionTemplates).
+#include "bitwisefunctions.h"
 #include "datefunctions.h"
 #include "numericfunctions.h"
 #include "stringfunctions.h"
+#include "logicfunctions.h"
+#include "jsonfunctions.h"
 
 #endif

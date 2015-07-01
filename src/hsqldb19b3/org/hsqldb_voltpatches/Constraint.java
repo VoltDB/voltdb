@@ -66,7 +66,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
 import org.hsqldb_voltpatches.index.Index;
@@ -116,7 +115,10 @@ public final class Constraint implements SchemaObject {
                             UNIQUE         = 2,
                             CHECK          = 3,
                             PRIMARY_KEY    = 4,
-                            TEMP           = 5;
+                            TEMP           = 5,
+    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+                            LIMIT          = 6;
+    // End of VoltDB extension
     ConstraintCore          core;
     private HsqlName        name;
     int                     constType;
@@ -175,6 +177,16 @@ public final class Constraint implements SchemaObject {
         copy.notNullColumnIndex = notNullColumnIndex;
         copy.rangeVariable      = rangeVariable;
         copy.schemaObjectNames  = schemaObjectNames;
+        // A VoltDB extension to support the assume unique attribute
+        copy.assumeUnique       = assumeUnique;
+        // End of VoltDB extension
+        // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+        copy.rowsLimit          = rowsLimit;
+        copy.rowsLimitDeleteStmt = rowsLimitDeleteStmt;
+        // End of VoltDB extension
+        // A VoltDB extension to support indexed expressions
+        copy.indexExprs         = indexExprs;
+        // End of VoltDB extension
 
         return copy;
     }
@@ -317,6 +329,11 @@ public final class Constraint implements SchemaObject {
 
                 sb.append(Tokens.T_UNIQUE);
 
+                // A VoltDB extension to support indexed expressions
+                if (indexExprs != null) {
+                    return getExprList(sb);
+                }
+                // End of VoltDB extension
                 int[] col = getMainColumns();
 
                 getColumnList(getMain(), col, col.length, sb);
@@ -584,7 +601,10 @@ public final class Constraint implements SchemaObject {
             case FOREIGN_KEY :
                 return core.refCols.length == 1 && core.refCols[0] == colIndex
                        && core.mainTable == core.refTable;
-
+            // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+            case LIMIT :
+                return false; // LIMIT PARTITION ROWS depends on no columns
+            // End of VoltDB extension
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
         }
@@ -613,6 +633,11 @@ public final class Constraint implements SchemaObject {
                        && (core.mainCols.length != 1
                            || core.mainTable == core.refTable);
 
+            // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+            case LIMIT :
+                return false; // LIMIT PARTITION ROWS depends on no columns
+            // End of VoltDB extension
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
         }
@@ -632,6 +657,11 @@ public final class Constraint implements SchemaObject {
 
             case FOREIGN_KEY :
                 return ArrayUtil.find(core.refCols, colIndex) != -1;
+
+            // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+            case LIMIT :
+                return false; // LIMIT PARTITION ROWS depends on no columns
+            // End of VoltDB extension
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
@@ -1011,7 +1041,31 @@ public final class Constraint implements SchemaObject {
         }
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
+
+    // !!!!!!!!
+    // NOTE!  IF YOU ARE GOING TO ADD NEW MEMBER FIELDS HERE YOU
+    // NEED TO MAKE SURE THEY GET ADDED TO Constraint.duplicate()
+    // AT THE TOP OF THE FILE OR ALTER WILL HATE YOU --izzy
+
+    // A VoltDB extension to support indexed expressions
+    Expression[] indexExprs;
+    // End of VoltDB extension
+    // A VoltDB extension to support the assume unique attribute
+    boolean assumeUnique = false;
+    // End of VoltDB extension
+    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+    int rowsLimit = Integer.MAX_VALUE; // For VoltDB
+    String rowsLimitDeleteStmt;
+    // End of VoltDB extension
+
+    // A VoltDB extension to support indexed expressions
+    // and new kinds of constraints
+    public Constraint withExpressions(Expression[] exprs) {
+        indexExprs = exprs;
+        return this;
+    }
+    // End of VoltDB extension
 
     /**
      * @return The name of this constraint instance's type.
@@ -1023,6 +1077,7 @@ public final class Constraint implements SchemaObject {
             case UNIQUE: return "UNIQUE";
             case CHECK: return isNotNull ? "NOT_NULL" : "CHECK";
             case PRIMARY_KEY: return "PRIMARY_KEY";
+            case LIMIT: return "LIMIT";
         }
         return "UNKNOWN";
     }
@@ -1034,50 +1089,76 @@ public final class Constraint implements SchemaObject {
      * some names.
      * @return XML, correctly indented, representing this object.
      */
-    VoltXMLElement voltGetXML(Session session)
-    throws HSQLParseException
+    VoltXMLElement voltGetConstraintXML()
     {
-        VoltXMLElement constraint = null;
+        // Skip "MAIN" constraints, as they are a side effect of foreign key constraints and add no new info.
+        if (this.constType == MAIN) {
+            return null;
+        }
 
-        // Skip "MAIN" constraints, as they are the parent of foreign key references
-        if (this.constType != MAIN) {
-            constraint = new VoltXMLElement("constraint");
+        VoltXMLElement constraint = new VoltXMLElement("constraint");
+        // WARNING: the name attribute setting is tentative, subject to reset in the
+        // calling function, Table.voltGetTableXML.
+        constraint.attributes.put("name", getName().name);
+        constraint.attributes.put("constrainttype", getTypeName());
+        constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
+        constraint.attributes.put("rowslimit", String.valueOf(rowsLimit));
+        if (rowsLimitDeleteStmt != null) {
+            constraint.attributes.put("rowslimitdeletestmt", rowsLimitDeleteStmt);
+        }
 
-            constraint.attributes.put("name", getName().name);
-            constraint.attributes.put("type", getTypeName());
+        // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
+        // or by issuing a "not supported" warning (such as for foreign keys).
+        // Any constraint implemented as an index must have an index name attribute.
+        // No other constraint details are currently used by VoltDB.
+        if (this.constType != FOREIGN_KEY && core.mainIndex != null) {
+            // WARNING: the index attribute setting is tentative, subject to reset in
+            // the calling function, Table.voltGetTableXML.
+            constraint.attributes.put("index", core.mainIndex.getName().name);
+        }
+        return constraint;
+    }
 
-            // Foreign Keys
-            if (this.constType == FOREIGN_KEY) {
-                Table our_table = this.getRef();
-                int our_cols[] = this.getRefColumns();
+    // A VoltDB extension to support indexed expressions
+    public boolean isUniqueWithExprs(Expression[] indexExprs2) {
+        if (constType != UNIQUE || (indexExprs == null) || ! indexExprs.equals(indexExprs2)) {
+            return false;
+        }
+        return true;
+    }
 
-                Table fkey_table = this.getMain();
-                int fkey_cols[] = this.getMainColumns();
+    // A VoltDB extension to support indexed expressions
+    // Is this for temp constraints only? What's a temp constraint?
+    public boolean hasExprs() {
+        return indexExprs != null;
+    }
 
-                constraint.attributes.put("foreignkeytable", fkey_table.getName().statementName);
+    // A VoltDB extension to support indexed expressions
+    public String getExprList(StringBuffer sb) {
+        String sep = "";
+        for(Expression ex : indexExprs) {
+            sb.append(sep).append(ex.getSQL());
+            sep = ", ";
+        }
+        return sb.toString();
+    }
 
-                // XXX Can bad SQL get us here or does HSQL barf before that?
-                assert(our_cols.length == fkey_cols.length);
-                for (int i = 0; i < our_cols.length; i++) {
-                    String our_colname = our_table.getColumn(our_cols[i]).getName().statementName;
-                    String fkey_colname = fkey_table.getColumn(fkey_cols[i]).getName().statementName;
+    public Constraint setAssumeUnique(boolean assumeUnique) {
+        this.assumeUnique = assumeUnique;
+        return this;
+    }
 
-                    VoltXMLElement ref = new VoltXMLElement("constraint");
-                    constraint.children.add(ref);
-                    assert(ref != null);
-                    ref.attributes.put("from", our_colname);
-                    ref.attributes.put("to", fkey_colname);
-                }
-            }
-            // All other constraints...
-            else {
-                if (core.mainIndex != null)
-                    constraint.attributes.put("index", core.mainIndex.getName().name);
-                else
-                    constraint.attributes.put("index", "");
+    @Override
+    public String toString() {
+        String str = "CONSTRAINT " + getName().name + " " + getTypeName();
+        if (constType == LIMIT) {
+            str += " " + rowsLimit;
+            if (rowsLimitDeleteStmt != null) {
+                str += " EXECUTE (" + rowsLimitDeleteStmt + ")";
             }
         }
 
-        return constraint;
+        return str;
     }
+    /**********************************************************************/
 }

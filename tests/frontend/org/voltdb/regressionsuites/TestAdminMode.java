@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -190,6 +190,12 @@ public class TestAdminMode extends RegressionSuite
     // Somewhat hacky test of the LIVECLIENTS @Statistics selector
     public void testBacklogAndPolling() throws Exception
     {
+        if (isValgrind()) {
+            // no reasonable way to get the timing right in valgrind
+            // also, this test isn't really about c++ code
+            return;
+        }
+
         ClientConfig config = new ClientConfig();
         config.setProcedureCallTimeout(600000);
         final Client adminclient = ClientFactory.createClient(config);
@@ -322,10 +328,18 @@ public class TestAdminMode extends RegressionSuite
                 int siteCount, BackendTarget target) {
             super(jarFileName, siteCount, target);
         }
+
+        @Override
+        public void setMaxHeap(int max) {
+            //Nothing
+        }
     }
 
     @SuppressWarnings("deprecation")
     static public Test suite() throws IOException {
+        // Set system property for 4sec CLIENT_HANGUP_TIMEOUT
+        System.setProperty("CLIENT_HANGUP_TIMEOUT", "4000");
+
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAdminMode.class);
 

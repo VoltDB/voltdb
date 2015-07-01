@@ -8,7 +8,16 @@ Exclusion file for findbugs ant task in build.xml
     <Package name="~org\.\w+_voltpatches.*" />
   </Match>
   <Match>
+    <Package name="~com\.\w+_voltpatches.*" />
+  </Match>
+  <Match>
     <Package name="~org\.apache\..*" />
+  </Match>
+  <Match>
+    <Package name="~jsr166y" />
+  </Match>
+  <Match>
+    <Package name="vanilla.java.affinity.impl" />
   </Match>
   <Match>
       <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE, NP_NULL_PARAM_DEREF, NP_NULL_ON_SOME_PATH"/>

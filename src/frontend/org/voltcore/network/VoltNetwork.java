@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008
@@ -43,46 +43,55 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltcore.network;
 
+import io.netty_voltpatches.NinjaKeySet;
+
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.CancelledKeyException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import jsr166y.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.EstTimeUpdater;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
+import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
-class VoltNetwork implements Runnable
+class VoltNetwork implements Runnable, IOStatsIntf
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
@@ -91,15 +100,15 @@ class VoltNetwork implements Runnable
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
+    private final AtomicInteger m_numPorts = new AtomicInteger();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
-
-    /*
-     * Thread pool used for the reverse DNS lookup triggers. If not provided, it
-     * will trigger the lookup immediately. Otherwise, it delays for 5 seconds.
-     */
-    private final ScheduledExecutorService m_es;
+    private final String m_coreBindId;
+    final String networkThreadName;
 
     private final int m_networkId;
+
+    private final NinjaKeySet m_ninjaSelectedKeys;
+
     /**
      * Start this VoltNetwork's thread;
      */
@@ -112,26 +121,28 @@ class VoltNetwork implements Runnable
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    VoltNetwork(int networkId,
-                       ScheduledExecutorService es) {
-        m_thread = new Thread(this, "Volt Network - " + networkId);
+    VoltNetwork(int networkId, String coreBindId, String networkName) {
+        m_thread = new Thread(this, "Volt " + networkName + " Network - " + networkId);
+        networkThreadName = new String("Volt " + networkName + " Network - " + networkId);
         m_networkId = networkId;
         m_thread.setDaemon(true);
-        m_es = es;
-
+        m_coreBindId = coreBindId;
         try {
             m_selector = Selector.open();
         } catch (IOException ex) {
             m_logger.fatal(null, ex);
             throw new RuntimeException(ex);
         }
+        m_ninjaSelectedKeys = NinjaKeySet.instrumentSelector(m_selector);
     }
 
     VoltNetwork( Selector s) {
         m_thread = null;
         m_networkId = 0;
-        m_es = null;
         m_selector = s;
+        m_coreBindId = null;
+        networkThreadName = new String("Test Selector Thread");
+        m_ninjaSelectedKeys = NinjaKeySet.instrumentSelector(m_selector);
     }
 
     /** Instruct the network to stop after the current loop */
@@ -153,7 +164,8 @@ class VoltNetwork implements Runnable
     Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
-            final int interestOps) throws IOException {
+            final int interestOps,
+            final ReverseDNSPolicy dns) throws IOException {
         channel.configureBlocking (false);
         channel.socket().setKeepAlive(true);
 
@@ -164,29 +176,16 @@ class VoltNetwork implements Runnable
                         new VoltPort(
                                 VoltNetwork.this,
                                 handler,
-                                channel.socket().getInetAddress().getHostAddress(),
+                                (InetSocketAddress)channel.socket().getRemoteSocketAddress(),
                                 m_pool);
                 port.registering();
 
                 /*
-                 * If no thread pool was given, VoltNetwork is probably used by client.
-                 * So trigger the reverse DNS lookup immediately. Otherwise, check if
-                 * the port is still alive 5 seconds later. If it is alive,start a
-                 * background thread to do reverse DNS lookup.
+                 * This means we are used by a client. No need to wait then, trigger
+                 * the reverse DNS lookup now.
                  */
-                if (m_es != null) {
-                    m_es.schedule(new Runnable() {
-                        @Override
-                        public void run() {
-                            port.resolveHostname();
-                        }
-                    }, 5, TimeUnit.SECONDS);
-                } else {
-                    /*
-                     * This means we are used by a client. No need to wait then, trigger
-                     * the reverse DNS lookup now.
-                     */
-                    port.resolveHostname();
+                if (dns != ReverseDNSPolicy.NONE) {
+                    port.resolveHostname(dns == ReverseDNSPolicy.SYNCHRONOUS);
                 }
 
                 try {
@@ -206,6 +205,7 @@ class VoltNetwork implements Runnable
                     return port;
                 } finally {
                     m_ports.add(port);
+                    m_numPorts.incrementAndGet();
                 }
             }
         };
@@ -241,6 +241,7 @@ class VoltNetwork implements Runnable
                             selectionKey.cancel();
                         } finally {
                             m_ports.remove(port);
+                            m_numPorts.decrementAndGet();
                         }
                     }
                 } finally {
@@ -287,16 +288,19 @@ class VoltNetwork implements Runnable
 
     @Override
     public void run() {
+        final ThreadLocalRandom r = ThreadLocalRandom.current();
+        if (m_coreBindId != null) {
+            // Remove Affinity for now to make this dependency dissapear from the client.
+            // Goal is to remove client dependency on this class in the medium term.
+            //PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
+        }
         try {
             while (m_shouldStop == false) {
                 try {
                     while (m_shouldStop == false) {
-                        int readyKeys = 0;
-                        if (m_networkId == 0) {
-                            readyKeys = m_selector.select(5);
-                        } else {
-                            readyKeys = m_selector.select();
-                        }
+                        LatencyWatchdog.pet();
+
+                        final int readyKeys = m_selector.select();
 
                         /*
                          * Run the task queue immediately after selection to catch
@@ -308,7 +312,11 @@ class VoltNetwork implements Runnable
                         }
 
                         if (readyKeys > 0) {
-                            invokeCallbacks();
+                            if (NinjaKeySet.supported) {
+                                optimizedInvokeCallbacks(r);
+                            } else {
+                                invokeCallbacks(r);
+                            }
                         }
 
                         /*
@@ -318,10 +326,6 @@ class VoltNetwork implements Runnable
                         task = null;
                         while ((task = m_tasks.poll()) != null) {
                             task.run();
-                        }
-
-                        if (m_networkId == 0) {
-                            EstTimeUpdater.update(System.currentTimeMillis());
                         }
                     }
                 } catch (Throwable ex) {
@@ -335,6 +339,7 @@ class VoltNetwork implements Runnable
             try {
                 p_shutdown();
             } catch (Throwable t) {
+                m_logger.error("Error shutting down Volt Network", t);
                 t.printStackTrace();
             }
         }
@@ -348,8 +353,8 @@ class VoltNetwork implements Runnable
             if (port != null) {
                 try {
                     getUnregisterRunnable(port).run();
-                } catch (Exception e) {
-                    networkLog.error("Exception unregisering port " + port, e);
+                } catch (Throwable e) {
+                    networkLog.error("Exception unregistering port " + port, e);
                 }
             }
         }
@@ -381,7 +386,7 @@ class VoltNetwork implements Runnable
         } catch (java.nio.channels.CancelledKeyException e) {
             networkLog.warn(
                     "Had a cancelled key exception while processing queued runnables for port "
-                    + port.m_remoteHost, e);
+                    + port, e);
         }
     }
 
@@ -392,6 +397,7 @@ class VoltNetwork implements Runnable
             key.interestOps (port.interestOps());
         } else {
             m_ports.remove(port);
+            m_numPorts.decrementAndGet();
         }
     }
 
@@ -402,13 +408,16 @@ class VoltNetwork implements Runnable
             port.run();
         } catch (CancelledKeyException e) {
             port.m_running = false;
-            e.printStackTrace();
             // no need to do anything here until
             // shutdown makes more sense
         } catch (Exception e) {
             port.die();
-            if (e instanceof IOException) {
-                m_logger.trace( "VoltPort died, probably of natural causes", e);
+            final String trimmed = e.getMessage() == null ? "" : e.getMessage().trim();
+            if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
+                    e instanceof AsynchronousCloseException ||
+                    e instanceof ClosedChannelException ||
+                    e instanceof ClosedByInterruptException) {
+                m_logger.debug( "VoltPort died, probably of natural causes", e);
             } else {
                 e.printStackTrace();
                 networkLog.error( "VoltPort died due to an unexpected exception", e);
@@ -419,57 +428,102 @@ class VoltNetwork implements Runnable
     }
 
     /** Set the selected interest set on the port and run it. */
-    protected void invokeCallbacks() {
+    protected void invokeCallbacks(ThreadLocalRandom r) {
         final Set<SelectionKey> selectedKeys = m_selector.selectedKeys();
-        for(SelectionKey key : selectedKeys) {
-            final Object obj = key.attachment();
+        final int keyCount = selectedKeys.size();
+        int startInx = r.nextInt(keyCount);
+        int itInx = 0;
+        Iterator<SelectionKey> it = selectedKeys.iterator();
+        while(itInx < startInx) {
+            it.next();
+            itInx++;
+        }
+        while(itInx < keyCount) {
+            final Object obj = it.next().attachment();
             if (obj == null) {
                 continue;
             }
-            final VoltPort port = (VoltPort) key.attachment();
+            final VoltPort port = (VoltPort)obj;
             callPort(port);
+            itInx++;
+        }
+        itInx = 0;
+        it = selectedKeys.iterator();
+        while(itInx < startInx) {
+            final Object obj = it.next().attachment();
+            if (obj == null) {
+                continue;
+            }
+            final VoltPort port = (VoltPort)obj;
+            callPort(port);
+            itInx++;
         }
         selectedKeys.clear();
+    }
+
+    protected void optimizedInvokeCallbacks(ThreadLocalRandom r) {
+        final int numKeys = m_ninjaSelectedKeys.size();
+        final int startIndex = r.nextInt(numKeys);
+        final SelectionKey keys[] = m_ninjaSelectedKeys.keys();
+        for (int ii = startIndex; ii < numKeys; ii++) {
+            final Object obj = keys[ii].attachment();
+            if (obj == null) {
+                continue;
+            }
+            final VoltPort port = (VoltPort) obj;
+            callPort(port);
+        }
+
+        for (int ii = 0; ii < startIndex; ii++) {
+            final Object obj = keys[ii].attachment();
+            if (obj == null) {
+                continue;
+            }
+            final VoltPort port = (VoltPort)obj;
+            callPort(port);
+        }
+        m_ninjaSelectedKeys.clear();
     }
 
     private Map<Long, Pair<String, long[]>> getIOStatsImpl(boolean interval) {
         final HashMap<Long, Pair<String, long[]>> retval =
                 new HashMap<Long, Pair<String, long[]>>();
-            long totalRead = 0;
-            long totalMessagesRead = 0;
-            long totalWritten = 0;
-            long totalMessagesWritten = 0;
-            for (VoltPort p : m_ports) {
-                final long read = p.readStream().getBytesRead(interval);
-                final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(interval);
-                final long messagesRead = p.getMessagesRead(interval);
-                totalRead += read;
-                totalMessagesRead += messagesRead;
-                totalWritten += writeInfo[0];
-                totalMessagesWritten += writeInfo[1];
-                retval.put(
-                        p.connectionId(),
-                        Pair.of(
-                                p.m_remoteHost,
-                                new long[] {
-                                        read,
-                                        messagesRead,
-                                        writeInfo[0],
-                                        writeInfo[1] }));
-            }
+        long totalRead = 0;
+        long totalMessagesRead = 0;
+        long totalWritten = 0;
+        long totalMessagesWritten = 0;
+        for (VoltPort p : m_ports) {
+            final long read = p.readStream().getBytesRead(interval);
+            final long writeInfo[] = p.writeStream().getBytesAndMessagesWritten(interval);
+            final long messagesRead = p.getMessagesRead(interval);
+            totalRead += read;
+            totalMessagesRead += messagesRead;
+            totalWritten += writeInfo[0];
+            totalMessagesWritten += writeInfo[1];
             retval.put(
-                    -1L,
+                    p.connectionId(),
                     Pair.of(
-                            "GLOBAL",
+                            p.getHostnameOrIP(),
                             new long[] {
-                                    totalRead,
-                                    totalMessagesRead,
-                                    totalWritten,
-                                    totalMessagesWritten }));
-            return retval;
+                                    read,
+                                    messagesRead,
+                                    writeInfo[0],
+                                    writeInfo[1] }));
+        }
+        retval.put(
+                -1L,
+                Pair.of(
+                        "GLOBAL",
+                        new long[] {
+                                totalRead,
+                                totalMessagesRead,
+                                totalWritten,
+                                totalMessagesWritten }));
+        return retval;
     }
 
-    Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
+    @Override
+    public Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
         Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
             @Override
             public Map<Long, Pair<String, long[]>> call() throws Exception {
@@ -492,5 +546,9 @@ class VoltNetwork implements Runnable
     void queueTask(Runnable r) {
         m_tasks.offer(r);
         m_selector.wakeup();
+    }
+
+    int numPorts() {
+        return m_numPorts.get();
     }
 }

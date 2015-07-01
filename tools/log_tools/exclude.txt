@@ -1,0 +1,24 @@
+#Dragent
+DEBUG
+INFO Replica bandwidth usage
+INFO Pending buffers
+INFO Master throughput
+
+#Server logs
+JOIN: Sending fault data .* lastKnownGloballyCommitedMultiPartTxnId \d*
+HOST: Received failure message from initiator.*commit point.*safe txn id .*
+HOST: Received failure message from .* safe txn id
+
+#Clientlog exceptions
+Connection to database host .* was lost before a response
+Transaction dropped due to change in mastership
+Non success in ProcCallback for
+WARN: ClientThread threw after
+
+#The damn ps output in apprunner.log
+USER.*PID.*PGID
+^\w+\s+\d+\s+\d+.*2013.*
+Current running processes
+^tcp\s+\d+\s+\d+
+netstat
+

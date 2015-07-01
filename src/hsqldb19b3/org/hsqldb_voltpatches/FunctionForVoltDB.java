@@ -31,10 +31,10 @@
 
 package org.hsqldb_voltpatches;
 
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.types.Type;
 
 
@@ -88,10 +88,143 @@ public class FunctionForVoltDB extends FunctionSQL {
         // These ID numbers need to be unique values for FunctionSQL.functType.
         // Assume that 1-19999 are reserved for existing HSQL functions.
         // That leaves new VoltDB-specific functions free to use values in the 20000s.
-        private static final int FUNC_VOLT_SQL_ERROR = 20000;
+        static final int FUNC_CONCAT                     = 124;
+
+        private static final int FUNC_VOLT_SQL_ERROR     = 20000;
+        private static final int FUNC_VOLT_DECODE        = 20001;
+        private static final int FUNC_VOLT_FIELD         = 20002;
+        private static final int FUNC_VOLT_ARRAY_ELEMENT = 20003;
+        private static final int FUNC_VOLT_ARRAY_LENGTH  = 20004;
+
+        static final int FUNC_VOLT_SINCE_EPOCH               = 20005;
+        static final int FUNC_VOLT_SINCE_EPOCH_SECOND        = 20006;
+        static final int FUNC_VOLT_SINCE_EPOCH_MILLISECOND   = 20007;
+        static final int FUNC_VOLT_SINCE_EPOCH_MICROSECOND   = 20008;
+
+        static final int FUNC_VOLT_TO_TIMESTAMP              = 20009;
+        static final int FUNC_VOLT_TO_TIMESTAMP_SECOND       = 20010;
+        static final int FUNC_VOLT_TO_TIMESTAMP_MILLISECOND  = 20011;
+        static final int FUNC_VOLT_TO_TIMESTAMP_MICROSECOND  = 20012;
+
+        static final int FUNC_VOLT_TRUNCATE_TIMESTAMP     = 20013;
+        static final int FUNC_VOLT_TRUNCATE_YEAR          = 20014;
+        static final int FUNC_VOLT_TRUNCATE_QUARTER       = 20015;
+        static final int FUNC_VOLT_TRUNCATE_MONTH         = 20016;
+        static final int FUNC_VOLT_TRUNCATE_DAY           = 20017;
+        static final int FUNC_VOLT_TRUNCATE_HOUR          = 20018;
+        static final int FUNC_VOLT_TRUNCATE_MINUTE        = 20019;
+        static final int FUNC_VOLT_TRUNCATE_SECOND        = 20020;
+        static final int FUNC_VOLT_TRUNCATE_MILLISECOND   = 20021;
+        static final int FUNC_VOLT_TRUNCATE_MICROSECOND   = 20022;
+
+        static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
+
+        static final int FUNC_VOLT_SET_FIELD              = 20024;
+
+        static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
+
+        static final int FUNC_VOLT_BITNOT                 = 20026;
+        static final int FUNC_VOLT_BIT_SHIFT_LEFT         = 20027;
+        static final int FUNC_VOLT_BIT_SHIFT_RIGHT        = 20028;
+        static final int FUNC_VOLT_HEX                    = 20029;
+        static final int FUNC_VOLT_BIN                    = 20030;
 
         private static final FunctionId[] instances = {
-            new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0, new Type[] { null, Type.SQL_VARCHAR }, new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
+                    new Type[] { null, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bit_shift_left", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_LEFT, -1,
+                    new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bit_shift_right", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_RIGHT, -1,
+                    new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("decode", null, FUNC_VOLT_DECODE, 2,
+                    new Type[] { null, null },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("field", Type.SQL_VARCHAR, FUNC_VOLT_FIELD, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET}),
+
+            new FunctionId("set_field", Type.SQL_VARCHAR, FUNC_VOLT_SET_FIELD, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_INTEGER },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET}),
+
+            new FunctionId("array_length", Type.SQL_INTEGER, FUNC_VOLT_ARRAY_LENGTH, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
+
+            new FunctionId("since_epoch", Type.SQL_BIGINT, FUNC_VOLT_SINCE_EPOCH, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 5,
+                    Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
+                    Tokens.MILLISECOND, Tokens.MICROSECOND,
+                    Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("to_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_TO_TIMESTAMP, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 5,
+                    Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
+                    Tokens.MILLISECOND, Tokens.MICROSECOND,
+                    Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("truncate", Type.SQL_TIMESTAMP, FUNC_VOLT_TRUNCATE_TIMESTAMP, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 11,
+                    Tokens.YEAR, Tokens.QUARTER, Tokens.MONTH, Tokens.DAY, Tokens.HOUR,
+                    Tokens.MINUTE, Tokens.SECOND, Tokens.MILLIS, Tokens.MILLISECOND,
+                    Tokens.MICROS, Tokens.MICROSECOND,
+                    Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
+                    new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("hex", Type.SQL_VARCHAR, FUNC_VOLT_HEX, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bin", Type.SQL_VARCHAR, FUNC_VOLT_BIN, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -113,7 +246,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     }
 
-    private FunctionId m_def;
+    private final FunctionId m_def;
 
     public static FunctionSQL newVoltDBFunction(String token, int tokenType) {
         FunctionId def = FunctionId.fn_by_name(token);
@@ -177,10 +310,159 @@ public class FunctionForVoltDB extends FunctionSQL {
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
                 nodes[i].resolveTypes(session, this);
+            }
+        }
+
+        switch(m_def.getId()) {
+        case FunctionId.FUNC_CONCAT:
+            for (int ii = 0; ii < nodes.length; ii++) {
+                if (nodes[ii].dataType == null && nodes[ii].isParam) {
+                    nodes[ii].dataType = Type.SQL_VARCHAR;
+                }
+            }
+            break;
+        /*
+         * The types to the FIELD functions parameters are VARCHAR
+         */
+        case FunctionId.FUNC_VOLT_FIELD:
+            if (nodes[0].dataType == null && nodes[0].isParam) {
+                nodes[0].dataType = Type.SQL_VARCHAR;
+            }
+            if (nodes[1].dataType == null && nodes[1].isParam) {
+                nodes[1].dataType = Type.SQL_VARCHAR;
+            }
+            break;
+
+            /*
+             * Infer parameter types to make the types of the 1st, 2nd, and (if not the last) 4th, 6th, etc.
+             * arguments to DECODE as consistent as possible,
+             * and the types of the 3rd, 5th, 7th, etc. and LAST arguments as consistent as possible.
+             * Punt to inferring VARCHAR if the other arguments give no clue or are inconsistent
+             * -- the VoltDB EE complains about NULL-typed parameters but is somewhat forgiving about
+             * mixed argument types.
+             */
+        case FunctionId.FUNC_VOLT_DECODE:
+            // Track whether parameter type hinting is needed for either key or value arguments.
+            // For simplicity(?), parameters are not tracked explicitly (by position)
+            // or even by category (key vs. value). So, if any parameter hinting is required at all,
+            // all arguments get re-checked.
+            boolean needParamType = false;
+            Type inputTypeInferred = null;
+            Type resultTypeInferred = null;
+
+            for (int ii = 0; ii < nodes.length; ii++) {
+                Type argType = nodes[ii].dataType;
+                if (argType == null) {
+                    // A param here means work to do, below.
+                    if (nodes[ii].isParam || nodes[ii].valueData == null) {
+                        needParamType = true;
+                    }
+                    continue;
+                }
+                // Except for the first and the optional last/"default" argument,
+                // the arguments alternate between candidate inputs and candidate results.
+                if ((((ii % 2) == 0) || ii == nodes.length-1) && (ii != 0)) {
+                    // These arguments represent candidate result values
+                    // that may hint at the result type or require hinting from the other result values.
+                    if (resultTypeInferred == null) {
+                        resultTypeInferred = argType; // Take the first result type hint.
+                    } else if (resultTypeInferred.typeComparisonGroup != argType.typeComparisonGroup) {
+                        resultTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints.
+                    }
+                } else {
+                    // These arguments represent candidate input keys
+                    // that may hint at the input type or may require hinting from the other input keys.
+                    if (inputTypeInferred == null) {
+                        inputTypeInferred = argType; // Take the first input type hint.
+                    } else if (inputTypeInferred.typeComparisonGroup != argType.typeComparisonGroup) {
+                        inputTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints, falling back to string type.
+                    }
+                }
+            }
+
+            // With any luck, there are no parameter "?" arguments to worry about.
+            if ( ! needParamType) {
+                break;
+            }
+
+            // No luck, try to infer the parameters' types.
+            // Punt to guessing VARCHAR for lack of better information.
+            if (inputTypeInferred == null) {
+                inputTypeInferred = Type.SQL_VARCHAR;
+            }
+            if (resultTypeInferred == null) {
+                resultTypeInferred = Type.SQL_VARCHAR;
+            }
+
+            for (int ii = 0; ii < nodes.length; ii++) {
+                Type argType = nodes[ii].dataType;
+                if ((argType != null) || ! (nodes[ii].isParam || nodes[ii].valueData == null)) {
+                    continue;
+                }
+                // This is the same test as above for determining that the argument
+                // is a candidate result vs. a candidate input.
+                if ((((ii % 2) == 0) || ii == nodes.length-1) && (ii != 0)) {
+                    nodes[ii].dataType = resultTypeInferred;
+                } else {
+                    nodes[ii].dataType = inputTypeInferred;
+                }
+            }
+            break;
+
+        case FunctionId.FUNC_VOLT_BITNOT:
+            voltResolveToBigintTypesForBitwise();
+            break;
+
+        case FunctionId.FUNC_VOLT_BIT_SHIFT_LEFT:
+        case FunctionId.FUNC_VOLT_BIT_SHIFT_RIGHT:
+            // the first parameter has to be BigInteger
+            voltResolveToBigintType(0);
+            voltResolveToBigintCompatibleType(1);
+
+            dataType = Type.SQL_BIGINT;
+            break;
+
+        case FunctionId.FUNC_VOLT_HEX:
+        case FunctionId.FUNC_VOLT_BIN:
+            voltResolveToBigintType(0);
+            dataType = Type.SQL_VARCHAR;
+            break;
+
+        default:
+            break;
+        }
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] != null) {
+                if (i >= paramTypes.length) {
+                 // TODO support type checking for variadic functions
+                    break;
+                }
                 if (paramTypes[i] == null) {
                     continue; // accept all argument types
                 }
-                if (paramTypes[i].canConvertFrom(nodes[i].dataType)) {
+                if (nodes[i].dataType == null) {
+                    // assert that the ambiguous argument (e.g. '?' parameter) has the required type
+                    nodes[i].dataType = paramTypes[i];
+                    continue;
+                }
+                else if (paramTypes[i].canConvertFrom(nodes[i].dataType)) {
+                    // Add support to pass in a JDBC time string constant
+                    if (paramTypes[i].isDateTimeType() && nodes[i].dataType.isCharacterType()) {
+                        String datetimestring = (String) nodes[i].valueData;
+                        if (datetimestring != null) {
+                            datetimestring = datetimestring.trim();
+                            try {
+                                Timestamp.valueOf(datetimestring);
+                            }
+                            catch (Exception e) {
+                                throw Error.error(ErrorCode.X_42561);
+                            }
+                            nodes[i].dataType = paramTypes[i];
+                        }
+                    } else if (paramTypes[i].isNumberType() && !nodes[i].dataType.isNumberType()) {
+                        throw Error.error(ErrorCode.X_42565);
+                    }
                     continue; // accept compatible argument types
                 }
                 throw Error.error(ErrorCode.X_42565); // incompatible data type
@@ -189,7 +471,10 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         dataType = m_def.getDataType();
         if (dataType == null && nodes.length > 0) {
-            Expression like_child = nodes[0];
+            if (parameterArg < 0 || parameterArg >= nodes.length) {
+                throw Error.error(ErrorCode.X_42565); // incompatible data type (so says the error -- we're missing one, actually)
+            }
+            Expression like_child = nodes[parameterArg];
             if (like_child != null) {
                 dataType = like_child.dataType;
             }
@@ -199,16 +484,26 @@ public class FunctionForVoltDB extends FunctionSQL {
     @Override
     public String getSQL() {
 
-        switch (funcType) {
-            default :
-                return super.getSQL();
+        StringBuffer sb = new StringBuffer();
+        sb.append(m_def.getName()).append(Tokens.T_OPENBRACKET);
+
+        switch (m_def.getId()) {
+        case FunctionId.FUNC_VOLT_SINCE_EPOCH:
+        case FunctionId.FUNC_VOLT_TO_TIMESTAMP:
+        case FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP: {
+            int timeUnit = ((Number) nodes[0].valueData).intValue();
+            sb.append(Tokens.getKeyword(timeUnit));
+            break;
         }
+        default:
+            sb.append(nodes[0].getSQL());
+            break;
+        }
+        for (int ii = 1; ii < nodes.length; ii++) {
+            sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
+        }
+        sb.append(Tokens.T_CLOSEBRACKET);
+        return sb.toString();
     }
 
-    @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException {
-        VoltXMLElement exp = super.voltGetXML(session);
-        exp.attributes.put("volt_alias", m_def.getName());
-        return exp;
-    }
 }

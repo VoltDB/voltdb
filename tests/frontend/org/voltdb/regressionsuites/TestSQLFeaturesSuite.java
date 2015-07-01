@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -354,52 +354,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assert(caught);
     }
 
-    public void testJoinOrder() throws Exception {
-        if (isHSQL() || isValgrind()) return;
-
-        Client client = getClient();
-
-        VoltTable[] results = null;
-        int nextId = 0;
-        for (int mb = 0; mb < 25; mb += 5) {
-            results = client.callProcedure("InsertLotsOfData", 0, nextId).getResults();
-            assertEquals(1, results.length);
-            assertTrue(nextId < results[0].asScalarLong());
-            nextId = (int) results[0].asScalarLong();
-            System.err.println("Inserted " + (mb + 5) + "mb");
-        }
-
-        for (int ii = 0; ii < 1000; ii++) {
-            client.callProcedure("T1.insert", ii);
-        }
-        client.callProcedure("T2.insert", 0);
-
-        //Right join order
-        client.callProcedure("SelectWithJoinOrder", 0);
-
-        //Wrong join order
-        boolean exception = false;
-        try {
-            client.callProcedure("SelectWithJoinOrder", 1);
-        } catch (Exception e) {
-            exception = true;
-        }
-        assertTrue(exception);
-
-        //Right join order
-        client.callProcedure("SelectRightOrder");
-
-        exception = false;
-        try {
-            client.callProcedure("SelectWrongOrder");
-        } catch (Exception e) {
-            exception = true;
-        }
-        assertTrue(exception);
-
-
-    }
-
     public void testSetOpsThatFail() throws Exception {
         Client client = getClient();
 
@@ -428,7 +382,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             caught = true;
         }
         assertTrue(caught);
-}
+    }
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
@@ -439,7 +393,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
 
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSQLFeaturesSuite.class);
@@ -447,19 +401,12 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-ddl.sql"));
-        project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addPartitionInfo("ORDER_LINE", "OL_W_ID");
-        project.addPartitionInfo("FIVEK_STRING", "P");
-        project.addPartitionInfo("FIVEK_STRING_WITH_INDEX", "ID");
-        project.addPartitionInfo("WIDE", "P");
-        project.addPartitionInfo("MANY_COLUMNS", "P");
         project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("SelectRightOrder",
-                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
-        project.addStmtProcedure("SelectWrongOrder",
-                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
 
         boolean success;
+
+        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        // IF (! DEBUG config) ...
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
@@ -467,6 +414,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config.setMaxHeap(3300);
 
         // build the jarfile
         success = config.compile(project);
@@ -480,6 +428,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        config.setMaxHeap(3300);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
@@ -489,11 +438,27 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config.setMaxHeap(3800);
         // Commented out until ENG-3076, ENG-3434 are resolved.
-        //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
+        //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
+        //                          LocalCluster.FailureState.ONE_FAILURE, false);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // build the jarfile
+        success = config.compile(project);
+        assert(success);
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This is a structured comment. Do not break it. ] */
 
         return builder;
     }

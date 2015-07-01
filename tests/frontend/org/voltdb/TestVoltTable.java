@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,8 +32,6 @@ import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.messaging.FastSerializableTestUtil;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
@@ -52,7 +50,15 @@ public class TestVoltTable extends TestCase {
         t2 = new VoltTable();
     }
 
-    void addAllPrimitives(Class<?>[] permittedTypes) {
+    VoltTable roundTrip(VoltTable t) {
+        ByteBuffer buf = ByteBuffer.allocate(t.getSerializedSize());
+        t.flattenToBuffer(buf);
+        buf.flip();
+        buf.getInt(); // ignore length prefix here
+        return PrivateVoltTableFactory.createVoltTableFromBuffer(buf.slice(), false);
+    }
+
+    void addAllPrimitives(VoltTable table, Class<?>[] permittedTypes) {
         Object[] primitives = {
                 null,
                 (byte) 0,
@@ -71,7 +77,7 @@ public class TestVoltTable extends TestCase {
 
         for (Object o : primitives) {
             try {
-                t.addRow(o);
+                table.addRow(o);
                 if (o != null && !contains(permittedTypes, o.getClass())) {
                     fail(o.getClass()
                             + " is not permitted but addRow succeeded");
@@ -281,22 +287,20 @@ public class TestVoltTable extends TestCase {
 
         VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
 
-        FastSerializer fs = new FastSerializer();
-        fs.writeObject(t);
-
-        byte uncompressedBytes[] = fs.getBytes();
-
+        ByteBuffer tempBuf = ByteBuffer.allocate(t.getSerializedSize());
+        t.flattenToBuffer(tempBuf);
+        byte uncompressedBytes[] = tempBuf.array().clone();
 
         /*
          * Test the sync method
          */
         byte decompressedBytes[] = CompressionService
-                .decompressBytes(vt.getCompressedBytes());
+                .decompressBytes(TableCompressor.getCompressedTableBytes(vt));
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 ByteBuffer.wrap(decompressedBytes), true);
-        fs = new FastSerializer();
-        fs.writeObject(vt);
-        byte bytesForComparison[] = fs.getBytes();
+        tempBuf = ByteBuffer.allocate(vt.getSerializedSize());
+        vt.flattenToBuffer(tempBuf);
+        byte bytesForComparison[] = tempBuf.array().clone();
         assertTrue(java.util.Arrays.equals(bytesForComparison,
                 uncompressedBytes));
 
@@ -305,26 +309,27 @@ public class TestVoltTable extends TestCase {
          */
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
         decompressedBytes = CompressionService
-                .decompressBytes(vt.getCompressedBytes());
+                .decompressBytes(TableCompressor.getCompressedTableBytes(vt));
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 ByteBuffer.wrap(decompressedBytes), true);
-        fs = new FastSerializer();
-        fs.writeObject(vt);
-        bytesForComparison = fs.getBytes();
+        tempBuf = ByteBuffer.allocate(vt.getSerializedSize());
+        vt.flattenToBuffer(tempBuf);
+        bytesForComparison = tempBuf.array().clone();
         assertTrue(java.util.Arrays.equals(bytesForComparison,
                 uncompressedBytes));
     }
 
     public void testCompression() throws Exception {
         testResizedTable();
-        byte compressedBytes[] = t.getCompressedBytes();
-        FastSerializer fs = new FastSerializer();
-        fs.writeObject(t);
+        byte compressedBytes[] = TableCompressor.getCompressedTableBytes(t);
 
-        byte uncompressedBytes[] = fs.getBytes();
+        ByteBuffer tempBuf = ByteBuffer.allocate(t.getSerializedSize());
+        t.flattenToBuffer(tempBuf);
+        byte uncompressedBytes[] = tempBuf.array().clone();
+
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
-        compressedBytes = t.getCompressedBytesAsync().get();
+        compressedBytes = TableCompressor.getCompressedTableBytesAsync(t).get();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
         byte decompressedBytes[] = CompressionService
@@ -332,9 +337,9 @@ public class TestVoltTable extends TestCase {
         VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 ByteBuffer.wrap(decompressedBytes), true);
 
-        fs = new FastSerializer();
-        fs.writeObject(vt);
-        byte bytesForComparison[] = fs.getBytes();
+        tempBuf = ByteBuffer.allocate(vt.getSerializedSize());
+        vt.flattenToBuffer(tempBuf);
+        byte[] bytesForComparison = tempBuf.array().clone();
         assertTrue(java.util.Arrays.equals(bytesForComparison,
                 uncompressedBytes));
     }
@@ -350,14 +355,14 @@ public class TestVoltTable extends TestCase {
         VoltTable tDirect = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 copy, true);
 
-        byte compressedBytes[] = tDirect.getCompressedBytes();
-        FastSerializer fs = new FastSerializer();
-        fs.writeObject(tDirect);
+        byte compressedBytes[] = TableCompressor.getCompressedTableBytes(tDirect);
 
-        byte uncompressedBytes[] = fs.getBytes();
+        ByteBuffer tempBuf = ByteBuffer.allocate(t.getSerializedSize());
+        t.flattenToBuffer(tempBuf);
+        byte uncompressedBytes[] = tempBuf.array().clone();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
-        compressedBytes = tDirect.getCompressedBytesAsync().get();
+        compressedBytes = TableCompressor.getCompressedTableBytesAsync(tDirect).get();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
         byte decompressedBytes[] = CompressionService
@@ -365,9 +370,9 @@ public class TestVoltTable extends TestCase {
         VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 ByteBuffer.wrap(decompressedBytes), true);
 
-        fs = new FastSerializer();
-        fs.writeObject(vt);
-        byte bytesForComparison[] = fs.getBytes();
+        tempBuf = ByteBuffer.allocate(vt.getSerializedSize());
+        vt.flattenToBuffer(tempBuf);
+        byte[] bytesForComparison = tempBuf.array().clone();
         assertTrue(java.util.Arrays.equals(bytesForComparison,
                 uncompressedBytes));
     }
@@ -409,18 +414,18 @@ public class TestVoltTable extends TestCase {
     @SuppressWarnings("deprecation")
     public void testEqualsDeserialized() {
         t = makeResizedTable();
-        t2 = FastSerializableTestUtil.roundTrip(t);
+        t2 = roundTrip(t);
         boolean equal = t.equals(t2);
         assertTrue(equal);
     }
 
     public void testStrings() {
         t = new VoltTable(new ColumnInfo("", VoltType.STRING));
-        addAllPrimitives(new Class[] { String.class, byte[].class });
+        addAllPrimitives(t, new Class[] { String.class, byte[].class });
         t.addRow("");
         assertEquals("string", t.fetchRow(1).getString(0));
 
-        t2 = FastSerializableTestUtil.roundTrip(t);
+        t2 = roundTrip(t);
         assertEquals("", t2.getColumnName(0));
         assertEquals(4, t2.getRowCount());
         VoltTableRow r = t2.fetchRow(0);
@@ -441,7 +446,7 @@ public class TestVoltTable extends TestCase {
         final byte[] FOO = new byte[] { 'f', 'o', 'o' };
         t.addRow(FOO);
 
-        t2 = FastSerializableTestUtil.roundTrip(t);
+        t2 = roundTrip(t);
         assertEquals(2, t2.getRowCount());
         assertEquals("", t2.fetchRow(0).getString(0));
         assertEquals(0, t2.fetchRow(0).getStringAsBytes(0).length);
@@ -459,7 +464,7 @@ public class TestVoltTable extends TestCase {
         final byte[] FOO = new byte[] { 'f', 'o', 'o' };
         t.addRow(FOO);
 
-        t2 = FastSerializableTestUtil.roundTrip(t);
+        t2 = roundTrip(t);
         assertEquals(2, t2.getRowCount());
         assertTrue(Arrays.equals(empty, t2.fetchRow(0).getVarbinary(0)));
         assertEquals(0, t2.fetchRow(0).getVarbinary(0).length);
@@ -471,10 +476,10 @@ public class TestVoltTable extends TestCase {
 
     public void testIntegers() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT));
-        addAllPrimitives(new Class[] { Long.class, Integer.class, Short.class,
+        addAllPrimitives(t, new Class[] { Long.class, Integer.class, Short.class,
                 Byte.class, Double.class, Float.class });
 
-        t2 = FastSerializableTestUtil.roundTrip(t);
+        t2 = roundTrip(t);
         assertEquals(8, t2.getRowCount());
         assertEquals(0, t2.fetchRow(1).getLong(0));
 
@@ -498,9 +503,9 @@ public class TestVoltTable extends TestCase {
                         .setScale(VoltDecimalHelper.kDefaultScale));
 
         t = new VoltTable(new ColumnInfo("foo", VoltType.DECIMAL));
-        addAllPrimitives(new Class[] { BigDecimal.class });
+        addAllPrimitives(t, new Class[] { BigDecimal.class });
 
-        t2 = FastSerializableTestUtil.roundTrip(t);
+        t2 = roundTrip(t);
         assertEquals(2, t2.getRowCount());
 
         // row 0 contains NULL
@@ -520,10 +525,10 @@ public class TestVoltTable extends TestCase {
 
     public void testFloats() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.FLOAT));
-        addAllPrimitives(new Class[] { Long.class, Integer.class, Short.class,
+        addAllPrimitives(t, new Class[] { Long.class, Integer.class, Short.class,
                 Byte.class, Double.class, Float.class });
 
-        t2 = FastSerializableTestUtil.roundTrip(t);
+        t2 = roundTrip(t);
         assertEquals(8, t2.getRowCount());
         VoltTableRow r = t2.fetchRow(0);
         assertEquals(VoltType.NULL_FLOAT, r.getDouble(0));
@@ -595,10 +600,10 @@ public class TestVoltTable extends TestCase {
 
     public void testTimestamps() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.TIMESTAMP));
-        addAllPrimitives(new Class[] { Byte.class, Short.class, Integer.class,
+        addAllPrimitives(t, new Class[] { Byte.class, Short.class, Integer.class,
                 Long.class, Float.class, Double.class, TimestampType.class });
 
-        t2 = FastSerializableTestUtil.roundTrip(t);
+        t2 = roundTrip(t);
         assertEquals(9, t2.getRowCount());
         assertEquals(0L, t2.fetchRow(1).getTimestampAsTimestamp(0).getTime());
         assertEquals(0L, t2.fetchRow(1).getTimestampAsLong(0));
@@ -660,6 +665,27 @@ public class TestVoltTable extends TestCase {
         assertEquals(VoltType.FLOAT, item_data.getColumnType(3));
         assertEquals(VoltType.FLOAT, item_data.getColumnType(4));
         item_data.addRow("asdfsdgfsdg", 123L, "a", 45.0d, 656.2d);
+    }
+
+    public void testGetSchema() {
+        VoltTable item_data_template = new VoltTable(new ColumnInfo("i_name",
+                VoltType.STRING),
+                new ColumnInfo("s_quantity", VoltType.BIGINT), new ColumnInfo(
+                        "brand_generic", VoltType.STRING), new ColumnInfo(
+                        "i_price", VoltType.FLOAT), new ColumnInfo("ol_amount",
+                        VoltType.FLOAT));
+        ColumnInfo[] cols = item_data_template.getTableSchema();
+        assertEquals(5, cols.length);
+        assertEquals("i_name", cols[0].name);
+        assertEquals("s_quantity", cols[1].name);
+        assertEquals("brand_generic", cols[2].name);
+        assertEquals("i_price", cols[3].name);
+        assertEquals("ol_amount", cols[4].name);
+        assertEquals(VoltType.STRING, cols[0].type);
+        assertEquals(VoltType.BIGINT, cols[1].type);
+        assertEquals(VoltType.STRING, cols[2].type);
+        assertEquals(VoltType.FLOAT, cols[3].type);
+        assertEquals(VoltType.FLOAT, cols[4].type);
     }
 
     public void testRowIterator() {
@@ -852,6 +878,56 @@ public class TestVoltTable extends TestCase {
             rowcounter++;
         }
         assertEquals(rowcounter, content.length);
+    }
+
+    public void testFormattedString() throws JSONException, IOException {
+        // Set the default timezone since we're using a timestamp type.  Eliminate test flakeyness.
+        VoltDB.setDefaultTimezone();
+
+        VoltTable table = new VoltTable(
+                new ColumnInfo("tinyint", VoltType.TINYINT), new ColumnInfo(
+                        "smallint", VoltType.SMALLINT), new ColumnInfo(
+                        "integer", VoltType.INTEGER), new ColumnInfo("bigint",
+                        VoltType.BIGINT), new ColumnInfo("float",
+                        VoltType.FLOAT), new ColumnInfo("string",
+                        VoltType.STRING), new ColumnInfo("varbinary",
+                        VoltType.VARBINARY), new ColumnInfo("timestamp",
+                        VoltType.TIMESTAMP), new ColumnInfo("decimal",
+                        VoltType.DECIMAL));
+
+        // add a row of nulls the hard way
+        table.addRow(VoltType.NULL_TINYINT, VoltType.NULL_SMALLINT,
+                VoltType.NULL_INTEGER, VoltType.NULL_BIGINT,
+                VoltType.NULL_FLOAT, VoltType.NULL_STRING_OR_VARBINARY,
+                VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_TIMESTAMP,
+                VoltType.NULL_DECIMAL);
+
+        // add a row of nulls the easy way
+        table.addRow(null, null, null, null, null, null, null, null, null);
+
+        // add a row of actual data.  Hard-code the timestamp so that we can compare deterministically
+        table.addRow(123, 12345, 1234567, 12345678901L, 1.234567, "aabbcc",
+                new byte[] { 10, 26, 10 },
+                new TimestampType(99), new BigDecimal(
+                        "123.45"));
+        String formatted_string = table.toFormattedString();
+
+        String expected =
+"tinyint  smallint  integer  bigint       float     string  varbinary  timestamp                   decimal          \n" +
+"-------- --------- -------- ------------ --------- ------- ---------- --------------------------- -----------------\n" +
+"    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
+"    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
+"     123     12345  1234567  12345678901  1.234567 aabbcc  0A1A0A     1970-01-01 00:00:00.000099   123.450000000000\n";
+
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output:");
+            System.out.println(formatted_string);
+            System.out.println("Expected output:");
+            System.out.println(expected);
+        }
+
+        assertTrue(formatted_string.equals(expected));
     }
 
     @SuppressWarnings("deprecation")

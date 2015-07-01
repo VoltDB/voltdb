@@ -1,27 +1,34 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -75,50 +82,6 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return child's value
-     */
-    @Override
-    public boolean isOrderDeterministic() {
-        AbstractPlanNode child = m_children.get(0);
-        if (child.isContentDeterministic()) {
-            if (orderingByAllColumns()) {
-                return true;
-            }
-            if (orderingByUniqueColumns()) {
-                return true;
-            }
-            m_nondeterminismDetail = "insufficient ordering criteria.";
-        } else {
-            m_nondeterminismDetail = m_children.get(0).nondeterminismDetail();
-        }
-        return false;
-    }
-
-    private boolean orderingByAllColumns() {
-        NodeSchema schema = getOutputSchema();
-        for (SchemaColumn col : schema.getColumns()) {
-            boolean found = false;
-            for (AbstractExpression expr : m_sortExpressions) {
-                if (col.getExpression().equals(expr)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean orderingByUniqueColumns() {
-        // NodeSchema schema = getOutputSchema();
-        return false; // TODO: for real, figure out if child guarantees a unique column (or combo).
-    }
-
-    /**
      * Add a sort to the order-by
      * @param sortExpr  The input expression on which to order the rows
      * @param sortDir
@@ -129,17 +92,16 @@ public class OrderByPlanNode extends AbstractPlanNode {
         // PlanNodes all need private deep copies of expressions
         // so that the resolveColumnIndexes results
         // don't get bashed by other nodes or subsequent planner runs
-        try
-        {
-            m_sortExpressions.add((AbstractExpression) sortExpr.clone());
-        }
-        catch (CloneNotSupportedException e)
-        {
-            // This shouldn't ever happen
-            e.printStackTrace();
-            throw new RuntimeException(e.getMessage());
-        }
+        m_sortExpressions.add((AbstractExpression) sortExpr.clone());
         m_sortDirections.add(sortDir);
+    }
+
+    public int countOfSortExpressions() {
+        return m_sortExpressions.size();
+    }
+
+    public List<AbstractExpression> getSortExpressions() {
+        return m_sortExpressions;
     }
 
     @Override
@@ -155,7 +117,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
@@ -170,9 +132,31 @@ public class OrderByPlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : sort_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
+    }
+
+    @Override
+    public void computeCostEstimates(long childOutputTupleCountEstimate,
+                                     Cluster cluster,
+                                     Database db,
+                                     DatabaseEstimates estimates,
+                                     ScalarValueHints[] paramHints)
+    {
+        // This method doesn't do anything besides what the parent method does,
+        // but it is a nice place to put a comment. Really, sorts should be pretty
+        // expensive and they're not costed as such yet because sometimes that
+        // backfires in our simplistic model.
+        //
+        // What's really interesting here is costing an index scan who has sorted
+        // output vs. an index scan that filters out a bunch of tuples, but still
+        // requires a sort. Which is best depends on how well the filter reduces the
+        // number of tuples, and that's not possible for us to know right now.
+        // The index scanner cost has been pretty carefully set up to do what we think
+        // we want, given the lack of table stats.
+        m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = childOutputTupleCountEstimate;
     }
 
     @Override
@@ -193,7 +177,31 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
+        JSONArray jarray = null;
+        if( !jobj.isNull(Members.SORT_COLUMNS.name()) ){
+            jarray = jobj.getJSONArray( Members.SORT_COLUMNS.name() );
+        }
+        int size = jarray.length();
+        for( int i = 0; i < size; i++ ) {
+            JSONObject tempObj = jarray.getJSONObject(i);
+            m_sortDirections.add( SortDirectionType.get(tempObj.getString( Members.SORT_DIRECTION.name())) );
+            m_sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, Members.SORT_EXPRESSION.name()) );
+        }
+    }
+
+    @Override
     protected String explainPlanForNode(String indent) {
         return "ORDER BY (SORT)";
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+        for (AbstractExpression ae : m_sortExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        return collected;
     }
 }

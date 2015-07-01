@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.voltcore.logging.VoltLogger;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ACLCallback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.Children2Callback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback;
@@ -59,6 +58,10 @@ import org.apache.zookeeper_voltpatches.proto.SetDataResponse;
 import org.apache.zookeeper_voltpatches.proto.SyncRequest;
 import org.apache.zookeeper_voltpatches.proto.SyncResponse;
 import org.apache.zookeeper_voltpatches.server.DataTree;
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltDB;
+
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * This is the main class of ZooKeeper client library. To use a ZooKeeper
@@ -110,7 +113,7 @@ public class ZooKeeper {
     }
 
     private final ZKWatchManager watchManager = new ZKWatchManager();
-
+    private final Set<Long> verbotenThreads;
     List<String> getDataWatches() {
         List<String> rc = new ArrayList<String>(
                 watchManager.dataWatches.keySet());
@@ -369,20 +372,29 @@ public class ZooKeeper {
      * @param watcher
      *            a watcher object which will be notified of state changes, may
      *            also be notified for node events
+     * @param verbotenThreads Threads that will cause a failure if they attempt to use ZK
      *
      * @throws IOException
      *             in cases of network failure
      * @throws IllegalArgumentException
      *             if an invalid chroot path is specified
      */
-    public ZooKeeper(String connectString, int sessionTimeout, Watcher watcher)
+    public ZooKeeper(String connectString, int sessionTimeout, Watcher watcher, Set<Long> verbotenThreads)
             throws IOException {
         LOG.info("Initiating client connection, connectString=" + connectString
                 + " sessionTimeout=" + sessionTimeout + " watcher=" + watcher);
-
         watchManager.defaultWatcher = watcher;
-        cnxn = new ClientCnxn(connectString, sessionTimeout, this, watchManager);
+        cnxn = new ClientCnxn(connectString, sessionTimeout, this, watchManager, verbotenThreads);
         cnxn.start();
+        verbotenThreads.add(cnxn.eventThread.getId());
+        verbotenThreads.add(cnxn.sendThread.getId());
+        this.verbotenThreads = verbotenThreads;
+    }
+
+    private void verbotenThreadCheck() {
+        if (verbotenThreads.contains(Thread.currentThread().getId())) {
+            VoltDB.crashLocalVoltDB("Thread " + Thread.currentThread().getName() + " attempted to use ZK", true, null);
+        }
     }
 
     /**
@@ -438,16 +450,16 @@ public class ZooKeeper {
      * @throws IllegalArgumentException
      *             if an invalid chroot path is specified
      */
-    public ZooKeeper(String connectString, int sessionTimeout, Watcher watcher,
+    public ZooKeeper(String connectString, int sessionTimeout, Watcher watcher, Set<Long> verbotenThreads,
             long sessionId, byte[] sessionPasswd) throws IOException {
         LOG.info("Initiating client connection, connectString=" + connectString
                 + " sessionTimeout=" + sessionTimeout + " watcher=" + watcher
                 + " sessionId=" + sessionId + " sessionPasswd="
                 + (sessionPasswd == null ? "<null>" : "<hidden>"));
-
+        this.verbotenThreads = verbotenThreads;
         watchManager.defaultWatcher = watcher;
         cnxn = new ClientCnxn(connectString, sessionTimeout, this,
-                watchManager, sessionId, sessionPasswd);
+                watchManager, verbotenThreads, sessionId, sessionPasswd);
         cnxn.start();
     }
 
@@ -625,6 +637,7 @@ public class ZooKeeper {
      */
     public String create(final String path, byte data[], List<ACL> acl,
             CreateMode createMode) throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath, createMode.isSequential());
 
@@ -662,6 +675,7 @@ public class ZooKeeper {
 
     public void create(final String path, byte data[], List<ACL> acl,
             CreateMode createMode, StringCallback cb, Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath, createMode.isSequential());
 
@@ -711,6 +725,7 @@ public class ZooKeeper {
      */
     public void delete(final String path, int version)
             throws InterruptedException, KeeperException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -747,6 +762,7 @@ public class ZooKeeper {
      */
     public void delete(final String path, int version, VoidCallback cb,
             Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -796,6 +812,7 @@ public class ZooKeeper {
      */
     public Stat exists(final String path, Watcher watcher)
             throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -847,6 +864,7 @@ public class ZooKeeper {
      */
     public Stat exists(String path, boolean watch) throws KeeperException,
             InterruptedException {
+        verbotenThreadCheck();
         return exists(path, watch ? watchManager.defaultWatcher : null);
     }
 
@@ -858,6 +876,7 @@ public class ZooKeeper {
      */
     public void exists(final String path, Watcher watcher, StatCallback cb,
             Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -916,6 +935,7 @@ public class ZooKeeper {
      */
     public byte[] getData(final String path, Watcher watcher, Stat stat)
             throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -969,6 +989,7 @@ public class ZooKeeper {
      */
     public byte[] getData(String path, boolean watch, Stat stat)
             throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         return getData(path, watch ? watchManager.defaultWatcher : null, stat);
     }
 
@@ -980,6 +1001,7 @@ public class ZooKeeper {
      */
     public void getData(final String path, Watcher watcher, DataCallback cb,
             Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1044,6 +1066,7 @@ public class ZooKeeper {
      */
     public Stat setData(final String path, byte data[], int version)
             throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1072,6 +1095,7 @@ public class ZooKeeper {
      */
     public void setData(final String path, byte data[], int version,
             StatCallback cb, Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1108,6 +1132,7 @@ public class ZooKeeper {
      */
     public List<ACL> getACL(final String path, Stat stat)
             throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1134,6 +1159,7 @@ public class ZooKeeper {
      * @see #getACL(String, Stat)
      */
     public void getACL(final String path, Stat stat, ACLCallback cb, Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1174,6 +1200,7 @@ public class ZooKeeper {
      */
     public Stat setACL(final String path, List<ACL> acl, int version)
             throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1205,6 +1232,7 @@ public class ZooKeeper {
      */
     public void setACL(final String path, List<ACL> acl, int version,
             StatCallback cb, Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1248,6 +1276,7 @@ public class ZooKeeper {
      */
     public List<String> getChildren(final String path, Watcher watcher)
             throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1308,6 +1337,7 @@ public class ZooKeeper {
      */
     public void getChildren(final String path, Watcher watcher,
             ChildrenCallback cb, Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1337,6 +1367,7 @@ public class ZooKeeper {
      */
     public void getChildren(String path, boolean watch, ChildrenCallback cb,
             Object ctx) {
+        verbotenThreadCheck();
         getChildren(path, watch ? watchManager.defaultWatcher : null, cb, ctx);
     }
 
@@ -1371,6 +1402,7 @@ public class ZooKeeper {
      */
     public List<String> getChildren(final String path, Watcher watcher,
             Stat stat) throws KeeperException, InterruptedException {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1441,6 +1473,7 @@ public class ZooKeeper {
      */
     public void getChildren(final String path, Watcher watcher,
             Children2Callback cb, Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
@@ -1487,6 +1520,7 @@ public class ZooKeeper {
      *             if an invalid path is specified
      */
     public void sync(final String path, VoidCallback cb, Object ctx) {
+        verbotenThreadCheck();
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 

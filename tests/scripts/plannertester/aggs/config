@@ -1,0 +1,59 @@
+DDL:
+../../testprocs/org/voltdb_testprocs/regressionsuites/aggregates/aggregate-sql-ddl.sql
+
+SQL:
+select distinct T.NUM from R1 T;
+select count(*) from R1 T;
+select SUM(distinct T.NUM) from R1 T;
+select avg(distinct T.NUM) from R1 T;
+select count(T.NUM) from R1 T;
+select MAX(T.NUM) from R1 T;
+select MIN(T.NUM) from R1 T;
+select SUM(T.NUM) from R1 T;
+select avg(T.NUM) from R1 T;
+select count(T.RATIO) from R1 T;
+select MAX(T.RATIO) from R1 T;
+select MIN(T.RATIO) from R1 T;
+select SUM(T.RATIO) from R1 T;
+select avg(T.RATIO) from R1 T;
+select count(T.CASH) from R1 T;
+select MAX(T.CASH) from R1 T;
+select MIN(T.CASH) from R1 T;
+select SUM(T.CASH) from R1 T;
+select avg(T.CASH) from R1 T;
+select MIN(T.DESC) from R1 T;
+select MAX(T.DESC) from R1 T;
+select COUNT(T.DESC) from R1 T;
+##select SUM(distinct T.NUM),     SUM(T.NUM) from R1 T;
+select SUM(distinct T.NUM * 2), SUM(T.NUM * 2) from R1 T;
+##select SUM(distinct T.NUM)*2,   SUM(T.NUM)*2 from R1 T;
+select distinct T.NUM from P1 T;
+select count(*) from P1 T;
+select SUM(distinct(T.NUM)) from P1 T;
+select avg(distinct(T.NUM)) from P1 T;
+select count(T.NUM) from P1 T;
+select MAX(T.NUM) from P1 T;
+select MIN(T.NUM) from P1 T;
+select SUM(T.NUM) from P1 T;
+select avg(T.NUM) from P1 T;
+select count(T.RATIO) from P1 T;
+select MAX(T.RATIO) from P1 T;
+select MIN(T.RATIO) from P1 T;
+select SUM(T.RATIO) from P1 T;
+select avg(T.RATIO) from P1 T;
+select count(T.CASH) from P1 T;
+select MAX(T.CASH) from P1 T;
+select MIN(T.CASH) from P1 T;
+select SUM(T.CASH) from P1 T;
+select avg(T.CASH) from P1 T;
+select MIN(T.DESC) from P1 T;
+select MAX(T.DESC) from P1 T;
+select COUNT(T.DESC) from P1 T;
+##select SUM(distinct(T.NUM)), SUM(T.NUM) from P1 T;
+##select SUM(distinct(T.NUM * 2)), SUM(T.NUM * 2) from P1 T;
+##select SUM(distinct(T.NUM))*2, SUM(T.NUM)*2 from P1 T;
+select SUM(HOURS),AVG(HOURS),MIN(HOURS),MAX(HOURS) FROM ENG3465 WHERE EMPNUM='E1';
+
+
+Partition Columns:
+P1.ID

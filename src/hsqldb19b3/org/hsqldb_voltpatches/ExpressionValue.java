@@ -31,11 +31,13 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-import org.hsqldb_voltpatches.types.BinaryData;
-import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+// A VoltDB extension to allow X'..' as numeric literals
+import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.types.BinaryData;
 
+import java.math.BigInteger;
+// End VoltDB extension
 /**
  * Implementation of value access operations.
  *
@@ -58,7 +60,6 @@ public class ExpressionValue extends Expression {
         valueData = o;
     }
 
-    @Override
     public String getSQL() {
 
         switch (opType) {
@@ -75,7 +76,6 @@ public class ExpressionValue extends Expression {
         }
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -99,115 +99,34 @@ public class ExpressionValue extends Expression {
         }
     }
 
-    @Override
     public Object getValue(Session session) {
         return valueData;
     }
-
-    /*************** VOLTDB *********************/
-
+    // A VoltDB extension to allow X'..' as numeric literals
     /**
-     * VoltDB added method to get a non-catalog-dependent
-     * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
-     * some names.
-     * @return XML, correctly indented, representing this object.
-     */
-    @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
-    {
-        VoltXMLElement exp = new VoltXMLElement("unset");
-        // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", getUniqueId(session));
-
-        // LEAF TYPES
-        if (getType() == OpTypes.VALUE) {
-            exp.name = "value";
-
-            if (dataType == null) {
-                exp.attributes.put("type", "NULL");
-                exp.attributes.put("value", "NULL");
-            }
-            else {
-                exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
-
-                if (isParam) {
-                    exp.attributes.put("isparam", "true");
-                } else {
-                    String value = "NULL";
-                    if (valueData != null)
-                    {
-                        if (valueData instanceof TimestampData)
-                        {
-                            // When we get the default from the DDL,
-                            // it gets jammed into a TimestampData object.  If we
-                            // don't do this, we get a Java class/reference
-                            // string in the output schema for the DDL.
-                            // EL HACKO: I'm just adding in the timezone seconds
-                            // at the moment, hope this is right --izzy
-                            TimestampData time = (TimestampData) valueData;
-                            value =
-                                Long.toString(Math.round((time.getSeconds() +
-                                                          time.getZone()) * 1e6) +
-                                                         time.getNanos() / 1000);
-                        }
-                        // convert binary default values to hex
-                        else if (valueData instanceof BinaryData) {
-                            BinaryData bd = (BinaryData) valueData;
-                            value = hexEncode(bd.getBytes());
-                        }
-                        else
-                        {
-                            value = valueData.toString();
-                        }
-                    }
-                    exp.attributes.put("value", value);
-                }
-            }
-        }
-        else if (getType() == OpTypes.COLUMN) {
-            // XXX Should we throw HSQLParseException here?
-            assert(false);
-        }
-        else if (getType() == OpTypes.ASTERISK) {
-            exp.name = "asterisk";
-        }
-
-        // catch unexpected types
-        else {
-            // XXX Should we throw HSQLParseException here instead?
-            System.err.println("UNSUPPORTED EXPR TYPE: " + String.valueOf(getType()));
-            exp.name = "unknown";
-        }
-
-        return exp;
-    }
-
-    private static final int caseDiff = ('a' - 'A');
-    /**
+     * Given a ExpressionValue that is a VARBINARY constant,
+     * convert it to a BIGINT constant.  Returns true for a
+     * successful conversion and false otherwise.
      *
-     * @param data A binary array of bytes.
-     * @return A hex-encoded string with double length.
+     * For more details on how the conversion is performed, see BinaryData.toLong().
+     *
+     * @param parent      Reference of parent expression
+     * @param childIndex  Index of this node in parent
+     * @return true for a successful conversion and false otherwise.
      */
-    public static String hexEncode(byte[] data) {
-        if (data == null)
-            return null;
+    public static boolean voltMutateToBigintType(Expression maybeConstantNode, Expression parent, int childIndex) {
+        if (maybeConstantNode.opType == OpTypes.VALUE && maybeConstantNode.dataType.isBinaryType()) {
+            ExpressionValue exprVal = (ExpressionValue)maybeConstantNode;
+            if (exprVal.valueData == null) {
+                return false;
+            }
 
-        StringBuilder sb = new StringBuilder();
-        for (byte b : data) {
-            // hex encoding same way as java.net.URLEncoder.
-            char ch = Character.forDigit((b >> 4) & 0xF, 16);
-            // to uppercase
-            if (Character.isLetter(ch)) {
-                ch -= caseDiff;
-            }
-            sb.append(ch);
-            ch = Character.forDigit(b & 0xF, 16);
-            if (Character.isLetter(ch)) {
-                ch -= caseDiff;
-            }
-            sb.append(ch);
+            BinaryData data = (BinaryData)exprVal.valueData;
+            parent.nodes[childIndex] = new ExpressionValue(data.toLong(), Type.SQL_BIGINT);
+
+            return true;
         }
-        return sb.toString();
+        return false;
     }
+    // End VoltDB extension
 }

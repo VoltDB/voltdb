@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -48,6 +48,9 @@
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
+#include "storage/tablefactory.h"
+#include "storage/TableCatalogDelegate.hpp"
+
 #include <vector>
 
 using namespace std;
@@ -57,6 +60,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                             TempTableLimits* limits)
 {
     assert (m_abstractNode);
+
     //
     // Grab the input tables directly from this node's children
     //
@@ -102,7 +106,8 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
         // If the target_table is NULL, then we need to ask the engine
         // for a reference to what we need
         // Really, we can't enforce this when we load the plan? --izzy 7/3/2010
-        if (target_table == NULL) {
+        bool is_subquery = (scan_node != NULL && scan_node->isSubQuery());
+        if (target_table == NULL && !is_subquery) {
             target_table = engine->getTable(targetTableName);
             if (target_table == NULL) {
                 VOLT_ERROR("Failed to retrieve target table '%s' "
@@ -111,37 +116,66 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                            m_abstractNode->debug().c_str());
                 return false;
             }
+            TableCatalogDelegate * tcd = engine->getTableDelegate(targetTableName);
+            assert(tcd != NULL);
             if (scan_node) {
-                scan_node->setTargetTable(target_table);
+                scan_node->setTargetTableDelegate(tcd);
             } else if (oper_node) {
-                oper_node->setTargetTable(target_table);
+                oper_node->setTargetTableDelegate(tcd);
             }
         }
     }
-    needs_outputtable_clear_cached = needsOutputTableClear();
 
     // Call the p_init() method on our derived class
-    try {
-        if (!p_init(m_abstractNode, limits))
-            return false;
-    } catch (exception& err) {
-        char message[128];
-        snprintf(message, 128, "The Executor failed to initialize PlanNode '%s'",
-                m_abstractNode->debug().c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message);
+    if (!p_init(m_abstractNode, limits)) {
+        return false;
     }
-    Table* tmp_output_table_base = m_abstractNode->getOutputTable();
-    m_tmpOutputTable = dynamic_cast<TempTable*>(tmp_output_table_base);
 
-    // determines whether the output table should be cleared or not.
-    // specific executor might not need (and must not do) clearing.
-    if (!needs_outputtable_clear_cached) {
-        VOLT_TRACE("Did not clear output table because the derived class"
-                   " answered so");
-        m_tmpOutputTable = NULL;
+    if (m_tmpOutputTable == NULL) {
+        m_tmpOutputTable = dynamic_cast<TempTable*>(m_abstractNode->getOutputTable());
     }
+
     return true;
 }
+
+/**
+ * Set up a multi-column temp output table for those executors that require one.
+ * Called from p_init.
+ */
+void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
+    assert(limits);
+    TupleSchema* schema = m_abstractNode->generateTupleSchema();
+    int column_count = schema->columnCount();
+    std::vector<std::string> column_names(column_count);
+    assert(column_count >= 1);
+    const std::vector<SchemaColumn*>& outputSchema = m_abstractNode->getOutputSchema();
+
+    for (int ctr = 0; ctr < column_count; ctr++) {
+        column_names[ctr] = outputSchema[ctr]->getColumnName();
+    }
+
+    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                              tempTableName,
+                                                              schema,
+                                                              column_names,
+                                                              limits);
+    m_abstractNode->setOutputTable(m_tmpOutputTable);
+}
+
+/**
+ * Set up a single-column temp output table for DML executors that require one to return their counts.
+ * Called from p_init.
+ */
+void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
+    TupleSchema* schema = m_abstractNode->generateDMLCountTupleSchema();
+    const std::vector<std::string> columnNames(1, "modified_tuples");
+    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                              "temp",
+                                                              schema,
+                                                              columnNames,
+                                                              limits);
+    m_abstractNode->setOutputTable(m_tmpOutputTable);
+}
+
 
 AbstractExecutor::~AbstractExecutor() {}

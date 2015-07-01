@@ -1,23 +1,28 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.client;
 
 import java.util.ArrayDeque;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Provide the {@link Client} with a way to throttle throughput in one
@@ -34,6 +39,8 @@ class RateLimiter {
     final int RECENT_HISTORY_SIZE = 5;
     final int MINIMUM_MOVEMENT = 5;
 
+    //Boolean indicating whether the only thing being tracked is max outstanding
+    protected boolean m_doesAnyTuning = false;
     protected boolean m_autoTune = false;
     protected int m_targetTxnsPerSecond = Integer.MAX_VALUE;
     //protected int m_targetTxnsPerBlock = Integer.MAX_VALUE;
@@ -42,6 +49,7 @@ class RateLimiter {
     protected int m_currentBlockSendCount = 0;
     protected int m_currentBlockRecvSuccessCount = 0;
     protected int m_outstandingTxns = 0;
+    protected Semaphore m_outstandingTxnsSemaphore = new Semaphore(10);
 
     protected int m_maxOutstandingTxns = 10;
 
@@ -120,6 +128,7 @@ class RateLimiter {
      */
     synchronized void enableAutoTuning(int latencyTarget) {
         m_autoTune = true;
+        m_doesAnyTuning = true;
         m_targetTxnsPerSecond = Integer.MAX_VALUE;
         m_maxOutstandingTxns = 20;
         m_latencyTarget = latencyTarget;
@@ -130,8 +139,17 @@ class RateLimiter {
      */
     synchronized void setLimits(int txnsPerSec, int maxOutstanding) {
         m_autoTune = false;
+        /*
+         * If the rate limit is some reasonably low value then go through the effort
+         * of rate limiting
+         */
+        if (txnsPerSec < Integer.MAX_VALUE / 2) {
+            m_doesAnyTuning = true;
+        }
         m_targetTxnsPerSecond = txnsPerSec;
         m_maxOutstandingTxns = maxOutstanding;
+        m_outstandingTxnsSemaphore.drainPermits();
+        m_outstandingTxnsSemaphore.release(maxOutstanding);
     }
 
     /**
@@ -146,12 +164,26 @@ class RateLimiter {
         return limits;
     }
 
-    synchronized void transactionResponseReceived(long timestamp, int internalLatency) {
-        ensureCurrentBlockIsKosher(timestamp);
-        --m_outstandingTxns;
-        if (internalLatency != -1) {
-            ++m_currentBlockRecvSuccessCount;
-            m_currentBlockTotalInternalLatency += internalLatency;
+    /**
+     *
+     * @param timestampNanos The time as measured when the call is made.
+     * @param internalLatency Latency measurement of this transaction in millis
+     * @param ignoreBackpressure Don't return a permit for backpressure purposes since none was ever taken
+     */
+    void transactionResponseReceived(long timestampNanos, int internalLatency, boolean ignoreBackpressure) {
+        if (m_doesAnyTuning) {
+            synchronized (this) {
+                ensureCurrentBlockIsKosher(TimeUnit.NANOSECONDS.toMillis(timestampNanos));
+                --m_outstandingTxns;
+                assert(m_outstandingTxns >= 0);
+                if (internalLatency != -1) {
+                    ++m_currentBlockRecvSuccessCount;
+                    m_currentBlockTotalInternalLatency += internalLatency;
+                }
+            }
+        } else {
+            if (ignoreBackpressure) return;
+            m_outstandingTxnsSemaphore.release();
         }
     }
 
@@ -162,50 +194,68 @@ class RateLimiter {
      * @param ignoreBackpressure If true, never block.
      * @return The time as measured when the call returns.
      */
-    long sendTxnWithOptionalBlockAndReturnCurrentTime(long timestamp, boolean ignoreBackpressure) {
-        while (true) {
-            synchronized(this) {
-                // switch to a new block if 100ms has passed
-                // possibly compute a new target rate
-                ensureCurrentBlockIsKosher(timestamp);
+    long sendTxnWithOptionalBlockAndReturnCurrentTime(long timestampNanos, long timeoutNanos, boolean ignoreBackpressure) throws TimeoutException {
+        if (m_doesAnyTuning) {
+            long timestamp = TimeUnit.NANOSECONDS.toMillis(timestampNanos);
+            while (true) {
+                synchronized(this) {
+                    // switch to a new block if 100ms has passed
+                    // possibly compute a new target rate
+                    ensureCurrentBlockIsKosher(timestamp);
 
-                assert((timestamp - m_currentBlockTimestamp) <= BLOCK_SIZE);
+                    assert((timestamp - m_currentBlockTimestamp) <= BLOCK_SIZE);
 
-                // don't let the time be before the start of the current block
-                // also ensure faketime - m_currentBlockTimestamp is positive
-                long faketime = timestamp < m_currentBlockTimestamp ? m_currentBlockTimestamp : timestamp;
+                    // don't let the time be before the start of the current block
+                    // also ensure faketime - m_currentBlockTimestamp is positive
+                    long faketime = timestamp < m_currentBlockTimestamp ? m_currentBlockTimestamp : timestamp;
 
-                long targetTxnsPerBlock = m_targetTxnsPerSecond / (1000 / BLOCK_SIZE);
+                    long targetTxnsPerBlock = m_targetTxnsPerSecond / (1000 / BLOCK_SIZE);
 
-                // compute the percentage of the current 100ms block that has passed
-                double expectedTxnsSent =
-                        targetTxnsPerBlock * (faketime - m_currentBlockTimestamp + 1.0) / BLOCK_SIZE;
-                expectedTxnsSent = Math.ceil(expectedTxnsSent);
+                    // compute the percentage of the current 100ms block that has passed
+                    double expectedTxnsSent =
+                            targetTxnsPerBlock * (faketime - m_currentBlockTimestamp + 1.0) / BLOCK_SIZE;
+                    expectedTxnsSent = Math.ceil(expectedTxnsSent);
 
-                assert(expectedTxnsSent <= targetTxnsPerBlock); // stupid fp math
-                assert((expectedTxnsSent >= 1.0) || (targetTxnsPerBlock == 0));
+                    assert(expectedTxnsSent <= targetTxnsPerBlock); // stupid fp math
+                    assert((expectedTxnsSent >= 1.0) || (targetTxnsPerBlock == 0));
 
-                // if the rate is under target, no problems
-                if (((m_currentBlockSendCount < expectedTxnsSent) &&
-                     (m_outstandingTxns < m_maxOutstandingTxns)) ||
-                    (ignoreBackpressure == true)) {
+                    // if the rate is under target, no problems
+                    if (((m_currentBlockSendCount < expectedTxnsSent) &&
+                         (m_outstandingTxns < m_maxOutstandingTxns)) ||
+                        (ignoreBackpressure == true)) {
 
-                    // bookkeeping
-                    ++m_currentBlockSendCount;
-                    ++m_outstandingTxns;
+                        // bookkeeping
+                        ++m_currentBlockSendCount;
+                        ++m_outstandingTxns;
 
-                    // exit the while loop
-                    break;
+                        // exit the while loop
+                        break;
+                    }
                 }
-            }
 
-            // if the rate is above target, pause for the smallest time possible
-            try { Thread.sleep(1); } catch (InterruptedException e) {}
-            timestamp = System.currentTimeMillis();
+                // if the rate is above target, pause for the smallest time possible
+                try { Thread.sleep(1); } catch (InterruptedException e) {}
+                timestampNanos = System.nanoTime();
+                timestamp = TimeUnit.NANOSECONDS.toMillis(timestampNanos);
+            }
+        } else {
+            if (ignoreBackpressure) return timestampNanos;
+            boolean acquired = m_outstandingTxnsSemaphore.tryAcquire();
+
+            if (!acquired) {
+                try {
+                    if (!m_outstandingTxnsSemaphore.tryAcquire(timeoutNanos, TimeUnit.NANOSECONDS)) {
+                        throw new TimeoutException();
+                    }
+                } catch (InterruptedException e) {
+                    Throwables.propagate(e);
+                }
+                return System.nanoTime();
+            }
         }
 
         // this time may have changed if this call blocked during a sleep
-        return timestamp;
+        return timestampNanos;
     }
 
     public synchronized void debug() {

@@ -1,26 +1,28 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "stats/StatsSource.h"
+
+#include "common/executorcontext.hpp"
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "stats/StatsSource.h"
 #include <vector>
 #include <string>
 #include <cassert>
@@ -38,12 +40,13 @@ vector<string> StatsSource::generateBaseStatsColumnNames() {
     return columnNames;
 }
 
-void StatsSource::populateBaseSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull) {
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+void StatsSource::populateBaseSchema(vector<ValueType> &types, vector<int32_t> &columnLengths,
+        vector<bool> &allowNull, vector<bool> &inBytes) {
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
 }
 
 StatsSource::StatsSource()  : m_statsTable(NULL) {
@@ -61,29 +64,27 @@ StatsSource::StatsSource()  : m_statsTable(NULL) {
  */
 void StatsSource::configure(
         string name,
-        CatalogId hostId,
-        string hostname,
-        int64_t siteId,
-        CatalogId partitionId,
         CatalogId databaseId) {
-    m_siteId = siteId;
-    m_partitionId = partitionId;
-    m_hostId = hostId;
-    m_hostname = ValueFactory::getStringValue(hostname);
+    ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
+    m_siteId = executorContext->m_siteId;
+    m_partitionId = executorContext->m_partitionId;
+    m_hostId = executorContext->m_hostId;
+    m_hostname = ValueFactory::getStringValue(executorContext->m_hostname);
+
     vector<string> columnNames = generateStatsColumnNames();
 
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
-    populateSchema(columnTypes, columnLengths, columnAllowNull);
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    vector<bool> columnInBytes;
+    populateSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes);
 
     for (int ii = 0; ii < columnNames.size(); ii++) {
         m_columnName2Index[columnNames[ii]] = ii;
     }
 
-    m_statsTable.reset(TableFactory::getTempTable(databaseId, name, schema,
-                                                  &columnNames[0], NULL));
+    m_statsTable.reset(TableFactory::getTempTable(databaseId, name, schema, columnNames, NULL));
     m_statsTuple = m_statsTable->tempTuple();
 }
 
@@ -125,9 +126,9 @@ TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
         return NULL;
     }
     m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(now));
-    m_statsTuple.setNValue(1, ValueFactory::getBigIntValue(m_hostId));
+    m_statsTuple.setNValue(1, ValueFactory::getIntegerValue(static_cast<int32_t>(m_hostId)));
     m_statsTuple.setNValue(2, m_hostname);
-    m_statsTuple.setNValue(3, ValueFactory::getBigIntValue(m_siteId));
+    m_statsTuple.setNValue(3, ValueFactory::getIntegerValue(static_cast<int32_t>(m_siteId >> 32)));
     m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(m_partitionId));
     updateStatsTuple(&m_statsTuple);
 
@@ -169,6 +170,7 @@ string StatsSource::toString() {
  * end of a list.
  */
 void
-StatsSource::populateSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull) {
-    StatsSource::populateBaseSchema(types, columnLengths, allowNull);
+StatsSource::populateSchema(vector<ValueType> &types, vector<int32_t> &columnLengths,
+        vector<bool> &allowNull, vector<bool> &inBytes) {
+    StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
 }

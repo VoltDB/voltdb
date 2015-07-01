@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -34,9 +35,20 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltdb.ClientInterface;
+import javax.security.auth.Subject;
+
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.GSSName;
+import org.ietf.jgss.Oid;
+import org.voltcore.network.ReverseDNSCache;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.messaging.FastSerializer;
+import org.voltdb.common.Constants;
+import org.voltdb.utils.SerializationHelper;
+
+import com.google_voltpatches.common.base.Throwables;
+import java.util.BitSet;
 
 /**
  * A utility class for opening a connection to a Volt server and authenticating as well
@@ -76,18 +88,30 @@ public class ConnectionUtil {
         new HashMap<SocketChannel, ExecutorPair>();
     private static final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
+    private static final GSSManager m_gssManager = GSSManager.getInstance();
+
     /**
      * Get a hashed password using SHA-1 in a consistent way.
      * @param password The password to encode.
      * @return The bytes of the hashed password.
      */
     public static byte[] getHashedPassword(String password) {
+        return getHashedPassword(ClientAuthHashScheme.HASH_SHA256, password);
+    }
+
+    /**
+     * Get a hashed password using SHA-1 in a consistent way.
+     * @param scheme hashing scheme for password.
+     * @param password The password to encode.
+     * @return The bytes of the hashed password.
+     */
+    public static byte[] getHashedPassword(ClientAuthHashScheme scheme, String password) {
         if (password == null)
             return null;
 
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance("SHA-1");
+            md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
             System.exit(-1);
@@ -107,6 +131,7 @@ public class ConnectionUtil {
      * @param username
      * @param password
      * @param port
+     * @param subject
      * @throws IOException
      * @returns An array of objects. The first is an
      * authenticated socket channel, the second. is an array of 4 longs -
@@ -114,37 +139,23 @@ public class ConnectionUtil {
      * The last object is the build string
      */
     public static Object[] getAuthenticatedConnection(String host, String username,
-                                                      byte[] hashedPassword, int port) throws IOException {
-        return getAuthenticatedConnection("database", host, username, hashedPassword, port);
+                                                      byte[] hashedPassword, int port,
+                                                      final Subject subject, ClientAuthHashScheme scheme) throws IOException {
+        String service = subject == null ? "database" : Constants.KERBEROS;
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme);
     }
 
-    /**
-     * Create a connection to a Volt server for export and authenticate the connection.
-     * @param host
-     * @param username
-     * @param password
-     * @param port
-     * @throws IOException
-     * @returns An array of objects. The first is an
-     * authenticated socket channel, the second. is an array of 4 longs -
-     * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
-     * The last object is the build string
-     */
-    public static Object[] getAuthenticatedExportConnection(InetSocketAddress address,
-            String username, byte[] hashedPassword) throws IOException
-            {
-        return getAuthenticatedConnection("export", address, username, hashedPassword);
-            }
-
     private static Object[] getAuthenticatedConnection(
-            String service, String host, String username, byte[] hashedPassword, int port)
+            String service, String host,
+            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthHashScheme scheme)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
-        return getAuthenticatedConnection(service, address, username, hashedPassword);
+        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme);
     }
 
     private static Object[] getAuthenticatedConnection(
-            String service, InetSocketAddress addr, String username, byte[] hashedPassword)
+            String service, InetSocketAddress addr, String username,
+            byte[] hashedPassword, final Subject subject, ClientAuthHashScheme scheme)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
@@ -156,7 +167,7 @@ public class ConnectionUtil {
         assert(aChannel.isConnected());
         if (!aChannel.isConnected()) {
             // TODO Can open() be asynchronous if configureBlocking(true)?
-            throw new IOException("Failed to open host " + addr.getHostName());
+            throw new IOException("Failed to open host " + ReverseDNSCache.hostnameOrAddress(addr.getAddress()));
         }
         final long retvals[] = new long[4];
         returnArray[1] = retvals;
@@ -166,19 +177,28 @@ public class ConnectionUtil {
              */
             aChannel.configureBlocking(true);
             aChannel.socket().setTcpNoDelay(true);
-            FastSerializer fs = new FastSerializer();
-            fs.writeInt(0);             // placeholder for length
-            fs.writeByte(0);            // version
-            fs.writeString(service);    // data service (export|database)
-            fs.writeString(username);
-            fs.write(hashedPassword);
-            final ByteBuffer fsBuffer = fs.getBuffer();
-            final ByteBuffer b = ByteBuffer.allocate(fsBuffer.remaining());
-            b.put(fsBuffer);
-            final int size = fsBuffer.limit() - 4;
+
+            // encode strings
+            byte[] serviceBytes = service == null ? null : service.getBytes(Constants.UTF8ENCODING);
+            byte[] usernameBytes = username == null ? null : username.getBytes(Constants.UTF8ENCODING);
+
+            // get the length of the data to serialize
+            int requestSize = 4;
+            requestSize += 2; //version and scheme
+            requestSize += serviceBytes == null ? 4 : 4 + serviceBytes.length;
+            requestSize += usernameBytes == null ? 4 : 4 + usernameBytes.length;
+            requestSize += hashedPassword.length;
+
+            ByteBuffer b = ByteBuffer.allocate(requestSize);
+
+            // serialize it
+            b.putInt(requestSize - 4);                            // length prefix
+            b.put((byte) 1);                                      // version
+            b.put((byte )scheme.getValue());
+            SerializationHelper.writeVarbinary(serviceBytes, b);  // data service (export|database)
+            SerializationHelper.writeVarbinary(usernameBytes, b);
+            b.put(hashedPassword);
             b.flip();
-            b.putInt(size);
-            b.position(0);
 
             boolean successfulWrite = false;
             IOException writeException = null;
@@ -226,22 +246,37 @@ public class ConnectionUtil {
                 }
             }
             loginResponse.flip();
-            loginResponse.position(1);
+            byte version = loginResponse.get();
             byte loginResponseCode = loginResponse.get();
+
+            if (version == Constants.AUTH_HANDSHAKE_VERSION) {
+                byte tag = loginResponseCode;
+                if (subject == null) {
+                    aChannel.close();
+                    throw new IOException("Server requires an authenticated JAAS principal");
+                }
+                if (tag != Constants.AUTH_SERVICE_NAME) {
+                    aChannel.close();
+                    throw new IOException("Wire protocol format violation error");
+                }
+                String servicePrincipal = SerializationHelper.getString(loginResponse);
+                loginResponse = performAuthenticationHandShake(aChannel, subject, servicePrincipal);
+                loginResponseCode = loginResponse.get();
+            }
 
             if (loginResponseCode != 0) {
                 aChannel.close();
                 switch (loginResponseCode) {
-                case ClientInterface.MAX_CONNECTIONS_LIMIT_ERROR:
+                case Constants.MAX_CONNECTIONS_LIMIT_ERROR:
                     throw new IOException("Server has too many connections");
-                case ClientInterface.WIRE_PROTOCOL_TIMEOUT_ERROR:
+                case Constants.WIRE_PROTOCOL_TIMEOUT_ERROR:
                     throw new IOException("Connection timed out during authentication. " +
                     "The VoltDB server may be overloaded.");
-                case ClientInterface.EXPORT_DISABLED_REJECTION:
+                case Constants.EXPORT_DISABLED_REJECTION:
                     throw new IOException("Export not enabled for server");
-                case ClientInterface.WIRE_PROTOCOL_FORMAT_ERROR:
+                case Constants.WIRE_PROTOCOL_FORMAT_ERROR:
                     throw new IOException("Wire protocol format violation error");
-                case ClientInterface.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
+                case Constants.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
                     throw new IOException("Failed to authenticate to rejoining node");
                 default:
                     throw new IOException("Authentication rejected");
@@ -257,7 +292,6 @@ public class ConnectionUtil {
             returnArray[2] = new String(buildStringBytes, "UTF-8");
 
             aChannel.configureBlocking(false);
-            aChannel.socket().setTcpNoDelay(false);
             aChannel.socket().setKeepAlive(true);
             success = true;
         } finally {
@@ -266,6 +300,147 @@ public class ConnectionUtil {
             }
         }
         return returnArray;
+    }
+
+    private final static ByteBuffer performAuthenticationHandShake(
+            final SocketChannel channel, final Subject subject,
+            final String serviceName) throws IOException {
+
+        try {
+             Subject.doAs(subject, new PrivilegedAction<GSSContext>() {
+                @Override
+                public GSSContext run() {
+                    GSSContext context = null;
+                    try {
+                        /*
+                         * The standard type designation for kerberos v5 secure service context
+                         */
+                        final Oid krb5Oid = new Oid("1.2.840.113554.1.2.2");
+                        /*
+                         * The standard type designation for principal
+                         */
+                        final Oid krb5PrincipalNameType = new Oid("1.2.840.113554.1.2.2.1");
+                        final GSSName serverName = m_gssManager.createName(serviceName, krb5PrincipalNameType);
+
+                        ByteBuffer bb = ByteBuffer.allocate(4096);
+
+                        context = m_gssManager.createContext(serverName, krb5Oid, null, GSSContext.DEFAULT_LIFETIME);
+                        context.requestMutualAuth(true);
+                        context.requestConf(true);
+                        context.requestInteg(true);
+
+                        byte [] token;
+                        int msgSize = 0;
+
+                        /*
+                         * Establishing a kerberos secure context, requires a handshake conversation
+                         * where client, and server exchange and use tokens generated via calls to initSecContext
+                         */
+                        bb.limit(msgSize);
+                        while (!context.isEstablished()) {
+                            token = context.initSecContext(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+                            if (token != null) {
+                                msgSize = 4 + 1 + 1 + token.length;
+                                bb.clear().limit(msgSize);
+                                bb.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
+                                bb.put(token).flip();
+
+                                while (bb.hasRemaining()) {
+                                    channel.write(bb);
+                                }
+                            }
+                            if (!context.isEstablished()) {
+                                bb.clear().limit(4);
+
+                                while (bb.hasRemaining()) {
+                                    if (channel.read(bb) == -1) throw new EOFException();
+                                }
+                                bb.flip();
+
+                                msgSize = bb.getInt();
+                                if (msgSize > bb.capacity()) {
+                                    throw new IOException("Authentication packet exceeded alloted size");
+                                }
+                                if (msgSize <= 0) {
+                                    throw new IOException("Wire Protocol Format error 0 or negative message length prefix");
+                                }
+                                bb.clear().limit(msgSize);
+
+                                while (bb.hasRemaining()) {
+                                    if (channel.read(bb) == -1) throw new EOFException();
+                                }
+                                bb.flip();
+
+                                byte version = bb.get();
+                                if (version != Constants.AUTH_HANDSHAKE_VERSION) {
+                                    throw new IOException("Encountered unexpected authentication protocol version " + version);
+                                }
+
+                                byte tag = bb.get();
+                                if (tag != Constants.AUTH_HANDSHAKE) {
+                                    throw new IOException("Encountered unexpected authentication protocol tag " + tag);
+                                }
+                            }
+                        }
+
+                        if (!context.getMutualAuthState()) {
+                            throw new IOException("Authentication Handshake Failed");
+                        }
+                        context.dispose();
+                        context = null;
+                    } catch (GSSException ex) {
+                        Throwables.propagate(ex);
+                    } catch (IOException ex) {
+                        Throwables.propagate(ex);
+                    } finally {
+                        if (context != null) try { context.dispose(); } catch (Exception ignoreIt) {}
+                    }
+                    return null;
+                }
+            });
+        } catch (SecurityException ex) {
+            // if we get here the authentication handshake failed.
+            try { channel.close(); } catch (Exception ignoreIt) {}
+            // PriviledgedActionException is the first wrapper. The runtime from Throwables would be
+            // the second wrapper
+            Throwable cause = ex.getCause();
+            if (cause != null && (cause instanceof RuntimeException) && cause.getCause() != null) {
+                cause = cause.getCause();
+            } else if (cause == null) {
+                cause = ex;
+            }
+            if (cause instanceof IOException) {
+                throw IOException.class.cast(cause);
+            } else {
+                throw new IOException("Authentication Handshake Failed", cause);
+            }
+        }
+
+        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+        while (lengthBuffer.hasRemaining()) {
+            if (channel.read(lengthBuffer) == -1) {
+                channel.close();
+                throw new EOFException();
+            }
+        }
+        lengthBuffer.flip();
+        int responseSize = lengthBuffer.getInt();
+
+        ByteBuffer loginResponse = ByteBuffer.allocate(responseSize);
+        while (loginResponse.hasRemaining()) {
+            if (channel.read(loginResponse) == -1) {
+                channel.close();
+                throw new EOFException();
+            }
+        }
+        loginResponse.flip();
+
+        byte version = loginResponse.get();
+        if (version != (byte)0) {
+            channel.close();
+            throw new IOException("Encountered unexpected version for the login response message: " + version);
+        }
+        return loginResponse;
     }
 
     public static void closeConnection(SocketChannel connection) throws InterruptedException, IOException {

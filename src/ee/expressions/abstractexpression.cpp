@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -88,24 +88,6 @@ AbstractExpression::~AbstractExpression()
     delete m_right;
 }
 
-void
-AbstractExpression::substitute(const NValueArray &params)
-{
-    if (!m_hasParameter)
-        return;
-
-    // descend. nodes with parameters overload substitute()
-    VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-    if (m_left) {
-        VOLT_TRACE("Substitute processing left child...");
-        m_left->substitute(params);
-    }
-    if (m_right) {
-        VOLT_TRACE("Substitute processing right child...");
-        m_right->substitute(params);
-    }
-}
-
 bool
 AbstractExpression::hasParameter() const
 {
@@ -123,9 +105,6 @@ AbstractExpression::initParamShortCircuits()
 std::string
 AbstractExpression::debug() const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     std::ostringstream buffer;
     //buffer << "Expression[" << expressionutil::getTypeName(getExpressionType()) << "]";
     buffer << "Expression[" << expressionToString(getExpressionType()) << ", " << getExpressionType() << "]";
@@ -135,18 +114,12 @@ AbstractExpression::debug() const
 std::string
 AbstractExpression::debug(bool traverse) const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     return (traverse ? debug(std::string("")) : debug());
 }
 
 std::string
 AbstractExpression::debug(const std::string &spacer) const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     std::ostringstream buffer;
     buffer << spacer << "+ " << debug() << "\n";
 
@@ -167,7 +140,7 @@ AbstractExpression::debug(const std::string &spacer) const
 // SERIALIZATION METHODS
 // ------------------------------------------------------------------
 AbstractExpression*
-AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
+AbstractExpression::buildExpressionTree(PlannerDomValue obj)
 {
     AbstractExpression * exp =
       AbstractExpression::buildExpressionTree_recurse(obj);
@@ -178,7 +151,7 @@ AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
 }
 
 AbstractExpression*
-AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
+AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
 {
     // build a tree recursively from the bottom upwards.
     // when the expression node is instantiated, its type,
@@ -186,81 +159,70 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
 
     ExpressionType peek_type = EXPRESSION_TYPE_INVALID;
     ValueType value_type = VALUE_TYPE_INVALID;
+    bool inBytes = false;
     AbstractExpression *left_child = NULL;
     AbstractExpression *right_child = NULL;
     std::vector<AbstractExpression*>* argsVector = NULL;
 
     // read the expression type
-    json_spirit::Value expressionTypeValue = json_spirit::find_value(obj,
-                                                                     "TYPE");
-    if (expressionTypeValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractExpression::"
-                                      "buildExpressionTree_recurse:"
-                                      " Couldn't find TYPE value");
-    }
-    assert(stringToExpression(expressionTypeValue.get_str()) != EXPRESSION_TYPE_INVALID);
-    peek_type = stringToExpression(expressionTypeValue.get_str());
+    peek_type = static_cast<ExpressionType>(obj.valueForKey("TYPE").asInt());
+    assert(peek_type != EXPRESSION_TYPE_INVALID);
 
-    // and the value type
-    json_spirit::Value valueTypeValue = json_spirit::find_value(obj,
-                                                                "VALUE_TYPE");
-    if (valueTypeValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractExpression::"
-                                      "buildExpressionTree_recurse:"
-                                      " Couldn't find VALUE_TYPE value");
-    }
-    std::string valueTypeString = valueTypeValue.get_str();
-    value_type = stringToValue(valueTypeString);
+    if (obj.hasNonNullKey("VALUE_TYPE")) {
+        int32_t value_type_int = obj.valueForKey("VALUE_TYPE").asInt();
+        value_type = static_cast<ValueType>(value_type_int);
+        assert(value_type != VALUE_TYPE_INVALID);
 
-    assert(value_type != VALUE_TYPE_INVALID);
+        if (obj.hasNonNullKey("IN_BYTES")) {
+            inBytes = true;
+        }
+    }
 
     // add the value size
-    json_spirit::Value valueSizeValue = json_spirit::find_value(obj,
-                                                                "VALUE_SIZE");
-    if (valueSizeValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractExpression::"
-                                      "buildExpressionTree_recurse:"
-                                      " Couldn't find VALUE_SIZE value");
+    int valueSize = -1;
+    if (obj.hasNonNullKey("VALUE_SIZE")) {
+        valueSize = obj.valueForKey("VALUE_SIZE").asInt();
+    } else {
+        // This value size should be consistent with VoltType.java
+        valueSize = NValue::getTupleStorageSize(value_type);
     }
-    int valueSize = valueSizeValue.get_int();
 
     // recurse to children
     try {
-        json_spirit::Value leftValue = json_spirit::find_value(obj, "LEFT");
-        if (!(leftValue == json_spirit::Value::null)) {
-            left_child = AbstractExpression::buildExpressionTree_recurse(leftValue.get_obj());
+        if (obj.hasNonNullKey("LEFT")) {
+            PlannerDomValue leftValue = obj.valueForKey("LEFT");
+            left_child = AbstractExpression::buildExpressionTree_recurse(leftValue);
         }
-
-        json_spirit::Value rightValue = json_spirit::find_value( obj, "RIGHT");
-        if (!(rightValue == json_spirit::Value::null)) {
-            right_child = AbstractExpression::buildExpressionTree_recurse(rightValue.get_obj());
+        if (obj.hasNonNullKey("RIGHT")) {
+            PlannerDomValue rightValue = obj.valueForKey("RIGHT");
+            right_child = AbstractExpression::buildExpressionTree_recurse(rightValue);
         }
 
         // NULL argsVector corresponds to a missing ARGS value
         // vs. an empty argsVector which corresponds to an empty array ARGS value.
         // Different expression types could assert either a NULL or non-NULL argsVector initializer.
-        json_spirit::Value argsValue = json_spirit::find_value(obj, "ARGS");
-        if (!(argsValue == json_spirit::Value::null)) {
+        if (obj.hasNonNullKey("ARGS")) {
+            PlannerDomValue argsArray = obj.valueForKey("ARGS");
             argsVector = new std::vector<AbstractExpression*>();
-
-            json_spirit::Array argsArray = argsValue.get_array();
-            for (int ii = 0; ii < argsArray.size(); ii++) {
-                json_spirit::Value argValue = argsArray[ii];
-                AbstractExpression* argExpr = AbstractExpression::buildExpressionTree_recurse(argValue.get_obj());
+            for (int i = 0; i < argsArray.arrayLen(); i++) {
+                PlannerDomValue argValue = argsArray.valueAtIndex(i);
+                AbstractExpression* argExpr = AbstractExpression::buildExpressionTree_recurse(argValue);
                 argsVector->push_back(argExpr);
             }
         }
+
         // invoke the factory. obviously it has to handle null children.
         // pass it the serialization stream in case a subclass has more
         // to read. yes, the per-class data really does follow the
         // child serializations.
-        return ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
-                                                 left_child, right_child, argsVector);
+        AbstractExpression* finalExpr = ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
+                left_child, right_child, argsVector);
+
+        finalExpr->setInBytes(inBytes);
+
+        return finalExpr;
     }
-    catch (SerializableEEException &ex) {
+    catch (const SerializableEEException &ex) {
         delete left_child;
         delete right_child;
         delete argsVector;

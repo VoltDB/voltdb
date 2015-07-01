@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,8 +23,8 @@
 
 package org.voltdb.client;
 
-import org.voltdb.ClientResponseImpl;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.ClientResponseImpl;
 
 /**
  * {@link ClientStatusListenerExt} implementation that just logs the
@@ -62,8 +62,8 @@ public class ClientConfigForTest extends ClientConfig {
          */
         @Override
         public void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e) {
-            log.info(String.format("ClientConfigForTest reports uncaught excepetion in callback: %s",
-                    callback.getClass().getSimpleName()));
+            log.info(String.format("ClientConfigForTest reports uncaught exception in callback: %s",
+                    callback != null ? callback.getClass().getSimpleName() : "null"));
             log.info(((ClientResponseImpl) r).toJSONString());
             log.info(e);
         }
@@ -84,7 +84,12 @@ public class ClientConfigForTest extends ClientConfig {
         super("", "", new LoggingCSL());
     }
 
+    //By default this will use SHA256
     public ClientConfigForTest(String user, String password) {
         super(user, password, new LoggingCSL());
+    }
+
+    public ClientConfigForTest(String user, String password, ClientAuthHashScheme scheme) {
+        super(user, password, new LoggingCSL(), scheme);
     }
 }

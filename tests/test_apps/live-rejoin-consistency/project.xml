@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<project>
+    <info>
+        <name>Sequence Test</name>
+        <version>0.1</version>
+        <description>Used to test database integrity.</description>
+    </info>
+    <database>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='LiveRejoinConsistency.procedures.Initialize' />
+            <procedure class='LiveRejoinConsistency.procedures.getCountFromPtn' />
+            <procedure class='LiveRejoinConsistency.procedures.getCountFromRep' />
+            <procedure class='LiveRejoinConsistency.procedures.getRowFromPtn' />
+            <procedure class='LiveRejoinConsistency.procedures.getRowFromRep' />
+            <procedure class='LiveRejoinConsistency.procedures.getCRCFromPtn' />
+            <procedure class='LiveRejoinConsistency.procedures.getCRCFromRep' />
+            <procedure class='LiveRejoinConsistency.procedures.getNextFromPtn' />
+            <procedure class='LiveRejoinConsistency.procedures.MPUpdatePtn' />
+            <procedure class='LiveRejoinConsistency.procedures.MPUpdateRep' />
+        </procedures>
+    </database>
+</project>

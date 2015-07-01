@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,8 +40,12 @@ public class ReplicatedProcedure extends VoltProcedure {
             throw new VoltAbortException();
         }
 
-        VoltTable result = new VoltTable(new ColumnInfo("txnId", VoltType.BIGINT));
-        result.addRow(getTransactionId());
+        VoltTable result = new VoltTable(new ColumnInfo("txnId", VoltType.BIGINT),
+                                         new ColumnInfo("timestamp", VoltType.BIGINT));
+        result.addRow(getVoltPrivateRealTransactionIdDontUseMe(), getUniqueId());
+
+        // replicated txns get their results replaced by a hash... so stash this here
+        setAppStatusString(result.toJSONString());
         return result;
     }
 }

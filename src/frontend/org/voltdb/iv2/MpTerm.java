@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,14 +19,13 @@ package org.voltdb.iv2;
 
 import java.lang.InterruptedException;
 
-import java.util.ArrayList;
+import java.util.*;
 
 import java.util.concurrent.ExecutionException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
 
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.logging.VoltLogger;
@@ -36,7 +35,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class MpTerm implements Term
 {
@@ -45,7 +44,7 @@ public class MpTerm implements Term
 
     private final InitiatorMailbox m_mailbox;
     private final ZooKeeper m_zk;
-    private final TreeSet<Long> m_knownLeaders = new TreeSet<Long>();
+    private volatile SortedSet<Long> m_knownLeaders = ImmutableSortedSet.of();
 
     // Initialized in start() -- when the term begins.
     protected LeaderCache m_leaderCache;
@@ -61,18 +60,18 @@ public class MpTerm implements Term
         @Override
         public void run(ImmutableMap<Integer, Long> cache)
         {
-            Set<Long> updatedLeaders = new HashSet<Long>();
+            ImmutableSortedSet.Builder<Long> builder = ImmutableSortedSet.naturalOrder();
             for (Long HSId : cache.values()) {
-                updatedLeaders.add(HSId);
+                builder.add(HSId);
             }
-            List<Long> leaders = new ArrayList<Long>(updatedLeaders);
-            tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
-            tmLog.info(m_whoami
-                    + "LeaderCache change handler updating leader list to: "
-                    + CoreUtils.hsIdCollectionToString(leaders));
-            m_knownLeaders.clear();
-            m_knownLeaders.addAll(updatedLeaders);
-            m_mailbox.updateReplicas(leaders);
+            final SortedSet<Long> updatedLeaders = builder.build();
+            tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(updatedLeaders));
+            tmLog.debug(m_whoami
+                      + "LeaderCache change handler updating leader list to: "
+                      + CoreUtils.hsIdCollectionToString(updatedLeaders));
+            m_knownLeaders = updatedLeaders;
+
+            m_mailbox.updateReplicas(new ArrayList<Long>(m_knownLeaders), cache);
         }
     };
 
@@ -118,8 +117,13 @@ public class MpTerm implements Term
     }
 
     @Override
-    public List<Long> getInterestingHSIds()
+    public Supplier<List<Long>> getInterestingHSIds()
     {
-        return new ArrayList<Long>(m_knownLeaders);
+        return new Supplier<List<Long>>() {
+            @Override
+            public List<Long> get() {
+                return new ArrayList<Long>(m_knownLeaders);
+            }
+        };
     }
 }

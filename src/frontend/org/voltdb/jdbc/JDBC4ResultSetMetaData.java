@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -41,28 +41,13 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     {
         sourceResultSet.checkColumnBounds(column);
         VoltType type = sourceResultSet.table.getColumnType(column - 1);
-        switch(type)
-        {
-            case TINYINT:
-                return "java.lang.Byte";
-            case SMALLINT:
-                return "java.lang.Short";
-            case INTEGER:
-                return "java.lang.Integer";
-            case BIGINT:
-                return "java.lang.Long";
-            case FLOAT:
-                return "java.lang.Double";
-            case DECIMAL:
-                return "java.math.BigDecimal";
-            case TIMESTAMP:
-                return "java.sql.Timestamp";
-            case STRING:
-                return "java.lang.String";
-            default:
-                throw SQLError.get(SQLError.TRANSLATION_NOT_FOUND, type);
+        String result = type.getJdbcClass();
+        if (result == null) {
+            throw SQLError.get(SQLError.TRANSLATION_NOT_FOUND, type);
         }
+        return result;
     }
+
     // Returns the number of columns in this ResultSet object.
     public int getColumnCount() throws SQLException
     {
@@ -71,6 +56,10 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     }
 
     // Indicates the designated column's normal maximum width in characters.
+    // *NOTE* this is supposed to be based on the data in the returned table.
+    // However, we're not in a position to inspect the entire table, so we're
+    // just going to throw up best guesses here.  I'm not moving this
+    // into VoltType --izzy
     public int getColumnDisplaySize(int column) throws SQLException
     {
         sourceResultSet.checkColumnBounds(column);
@@ -92,6 +81,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
             case TIMESTAMP:
                 return 32;
             case STRING:
+            case VARBINARY:
                 return 128; // That is wrong: should be length in bytes / 3 (max bytes per char for UTF8), but we don't receive the length!
             default:
                 throw SQLError.get(SQLError.TRANSLATION_NOT_FOUND, type);
@@ -116,27 +106,8 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     {
         sourceResultSet.checkColumnBounds(column);
         VoltType type = sourceResultSet.table.getColumnType(column - 1);
-        switch(type)
-        {
-            case TINYINT:
-                return Types.TINYINT;
-            case SMALLINT:
-                return Types.SMALLINT;
-            case INTEGER:
-                return Types.INTEGER;
-            case BIGINT:
-                return Types.BIGINT;
-            case FLOAT:
-                return Types.DOUBLE;
-            case DECIMAL:
-                return Types.DECIMAL;
-            case TIMESTAMP:
-                return Types.TIMESTAMP;
-            case STRING:
-                return Types.VARCHAR;
-            default:
-                throw SQLError.get(SQLError.TRANSLATION_NOT_FOUND, type);
-        }
+        // Types unknown to JDBC will return "OTHER"
+        return type.getJdbcSqlType();
     }
 
     // Retrieves the designated column's database-specific type name.
@@ -144,27 +115,13 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     {
         sourceResultSet.checkColumnBounds(column);
         VoltType type = sourceResultSet.table.getColumnType(column - 1);
-        switch(type)
-        {
-            case TINYINT:
-                return "TINYINT";
-            case SMALLINT:
-                return "SMALLINT";
-            case INTEGER:
-                return "INT";
-            case BIGINT:
-                return "BIGINT";
-            case FLOAT:
-                return "FLOAT";
-            case DECIMAL:
-                return "DECIMAL";
-            case TIMESTAMP:
-                return "TIMESTAMP";
-            case STRING:
-                return "VARCHAR";
-            default:
-                return "UNKNOWN";
+        String result = type.toSQLString().toUpperCase();
+        if (result == null) {
+            // Types unknown to JDBC will return null, no other good
+            // answer to give
+            throw SQLError.get(SQLError.TRANSLATION_NOT_FOUND, type);
         }
+        return type.toSQLString().toUpperCase();
     }
 
     // Get the designated column's specified column size.
@@ -172,27 +129,11 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     {
         sourceResultSet.checkColumnBounds(column);
         VoltType type = sourceResultSet.table.getColumnType(column - 1);
-        switch(type)
-        {
-            case TINYINT:
-                return 1;
-            case SMALLINT:
-                return 2;
-            case INTEGER:
-                return 4;
-            case BIGINT:
-                return 8;
-            case FLOAT:
-                return 8;
-            case DECIMAL:
-                return 38;
-            case TIMESTAMP:
-                return 32;
-            case STRING:
-                return 128; // That is wrong: should be length in bytes / 3 (max bytes per char for UTF8), but we don't receive the length!
-            default:
-                throw SQLError.get(SQLError.TRANSLATION_NOT_FOUND, type);
+        Integer result =  type.getTypePrecisionAndRadix()[0];
+        if (result == null) {
+            result = 0;
         }
+        return result;
     }
 
     // Gets the designated column's number of digits to right of the decimal point.
@@ -200,13 +141,11 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     {
         sourceResultSet.checkColumnBounds(column);
         VoltType type = sourceResultSet.table.getColumnType(column - 1);
-        switch(type)
-        {
-            case DECIMAL:
-                return 12;
-            default:
-                return 0;
+        Integer result = type.getMaximumScale();
+        if (result == null) {
+            result = 0;
         }
+        return result;
     }
 
     // Get the designated column's table's schema.
@@ -237,21 +176,7 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     {
         sourceResultSet.checkColumnBounds(column);
         VoltType type = sourceResultSet.table.getColumnType(column - 1);
-        switch(type)
-        {
-            case TINYINT:
-            case SMALLINT:
-            case INTEGER:
-            case BIGINT:
-            case FLOAT:
-            case DECIMAL:
-            case TIMESTAMP:
-                return false;
-            case STRING:
-                return true;
-            default:
-                return true;
-        }
+        return type.isCaseSensitive();
     }
 
     // Indicates whether the designated column is a cash value.
@@ -293,18 +218,12 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
     {
         sourceResultSet.checkColumnBounds(column);
         VoltType type = sourceResultSet.table.getColumnType(column - 1);
-        switch(type)
-        {
-            case TINYINT:
-            case SMALLINT:
-            case INTEGER:
-            case BIGINT:
-            case FLOAT:
-            case DECIMAL:
-                return true;
-            default:
-                return false;
+        Boolean result = type.isUnsigned();
+        if (result == null) {
+            // Null return value means 'not signed' as far as this interface goes
+            return false;
         }
+        return !result;
     }
 
     // Indicates whether it is possible for a write on the designated column to succeed.

@@ -16,7 +16,6 @@ class BuildContext:
         self.THIRD_PARTY_INPUT_PREFIX = ""
         self.OUTPUT_PREFIX = ""
         self.TEST_PREFIX = ""
-        self.TEST_EXTRAFLAGS = ""
         self.INPUT = {}
         self.THIRD_PARTY_INPUT = {}
         self.TESTS = {}
@@ -27,6 +26,8 @@ class BuildContext:
         self.NMFLAGS = "-n"    # specialized by platform in build.py
         self.COVERAGE = False
         self.PROFILE = False
+        self.CC = "gcc"
+        self.CXX = "g++"
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -36,6 +37,14 @@ class BuildContext:
                 self.COVERAGE = True
             if arg in ["PROFILE"]:
                 self.PROFILE = True
+        # Exec build.local if available, a python script provided with this
+        # BuildContext object as the update-able symbol BUILD.  These example
+        # build.local lines force the use of clang instead of gcc/g++.
+        #   BUILD.CC = "clang"
+        #   BUILD.CXX = "clang"
+        buildLocal = os.path.join(os.path.dirname(__file__), "build.local")
+        if os.path.exists(buildLocal):
+            execfile(buildLocal, dict(BUILD = self))
 
 def readFile(filename):
     "read a file into a string"
@@ -157,8 +166,8 @@ def buildMakefile(CTX):
         tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
 
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
-    makefile.write("CC = gcc\n")
-    makefile.write("CXX = g++\n")
+    makefile.write("CC = %s\n" % CTX.CC)
+    makefile.write("CXX = %s\n" % CTX.CXX)
     makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
@@ -214,7 +223,7 @@ def buildMakefile(CTX):
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
     makefile.write("prod/voltdbipc: $(SRC)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) %s -o $@ $^ %s\n" % (CTX.TEST_EXTRAFLAGS, CTX.LASTLDFLAGS))
+    makefile.write("\t$(LINK.cpp) -o $@ $^ %s\n" % (CTX.LASTLDFLAGS))
     makefile.write("\n")
 
 
@@ -228,15 +237,14 @@ def buildMakefile(CTX):
     if CTX.LEVEL == "MEMCHECK_NOFREELIST":
         makefile.write("prod/voltdbipc")
     makefile.write("\n\n")
-    makefile.write("objects/volt.a: " + " ".join(jni_objects) + " objects/harness.o objects/execution/IPCTopend.o\n")
+    makefile.write("objects/volt.a: " + " ".join(jni_objects) + " objects/harness.o\n")
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     makefile.write("objects/harness.o: ../../" + TEST_PREFIX + "/harness.cpp\n")
     makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
-    makefile.write("objects/execution/IPCTopend.o: ../../" + INPUT_PREFIX + "/execution/IPCTopend.cpp\n")
     makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
     makefile.write("\n")
 
-    LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX) + CTX.TEST_EXTRAFLAGS
+    LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
     allsources = []
     for filename in input_paths:
         allsources += [(filename, LOCALCPPFLAGS, IGNORE_SYS_PREFIXES)]
@@ -286,11 +294,11 @@ def buildMakefile(CTX):
         for dep in mydeps:
             makefile.write(" ../../%s" % (dep))
         makefile.write("\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s %s -o $@ ../../%s\n" % (TEST_PREFIX, CTX.TEST_EXTRAFLAGS, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -o $@ ../../%s\n" % (TEST_PREFIX, sourcename))
 
         # link the test
         makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) %s -o %s %s objects/volt.a\n" % (CTX.TEST_EXTRAFLAGS, binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a\n" % (binname, objectname))
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
 
@@ -371,13 +379,32 @@ def runTests(CTX):
 
     return failures
 
-def getGCCVersion():
+def getCompilerVersion():
     vinfo = output = Popen(["gcc", "-v"], stderr=PIPE).communicate()[1]
-    vinfo = vinfo.strip().split("\n")
-    vinfo = vinfo[-1]
-    vinfo = vinfo.split()[2]
-    vinfo = vinfo.split(".")
-    return int(vinfo[0]), int(vinfo[1]), int(vinfo[2])
+    # Apple now uses clang and has its own versioning system.
+    # Not sure we do anything that cares which version of clang yet.
+    # This is pretty dumb code that could be improved as we support more
+    #  compilers and versions.
+    if output.find('clang') != -1:
+        # this is a hacky way to find the real clang version from the output of
+        # gcc -v on the mac. The version is right after the string "based on LLVM ".
+        token = "based on LLVM "
+        pos = vinfo.find(token)
+        if pos != -1:
+            pos += len(token)
+            vinfo = vinfo[pos:pos+3]
+            vinfo = vinfo.split(".")
+            return "clang", vinfo, vinfo, 0
+        # if not the expected apple clang format
+        # this probably needs to be adjusted for clang on linux or from source
+        return "clang", 0, 0, 0
+    else:
+        vinfo = vinfo.strip().split("\n")
+        vinfo = vinfo[-1]
+        vinfo = vinfo.split()[2]
+        vinfo = vinfo.split(".")
+        return "gcc", int(vinfo[0]), int(vinfo[1]), int(vinfo[2])
 
 # get the version of gcc and make it avaliable
-gcc_major, gcc_minor, gcc_point = getGCCVersion()
+compiler_name, compiler_major, compiler_minor, compiler_point = getCompilerVersion()
+

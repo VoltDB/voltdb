@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -43,51 +43,43 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdexcept>
-#include <sstream>
 #include "abstractoperationnode.h"
+
 #include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "storage/table.h"
-#include "catalog/table.h"
-#include "json_spirit/json_spirit.h"
+#include "execution/VoltDBEngine.h"
+#include "storage/TableCatalogDelegate.hpp"
 
-using namespace std;
-using namespace voltdb;
+#include <sstream>
 
-AbstractOperationPlanNode::~AbstractOperationPlanNode()
+namespace voltdb {
+
+AbstractOperationPlanNode::~AbstractOperationPlanNode() { }
+
+Table* AbstractOperationPlanNode::getTargetTable() const
 {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-string AbstractOperationPlanNode::getTargetTableName() const {
-    return target_table_name;
-}
-Table* AbstractOperationPlanNode::getTargetTable() const {
-    return (this->target_table);
-}
-void AbstractOperationPlanNode::setTargetTable(Table* table) {
-    this->target_table = table;
-}
-void AbstractOperationPlanNode::setTargetTableName(string name) {
-    this->target_table_name = name;
-}
-
-
-string AbstractOperationPlanNode::debugInfo(const string &spacer) const {
-    ostringstream buffer;
-    buffer << spacer << "TargetTable[" << this->target_table_name << "]\n";
-    return (buffer.str());
-}
-
-void AbstractOperationPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
-    json_spirit::Value targetTableNameValue = json_spirit::find_value( obj, "TARGET_TABLE_NAME");
-    if (targetTableNameValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractOperationPlanNode::"
-                                      "loadFromJSONObject: "
-                                      "Couldn't find TARGET_TABLE_NAME value");
+    if (m_tcd == NULL) {
+        return NULL;
     }
-    target_table_name = targetTableNameValue.get_str();
+    return m_tcd->getTable();
 }
+
+std::string AbstractOperationPlanNode::debugInfo(const std::string &spacer) const
+{
+    std::ostringstream buffer;
+    buffer << spacer << "TargetTable[" << m_target_table_name << "]\n";
+    return buffer.str();
+}
+
+void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+    m_target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    m_tcd = engine->getTableDelegate(m_target_table_name);
+    if ( ! m_tcd) {
+        VOLT_ERROR("Failed to retrieve target table from execution engine for PlanNode '%s'",
+                   debug().c_str());
+        //TODO: throw something
+    }
+}
+
+} // namespace voltdb

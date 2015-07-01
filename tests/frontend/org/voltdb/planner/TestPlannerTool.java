@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,7 @@ import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class TestPlannerTool extends TestCase {
 
@@ -55,21 +56,21 @@ public class TestPlannerTool extends TestCase {
             start = end;
         }*/
 
-        byte[] bytes = CatalogUtil.toBytes(new File("tpcc-oop.jar"));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        byte[] bytes = MiscUtils.fileToBytes(new File("tpcc-oop.jar"));
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database);
+        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 
         AdHocPlannedStatement result = null;
-        result = m_pt.planSql("select * from warehouse;", false, true, false);
+        result = m_pt.planSqlForTest("select * from warehouse;");
         System.out.println(result);
 
-        // try too many tables
+        // try many tables joins
         try {
-            result = m_pt.planSql("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
+            result = m_pt.planSqlForTest("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
                 "WAREHOUSE.W_ID = DISTRICT.D_W_ID and " +
                 "WAREHOUSE.W_ID = CUSTOMER.C_W_ID and " +
                 "WAREHOUSE.W_ID = CUSTOMER_NAME.C_W_ID and " +
@@ -78,10 +79,12 @@ public class TestPlannerTool extends TestCase {
                 "WAREHOUSE.W_ID = ORDERS.O_W_ID and " +
                 "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
                 "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
-                "WAREHOUSE.W_ID = 0", false, true, false);
+                "WAREHOUSE.W_ID = 0");
+        }
+        catch (Exception e) {
+            // V4.5 supports multiple table joins
             fail();
         }
-        catch (Exception e) {}
 
         // commented out code put the big stat
         /*int i = 0;
@@ -89,13 +92,13 @@ public class TestPlannerTool extends TestCase {
             long start = System.currentTimeMillis();*/
         // try just the right amount of tables
         try {
-            result = m_pt.planSql("select * from CUSTOMER, STOCK, ORDERS, ORDER_LINE, NEW_ORDER where " +
+            result = m_pt.planSqlForTest("select * from CUSTOMER, STOCK, ORDERS, ORDER_LINE, NEW_ORDER where " +
                 "CUSTOMER.C_W_ID = CUSTOMER.C_W_ID and " +
                 "CUSTOMER.C_W_ID = STOCK.S_W_ID and " +
                 "CUSTOMER.C_W_ID = ORDERS.O_W_ID and " +
                 "CUSTOMER.C_W_ID = ORDER_LINE.OL_W_ID and " +
                 "CUSTOMER.C_W_ID = NEW_ORDER.NO_W_ID and " +
-                "CUSTOMER.C_W_ID = 0", true, true, false);
+                "CUSTOMER.C_W_ID = 0");
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -107,7 +110,7 @@ public class TestPlannerTool extends TestCase {
 
         // try garbage
         try {
-            result = m_pt.planSql("ryan likes the yankees", false, true, false);
+            result = m_pt.planSqlForTest("ryan likes the yankees");
             fail();
         }
         catch (Exception e) {}
@@ -120,12 +123,12 @@ public class TestPlannerTool extends TestCase {
         }
 
         try {
-            result = m_pt.planSql("ryan likes the yankees", false, true, false);
+            result = m_pt.planSqlForTest("ryan likes the yankees");
             fail();
         }
         catch (Exception e) {}
 
-        result = m_pt.planSql("select * from warehouse;", false, true, false);
+        result = m_pt.planSqlForTest("select * from warehouse;");
         System.out.println(result);
     }
 
@@ -147,17 +150,17 @@ public class TestPlannerTool extends TestCase {
         final File jar = new File("testbadddl-oop.jar");
         jar.deleteOnExit();
         builder.compile("testbadddl-oop.jar");
-        byte[] bytes = CatalogUtil.toBytes(new File("testbadddl-oop.jar"));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        byte[] bytes = MiscUtils.fileToBytes(new File("testbadddl-oop.jar"));
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, c, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, c, bytes, new byte[] {}, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database);
+        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
-        m_pt.planSql("select * from A;", false, true, false);
+        m_pt.planSqlForTest("select * from A;");
     }
 }

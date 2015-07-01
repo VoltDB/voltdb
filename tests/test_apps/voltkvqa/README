@@ -16,13 +16,10 @@ Many attributes of the application are customizable through arguments passed to 
 
 These attributes can be adjusted by modifying the arguments to the "async-benchmark" and "sync-benchmark" targets in run.sh.
 
-
 Additional arguments allow the client to automatically tune itself for optimal performance ("client" target only).
 
   - Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
   - Target average transaction call latency (in milliseconds)
-  - Adjustment rate: the tuning process decreases the number of requested transactions per second to FACTOR*<observed-TPS> until the target latency is reached
-  - Auto-tuning interval (in seconds)
 
 Logging
 ------------------------------------------------
@@ -35,7 +32,7 @@ Interpreting the Results
 
 The default client configuration will allow the system to automatically tune itself for optimal performance, regardless of your underlying hardware and cluster deployment.
 
-The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion transactions per second, or 1B TPS).  Within 5 seconds, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency within 10 ms.
+The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion transactions per second, or 1B TPS).  Within 5 seconds, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency within 6 ms.
 
 You can also turn auto-tuning off to experiment with different loads or to better understand why proper tuning is key to getting the most of your specific VoltDB deployment.
 
@@ -61,8 +58,6 @@ run.sh client          : start the async client benchmark, [if needed, initializ
 run.sh async-benchmark : same as run.sh client
 
 run.sh sync-benchmark  : start the multi-threaded sync client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
-
-run.sh jdbc-benchmark  : start the JDBC client benchmark
 
 run.sh catalog         : compile sources and build the catalog
 

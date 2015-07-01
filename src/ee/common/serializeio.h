@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -56,10 +56,12 @@
 #include <exception>
 #include <arpa/inet.h>
 #include <cassert>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 #include "bytearray.h"
 #include "debuglog.h"
 #include "common/SQLException.h"
+#include "common/types.h"
 
 namespace voltdb {
 
@@ -93,7 +95,7 @@ namespace voltdb {
 
 
 /** Abstract class for reading from memory buffers. */
-class SerializeInput {
+template <Endianess E> class SerializeInput {
 protected:
     /** Does no initialization. Subclasses must call initialize. */
     SerializeInput() : current_(NULL), end_(NULL) {}
@@ -117,12 +119,20 @@ public:
 
     inline int16_t readShort() {
         int16_t value = readPrimitive<int16_t>();
-        return ntohs(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            return ntohs(value);
+        } else {
+            return value;
+        }
     }
 
     inline int32_t readInt() {
         int32_t value = readPrimitive<int32_t>();
-        return ntohl(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            return ntohl(value);
+        } else {
+            return value;
+        }
     }
 
     inline bool readBool() {
@@ -135,12 +145,18 @@ public:
 
     inline int64_t readLong() {
         int64_t value = readPrimitive<int64_t>();
-        return ntohll(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            return ntohll(value);
+        } else {
+            return value;
+        }
     }
 
     inline float readFloat() {
         int32_t value = readPrimitive<int32_t>();
-        value = ntohl(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            value = ntohl(value);
+        }
         float retval;
         memcpy(&retval, &value, sizeof(retval));
         return retval;
@@ -148,19 +164,25 @@ public:
 
     inline double readDouble() {
         int64_t value = readPrimitive<int64_t>();
-        value = ntohll(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            value = ntohll(value);
+        }
         double retval;
         memcpy(&retval, &value, sizeof(retval));
         return retval;
     }
 
     /** Returns a pointer to the internal data buffer, advancing the read position by length. */
-    const void* getRawPointer(size_t length) {
-        const void* result = current_;
+    const char* getRawPointer(size_t length) {
+        const char* result = current_;
         current_ += length;
         // TODO: Make this a non-optional check?
         assert(current_ <= end_);
         return result;
+    }
+
+    const char* getRawPointer() {
+        return current_;
     }
 
     /** Copy a string from the buffer. */
@@ -193,6 +215,10 @@ public:
     // TODO(evanj): Change the implementation to validate this?
     void unread(size_t bytes) {
         current_ -= bytes;
+    }
+
+    bool hasRemaining() {
+        return current_ < end_;
     }
 
 private:
@@ -377,7 +403,7 @@ public:
         return byte != 0;
     }
 
-    std::size_t position() {
+    std::size_t position() const {
         return position_;
     }
 
@@ -426,10 +452,10 @@ protected:
 };
 
 /** Implementation of SerializeInput that references an existing buffer. */
-class ReferenceSerializeInput : public SerializeInput {
+template <Endianess E> class ReferenceSerializeInput : public SerializeInput<E> {
 public:
     ReferenceSerializeInput(const void* data, size_t length) {
-        initialize(data, length);
+        this->initialize(data, length);
     }
 
     // Destructor does nothing: nothing to clean up!
@@ -437,11 +463,11 @@ public:
 };
 
 /** Implementation of SerializeInput that makes a copy of the buffer. */
-class CopySerializeInput : public SerializeInput {
+template <Endianess E> class CopySerializeInput : public SerializeInput<E> {
 public:
     CopySerializeInput(const void* data, size_t length) :
             bytes_(reinterpret_cast<const char*>(data), static_cast<int>(length)) {
-        initialize(bytes_.data(), static_cast<int>(length));
+        this->initialize(bytes_.data(), static_cast<int>(length));
     }
 
     // Destructor frees the ByteArray.
@@ -450,6 +476,18 @@ public:
 private:
     ByteArray bytes_;
 };
+
+#ifndef SERIALIZE_IO_DECLARATIONS
+#define SERIALIZE_IO_DECLARATIONS
+typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
+typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;
+
+typedef ReferenceSerializeInput<BYTE_ORDER_BIG_ENDIAN> ReferenceSerializeInputBE;
+typedef ReferenceSerializeInput<BYTE_ORDER_LITTLE_ENDIAN> ReferenceSerializeInputLE;
+
+typedef CopySerializeInput<BYTE_ORDER_BIG_ENDIAN> CopySerializeInputBE;
+typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
+#endif
 
 /** Implementation of SerializeOutput that references an existing buffer. */
 class ReferenceSerializeOutput : public SerializeOutput {
@@ -466,7 +504,7 @@ public:
         initialize(buffer, capacity);
     }
 
-    size_t remaining() {
+    size_t remaining() const {
         return capacity_ - position_;
     }
 
@@ -532,7 +570,7 @@ public:
         setPosition(0);
     }
 
-    int remaining() {
+    size_t remaining() const {
         return bytes_.length() - static_cast<int>(position());
     }
 

@@ -20,7 +20,8 @@
     <attribute name="excludes" default=""/>
     <sequential>
         <javac
-            target="1.6"
+            source="1.7"
+            target="1.7"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"

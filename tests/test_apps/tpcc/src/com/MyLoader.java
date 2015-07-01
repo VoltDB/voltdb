@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -103,8 +103,8 @@ public class MyLoader
     {
         m_helpah = new AppHelper(MyTPCC.class.getCanonicalName());
         m_helpah.add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 180);
-        m_helpah.add("warehouses", "number_of_warehouses", "Number of warehouses", 12);
-        m_helpah.add("scale-factor", "scale_factor", "Scale factor", 1.0);
+        m_helpah.add("warehouses", "number_of_warehouses", "Number of warehouses", 256);
+        m_helpah.add("scalefactor", "scale_factor", "Reduces per-warehouse data by warehouses/scalefactor", 22.0);
         m_helpah.add("skew-factor", "skew_factor", "Skew factor", 0.0);
         m_helpah.add("load-threads", "number_of_load_threads", "Number of load threads", 4);
         m_helpah.add("ratelimit", "rate_limit", "Rate limit to start from (tps)", 200000);
@@ -114,7 +114,7 @@ public class MyLoader
 
         initTableNames();
         int warehouses = m_helpah.intValue("warehouses");
-        double scaleFactor = m_helpah.doubleValue("scale-factor");
+        double scaleFactor = m_helpah.doubleValue("scalefactor");
         int loadThreads = m_helpah.intValue("load-threads");
 
         if (loadThreads > warehouses)

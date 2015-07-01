@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -27,8 +27,8 @@ import java.lang.management.MemoryUsage;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 
-import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.processtools.ShellTools;
 
 /**
@@ -46,7 +46,7 @@ public class SystemStatsCollector {
     static long starttime = System.currentTimeMillis();
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
     static long memorysize = 256;
-    static int pid;
+    static int pid = 0;
     static boolean initialized = false;
     static GetRSSMode mode = GetRSSMode.PS;
     static Thread thread = null;
@@ -136,7 +136,7 @@ public class SystemStatsCollector {
         public static PSData getPSData(int pid) {
             // run "ps" to get stats for this pid
             String command = String.format("ps -p %d -o rss,pmem,pcpu,time,etime", pid);
-            String results = ShellTools.cmd(command);
+            String results = ShellTools.local_cmd(command);
 
             // parse ps into value array
             String[] lines = results.split("\n");
@@ -312,7 +312,11 @@ public class SystemStatsCollector {
         try {
             rss = ExecutionEngine.nativeGetRSS();
         }
-        catch (Exception e) {}
+        // This catch is broad to specifically include the UnsatisfiedLinkError that arises when
+        // using the hsqldb backend on linux -- along with any other exceptions that might arise.
+        // Otherwise, the hsql backend would get an annoying report to stdout
+        // as the useless stats thread got needlessly killed.
+        catch (Throwable e) { }
         if (rss > 0) mode = GetRSSMode.MACOSX_NATIVE;
 
         // try procfs
@@ -350,6 +354,11 @@ public class SystemStatsCollector {
         }
     }
 
+    public static synchronized long getRSSMB() {
+        Datum d = generateCurrentSample();
+        return d.rss;
+    }
+
     /**
      * Poll the operating system and generate a Datum
      * @return A newly created Datum instance.
@@ -374,29 +383,6 @@ public class SystemStatsCollector {
         // create a new Datum which adds java stats
         Datum d = new Datum(rss);
         return d;
-    }
-
-    /**
-     * Get a CSV string of all the values in the history,
-     * filtering for uniqueness.
-     * @return A string containing CSV memory values.
-     */
-    public static synchronized String getCSV() {
-        // build a unique set
-        HashMap<Long, Datum> all =  new HashMap<Long, Datum>();
-        for (Datum d : historyS)
-            all.put(d.timestamp, d);
-        for (Datum d : historyM)
-            all.put(d.timestamp, d);
-        for (Datum d : historyL)
-            all.put(d.timestamp, d);
-
-        // print the csv out
-        StringBuilder sb = new StringBuilder();
-        for (Datum d : all.values())
-            sb.append(d.toLine()).append("\n");
-
-        return sb.toString();
     }
 
     /**

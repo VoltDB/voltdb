@@ -1,28 +1,29 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef RECOVERY_PROTO_MESSAGE_
 #define RECOVERY_PROTO_MESSAGE_
 
-#include "common/serializeio.h"
 #include "common/tabletuple.h"
+#include "common/declarations.h"
 
 namespace voltdb {
 class Pool;
+
 /*
  * A class for generating and receiving recovery messages. The class mixes read/write functionality along
  * with the ability to read/write several different types of payloads. RecoveryMsgType specifies the correct
@@ -44,7 +45,7 @@ public:
     /*
      * Prepare a recovery message for reading.
      */
-    RecoveryProtoMsg(ReferenceSerializeInput *in);
+    RecoveryProtoMsg(ReferenceSerializeInputBE *in);
 
     /*
      * Iterate over a recovery message and retrieve tuples for insertion/update.
@@ -66,13 +67,13 @@ public:
      */
     uint32_t totalTupleCount();
 
-    ReferenceSerializeInput* stream();
+    ReferenceSerializeInputBE* stream();
 
 private:
     /*
      * Input serializer.
      */
-    ReferenceSerializeInput *m_in;
+    ReferenceSerializeInputBE *m_in;
 
     /*
      * Type of this recovery message

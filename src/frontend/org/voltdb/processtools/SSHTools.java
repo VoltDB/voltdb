@@ -1,242 +1,463 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.processtools;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.Reader;
+
+import org.voltcore.logging.VoltLogger;
+
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
 
 public class SSHTools {
+    protected static final VoltLogger cmdLog = new VoltLogger("REMOTECMD");
     private final String m_username;
     private final String m_keyFile;
-    private final String m_password;
 
-    public SSHTools() {
-        this(null, null, null);
-    }
-
-    public SSHTools(String username) {
-        this(username, null, null);
-    }
-
-    public SSHTools(String username, String key, String password) {
-        if (username != null && username.isEmpty()) {
-            m_username = null;
+    public SSHTools(String username, String key) {
+        // If a username is not specified, default to the user who started the process.
+        if (username == null || username.isEmpty()) {
+            m_username = System.getProperty("user.name");
         } else {
             m_username = username;
         }
-        m_keyFile = key;
-        m_password = password;
-    }
-
-    public String generatePasswordScript() {
-        try {
-            final File passwordScript = File.createTempFile("foo", "bar");
-            passwordScript.setExecutable(true);
-            passwordScript.deleteOnExit();
-            //Make sure it is deleted eventually
-            final Thread t = new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        Thread.sleep(10000);
-                    } catch (InterruptedException e) {
-                    }
-                    passwordScript.delete();
-                }
-            };
-            t.setDaemon(true);
-            t.start();
-            final String sep = System.getProperty("line.separator");
-            StringBuilder sb = new StringBuilder();
-            if (m_password != null) {
-                sb.append("#!/bin/sh").append(sep);
-                sb.append("echo \"" + m_password + "\"").append(sep);
-                sb.append("rm $0");
-            } else {
-                sb.append("#!/bin/sh").append(sep);
-                sb.append("echo \"\"").append(sep);
-                sb.append("rm $0");
-            }
-            FileOutputStream fos = new FileOutputStream(passwordScript);
-            fos.write(sb.toString().getBytes("UTF-8"));
-            fos.flush();
-            fos.close();
-            return passwordScript.getAbsolutePath();
-        } catch (java.io.IOException e) {
-            throw new RuntimeException(e);
+        // If a private key is not specified, default to the rsa key in the default location.
+        if (key == null || key.isEmpty()) {
+            m_keyFile = System.getProperty("user.home") + "/.ssh/id_rsa";
+        } else {
+            m_keyFile = key;
         }
     }
 
-    public String createUrl(String hostname, String path) {
-        StringBuilder sb = new StringBuilder();
-        if (m_username != null)
-            sb.append(m_username + "@");
+    // Execute a remote SSH command on the specified host.
+    public String cmd(String hostname, String command) {
+        return cmdSSH(m_username, m_keyFile, hostname, command);
+    }
 
-        if (hostname != null)
-           sb.append(hostname);
+    // Execute a remote SSH command on the specified host.
+    public String cmd(String hostname, String[] command) {
+        return cmdSSH(m_username, m_keyFile, hostname, command);
+    }
 
-        sb.append(":");
-        if (path != null)
-            sb.append(path);
+    public String cmdSSH(String user, String key, String host, String command) {
+        return cmdSSH(user, null, key, host, command);
+    }
 
-        return sb.toString();
+    public String cmdSSH(String user, String key, String host, String[] command) {
+        return cmdSSH(user, key, host, stringify(command));
+    }
+
+    public SFTPSession getSftpSession(String hostname, VoltLogger logger) {
+        return new SFTPSession(m_username, m_keyFile, hostname, logger);
+    }
+
+    public SFTPSession getSftpSession(String user, String password, String key, String hostname, VoltLogger logger) {
+        return new SFTPSession(user, password, key, hostname, logger);
+    }
+
+    public SFTPSession getSftpSession(String user, String password, String key, String hostname, int port, VoltLogger logger) {
+        return new SFTPSession(user, password, key, hostname, port, logger);
+    }
+
+    /*
+     * The code from here to the end of the file is code that integrates with an external
+     * SSH library (JSCH, http://www.jcraft.com/jsch/).  If you wish to replaces this
+     * library, these are the methods that need to be re-worked.
+     */
+    public String cmdSSH(String user, String password, String key, String host, String command) {
+        StringBuilder result = new StringBuilder(2048);
+        try{
+            JSch jsch=new JSch();
+
+            // Set the private key
+            if (null != key)
+                jsch.addIdentity(key);
+            Session session=jsch.getSession(user, host, 22);
+            session.setTimeout(5000);
+
+            // To avoid the UnknownHostKey issue
+            java.util.Properties config = new java.util.Properties();
+            config.put("StrictHostKeyChecking", "no");
+            session.setConfig(config);
+
+            if (password != null && !password.trim().isEmpty()) {
+                session.setPassword(password);
+            }
+
+            session.connect();
+
+            Channel channel = session.openChannel("exec");
+            ((ChannelExec) channel).setCommand(command);
+
+            // Direct stderr output of command
+            InputStream err = ((ChannelExec) channel).getErrStream();
+            InputStreamReader errStrRdr = new InputStreamReader(err, "UTF-8");
+            Reader errStrBufRdr = new BufferedReader(errStrRdr);
+
+            // Direct stdout output of command
+            InputStream out = channel.getInputStream();
+            InputStreamReader outStrRdr = new InputStreamReader(out, "UTF-8");
+            Reader outStrBufRdr = new BufferedReader(outStrRdr);
+
+            StringBuffer stdout = new StringBuffer();
+            StringBuffer stderr = new StringBuffer();
+
+            channel.connect(5000);  // timeout after 5 seconds
+            while (true) {
+                if (channel.isClosed()) {
+                    break;
+                }
+
+                // Read from both streams here so that they are not blocked,
+                // if they are blocked because the buffer is full, channel.isClosed() will never
+                // be true.
+                int ch;
+                while (outStrBufRdr.ready() && (ch = outStrBufRdr.read()) > -1) {
+                    stdout.append((char) ch);
+                }
+                while (errStrBufRdr.ready() && (ch = errStrBufRdr.read()) > -1) {
+                    stderr.append((char) ch);
+                }
+
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ie) {
+                }
+            }
+
+            // In case there's still some more stuff in the buffers, read them
+            int ch;
+            while ((ch = outStrBufRdr.read()) > -1) {
+                stdout.append((char) ch);
+            }
+            while ((ch = errStrBufRdr.read()) > -1) {
+                stderr.append((char) ch);
+            }
+
+            // After the command is executed, gather the results (both stdin and stderr).
+            result.append(stdout.toString());
+            result.append(stderr.toString());
+
+            // Shutdown the connection
+            channel.disconnect();
+            session.disconnect();
+        }
+        catch(Throwable e){
+            e.printStackTrace();
+            // Return empty string if we can't connect.
+        }
+
+        return result.toString();
+    }
+
+    public ProcessData long_running_command(String hostname, String command[], String processName, OutputHandler handler) {
+        try{
+            JSch jsch=new JSch();
+            // Set the private key
+            if (null != m_keyFile)
+                jsch.addIdentity(m_keyFile);
+            Session session=jsch.getSession(m_username, hostname, 22);
+
+            // To avoid the UnknownHostKey issue
+            java.util.Properties config = new java.util.Properties();
+            config.put("StrictHostKeyChecking", "no");
+            session.setConfig(config);
+
+            session.connect(5000); // timeout after 5 seconds.
+
+            return new ProcessData(processName, handler, session, stringify(command));
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public boolean copyFromLocal(String src, String hostNameTo, String pathTo) {
-        // scp -r -i identity -q src.getPath remoteUser@hostNameTo:/pathTo
-        int len = 1;
-        if (m_keyFile != null)
-            len += 10;
-        else
-            len += 8;
-        String[] command = new String[len];
-        int i = 0;
-        command[i++] = "scp";
-        i = buildArgs(command);
-        command[i++] = "-r";
-        command[i++] = src;
-        command[i++] = createUrl(hostNameTo, pathTo);
-        assert(i == len);
-        String output = ShellTools.cmd(null, command, generatePasswordScript());
-        if (output.length() > 1) {
-            System.err.print(output);
-            return false;
-        }
-
-        return true;
+        return ScpTo(src, m_username, m_keyFile, hostNameTo, pathTo);
     }
 
     public boolean copyFromRemote(String dst, String hostNameFrom, String pathFrom) {
-        // scp -r -i identity -q fromhost:path tohost:path
-        int len = 1;
-        if (m_keyFile != null)
-            len += 10;
-        else
-            len += 8;
-        String[] command = new String[len];
-        int i = 0;
-        command[i++] = "scp";
-        i = buildArgs(command);
-        command[i++] = "-r";
-        command[i++] = createUrl(hostNameFrom, pathFrom);
-        command[i++] = dst;
-        assert(i == len);
-        String output = ShellTools.cmd(null, command, generatePasswordScript());
-        if (output.length() > 1) {
-            System.err.print(output);
+        return ScpFrom(m_username, m_keyFile, hostNameFrom, pathFrom, dst);
+    }
+
+    // The Jsch method for SCP to.
+    // This code is direcly copied from the Jsch SCP sample program.
+    public boolean ScpTo(String local_file, String user, String key, String host, String remote_file){
+
+        FileInputStream fis=null;
+        try{
+            boolean ptimestamp = true;
+            String command="scp " + (ptimestamp ? "-p" :"") +" -t "+remote_file;
+            cmdLog.debug("CMD: '" + command + "'");
+
+            JSch jsch=new JSch();
+            // Set the private key
+            if (null != key)
+                jsch.addIdentity(key);
+            Session session=jsch.getSession(user, host, 22);
+
+            // To avoid the UnknownHostKey issue
+            java.util.Properties config = new java.util.Properties();
+            config.put("StrictHostKeyChecking", "no");
+            session.setConfig(config);
+
+            session.connect(5000); // timeout after 5 seconds
+
+            // exec 'scp -t rfile' remotely
+            Channel channel=session.openChannel("exec");
+            ((ChannelExec)channel).setCommand(command);
+
+            // get I/O streams for remote scp
+            OutputStream out=channel.getOutputStream();
+            InputStream in=channel.getInputStream();
+
+            channel.connect();
+
+            if(checkAck(in)!=0){
+                return false;
+            }
+
+            File _lfile = new File(local_file);
+
+            if(ptimestamp){
+                command="T "+(_lfile.lastModified()/1000)+" 0";
+                // The access time should be sent here,
+                // but it is not accessible with JavaAPI ;-<
+                command+=(" "+(_lfile.lastModified()/1000)+" 0\n");
+                out.write(command.getBytes()); out.flush();
+                if(checkAck(in)!=0){
+                    return false;
+                }
+            }
+
+            // send "C0644 filesize filename", where filename should not include '/'
+            long filesize=_lfile.length();
+            command="C0644 "+filesize+" ";
+            if(local_file.lastIndexOf('/')>0){
+                command+=local_file.substring(local_file.lastIndexOf('/')+1);
+            }
+            else{
+                command+=local_file;
+            }
+            command+="\n";
+            out.write(command.getBytes()); out.flush();
+            if(checkAck(in)!=0){
+                return false;
+            }
+
+            // send a content of lfile
+            fis=new FileInputStream(local_file);
+            byte[] buf=new byte[1024];
+            while(true){
+                int len=fis.read(buf, 0, buf.length);
+                if(len<=0) break;
+                out.write(buf, 0, len); //out.flush();
+            }
+            fis.close();
+            fis=null;
+            // send '\0'
+            buf[0]=0; out.write(buf, 0, 1); out.flush();
+            if(checkAck(in)!=0){
+                return false;
+            }
+            out.close();
+
+            channel.disconnect();
+            session.disconnect();
+        }
+        catch(Exception e){
+            System.out.println(e);
+            try{if(fis!=null)fis.close();}catch(Exception ee){}
             return false;
         }
 
         return true;
     }
 
-    public boolean copyBetweenRemotes(String hostNameFrom, String pathFrom,
-            String hostNameTo, String pathTo) {
-        // scp -r -i identity -q fromhost:path tohost:path
-        int len = 1;
-        if (m_keyFile != null)
-            len += 10;
-        else
-            len += 8;
-        String[] command = new String[len];
-        int i = 0;
-        command[i++] = "scp";
-        i = buildArgs(command);
-        command[i++] = "-r";
-        command[i++] = createUrl(hostNameFrom, pathFrom);
-        command[i++] = createUrl(hostNameTo, pathTo);
-        assert(i == len);
+    // The Jsch method for SCP from.
+    // This code is directly copied from the Jsch SCP sample program.  Error handling has been modified by VoltDB.
+    public boolean ScpFrom(String user, String key, String host, String remote_file, String local_file){
 
-        String output = ShellTools.cmd(null, command, generatePasswordScript());
-        if (output.length() > 1) {
-            System.err.print(output);
+        FileOutputStream fos=null;
+        try{
+            String prefix=null;
+            if(new File(local_file).isDirectory()){
+                prefix=local_file+File.separator;
+            }
+
+            String command="scp -f "+remote_file;
+            cmdLog.debug("CMD: '" + command + "'");
+
+            JSch jsch=new JSch();
+            // Set the private key
+            if (null != key)
+                jsch.addIdentity(key);
+            Session session=jsch.getSession(user, host, 22);
+
+            // To avoid the UnknownHostKey issue
+            java.util.Properties config = new java.util.Properties();
+            config.put("StrictHostKeyChecking", "no");
+            session.setConfig(config);
+
+            session.connect();
+
+            // exec 'scp -f rfile' remotely
+            Channel channel=session.openChannel("exec");
+            ((ChannelExec)channel).setCommand(command);
+
+            // get I/O streams for remote scp
+            OutputStream out=channel.getOutputStream();
+            InputStream in=channel.getInputStream();
+
+            channel.connect();
+            byte[] buf=new byte[1024];
+
+            // send '\0'
+            buf[0]=0; out.write(buf, 0, 1); out.flush();
+
+            while(true){
+                int c=checkAck(in);
+                if(c!='C'){
+                    break;
+                }
+
+                // read '0644 '
+                in.read(buf, 0, 5);
+
+                long filesize=0L;
+                while(true){
+                    if(in.read(buf, 0, 1)<0){
+                        // error
+                        break;
+                    }
+                    if(buf[0]==' ')break;
+                    filesize=filesize*10L+(buf[0]-'0');
+                }
+
+                String file=null;
+                for(int i=0;;i++){
+                    in.read(buf, i, 1);
+                    if(buf[i]==(byte)0x0a){
+                        file=new String(buf, 0, i);
+                        break;
+                    }
+                }
+
+                String destination_file = prefix==null ? local_file : prefix+file;
+                cmdLog.debug("CMD: scp to local file '" + destination_file + "'");
+
+                // send '\0'
+                buf[0]=0; out.write(buf, 0, 1); out.flush();
+
+                // read a content of lfile
+                fos=new FileOutputStream(destination_file);
+                int foo;
+                while(true){
+                    if(buf.length<filesize) foo=buf.length;
+                    else foo=(int)filesize;
+                    foo=in.read(buf, 0, foo);
+                    if(foo<0){
+                        // error
+                        break;
+                    }
+                    fos.write(buf, 0, foo);
+                    filesize-=foo;
+                    if(filesize==0L) break;
+                }
+                fos.close();
+                fos=null;
+
+                if(checkAck(in)!=0){
+                    cmdLog.debug("CMD: scp checkAck failed");
+                    System.out.println("checkAck did not equal zero.");
+                    return false;
+                }
+
+                // send '\0'
+                buf[0]=0; out.write(buf, 0, 1); out.flush();
+            }
+
+            session.disconnect();
+        }
+        catch(Exception e){
+            System.out.println(e);
+            cmdLog.debug("CMD: scp failed with exception: " + e.toString());
             return false;
+        }
+        finally
+        {
+            try{if(fos!=null)fos.close();}catch(Exception ee){}
         }
 
         return true;
     }
 
-    public ProcessData command(String hostname, String remotePath, String command[], String processName, OutputHandler handler) {
-        String passwordScript = generatePasswordScript();
-        return ShellTools.command(null, convert(hostname, remotePath, command),
-                                  passwordScript, processName, handler);
-    }
+    static int checkAck(InputStream in) throws IOException{
+        int b=in.read();
+        // b may be 0 for success,
+        //          1 for error,
+        //          2 for fatal error,
+        //          -1
+        if(b==0) return b;
+        if(b==-1) return b;
 
-    public String cmd(String hostname, String remotePath, String command) {
-        return ShellTools.cmd(null, convert(hostname, remotePath, command), generatePasswordScript());
-    }
-
-    public String cmd(String hostname, String remotePath, String[] command) {
-        return ShellTools.cmd(null, convert(hostname, remotePath, command), generatePasswordScript());
-    }
-
-    public String[] convert(String hostname, String remotePath, String command) {
-        String[] command2 = command.split(" ");
-        return convert(hostname, remotePath, command2);
-    }
-
-    public String[] convert(String hostname, String remotePath, String[] command) {
-        assert(hostname != null);
-        int sshArgCount = 7 + (remotePath == null ? 0 : 1) + (m_keyFile == null ? 0 : 2);
-
-        String[] retval = new String[command.length + sshArgCount];
-        int i = 0;
-        retval[i++] = "ssh";
-        i = buildArgs(retval);
-        retval[i] = "";
-        if (m_username != null)
-            retval[i] = retval[i].concat(m_username + "@");
-        retval[i] = retval[i].concat(hostname);
-        i++;
-        if (remotePath != null)
-            retval[i] = "cd " + remotePath + ";";
-        for (int j = 0; j < command.length; j++) {
-            assert(command[j] != null);
-            retval[sshArgCount + j] = command[j];
+        if(b==1 || b==2){
+            StringBuffer sb=new StringBuffer();
+            int c;
+            do {
+                c=in.read();
+                sb.append((char)c);
+            }
+            while(c!='\n');
+            if(b==1){ // error
+                System.out.print(sb.toString());
+            }
+            if(b==2){ // fatal error
+                System.out.print(sb.toString());
+            }
         }
-
-        return retval ;
+        return b;
     }
 
-    /**
-     * This fills the few entries after the first one in the command list with
-     * the common options for SSH. Currently takes 5 or 7 entries depends on
-     * whether identity files are used.
-     *
-     * @param command
-     */
-    private int buildArgs(String[] command) {
-        int i = 1;
-        if (m_keyFile != null) {
-            command[i++] = "-i";
-            command[i++] = m_keyFile;
+    public static String stringify(String[] str_array) {
+        StringBuffer result = new StringBuffer(2048);
+        if (str_array != null) {
+            for (int i=0; i<str_array.length; i++) {
+                result.append(" ").append(str_array[i]);
+            }
         }
-        command[i++] = "-q";
-        command[i++] = "-o";
-        command[i++] = "UserKnownHostsFile=/dev/null";
-        command[i++] = "-o";
-        command[i++] = "StrictHostKeyChecking=no";
-
-        return i;
+        return result.toString();
     }
 
     public static void main(String args[]) throws Exception {
-        SSHTools tools = new SSHTools(args[0], null, args[1]);
-        System.out.println(tools.cmd( args[2], args[3], args[4]));
+        SSHTools tools = new SSHTools(args[0], args[1]);
+        System.out.println(tools.cmd( args[2], args[3]));
     }
 }

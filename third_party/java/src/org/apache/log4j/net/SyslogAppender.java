@@ -5,9 +5,9 @@
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,6 +23,8 @@ import org.apache.log4j.helpers.SyslogQuietWriter;
 import org.apache.log4j.helpers.SyslogWriter;
 import org.apache.log4j.helpers.TCPSyslogWriter;
 import org.apache.log4j.spi.LoggingEvent;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.network.ReverseDNSCache;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -289,7 +291,7 @@ public class SyslogAppender extends AppenderSkeleton {
           int split = header.length() + (packet.length() - header.length())/2;
           splitPacket(header, packet.substring(0, split) + "...");
           splitPacket(header, header + "..." + packet.substring(split));
-      }      
+      }
   }
 
   public
@@ -488,12 +490,7 @@ public class SyslogAppender extends AppenderSkeleton {
      */
   private String getLocalHostname() {
       if (localHostname == null) {
-          try {
-            InetAddress addr = InetAddress.getLocalHost();
-            localHostname = addr.getHostName();
-          } catch (UnknownHostException uhe) {
-            localHostname = "UNKNOWN_HOST";
-          }
+          localHostname = CoreUtils.getHostnameOrAddress();
       }
       return localHostname;
   }

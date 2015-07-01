@@ -31,13 +31,13 @@
 
 package org.hsqldb_voltpatches.types;
 
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
-import org.hsqldb_voltpatches.SqlInvariants;
-import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
+import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.SqlInvariants;
 
 /**
  * Implementation of CHARACTER SET objects.<p>

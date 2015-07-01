@@ -39,13 +39,13 @@ import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.DatabaseManager;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.NumberSequence;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.FileAccess;
 import org.hsqldb_voltpatches.lib.FileUtil;
 import org.hsqldb_voltpatches.lib.HsqlTimer;
@@ -54,7 +54,7 @@ import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
 import org.hsqldb_voltpatches.result.Result;
 
-//import org.hsqldb.lib.StopWatch;
+//import org.hsqldb_voltpatches.lib.StopWatch;
 
 /**
  * @todo - can lock the database engine as readonly in a wrapper for this when

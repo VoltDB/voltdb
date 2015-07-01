@@ -1,29 +1,95 @@
-This directory contains the source files for the Hello, World! tutorial described in _Getting Started with VoltDB_.
+HELLO WORLD! IN VOLTDB
+=====================
+Welcome to the VoltDB Hello World application. Hello World introduces you to the statements and commands needed to create and run VoltDB applications, so we suggest you try issuing the commands yourself. However, a run.sh script is provided for those who just want to see the example in action.
 
-The tutorial is designed to familiarize you with the source code and the commands needed to write and compile VoltDB applications, so we suggest you try issuing the commands yourself. However, a run.sh script is provided as well for those who just want to see the example in action.
+Before getting started, be sure to include the VoltDB /bin directory in your PATH environment variable so you have access to the VoltDB command line tools.
 
-The commands to process these files (not using run.sh) are the following:
+CREATING THE DATABASE
+=====================
+VoltDB is a ACID-compliant relational database. You define database tables using standard SQL just like you would in any other SQL database. The first step is to create a database instance using the “voltdb create” command:
 
-  $ export CLASSPATH=.:../../../lib/*:../../../voltdb/*
+        $ voltdb create
 
-  $ javac Client.java
-  $ javac Insert.java
-  $ javac Select.java
+Once the database is initialized, we can go ahead and define a database table to hold the words "hello" and "world". Just to make it interesting, let's add a DIALECT column so we can identify the language the words represent.
 
-        (compile application catalog)
+        CREATE TABLE HELLOWORLD (
+           HELLO VARCHAR(15),
+           WORLD VARCHAR(15),
+           DIALECT VARCHAR(15) NOT NULL,
+           PRIMARY KEY (DIALECT)
+        );
 
-  $ java org.voltdb.compiler.VoltCompiler project.xml helloworld.jar
 
-        (create database)
+You enter SQL DDL and DML statements using VoltDB’s interactive command line utility, sqlcmd. Type “sqlcmd” at the shell prompt and then cut & paste the preceding CREATE TABLE statement into the sqlcmd prompt.
 
-  $ java -Djava.library.path=../../../voltdb/ org.voltdb.VoltDB \
-         host localhost \
-         catalog helloworld.jar \
-         deployment deployment.xml \
-         license ../../../voltdb/license.xml
+Congratulations! You've created your first VoltDB database.
 
-        (in a separate window, set default to the helloworld sample directory
-         then set the class path and run the client application)
+INPUT AND OUTPUT
+================
+You use standard SQL queries to read and write from a VoltDB database. For example, you can use sqlcmd to enter the following two queries to input and return data from the database:
 
-  $ export CLASSPATH=.:../../../voltdb/*
-  $ java Client
+        INSERT INTO helloworld VALUES ('Hello','World','English');
+        SELECT hello, world FROM helloworld WHERE dialect='English';
+
+Type "exit" to return to the shell prompt. You have successfully created your first records in VoltDB.
+
+PARTITIONING
+============
+A key feature of VoltDB is the ability to partition both the data and the stored procedures that access that data. Note that VoltDB does the work of partitioning for you. All you need to do is specify the column to partition the table on.
+
+Although a simple application like Hello World does not need partitioning, it is a good thing to learn how to do it. So let’s go ahead and remove any existing data in the table and add the following PARTITION TABLE statement to your schema. We will partition on the language; that is, the DIALECT column. So start sqlcmd and type the following statements:
+
+      TRUNCATE TABLE Helloworld;
+      PARTITION TABLE Helloworld ON COLUMN Dialect;
+
+Note that the partitioning is automatic and transparent to ad hoc queries. For example, you can access the database by repeating your earlier queries:
+
+      INSERT INTO helloworld VALUES ('Hello','World','English');
+      SELECT hello, world FROM helloworld WHERE dialect='English';
+
+USING STORED PROCEDURES
+=======================
+The real power of VoltDB comes from using the partitioning of the database tables to partition and parallelize the transactions that access the database. You define VoltDB transactions as stored procedures. Each stored procedure either succeeds or rolls back as a whole, providing full transactional support.
+
+In addition, each stored procedure can be partitioned, like the tables, so they occupy only one partition for the duration of the transaction, freeing up the other partitions to do other work. Not all stored procedures must be partitioned. But it is a good idea to learn how to create a partitioned stored procedure. So we will define two stored procedures for the Hello World example, one to insert records and one to retrieve records.
+
+To be partitioned, procedures must access tables based on a specific value of the partitioning column of the table(s) accessed. In the case of Hello World, we can access each record based on DIALECT, the partitioning column of the HELLOWORLD table.
+
+In the simplest case, a single query, you can define the stored procedure in the schema using the CREATE PROCEDURE AS statement. So let’s go ahead and define our two stored procedures by entering the following DDL statements at the sqlcmd prompt:
+
+        CREATE PROCEDURE Insert
+         PARTITION ON TABLE Helloworld COLUMN Dialect
+           AS INSERT INTO HELLOWORLD (Dialect, Hello, World) VALUES (?, ?, ?);
+        CREATE PROCEDURE Select
+         PARTITION ON TABLE Helloworld COLUMN Dialect
+           AS SELECT HELLO, WORLD FROM HELLOWORLD WHERE DIALECT = ?;
+
+Note the use of question marks as placeholders where specific arguments passed in as parameters to the stored procedure will be inserted.
+
+For more complex stored procedures, which involve multiple queries and other processing, you can write the stored procedure using Java. Even if you are not familiar with Java, VoltDB stored procedures can be easy to write since they all follow the same basic structure. See the Using VoltDB manual for more information.
+
+
+WRITING THE CLIENT APPLICATION
+==============================
+The last component of our example is the client application. Client applications contain the business logic that turns databases into solutions. The Hello World client is very simple. First, it calls the Insert procedure to load the database. To make it interesting, we load the words "hello" and "world" in several different languages. Then it calls Select to retrieve and display the hello world message in your language of your choice.
+
+VoltDB provides callable interfaces (APIs) for several programming languages. But the basic process for accessing VoltDB is the same in all cases:
+
+1.  Create a client instance
+2.  Connect to one or more servers in the database cluster
+2.  Invoke stored procedures and process the results
+
+The Hello World example uses Java for the client application. In the source code for Client.java you can see how the program uses the createClient and createConnection methods to complete steps #1 & #2. Then the body of the program uses the callProcedure method to invoke the two stored procedures, and the ClientResponse object to analyze the results.
+
+All that’s left to do is compile the client application (setting CLASSPATH to include the VoltDB client libraries) and your application is complete:
+
+        export CLASSPATH=.:../../../voltdb/*
+        javac Client.java
+
+To see the full application in action, we can start with a fresh copy of the database. From the shell prompt use the “voltadmin shutdown” command to stop the current database. You can then create a new database and once it is running, use the sqlcmd utility to load the schema (provided in the file hello world.sql). Then run the client application:
+
+        $ voltdb create &
+        $ sqlcmd < helloworld.sql
+        $ java Client
+
+To learn more about VoltDB we encourage you to try out the complete tutorial, run the other sample applications that come with the software and look through the documentation that is availaBle at http://docs.voltdb.com/

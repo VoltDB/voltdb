@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/SQLException.h"
@@ -25,6 +25,7 @@ using namespace voltdb;
 // Please keep these ordered alphabetically.
 // Names and codes are standardized.
 const char* SQLException::data_exception_division_by_zero = "22012";
+const char* SQLException::data_exception_invalid_character_value_for_cast = "22018";
 const char* SQLException::data_exception_invalid_parameter = "22023";
 const char* SQLException::data_exception_most_specific_type_mismatch = "2200G";
 const char* SQLException::data_exception_numeric_value_out_of_range = "22003";
@@ -64,7 +65,7 @@ SQLException::SQLException(std::string sqlState, std::string message, int intern
     assert(m_sqlState.length() == 5);
 }
 
-void SQLException::p_serialize(ReferenceSerializeOutput *output) {
+void SQLException::p_serialize(ReferenceSerializeOutput *output) const {
     const char* sqlState = m_sqlState.c_str();
     for (int ii = 0; ii < 5; ii++) {
         output->writeByte(sqlState[ii]);

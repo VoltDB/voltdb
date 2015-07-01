@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -48,16 +48,13 @@
 
 #include "boost/shared_ptr.hpp"
 #include "common/types.h"
-#include "common/valuevector.h"
+#include "common/PlannerDomValue.h"
 
 #include <string>
 #include <vector>
-#include "json_spirit/json_spirit.h"
 
 namespace voltdb {
 
-class SerializeInput;
-class SerializeOutput;
 class NValue;
 class TableTuple;
 
@@ -74,10 +71,7 @@ class AbstractExpression {
     /** destroy this node and all children */
     virtual ~AbstractExpression();
 
-    virtual NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const = 0;
-
-    /** set parameter values for this node and its descendents */
-    virtual void substitute(const NValueArray &params);
+    virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
 
     /** return true if self or descendent should be substitute()'d */
     virtual bool hasParameter() const;
@@ -94,7 +88,7 @@ class AbstractExpression {
 
     /** create an expression tree. call this once with the input
         stream positioned at the root expression node */
-    static AbstractExpression* buildExpressionTree(json_spirit::Object &obj);
+    static AbstractExpression* buildExpressionTree(PlannerDomValue obj);
 
     /** accessors */
     ExpressionType getExpressionType() const {
@@ -111,12 +105,22 @@ class AbstractExpression {
         return m_valueSize;
     }
 
+    bool getInBytes() const
+    {
+        return m_inBytes;
+    }
+
     // These should really be part of the constructor, but plumbing
     // the type and size args through the whole of the expression world is
     // not something I'm doing right now.
     void setValueType(ValueType type)
     {
         m_valueType = type;
+    }
+
+    void setInBytes(bool bytes)
+    {
+        m_inBytes = bytes;
     }
 
     void setValueSize(int size)
@@ -140,7 +144,7 @@ class AbstractExpression {
                        AbstractExpression *right);
 
   private:
-    static AbstractExpression* buildExpressionTree_recurse(json_spirit::Object &obj);
+    static AbstractExpression* buildExpressionTree_recurse(PlannerDomValue obj);
     bool initParamShortCircuits();
 
   protected:
@@ -149,6 +153,7 @@ class AbstractExpression {
     bool m_hasParameter;
     ValueType m_valueType;
     int m_valueSize;
+    bool m_inBytes;
 };
 
 }

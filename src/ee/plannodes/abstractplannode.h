@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -51,62 +51,102 @@
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/types.h"
-
-#include "json_spirit/json_spirit.h"
+#include "common/PlannerDomValue.h"
 
 #include <map>
 #include <string>
 #include <vector>
 
-namespace voltdb
-{
+#include "boost/scoped_ptr.hpp"
+
+namespace voltdb {
+
 class AbstractExecutor;
+class AbstractExpression;
 class Table;
+class TableCatalogDelegate;
+class TempTable;
 class TupleSchema;
 
-class AbstractPlanNode
-{
+class AbstractPlanNode {
 public:
     virtual ~AbstractPlanNode();
 
     // ------------------------------------------------------------------
     // CHILDREN + PARENTS METHODS
     // ------------------------------------------------------------------
-    void addChild(AbstractPlanNode* child);
-    std::vector<AbstractPlanNode*>& getChildren();
-    std::vector<int32_t>& getChildIds();
-    const std::vector<AbstractPlanNode*>& getChildren() const;
-
-    void addParent(AbstractPlanNode* parent);
-    std::vector<AbstractPlanNode*>& getParents();
-    std::vector<int32_t>& getParentIds();
-    const std::vector<AbstractPlanNode*>& getParents() const;
+    void addChild(AbstractPlanNode* child) { m_children.push_back(child); }
+    const std::vector<int32_t>& getChildIds() const { return m_childIds; }
+    const std::vector<AbstractPlanNode*>& getChildren() const { return m_children; }
 
     // ------------------------------------------------------------------
     // INLINE PLANNODE METHODS
     // ------------------------------------------------------------------
     void addInlinePlanNode(AbstractPlanNode* inline_node);
     AbstractPlanNode* getInlinePlanNode(PlanNodeType type) const;
-    std::map<PlanNodeType, AbstractPlanNode*>& getInlinePlanNodes();
-    const std::map<PlanNodeType, AbstractPlanNode*>& getInlinePlanNodes() const;
-    bool isInline() const;
+    const std::map<PlanNodeType, AbstractPlanNode*>& getInlinePlanNodes() const { return m_inlineNodes; }
+    bool isInline() const { return m_isInline; }
 
     // ------------------------------------------------------------------
     // DATA MEMBER METHODS
     // ------------------------------------------------------------------
-    int32_t getPlanNodeId() const;
+    int32_t getPlanNodeId() const { return m_planNodeId; }
 
     // currently a hack needed to initialize the executors.
     CatalogId databaseId() const { return 1; }
 
     void setExecutor(AbstractExecutor* executor);
-    inline AbstractExecutor* getExecutor() const { return m_executor; }
+    AbstractExecutor* getExecutor() const { return m_executor.get(); }
+
+    class TableReference {
+    public:
+        TableReference() : m_tcd(NULL), m_tempTable(NULL) { }
+        //TableReference(TableCatalogDelegate* tcd) : m_tcd(tcd), m_tempTable(NULL) { }
+        //TableReference(TempTable* tempTable) : m_tcd(NULL), m_tempTable(tempTable) { }
+
+        Table* getTable() const;
+        void setTable(TableCatalogDelegate* tcd)
+        {
+            assert(! m_tcd);
+            assert(! m_tempTable);
+            m_tcd = tcd;
+        }
+        void setTable(TempTable* table)
+        {
+            assert(! m_tcd);
+            assert(! m_tempTable);
+            m_tempTable = table;
+        }
+        void clearTable()
+        {
+            m_tcd = NULL;
+            m_tempTable = NULL;
+        }
+
+        TableCatalogDelegate* m_tcd;
+        TempTable* m_tempTable;
+    };
+
+    // Adds cleanup behavior that only effects output temp tables.
+    class TableOwner : public TableReference {
+    public:
+        ~TableOwner();
+    };
 
     void setInputTables(const std::vector<Table*> &val);
-    std::vector<Table*>& getInputTables();
+    size_t getInputTableCount() { return m_inputTables.size(); }
+    const std::vector<TableReference>& getInputTableRefs() { return m_inputTables; }
+
+    Table *getInputTable() const { return m_inputTables[0].getTable(); }
+
+    Table *getInputTable(int which) const { return m_inputTables[which].getTable(); }
+
+    TempTable *getTempInputTable() const { return m_inputTables[0].m_tempTable; }
 
     void setOutputTable(Table* val);
-    Table *getOutputTable() const;
+    void clearOutputTableReference() { m_outputTable.clearTable(); }
+    Table *getOutputTable() const { return m_outputTable.getTable(); }
+    TempTable *getTempOutputTable() const { return m_outputTable.m_tempTable; }
 
     //
     // Each sub-class will have to implement this function to return their type
@@ -122,82 +162,111 @@ public:
     const std::vector<SchemaColumn*>& getOutputSchema() const;
 
     /**
+     * Get the output number of columns -- strictly for use with plannode
+     * classes that "project" a new output schema (vs. passing one up from a child).
+     * This is cleaner than using "getOutputSchema().size()" in such cases, such as Projection nodes,
+     * when m_outputSchema and m_validOutputColumnCount are known to be valid and in agreement.
+     */
+    int getValidOutputColumnCount() const
+    {
+        // Assert that this plan node defined (derialized in) its own output schema.
+        assert(m_validOutputColumnCount >= 0);
+        return m_validOutputColumnCount;
+    }
+
+    /**
      * Convenience method:
      * Generate a TupleSchema based on the contents of the output schema
      * from the plan
-     *
-     * @param allowNulls whether or not the generated schema should
-     * permit null values in the output columns
      */
-    TupleSchema* generateTupleSchema(bool allowNulls);
+    TupleSchema* generateTupleSchema() const;
+
+    /**
+     * Convenience method:
+     * Generate a TupleSchema based on the expected format for DML results.
+     */
+    static TupleSchema* generateDMLCountTupleSchema();
 
     // ------------------------------------------------------------------
     // UTILITY METHODS
     // ------------------------------------------------------------------
-    static AbstractPlanNode*
-    fromJSONObject(json_spirit::Object& obj);
+    static AbstractPlanNode* fromJSONObject(PlannerDomValue obj);
 
     // Debugging convenience methods
     std::string debug() const;
-    std::string debug(bool traverse) const;
     std::string debug(const std::string& spacer) const;
     virtual std::string debugInfo(const std::string& spacer) const = 0;
 
-    //
-    // Generate a new PlanNodeID
-    // NOTE: Only use in debugging & testing! The catalogs will
-    // generate real ids at deployment
-    //
-    static int32_t getNextPlanNodeId() {
-        static int32_t next = 1000;
-        return next++;
-    }
+    void setPlanNodeIdForTest(int32_t plannode_id) { m_planNodeId = plannode_id; }
+
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj) = 0;
-    AbstractPlanNode(int32_t plannode_id);
     AbstractPlanNode();
 
-    void setPlanNodeId(int32_t plannode_id);
+    virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
+
+    // Common code for use by the public generateTupleSchema() overload
+    // and by AbstractJoinPlanNode::loadFromJSONObject for its pre-agg output tuple.
+    static TupleSchema* generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema);
+
+    static void loadIntArrayFromJSONObject(const char* label, PlannerDomValue obj, std::vector<int>& ary);
+
+    static AbstractExpression* loadExpressionFromJSONObject(const char* label,
+                                                            PlannerDomValue obj);
+
+    // A simple method of managing the lifetime of AbstractExpressions referenced by
+    // a vector that is never mutated once it is loaded.
+    struct OwningExpressionVector : public std::vector<AbstractExpression*> {
+        // Nothing prevents the vector from being set up or even modified
+        // via other vector methods, with this caveat:
+        // The memory managament magic provided here simply assumes ownership
+        // of any elements referenced by the _final_ state of the vector.
+        ~OwningExpressionVector();
+        void loadExpressionArrayFromJSONObject(const char* label,
+                                               PlannerDomValue obj);
+    };
+
+    // Every PlanNode will have a unique id assigned to it at compile time
+    int32_t m_planNodeId;
 
     //
-    // Every PlanNode will have a unique id assigned to it at compile time
-    //
-    int32_t m_planNodeId;
-    //
-    // Output Table
-    // This is where we will write the results of the plan node's
-    // execution out to
-    //
-    Table* m_outputTable; // volatile
-    //
-    // Input Tables
-    // These tables are derived from the output of this node's children
-    //
-    std::vector<Table*> m_inputTables; // volatile
-    //
-    // A node can have multiple children and parents
+    // A node can have multiple children references, initially serialized as Ids
     //
     std::vector<AbstractPlanNode*> m_children;
     std::vector<int32_t> m_childIds;
-    std::vector<AbstractPlanNode*> m_parents;
-    std::vector<int32_t> m_parentIds;
-    //
-    // We also keep a pointer to this node's executor so that we can
-    // reference it quickly
-    // at runtime without having to look-up a map
-    //
-    AbstractExecutor* m_executor; // volatile
-    //
-    // Some Executors can take advantage of multiple internal PlanNodes
-    // to perform tasks inline. This can be a big speed increase
-    //
+
+    // Keep a pointer to this node's executor for memeory management purposes.
+    boost::scoped_ptr<AbstractExecutor> m_executor;
+
+    // Some Executors can take advantage of multiple internal PlanNodes to perform tasks inline.
+    // This can be a big speed increase and/or temp table memory decrease.
     std::map<PlanNodeType, AbstractPlanNode*> m_inlineNodes;
+    // This PlanNode may be getting referenced in that way.
+    // Currently, it is still assigned an executor that either goes unused or
+    // provides some service to the parent executor. This allows code sharing between inline
+    // and non-inline uses of the same PlanNode type.
     bool m_isInline;
 
+private:
+    static const int SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION = -1;
+    static const int SCHEMA_UNDEFINED_SO_GET_FROM_CHILD = -2;
+
+    // Output Table
+    // This is where we will write the results of the plan node's execution
+    TableOwner m_outputTable;
+
+    // Input Tables
+    // These tables are derived from the output of this node's children
+    std::vector<TableReference> m_inputTables;
+
+    // This is mostly used to hold one of the SCHEMA_UNDEFINED_SO_GET_FROM_ flags
+    // or some/any non-negative value indicating that m_outputSchema is valid.
+    // the fact that it also matches the size of m_outputSchema -- when it is valid
+    // -- MIGHT come in handy?
+    int m_validOutputColumnCount;
     std::vector<SchemaColumn*> m_outputSchema;
 };
 
-}
+} // namespace voltdb
 
 #endif

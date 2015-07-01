@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,6 +48,8 @@ public class LatencyManualTest {
             builder.addLiteralSchema(simpleSchema);
             builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
             builder.addPartitionInfo("blah", "ival");
+            // this is a NOOP as builder will only honor it if there is
+            // and accompanying call to builder.addExport
             builder.setTableAsExportOnly("blah");
 
             LocalCluster cluster = new LocalCluster("latencycheck.jar",

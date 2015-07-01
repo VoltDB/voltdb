@@ -36,14 +36,14 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 
 import org.hsqldb_voltpatches.Database;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.NumberSequence;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.lib.SimpleLog;
 import org.hsqldb_voltpatches.lib.tar.DbBackup;
+import org.hsqldb_voltpatches.Error;
+import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.lib.tar.TarMalformatException;
 
 // boucherb@users 20030510 - patch 1.7.2 - added cooperative file locking
@@ -490,7 +490,7 @@ public class Logger {
             case TableBase.TEMP_TABLE :
                 diskBased = false;
 
-            // fall through
+            // $FALL-THROUGH$
             case TableBase.RESULT_TABLE :
             case TableBase.SYSTEM_SUBQUERY :
             case TableBase.VIEW_TABLE :

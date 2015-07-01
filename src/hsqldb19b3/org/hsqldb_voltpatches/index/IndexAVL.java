@@ -66,12 +66,17 @@
 
 package org.hsqldb_voltpatches.index;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.OpTypes;
 import org.hsqldb_voltpatches.Row;
@@ -81,7 +86,6 @@ import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.navigator.RowIterator;
@@ -1579,20 +1583,49 @@ public class IndexAVL implements Index {
         }
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
-    String getColumnNameList() {
+    private org.hsqldb_voltpatches.Expression[]    exprs; // A VoltDB extension to support indexed expressions
+    private boolean         isAssumeUnique;  // A VoltDB extension to allow unique index on partitioned table without partition column included.
+    private org.hsqldb_voltpatches.Expression predicate; // A VoltDB extension to support partial indexes
 
-        String columnNameList = "";
+    /**
+     * VoltDB-specific Expression Index Constructor supports indexed expressions
+     *
+     * @param name HsqlName of the index
+     * @param id persistnece id
+     * @param tableRep table of the index
+     * @param cols
+     * @param expressions
+     * @param unique is this a unique index
+     * @param constraint does this index belonging to a constraint
+     */
+    @Override
+    public IndexAVL withExpressions(org.hsqldb_voltpatches.Expression[] expressions) {
+        exprs = expressions;
+        return this;
+    }
+
+    /**
+     * VoltDB-specific Partial Index Constructor
+     *
+     * @param indexPredicate partial index predicate
+     * @return Index
+     */
+    @Override
+    public IndexAVL withPredicate(org.hsqldb_voltpatches.Expression indexPredicate) {
+        predicate = indexPredicate;
+        return this;
+    }
+
+    List<String> getColumnNameList() {
+
+        List<String> columnNameList = new ArrayList<String>();
         Table t2 = (Table) table;
 
         for (int j = 0; j < colIndex.length; ++j) {
-            columnNameList +=
-                t2.getColumn(colIndex[j]).getName().statementName;
-
-            if (j < colIndex.length - 1) {
-                columnNameList += ",";
-            }
+            columnNameList.add(
+                t2.getColumn(colIndex[j]).getName().statementName);
         }
 
         return columnNameList;
@@ -1604,15 +1637,113 @@ public class IndexAVL implements Index {
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.
+     * @throws HSQLParseException
      */
     @Override
-    public VoltXMLElement voltGetXML(Session session) {
-        VoltXMLElement index = new VoltXMLElement("index");
+    public org.hsqldb_voltpatches.VoltXMLElement voltGetIndexXML(Session session, String tableName)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
+        org.hsqldb_voltpatches.VoltXMLElement index = new org.hsqldb_voltpatches.VoltXMLElement("index");
 
-        index.attributes.put("name", getName().name);
-        index.attributes.put("columns", getColumnNameList());
+        String indexName = getName().name;
+        String autoGenIndexName = null;
+        if (indexName.startsWith("SYS_IDX_")) {
+            if (indexName.startsWith("SYS_PK_", 8)) {
+                autoGenIndexName = HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX + tableName;
+            }
+            else if (indexName.startsWith("SYS_CT_", 8)) {
+                autoGenIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + tableName;
+            }
+            else {
+                if (indexName.length() == 13) {
+                    // Raw SYS_IDX_XXXXX
+                    autoGenIndexName = HSQLInterface.AUTO_GEN_IDX_PREFIX + tableName;
+                }
+                else {
+                    // Explicitly named constraint wrapped by SYS_IDX_
+                    autoGenIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX +
+                            indexName.substring(8, indexName.length()-6);
+                    indexName = autoGenIndexName;
+                }
+            }
+        }
+        else {
+            autoGenIndexName = "";
+        }
+
+        // Support indexed expressions
+        int exprHash = 0;
+        if (exprs != null) {
+            org.hsqldb_voltpatches.VoltXMLElement indexedExprs = new org.hsqldb_voltpatches.VoltXMLElement("exprs");
+            index.children.add(indexedExprs);
+            String hashExprString = new String();
+            String sep = "";
+            for (org.hsqldb_voltpatches.Expression expression : exprs) {
+                org.hsqldb_voltpatches.VoltXMLElement xml = expression.voltGetExpressionXML(session, (Table) table);
+                indexedExprs.children.add(xml);
+                hashExprString += sep + expression.getSQL();
+                sep = ",";
+            }
+            if (!autoGenIndexName.equals("")) {
+                byte[] bytes = hashExprString.getBytes();
+                int offset = 0;
+                for (int ii = 0; ii < bytes.length; ii++) {
+                    exprHash = 31 * exprHash + bytes[offset++];
+                }
+            }
+        }
+        index.attributes.put("assumeunique", isAssumeUnique() ? "true" : "false");
+
+        Object[] columnList = getColumnNameList().toArray();
+        if (columnList.length > 0) {
+            if (!autoGenIndexName.equals("") &&
+                    !autoGenIndexName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX)) {
+                autoGenIndexName += "_" + StringUtils.join(columnList, "_");
+                if (exprs != null) {
+                    autoGenIndexName += "_" + java.lang.Math.abs(exprHash % 100000);
+                }
+                indexName = autoGenIndexName;
+            }
+            index.attributes.put("name", indexName);
+            index.attributes.put("columns", StringUtils.join(columnList, ","));
+        }
+        else {
+            index.attributes.put("name", autoGenIndexName.equals("") ? indexName : autoGenIndexName);
+            index.attributes.put("columns", "");
+        }
         index.attributes.put("unique", isUnique() ? "true" : "false");
 
+        if (predicate != null) {
+            org.hsqldb_voltpatches.VoltXMLElement partialExpr = new org.hsqldb_voltpatches.VoltXMLElement("predicate");
+            index.children.add(partialExpr);
+            org.hsqldb_voltpatches.VoltXMLElement xml = predicate.voltGetExpressionXML(session, (Table) table);
+            partialExpr.children.add(xml);
+        }
         return index;
     }
+
+    /**
+     * VoltDB added method to get a list of indexed expressions that contain one or more non-columns.
+     * @return the list of expressions, or null if indexing only plain column value(s).
+     */
+    @Override
+    public org.hsqldb_voltpatches.Expression[] getExpressions() {
+        return exprs;
+    }
+
+    @Override
+    public boolean isAssumeUnique() {
+        return isAssumeUnique;
+    }
+
+    @Override
+    public Index setAssumeUnique(boolean assumeUnique) {
+        this.isAssumeUnique = assumeUnique;
+        return this;
+    }
+
+    @Override
+    public org.hsqldb_voltpatches.Expression getPredicate() {
+        return predicate;
+    }
+    /**********************************************************************/
 }

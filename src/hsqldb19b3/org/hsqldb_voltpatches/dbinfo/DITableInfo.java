@@ -35,11 +35,11 @@ import java.util.Locale;
 
 import org.hsqldb_voltpatches.ColumnSchema;
 import org.hsqldb_voltpatches.Table;
-import org.hsqldb_voltpatches.TableBase;
-import org.hsqldb_voltpatches.TextTable;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.resources.BundleHandler;
 import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.TableBase;
+import org.hsqldb_voltpatches.TextTable;
 
 /**
  * Provides extended information about HSQLDB tables and their

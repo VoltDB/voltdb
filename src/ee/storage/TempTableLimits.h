@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -20,49 +20,51 @@
 
 #include <stdint.h>
 
-namespace voltdb
-{
+namespace voltdb {
+
+/**
+ * Track the amount of memory used by temp tables in a plan fragment's executors.
+ * Log or throw exceptions based on thresholds.
+ */
+class TempTableLimits {
+public:
+    TempTableLimits(int64_t memoryLimit = 1024 * 1024 * 100, int64_t logThreshold = -1)
+        : m_currMemoryInBytes(0)
+        , m_peakMemoryInBytes(0)
+        , m_logThreshold(logThreshold)
+        , m_memoryLimit(memoryLimit)
+        , m_logLatch(false)
+    { }
+
     /**
-     * Track the amount of memory used for the temp tables contained
-     * within a plan fragment's executors.  Log or throw exceptions
-     * based on thresholds.
+     * Track an increase in the amount of memory accumulated in temp tables.
+     * Log once at INFO level to the SQL instance if the log threshold is set and it is crossed.
+     * Throw a SQLException when the memory limit is exceeded.
      */
-    class TempTableLimits
-    {
-    public:
-        TempTableLimits();
+    void increaseAllocated(int bytes);
+    void reduceAllocated(int bytes);
 
-        /**
-         * Increase the amount of memory accumulated in temp tables.
-         * Will log once at INFO level to the SQL instance if the log
-         * threshold is set and it is crossed.  Will throw a
-         * SQLException when the memory limit is exceeded.
-         */
-        void increaseAllocated(int bytes);
-        void reduceAllocated(int bytes);
+    int64_t getAllocated() const { return m_currMemoryInBytes; }
+    int64_t getPeakMemoryInBytes() const { return m_peakMemoryInBytes; }
+    void resetPeakMemory() { m_peakMemoryInBytes = m_currMemoryInBytes; }
 
-        int64_t getAllocated() const;
-        void setLogThreshold(int64_t threshold);
-        int64_t getLogThreshold() const;
-        void setMemoryLimit(int64_t limit);
-        int64_t getMemoryLimit() const;
+private:
+    /// The current amount of memory used by temp tables for this plan fragment.
+    int64_t m_currMemoryInBytes;
+    /// The high water amount of memory used by temp tables
+    /// during the current execution of this plan fragment.
+    int64_t m_peakMemoryInBytes;
+    /// The memory allocation at which a log message will be generated.
+    /// A negative value disables this behavior.
+    const int64_t m_logThreshold;
+    /// The memory allocation at which an exception will be thrown and the execution aborted.
+    /// A negative value disables this behavior.
+    const int64_t m_memoryLimit;
+    /// True if we have already generated a log message for
+    /// exceeding the log threshold and not yet dropped below it.
+    bool m_logLatch;
+};
 
-    private:
-        // The current amount of memory used by temp tables for this
-        // plan fragment
-        int64_t m_currMemoryInBytes;
-        // The memory allocation at which a log message will be
-        // generated.  A negative value with disable this behavior.
-        int64_t m_logThreshold;
-        // The memory allocation at which an exception will be thrown
-        // and the execution aborted.  A negative value will disable
-        // this behavior.
-        int64_t m_memoryLimit;
-        // True if we have already generated a log message for
-        // exceeding the log threshold and not yet dropped below it.
-        bool m_logLatch;
-    };
-}
-
+} // namespace voltdb
 
 #endif // _EE_STORAGE_TEMPTABLELIMITS_H_

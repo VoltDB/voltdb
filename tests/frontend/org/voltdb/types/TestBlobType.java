@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -67,110 +67,122 @@ public class TestBlobType extends TestCase {
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest.xml"));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("binarytest.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("binarytest.xml");
-        config.m_backend = BackendTarget.NATIVE_EE_JNI;
-        ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
+        ServerThread localServer = null;
+        Client client = null;
 
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost");
-
-        // insert data
-        ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a', 'b', 'c', 'd' }, "hi", new byte[] { 'a' });
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-
-        // make sure strings as bytes works
-        cr = client.callProcedure("FindString", 5, "hi".getBytes("UTF-8"));
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        assertEquals(1, cr.getResults()[0].getRowCount());
-        cr = client.callProcedure("VarbinaryStringLookup", 5, "hi".getBytes("UTF-8"), "hi");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        assertEquals(1, cr.getResults()[0].getRowCount());
-        assertEquals(1, cr.getResults()[1].getRowCount());
-
-        // literal update
-        cr = client.callProcedure("LiteralUpdate");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        assertEquals(1, cr.getResults()[0].getRowCount());
-        assertEquals(1, cr.getResults()[0].asScalarLong());
-
-        // see if we can get the binary value from the '0a1A' update above
-        cr = client.callProcedure("Select");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        VoltTable t = cr.getResults()[0];
-        assertEquals(1, t.getRowCount());
-        t.resetRowPosition();
-        t.advanceRow();
-        byte[] vb = t.getVarbinary("b");
-        assertEquals(2, vb.length);
-        assertEquals((byte) 10, vb[0]);
-        assertEquals((byte) 26, vb[1]);
-
-        // try again with generic call
-        vb = (byte[]) t.get("b", VoltType.VARBINARY);
-        assertEquals(2, vb.length);
-        assertEquals((byte) 10, vb[0]);
-        assertEquals((byte) 26, vb[1]);
-
-        // insert hex data
-        cr = client.callProcedure("Insert", 9, "aabbccdd", "hi", "aabb");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-
-        // literal inserts
-        cr = client.callProcedure("LiteralInsert");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        assertEquals(1, cr.getResults()[0].getRowCount());
-        assertEquals(1, cr.getResults()[0].asScalarLong());
-
-        // adhoc queries
-        cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb01' where ival = 5");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        assertEquals(1, cr.getResults()[0].getRowCount());
-        assertEquals(1, cr.getResults()[0].asScalarLong());
-        cr = client.callProcedure("@AdHoc", "insert into blah values (12, 'aabbcc', 'hi', 'aabb');");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        assertEquals(1, cr.getResults()[0].getRowCount());
-        assertEquals(1, cr.getResults()[0].asScalarLong());
-
-        // try bad value insert for normal query
         try {
-            cr = client.callProcedure("Insert", 6, new byte[] { 'a' }, "hi", new byte[] { 'a', 'b', 'c' });
-            fail();
-        }
-        catch (ProcCallException e) {}
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("binarytest.jar");
+            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("binarytest.xml");
+            config.m_backend = BackendTarget.NATIVE_EE_JNI;
+            localServer = new ServerThread(config);
+            localServer.start();
+            localServer.waitForInitialization();
 
-        // try invalid hex literal strings in adhoc query
-        try {
-            cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb01nt' where ival = 5");
-            fail();
-        }
-        catch (ProcCallException e) {}
-        try {
-            cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb0' where ival = 5");
-            fail();
-        }
-        catch (ProcCallException e) {}
+            client = ClientFactory.createClient();
+            client.createConnection("localhost");
 
-        // test invalid comparison
-        try {
-            cr = client.callProcedure("@AdHoc", "update blah set ival = 5 where b = 'Bb01'");
-            fail();
-        }
-        catch (ProcCallException e) {}
+            // insert data
+            ClientResponse cr = client.callProcedure("Insert", 5, new byte[] { 'a', 'b', 'c', 'd' }, "hi", new byte[] { 'a' });
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
-        // test too long varbinary
-        byte[] overlong = new byte[VoltType.MAX_VALUE_LENGTH + 1];
-        try {
-            cr = client.callProcedure("Insert", 6, new byte[] { 'a' }, "hi", overlong);
-            fail();
-        }
-        catch (ProcCallException e) {}
+            // make sure strings as bytes works
+            cr = client.callProcedure("FindString", 5, "hi".getBytes("UTF-8"));
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(1, cr.getResults()[0].getRowCount());
+            cr = client.callProcedure("VarbinaryStringLookup", 5, "hi".getBytes("UTF-8"), "hi");
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(1, cr.getResults()[0].getRowCount());
+            assertEquals(1, cr.getResults()[1].getRowCount());
 
-        // stop execution
-        VoltDB.instance().shutdown(localServer);
+            // literal update
+            cr = client.callProcedure("LiteralUpdate");
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(1, cr.getResults()[0].getRowCount());
+            assertEquals(1, cr.getResults()[0].asScalarLong());
+
+            // see if we can get the binary value from the '0a1A' update above
+            cr = client.callProcedure("Select");
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            VoltTable t = cr.getResults()[0];
+            assertEquals(1, t.getRowCount());
+            t.resetRowPosition();
+            t.advanceRow();
+            byte[] vb = t.getVarbinary("b");
+            assertEquals(2, vb.length);
+            assertEquals((byte) 10, vb[0]);
+            assertEquals((byte) 26, vb[1]);
+
+            // try again with generic call
+            vb = (byte[]) t.get("b", VoltType.VARBINARY);
+            assertEquals(2, vb.length);
+            assertEquals((byte) 10, vb[0]);
+            assertEquals((byte) 26, vb[1]);
+
+            // insert hex data
+            cr = client.callProcedure("Insert", 9, "aabbccdd", "hi", "aabb");
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+            // literal inserts
+            cr = client.callProcedure("LiteralInsert");
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(1, cr.getResults()[0].getRowCount());
+            assertEquals(1, cr.getResults()[0].asScalarLong());
+
+            // adhoc queries
+            cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb01' where ival = 5");
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(1, cr.getResults()[0].getRowCount());
+            assertEquals(1, cr.getResults()[0].asScalarLong());
+            cr = client.callProcedure("@AdHoc", "insert into blah values (12, 'aabbcc', 'hi', 'aabb');");
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(1, cr.getResults()[0].getRowCount());
+            assertEquals(1, cr.getResults()[0].asScalarLong());
+
+            // try bad value insert for normal query
+            try {
+                cr = client.callProcedure("Insert", 6, new byte[] { 'a' }, "hi", new byte[] { 'a', 'b', 'c' });
+                fail();
+            }
+            catch (ProcCallException e) {}
+
+            // try invalid hex literal strings in adhoc query
+            try {
+                cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb01nt' where ival = 5");
+                fail();
+            }
+            catch (ProcCallException e) {}
+            try {
+                cr = client.callProcedure("@AdHoc", "update blah set b = 'Bb0' where ival = 5");
+                fail();
+            }
+            catch (ProcCallException e) {}
+
+            // test invalid comparison
+            try {
+                cr = client.callProcedure("@AdHoc", "update blah set ival = 5 where b = 'Bb01'");
+                fail();
+            }
+            catch (ProcCallException e) {}
+
+            // test too long varbinary
+            byte[] overlong = new byte[VoltType.MAX_VALUE_LENGTH + 1];
+            try {
+                cr = client.callProcedure("Insert", 6, new byte[] { 'a' }, "hi", overlong);
+                fail();
+            }
+            catch (ProcCallException e) {}
+        }
+        finally {
+            // stop execution
+            if (client != null) {
+                client.close();
+            }
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+        }
     }
 
     public void testIndexRejection() throws Exception {
@@ -209,72 +221,84 @@ public class TestBlobType extends TestCase {
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest2.xml"));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("binarytest2.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("binarytest2.xml");
-        config.m_backend = BackendTarget.NATIVE_EE_JNI;
-        ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
+        ServerThread localServer = null;
+        Client client = null;
 
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost");
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("binarytest2.jar");
+            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("binarytest2.xml");
+            config.m_backend = BackendTarget.NATIVE_EE_JNI;
+            localServer = new ServerThread(config);
+            localServer.start();
+            localServer.waitForInitialization();
 
-        // insert data
-        // long c_id, long c_d_id, long c_w_id, String c_first, String c_middle,
-        // String c_last, String c_street_1, String c_street_2, String d_city,
-        // String d_state, String d_zip, String c_phone, Date c_since, String
-        // c_credit, double c_credit_lim, double c_discount, double c_balance,
-        // double c_ytd_payment, double c_payment_cnt, double c_delivery_cnt,
-        // String c_data
-        final double initialBalance = 15.75;
-        final double initialYTD = 15241.45;
-        VoltTable customer1 = client.callProcedure("InsertCustomer", C_ID, D_ID,
-                W_ID, "I", "Be", "lastname", "Place", "Place2", "BiggerPlace",
-                "AL", "91083", "(193) 099 - 9082", new TimestampType(), "BC",
-                19298943.12, .13, initialBalance, initialYTD, 0L, 15L,
-                "Some History").getResults()[0];
-        // check for successful insertion.
-        assertEquals(1L, customer1.asScalarLong());
+            client = ClientFactory.createClient();
+            client.createConnection("localhost");
 
-        VoltTable customer2 = client.callProcedure("InsertCustomer", C_ID + 1,
-                D_ID, W_ID, "We", "R", "Customer", "Random Department",
-                "Place2", "BiggerPlace", "AL", "13908", "(913) 909 - 0928",
-                new TimestampType(), "GC", 19298943.12, .13, initialBalance, initialYTD,
-                1L, 15L, "Some History").getResults()[0];
-        // check for successful insertion.
-        assertEquals(1L, customer2.asScalarLong());
+            // insert data
+            // long c_id, long c_d_id, long c_w_id, String c_first, String c_middle,
+            // String c_last, String c_street_1, String c_street_2, String d_city,
+            // String d_state, String d_zip, String c_phone, Date c_since, String
+            // c_credit, double c_credit_lim, double c_discount, double c_balance,
+            // double c_ytd_payment, double c_payment_cnt, double c_delivery_cnt,
+            // String c_data
+            final double initialBalance = 15.75;
+            final double initialYTD = 15241.45;
+            VoltTable customer1 = client.callProcedure("InsertCustomer", C_ID, D_ID,
+                    W_ID, "I", "Be", "lastname", "Place", "Place2", "BiggerPlace",
+                    "AL", "91083", "(193) 099 - 9082", new TimestampType(), "BC",
+                    19298943.12, .13, initialBalance, initialYTD, 0L, 15L,
+                    "Some History").getResults()[0];
+            // check for successful insertion.
+            assertEquals(1L, customer1.asScalarLong());
 
-        VoltTable customer3 = client.callProcedure("InsertCustomer", C_ID + 2,
-                D_ID, W_ID, "Who", "Is", "Customer", "Receiving",
-                "450 Mass F.X.", "BiggerPlace", "CI", "91083",
-                "(541) 931 - 0928", new TimestampType(), "GC", 19899324.21, .13,
-                initialBalance, initialYTD, 2L, 15L, "Some History").getResults()[0];
-        // check for successful insertion.
-        assertEquals(1L, customer3.asScalarLong());
+            VoltTable customer2 = client.callProcedure("InsertCustomer", C_ID + 1,
+                    D_ID, W_ID, "We", "R", "Customer", "Random Department",
+                    "Place2", "BiggerPlace", "AL", "13908", "(913) 909 - 0928",
+                    new TimestampType(), "GC", 19298943.12, .13, initialBalance, initialYTD,
+                    1L, 15L, "Some History").getResults()[0];
+            // check for successful insertion.
+            assertEquals(1L, customer2.asScalarLong());
 
-        VoltTable customer4 = client.callProcedure("InsertCustomer", C_ID + 3,
-                D_ID, W_ID, "ICanBe", "", "Customer", "street", "place",
-                "BiggerPlace", "MA", "91083", "(913) 909 - 0928", new TimestampType(),
-                "GC", 19298943.12, .13, initialBalance, initialYTD, 3L, 15L,
-                "Some History").getResults()[0];
-        // check for successful insertion.
-        assertEquals(1L, customer4.asScalarLong());
+            VoltTable customer3 = client.callProcedure("InsertCustomer", C_ID + 2,
+                    D_ID, W_ID, "Who", "Is", "Customer", "Receiving",
+                    "450 Mass F.X.", "BiggerPlace", "CI", "91083",
+                    "(541) 931 - 0928", new TimestampType(), "GC", 19899324.21, .13,
+                    initialBalance, initialYTD, 2L, 15L, "Some History").getResults()[0];
+            // check for successful insertion.
+            assertEquals(1L, customer3.asScalarLong());
 
-        // make sure strings as bytes works
-        ClientResponse cr = client.callProcedure("Fake1", "Customer".getBytes("UTF-8"), D_ID, W_ID);
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        assertEquals(3, cr.getResults()[0].getRowCount());
+            VoltTable customer4 = client.callProcedure("InsertCustomer", C_ID + 3,
+                    D_ID, W_ID, "ICanBe", "", "Customer", "street", "place",
+                    "BiggerPlace", "MA", "91083", "(913) 909 - 0928", new TimestampType(),
+                    "GC", 19298943.12, .13, initialBalance, initialYTD, 3L, 15L,
+                    "Some History").getResults()[0];
+            // check for successful insertion.
+            assertEquals(1L, customer4.asScalarLong());
 
-        cr = client.callProcedure("Fake1", "Customer", D_ID, W_ID);
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-        assertEquals(3, cr.getResults()[0].getRowCount());
+            // make sure strings as bytes works
+            ClientResponse cr = client.callProcedure("Fake1", "Customer".getBytes("UTF-8"), D_ID, W_ID);
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(3, cr.getResults()[0].getRowCount());
 
-        cr = client.callProcedure("FakeCustomerLookup", W_ID, W_ID, D_ID, "Customer".getBytes("UTF-8"));
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            cr = client.callProcedure("Fake1", "Customer", D_ID, W_ID);
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(3, cr.getResults()[0].getRowCount());
 
-        // stop execution
-        VoltDB.instance().shutdown(localServer);
+            cr = client.callProcedure("FakeCustomerLookup", W_ID, W_ID, D_ID, "Customer".getBytes("UTF-8"));
+            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        }
+        finally {
+            // stop execution
+            if (client != null) {
+                client.close();
+            }
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+        }
     }
 
     public void testBigFatBlobs() throws Exception {
@@ -296,39 +320,45 @@ public class TestBlobType extends TestCase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("bigfatblobs.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("bigfatblobs.xml");
         config.m_backend = BackendTarget.NATIVE_EE_JNI;
-        ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
+
+        ServerThread localServer = null;
+        Client client = null;
 
         try {
-            Client client = ClientFactory.createClient();
+            localServer = new ServerThread(config);
+            localServer.start();
+            localServer.waitForInitialization();
+
+            client = ClientFactory.createClient();
             client.createConnection("localhost");
-            try {
-                byte[] b = new byte[5000000];
-                char[] c = new char[5000000];
-                for (int i = 0; i < b.length; i++) {
-                    b[i] = (byte) (i % 256);
-                    c[i] = (char) (i % 128);
-                }
-                String s = new String(c);
-                ClientResponse cr = client.callProcedure("BigFatBlobAndStringMD5", b, s);
-                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-                VoltTable t = cr.getResults()[0];
-                assertEquals(1, t.getRowCount());
-                assertTrue(t.advanceRow());
-                // Validate MD5 sums instead of the actual data. The returned VoltTable
-                // can't hold it anyway due to a 1 MB limit.
-                MessageDigest md5 = MessageDigest.getInstance("MD5");
-                assertTrue(Arrays.equals(md5.digest(b), t.getVarbinary("b_md5")));
-                assertTrue(Arrays.equals(md5.digest(s.getBytes()), t.getVarbinary("s_md5")));
+
+            byte[] b = new byte[5000000];
+            char[] c = new char[5000000];
+            for (int i = 0; i < b.length; i++) {
+                b[i] = (byte) (i % 256);
+                c[i] = (char) (i % 128);
             }
-            finally {
-                client.close();
-            }
+            String s = new String(c);
+            ClientResponse cr = client.callProcedure("BigFatBlobAndStringMD5", b, s);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            VoltTable t = cr.getResults()[0];
+            assertEquals(1, t.getRowCount());
+            assertTrue(t.advanceRow());
+            // Validate MD5 sums instead of the actual data. The returned VoltTable
+            // can't hold it anyway due to a 1 MB limit.
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            assertTrue(Arrays.equals(md5.digest(b), t.getVarbinary("b_md5")));
+            assertTrue(Arrays.equals(md5.digest(s.getBytes()), t.getVarbinary("s_md5")));
         }
         finally {
             // stop execution
-            VoltDB.instance().shutdown(localServer);
+            if (client != null) {
+                client.close();
+            }
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
         }
     }
 }

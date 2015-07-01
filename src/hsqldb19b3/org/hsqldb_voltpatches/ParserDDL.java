@@ -70,6 +70,7 @@ public class ParserDDL extends ParserRoutine {
         super(session, scanner);
     }
 
+    @Override
     void reset(String sql) {
         super.reset(sql);
     }
@@ -146,6 +147,9 @@ public class ParserDDL extends ParserRoutine {
             return compileCreateTable(tableType);
         }
 
+        // A VoltDB extension to support the assume unique attribute
+        boolean assumeUnique = false;
+        // End of VoltDB extension
         switch (token.tokenType) {
 
             // other objects
@@ -180,14 +184,29 @@ public class ParserDDL extends ParserRoutine {
                 return compileCreateCharacterSet();
 
             // index
+            // A VoltDB extension to support the assume unique attribute
+            case Tokens.ASSUMEUNIQUE :
+                assumeUnique = true;
+                // $FALL-THROUGH$
+            // End of VoltDB extension
             case Tokens.UNIQUE :
                 read();
                 checkIsThis(Tokens.INDEX);
 
+                // A VoltDB extension to support the assume unique attribute
+                return compileCreateIndex(true, assumeUnique);
+                /* disable 1 line ...
                 return compileCreateIndex(true);
+                ... disabled 1 line */
+                // End of VoltDB extension
 
             case Tokens.INDEX :
+                // A VoltDB extension to support the assume unique attribute
+                return compileCreateIndex(false, false);
+                /* disable 1 line ...
                 return compileCreateIndex(false);
+                ... disabled 1 line */
+                // End of VoltDB extension
 
             case Tokens.FUNCTION :
             case Tokens.PROCEDURE :
@@ -497,9 +516,23 @@ public class ParserDDL extends ParserRoutine {
                                         ? session.getSchemaName(null)
                                         : name.schema.name;
                     SchemaObject object =
+                    // A VoltDB extension to avoid exceptions in
+                    // the normal control flow.
+                    // findSchemaObject returns null when 
+                    // getSchemaObject would needlessly
+                    // throw into the catch block below.
+                    /* disable 3 lines ...
                         database.schemaManager.getSchemaObject(name.name,
                             schemaName, objectType);
 
+                    ... disabled 3 lines */
+                        database.schemaManager.findSchemaObject(name.name,
+                                schemaName, objectType);
+                    if (object == null) {
+                    	writeName = null;
+                    }
+                    else  // AS IN else if (cascade) {
+                    // End of VoltDB extension
                     if (cascade) {
                         writeName = database.getCatalogName();
                     } else {
@@ -582,6 +615,9 @@ public class ParserDDL extends ParserRoutine {
                     database.schemaManager.checkSchemaObjectNotExists(cname);
                 }
 
+                // A VoltDB extension to support the assume unique attribute
+                boolean assumeUnique = false; // For VoltDB
+                // End of VoltDB extension
                 switch (token.tokenType) {
 
                     case Tokens.FOREIGN :
@@ -591,9 +627,19 @@ public class ParserDDL extends ParserRoutine {
 
                         return;
 
+                    // A VoltDB extension to support the assume unique attribute
+                    case Tokens.ASSUMEUNIQUE :
+                        assumeUnique = true;
+                        // $FALL-THROUGH$
+                    // End of VoltDB extension
                     case Tokens.UNIQUE :
                         read();
+                        // A VoltDB extension to support the assume unique attribute
+                        processAlterTableAddUniqueConstraint(t, cname, assumeUnique);
+                        /* disable 1 line ...
                         processAlterTableAddUniqueConstraint(t, cname);
+                        ... disabled 1 line */
+                        // End of VoltDB extension
 
                         return;
 
@@ -610,6 +656,13 @@ public class ParserDDL extends ParserRoutine {
 
                         return;
 
+                    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+                    case Tokens.LIMIT :
+                        read();
+                        processAlterTableAddLimitConstraint(t, cname);
+
+                        return;
+                    // End of VoltDB extension
                     case Tokens.COLUMN :
                         if (cname != null) {
                             throw unexpectedToken();
@@ -659,6 +712,28 @@ public class ParserDDL extends ParserRoutine {
 
                         return;
                     }
+                    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+                    case Tokens.LIMIT : {
+                        // CASCADE currently has no meaning with this constraint,
+                        // always false
+                        boolean cascade = false;
+
+                        read();
+                        readThis(Tokens.PARTITION);
+                        readThis(Tokens.ROWS);
+
+                        Constraint c = t.getLimitConstraint();
+                        if (c != null) {
+                            processAlterTableDropConstraint(
+                                    t, c.getName().name, cascade);
+                        }
+                        else {
+                            throw Error.error(ErrorCode.X_42501);
+                        }
+
+                        return;
+                    }
+                    // End of VoltDB extension
                     case Tokens.CONSTRAINT : {
                         boolean cascade = false;
 
@@ -684,7 +759,7 @@ public class ParserDDL extends ParserRoutine {
                     case Tokens.COLUMN :
                         read();
 
-                    // fall through
+                    // $FALL-THROUGH$
                     default : {
                         checkIsSimpleName();
 
@@ -761,6 +836,9 @@ public class ParserDDL extends ParserRoutine {
                             SchemaObject.CONSTRAINT);
                 }
 
+                // A VoltDB extension to support the assume unique attribute
+                boolean assumeUnique = false;
+                // End of VoltDB extension
                 switch (token.tokenType) {
 
                     case Tokens.FOREIGN :
@@ -770,10 +848,20 @@ public class ParserDDL extends ParserRoutine {
                         return compileAlterTableAddForeignKeyConstraint(t,
                                 cname);
 
+                    // A VoltDB extension to support the assume unique attribute
+                    case Tokens.ASSUMEUNIQUE:
+                        assumeUnique = true;
+                        // $FALL-THROUGH$
+                    // End of VoltDB extension
                     case Tokens.UNIQUE :
                         read();
 
+                        // A VoltDB extension to support the assume unique attribute
+                        return compileAlterTableAddUniqueConstraint(t, cname, assumeUnique);
+                        /* disable 1 line ...
                         return compileAlterTableAddUniqueConstraint(t, cname);
+                        ... disabled 1 line */
+                        // End of VoltDB extension
 
                     case Tokens.CHECK :
                         read();
@@ -786,6 +874,12 @@ public class ParserDDL extends ParserRoutine {
 
                         return compileAlterTableAddPrimaryKey(t, cname);
 
+                    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+                    case Tokens.LIMIT :
+                        read();
+
+                        return compileAlterTableAddLimitConstraint(t, cname);
+                    // End of VoltDB extension
                     case Tokens.COLUMN :
                         if (cname != null) {
                             throw unexpectedToken();
@@ -819,6 +913,14 @@ public class ParserDDL extends ParserRoutine {
 
                         return compileAlterTableDropPrimaryKey(t);
                     }
+                    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+                    case Tokens.LIMIT : {
+                        read();
+                        readThis(Tokens.PARTITION);
+                        readThis(Tokens.ROWS);
+                        return compileAlterTableDropLimit(t);
+                    }
+                    // End of VoltDB extension
                     case Tokens.CONSTRAINT : {
                         read();
 
@@ -827,7 +929,7 @@ public class ParserDDL extends ParserRoutine {
                     case Tokens.COLUMN :
                         read();
 
-                    // fall through
+                    // $FALL-THROUGH$
                     default : {
                         checkIsSimpleName();
 
@@ -980,8 +1082,14 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.CONSTRAINT :
                 case Tokens.PRIMARY :
                 case Tokens.FOREIGN :
+                // A VoltDB extension to support the assume unique attribute
+                case Tokens.ASSUMEUNIQUE :
+                // End of VoltDB extension
                 case Tokens.UNIQUE :
                 case Tokens.CHECK :
+                // A VoltDB extension to support LIMIT PARTITION ROWS
+                case Tokens.LIMIT :
+                // End of VoltDB extension
                     if (!startPart) {
                         throw unexpectedToken();
                     }
@@ -1269,6 +1377,15 @@ public class ParserDDL extends ParserRoutine {
                 case Constraint.UNIQUE : {
                     c.setColumnsIndexes(table);
 
+                    // A VoltDB extension to support indexed expressions and the assume unique attribute
+                    if (c.indexExprs != null) {
+                        // Special case handling for VoltDB indexed expressions
+                        if (table.getUniqueConstraintForExprs(c.indexExprs) != null) {
+                            throw Error.error(ErrorCode.X_42522);
+                        }
+                    }
+                    else
+                    // End of VoltDB extension
                     if (table.getUniqueConstraintForColumns(c.core.mainCols)
                             != null) {
                         throw Error.error(ErrorCode.X_42522);
@@ -1279,10 +1396,25 @@ public class ParserDDL extends ParserRoutine {
                             c.getName().name, table.getSchemaName(),
                             table.getName(), SchemaObject.INDEX);
 
+                    // A VoltDB extension to support indexed expressions and the assume unique attribute
+                    Index index = null;
+                    if (c.indexExprs != null) {
+                        // Special case handling for VoltDB indexed expressions
+                        index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true).setAssumeUnique(c.assumeUnique);
+                    } else {
+                        index = table.createAndAddIndexStructure(indexName,
+                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.assumeUnique);
+                    }
+                    /* disable 2 lines ...
                     Index index = table.createAndAddIndexStructure(indexName,
                         c.core.mainCols, null, null, true, true, false);
+                    ... disabled 2 lines */
+                    // End of VoltDB extension
                     Constraint newconstraint = new Constraint(c.getName(),
                         table, index, Constraint.UNIQUE);
+                    // A VoltDB extension to support the assume unique attribute
+                    newconstraint = newconstraint.setAssumeUnique(c.assumeUnique);
+                    // End of VoltDB extension
 
                     table.addConstraint(newconstraint);
                     session.database.schemaManager.addSchemaObject(
@@ -1311,6 +1443,14 @@ public class ParserDDL extends ParserRoutine {
 
                     break;
                 }
+                // A VoltDB extension to support LIMIT PARTITION ROWS
+                case Constraint.LIMIT : {
+                    table.addConstraint(c);
+                    session.database.schemaManager.addSchemaObject(c);
+
+                    break;
+                }
+                // End of VoltDB extension
             }
         }
 
@@ -2640,6 +2780,9 @@ public class ParserDDL extends ParserRoutine {
                                                  SchemaObject.CONSTRAINT);
         }
 
+        // A VoltDB extension to support indexed expressions and the assume unique attribute
+        boolean assumeUnique = false; // For VoltDB
+        // End of VoltDB extension
         switch (token.tokenType) {
 
             case Tokens.PRIMARY : {
@@ -2672,6 +2815,11 @@ public class ParserDDL extends ParserRoutine {
 
                 break;
             }
+            // A VoltDB extension to support indexed expressions and the assume unique attribute
+            case Tokens.ASSUMEUNIQUE :
+                assumeUnique = true;
+                // $FALL-THROUGH$
+            // End of VoltDB extension
             case Tokens.UNIQUE : {
                 if (schemaObject.getName().type != SchemaObject.TABLE) {
                     throw this.unexpectedTokenRequire(Tokens.T_CHECK);
@@ -2679,7 +2827,13 @@ public class ParserDDL extends ParserRoutine {
 
                 read();
 
+                // A VoltDB extension to "readColumnNames(false)" to support indexed expressions.
+                java.util.List<Expression> indexExprs = XreadExpressions(null);
+                OrderedHashSet set = getSimpleColumnNames(indexExprs);
+                /* disable 1 line ...
                 OrderedHashSet set = readColumnNames(false);
+                ... disabled 1 line */
+                // End of VoltDB extension
 
                 if (constName == null) {
                     constName = database.nameManager.newAutoName("CT",
@@ -2687,8 +2841,21 @@ public class ParserDDL extends ParserRoutine {
                             schemaObject.getName(), SchemaObject.CONSTRAINT);
                 }
 
+                // A VoltDB extension to support indexed expressions.
+                boolean hasNonColumnExprs = false;
+                if (set == null) {
+                    hasNonColumnExprs = true;
+                    set = getBaseColumnNames(indexExprs);
+                }
+                // End of VoltDB extension
                 Constraint c = new Constraint(constName, set,
                                               Constraint.UNIQUE);
+                // A VoltDB extension to support indexed expressions and assume unique attribute.
+                c.setAssumeUnique(assumeUnique);
+                if (hasNonColumnExprs) {
+                    c = c.withExpressions(indexExprs.toArray(new Expression[indexExprs.size()]));
+                }
+                // End of VoltDB extension
 
                 constraintList.add(c);
 
@@ -2727,6 +2894,30 @@ public class ParserDDL extends ParserRoutine {
 
                 break;
             }
+            // A VoltDB extension to support LIMIT PARTITION ROWS
+            case Tokens.LIMIT : {
+                read();
+
+                for (int i = 0;  i < constraintList.size(); i++) {
+                    if (((Constraint)constraintList.get(i)).getConstraintType() == Constraint.LIMIT) {
+                        throw Error.error(ErrorCode.X_42524,
+                                String.format("Multiple LIMIT PARTITION ROWS constraints on table %s are forbidden.", schemaObject.getName().name));
+                    }
+                }
+
+                if (constName == null) {
+                    constName = database.nameManager.newAutoName("LIMIT",
+                            schemaObject.getSchemaName(),
+                            schemaObject.getName(), SchemaObject.CONSTRAINT);
+                }
+
+                Constraint c = new Constraint(constName, null, Constraint.LIMIT);
+                readLimitConstraintCondition(c);
+                constraintList.add(c);
+
+                break;
+            }
+            // End of VoltDB extension
             default : {
                 if (constName != null) {
                     throw Error.error(ErrorCode.X_42581);
@@ -2753,6 +2944,9 @@ public class ParserDDL extends ParserRoutine {
                         SchemaObject.CONSTRAINT);
             }
 
+            // A VoltDB extension to support indexed expressions and the assume unique attribute
+            boolean assumeUnique = false; // For VoltDB
+            // End of VoltDB extension
             switch (token.tokenType) {
 
                 case Tokens.PRIMARY : {
@@ -2784,6 +2978,11 @@ public class ParserDDL extends ParserRoutine {
 
                     break;
                 }
+                // A VoltDB extension to support indexed expressions and the assume unique attribute
+                case Tokens.ASSUMEUNIQUE :
+                    assumeUnique = true;
+                    // $FALL-THROUGH$
+                // End of VoltDB extension
                 case Tokens.UNIQUE : {
                     read();
 
@@ -2799,6 +2998,9 @@ public class ParserDDL extends ParserRoutine {
 
                     Constraint c = new Constraint(constName, set,
                                                   Constraint.UNIQUE);
+                    // A VoltDB extension to support indexed expressions and the assume unique attribute
+                    c.setAssumeUnique(assumeUnique);
+                    // End of VoltDB extension
 
                     constraintList.add(c);
 
@@ -2809,7 +3011,7 @@ public class ParserDDL extends ParserRoutine {
                     readThis(Tokens.KEY);
                 }
 
-                // fall through
+                // $FALL-THROUGH$
                 case Tokens.REFERENCES : {
                     OrderedHashSet set = new OrderedHashSet();
 
@@ -2925,7 +3127,12 @@ public class ParserDDL extends ParserRoutine {
         return table.getColumnIndexes(set);
     }
 
+    // A VoltDB extension to support indexed expressions and the assume unique attribute
+    StatementSchema compileCreateIndex(boolean unique, boolean assumeUnique) {
+    /* disable 1 line ...
     StatementSchema compileCreateIndex(boolean unique) {
+    ... disabled 1 line */
+    // End of VoltDB extension
 
         Table    table;
         HsqlName indexHsqlName;
@@ -2950,10 +3157,42 @@ public class ParserDDL extends ParserRoutine {
 
         indexHsqlName.schema = table.getSchemaName();
 
+        // A VoltDB extension to support indexed expressions and the assume unique attribute
+        java.util.List<Boolean> ascDesc = new java.util.ArrayList<Boolean>();
+        // A VoltDB extension to "readColumnList(table, true)" to support indexed expressions.
+        java.util.List<Expression> indexExprs = XreadExpressions(ascDesc);
+        OrderedHashSet set = getSimpleColumnNames(indexExprs);
+        int[] indexColumns = null;
+        if (set == null) {
+            // A VoltDB extension to support indexed expressions.
+            // Not just indexing columns.
+            // The meaning of set and indexColumns shifts here to be
+            // the set of unique base columns for the indexed expressions.
+            set = getBaseColumnNames(indexExprs);
+        } else {
+            // Just indexing columns -- by-pass extended support for generalized index expressions.
+            indexExprs = null;
+        }
+
+        // A VoltDB extension to support partial index
+        Expression predicate = null;
+        if (readIfThis(Tokens.WHERE)) {
+            predicate = XreadBooleanValueExpression();
+        }
+
+        indexColumns = getColumnList(set, table);
+        String   sql          = getLastPart();
+        Object[] args         = new Object[] {
+            table, indexColumns, indexHsqlName, Boolean.valueOf(unique), indexExprs,
+            Boolean.valueOf(assumeUnique),
+            predicate
+        /* disable 4 lines ...
         int[]    indexColumns = readColumnList(table, true);
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
             table, indexColumns, indexHsqlName, Boolean.valueOf(unique)
+        ... disabled 4 lines */
+        // End of VoltDB extension
         };
 
         return new StatementSchema(sql, StatementTypes.CREATE_INDEX, args,
@@ -3294,7 +3533,12 @@ public class ParserDDL extends ParserRoutine {
         database.schemaManager.renameSchemaObject(table.getName(), name);
     }
 
+    // A VoltDB extension to support indexed expressions and the assume unique attribute
+    void processAlterTableAddUniqueConstraint(Table table, HsqlName name, boolean assumeUnique) {
+    /* disable 1 line ...
     void processAlterTableAddUniqueConstraint(Table table, HsqlName name) {
+    ... disabled 1 line */
+    // End of VoltDB extension
 
         if (name == null) {
             name = database.nameManager.newAutoName("CT",
@@ -3302,17 +3546,45 @@ public class ParserDDL extends ParserRoutine {
                     SchemaObject.CONSTRAINT);
         }
 
+        // A VoltDB extension to "readColumnList(table, false)" to support indexed expressions.
+        java.util.List<Expression> indexExprs = XreadExpressions(null);
+        OrderedHashSet set = getSimpleColumnNames(indexExprs);
+        int[] cols = getColumnList(set, table);
+        /* disable 1 line ...
         int[] cols = this.readColumnList(table, false);
+        ... disabled 1 line */
+        // End of VoltDB extension
 
         session.commit(false);
 
         TableWorks tableWorks = new TableWorks(session, table);
 
+        // A VoltDB extension to support indexed expressions and the assume unique attribute
+        if ((indexExprs != null) && (cols == null)) {
+            // A VoltDB extension to support indexed expressions.
+            // Not just indexing columns.
+            // The meaning of cols shifts here to be
+            // the set of unique base columns for the indexed expressions.
+            set = getBaseColumnNames(indexExprs);
+            cols = getColumnList(set, table);
+            tableWorks.addUniqueExprConstraint(cols, indexExprs.toArray(new Expression[indexExprs.size()]), name, assumeUnique);
+            return;
+        }
+        tableWorks.addUniqueConstraint(cols, name, assumeUnique);
+        /* disable 1 line ...
         tableWorks.addUniqueConstraint(cols, name);
+        ... disabled 1 line */
+        // End of VoltDB extension
     }
 
+    // A VoltDB extension to support the assume unique attribute
+    Statement compileAlterTableAddUniqueConstraint(Table table,
+            HsqlName name, boolean assumeUnique) {
+    /* disable 2 lines ...
     Statement compileAlterTableAddUniqueConstraint(Table table,
             HsqlName name) {
+    ... disabled 2 lines */
+    // End of VoltDB extension
 
         if (name == null) {
             name = database.nameManager.newAutoName("CT",
@@ -3320,11 +3592,33 @@ public class ParserDDL extends ParserRoutine {
                     SchemaObject.CONSTRAINT);
         }
 
-        int[]    cols = this.readColumnList(table, false);
+        // A VoltDB extension to support indexed expressions.
+        java.util.List<Expression> indexExprs = XreadExpressions(null);
+        OrderedHashSet set = getSimpleColumnNames(indexExprs);
+        int[] cols = getColumnList(set, table);
+        if ((indexExprs != null) && (cols == null)) {
+            // Not just indexing columns.
+            // The meaning of cols shifts here to be
+            // the set of unique base columns for the indexed expressions.
+            set = getBaseColumnNames(indexExprs);
+            cols = getColumnList(set, table);
+        }
+        /* disable 1 line ...
+        int[] cols = this.readColumnList(table, false);
+        ... disabled 1 line */
+        // End of VoltDB extension
         String   sql  = getLastPart();
+        // A VoltDB extension to support the assume unique attribute and indexed expressions
+        Object[] args = new Object[] {
+            cols, name, indexExprs,
+            Boolean.valueOf(assumeUnique)
+        };
+        /* disable 3 lines ...
         Object[] args = new Object[] {
             cols, name
         };
+        .. disabled 3 lines */
+        // End of VoltDB extension
 
         return new StatementSchema(sql, StatementTypes.ALTER_TABLE, args,
                                    null, table.getName());
@@ -3778,7 +4072,7 @@ public class ParserDDL extends ParserRoutine {
                 }
             }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
         }
 
@@ -4066,6 +4360,12 @@ public class ParserDDL extends ParserRoutine {
             }
 
             if (list.size() > 1) {
+                // A VoltDB extension to support establishing or preserving the NOT NULL
+                // attribute of an altered column.
+                if (voltDBacceptNotNullConstraint(list)) {
+                    newCol.setNullable(false);
+                } else
+                // End of VoltDB extension
                 throw Error.error(ErrorCode.X_42524);
             }
         } else {
@@ -4494,7 +4794,7 @@ public class ParserDDL extends ParserRoutine {
                             columnSet = readColumnNames(false);
                         }
 
-                    // fall through
+                    // $FALL-THROUGH$
                     case Tokens.DELETE :
                     case Tokens.TRIGGER :
                         if (right == null) {
@@ -4777,4 +5077,247 @@ public class ParserDDL extends ParserRoutine {
         session.checkAdmin();
         session.checkDDLWrite();
     }
+
+
+    /************************* Volt DB Extensions *************************/
+    /**
+     * Responsible for handling Volt limit constraints section of CREATE TABLE ...
+     *
+     * @param c check constraint
+     */
+    void readLimitConstraintCondition(Constraint c) {
+        readThis(Tokens.PARTITION);
+        readThis(Tokens.ROWS);
+
+        int rowsLimit = readInteger();
+        c.rowsLimit = rowsLimit;
+
+        // The optional EXECUTE (DELETE ...) clause
+        if (readIfThis(Tokens.EXECUTE)) {
+            // Capture the statement between parentheses following the EXECUTE keyword,
+            // as in
+            //
+            // LIMIT PARTITION ROWS 10 EXECUTE (DELETE FROM tbl WHERE b = 1)
+            //
+            readThis(Tokens.OPENBRACKET);
+
+            startRecording();
+
+            int numOpenBrackets = 1;
+            while (numOpenBrackets > 0) {
+                switch(token.tokenType) {
+                case Tokens.OPENBRACKET:
+                    numOpenBrackets++;
+                    read();
+                    break;
+
+                case Tokens.CLOSEBRACKET:
+                    numOpenBrackets--;
+                    if (numOpenBrackets > 0) {
+                        // don't want the final parenthesis
+                        read();
+                    }
+                    break;
+
+                case Tokens.X_ENDPARSE:
+                    throw unexpectedToken();
+
+                default:
+                    read();
+                }
+            }
+
+            Token[] stmtTokens = getRecordedStatement();
+
+            // This captures the DELETE statement exactly, including embedded whitespace, etc.
+            c.rowsLimitDeleteStmt = Token.getSQL(stmtTokens);
+            readThis(Tokens.CLOSEBRACKET);
+        }
+    }
+
+    /// A VoltDB extension to the parsing behavior of the "readColumnList/readColumnNames" functions,
+    /// adding support for indexed expressions.
+    private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {
+        readThis(Tokens.OPENBRACKET);
+
+        java.util.List<Expression> indexExprs = new java.util.ArrayList<Expression>();
+
+        while (true) {
+            Expression expression = XreadValueExpression();
+            indexExprs.add(expression);
+
+            // A VoltDB extension to the "readColumnList(table, true)" support for descending-value indexes,
+            // that similarly parses the asc/desc indicators but COLLECTS them so they can be ignored later,
+            // rather than ignoring them on the spot.
+            if (ascDesc != null) {
+                Boolean is_asc = Boolean.TRUE;
+                if (token.tokenType == Tokens.ASC
+                        || token.tokenType == Tokens.DESC) {
+                    read();
+                    is_asc = (token.tokenType == Tokens.ASC);
+                }
+                ascDesc.add(is_asc);
+            }
+
+            if (readIfThis(Tokens.COMMA)) {
+                continue;
+            }
+
+            break;
+        }
+
+        readThis(Tokens.CLOSEBRACKET);
+
+        return indexExprs;
+    }
+
+    /// Collect the names of the columns being indexed, or null if indexing anything more general than columns.
+    /// This adapts XreadExpressions output to the format originally produced by readColumnNames
+    private OrderedHashSet getSimpleColumnNames(java.util.List<Expression> indexExprs) {
+        OrderedHashSet set = new OrderedHashSet();
+
+        for (Expression expression : indexExprs) {
+            if (expression instanceof ExpressionColumn) {
+                String colName = ((ExpressionColumn)expression).columnName;
+                if (!set.add(colName)) {
+                    throw Error.error(ErrorCode.X_42577, colName);
+                }
+            } else {
+                return null;
+            }
+        }
+
+        return set;
+    }
+
+    /// Collect the names of the unique columns underlying a list of indexed expressions.
+    private OrderedHashSet getBaseColumnNames(java.util.List<Expression> indexExprs) {
+        OrderedHashSet set = new OrderedHashSet();
+
+        HsqlList col_list = new HsqlArrayList();
+        for (Expression expression : indexExprs) {
+            expression.collectAllColumnExpressions(col_list);
+        }
+
+        for (int i = 0; i < col_list.size(); i++) {
+            String colName = ((ExpressionColumn)col_list.get(i)).columnName;
+            set.add(colName);
+        }
+
+        return set;
+    }
+
+    /// Collect the column indexes of the unique columns underlying a list of indexed expressions.
+    /// This adapts XreadExpressions/getSimpleColumnNames output to the format originally produced by readColumnList.
+    private int[] getColumnList(OrderedHashSet set, Table table) {
+        if (set == null) {
+            return null;
+        }
+        return table.getColumnIndexes(set);
+    }
+
+    private boolean voltDBacceptNotNullConstraint(HsqlArrayList list) {
+		if (list.size() != 2) {
+			return false;
+		}
+		if (! (list.get(1) instanceof Constraint)) {
+			return false;
+		}
+        // This replicates the logic that controls the setting of the Consraint.isNotNull member.
+        // Unfortunately that member only gets set a little later.
+		Constraint constraint = (Constraint)list.get(1);
+		if ( constraint.getConstraintType() != Constraint.CHECK ) {
+			return false;
+		}
+		Expression check = constraint.getCheckExpression();
+		if (check.getType() != OpTypes.NOT) {
+			return false;
+		}
+		if (check.getLeftNode().getType() != OpTypes.IS_NULL) {
+			return false;
+		}
+		if (check.getLeftNode().getLeftNode().getType() != OpTypes.COLUMN) {
+			return false;
+		}
+		return true;
+	}
+
+    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+    private Statement compileAlterTableAddLimitConstraint(Table table, HsqlName name)
+    {
+        if (name == null) {
+            name = database.nameManager.newAutoName("LIMIT",
+                    table.getSchemaName(), table.getName(),
+                    SchemaObject.CONSTRAINT);
+        }
+
+        Constraint c = new Constraint(name, null, Constraint.LIMIT);
+
+        readLimitConstraintCondition(c);
+
+        String   sql  = getLastPart();
+        Object[] args = new Object[]{ c };
+
+        return new StatementSchema(sql, StatementTypes.ALTER_TABLE, args,
+                                   null, table.getName());
+    }
+    // End of VoltDB extension
+
+    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+    private void processAlterTableAddLimitConstraint(Table table, HsqlName name) {
+        if (name == null) {
+            name = database.nameManager.newAutoName("LIMIT",
+                    table.getSchemaName(), table.getName(),
+                    SchemaObject.CONSTRAINT);
+        }
+
+        Constraint c = new Constraint(name, null, Constraint.LIMIT);
+
+        readLimitConstraintCondition(c);
+        session.commit(false);
+
+        TableWorks tableWorks = new TableWorks(session, table);
+        tableWorks.addLimitConstraint(c);
+    }
+    // End of VoltDB extension
+
+    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+    private Statement compileAlterTableDropLimit(Table t) {
+
+        HsqlName readName  = null;
+        HsqlName writeName = null;
+        boolean  cascade   = false;
+
+        if (token.tokenType == Tokens.RESTRICT) {
+            read();
+        } else if (token.tokenType == Tokens.CASCADE) {
+            read();
+
+            cascade = true;
+        }
+
+        SchemaObject object = t.getLimitConstraint();
+        if (object == null) {
+            throw Error.error(ErrorCode.X_42501);
+        }
+
+        if (cascade) {
+            writeName = database.getCatalogName();
+        } else {
+            writeName = t.getName();
+        }
+
+        Object[] args = new Object[] {
+            object.getName(), Integer.valueOf(SchemaObject.CONSTRAINT),
+            Boolean.valueOf(cascade), Boolean.valueOf(false)
+        };
+        String sql = getLastPart();
+
+        return new StatementSchema(sql, StatementTypes.DROP_CONSTRAINT, args,
+                                   readName, writeName);
+    }
+    // End of VoltDB extension
+
+    /**********************************************************************/
+
 }

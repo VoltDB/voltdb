@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 
 import java.math.BigDecimal;
 
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
@@ -368,29 +369,6 @@ public class ParserBase {
     void checkIsSimpleName() {
 
         if (!isSimpleName()) {
-            throw unexpectedToken();
-        }
-    }
-
-    /**
-     * Method added by VoltDB to make reserved words more consistent in DDL.
-     * SEE: ENG-912
-     */
-    boolean isSimpleName(boolean isStrictSQLNames) {
-        if (isStrictSQLNames) {
-            return isNonReservedIdentifier() && token.namePrefix == null;
-        } else {
-            return isNonCoreReservedIdentifier() && token.namePrefix == null;
-        }
-    }
-
-    /**
-     * Method added by VoltDB to make reserved words more consistent in DDL.
-     * SEE: ENG-912
-     */
-    void checkIsSimpleName(boolean isStrictSQLNames) {
-
-        if (!isSimpleName(isStrictSQLNames)) {
             throw unexpectedToken();
         }
     }
@@ -783,4 +761,35 @@ public class ParserBase {
     public Number convertToNumber(String s, NumberType type) {
         return scanner.convertToNumber(s, type);
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    /**
+     * Method added by VoltDB to make reserved words more consistent in DDL.
+     * SEE: ENG-912
+     */
+    boolean isSimpleName(boolean isStrictSQLNames) {
+        if (isStrictSQLNames) {
+            return isNonReservedIdentifier() && token.namePrefix == null;
+        } else {
+            return isNonCoreReservedIdentifier() && token.namePrefix == null;
+        }
+    }
+
+    /**
+     * Method added by VoltDB to make reserved words more consistent in DDL.
+     * SEE: ENG-912
+     */
+    void checkIsSimpleName(boolean isStrictSQLNames) {
+
+        if (!isSimpleName(isStrictSQLNames)) {
+            throw unexpectedToken();
+        }
+    }
+    /**********************************************************************/
+    // A VoltDB extension to make it easier to see SQL statement being parsed in the debugger
+    public String toString() {
+        return "A subclass of ParserBase parsing <<" + scanner.sqlString + ">>";
+    }
+    // End of VoltDB extension
 }

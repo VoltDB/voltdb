@@ -1,37 +1,36 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.ExecutionException;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
-
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+
+import com.google_voltpatches.common.base.Supplier;
 
 public class SpTerm implements Term
 {
@@ -55,10 +54,11 @@ public class SpTerm implements Term
         {
             // remove the leader; convert to hsids; deal with the replica change.
             List<Long> replicas = VoltZK.childrenToReplicaHSIds(children);
-            tmLog.info(m_whoami
-                    + "replica change handler updating replica list to: "
-                    + CoreUtils.hsIdCollectionToString(replicas));
-            m_mailbox.updateReplicas(replicas);
+            tmLog.debug(m_whoami
+                      + "replica change handler updating replica list to: "
+                      + CoreUtils.hsIdCollectionToString(replicas));
+
+            m_mailbox.updateReplicas(replicas, null);
         }
     };
 
@@ -83,7 +83,7 @@ public class SpTerm implements Term
     {
         try {
             Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
-                    LeaderElector.electionDirForPartition(m_partitionId),
+                    LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                     m_replicasChangeHandler);
             m_babySitter = pair.getFirst();
         }
@@ -103,10 +103,15 @@ public class SpTerm implements Term
     }
 
     @Override
-    public List<Long> getInterestingHSIds()
+    public Supplier<List<Long>> getInterestingHSIds()
     {
-        List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  VoltZK.childrenToReplicaHSIds(survivorsNames);
-        return survivors;
+        return new Supplier<List<Long>>() {
+            @Override
+            public List<Long> get() {
+                List<String> survivorsNames = m_babySitter.lastSeenChildren();
+                List<Long> survivors =  VoltZK.childrenToReplicaHSIds(survivorsNames);
+                return survivors;
+            }
+        };
     }
 }

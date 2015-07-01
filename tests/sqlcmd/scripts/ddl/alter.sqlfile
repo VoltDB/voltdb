@@ -1,0 +1,18 @@
+-- restrict the commands in this file to batchable ddl commands
+-- try a full range of alter table statements
+
+alter table dropable alter column defaulted set default null;
+alter table dropable alter column nevernull set null;
+alter table dropable drop column expendable;
+alter table dropable drop constraint altuniq;
+alter table dropable drop primary key;
+alter table dropable drop limit partition rows;
+
+alter table addable alter column defaultable SET default -1;
+alter table addable alter column nevernullable SET not null;
+alter table addable add primary key ( stable );
+alter table addable add unique ( altkey );
+alter table addable add limit partition rows 1;
+alter table addable add column added integer;
+alter table addable alter alterable bigint default -2;
+alter table addable add constraint aa unique( added, alterable );

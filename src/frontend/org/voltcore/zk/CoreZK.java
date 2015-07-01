@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -74,9 +74,19 @@ public class CoreZK {
     /**
      * Given a ZK node name of the form PREFIX_SUFFIX (for example, the
      * format used by the LeaderElector which is HSID_SEQUENCENUM), return
-     * the prefix.
+     * the prefix. The prefix cannot have any underscores in it.
      */
     public static String getPrefixFromChildName(String childName) {
         return childName.split("_")[0];
+    }
+
+    /**
+     * Given a ZK node name of the form PREFIX_SUFFIX (for example, the
+     * format used by the LeaderElector which is HSID_SEQUENCENUM), return
+     * the suffix. The suffix cannot have any underscores in it.
+     */
+    public static String getSuffixFromChildName(String childName) {
+        final String[] parts = childName.split("_");
+        return parts[parts.length - 1];
     }
 }

@@ -1,24 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,17 +25,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.FastSerializer;
+import org.voltdb.dtxn.UndoAction;
+import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+
+import com.google_voltpatches.common.primitives.Longs;
 
 /**
  * System procedures extend VoltSystemProcedure and use its utility methods to
@@ -44,6 +49,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
  * user procedures (which extend VoltProcedure).
  */
 public abstract class VoltSystemProcedure extends VoltProcedure {
+
+    private static final VoltLogger log = new VoltLogger("HOST");
 
     /** Standard column type for host/partition/site id columns */
     public static final VoltType CTYPE_ID = VoltType.INTEGER;
@@ -63,13 +70,38 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     /** Standard success return value for sysprocs returning STATUS_SCHEMA */
     protected static long STATUS_OK = 0L;
+    protected static long STATUS_FAILURE = 1L;
 
-    protected int m_numberOfPartitions;
     protected Procedure m_catProc;
     protected Cluster m_cluster;
     protected SiteProcedureConnection m_site;
     private LoadedProcedureSet m_loadedProcedureSet;
     protected ProcedureRunner m_runner; // overrides private parent var
+
+    /**
+     * Since sysprocs still use long fragids in places (rather than sha1 hashes),
+     * provide a utility method to convert between longs and hashes. This method
+     * is the inverse of {@link VoltSystemProcedure#fragIdToHash(long)}.
+     *
+     * @param hash 20bytes of hash value (last 12 bytes ignored)
+     * @return 8 bytes of fragid
+     */
+    public static long hashToFragId(byte[] hash) {
+        return Longs.fromByteArray(hash);
+    }
+
+    /**
+     * Since sysprocs still use long fragids in places (rather than sha1 hashes),
+     * provide a utility method to convert between longs and hashes. This method
+     * is the inverse of {@link VoltSystemProcedure#hashToFragId(byte[])}.
+     *
+     * @param fragId 8 bytes of frag id
+     * @return 20 bytes of hash padded with 12 empty bytes
+     */
+    public static byte[] fragIdToHash(long fragId) {
+        // use 12 bytes to pad the fake 20-byte sha1 hash after the 8-byte long
+        return ArrayUtils.addAll(Longs.toByteArray(fragId), new byte[12]);
+    }
 
     @Override
     void init(ProcedureRunner procRunner) {
@@ -77,11 +109,10 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         m_runner = procRunner;
     }
 
-    void initSysProc(int numberOfPartitions, SiteProcedureConnection site,
+    void initSysProc(SiteProcedureConnection site,
             LoadedProcedureSet loadedProcedureSet,
             Procedure catProc, Cluster cluster) {
 
-        m_numberOfPartitions = numberOfPartitions;
         m_site = site;
         m_catProc = catProc;
         m_cluster = cluster;
@@ -94,31 +125,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * For Sysproc init tasks like registering plan frags
      */
     abstract public void init();
-
-    /**
-     * Utility to aggregate a list of tables sharing a schema. Common for
-     * sysprocs to do this, to aggregate results.
-     */
-    protected VoltTable unionTables(List<VoltTable> operands) {
-        VoltTable result = null;
-        VoltTable vt = operands.get(0);
-        if (vt != null) {
-            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt
-                                                                        .getColumnCount()];
-            for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
-                                                       vt.getColumnType(ii));
-            }
-            result = new VoltTable(columns);
-            for (Object table : operands) {
-                vt = (VoltTable) (table);
-                while (vt.advanceRow()) {
-                    result.add(vt);
-                }
-            }
-        }
-        return result;
-    }
 
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
@@ -166,23 +172,45 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         assert (txnState != null);
         txnState.setupProcedureResume(false, new int[] { aggregatorOutputDependencyId });
 
-        VoltTable[] results = new VoltTable[1];
+        final ArrayList<VoltTable> results = new ArrayList<>();
         executeSysProcPlanFragmentsAsync(pfs);
 
         // execute the tasks that just got queued.
         // recursively call recurableRun and don't allow it to shutdown
         Map<Integer, List<VoltTable>> mapResults = m_site.recursableRun(txnState);
 
-        List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
-        if (matchingTablesForId == null) {
-            assert (mapResults.size() == 0);
-            results[0] = null;
-        } else {
-            results[0] = matchingTablesForId.get(0);
+        if (mapResults != null) {
+            List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
+            if (matchingTablesForId == null) {
+                if (mapResults.size() != 0 && log.isDebugEnabled()) {
+                    log.debug("Sysproc received a stale fragment response message from before the " +
+                              "transaction restart. This is possible for sysprocs because the dependency " +
+                              "IDs are always the same for a given sysproc. The result of this cannot be " +
+                              "trusted.");
+                }
+            } else {
+                results.add(matchingTablesForId.get(0));
+            }
         }
 
-        return results;
+        return results.toArray(new VoltTable[0]);
     }
+
+    /*
+     * When restoring replicated tables I found that a single site can receive multiple fragments instructing it to
+     * distribute a replicated table. It processes each fragment causing it to enter executeSysProcPlanFragments
+     * twice. Each time it enters it has generated a task for some other site, and is waiting on dependencies.
+     *
+     * The problem is that they will come back out of order, the dependency for the first task comes while
+     * the site is waiting for the dependency of the second task. When the second dependency arrives we fail
+     * to drop out because of extra/mismatches dependencies.
+     *
+     * The solution is to recognize unexpected dependencies, stash them away, and then check for them each time
+     * we finish running a plan fragment. This doesn't allow you to process the dependencies immediately
+     * (Continuations anyone?), but it doesn't deadlock and is good enough for restore.
+     */
+    private final Map<Integer, List<VoltTable>> m_unexpectedDependencies =
+            new HashMap<Integer, List<VoltTable>>();
 
     /*
      * A helper method for snapshot restore that manages a mailbox run loop and dependency tracking.
@@ -191,6 +219,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * by fragment N which uses their output dependencies as it's input dependencies.
      *
      * This matches the workflow of snapshot restore
+     *
+     * This is not safe to use after restore because it doesn't do failure handling that would deal with
+     * dropped plan fragments
      */
     public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[], Mailbox m) {
         Set<Integer> dependencyIds = new HashSet<Integer>();
@@ -206,20 +237,11 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             SynthesizedPlanFragment pf = pfs[ii];
             dependencyIds.add(pf.outputDepId);
 
-            // serialize parameters
-            ByteBuffer parambytes = null;
-            if (pf.parameters != null) {
-                FastSerializer fs = new FastSerializer();
-                try {
-                    fs.writeObject(pf.parameters);
-                }
-                catch (IOException e) {
-                    e.printStackTrace();
-                    assert (false);
-                }
-                parambytes = fs.getBuffer();
-            }
-
+            log.trace(
+                    "Sending fragment " + pf.fragmentId + " dependency " + pf.outputDepId +
+                    " from " + CoreUtils.hsIdToString(m.getHSId()) + "-" +
+                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) + " to " +
+                            CoreUtils.hsIdToString(pf.siteId));
             /*
              * The only real data is the fragment id, output dep id,
              * and parameters. Transactions ids, readonly-ness, and finality-ness
@@ -230,11 +252,13 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                             0,
                             m.getHSId(),
                             0,
+                            0,
                             false,
-                            pf.fragmentId,
+                            fragIdToHash(pf.fragmentId),
                             pf.outputDepId,
-                            parambytes,
-                            false);
+                            pf.parameters,
+                            false,
+                            m_runner.getTxnState().isForReplay());
             m.send(pf.siteId, ftm);
         }
 
@@ -258,22 +282,58 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             if (vm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
                 DependencyPair dp =
-                        m_runner.executePlanFragment(
+                        m_runner.executeSysProcPlanFragment(
                                 m_runner.getTxnState(),
                                 null,
-                                ftm.getFragmentId(0),
+                                hashToFragId(ftm.getPlanHash(0)),
                                 ftm.getParameterSetForFragment(0));
                 FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
                 frm.addDependency(dp.depId, dp.dependency);
                 m.send(ftm.getCoordinatorHSId(), frm);
+
+                if (!m_unexpectedDependencies.isEmpty()) {
+                    for (Integer dependencyId : dependencyIds) {
+                        if (m_unexpectedDependencies.containsKey(dependencyId)) {
+                            receivedDependencyIds.put(dependencyId, m_unexpectedDependencies.remove(dependencyId));
+                        }
+                    }
+
+                    /*
+                     * This predicate exists below in FRM handling, they have to match
+                     */
+                    if (receivedDependencyIds.size() == dependencyIds.size() &&
+                            receivedDependencyIds.keySet().equals(dependencyIds)) {
+                        break;
+                    }
+                }
             } else if (vm instanceof FragmentResponseMessage) {
                 FragmentResponseMessage frm = (FragmentResponseMessage)vm;
-                receivedDependencyIds.put(
-                        frm.getTableDependencyIdAtIndex(0),
-                        Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)}));
-                if (receivedDependencyIds.size() == dependencyIds.size() &&
-                        receivedDependencyIds.keySet().equals(dependencyIds)) {
-                    break;
+                final int dependencyId = frm.getTableDependencyIdAtIndex(0);
+                if (dependencyIds.contains(dependencyId)) {
+                    receivedDependencyIds.put(
+                            dependencyId,
+                            Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)}));
+                    log.trace("Received dependency at " + CoreUtils.hsIdToString(m.getHSId()) +
+                            "-" + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                            " from " + CoreUtils.hsIdToString(frm.m_sourceHSId) +
+                            " have " + receivedDependencyIds.size() + " " + receivedDependencyIds.keySet() +
+                            " and need " + dependencyIds.size() + " " + dependencyIds);
+                    /*
+                     * This predicate exists above in FTM handling, they have to match
+                     */
+                    if (receivedDependencyIds.size() == dependencyIds.size() &&
+                            receivedDependencyIds.keySet().equals(dependencyIds)) {
+                        break;
+                    }
+                } else {
+                    /*
+                     * Stash the dependency intended for a different fragment
+                     */
+                    if (m_unexpectedDependencies.put(
+                            dependencyId,
+                            Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)})) != null) {
+                        VoltDB.crashGlobalVoltDB("Received a duplicate dependency", true, null);
+                    }
                 }
             }
         }
@@ -282,7 +342,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
          * Executing the last aggregator plan fragment in the list produces the result
          */
         results[0] =
-                m_runner.executePlanFragment(
+                m_runner.executeSysProcPlanFragment(
                         m_runner.getTxnState(),
                         receivedDependencyIds,
                         pfs[pfs.length - 1].fragmentId,
@@ -316,29 +376,17 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 assert ((pf.outputDepId & DtxnConstants.MULTIPARTITION_DEPENDENCY) == DtxnConstants.MULTIPARTITION_DEPENDENCY);
             }
 
-            // serialize parameters
-            ByteBuffer parambytes = null;
-            if (pf.parameters != null) {
-                FastSerializer fs = new FastSerializer();
-                try {
-                    fs.writeObject(pf.parameters);
-                }
-                catch (IOException e) {
-                    e.printStackTrace();
-                    assert (false);
-                }
-                parambytes = fs.getBuffer();
-            }
-
             FragmentTaskMessage task = FragmentTaskMessage.createWithOneFragment(
                     txnState.initiatorHSId,
                     m_site.getCorrespondingSiteId(),
                     txnState.txnId,
+                    txnState.uniqueId,
                     txnState.isReadOnly(),
-                    pf.fragmentId,
+                    fragIdToHash(pf.fragmentId),
                     pf.outputDepId,
-                    parambytes,
-                    false);
+                    pf.parameters,
+                    false,
+                    txnState.isForReplay());
             if (pf.inputDepIds != null) {
                 for (int depId : pf.inputDepIds) {
                     task.addInputDepId(0, depId);
@@ -370,5 +418,23 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     public void registerPlanFragment(long fragmentId) {
         assert(m_runner != null);
         m_loadedProcedureSet.registerPlanFragment(fragmentId, m_runner);
+    }
+
+    protected void noteOperationalFailure(String errMsg) {
+        m_runner.m_statusCode = ClientResponse.OPERATIONAL_FAILURE;
+        m_runner.m_statusString = errMsg;
+    }
+
+    protected void registerUndoAction(UndoAction action) {
+        m_runner.getTxnState().registerUndoAction(action);
+    }
+
+    protected Long getMasterHSId(int partition) {
+        TransactionState txnState = m_runner.getTxnState();
+        if (txnState instanceof MpTransactionState) {
+            return ((MpTransactionState) txnState).getMasterHSId(partition);
+        } else {
+            throw new RuntimeException("SP sysproc doesn't support getting the master HSID");
+        }
     }
 }

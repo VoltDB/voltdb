@@ -66,6 +66,9 @@ public class Tokens {
     public static final String T_BIGINT           = "BIGINT";
     public static final String T_BINARY           = "BINARY";
     static final String        T_BIT_LENGTH       = "BIT_LENGTH";
+    // A VoltDB extension to support varchar column in bytes.
+    static final String        T_BYTES            = "BYTES"; // For VoltDB
+    // End of VoltDB extension
     public static final String T_BLOB             = "BLOB";
     public static final String T_BOOLEAN          = "BOOLEAN";
     static final String        T_BOTH             = "BOTH";
@@ -133,7 +136,12 @@ public class Tokens {
     static final String        T_DISCONNECT        = "DISCONNECT";
     static final String        T_DISTINCT          = "DISTINCT";
     public static final String T_DO                = "DO";
+    // A VoltDB extension to use FLOAT as the official DOUBLE type name
     public static final String T_DOUBLE            = "FLOAT";
+    /* disable 1 line ...
+    public static final String T_DOUBLE            = "DOUBLE";
+    ... disabled 1 line */
+    // End of VoltDB extension
     static final String        T_DROP              = "DROP";
     static final String        T_DYNAMIC           = "DYNAMIC";
     static final String        T_EACH              = "EACH";
@@ -343,6 +351,9 @@ public class Tokens {
     static final String        T_TRUNCATE          = "TRUNCATE";
     static final String        T_UESCAPE           = "UESCAPE";
     static final String        T_UNION             = "UNION";
+    // A VoltDB extension to support the assume unique index attribute
+    static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE";     // For VoltDB
+    // End of VoltDB extension
     public static final String T_UNIQUE            = "UNIQUE";
     static final String        T_UNKNOWN           = "UNKNOWN";
     static final String        T_UNNEST            = "UNNEST";
@@ -654,7 +665,14 @@ public class Tokens {
     static final String        T_LOGSIZE             = "LOGSIZE";
     static final String        T_MAXROWS             = "MAXROWS";
     static final String        T_MEMORY              = "MEMORY";
+    // A VoltDB extension to support more units for timestamp functions
+    static final String        T_MICROS              = "MICROS";         // For VoltDB
+    static final String        T_MICROSECOND         = "MICROSECOND";    // For VoltDB
+    // End of VoltDB extension
     static final String        T_MILLIS              = "MILLIS";
+    // A VoltDB extension to support more units for timestamp functions
+    static final String        T_MILLISECOND         = "MILLISECOND";    // For VoltDB
+    // End of VoltDB extension
     static final String        T_MINUS_EXCEPT        = "MINUS";
     static final String        T_MVCC                = "MVCC";
     static final String        T_NIO                 = "NIO";
@@ -739,6 +757,10 @@ public class Tokens {
     static final String        T_DAYOFWEEK           = "DAYOFWEEK";
     static final String        T_DAYOFYEAR           = "DAYOFYEAR";
     static final String        T_WEEK                = "WEEK";
+    // A VoltDB extension to support WEEKOFYEAR, WEEKDAY function
+    static final String        T_WEEKOFYEAR          = "WEEKOFYEAR"; // for compliant with MySQL
+    static final String        T_WEEKDAY             = "WEEKDAY";    // for compliant with MySQL
+    // End of VoltDB extension
 
     //
     static final String        T_ACOS             = "ACOS";
@@ -761,9 +783,16 @@ public class Tokens {
     static final String        T_BITAND           = "BITAND";
     static final String        T_BITOR            = "BITOR";
     static final String        T_BITXOR           = "BITXOR";
+    // CHERRY PICK -- mysterious
+    static final String        T_CONCAT_WORD      = "CONCAT";
+    // End of CHERRY PICK
     static final String        T_ROUNDMAGIC       = "ROUNDMAGIC";
     static final String        T_ASCII            = "ASCII";
+    // CHERRY PICK -- mysterious
+    /* disable 1 line ...
     static final String        T_CONCAT_WORD      = "CONCAT_WORD";
+    ... disabled 1 line */
+    // End of CHERRY PICK
     static final String        T_DIFFERENCE       = "DIFFERENCE";
     static final String        T_HEXTORAW         = "HEXTORAW";
     static final String        T_LCASE            = "LCASE";
@@ -1079,6 +1108,9 @@ public class Tokens {
     public static final int UNDO                             = 295;
     public static final int UNION                            = 296;
     public static final int UNIQUE                           = 297;
+    // A VoltDB extension to support the assume unique index attribute
+    public static final int ASSUMEUNIQUE                     = 1303;    // For VoltDB
+    // End of VoltDB extension
     public static final int UNKNOWN                          = 298;
     public static final int UNNEST                           = 299;
     public static final int UNTIL                            = 300;
@@ -1330,6 +1362,9 @@ public class Tokens {
     static final int        AUTOCOMMIT            = 552;
     static final int        BIT                   = 553;
     static final int        BIT_LENGTH            = 554;
+    // A VoltDB extension to support varchar column in bytes.
+    static final int        BYTES                 = 1010; // For VoltDB
+    // End of VoltDB extension
     static final int        CACHED                = 555;
     static final int        CASEWHEN              = 556;
     static final int        CHECKPOINT            = 557;
@@ -1348,7 +1383,14 @@ public class Tokens {
     static final int        LOGSIZE               = 570;
     static final int        MAXROWS               = 571;
     static final int        MEMORY                = 572;
+    // A VoltDB extension to support more units for timestamp functions
+    static final int        MICROS                = 1000; // For VoltDB
+    static final int        MICROSECOND           = 1001; // For VoltDB
+    // End of VoltDB extension
     static final int        MILLIS                = 573;
+    // A VoltDB extension to support more units for timestamp functions
+    static final int        MILLISECOND           = 1002; // For VoltDB
+    // End of VoltDB extension
     static final int        MINUS_EXCEPT          = 574;
     static final int        NOW                   = 575;
     static final int        OFF                   = 576;
@@ -1394,7 +1436,12 @@ public class Tokens {
     static final int        DAYOFMONTH              = 614;
     static final int        DAYOFWEEK               = 615;
     static final int        DAYOFYEAR               = 616;
-    static final int        WEEK                    = 617;
+    // A VoltDB extension to make WEEK public
+    public static final int WEEK                    = 617;
+    /* disable 1 line ...
+    static final int WEEK                           = 617;
+    ... disabled 1 line */
+    // End of VoltDB extension
     static final int        OCTETLENGTH             = 618;
     static final int        BITLENGTH               = 619;
 
@@ -1536,6 +1583,10 @@ public class Tokens {
     public static final int X_MALFORMED_COMMENT        = 737;
     public static final int X_MALFORMED_IDENTIFIER     = 738;
     public static final int X_MALFORMED_UNICODE_ESCAPE = 739;
+    // A VoltDB extension to support WEEKOFYEAR, WEEKDAY
+    public static final int WEEKOFYEAR                 = 740; // for compliant with MySQL
+    public static final int WEEKDAY                    = 741; // for compliant with MySQL
+    // End of VoltDB extension
 
     //
     public static final int X_UNKNOWN_TOKEN = -1;
@@ -1563,6 +1614,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_BIGINT, BIGINT);
         reservedKeys.put(Tokens.T_BINARY, BINARY);
         reservedKeys.put(Tokens.T_BIT_LENGTH, BIT_LENGTH);
+        // A VoltDB extension to support varchar column in bytes.
+        reservedKeys.put(Tokens.T_BYTES, BYTES); // For VoltDB
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_BLOB, BLOB);
         reservedKeys.put(Tokens.T_BOOLEAN, BOOLEAN);
         reservedKeys.put(Tokens.T_BOTH, BOTH);
@@ -1588,6 +1642,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_COLUMN, COLUMN);
         reservedKeys.put(Tokens.T_COMMIT, COMMIT);
         reservedKeys.put(Tokens.T_COMPARABLE, COMPARABLE);
+        // A VoltDB extension -- mysterious
+        reservedKeys.put(Tokens.T_CONCAT, CONCAT);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_CONDITION, CONDITION);
         reservedKeys.put(Tokens.T_CONNECT, CONNECT);
         reservedKeys.put(Tokens.T_CONSTRAINT, CONSTRAINT);
@@ -1802,6 +1859,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SIMILAR, SIMILAR);
         reservedKeys.put(Tokens.T_SMALLINT, SMALLINT);
         reservedKeys.put(Tokens.T_SOME, SOME);
+        // A VoltDB extension to augment the set of SQL functions supported
+        reservedKeys.put(Tokens.T_SPACE, SPACE);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_SPECIFIC, SPECIFIC);
         reservedKeys.put(Tokens.T_SPECIFICTYPE, SPECIFICTYPE);
         reservedKeys.put(Tokens.T_SQL, SQL);
@@ -1843,6 +1903,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_UNDO, UNDO);
         reservedKeys.put(Tokens.T_UNION, UNION);
         reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);
+        // A VoltDB extension to support the assume unique index attribute
+        reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);    // For VoltDB
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_UNKNOWN, UNKNOWN);
         reservedKeys.put(Tokens.T_UNNEST, UNNEST);
         reservedKeys.put(Tokens.T_UNTIL, UNTIL);
@@ -1867,6 +1930,10 @@ public class Tokens {
         reservedKeys.put(Tokens.T_WITHOUT, WITHOUT);
         reservedKeys.put(Tokens.T_WHILE, WHILE);
         reservedKeys.put(Tokens.T_YEAR, YEAR);
+        // A VoltDB extension to support WEEKOFYEAR and WEEKDAY function
+        reservedKeys.put(Tokens.T_WEEKOFYEAR, WEEKOFYEAR);    // For compliant with MySQL
+        reservedKeys.put(Tokens.T_WEEKDAY, WEEKDAY);          // For compliant with MySQL
+        // End of VoltDB extension
     }
 
     private static final IntValueHashMap commandSet = new IntValueHashMap(251);
@@ -1952,7 +2019,14 @@ public class Tokens {
         commandSet.put(T_MAXROWS, MAXROWS);
         commandSet.put(T_MAXVALUE, MAXVALUE);
         commandSet.put(T_MEMORY, MEMORY);
+        // A VoltDB extension to support more units for timestamp functions
+        commandSet.put(T_MICROS, MICROS);                // For VoltDB
+        commandSet.put(T_MICROSECOND, MICROSECOND);      // For VoltDB
+        // End of VoltDB extension
         commandSet.put(T_MILLIS, MILLIS);
+        // A VoltDB extension to support more units for timestamp functions
+        commandSet.put(T_MILLISECOND, MILLISECOND);      // For VoltDB
+        // End of VoltDB extension
         commandSet.put(T_MINUS_EXCEPT, MINUS_EXCEPT);
         commandSet.put(T_MINVALUE, MINVALUE);
         commandSet.put(T_MVCC, MVCC);
@@ -2049,6 +2123,14 @@ public class Tokens {
         commandSet.put(T_ZONE, ZONE);
 
         //
+        // A VoltDB extension to extract timestamp field function
+        commandSet.put(T_DAYOFWEEK, DAYOFWEEK);
+        commandSet.put(T_DAYOFYEAR, DAYOFYEAR);
+        commandSet.put(T_WEEK, WEEK);
+        commandSet.put(T_WEEKOFYEAR, WEEKOFYEAR);
+        commandSet.put(T_WEEK_OF_YEAR, WEEK_OF_YEAR);
+        commandSet.put(T_WEEKDAY, WEEKDAY);
+        // End of VoltDB extension
         commandSet.put(T_DAY_NAME, DAY_NAME);
         commandSet.put(T_MONTH_NAME, MONTH_NAME);
         commandSet.put(T_QUARTER, QUARTER);
@@ -2174,6 +2256,9 @@ public class Tokens {
             OUTER, PRIMARY, REFERENCES, RIGHT, SELECT, SET, SOME, STDDEV_POP,
             STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER, UNION,
             UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
+            // A VoltDB extension to support the assume unique index attribute.
+            ASSUMEUNIQUE, // For VoltDB
+            // End of VoltDB extension
         };
 
         for (int i = 0; i < keyword.length; i++) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,7 +33,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.exceptions.ConstraintFailureException;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadDecimalToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadFloatToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadVarcharCompare;
@@ -247,16 +247,9 @@ public class TestFailuresSuite extends RegressionSuite {
         } catch (ProcCallException e) {
             threwException = true;
             assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(e.getCause().getMessage().toUpperCase().contains("UNIQUE"));
-            if (!isHSQL()) {
-                VoltTable table = ((ConstraintFailureException)e.getCause()).getTuples();
-                table.resetRowPosition();
-                assertTrue(table.advanceRow());
-                assertTrue(java.util.Arrays.equals(stringData, table.getStringAsBytes(2)));
-                ConstraintFailureException cfe = (ConstraintFailureException)e.getCause();
-                assertTrue(cfe.getTableName().equalsIgnoreCase("FIVEK_STRING"));
-
-            }
+            assertTrue(e.getClientResponse().getStatusString().toUpperCase().contains("UNIQUE"));
+            String msg = e.getClientResponse().getStatusString();
+            System.err.println(msg);
         }
         assertTrue(threwException);
     }
@@ -330,9 +323,26 @@ public class TestFailuresSuite extends RegressionSuite {
             totalBytes += STRLEN;
         }
 
+        // Some tests are run with a different effective partition count on community builds,
+        // due to a k-factor downgrade, so allow for a possible per partition row count scale difference.
+        int kFactorScaleDown;
+        if (MiscUtils.isPro()) {
+            kFactorScaleDown = 1;
+        } else {
+            kFactorScaleDown = 2;
+        }
+
         for (int ii = 0; ii < 4; ii++) {
             results = client.callProcedure("SelectBigString", ii).getResults();
-            assertEquals(874, results[0].getRowCount());
+            System.out.println(results[0].getRowCount());
+            long rowCount = results[0].getRowCount();
+            //With elastic hashing the numbers are a little fuzzy
+            if ( ! ((rowCount > 800 && rowCount < 950) ||
+                    (rowCount > 800/kFactorScaleDown && rowCount < 950/kFactorScaleDown))) {
+                System.out.println("Unexpected row count: " + rowCount);
+            }
+            assertTrue((rowCount > 800 && rowCount < 950) ||
+                (rowCount > 800/kFactorScaleDown && rowCount < 950/kFactorScaleDown));
         }
 
         //System.out.printf("Fail Bytes: %d, Expected Rows %d\n", totalBytes, expectedRows);
@@ -484,11 +494,6 @@ public class TestFailuresSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(DivideByZero.class.getResource("failures-ddl.sql"));
-        project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addPartitionInfo("FIVEK_STRING", "P");
-        project.addPartitionInfo("FIVEK_STRING_WITH_INDEX", "ID");
-        project.addPartitionInfo("WIDE", "P");
-        //project.addPartitionInfo("BAD_COMPARES", "ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 

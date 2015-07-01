@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,13 +26,11 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-
-import org.voltdb.VoltTable;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1_MP;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1_SP;
@@ -133,10 +131,10 @@ public class TestUndoSuite extends RegressionSuite {
         project.addStmtProcedure("CountP1", "select count(*) from p1;");
         try {
             project.addLiteralSchema(
-                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
+                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL ASSUMEUNIQUE, " +
+                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key)); " +
+                    "PARTITION TABLE P1 ON COLUMN key;"
             );
-            project.addPartitionInfo("p1", "key");
 
             // a replicated table (should not generate procedures).
             project.addLiteralSchema(

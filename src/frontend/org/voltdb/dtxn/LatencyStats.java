@@ -1,30 +1,40 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.dtxn;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.HdrHistogram_voltpatches.AtomicHistogram;
+import org.HdrHistogram_voltpatches.Histogram;
+import org.voltcore.utils.CompressionStrategySnappy;
+import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
-import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
 
 /**
  * Class that provides latency information in buckets. Each bucket contains the
@@ -32,29 +42,25 @@ import org.voltdb.VoltType;
  */
 public class LatencyStats extends SiteStatsSource {
     /**
-     * A dummy iterator that wraps an integer and provides the
+     * A dummy iterator that wraps and int and provides the
      * Iterator<Object> necessary for getStatsRowKeyIterator()
      *
      */
-    private static class BucketIterator implements Iterator<Object> {
-        private final int max;
-        private int current = -1;
-
-        private BucketIterator(int max) {
-            this.max = max - 1; // minus one so that it's easier to compare later
-        }
+    private static class DummyIterator implements Iterator<Object> {
+        boolean oneRow = false;
 
         @Override
         public boolean hasNext() {
-            if (current == max) {
-                return false;
+            if (!oneRow) {
+                oneRow = true;
+                return true;
             }
-            return true;
+            return false;
         }
 
         @Override
         public Object next() {
-            return ++current;
+            return null;
         }
 
         @Override
@@ -63,62 +69,81 @@ public class LatencyStats extends SiteStatsSource {
         }
     }
 
-    /**
-     * Latency buckets to store overall latency distribution. It's divided into
-     * 26 buckets, each stores 10ms latency range invocation info. The last
-     * bucket covers invocations with latencies larger than 250ms.
-     */
-    private final long[] m_latencyBuckets = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
-                                             0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
-                                             0l, 0l, 0l, 0l, 0l, 0l};
-    private long m_max = (m_latencyBuckets.length - 1) * BUCKET_RANGE;
-    private static final long BUCKET_RANGE = 10; // 10ms
+    public static AbstractHistogram constructHistogram(boolean threadSafe) {
+        final long highestTrackableValue = 60L * 60L * 1000000L;
+        final int numberOfSignificantValueDigits = 2;
+        if (threadSafe) {
+            return new AtomicHistogram( highestTrackableValue, numberOfSignificantValueDigits);
+        } else {
+            return new Histogram( highestTrackableValue, numberOfSignificantValueDigits);
+        }
+    }
+
+    private WeakReference<byte[]> m_compressedCache = null;
+    private WeakReference<byte[]> m_serializedCache = null;
+
+    private AbstractHistogram m_totals = constructHistogram(false);
+
+    private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 900);
+
+    private Supplier<AbstractHistogram> getHistogramSupplier() {
+        return Suppliers.memoizeWithExpiration(new Supplier<AbstractHistogram>() {
+            @Override
+            public AbstractHistogram get() {
+                m_totals.reset();
+                ClientInterface ci = VoltDB.instance().getClientInterface();
+                if (ci != null) {
+                    List<AbstractHistogram> thisci = ci.getLatencyStats();
+                    for (AbstractHistogram info : thisci) {
+                        m_totals.add(info);
+                    }
+                }
+                m_compressedCache = null;
+                m_serializedCache = null;
+
+                return m_totals;
+            }
+        }, EXPIRATION, TimeUnit.MILLISECONDS);
+    }
+    private Supplier<AbstractHistogram> m_histogramSupplier = getHistogramSupplier();
+
+    public byte[] getSerializedCache() {
+        byte[] retval = null;
+        if (m_serializedCache == null || (retval = m_serializedCache.get()) == null) {
+            retval = m_histogramSupplier.get().toUncompressedBytes();
+            m_serializedCache = new WeakReference<byte[]>(retval);
+        }
+        return retval;
+    }
+
+    public byte[] getCompressedCache() {
+        byte[] retval = null;
+        if (m_compressedCache == null || (retval = m_compressedCache.get()) == null) {
+            retval = AbstractHistogram.toCompressedBytes(getSerializedCache(), CompressionStrategySnappy.INSTANCE);
+            m_compressedCache = new WeakReference<byte[]>(retval);
+        }
+        return retval;
+    }
 
     public LatencyStats(long siteId) {
         super(siteId, false);
-        VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.LATENCY, 0, this);
-    }
-
-    /**
-     * Called by the Initiator every time a transaction is completed
-     * @param delta Time the procedure took to round trip intra cluster
-     */
-    public synchronized void logTransactionCompleted(int delta) {
-        int bucketIndex = Math.min((int) (delta / BUCKET_RANGE), m_latencyBuckets.length - 1);
-
-        // if the host's clock moves backwards, bucketIndex can be negative
-        // this next line of code is a lie, but a beautiful one that keeps your server up
-        if (bucketIndex < 0) bucketIndex = 0;
-
-        m_max = Math.max(delta, m_max);
-        m_latencyBuckets[bucketIndex]++;
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        return new BucketIterator(m_latencyBuckets.length);
+        m_histogramSupplier.get();
+        return new DummyIterator();
     }
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("BUCKET_MIN", VoltType.INTEGER));
-        columns.add(new ColumnInfo("BUCKET_MAX", VoltType.INTEGER));
-        columns.add(new ColumnInfo("INVOCATIONS", VoltType.BIGINT));
+        columns.add(new ColumnInfo("HISTOGRAM", VoltType.VARBINARY));
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        final int bucket = (Integer) rowKey;
-
-        rowValues[columnNameToIndex.get("BUCKET_MIN")] = bucket * BUCKET_RANGE;
-        if (bucket < m_latencyBuckets.length - 1) {
-            rowValues[columnNameToIndex.get("BUCKET_MAX")] = (bucket + 1) * BUCKET_RANGE;
-        } else {
-            // max for the last bucket is the max of the largest latency
-            rowValues[columnNameToIndex.get("BUCKET_MAX")] = m_max;
-        }
-        rowValues[columnNameToIndex.get("INVOCATIONS")] = m_latencyBuckets[bucket];
+        rowValues[columnNameToIndex.get("HISTOGRAM")] = getCompressedCache();
         super.updateStatsRow(rowKey, rowValues);
     }
 }

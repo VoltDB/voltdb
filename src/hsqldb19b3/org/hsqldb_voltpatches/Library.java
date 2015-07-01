@@ -74,7 +74,7 @@ import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 // sqlbob@users 20020420- patch 1.7.0 - added HEXTORAW and RAWTOHEX.
 // boucherb@user 20020918 - doc 1.7.2 - added JavaDoc  and code comments
 // fredt@user 20021021 - doc 1.7.2 - modified JavaDoc
-// boucherb@users 20030201 - patch 1.7.2 - direct calls for org.hsqldb.Library
+// boucherb@users 20030201 - patch 1.7.2 - direct calls for org.hsqldb_voltpatches.Library
 // fredt@users - patch 1.8.0 - new functions added
 // boucherb@users 20060428 - patch 1.8.0 - Bug fix for [ 1455637 ] allow double args for modulo
 // fredt@users - patch 1.9.0 - most methods removed - see legacy support details

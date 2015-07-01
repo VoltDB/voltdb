@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,32 +25,51 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
 public class VoltNetworkPool {
+
+    public interface IOStatsIntf {
+        Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval);
+    }
+
     private static final VoltLogger m_logger = new VoltLogger(VoltNetworkPool.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private final VoltNetwork m_networks[];
-    private final AtomicLong m_nextWorkerSelection = new AtomicLong();
+    private final AtomicLong m_nextNetwork = new AtomicLong();
+    public final String m_poolName;
 
     public VoltNetworkPool() {
-        this(1, null);
+        this(1, 1, null, "");
     }
 
-    public VoltNetworkPool(int numThreads, ScheduledExecutorService ses) {
+    public VoltNetworkPool(int numThreads, int startThreadId, Queue<String> coreBindIds, String poolName) {
+        m_poolName = poolName;
         if (numThreads < 1) {
-            throw new IllegalArgumentException("Must specify a postive number of threads");
+            throw new IllegalArgumentException("Must specify a positive number of threads");
         }
-        m_networks = new VoltNetwork[numThreads];
-        for (int ii = 0; ii < numThreads; ii++) {
-            m_networks[ii] = new VoltNetwork(ii, ses);
+        if (coreBindIds == null || coreBindIds.isEmpty()) {
+            m_networks = new VoltNetwork[numThreads];
+            for (int ii = 0; ii < numThreads; ii++) {
+                // Adding startThreadId avoids unnecessary polling for non-Server VoltNetworkPools
+                m_networks[ii] = new VoltNetwork(ii+startThreadId, null, poolName);
+            }
+        } else {
+            final int coreBindIdsSize = coreBindIds.size();
+            m_networks = new VoltNetwork[coreBindIdsSize];
+            for (int ii = 0; ii < coreBindIdsSize; ii++) {
+                // Adding startThreadId avoids unnecessary polling for non-Server VoltNetworkPools
+                m_networks[ii] = new VoltNetwork(ii+startThreadId, coreBindIds.poll(), poolName);
+            }
         }
     }
 
@@ -69,15 +88,24 @@ public class VoltNetworkPool {
     public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler) throws IOException {
-        return registerChannel( channel, handler, SelectionKey.OP_READ);
+        return registerChannel( channel, handler, SelectionKey.OP_READ, ReverseDNSPolicy.ASYNCHRONOUS);
     }
 
     public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
-            final int interestOps) throws IOException {
-        VoltNetwork vn = m_networks[(int)(m_nextWorkerSelection.incrementAndGet() % m_networks.length)];
-        return vn.registerChannel(channel, handler, interestOps);
+            final int interestOps,
+            final ReverseDNSPolicy dns) throws IOException {
+        //Start with a round robin base policy
+        VoltNetwork vn = m_networks[(int)(m_nextNetwork.getAndIncrement() % m_networks.length)];
+        //Then do a load based policy which is a little racy
+        for (int ii = 0; ii < m_networks.length; ii++) {
+            if (m_networks[ii] == vn) continue;
+            if (vn.numPorts() > m_networks[ii].numPorts()) {
+                vn = m_networks[ii];
+            }
+        }
+        return vn.registerChannel(channel, handler, interestOps, dns);
     }
 
     public List<Long> getThreadIds() {
@@ -89,7 +117,7 @@ public class VoltNetworkPool {
     }
 
     public Map<Long, Pair<String, long[]>>
-        getIOStats(final boolean interval)
+        getIOStats(final boolean interval, List<IOStatsIntf> picoNetworks)
                 throws ExecutionException, InterruptedException {
         HashMap<Long, Pair<String, long[]>> retval = new HashMap<Long, Pair<String, long[]>>();
 
@@ -98,19 +126,26 @@ public class VoltNetworkPool {
         for (VoltNetwork vn : m_networks) {
             statTasks.add(vn.getIOStats(interval));
         }
+        for (IOStatsIntf pn : picoNetworks) {
+            statTasks.add(pn.getIOStats(interval));
+        }
 
         long globalStats[] = null;
         for (Future<Map<Long, Pair<String, long[]>>> statsFuture : statTasks) {
-            Map<Long, Pair<String, long[]>> stats = statsFuture.get();
-            if (globalStats == null) {
-                globalStats = stats.get(-1L).getSecond();
-            } else {
-                final long localStats[] = stats.get(-1L).getSecond();
-                for (int ii = 0; ii < localStats.length; ii++) {
-                    globalStats[ii] += localStats[ii];
+            try {
+                Map<Long, Pair<String, long[]>> stats = statsFuture.get(500, TimeUnit.MILLISECONDS);
+                if (globalStats == null) {
+                    globalStats = stats.get(-1L).getSecond();
+                } else {
+                    final long localStats[] = stats.get(-1L).getSecond();
+                    for (int ii = 0; ii < localStats.length; ii++) {
+                        globalStats[ii] += localStats[ii];
+                    }
                 }
+                retval.putAll(stats);
+            } catch (TimeoutException e) {
+                m_logger.warn("Timed out retrieving stats from network thread, probably harmless", e);
             }
-            retval.putAll(stats);
         }
         retval.put(-1L, Pair.of("GLOBAL", globalStats));
 

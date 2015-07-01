@@ -1,34 +1,38 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.types;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
  */
 public enum ConstraintType {
-    FOREIGN_KEY (0),
-    MAIN           (1),
+    FOREIGN_KEY  (0),
+    MAIN         (1),
     UNIQUE       (2),
-    CHECK         (3),
-    PRIMARY_KEY (4),
-    NOT_NULL(5);
+    CHECK        (3),
+    PRIMARY_KEY  (4),
+    NOT_NULL     (5),
+    PARTITIONING (6),
+    LIMIT        (7);
 
     ConstraintType(int val) {
         assert (this.ordinal() == val) :

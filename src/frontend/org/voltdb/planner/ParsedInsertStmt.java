@@ -1,24 +1,27 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.planner;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
@@ -26,7 +29,10 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  *
@@ -34,53 +40,56 @@ import org.voltdb.expressions.ExpressionUtil;
  */
 public class ParsedInsertStmt extends AbstractParsedStmt {
 
-    public HashMap<Column, AbstractExpression> columns = new HashMap<Column, AbstractExpression>();
+    /**
+     * A hash of the columns that were provided in the insert stmt,
+     * and the corresponding values that were provided.  It is a
+     * linked hash map so we retain the order in which the user
+     * specified the columns.
+     */
+    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
 
-    ParsedInsertStmt() {
-        columns = new HashMap<Column, AbstractExpression>();
+    /**
+     * The SELECT statement for INSERT INTO ... SELECT.
+     */
+    private StmtSubqueryScan m_subquery = null;
+
+
+
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedInsertStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
     }
 
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
-        assert(tableList.size() <= 1);
+    void parse(VoltXMLElement stmtNode) {
+        // An INSERT statement may have table scans if its an INSERT INTO ... SELECT,
+        // but those table scans will belong to the corresponding ParsedSelectStmt
+        assert(m_tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
-        Table table = db.getTables().getIgnoreCase(tableName);
+        // Need to add the table to the cache. It may be required to resolve the
+        // correlated TVE in case of WHERE clause contains IN subquery
+        Table table = getTableFromDB(tableName);
+        addTableToStmtCache(table, tableName);
 
-        // if the table isn't in the list add it
-        // if it's there, good
-        // if something else is there, we have a problem
-        if (tableList.size() == 0)
-            tableList.add(table);
-        else
-            assert(tableList.get(0) == table);
+        m_tableList.add(table);
 
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
-                for (VoltXMLElement colNode : node.children) {
-                    if (colNode.name.equalsIgnoreCase("column")) {
-                         parseInsertColumn(colNode, db, table);
-                    }
-                }
+                parseTargetColumns(node, table, m_columns);
+            }
+            else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+                m_subquery = new StmtSubqueryScan (parseSubquery(node), "__VOLT_INSERT_SUBQUERY__");
+            }
+            else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+                throw new PlanningErrorException(
+                        "INSERT INTO ... SELECT is not supported for UNION or other set operations.");
             }
         }
-    }
-
-    void parseInsertColumn(VoltXMLElement columnNode, Database db, Table table) {
-        String tableName = columnNode.attributes.get("table");
-        String columnName = columnNode.attributes.get("name");
-
-        assert(tableName.equalsIgnoreCase(table.getTypeName()));
-        Column column = table.getColumns().getIgnoreCase(columnName);
-
-        AbstractExpression expr = null;
-        for (VoltXMLElement node : columnNode.children) {
-            expr = parseExpressionTree(node, db);
-            expr.refineValueType(VoltType.get((byte)column.getType()));
-            ExpressionUtil.finalizeValueTypes(expr);
-        }
-
-        columns.put(column, expr);
     }
 
     @Override
@@ -88,12 +97,146 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         String retval = super.toString() + "\n";
 
         retval += "COLUMNS:\n";
-        for (Entry<Column, AbstractExpression> col : columns.entrySet()) {
-            retval += "\tColumn: " + col.getKey().getTypeName() + ": ";
-            retval += col.getValue().toString() + "\n";
+        for (Entry<Column, AbstractExpression> col : m_columns.entrySet()) {
+            retval += "\tColumn: " + col.getKey().getTypeName();
+            if (col.getValue() != null) {
+                retval += ": " + col.getValue().toString();
+            }
+            retval += "\n";
         }
-        retval = retval.trim();
 
+        if (getSubselectStmt() != null) {
+            retval += "SUBSELECT:\n";
+            retval += getSubselectStmt().toString();
+        }
         return retval;
+    }
+
+    private AbstractExpression defaultValueToExpr(Column column) {
+        AbstractExpression expr = null;
+
+        boolean isConstantValue = true;
+        if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+            boolean isFunctionFormat = true;
+            String timeValue = column.getDefaultvalue();
+            try {
+                Long.parseLong(timeValue);
+                isFunctionFormat = false;
+            } catch (NumberFormatException  e) {}
+            if (isFunctionFormat) {
+                try {
+                    java.sql.Timestamp.valueOf(timeValue);
+                    isFunctionFormat = false;
+                } catch (IllegalArgumentException e) {}
+            }
+
+            if (isFunctionFormat) {
+                String name = timeValue.split(":")[0];
+                int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                FunctionExpression funcExpr = new FunctionExpression();
+                funcExpr.setAttributes(name, null, id);
+
+                funcExpr.setValueType(VoltType.TIMESTAMP);
+                funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                expr = funcExpr;
+                isConstantValue = false;
+            }
+        }
+        if (isConstantValue) {
+            // Not Default sql function.
+            ConstantValueExpression const_expr = new ConstantValueExpression();
+            expr = const_expr;
+            if (column.getDefaulttype() != 0) {
+                const_expr.setValue(column.getDefaultvalue());
+                const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+            }
+            else {
+                const_expr.setValue(null);
+                const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+            }
+        }
+
+        assert(expr != null);
+        return expr;
+    }
+
+    public AbstractExpression getExpressionForPartitioning(Column column) {
+        AbstractExpression expr = null;
+        if (getSubselectStmt() != null) {
+            // This method is used by statement partitioning to help infer single partition statements.
+            // Caller expects a constant or parameter to be returned.
+            return null;
+        }
+        else {
+            expr = m_columns.get(column);
+            if (expr == null) {
+                expr = defaultValueToExpr(column);
+            }
+        }
+
+        assert(expr != null);
+        return expr;
+    }
+
+    public StmtSubqueryScan getSubqueryScan() { return m_subquery; }
+
+    /**
+     * Return the subqueries for this statement.  For INSERT statements,
+     * there can be only one.
+     */
+    @Override
+    public List<StmtSubqueryScan> getSubqueryScans() {
+        List<StmtSubqueryScan> subqueries = new ArrayList<>();
+
+        if (m_subquery != null) {
+            subqueries.add(m_subquery);
+        }
+
+        return subqueries;
+    }
+
+    /**
+     * @return the subquery for the insert stmt if there is one, null otherwise
+     */
+    private ParsedSelectStmt getSubselectStmt() {
+        if (m_subquery != null) {
+            return (ParsedSelectStmt)(m_subquery.getSubqueryStmt());
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        assert(getSubselectStmt() != null);
+        return getSubselectStmt().isOrderDeterministicInSpiteOfUnorderedSubqueries();
+    }
+
+    /**
+     * Returns true if the table being inserted into has a trigger executed
+     * when row limit is met
+     */
+    public boolean targetTableHasLimitRowsTrigger() {
+        assert(m_tableList.size() == 1);
+        return CatalogUtil.getLimitPartitionRowsDeleteStmt(m_tableList.get(0)) != null;
+    }
+
+    @Override
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+
+        for (AbstractExpression expr : m_columns.values()) {
+            if (expr != null) {
+                exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+
+        if (m_subquery != null) {
+            exprs.addAll(m_subquery.getSubqueryStmt().findAllSubexpressionsOfClass(aeClass));
+        }
+
+        return exprs;
     }
 }

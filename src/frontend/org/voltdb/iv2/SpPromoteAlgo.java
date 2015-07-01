@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,22 +19,20 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-
-import java.util.concurrent.Future;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeSet;
+import java.util.concurrent.Future;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
-
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class SpPromoteAlgo implements RepairAlgo
 {
@@ -44,11 +42,13 @@ public class SpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
-    private long m_maxSeenTxnId = 0; // UPDATE ME TO REAL VALUE WHEN EXTRACTING BASE CLASS
+    private long m_maxSeenTxnId;
+    private long m_maxSeenBinaryLogSequenceNumber;
+    private long m_maxSeenBinaryLogUniqueId;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final InaugurationFuture m_promotionResult = new InaugurationFuture();
+    private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
 
     long getRequestId()
     {
@@ -94,7 +94,13 @@ public class SpPromoteAlgo implements RepairAlgo
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
-            return (int)(o1.getHandle() - o2.getHandle());
+            if (o1.getHandle() < o2.getHandle()) {
+                return -1;
+            }
+            else if (o1.getHandle() > o2.getHandle()) {
+                return 1;
+            }
+            return 0;
         }
     };
 
@@ -106,23 +112,25 @@ public class SpPromoteAlgo implements RepairAlgo
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public SpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami)
+            String whoami, int partitionId)
     {
         m_mailbox = mailbox;
         m_survivors = survivors;
 
         m_whoami = whoami;
+        m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
+        m_maxSeenBinaryLogSequenceNumber = Long.MIN_VALUE;
+        m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
     }
 
     @Override
-    public Future<Pair<Boolean, Long>> start()
+    public Future<RepairResult> start()
     {
         try {
             prepareForFaultRecovery();
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.done(Long.MIN_VALUE);
         }
         return m_promotionResult;
     }
@@ -141,11 +149,11 @@ public class SpPromoteAlgo implements RepairAlgo
         }
 
         tmLog.info(m_whoami + "found (including self) " + m_survivors.size()
-                + " surviving replicas to repair. "
-                + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
+                 + " surviving replicas to repair. "
+                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest =
             new Iv2RepairLogRequestMessage(m_requestId, Iv2RepairLogRequestMessage.SPREQUEST);
-        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
+        m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
 
     /** Process a new repair log response */
@@ -155,22 +163,35 @@ public class SpPromoteAlgo implements RepairAlgo
         if (message instanceof Iv2RepairLogResponseMessage) {
             Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
             if (response.getRequestId() != m_requestId) {
-                tmLog.info(m_whoami + "rejecting stale repair response."
-                        + " Current request id is: " + m_requestId
-                        + " Received response for request id: " + response.getRequestId());
+                tmLog.debug(m_whoami + "rejecting stale repair response."
+                          + " Current request id is: " + m_requestId
+                          + " Received response for request id: " + response.getRequestId());
                 return;
             }
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
             if (rrs.m_expectedResponses < 0) {
-                tmLog.info(m_whoami + "collecting " + response.getOfTotal()
-                        + " repair log entries from "
-                        + CoreUtils.hsIdToString(response.m_sourceHSId));
+                tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
+                          + " repair log entries from "
+                          + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
-            m_repairLogUnion.add(response);
+            // Long.MAX_VALUE has rejoin semantics
+            if (response.getHandle() != Long.MAX_VALUE) {
+                m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
+            }
+            m_maxSeenBinaryLogSequenceNumber = Math.max(m_maxSeenBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
+            m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, response.getBinaryLogUniqueId());
+
+            if (response.getPayload() != null) {
+                m_repairLogUnion.add(response);
+                if (tmLog.isTraceEnabled()) {
+                    tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+                            ", message: " + response.getPayload());
+                }
+            }
             if (rrs.update(response)) {
-                tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
-                        + " responses for " + rrs.m_expectedResponses +
-                        " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
+                tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
+                          + " responses for " + rrs.m_expectedResponses
+                          + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
                 if (areRepairLogsComplete()) {
                     repairSurvivors();
                 }
@@ -189,7 +210,7 @@ public class SpPromoteAlgo implements RepairAlgo
         return true;
     }
 
-    /** Send missed-messages to survivors. Exciting! */
+    /** Send missed-messages to survivors. */
     public void repairSurvivors()
     {
         // cancel() and repair() must be synchronized by the caller (the deliver lock,
@@ -201,24 +222,31 @@ public class SpPromoteAlgo implements RepairAlgo
         }
 
         int queued = 0;
-        tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
                 if  (entry.getValue().needs(li.getHandle())) {
                     ++queued;
-                    tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
-                            entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
+                    tmLog.debug(m_whoami + "repairing " + CoreUtils.hsIdToString(entry.getKey()) +
+                            ". Max seen " + entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
                             li.getHandle());
                     needsRepair.add(entry.getKey());
                 }
             }
             if (!needsRepair.isEmpty()) {
+                if (tmLog.isTraceEnabled()) {
+                    tmLog.trace(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
+                            " with message: " + li.getPayload());
+                }
                 m_mailbox.repairReplicasWith(needsRepair, li.getPayload());
             }
         }
-        tmLog.info(m_whoami + "finished queuing " + queued + " replica repair messages.");
+        tmLog.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
 
-        m_promotionResult.done(m_maxSeenTxnId);
+        m_promotionResult.set(new RepairResult(
+                m_maxSeenTxnId,
+                m_maxSeenBinaryLogSequenceNumber,
+                m_maxSeenBinaryLogUniqueId));
     }
 }

@@ -15,3 +15,18 @@ CREATE TABLE USERACCOUNT (
 );
 
 PARTITION TABLE USERACCOUNT ON COLUMN EMAIL;
+
+LOAD CLASSES helloworld.jar;
+
+CREATE PROCEDURE Insert
+   AS INSERT INTO HELLOWORLD (Dialect, Hello, World) VALUES (?, ?, ?);
+
+CREATE PROCEDURE RegisterUser
+    PARTITION ON TABLE Useraccount COLUMN Email
+    AS INSERT INTO USERACCOUNT
+      (Email, Firstname, Lastname, Dialect)
+      VALUES (?,?,?,?);
+
+CREATE PROCEDURE
+    PARTITION ON TABLE Useraccount COLUMN Email
+    FROM CLASS SignIn;

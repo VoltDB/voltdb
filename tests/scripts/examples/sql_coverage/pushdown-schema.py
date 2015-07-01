@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -28,15 +28,15 @@
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
-        "partitions": (),
+        "partitions": ("ID"),
         "indexes": ("ID")
         },
     "P2": {
-        "columns": (("P2_DESC", FastSerializer.VOLTTYPE_STRING),
-                    ("P2_ID", FastSerializer.VOLTTYPE_INTEGER),
-                    ("P2_NUM1", FastSerializer.VOLTTYPE_INTEGER),
-                    ("P2_NUM2", FastSerializer.VOLTTYPE_INTEGER)),
-        "partitions": (),
+        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("NUM", FastSerializer.VOLTTYPE_INTEGER),
+                    ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
+        "partitions": ("ID"),
         "indexes": ("ID")
         },
     "R1": {
@@ -46,5 +46,13 @@
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
         "indexes": ("ID")
-        }
+        },
+    "R2": {
+        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("NUM", FastSerializer.VOLTTYPE_INTEGER),
+                    ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
+        "partitions": (),
+        "indexes": ("ID")
+        },
 }

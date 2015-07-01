@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -51,14 +51,19 @@
 package org.voltcore.network;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
+import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
 
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.EstTimeUpdater;
+import org.voltdb.AdmissionControlGroup;
 
 public class TestNIOWriteStream extends TestCase {
 
@@ -69,8 +74,8 @@ public class TestNIOWriteStream extends TestCase {
             return null;
         }
 
-        public MockPort() {
-            super(null, null, "", pool);
+        public MockPort() throws UnknownHostException {
+            super(null, null, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), pool);
         }
 
         @Override
@@ -93,7 +98,8 @@ public class TestNIOWriteStream extends TestCase {
 
     @Override
     public void setUp() {
-        pool = new NetworkDBBPool();
+        //Use low size for each buffer in pool
+        pool = new NetworkDBBPool(64, 4);
     }
 
     @Override
@@ -106,20 +112,26 @@ public class TestNIOWriteStream extends TestCase {
      * bytes from the buffer.
      */
     private static class MockChannel implements GatheringByteChannel {
-        MockChannel(int behavior) {
+        MockChannel(int behavior, int closeafter) {
             m_behavior = behavior;
+            this.closeAfter = closeafter;
         }
-
-        private boolean wroteSizeZero = false;
+        private int writeCount = 0;
+        private final int closeAfter;
         private boolean didOversizeWrite = false;
         private boolean wrotePartial = false;
+        public boolean m_open = true;
+
+        public int m_behavior;
+        public static int SINK = 0;     // accept all data
+        public static int FULL = 1;     // accept no data
+        public static int PARTIAL = 2;  // accept some data
 
         @Override
         public int write(ByteBuffer src) throws IOException {
             if (!m_open) throw new IOException();
-
-            if (!src.hasRemaining()) {
-                wroteSizeZero = true;
+            if (closeAfter > 0 && ++writeCount >= closeAfter) {
+                m_open = false;
             }
 
             if (!src.isDirect()) {
@@ -152,6 +164,9 @@ public class TestNIOWriteStream extends TestCase {
         @Override
         public long write(ByteBuffer src[]) throws IOException {
             if (!m_open) throw new IOException();
+            if (closeAfter > 0 && ++writeCount >= closeAfter) {
+                m_open = false;
+            }
 
             if (m_behavior == SINK) {
                 int remaining = src[0].remaining();
@@ -185,12 +200,6 @@ public class TestNIOWriteStream extends TestCase {
             return m_open;
         }
 
-        public boolean m_open = true;
-
-        public int m_behavior;
-        public static int SINK = 0;     // accept all data
-        public static int FULL = 1;     // accept no data
-        public static int PARTIAL = 2;  // accept some data
         @Override
         public long write(ByteBuffer[] srcs, int offset, int length)
                 throws IOException {
@@ -201,7 +210,7 @@ public class TestNIOWriteStream extends TestCase {
 
 
     public void testSink() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.SINK);
+        MockChannel channel = new MockChannel(MockChannel.SINK, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
@@ -222,7 +231,7 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testFull() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.FULL);
+        MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
@@ -250,7 +259,7 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testPartial() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.PARTIAL);
+        MockChannel channel = new MockChannel(MockChannel.PARTIAL, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
@@ -292,7 +301,7 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testClosed() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.FULL);
+        MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
 
@@ -322,8 +331,51 @@ public class TestNIOWriteStream extends TestCase {
 
     }
 
+    public void testClosedWithBackPressure() throws IOException {
+        MockChannel channel = new MockChannel(MockChannel.SINK, 1);
+        MockPort port = new MockPort();
+        AdmissionControlGroup acg = new AdmissionControlGroup(2, 1024);
+        NIOWriteStream wstream = new NIOWriteStream(port, null, null, acg);
+
+        ByteBuffer tmp = ByteBuffer.allocate(6);
+        tmp.put((byte)1);
+        tmp.put((byte)2);
+        tmp.put((byte)3);
+        tmp.put((byte)4);
+        tmp.put((byte)5);
+        tmp.put((byte)6);
+        tmp.flip();
+        ByteBuffer tmp2 = ByteBuffer.allocate(4);
+        tmp2.put((byte)1);
+        tmp2.put((byte)2);
+        tmp2.put((byte)3);
+        tmp2.put((byte)4);
+        tmp2.flip();
+        wstream.enqueue(tmp);
+        wstream.enqueue(tmp2);
+        assertTrue(port.checkWriteSet());
+
+        boolean threwException = false;
+        try {
+            wstream.swapAndSerializeQueuedWrites(pool);
+            //First write will succeed leaving 2 in first buffer and 4 in next
+            wstream.drainTo( channel);
+        } catch (IOException e) {
+            threwException = true;
+        }
+        assertTrue(threwException);
+        //Since ACG limit is 2 bytes we should be in backpressure.
+        assertTrue(acg.hasBackPressure());
+        assertEquals(6, acg.getPendingBytes());
+        wstream.shutdown();
+        //We should be out of backpressure.
+        assertFalse(acg.hasBackPressure());
+        //acg pending bytes must be 0
+        assertEquals(0, acg.getPendingBytes());
+    }
+
     public void testLargeNonDirectWrite() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.SINK);
+        MockChannel channel = new MockChannel(MockChannel.SINK, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
 
@@ -338,37 +390,66 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testLastWriteDelta() throws Exception {
-        final MockChannel channel = new MockChannel(MockChannel.SINK);
+        EstTimeUpdater.pause = true;
+        Thread.sleep(10);
+        try {
+            final MockChannel channel = new MockChannel(MockChannel.SINK, 0);
+            MockPort port = new MockPort();
+            NIOWriteStream wstream = new NIOWriteStream(port);
+
+            assertEquals( 0, wstream.calculatePendingWriteDelta(999));
+
+            EstTimeUpdater.update(System.currentTimeMillis());
+
+            /**
+             * Test the basic write and drain
+             */
+            final ByteBuffer b = ByteBuffer.allocate(5);
+            wstream.enqueue(b.duplicate());
+            assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            wstream.swapAndSerializeQueuedWrites(pool);
+            wstream.drainTo( channel);
+            assertEquals( 0, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+
+            Thread.sleep(20);
+            EstTimeUpdater.update(System.currentTimeMillis());
+
+            wstream.enqueue(b.duplicate());
+            assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            wstream.enqueue(b.duplicate());
+            assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            channel.m_behavior = MockChannel.PARTIAL;
+            wstream.swapAndSerializeQueuedWrites(pool);
+            wstream.drainTo( channel );
+            assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            wstream.shutdown();
+        } finally {
+            EstTimeUpdater.pause = false;
+        }
+    }
+
+    public void testQueueMonitor() throws Exception {
+        final MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
-        NIOWriteStream wstream = new NIOWriteStream(port);
+        final AtomicLong queue = new AtomicLong();
+        NIOWriteStream wstream = new NIOWriteStream(port, null, null, new QueueMonitor() {
 
-        assertEquals( 0, wstream.calculatePendingWriteDelta(999));
-
-        EstTimeUpdater.update(System.currentTimeMillis());
-
-        /**
-         * Test the basic write and drain
-         */
-        final ByteBuffer b = ByteBuffer.allocate(5);
-        wstream.enqueue(b.duplicate());
-        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            @Override
+            public boolean queue(int bytes) {
+                queue.addAndGet(bytes);
+                return false;
+            }
+        });
+        wstream.enqueue(ByteBuffer.allocate(32));
         wstream.swapAndSerializeQueuedWrites(pool);
-        wstream.drainTo( channel);
-        assertEquals( 0, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-
-        Thread.sleep(20);
-        EstTimeUpdater.update(System.currentTimeMillis());
-
-        wstream.enqueue(b.duplicate());
-        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        wstream.enqueue(b.duplicate());
-        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        channel.m_behavior = MockChannel.PARTIAL;
+        assertEquals(32, queue.get());
+        wstream.drainTo(channel);
+        assertEquals(32, queue.get());
+        wstream.enqueue(ByteBuffer.allocate(32));
         wstream.swapAndSerializeQueuedWrites(pool);
-        wstream.drainTo( channel );
-        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-
+        assertEquals(64, queue.get());
         wstream.shutdown();
+        assertEquals(0, queue.get());
     }
 
 }

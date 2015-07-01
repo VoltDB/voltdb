@@ -1,44 +1,59 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb.utils;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterOutputStream;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.utils.Base64;
 import org.xerial.snappy.Snappy;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 public final class CompressionService {
 
-    private static class IOBuffers {
-        private final ByteBuffer input;
-        private final ByteBuffer output;
+    static {
+        CoreUtils.m_threadLocalDeallocator = new Runnable() {
+            @Override
+            public void run() {
+                releaseThreadLocal();
+            }
+        };
+    }
 
-        private IOBuffers(ByteBuffer input, ByteBuffer output) {
+    private static class IOBuffers {
+        private final BBContainer input;
+        private final BBContainer output;
+
+        private IOBuffers(BBContainer input, BBContainer output) {
             this.input = input;
             this.output = output;
         }
@@ -46,47 +61,47 @@ public final class CompressionService {
     private static ThreadLocal<IOBuffers> m_buffers = new ThreadLocal<IOBuffers>() {
         @Override
         protected IOBuffers initialValue() {
-            return new IOBuffers(ByteBuffer.allocateDirect(1024 * 32), ByteBuffer.allocateDirect(1024 * 32));
+            return new IOBuffers(DBBPool.allocateDirect(1024 * 32), DBBPool.allocateDirect(1024 * 32));
         }
     };
 
     public static void releaseThreadLocal() {
+        m_buffers.get().input.discard();
+        m_buffers.get().output.discard();
         m_buffers.remove();
     }
 
     /*
      * The executor service is only used if the VoltDB computation service is not available.
      */
-    private static final ExecutorService m_executor =
-            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()), new ThreadFactory() {
-                private int threadIndex = 0;
-                @Override
-                public synchronized Thread  newThread(Runnable r) {
-                    Thread t = new Thread(r, "Compression service thread - " + threadIndex++);
-                    t.setDaemon(true);
-                    return t;
-                }
-
-            });
+    private static final ListeningExecutorService m_executor = MoreExecutors.listeningDecorator(
+            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()),
+                                         CoreUtils.getThreadFactory("Compression service thread"))
+            );
 
     private static IOBuffers getBuffersForCompression(int length, boolean inputNotUsed) {
         IOBuffers buffers = m_buffers.get();
-        ByteBuffer input = buffers.input;
-        ByteBuffer output = buffers.output;
+        BBContainer input = buffers.input;
+        BBContainer output = buffers.output;
 
         final int maxCompressedLength = Snappy.maxCompressedLength(length);
+
+        final int inputCapacity = input.b().capacity();
+        final int outputCapacity = output.b().capacity();
 
         /*
          * A direct byte buffer might be provided in which case no input buffer is needed
          */
         boolean changedBuffer = false;
-        if (!inputNotUsed && input.capacity() < length) {
-            input = ByteBuffer.allocateDirect(Math.max(input.capacity() * 2, length));
+        if (!inputNotUsed && inputCapacity < length) {
+            input.discard();
+            input = DBBPool.allocateDirect(Math.max(inputCapacity * 2, length));
             changedBuffer = true;
         }
 
-        if (output.capacity() < maxCompressedLength) {
-            output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, maxCompressedLength));
+        if (outputCapacity < maxCompressedLength) {
+            output.discard();
+            output = DBBPool.allocateDirect(Math.max(outputCapacity * 2, maxCompressedLength));
             changedBuffer = true;
         }
 
@@ -94,8 +109,8 @@ public final class CompressionService {
             buffers = new IOBuffers(input, output);
             m_buffers.set(buffers);
         }
-        output.clear();
-        input.clear();
+        output.b().clear();
+        input.b().clear();
 
         return buffers;
     }
@@ -112,6 +127,28 @@ public final class CompressionService {
         });
     }
 
+    public static Future<BBContainer> compressAndCRC32cBufferAsync(final ByteBuffer inBuffer, final BBContainer outBufferC) {
+        assert(inBuffer.isDirect());
+        assert(outBufferC.b().isDirect());
+        return submitCompressionTask(new Callable<BBContainer>() {
+
+            @Override
+            public BBContainer call() throws Exception {
+                final ByteBuffer outBuffer = outBufferC.b();
+                //Reserve 4-bytes for the CRC
+                final int crcPosition = outBuffer.position();
+                outBuffer.position(outBuffer.position() + 4);
+                final int crcCalcStart = outBuffer.position();
+                compressBuffer(inBuffer, outBuffer);
+                final int crc32c =
+                        DBBPool.getCRC32C( outBufferC.address(), crcCalcStart, outBuffer.limit() - crcCalcStart);
+                outBuffer.putInt(crcPosition, crc32c);
+                return outBufferC;
+            }
+
+        });
+    }
+
     public static int compressBuffer(ByteBuffer buffer, ByteBuffer output) throws IOException {
         assert(buffer.isDirect());
         assert(output.isDirect());
@@ -121,7 +158,7 @@ public final class CompressionService {
     public static byte[] compressBuffer(ByteBuffer buffer) throws IOException {
         assert(buffer.isDirect());
         IOBuffers buffers = getBuffersForCompression(buffer.remaining(), true);
-        ByteBuffer output = buffers.output;
+        ByteBuffer output = buffers.output.b();
 
         final int compressedSize = Snappy.compress(buffer, output);
         byte result[] = new byte[compressedSize];
@@ -130,12 +167,14 @@ public final class CompressionService {
     }
 
     public static byte[] compressBytes(byte bytes[], int offset, int length) throws IOException {
-        IOBuffers buffers = getBuffersForCompression(bytes.length, false);
-        buffers.input.put(bytes, offset, length);
-        buffers.input.flip();
-        final int compressedSize = Snappy.compress(buffers.input, buffers.output);
+        final IOBuffers buffers = getBuffersForCompression(bytes.length, false);
+        final ByteBuffer input = buffers.input.b();
+        final ByteBuffer output = buffers.output.b();
+        input.put(bytes, offset, length);
+        input.flip();
+        final int compressedSize = Snappy.compress(input, output);
         final byte compressed[] = new byte[compressedSize];
-        buffers.output.get(compressed);
+        output.get(compressed);
         return compressed;
     }
 
@@ -157,21 +196,23 @@ public final class CompressionService {
     public static byte[] decompressBuffer(final ByteBuffer compressed) throws IOException {
         assert(compressed.isDirect());
         IOBuffers buffers = m_buffers.get();
-        ByteBuffer output = buffers.output;
+        BBContainer output = buffers.output;
 
         final int uncompressedLength = Snappy.uncompressedLength(compressed);
-        if (output.capacity() < uncompressedLength) {
-            output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, uncompressedLength));
-            buffers = new IOBuffers(compressed, output);
+        final int outputCapacity = buffers.output.b().capacity();
+        if (outputCapacity < uncompressedLength) {
+            buffers.output.discard();
+            output = DBBPool.allocateDirect(Math.max(outputCapacity * 2, uncompressedLength));
+            buffers = new IOBuffers(buffers.input, output);
             m_buffers.set(buffers);
         }
-        output.clear();
+        output.b().clear();
 
-        final int actualUncompressedLength = Snappy.uncompress(compressed, output);
+        final int actualUncompressedLength = Snappy.uncompress(compressed, output.b());
         assert(uncompressedLength == actualUncompressedLength);
 
         byte result[] = new byte[actualUncompressedLength];
-        output.get(result);
+        output.b().get(result);
         return result;
     }
 
@@ -193,32 +234,38 @@ public final class CompressionService {
 
     public static byte[] decompressBytes(byte bytes[]) throws IOException {
         IOBuffers buffers = m_buffers.get();
-        ByteBuffer input = buffers.input;
-        ByteBuffer output = buffers.output;
+        BBContainer input = buffers.input;
+        BBContainer output = buffers.output;
 
-        if (input.capacity() < bytes.length){
-            input = ByteBuffer.allocateDirect(Math.max(input.capacity() * 2, bytes.length));
+        final int inputCapacity = input.b().capacity();
+        if (inputCapacity < bytes.length){
+            input.discard();
+            input = DBBPool.allocateDirect(Math.max(inputCapacity * 2, bytes.length));
             buffers = new IOBuffers(input, output);
             m_buffers.set(buffers);
         }
 
-        input.clear();
-        input.put(bytes);
-        input.flip();
+        final ByteBuffer inputBuffer = input.b();
+        inputBuffer.clear();
+        inputBuffer.put(bytes);
+        inputBuffer.flip();
 
-        final int uncompressedLength = Snappy.uncompressedLength(input);
-        if (output.capacity() < uncompressedLength) {
-            output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, uncompressedLength));
+        final int uncompressedLength = Snappy.uncompressedLength(inputBuffer);
+        final int outputCapacity = output.b().capacity();
+        if (outputCapacity < uncompressedLength) {
+            output.discard();
+            output = DBBPool.allocateDirect(Math.max(outputCapacity * 2, uncompressedLength));
             buffers = new IOBuffers(input, output);
             m_buffers.set(buffers);
         }
-        output.clear();
+        final ByteBuffer outputBuffer = output.b();
+        outputBuffer.clear();
 
-        final int actualUncompressedLength = Snappy.uncompress(input, output);
+        final int actualUncompressedLength = Snappy.uncompress(inputBuffer, outputBuffer);
         assert(uncompressedLength == actualUncompressedLength);
 
         byte result[] = new byte[actualUncompressedLength];
-        output.get(result);
+        outputBuffer.get(result);
         return result;
     }
 
@@ -230,7 +277,7 @@ public final class CompressionService {
     public static byte[][] compressBytes(byte bytes[][], final boolean base64Encode) throws Exception {
         if (bytes.length == 1) {
             if (base64Encode) {
-                return new byte[][] {Base64.encodeBytesToBytes(compressBytes(bytes[0]))};
+                return new byte[][] {Base64.encodeToByte(compressBytes(bytes[0]), false)};
             } else {
                 return new byte[][] {compressBytes(bytes[0])};
             }
@@ -242,7 +289,7 @@ public final class CompressionService {
                 @Override
                 public byte[] call() throws Exception {
                     if (base64Encode) {
-                        return Base64.encodeBytesToBytes(compressBytes(bts));
+                        return Base64.encodeToByte(compressBytes(bts), false);
                     } else {
                         return compressBytes(bts);
                     }
@@ -313,14 +360,32 @@ public final class CompressionService {
         });
     }
 
-    public static Future<byte[]> submitCompressionTask(Callable<byte[]> task) {
+    public static <T> ListenableFuture<T> submitCompressionTask(Callable<T> task) {
         VoltDBInterface instance = VoltDB.instance();
         if (VoltDB.instance() != null) {
-            ExecutorService es = instance.getComputationService();
+            ListeningExecutorService es = instance.getComputationService();
             if (es != null) {
                 return es.submit(task);
             }
         }
         return m_executor.submit(task);
+    }
+
+    public static byte[] gzipBytes(byte[] rawBytes) throws IOException
+    {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(rawBytes.length);
+        DeflaterOutputStream dos = new DeflaterOutputStream(bos);
+        dos.write(rawBytes);
+        dos.close();
+        return bos.toByteArray();
+    }
+
+    public static byte[] gunzipBytes(byte[] compressedBytes) throws IOException
+    {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedBytes.length * 1.5));
+        InflaterOutputStream dos = new InflaterOutputStream(bos);
+        dos.write(compressedBytes);
+        dos.close();
+        return bos.toByteArray();
     }
 }

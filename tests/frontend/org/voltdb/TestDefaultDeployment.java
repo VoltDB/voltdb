@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,14 +26,14 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.utils.CatalogUtil;
-
 import junit.framework.TestCase;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.utils.CatalogUtil;
 
 public class TestDefaultDeployment extends TestCase {
 
@@ -61,12 +61,12 @@ public class TestDefaultDeployment extends TestCase {
         // the default deployment file includes an http server on port 8080.
         // do some verification without starting VoltDB, since that port
         // number conflicts with jenkins on some test servers.
-        String absolutePath = RealVoltDB.setupDefaultDeployment();
+        String absolutePath = RealVoltDB.setupDefaultDeployment(new VoltLogger("HOST"));
 
         DeploymentType dflt = CatalogUtil.parseDeployment(absolutePath);
         assertTrue(dflt != null);
 
         assertTrue(dflt.getCluster().getHostcount() == 1);
-        assertTrue(dflt.getCluster().getSitesperhost() == 2);
+        assertTrue(dflt.getCluster().getSitesperhost() == 8);
     }
 }

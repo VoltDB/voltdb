@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -76,21 +76,14 @@ public class ClusterSaveFileState
     public ClusterSaveFileState(VoltTable saveFileState)
         throws IOException
     {
-        if (saveFileState.getRowCount() == 0)
-        {
-            String error = "No savefile state to restore";
-            throw new IOException(error);
-        }
-        VoltTableRow a_row = saveFileState.fetchRow(0);
-        m_clusterName = a_row.getString("CLUSTER");
-        m_databaseName = a_row.getString("DATABASE");
-
+        // Checks cluster/database name consistency between rows.
+        ConsistencyChecker checker = new ConsistencyChecker();
 
         m_tableStateMap = new HashMap<String, TableSaveFileState>();
         long txnId = -1;
         while (saveFileState.advanceRow())
         {
-            checkConsistency(saveFileState); // throws if inconsistent
+            checker.checkRow(saveFileState); // throws if inconsistent
             String table_name = saveFileState.getString("TABLE");
 
             // Check if the transaction IDs match
@@ -134,27 +127,37 @@ public class ClusterSaveFileState
         return m_tableStateMap.get(tableName);
     }
 
-    private void checkConsistency(VoltTableRow row) throws IOException
+    private static class ConsistencyChecker
     {
-        if (!row.getString("CLUSTER").equals(m_clusterName))
+        private int m_numRows = 0;
+        private String m_clusterName = null;
+        private String m_databaseName = null;
+
+        private void checkRow(VoltTableRow row) throws IOException
         {
-            String error = "Site: " + row.getLong("CURRENT_HOST_ID") +
-            ", Table: " + row.getString("TABLE") + " has an inconsistent " +
-            "cluster name: " + row.getString("CLUSTER") + " (previous was: " +
-            m_clusterName + ").";
-            throw new IOException(error);
-        }
-        if (!row.getString("DATABASE").equals(m_databaseName))
-        {
-            String error = "Site: " + row.getLong("CURRENT_HOST_ID") +
-            ", Table: " + row.getString("TABLE") + " has an inconsistent " +
-            "database name: " + row.getString("DATABASE") + " (previous was: " +
-            m_databaseName + ").";
-            throw new IOException(error);
+            // Get the comparison cluster/database names from the first row received.
+            if (m_numRows++ == 0) {
+                m_clusterName = row.getString("CLUSTER");
+                m_databaseName = row.getString("DATABASE");
+            }
+            else if (!row.getString("CLUSTER").equals(m_clusterName))
+            {
+                String error = "Site: " + row.getLong("CURRENT_HOST_ID") +
+                ", Table: " + row.getString("TABLE") + " has an inconsistent " +
+                "cluster name: " + row.getString("CLUSTER") + " (previous was: " +
+                m_clusterName + ").";
+                throw new IOException(error);
+            }
+            else if (!row.getString("DATABASE").equals(m_databaseName))
+            {
+                String error = "Site: " + row.getLong("CURRENT_HOST_ID") +
+                ", Table: " + row.getString("TABLE") + " has an inconsistent " +
+                "database name: " + row.getString("DATABASE") + " (previous was: " +
+                m_databaseName + ").";
+                throw new IOException(error);
+            }
         }
     }
 
-    private String m_clusterName;
-    private String m_databaseName;
     private Map<String, TableSaveFileState> m_tableStateMap;
 }

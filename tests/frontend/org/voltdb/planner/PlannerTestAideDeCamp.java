@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,19 +34,19 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
-import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.StatementCompiler;
-import org.voltdb.compiler.TablePartitionMap;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 
@@ -70,69 +70,47 @@ public class PlannerTestAideDeCamp {
      * @throws Exception
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
-        catalog = new Catalog();
-        catalog.execute("add / clusters cluster");
-        catalog.execute("add /clusters[cluster] databases database");
-        db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        proc = db.getProcedures().add(basename);
-
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
-
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
-        //hsql.runDDLFile(schemaPath);
-        TablePartitionMap partitionMap = new TablePartitionMap(compiler);
-        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap);
-        ddl_compiler.loadSchema(schemaPath);
-        ddl_compiler.compileToCatalog(catalog, db);
+        VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
+        catalog = compiler.loadSchema(hsql, no_procs, schemaPath);
+        db = compiler.getCatalogDatabase();
+        proc = db.getProcedures().add(basename);
     }
 
     public void tearDown() {
     }
 
-    public Catalog getCatalog() {
-        return catalog;
+    public Database getDatabase() {
+        return db;
     }
 
     /**
      * Compile a statement and return the head of the plan.
      * @param sql
+     * @param detMode
      */
-    public CompiledPlan compileAdHocPlan(String sql)
+    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
     {
-        compile(sql, 0, null, null, true, false);
+        compile(sql, 0, null, true, false, detMode);
         return m_currentPlan;
     }
 
-    public List<AbstractPlanNode> compile(String sql, int paramCount)
-    {
-        return compile(sql, paramCount, false, null);
-    }
-
-    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {
-        return compile(sql, paramCount, singlePartition, null);
-    }
-
-    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
-        Object partitionBy = null;
-        if (singlePartition) {
-            partitionBy = "Forced single partitioning";
-        }
-        return compile(sql, paramCount, joinOrder, partitionBy, true, false);
+    List<AbstractPlanNode> compile(String sql, int paramCount, boolean inferPartitioning, boolean singlePartition, String joinOrder) {
+        return compile(sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
     }
 
     /**
      * Compile and cache the statement and plan and return the final plan graph.
-     * @param sql
-     * @param paramCount
      */
-    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP)
+    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
     {
-        Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
+        String stmtLabel = "stmt-" + String.valueOf(compileCounter++);
+
+        Statement catalogStmt = proc.getStatements().add(stmtLabel);
         catalogStmt.setSqltext(sql);
-        catalogStmt.setSinglepartition(partitionParameter != null);
-        catalogStmt.setBatched(false);
-        catalogStmt.setParamnum(paramCount);
+        catalogStmt.setSinglepartition(forceSingle);
 
         // determine the type of the query
         QueryType qtype = QueryType.SELECT;
@@ -155,47 +133,38 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
-        QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
-                             hsql, estimates, false);
+        StatementPartitioning partitioning;
+        if (inferPartitioning) {
+            partitioning = StatementPartitioning.inferPartitioning();
+        } else if (forceSingle) {
+            partitioning = StatementPartitioning.forceSP();
+        } else {
+            partitioning = StatementPartitioning.forceMP();
+        }
+        String procName = catalogStmt.getParent().getTypeName();
+        Cluster catalogCluster = catalog.getClusters().get("cluster");
+        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, catalogCluster, db,
+                partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                costModel, null, joinOrder, detMode);
 
         CompiledPlan plan = null;
-        plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null, false);
-        //TODO: Some day, when compilePlan throws a proper PlanningErrorException for all error cases, this test can become an assert.
-        if (plan == null)
-        {
-            String msg = "planner.compilePlan returned null plan";
-            String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null)
-            {
-                msg += " with error: \"" + plannerMsg + "\"";
-            }
-            throw new PlanningErrorException(msg);
+        planner.parse();
+        plan = planner.plan();
+        assert(plan != null);
+
+        // Partitioning optionally inferred from the planning process.
+        if (partitioning.isInferred()) {
+            catalogStmt.setSinglepartition(partitioning.isInferredSingle());
         }
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        // If this is an adhoc query then there won't be any parameters
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(plan.parameters[i].getValue());
+            ParameterValueExpression pve = plan.parameters[i];
+            catalogParam.setJavatype(pve.getValueType().getValue());
+            catalogParam.setIsarray(pve.getParamIsVector());
             catalogParam.setIndex(i);
-        }
-
-        // Output Columns
-        int index = 0;
-        for (SchemaColumn col : plan.columns.getColumns())
-        {
-            Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
-            catColumn.setNullable(false);
-            catColumn.setIndex(index);
-            catColumn.setName(col.getColumnName());
-            catColumn.setType(col.getType().getValue());
-            catColumn.setSize(col.getSize());
-            index++;
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
@@ -207,7 +176,8 @@ public class PlannerTestAideDeCamp {
         //Store the list of parameters types and indexes in the plan node list.
         List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
         for (int i = 0; i < plan.parameters.length; ++i) {
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, plan.parameters[i]);
+            ParameterValueExpression pve = plan.parameters[i];
+            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, pve.getValueType());
             parameters.add(parameter);
         }
 
@@ -229,8 +199,8 @@ public class PlannerTestAideDeCamp {
         // We then stick a serialized version of PlanNodeTree into a PlanFragment
         //
         try {
-            BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json);
-            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"));
+            BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json, true);
+            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"), true);
         } catch (Exception e) {
             e.printStackTrace();
         }

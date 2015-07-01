@@ -1,33 +1,39 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.utils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,13 +41,27 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
+import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.LicenseException;
 
-import com.google.common.net.HostAndPort;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
+import com.google_voltpatches.common.collect.ListMultimap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Multimaps;
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final String licenseFileName = "license.xml";
 
     /**
      * Simple code to copy a file from one place to another...
@@ -50,7 +70,29 @@ public class MiscUtils {
     public static void copyFile(String fromPath, String toPath) throws Exception {
         File inputFile = new File(fromPath);
         File outputFile = new File(toPath);
-        com.google.common.io.Files.copy(inputFile, outputFile);
+        com.google_voltpatches.common.io.Files.copy(inputFile, outputFile);
+    }
+
+    /**
+     * Serialize a file into bytes. Used to serialize catalog and deployment
+     * file for UpdateApplicationCatalog on the client.
+     *
+     * @param path
+     * @return a byte array of the file
+     * @throws IOException
+     *             If there are errors reading the file
+     */
+    public static byte[] fileToBytes(File path) throws IOException {
+        FileInputStream fin = new FileInputStream(path);
+        byte[] buffer = new byte[(int) fin.getChannel().size()];
+        try {
+            if (fin.read(buffer) == -1) {
+                throw new IOException("File " + path.getAbsolutePath() + " is empty");
+            }
+        } finally {
+            fin.close();
+        }
+        return buffer;
     }
 
     /**
@@ -146,7 +188,6 @@ public class MiscUtils {
         // verify the license file exists.
         File licenseFile = new File(pathToLicense);
         if (licenseFile.exists() == false) {
-            hostLog.fatal("Unable to open license file: " + pathToLicense);
             return null;
         }
 
@@ -157,11 +198,56 @@ public class MiscUtils {
         }
 
         // Perform signature verification - detect modified files
-        if (licenseApi.verify() == false) {
-            hostLog.fatal("Unable to load license file: could not verify license signature.");
+        try
+        {
+            if (licenseApi.verify() == false) {
+                hostLog.fatal("Unable to load license file: could not verify license signature.");
+                return null;
+            }
+        }
+        catch (LicenseException lex)
+        {
+            hostLog.fatal(lex.getMessage());
             return null;
         }
 
+        return licenseApi;
+    }
+
+    /**
+     * Instantiate the license api impl based on enterprise/community editions
+     * For enterprise edition, look in default locations ./, ~/, jar file directory
+     * @return a valid API for community and pro editions, or null on error.
+     */
+    public static LicenseApi licenseApiFactory()
+    {
+        String licensePath = System.getProperty("user.dir") + "/" + licenseFileName;
+        LicenseApi licenseApi = MiscUtils.licenseApiFactory(licensePath);
+        if (licenseApi == null) {
+            try {
+                // Get location of jar file
+                String jarLoc = VoltDB.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                // Strip of file name
+                int lastSlashOff = jarLoc.lastIndexOf("/");
+                if (lastSlashOff == -1) {
+                    // Jar is at root directory
+                    licensePath = "/" + licenseFileName;
+                }
+                else {
+                    licensePath = jarLoc.substring(0, lastSlashOff+1) + licenseFileName;
+                }
+                licenseApi = MiscUtils.licenseApiFactory(licensePath);
+            }
+            catch (URISyntaxException e) {
+            }
+        }
+        if (licenseApi == null) {
+            licensePath = System.getProperty("user.home") + "/" + licenseFileName;
+            licenseApi = MiscUtils.licenseApiFactory(licensePath);
+        }
+        if (licenseApi != null) {
+            hostLog.info("Searching for license file located " + licensePath);
+        }
         return licenseApi;
     }
 
@@ -187,6 +273,7 @@ public class MiscUtils {
         if (now.after(licenseApi.expires())) {
             if (licenseApi.isTrial()) {
                 hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
+                hostLog.fatal("Please contact sales@voltdb.com to request a new license.");
                 return false;
             }
             else {
@@ -235,6 +322,23 @@ public class MiscUtils {
                                    expiresStr);
         consoleLog.info(msg);
 
+        // If this is a commercial license, and there is less than or equal to 30 days until expiration,
+        // issue a "days remaining" warning message.
+        long diff = licenseApi.expires().getTimeInMillis() - now.getTimeInMillis();
+        // The original license is only a whole data (no minutes/millis).
+        // There should thus be no issue with daylight savings time,
+        // but just in case, if the diff is a negative number, round up to zero.
+        if (diff < 0)
+        {
+            diff = 0;
+        }
+        long diffDays = diff / (24 * 60 * 60 * 1000);
+        if ((diff > 0) && (diff <= 30))
+        {
+            msg = "Warning, VoltDB commercial license expires in " + diffDays + " day(s).";
+            consoleLog.info(msg);
+        }
+
         return true;
     }
 
@@ -260,8 +364,9 @@ public class MiscUtils {
         // Test for git build string - example: 2.0 voltdb-2.0-70-gb39f43e-dirty
         Pattern p = Pattern.compile("-(\\d*-\\w{8}(?:-.*)?)");
         Matcher m = p.matcher(fullBuildString);
-        if (! m.find())
+        if (! m.find()) {
             return null;
+        }
         build = m.group(1).trim();
         if (build.length() == 0) {
             return null;
@@ -271,29 +376,46 @@ public class MiscUtils {
 
     /**
      * Parse a version string in the form of x.y.z. It doesn't require that
-     * there are exactly three parts in the version. Each part must be seperated
+     * there are exactly three parts in the version. Each part must be separated
      * by a dot.
      *
      * @param versionString
      * @return an array of each part as integer.
      */
-    public static int[] parseVersionString(String versionString) {
+    public static Object[] parseVersionString(String versionString) {
         if (versionString == null) {
             return null;
         }
 
+        // check for whitespace
+        if (versionString.matches("\\s")) {
+            return null;
+        }
+
+        // split on the dots
         String[] split = versionString.split("\\.");
-        int[] v = new int[split.length];
+        if (split.length == 0) {
+            return null;
+        }
+
+        Object[] v = new Object[split.length];
         int i = 0;
         for (String s : split) {
             try {
-                v[i++] = Integer.parseInt(s.trim());
+                v[i] = Integer.parseInt(s);
             } catch (NumberFormatException e) {
-                return null;
+                v[i] = s;
             }
+            i++;
         }
 
-        return v;
+        // check for a numeric beginning
+        if (v[0] instanceof Integer) {
+            return v;
+        }
+        else {
+            return null;
+        }
     }
 
     /**
@@ -305,31 +427,57 @@ public class MiscUtils {
      * @return -1 if left is smaller than right, 0 if they are equal, 1 if left
      *         is greater than right.
      */
-    public static int compareVersions(int[] left, int[] right) {
+    public static int compareVersions(Object[] left, Object[] right) {
         if (left == null || right == null) {
             throw new IllegalArgumentException("Invalid versions");
         }
 
-        int i = 0;
-        for (int part : right) {
-            // left is shorter than right and share the same prefix, must be smaller
-            if (left.length == i) {
-                return -1;
-            }
-
-            if (left[i] > part) {
+        for (int i = 0; i < left.length; i++) {
+            // right is shorter than left and share the same prefix => left must be larger
+            if (right.length == i) {
                 return 1;
-            } else if (left[i] < part) {
-                return -1;
             }
 
-            i++;
+            if (left[i] instanceof Integer) {
+                if (right[i] instanceof Integer) {
+                    // compare two numbers
+                    if (((Integer) left[i]) > ((Integer) right[i])) {
+                        return 1;
+                    } else if (((Integer) left[i]) < ((Integer) right[i])) {
+                        return -1;
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                else {
+                    // numbers always greater than alphanumeric tags
+                    return 1;
+                }
+            }
+            else if (right[i] instanceof Integer) {
+                // alphanumeric tags always less than numbers
+                return -1;
+            }
+            else {
+                // compare two alphanumeric tags lexicographically
+                int cmp = ((String) left[i]).compareTo((String) right[i]);
+                if (cmp != 0) {
+                    return cmp;
+                }
+                else {
+                    // two alphanumeric tags are the same... so keep comparing
+                    continue;
+                }
+            }
         }
 
-        // left is longer than right and share the same prefix, must be greater
-        if (left.length > i) {
-            return 1;
+        // left is shorter than right and share the same prefix, must be less
+        if (left.length < right.length) {
+            return -1;
         }
+
+        // samesies
         return 0;
     }
 
@@ -357,8 +505,14 @@ public class MiscUtils {
         return "";
     }
 
+    // cache whether we're running pro code
+    private static Boolean m_isPro = null;
+    // check if we're running pro code
     public static boolean isPro() {
-        return null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        if (m_isPro == null) {
+            m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        }
+        return m_isPro.booleanValue();
     }
 
     /**
@@ -377,6 +531,15 @@ public class MiscUtils {
      */
     public static int getPortFromHostnameColonPort(String server, int defaultPort) {
         return HostAndPort.fromString(server).getPortOrDefault(defaultPort);
+    }
+
+    /**
+     * @param server String containing a hostname/ip, or a hostname/ip:port.
+     * @param defaultPort If a port isn't specified, use this one.
+     * @return HostAndPort number.
+     */
+    public static HostAndPort getHostAndPortFromHostnameColonPort(String server, int defaultPort) {
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort);
     }
 
     /**
@@ -442,10 +605,22 @@ public class MiscUtils {
      */
     public static synchronized void printPortsInUse(VoltLogger log) {
         try {
-            Process p = Runtime.getRuntime().exec("lsof -i");
+            /*
+             * Don't do DNS resolution, don't use names for port numbers
+             */
+            ProcessBuilder pb = new ProcessBuilder("lsof", "-i", "-n", "-P");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
             java.io.BufferedReader br = new java.io.BufferedReader(reader);
-            String str = null;
+            String str = br.readLine();
+            log.fatal("Logging ports that are bound for listening, " +
+                      "this doesn't include ports bound by outgoing connections " +
+                      "which can also cause a failure to bind");
+            log.fatal("The PID of this process is " + CLibrary.getpid());
+            if (str != null) {
+                log.fatal(str);
+            }
             while((str = br.readLine()) != null) {
                 if (str.contains("LISTEN")) {
                     log.fatal(str);
@@ -458,119 +633,6 @@ public class MiscUtils {
     }
 
     /**
-     * Split SQL statements on semi-colons with quoted string and comment support.
-     *
-     * Degenerate formats such as escape as the last character or unclosed strings are ignored and
-     * left to the SQL parser to complain about. This is a simple string splitter that errs on the
-     * side of not splitting.
-     *
-     * Regexes are avoided.
-     *
-     * Handle single and double quoted strings and backslash escapes. Backslashes escape a single
-     * character.
-     *
-     * Handle double-dash (single line) and C-style (muli-line) comments. Nested C-style comments
-     * are not supported.
-     *
-     * @param sql raw SQL text to split
-     * @return list of individual SQL statements
-     */
-    public static List<String> splitSQLStatements(final String sql) {
-        List<String> statements = new ArrayList<String>();
-        // Use a character array for efficient character-at-a-time scanning.
-        char[] buf = sql.toCharArray();
-        // Set to null outside of quoted segments or the quote character inside them.
-        Character cQuote = null;
-        // Set to null outside of comments or to the string that ends the comment.
-        String sCommentEnd = null;
-        // Index to start of current statement.
-        int iStart = 0;
-        // Index to current character.
-        // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
-        // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
-        int iCur = 0;
-        while (iCur < buf.length) {
-            if (sCommentEnd != null) {
-                // Processing the interior of a comment. Check if at the comment or buffer end.
-                if (iCur >= buf.length - sCommentEnd.length()) {
-                    // Exit
-                    iCur = buf.length;
-                } else if (String.copyValueOf(buf, iCur, sCommentEnd.length()).equals(sCommentEnd)) {
-                    // Move past the comment end.
-                    iCur += sCommentEnd.length();
-                    sCommentEnd = null;
-                } else {
-                    // Keep going inside the comment.
-                    iCur++;
-                }
-            } else if (cQuote != null) {
-                // Processing the interior of a quoted string.
-                if (buf[iCur] == '\\') {
-                    // Skip the '\' escape and the trailing single escaped character.
-                    // Doesn't matter if iCur is beyond the end, it won't be used in that case.
-                    iCur += 2;
-                } else if (buf[iCur] == cQuote) {
-                    // Look at the next character to distinguish a double escaped quote
-                    // from the end of the quoted string.
-                    iCur++;
-                    if (iCur < buf.length) {
-                        if (buf[iCur] != cQuote) {
-                            // Not a double escaped quote - end of quoted string.
-                            cQuote = null;
-                        } else {
-                            // Move past the double escaped quote.
-                            iCur++;
-                        }
-                    }
-                } else {
-                    // Move past an ordinary character.
-                    iCur++;
-                }
-            } else {
-                // Outside of a quoted string - watch for the next separator, quote or comment.
-                if (buf[iCur] == ';') {
-                    // Add terminated statement (if not empty after trimming).
-                    String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-                    if (!statement.isEmpty()) {
-                        statements.add(statement);
-                    }
-                    iStart = iCur + 1;
-                    iCur = iStart;
-                } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
-                    // Start of quoted string.
-                    cQuote = buf[iCur];
-                    iCur++;
-                } else if (iCur <= buf.length - 2) {
-                    // Comment (double-dash or C-style)?
-                    if (buf[iCur] == '-' && buf[iCur+1] == '-') {
-                        // One line double-dash comment start.
-                        sCommentEnd = "\n"; // Works for *IX (\n) and Windows (\r\n).
-                        iCur += 2;
-                    } else if (buf[iCur] == '/' && buf[iCur+1] == '*') {
-                        // Multi-line C-style comment start.
-                        sCommentEnd = "*/";
-                        iCur += 2;
-                    } else {
-                        // Not a comment start, move past this character.
-                        iCur++;
-                    }
-                } else {
-                    // Move past a non-quote/non-separator character.
-                    iCur++;
-                }
-            }
-        }
-        // Get the last statement, if any.
-        if (iStart < buf.length) {
-            String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-            if (!statement.isEmpty()) {
-                statements.add(statement);
-            }
-        }
-        return statements;
-    }
-
-    /**
      * Concatenate an list of arrays of typed-objects
      * @param empty An empty array of the right type used for cloning
      * @param arrayList A list of arrays to concatenate.
@@ -578,7 +640,9 @@ public class MiscUtils {
      */
     public static <T> T[] concatAll(final T[] empty, Iterable<T[]> arrayList) {
         assert(empty.length == 0);
-        if (arrayList.iterator().hasNext() == false) return empty;
+        if (arrayList.iterator().hasNext() == false) {
+            return empty;
+        }
 
         int len = 0;
         for (T[] subArray : arrayList) {
@@ -591,5 +655,264 @@ public class MiscUtils {
             pos += subArray.length;
         }
         return result;
+    }
+
+    public static void deleteRecursively( File file) {
+        if (file == null || !file.exists() || !file.canRead() || !file.canWrite()) {
+            return;
+        }
+        if (file.isDirectory() && file.canExecute()) {
+            for (File f: file.listFiles()) {
+                deleteRecursively(f);
+            }
+        }
+        file.delete();
+    }
+
+    /**
+     * Get the resident set size, in mb, for the voltdb server on the other end of the client.
+     * If the client is connected to multiple servers, return the max individual rss across
+     * the cluster.
+     */
+    public static long getMBRss(Client client) {
+        assert(client != null);
+        long rssMax = 0;
+        try {
+            ClientResponse r = client.callProcedure("@Statistics", "MEMORY", 0);
+            VoltTable stats = r.getResults()[0];
+            stats.resetRowPosition();
+            while (stats.advanceRow()) {
+                long rss = stats.getLong("RSS") / 1024;
+                if (rss > rssMax) {
+                    rssMax = rss;
+                }
+            }
+            return rssMax;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            System.exit(-1);
+            return 0;
+        }
+    }
+
+    /**
+     * Zip the two lists up into a multimap
+     * @return null if one of the lists is empty
+     */
+    public static <K, V> Multimap<K, V> zipToMap(List<K> keys, List<V> values)
+    {
+        if (keys.isEmpty() || values.isEmpty()) {
+            return null;
+        }
+
+        Iterator<K> keyIter = keys.iterator();
+        Iterator<V> valueIter = values.iterator();
+        ArrayListMultimap<K, V> result = ArrayListMultimap.create();
+
+        while (keyIter.hasNext() && valueIter.hasNext()) {
+            result.put(keyIter.next(), valueIter.next());
+        }
+
+        // In case there are more values than keys, assign the rest of the
+        // values to the first key
+        K firstKey = keys.get(0);
+        while (valueIter.hasNext()) {
+            result.put(firstKey, valueIter.next());
+        }
+
+        return result;
+    }
+
+    /**
+     * Create an ArrayListMultimap that uses TreeMap as the container map, so order is preserved.
+     */
+    public static <K extends Comparable, V> ListMultimap<K, V> sortedArrayListMultimap()
+    {
+        Map<K, Collection<V>> map = Maps.newTreeMap();
+        return Multimaps.newListMultimap(map, new Supplier<List<V>>() {
+            @Override
+            public List<V> get()
+            {
+                return Lists.newArrayList();
+            }
+        });
+    }
+
+    /**
+     * Serialize and then deserialize an invocation so that it has serializedParams set for command logging if the
+     * invocation is sent to a local site.
+     * @return The round-tripped version of the invocation
+     * @throws IOException
+     */
+    public static StoredProcedureInvocation roundTripForCL(StoredProcedureInvocation invocation) throws IOException
+    {
+        if (invocation.getSerializedParams() == null) {
+            ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
+            invocation.flattenToBuffer(buf);
+            buf.flip();
+
+            StoredProcedureInvocation rti = new StoredProcedureInvocation();
+            rti.initFromBuffer(buf);
+            return rti;
+        } else {
+            return invocation;
+        }
+    }
+
+    /**
+     * Utility class to convert and hold a human-friendly time value and unit
+     * string.  For now it only deals with hours, minutes or seconds and their
+     * fractions.
+     * TODO: Parameterize conversion to optionally support other units, e.g. ms.
+     */
+    public static class HumanTime
+    {
+        /// The scaled time value.
+        public final double value;
+        /// The scale unit name ("hour", "minute", or "second").
+        public final String unit;
+
+        /**
+         * Private constructor. Use static methods to construct.
+         * @param value the scaled time value.
+         * @param unit the unit name (unchecked)
+         */
+        private HumanTime(double value, String unit)
+        {
+            this.value = value;
+            this.unit = unit;
+        }
+
+        /**
+         * Scale a nanoseconds number for human consumption.
+         * @param nanos time in nanoseconds.
+         */
+        public static HumanTime scale(double nanos)
+        {
+            // Start with hours and adjust down until it's >1. Stop at seconds.
+            double value = nanos / 1000000000 / 3600;
+            String unit;
+            if (value >= 1) {
+                unit = "hour";
+            }
+            else{
+                value *= 60.0;
+                if (value >= 1) {
+                    unit = "minute";
+                }
+                else {
+                    value *= 60.0;
+                    unit = "second";
+                }
+            }
+            return new HumanTime(value, unit);
+        }
+
+        /**
+         * Format a string for human consumption based on raw nanoseconds.
+         * @param nanos time in nanoseconds.
+         * @return formatted string.
+         */
+        public static String formatTime(double nanos)
+        {
+            HumanTime tu = scale(nanos);
+            return String.format("%.2f %ss", tu.value, tu.unit);
+        }
+
+        /**
+         * Format a rate string, for example <value>/second based on an input value
+         * and duration in nanoseconds. Specify the itemUnit value if you would
+         * like to insert a character or word (add your own leading space),
+         * e.g. "%" or " Megawatts", between the rate and the slash ('/').
+         * @param value arbitrary value for rate calculation.
+         * @param nanos time in nanoseconds.
+         * @param itemUnit unit name for value
+         * @return formatted string.
+         */
+        public static String formatRate(double value, double nanos, String itemUnit)
+        {
+            // Multiply by 60 so that a seconds duration becomes a per minute rate, and so on..
+            HumanTime tu = scale((nanos * 60) / value);
+            return String.format("%.2f%s/%s", 60 / tu.value, itemUnit, tu.unit);
+        }
+
+        /**
+         * Format a rate string, for example <value>/second based on an input value
+         * and duration in nanoseconds.
+         * @param value arbitrary value for rate calculation.
+         * @param nanos time in nanoseconds.
+         * @return formatted string.
+         */
+        public static String formatRate(double value, double nanos)
+        {
+            return formatRate(value, nanos, "");
+        }
+    }
+
+    public static String formatUptime(long uptimeInMs)
+    {
+        long remainingMs = uptimeInMs;
+        long days = TimeUnit.MILLISECONDS.toDays(remainingMs);
+        remainingMs -= TimeUnit.DAYS.toMillis(days);
+        long hours = TimeUnit.MILLISECONDS.toHours(remainingMs);
+        remainingMs -= TimeUnit.HOURS.toMillis(hours);
+        long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingMs);
+        remainingMs -= TimeUnit.MINUTES.toMillis(minutes);
+        long seconds = TimeUnit.MILLISECONDS.toSeconds(remainingMs);
+        remainingMs -= TimeUnit.SECONDS.toMillis(seconds);
+        return String.format("%d days %02d:%02d:%02d.%03d",
+                days, hours, minutes, seconds, remainingMs);
+    }
+
+    /**
+     * Delays retrieval until first use, but holds onto a boolean value to
+     * minimize overhead. The delayed retrieval allows tests to set properties
+     * dynamically and have them obeyed.
+     */
+    public static class BooleanSystemProperty
+    {
+        private final String key;
+        private Boolean value = null;
+        private final boolean defaultValue;
+
+        /**
+         * Construct system property retriever with default value of false
+         * @param key  key name
+         */
+        public BooleanSystemProperty(String key)
+        {
+            this(key, false);
+        }
+
+        /**
+         * Construct system property retriever with default value provided by caller
+         * @param key  key name
+         */
+        public BooleanSystemProperty(String key, boolean defaultValue)
+        {
+            this.key = key;
+            this.defaultValue = defaultValue;
+        }
+
+        /**
+         * Retrieves once and caches boolean value. Uses default if not available.
+         * @return true if value or default is true ("true" or "yes" string)
+         */
+        public boolean isTrue()
+        {
+            if (this.value == null) {
+                // First time - retrieve and convert the value or use the default value.
+                String stringValue = System.getProperty(this.key);
+                if (stringValue != null) {
+                    this.value = (stringValue.equalsIgnoreCase("true") || stringValue.equalsIgnoreCase("yes"));
+                }
+                else {
+                    this.value = this.defaultValue;
+                }
+            }
+            assert this.value != null;
+            return this.value;
+        }
     }
 }

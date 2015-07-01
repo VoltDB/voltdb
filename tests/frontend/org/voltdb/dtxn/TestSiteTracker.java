@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -47,7 +47,7 @@ public class TestSiteTracker extends TestCase
         helper.addSite(site101, 2);
         helper.addSite(site102, 3);
 
-        SiteTracker tracker = helper.getSiteTracker();
+        SiteTracker tracker = helper.getSiteTrackerForSnapshot();
         assertEquals(site1, tracker.getSitesForPartition(0).get(0));
         assertEquals(site2, tracker.getSitesForPartition(1).get(0));
         assertEquals(site101, tracker.getSitesForPartition(2).get(0));
@@ -83,7 +83,7 @@ public class TestSiteTracker extends TestCase
         helper.addSite(site101, 0);
         helper.addSite(site102, 1);
 
-        SiteTracker tracker = helper.getSiteTracker();
+        SiteTracker tracker = helper.getSiteTrackerForSnapshot();
         assertTrue(tracker.getSitesForPartition(0).contains(site1));
         assertTrue(tracker.getSitesForPartition(0).contains(site101));
         assertTrue(tracker.getSitesForPartition(1).contains(site2));
@@ -126,7 +126,7 @@ public class TestSiteTracker extends TestCase
         helper.addSite(site102, 1);
         helper.addSite(site103, 1);
 
-        SiteTracker tracker = helper.getSiteTracker();
+        SiteTracker tracker = helper.getSiteTrackerForSnapshot();
         List<Long> host0 = tracker.getSitesForHost(0);
         assertFalse(host0.contains(site0));
         assertTrue(host0.contains(site1));
@@ -161,7 +161,7 @@ public class TestSiteTracker extends TestCase
         helper.addSite(site101, 0);
         helper.addSite(site102, 1);
 
-        SiteTracker tracker = helper.getSiteTracker();
+        SiteTracker tracker = helper.getSiteTrackerForSnapshot();
         Set<Long> exec_sites = tracker.getAllSites();
         assertFalse(exec_sites.contains(site0));
         assertTrue(exec_sites.contains(site1));

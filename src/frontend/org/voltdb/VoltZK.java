@@ -1,22 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -27,10 +28,11 @@ import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
@@ -44,12 +46,22 @@ public class VoltZK {
 
     public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
+    //This node doesn't mean as much as it used to, it is accurate at startup
+    //but isn't updated after elastic join. We use the cartographer for most things
+    //now
     public static final String topology = "/db/topology";
-    public static final String replicationrole = "/db/replicationrole";
-    public static final String deploymentBytes = "/db/deploymentBytes";
+    public static final String replicationconfig = "/db/replicationconfig";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";
+    public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
+    public static final String exportGenerations = "/db/export_generations";
+    public static final String importerBase = "/db/import";
+
+    /*
+     * Processes that want to block catalog updates create children here
+     */
+    public static final String catalogUpdateBlockers = "/db/catalog_update_blockers";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
@@ -73,6 +85,7 @@ public class VoltZK {
     public static final String nodes_currently_snapshotting = "/db/nodes_currently_snapshotting";
     public static final String restore = "/db/restore";
     public static final String restore_barrier = "/db/restore_barrier";
+    public static final String restore_barrier2 = "/db/restore_barrier2";
     public static final String restore_snapshot_id = "/db/restore/snapshot_id";
     public static final String request_truncation_snapshot = "/db/request_truncation_snapshot";
     public static final String snapshot_truncation_master = "/db/snapshot_truncation_master";
@@ -80,7 +93,7 @@ public class VoltZK {
     public static final String truncation_snapshot_path = "/db/truncation_snapshot_path";
     public static final String user_snapshot_request = "/db/user_snapshot_request";
     public static final String user_snapshot_response = "/db/user_snapshot_response";
-    public static final String initial_catalog_txnid = "/db/initial_catalog_txnid";
+    public static final String commandlog_init_barrier = "/db/commmandlog_init_barrier";
 
     // leader election
     public static final String iv2masters = "/db/iv2masters";
@@ -89,6 +102,22 @@ public class VoltZK {
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
     public static final String leaders_globalservice = "/db/leaders/globalservice";
+    public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
+
+    // flag of initialization process complete
+    public static final String init_completed = "/db/init_completed";
+
+    // start action of node in the current system (ephemeral)
+    public static final String start_action = "/db/start_action";
+    public static final String start_action_node = ZKUtil.joinZKPath(start_action, "node_");
+
+    public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "join_blocker");
+    public static final String rejoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "rejoin_blocker");
+    public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
+
+
+    // Synchronized State Machine
+    public static final String syncStateMachine = "/db/synchronized_states";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -101,7 +130,11 @@ public class VoltZK {
             iv2mpi,
             leaders,
             leaders_initiators,
-            leaders_globalservice
+            leaders_globalservice,
+            lastKnownLiveNodes,
+            syncStateMachine,
+            catalogUpdateBlockers,
+            request_truncation_snapshot
     };
 
     /**
@@ -198,5 +231,54 @@ public class VoltZK {
             replicas.add(HSId);
         }
         return replicas;
+    }
+
+    public static void createStartActionNode(ZooKeeper zk, final int hostId, StartAction action) {
+        byte [] startActionBytes = null;
+        try {
+            startActionBytes = action.toString().getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            VoltDB.crashLocalVoltDB("Utf-8 encoding is not supported in current platform", false, e);
+        }
+
+        zk.create(VoltZK.start_action_node + hostId, startActionBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL,
+                new ZKUtil.StringCallback(), null);
+    }
+
+    public static int getHostIDFromChildName(String childName) {
+        return Integer.parseInt(childName.split("_")[1]);
+    }
+
+    public static void createCatalogUpdateBlocker(ZooKeeper zk, String node)
+    {
+        try {
+            zk.create(node,
+                      null,
+                      Ids.OPEN_ACL_UNSAFE,
+                      CreateMode.EPHEMERAL);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NODEEXISTS) {
+                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker", true, e);
+            }
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to create catalog update blocker", true, e);
+        }
+    }
+
+    public static boolean removeCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger log)
+    {
+        try {
+            ZKUtil.deleteRecursively(zk, node);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NONODE) {
+                if (log != null) {
+                    log.error("Failed to remove catalog udpate blocker: " + e.getMessage(), e);
+                }
+                return false;
+            }
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return true;
     }
 }

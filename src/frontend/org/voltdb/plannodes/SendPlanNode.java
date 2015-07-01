@@ -1,31 +1,33 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class SendPlanNode extends AbstractPlanNode {
-
-    // used for planning
-    public boolean isMultiPartition = false;
 
     public SendPlanNode() {
         super();
@@ -43,15 +45,31 @@ public class SendPlanNode extends AbstractPlanNode {
         assert(m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        assert (input_schema.equals(m_outputSchema));
+
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
-        m_outputSchema.sortByTveIndex();
+        // output schema for SendPlanNode should not ever be changed
+    }
+
+
+    @Override
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+        assert(estimates != null);
+
+        // Recursively compute and collect stats from the child node, but don't add any costs for this Send node.
+        // Let the parent "RecievePlanNode" account for any (theoretical) cost differences due to how much data
+        // different plans must distribute as intermediate results.
+        // Don't bother accounting for how much data is sent as the FINAL result -- when there is no RecivePlanNode --
+        // that cost is constant for a given query, so it would be a wash when comparing any two plans for that query.
+        m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = 0;
     }
 
     @Override
@@ -68,4 +86,17 @@ public class SendPlanNode extends AbstractPlanNode {
 
 
     }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
+    }
+
+    @Override
+    public String getUpdatedTable() {
+        assert(m_children.size() == 1);
+        AbstractPlanNode child = m_children.get(0);
+        return child.getUpdatedTable();
+    }
+
 }

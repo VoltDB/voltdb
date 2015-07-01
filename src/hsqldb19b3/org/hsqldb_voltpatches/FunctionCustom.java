@@ -169,6 +169,10 @@ public class FunctionCustom extends FunctionSQL {
         customRegularFuncMap.put(Tokens.LTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.RTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.LEFT, FUNC_LEFT);
+        // A VoltDB extension to support WEEKOFYEAR, WEEKDAY function
+        customRegularFuncMap.put(Tokens.WEEKOFYEAR, FUNC_EXTRACT);
+        customRegularFuncMap.put(Tokens.WEEKDAY, FUNC_EXTRACT);
+        // End of VoltDB extension
 
         //
         customRegularFuncMap.put(Tokens.IDENTITY, FUNC_IDENTITY);
@@ -236,9 +240,6 @@ public class FunctionCustom extends FunctionSQL {
         customValueFuncMap.put(Tokens.NOW, FUNC_CURRENT_TIMESTAMP);
     }
 
-    private static String DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR = "Custom Function";
-    private static String DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD = "Custom Function Special Case";
-
     private int extractSpec;
 
     public static FunctionSQL newCustomFunction(String token, int tokenType) {
@@ -277,6 +278,9 @@ public class FunctionCustom extends FunctionSQL {
                 FunctionSQL function = new FunctionSQL(id);
 
                 function.parseList = tripleParamList;
+                // A VoltDB extension -- to make the third parameter optional
+                function.parseListAlt = doubleParamList;
+                // End of VoltDB extension
 
                 return function;
             }
@@ -302,14 +306,25 @@ public class FunctionCustom extends FunctionSQL {
 
                 case Tokens.DAYNAME :
                     function.extractSpec = Tokens.DAY_OF_WEEK;
+                    // A VoltDB extension to customize the SQL function set support
                     function.voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD;
+                    // End of VoltDB extension
                     break;
 
                 case Tokens.NONTHNAME :
                     function.extractSpec = Tokens.MONTH_NAME;
+                    // A VoltDB extension to customize the SQL function set support
                     function.voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD;
+                    // End of VoltDB extension
                     break;
 
+                 // A VoltDB extension to customize the SQL function set support
+                case Tokens.WEEK :
+                case Tokens.WEEKOFYEAR:
+                    function.extractSpec = Tokens.WEEK_OF_YEAR;
+                    break;
+                // case Tokens.WEEKDAY is handled by default case
+                // End of VoltDB extension
                 case Tokens.DAYOFMONTH :
                     function.extractSpec = Tokens.DAY_OF_MONTH;
                     break;
@@ -351,9 +366,13 @@ public class FunctionCustom extends FunctionSQL {
         switch (id) {
 
             case FUNC_CONCAT :
+                // A VoltDB extension to let CONCAT support more than 2 parameters
+                // this line should be never called because volt check FunctionForVoltDB first
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                break;
+                // End of VoltDB extension
             case FUNC_LEFT :
                 parseList = doubleParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_DATABASE :
@@ -365,7 +384,9 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_ISREADONLYDATABASE :
             case FUNC_ISREADONLYDATABASEFILES :
                 parseList = emptyParamList;
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_EXTRACT :
@@ -376,25 +397,27 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_TRIM_CHAR :
                 name      = Tokens.T_TRIM;
                 parseList = singleParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_OVERLAY_CHAR :
                 name      = Tokens.T_OVERLAY;
                 parseList = quadParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_IDENTITY :
                 name      = Tokens.T_IDENTITY;
                 parseList = emptyParamList;
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_SYSDATE :
                 name      = Tokens.T_SYSDATE;
                 parseList = noParamList;
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_TIMESTAMPADD :
@@ -408,7 +431,9 @@ public class FunctionCustom extends FunctionSQL {
                     Tokens.SQL_TSI_YEAR, Tokens.COMMA, Tokens.QUESTION,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_TIMESTAMPDIFF :
@@ -422,17 +447,23 @@ public class FunctionCustom extends FunctionSQL {
                     Tokens.SQL_TSI_YEAR, Tokens.COMMA, Tokens.QUESTION,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_TRUNCATE :
                 parseList = doubleParamList;
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_TO_CHAR :
                 parseList = doubleParamList;
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_TIMESTAMP :
@@ -441,17 +472,23 @@ public class FunctionCustom extends FunctionSQL {
                     Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_PI :
                 parseList = emptyParamList;
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_RAND :
                 parseList = optionalIntegerParamList;
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_ACOS :
@@ -469,24 +506,40 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_SIGN :
             case FUNC_SOUNDEX :
             case FUNC_ASCII :
-            case FUNC_CHAR :
             case FUNC_HEXTORAW :
             case FUNC_RAWTOHEX :
+                // A VoltDB extension to customize the SQL function set support
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // $FALL-THROUGH$
+                // End of VoltDB extension
+            case FUNC_CHAR :
             case FUNC_SPACE :
                 parseList = singleParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_ROUND :
-            case FUNC_BITAND :
-            case FUNC_BITOR :
-            case FUNC_BITXOR :
             case FUNC_DIFFERENCE :
+            // A VoltDB extension to customize the SQL function set support
+            case FUNC_DATEDIFF :
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // $FALL-THROUGH$
+            case FUNC_BITAND :
+                parseList = doubleParamList;
+                break;
+            case FUNC_BITOR :
+                parseList = doubleParamList;
+                break;
+            case FUNC_BITXOR :
+                parseList = doubleParamList;
+                break;
+            case FUNC_REPEAT :
+            /* disable 2 lines ...
             case FUNC_REPEAT :
             case FUNC_DATEDIFF :
+            ... disabled 2 lines */
+            // End of VoltDB extension
             case FUNC_RIGHT :
                 parseList = doubleParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_LOCATE :
@@ -495,12 +548,13 @@ public class FunctionCustom extends FunctionSQL {
                     Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA,
                     Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // End of VoltDB extension
                 break;
 
             case FUNC_REPLACE :
                 parseList = tripleParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             default :
@@ -508,7 +562,6 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    @Override
     public void setArguments(Expression[] nodes) {
 
         switch (funcType) {
@@ -549,7 +602,6 @@ public class FunctionCustom extends FunctionSQL {
         super.setArguments(nodes);
     }
 
-    @Override
     public Expression getFunctionExpression() {
 
         switch (funcType) {
@@ -572,7 +624,6 @@ public class FunctionCustom extends FunctionSQL {
         return super.getFunctionExpression();
     }
 
-    @Override
     Object getValue(Session session, Object[] data) {
 
         switch (funcType) {
@@ -777,7 +828,7 @@ public class FunctionCustom extends FunctionSQL {
                 }
             }
 
-            // fall through
+            // $FALL-THROUGH$
             case FUNC_TRUNCATE : {
                 if (data[0] == null || data[1] == null) {
                     return null;
@@ -1018,11 +1069,14 @@ public class FunctionCustom extends FunctionSQL {
                         return null;
                     }
                 }
-
+                /************************* Volt DB Extensions *************************/
                 if (nodes[0].dataType.isIntegralType()) {
-                    int v = 0;
-                    int a = ((Number) data[0]).intValue();
-                    int b = ((Number) data[0]).intValue();
+                    if (data[0] == null || data[1] == null)
+                        return null;
+
+                    long v = 0;
+                    long a = ((Number) data[0]).longValue();
+                    long b = ((Number) data[1]).longValue();
 
                     switch (funcType) {
 
@@ -1039,7 +1093,8 @@ public class FunctionCustom extends FunctionSQL {
                             break;
                     }
 
-                    return ValuePool.getInt(v);
+                    return ValuePool.getLong(v);
+                    /**********************************************************************/
                 } else {
 
                     /** @todo - for binary */
@@ -1133,7 +1188,6 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -1222,7 +1276,7 @@ public class FunctionCustom extends FunctionSQL {
                 funcType           = FUNC_TIMESTAMPDIFF;
             }
 
-            // fall through
+            // $FALL-THROUGH$
             case FUNC_TIMESTAMPDIFF : {
                 if (nodes[1].dataType == null) {
                     nodes[1].dataType = Type.SQL_TIMESTAMP;
@@ -1358,7 +1412,7 @@ public class FunctionCustom extends FunctionSQL {
                     throw Error.error(ErrorCode.X_42561);
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case FUNC_ACOS :
             case FUNC_ASIN :
             case FUNC_ATAN :
@@ -1426,22 +1480,15 @@ public class FunctionCustom extends FunctionSQL {
 
                 break;
             }
+            // A VoltDB extension: Hsqldb uses Integer type by default,
+            // VoltDB wants to support BigInt instead
             case FUNC_BITAND :
             case FUNC_BITOR :
             case FUNC_BITXOR : {
-                for (int i = 0; i < nodes.length; i++) {
-                    if (nodes[i].dataType == null) {
-                        nodes[i].dataType = Type.SQL_INTEGER;
-                    } else if (nodes[i].dataType.typeCode
-                               != Types.SQL_INTEGER) {
-                        throw Error.error(ErrorCode.X_42561);
-                    }
-                }
-
-                dataType = Type.SQL_INTEGER;
-
+                voltResolveToBigintTypesForBitwise();
                 break;
             }
+            // End of VoltDB extension
             case FUNC_ASCII : {
                 if (nodes[0].dataType == null) {
                     nodes[0].dataType = Type.SQL_VARCHAR;
@@ -1547,6 +1594,11 @@ public class FunctionCustom extends FunctionSQL {
                     throw Error.error(ErrorCode.X_42561);
                 }
 
+                // A VoltDB extension to customize the SQL function set support
+                if (nodes[1].dataType == null) {
+                    nodes[1].dataType = Type.SQL_INTEGER;
+                }
+                // End of VoltDB extension
                 dataType = isChar ? Type.SQL_VARCHAR
                                   : Type.SQL_VARBINARY;;
 
@@ -1599,7 +1651,6 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    @Override
     public String getSQL() {
 
         switch (funcType) {
@@ -1673,8 +1724,42 @@ public class FunctionCustom extends FunctionSQL {
                     .append(nodes[0].getSQL()).append(Tokens.T_COMMA)     //
                     .append(nodes[1].getSQL()).append(')').toString();
             }
+            // A VoltDB extension to customize SQL function support
+            case FUNC_CHAR :
+            case FUNC_SPACE :
+                return new StringBuffer(name).append('(')                 //
+                    .append(nodes[0].getSQL()).append(')').toString();
+            case FUNC_REPEAT :
+            case FUNC_LEFT :
+            case FUNC_RIGHT :
+            case FUNC_BITAND :
+            case FUNC_BITOR :
+            case FUNC_BITXOR: {
+                return new StringBuffer(name).append('(')         //
+                        .append(nodes[0].getSQL()).append(Tokens.T_COMMA)     //
+                        .append(nodes[1].getSQL()).append(')').toString();
+            }
+            case FUNC_REPLACE : {
+                return new StringBuffer(name).append('(').append(
+                    nodes[0].getSQL()).append(Tokens.T_COMMA).append(
+                    nodes[1].getSQL()).append(Tokens.T_COMMA).append(
+                    nodes[2].getSQL()).append(')').toString();
+            }
+            // End of VoltDB extension
             default :
+            // A VoltDB extension to customize SQL function support
+            // This delegation to super (usually?) fails with a runtime exception.
+            //*enable to debug */ System.out.println("DEBUGGING: super.getSQL FUNCTION " + name + " VALUE " + funcType);
+            // End of VoltDB extension
                 return super.getSQL();
         }
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    public static final String FUNC_CONCAT_ID_STRING = String.valueOf(FunctionCustom.FUNC_CONCAT);
+
+    private static String DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR = "Custom Function";
+    private static String DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD = "Custom Function Special Case";
+    /**********************************************************************/
 }

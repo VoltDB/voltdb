@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,10 +25,9 @@ package org.voltdb.regressionsuites;
 
 import java.io.BufferedReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.IOException;
-
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /* class pipes a process's output to a file name.
@@ -38,7 +37,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
     public class PipeToFile extends Thread {
         final static String m_initToken = "Server completed init";
         final static String m_rejoinToken = "Node rejoin completed";
-        final static String m_initiatorID = "Initializing initiator ID:";
+        final static String m_joinToken = "Node join completed";
+        final static String m_hostID = "Host id of this node is: ";
 
         FileWriter m_writer ;
         BufferedReader m_input;
@@ -50,6 +50,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
         final String m_token;
         int m_hostId = Integer.MAX_VALUE;
         long m_initTime;
+
+        // optional watcher interface
+        OutputWatcher m_watcher = null;
 
         // memoize the process here so we can easily check for process death
         Process m_process;
@@ -76,6 +79,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
             return m_process;
         }
 
+        /**
+         * Inject a watcher to scan output.
+         */
+        void setWatcher(OutputWatcher watcher) {
+            m_watcher = watcher;
+        }
+
         public int getHostId() {
             synchronized(this) {
                 return m_hostId;
@@ -94,8 +104,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
                         continue;
                     }
 
+                    // let the optional watcher take a peak
+                    if (m_watcher != null) {
+                        m_watcher.handleLine(data);
+                    }
+
                     // look for the non-exec site id
-                    if (data.contains(m_initiatorID)) {
+                    if (data.contains(m_hostID)) {
                         // INITIALIZING INITIATOR ID: 1, SITEID: 0
                         String[] split = data.split(" ");
                         synchronized(this) {

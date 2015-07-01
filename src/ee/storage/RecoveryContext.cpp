@@ -1,34 +1,41 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "storage/RecoveryContext.h"
 #include "common/RecoveryProtoMessageBuilder.h"
 #include "common/DefaultTupleSerializer.h"
+#include "common/TupleOutputStream.h"
+#include "common/TupleOutputStreamProcessor.h"
 #include "storage/persistenttable.h"
 
 #include <cstdio>
 using namespace std;
 
 namespace voltdb {
-RecoveryContext::RecoveryContext(PersistentTable *table, int32_t tableId) :
-        m_table(table),
-        m_firstMessage(true),
-        m_iterator(m_table->iterator()),
-        m_tableId(tableId),
-        m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
+RecoveryContext::RecoveryContext(
+        PersistentTable &table,
+        PersistentTableSurgeon &surgeon,
+        int32_t partitionId,
+        TupleSerializer &serializer,
+        int32_t tableId) :
+    TableStreamerContext(table, surgeon, partitionId, serializer),
+    m_firstMessage(true),
+    m_iterator(getTable().iterator()),
+    m_tableId(tableId),
+    m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
 }
 
 /*
@@ -48,7 +55,7 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
     // us with an inconsistent iterator).
     if (m_firstMessage)
     {
-        m_iterator = m_table->iterator();
+        m_iterator = getTable().iterator();
         m_firstMessage = false;
 
     }
@@ -68,19 +75,42 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
     }
     DefaultTupleSerializer serializer;
     //Use allocated tuple count to size stuff at the other end
-    uint32_t allocatedTupleCount = static_cast<uint32_t>(m_table->allocatedTupleCount());
+    uint32_t allocatedTupleCount = static_cast<uint32_t>(getTable().allocatedTupleCount());
     RecoveryProtoMsgBuilder message(
             m_recoveryPhase,
             m_tableId,
             allocatedTupleCount,
             out,
             &m_serializer,
-            m_table->schema());
-    TableTuple tuple(m_table->schema());
+            getTable().schema());
+    TableTuple tuple(getTable().schema());
     while (message.canAddMoreTuples() && m_iterator.next(tuple)) {
         message.addTuple(tuple);
     }
     message.finalize();
     return true;
 }
+
+/**
+ * Mandatory TableStreamContext override.
+ */
+int64_t RecoveryContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
+                                          std::vector<int> &retPositions) {
+    if (outputStreams.size() != 1) {
+        throwFatalException("RecoveryContext::handleStreamMore: Expect 1 output stream "
+                            "for recovery, received %ld", outputStreams.size());
+    }
+    /*
+     * Table ids don't change during recovery because
+     * catalog changes are not allowed.
+     */
+    bool hasMore = nextMessage(&outputStreams[0]);
+    // Non-zero if some tuples remain, we're just not sure how many.
+    int64_t remaining = (hasMore ? 1 : 0);
+    for (size_t i = 0; i < outputStreams.size(); i++) {
+        retPositions.push_back((int)outputStreams.at(i).position());
+    }
+    return remaining;
+}
+
 }

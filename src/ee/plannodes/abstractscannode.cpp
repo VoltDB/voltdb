@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -45,98 +45,52 @@
 
 #include "abstractscannode.h"
 
-#include "storage/table.h"
-#include "catalog/table.h"
-#include "catalog/column.h"
+#include "execution/VoltDBEngine.h"
+#include "storage/TableCatalogDelegate.hpp"
 
-using namespace json_spirit;
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
-AbstractScanPlanNode::AbstractScanPlanNode(int32_t id)
-    : AbstractPlanNode(id), m_predicate(NULL)
+AbstractScanPlanNode::~AbstractScanPlanNode() { }
+
+Table* AbstractScanPlanNode::getTargetTable() const
 {
-    m_targetTable = NULL;
-}
-
-AbstractScanPlanNode::AbstractScanPlanNode()
-    : AbstractPlanNode(), m_predicate(NULL)
-{
-    m_targetTable = NULL;
-}
-
-AbstractScanPlanNode::~AbstractScanPlanNode()
-{
-    delete m_predicate;
-}
-
-void
-AbstractScanPlanNode::setPredicate(AbstractExpression* predicate)
-{
-    assert(!m_predicate);
-    if (m_predicate != predicate)
-    {
-        delete m_predicate;
+    if (m_tcd == NULL) {
+        return NULL;
     }
-    m_predicate = predicate;
+    return m_tcd->getTable();
 }
 
-AbstractExpression*
-AbstractScanPlanNode::getPredicate() const
+std::string AbstractScanPlanNode::debugInfo(const std::string &spacer) const
 {
-    return m_predicate;
-}
-
-Table*
-AbstractScanPlanNode::getTargetTable() const
-{
-    return m_targetTable;
-}
-
-void
-AbstractScanPlanNode::setTargetTable(Table* table)
-{
-    m_targetTable = table;
-}
-
-string
-AbstractScanPlanNode::getTargetTableName() const
-{
-    return m_targetTableName;
-}
-
-void
-AbstractScanPlanNode::setTargetTableName(string table_name)
-{
-    m_targetTableName = table_name;
-}
-
-string
-AbstractScanPlanNode::debugInfo(const string &spacer) const
-{
-    ostringstream buffer;
-    buffer << spacer << "TargetTable[" << m_targetTableName << "]\n";
+    std::ostringstream buffer;
+    buffer << spacer << "TargetTable[" << m_target_table_name << "]\n";
     return buffer.str();
 }
 
-void
-AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    json_spirit::Value targetTableNameValue =
-        json_spirit::find_value(obj, "TARGET_TABLE_NAME");
-    if (targetTableNameValue == json_spirit::Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractScanPlanNode::loadFromJSONObject:"
-                                      " Couldn't find TARGET_TABLE_NAME value");
+    m_target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
+
+    m_isEmptyScan = obj.hasNonNullKey("PREDICATE_FALSE");
+
+    // Set the predicate (if any) only if it's not a trivial FALSE expression
+    if (!m_isEmptyScan) {
+        m_predicate.reset(loadExpressionFromJSONObject("PREDICATE", obj));
     }
 
-    m_targetTableName = targetTableNameValue.get_str();
+    m_isSubQuery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
 
-    json_spirit::Value predicateValue = json_spirit::find_value(obj, "PREDICATE");
-    if (!(predicateValue == json_spirit::Value::null))
-    {
-        json_spirit::Object predicateObject = predicateValue.get_obj();
-        m_predicate = AbstractExpression::buildExpressionTree(predicateObject);
+    if (m_isSubQuery) {
+        m_tcd = NULL;
+    } else {
+        VoltDBEngine* engine = ExecutorContext::getEngine();
+        m_tcd = engine->getTableDelegate(m_target_table_name);
+        if ( ! m_tcd) {
+            VOLT_ERROR("Failed to retrieve target table from execution engine for PlanNode '%s'",
+                       debug().c_str());
+            //TODO: throw something
+        }
     }
 }
+
+} // namespace voltdb

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -84,8 +84,7 @@ public class TestGiantDeleteSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestGiantDeleteSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
-        project.addPartitionInfo("ASSET", "OBJECT_DETAIL_ID");
+        project.addSchema(Insert.class.getResource("giant-delete-ddl.sql"));
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
 

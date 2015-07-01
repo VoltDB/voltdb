@@ -31,6 +31,10 @@
 
 package org.hsqldb_voltpatches.util;
 
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.CardLayout;
@@ -52,10 +56,6 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.WindowListener;
 import java.awt.image.MemoryImageSource;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 
 import org.hsqldb_voltpatches.lib.java.JavaSystem;
 
@@ -102,7 +102,6 @@ implements ActionListener, WindowListener, KeyListener {
      *
      * @param c
      */
-    @Override
     public void connect(Connection c) {
 
         if (c == null) {
@@ -276,7 +275,7 @@ implements ActionListener, WindowListener, KeyListener {
         System.out.println("");
         System.out.println(
             "1. Example: java org.hsqldb_voltpatches.util.ZaurusDatabaseManager +");
-        System.out.println("  -driver 'org.hsqldb.jdbcDriver' +");
+        System.out.println("  -driver 'org.hsqldb_voltpatches.jdbcDriver' +");
         System.out.println("  -url 'jdbc:hsqldb:test'");
         System.out.println(
             "2. Example: java org.hsqldb_voltpatches.util.ZaurusDatabaseManager +");
@@ -287,7 +286,6 @@ implements ActionListener, WindowListener, KeyListener {
      * Method declaration
      *
      */
-    @Override
     public void main() {
 
         fMain = new Frame("HSQLDB Database Manager for Zaurus");
@@ -380,7 +378,6 @@ implements ActionListener, WindowListener, KeyListener {
      *
      * @param k
      */
-    @Override
     public void keyTyped(KeyEvent k) {
 
         // Strg+Enter or Shift+Enter executes the actual SQL statement in command panel
@@ -392,7 +389,6 @@ implements ActionListener, WindowListener, KeyListener {
         }
     }
 
-    @Override
     public void keyPressed(KeyEvent k) {
 
         //  System.out.println("Key pressed: " + k.getKeyCode());
@@ -404,7 +400,6 @@ implements ActionListener, WindowListener, KeyListener {
      *
      * @param ev
      */
-    @Override
     public void actionPerformed(ActionEvent ev) {
 
         String s = ev.getActionCommand();
@@ -668,7 +663,6 @@ implements ActionListener, WindowListener, KeyListener {
         fMain.pack();
     }
 
-    @Override
     protected void refreshTree() {
         super.refreshTree();
         eEditor.refresh(cConn);

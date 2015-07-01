@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -60,7 +60,7 @@ public class InsertNewOrder extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
 
-    public VoltTable[] run(long no_o_id, long no_d_id, short no_w_id) {
+    public VoltTable[] run(long no_o_id, byte no_d_id, short no_w_id) {
         voltQueueSQL(insert, no_o_id, no_d_id, no_w_id);
         return voltExecuteSQL();
     }

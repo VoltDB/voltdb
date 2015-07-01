@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,137 +25,92 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import junit.framework.TestCase;
-
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.DistinctPlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
-public class TestPushDownAggregates extends TestCase {
-    private PlannerTestAideDeCamp aide;
-
-    private List<AbstractPlanNode> compile(String sql, int paramCount,
-                                     boolean singlePartition)
-    {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn = aide.compile(sql, paramCount, singlePartition);
-        }
-        catch (PlanningErrorException ex) {
-            throw ex;
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        return pn;
-    }
-
+public class TestPushDownAggregates extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(getClass().getResource("testplans-groupby-ddl.sql"),
-                                         "testpushdownaggregates");
-
-        // Set all tables except for D1 to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            if (!t.getTypeName().equalsIgnoreCase("d1")) {
-                t.setIsreplicated(false);
-            }
-            // partition column PKEY for Table t2
-            if (!t.getTypeName().equalsIgnoreCase("t2")) {
-                t.setIsreplicated(false);
-                t.setPartitioncolumn(t.getColumns().get("PKEY"));
-            }
-        }
+        setupSchema(getClass().getResource("testplans-groupby-ddl.sql"),
+                    "testpushdownaggregates", false);
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
-    }
-
-    public void testCountStarOnReplicatedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from D1", 0, true);
-        checkPushedDown(pn, false,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
-    }
-
-    public void testCountStarOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-        checkPushedDown(pn, true,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
     public void testCountOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(A1) from T1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(A1) from T1");
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT},
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
     public void testSumOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT sum(A1) from T1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT sum(A1) from T1");
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM},
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
     public void testMinOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT MIN(A1) from T1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(A1) from T1");
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_MIN},
                         new ExpressionType[] {ExpressionType.AGGREGATE_MIN});
     }
 
     public void testMaxOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT MAX(A1) from T1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(A1) from T1");
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_MAX},
                         new ExpressionType[] {ExpressionType.AGGREGATE_MAX});
     }
 
     public void testAvgOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT AVG(A1) from T1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT AVG(A1) from T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
         checkPushedDown(pn, true,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_AVG},
-                        null);
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_COUNT},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
     }
 
     public void testCountStarWithGroupBy() {
-        List<AbstractPlanNode> pn = compile("SELECT A1, count(*) FROM T1 GROUP BY A1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT A1, count(*) FROM T1 GROUP BY A1");
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
-    public void testDistinctOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT DISTINCT A1 from T1", 0, false);
-        checkPushedDownDistinct(pn, true);
-    }
+    public void testDistinct() {
+        // On partitioned table
+        String sql1,sql2;
+        sql1 = "SELECT DISTINCT A1 from T1";
+        sql2 = "SELECT A1 from T1 group by A1";
+        checkQueriesPlansAreTheSame(sql1, sql2);
 
-    public void testDistinctOnReplicatedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT DISTINCT D1_NAME from D1", 0, false);
-        checkPushedDownDistinct(pn, false);
+        // On replicated table
+        sql1 = "SELECT DISTINCT D1_NAME from D1";
+        sql2 = "SELECT D1_NAME from D1 group by D1_NAME";
+        checkQueriesPlansAreTheSame(sql1, sql2);
     }
 
    public void testAllPushDownAggregates() {
         List<AbstractPlanNode> pn =
-            compile("SELECT A1, count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY)" +
-                    " FROM T1 GROUP BY A1", 0, false);
+                compileToFragments("SELECT A1, count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY)" +
+                    " FROM T1 GROUP BY A1");
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
                                               ExpressionType.AGGREGATE_COUNT,
@@ -171,65 +126,111 @@ public class TestPushDownAggregates extends TestCase {
 
     public void testAllAggregates() {
         List<AbstractPlanNode> pn =
-            compile("SELECT count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY), avg(PKEY)" +
-                    " FROM T1", 0, false);
+            compileToFragments("SELECT count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
                                               ExpressionType.AGGREGATE_COUNT,
                                               ExpressionType.AGGREGATE_SUM,
                                               ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX},
+                        true);
+    }
+
+    public void testAllAggregatesAVG1() {
+        List<AbstractPlanNode> pn =
+            compileToFragments("SELECT count(*), count(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
+                                              ExpressionType.AGGREGATE_COUNT,
+                                              ExpressionType.AGGREGATE_MIN,
                                               ExpressionType.AGGREGATE_MAX,
-                                              ExpressionType.AGGREGATE_AVG},
-                        null);
+                                              ExpressionType.AGGREGATE_SUM},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
+    }
+
+    public void testAllAggregatesAVG2() {
+        List<AbstractPlanNode> pn =
+            compileToFragments("SELECT count(*), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_COUNT},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
     }
 
     public void testGroupByNotInDisplayColumn() {
-        try {
-            compile("SELECT count(A1) FROM T1 GROUP BY A1", 0, false);
-        } catch (PlanningErrorException e) {
-            // There shouldn't be any plan
-            return;
-        }
-        fail("This statement should not generate any plan.");
+        List<AbstractPlanNode> pn = compileToFragments ("SELECT count(A1) FROM T1 GROUP BY A1");
+        checkPushedDown(pn, true,
+                new ExpressionType[] {ExpressionType.AGGREGATE_COUNT},
+                new ExpressionType[] {ExpressionType.AGGREGATE_SUM}, true);
+
     }
 
     public void testGroupByWithoutAggregates() {
-        List<AbstractPlanNode> pn = compile("SELECT A1 FROM T1 GROUP BY A1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT A1 FROM T1 GROUP BY A1");
         assertFalse(pn.get(0).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
-        assertTrue(pn.get(1).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
+        // We used to be careful to send raw rows to the coordinator instead of first
+        // de-duping them into groups -- solely because there were no aggregation functions
+        // requested. What did that have to do with anything? Assert that we're past that phase.
+        assertFalse(pn.get(1).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
     }
 
     public void testCountDistinct() {
-        List<AbstractPlanNode> pn = compile("SELECT count(distinct A1) from T1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct A1) from T1");
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT},
                         null);
     }
 
     public void testSumDistinct() {
-        List<AbstractPlanNode> pn = compile("SELECT sum(distinct A1) from T1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("SELECT sum(distinct A1) from T1");
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM},
                         null);
     }
 
-    public void testSinglePartOffset() {
-        List<AbstractPlanNode> pn =
-                compile("select PKEY from T1 order by PKEY limit 5 offset 1", 0, true);
-        assertEquals(1, pn.size());
-        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+    //TODO: Not sure what this has to do with PushDownAggregates -- move this test case?
+    public void testSinglePartOffset()
+    {
+        AbstractPlanNode pn = compile("select PKEY from T1 order by PKEY limit 5 offset 1");
+        assertTrue(pn.toExplainPlanString().contains("LIMIT"));
     }
 
     public void testMultiPartOffset() {
-        List<AbstractPlanNode> pn =
-                compile("select PKEY from T1 order by PKEY limit 5 offset 1", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("select PKEY from T1 order by PKEY limit 5 offset 1");
         assertEquals(2, pn.size());
         assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
         assertTrue(pn.get(1).toExplainPlanString().contains("LIMIT"));
     }
 
     public void testLimit() {
-        List<AbstractPlanNode> pn = compile("select PKEY from T1 order by PKEY limit 5", 0, false);
+        List<AbstractPlanNode> pn = compileToFragments("select PKEY from T1 order by PKEY limit 5");
         PlanNodeList pnl = new PlanNodeList(pn.get(0));
         System.out.println(pnl.toDOTString("FRAG0"));
         pnl = new PlanNodeList(pn.get(1));
@@ -237,28 +238,81 @@ public class TestPushDownAggregates extends TestCase {
     }
 
     public void testMultiPartLimitPushdown() {
-        List<AbstractPlanNode> pn =
-                compile("select I, count(*) as tag from T2 group by I order by I limit 1", 0, false);
+        List<AbstractPlanNode> pns;
+        // push down the limit because of the order by
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
+        checkLimitPushedDown(pns, true);
 
-        for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
-            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
-        }
+        // order by does not cover all group by columns
+        pns = compileToFragments("select B3, C3, count(*) as tag from T3 group by B3, C3 order by B3 limit 1");
+        checkLimitPushedDown(pns, false);
+
+
+        // T1 is partitioned on PKEY column
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
+        checkLimitPushedDown(pns, false);
+
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag+1 limit 1");
+        checkLimitPushedDown(pns, false);
+
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by count(*)+1 limit 1");
+        checkLimitPushedDown(pns, false);
+
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1, count(*)+1 limit 1");
+        checkLimitPushedDown(pns, false);
+
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1, ABS(count(*)+1) limit 1");
+        checkLimitPushedDown(pns, false);
+
+        //
+        // T3 is partitioned on A3 column: group by partition column is another story
+        //
+        pns = compileToFragments("select A3, count(*) as tag from T3 group by A3 order by tag limit 1");
+        checkLimitPushedDown(pns, true);
+
+        // function on partition column
+        pns = compileToFragments("select ABS(A3), count(*) as tag from T3 group by ABS(A3) order by tag limit 1");
+        checkLimitPushedDown(pns, false);
+
+
+        // Add a replicate table to test
+        pns = compileToFragments("select A1, count(*) as tag from R1 group by A1 order by tag limit 1");
+        assertEquals(1, pns.size());
+        assertTrue(pns.get(0).toExplainPlanString().contains("LIMIT"));
+
+        //
+        // Partition table join, limit push down
+        //
+        pns = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag desc limit 10");
+        checkLimitPushedDown(pns, true);
+
+        pns = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag+1 desc limit 10");
+        checkLimitPushedDown(pns, true);
+
+        // One of the partition table is from sub-query
+        pns = compileToFragments("select A3, B4, count(CT) as tag " +
+                " from (select A3, count(*) CT from T3 GROUP BY A3) TEMP, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag desc limit 10");
+        checkLimitPushedDown(pns, true);
+
     }
 
-    public void testMultiPartLimitPushdownByOne() {
-        List<AbstractPlanNode> pn =
-                compile("select I, count(*) as tag from T2 group by I order by 1 limit 1", 0, false);
-
-        for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
-            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
+    private void checkLimitPushedDown(List<AbstractPlanNode> pn, boolean pushdown) {
+        assertEquals(2, pn.size());
+        // inline limit with order by node
+        assertTrue(pn.get(0).toExplainPlanString().contains("inline LIMIT"));
+        if (pushdown) {
+            assertTrue(pn.get(1).toExplainPlanString().contains("inline LIMIT"));
+        } else {
+            assertFalse(pn.get(1).toExplainPlanString().contains("inline LIMIT"));
         }
     }
 
     public void testMultiPartNoLimitPushdown() {
         List<AbstractPlanNode> pn =
-                compile("select I, count(*) as tag from T2 group by I order by tag, I limit 1", 0, false);
+                compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag, A1 limit 1");
 
         for ( AbstractPlanNode nd : pn) {
             System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
@@ -269,7 +323,7 @@ public class TestPushDownAggregates extends TestCase {
 
     public void testMultiPartNoLimitPushdownByTwo() {
         List<AbstractPlanNode> pn =
-                compile("select I, count(*) as tag from T2 group by I order by 2 limit 1", 0, false);
+                compileToFragments("select A1, count(*) as tag from T1 group by A1 order by 2 limit 1");
 
         for ( AbstractPlanNode nd : pn) {
             System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
@@ -285,70 +339,71 @@ public class TestPushDownAggregates extends TestCase {
      *
      * @param np
      *            The generated plan
-     * @param isMultiPart
-     *            Whether or not the plan is distributed
+     * @param isAggInlined
+     *            Whether or not the aggregate node can be inlined
      * @param aggTypes
      *            The expected aggregate types for the original aggregate node.
      * @param pushDownTypes
      *            The expected aggregate types for the top aggregate node after
      *            pushing the original aggregate node down.
      */
-    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
+    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isAggInlined,
                                  ExpressionType[] aggTypes, ExpressionType[] pushDownTypes) {
-        assertTrue(pn.size() > 0);
+        checkPushedDown(pn, isAggInlined, aggTypes, pushDownTypes, false);
+    }
 
-        AbstractPlanNode p = pn.get(0).getChild(0);
-        assertTrue(p instanceof HashAggregatePlanNode);
-        if (pushDownTypes != null) {
-            for (ExpressionType type : pushDownTypes) {
-                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-                                                     type.toString() + "\""));
-            }
-        } else {
-            for (ExpressionType type : aggTypes) {
-                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-                                                     type.toString() + "\""));
-            }
-        }
+    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isAggInlined,
+            ExpressionType[] aggTypes, ExpressionType[] pushDownTypes,
+            boolean hasProjectionNode) {
 
-        if (isMultiPart) {
-            assertTrue(pn.size() == 2);
-            p = pn.get(1).getChild(0);
-        } else {
+        // Aggregate push down check has to run on two fragments
+        assertTrue(pn.size() == 2);
+
+        AbstractPlanNode p = pn.get(0).getChild(0);;
+        if (hasProjectionNode) {
+            // Complex aggregation or optimized AVG
+            assertTrue(p instanceof ProjectionPlanNode);
             p = p.getChild(0);
         }
 
-        if (pushDownTypes != null) {
-            assertTrue(p instanceof HashAggregatePlanNode);
-            for (ExpressionType type : aggTypes) {
-                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-                                                     type.toString() + "\""));
-            }
-        } else {
+        assertTrue(p instanceof AggregatePlanNode);
+        String fragmentString = p.toJSONString();
+        ExpressionType[] topTypes = (pushDownTypes != null) ? pushDownTypes : aggTypes;
+        for (ExpressionType type : topTypes) {
+            assertTrue(fragmentString.contains("\"AGGREGATE_TYPE\":\"" + type.toString() + "\""));
+        }
+
+        // Check the pushed down aggregation
+        p = pn.get(1).getChild(0);
+
+        if (pushDownTypes == null) {
             assertTrue(p instanceof AbstractScanPlanNode);
+            return;
+        }
+
+        if (isAggInlined) {
+            // If it's table count, it won't have inline plan node.
+            // See ENG-6131
+            if(p instanceof TableCountPlanNode) {
+                return;
+            }
+            assertTrue(p instanceof AbstractScanPlanNode);
+            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+
+            if (p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null) {
+                p  = p.getInlinePlanNode(PlanNodeType.AGGREGATE);
+            } else {
+                p  = p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+            }
+
+        } else {
+            assertTrue(p instanceof AggregatePlanNode);
+        }
+        fragmentString = p.toJSONString();
+        for (ExpressionType type : aggTypes) {
+            assertTrue(fragmentString.contains("\"AGGREGATE_TYPE\":\"" + type.toString() + "\""));
         }
     }
 
-    /**
-     * Check if the distinct node is pushed-down in the given plan.
-     *
-     * @param np
-     *            The generated plan
-     * @param isMultiPart
-     *            Whether or not the plan is distributed
-     */
-    private void checkPushedDownDistinct(List<AbstractPlanNode> pn, boolean isMultiPart) {
-        assertTrue(pn.size() > 0);
-
-        AbstractPlanNode p = pn.get(0).getChild(0).getChild(0);
-        assertTrue(p instanceof DistinctPlanNode);
-        assertTrue(p.toJSONString().contains("\"DISTINCT\""));
-
-        if (isMultiPart) {
-            assertTrue(pn.size() == 2);
-            p = pn.get(1).getChild(0);
-            assertTrue(p instanceof DistinctPlanNode);
-            assertTrue(p.toJSONString().contains("\"DISTINCT\""));
-        }
-    }
 }

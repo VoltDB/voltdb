@@ -145,7 +145,7 @@ public class ParserDML extends ParserDQL {
                         break;
                     }
 
-                    // fall through
+                    // $FALL-THROUGH$
                 } else {
                     rewind(position);
 
@@ -153,7 +153,7 @@ public class ParserDML extends ParserDQL {
                 }
             }
 
-            // fall through
+            // $FALL-THROUGH$
             case Tokens.OVERRIDING : {
                 if (token.tokenType == Tokens.OVERRIDING) {
                     read();
@@ -176,7 +176,7 @@ public class ParserDML extends ParserDQL {
                 }
             }
 
-            // fall through
+            // $FALL-THROUGH$
             case Tokens.VALUES : {
                 read();
 
@@ -440,8 +440,17 @@ public class ParserDML extends ParserDQL {
             rangeVariables = resolver.rangeVariables;
         }
 
+        // VoltDB Extension:
+        // This needs to be done before building the compiled statement
+        // so that parameters in LIMIT or OFFSET are retrieved from
+        // the compileContext
+        SortAndSlice sas = voltGetSortAndSliceForDelete(rangeVariables);
+
         StatementDMQL cs = new StatementDML(session, table, rangeVariables,
                                             compileContext, restartIdentity);
+
+        // VoltDB Extension:
+        voltAppendDeleteSortAndSlice((StatementDML)cs, sas);
 
         return cs;
     }
@@ -1053,4 +1062,41 @@ public class ParserDML extends ParserDQL {
 
         return cs;
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    /**
+     * This is a Volt extension to allow
+     *   DELETE FROM tab ORDER BY c LIMIT 1
+     * Adds a SortAndSlice object to the statement if the next tokens
+     * are ORDER BY, LIMIT or OFFSET.
+     * @param deleteStmt
+     */
+    private SortAndSlice voltGetSortAndSliceForDelete(RangeVariable[] rangeVariables) {
+        SortAndSlice sas = XreadOrderByExpression();
+        if (sas == null || sas == SortAndSlice.noSort)
+            return SortAndSlice.noSort;
+
+        // Resolve columns in the ORDER BY clause.  This code modified
+        // from how compileDelete resolves columns in its WHERE clause
+        for (int i = 0; i < sas.exprList.size(); ++i) {
+            Expression e = (Expression)sas.exprList.get(i);
+            HsqlList unresolved =
+                e.resolveColumnReferences(RangeVariable.emptyArray, null);
+
+            unresolved = Expression.resolveColumnSet(rangeVariables,
+                    unresolved, null);
+
+            ExpressionColumn.checkColumnsResolved(unresolved);
+            e.resolveTypes(session, null);
+        }
+
+        return sas;
+    }
+
+    private void voltAppendDeleteSortAndSlice(StatementDML deleteStmt, SortAndSlice sas) {
+        deleteStmt.setSortAndSlice(sas);
+    }
+    /**********************************************************************/
+
 }

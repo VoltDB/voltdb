@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -54,38 +54,18 @@
 #include <list>
 #include <cassert>
 
+#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
+#include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
 #include "stx/btree_set.h"
 #include "common/ThreadLocalPool.h"
 
-class CopyOnWriteTest_CopyOnWriteIterator;
-class CompactionTest_BasicCompaction;
-class CompactionTest_CompactionWithCopyOnWrite;
-
 namespace voltdb {
-
-class TableIndex;
-class TableColumn;
-class TableTuple;
-class TableFactory;
-class TableIterator;
-class CopyOnWriteIterator;
-class CopyOnWriteContext;
-class UndoLog;
-class ReadWriteSet;
-class SerializeInput;
-class SerializeOutput;
-class TableStats;
-class StatsSource;
-class StreamBlock;
-class Topend;
-class TupleBlock;
-class PersistentTableUndoDeleteAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -106,6 +86,7 @@ class Table {
     friend class StatsSource;
     friend class TupleBlock;
     friend class PersistentTableUndoDeleteAction;
+    friend class PersistentTableUndoTruncateTableAction;
 
   private:
     Table();
@@ -139,14 +120,23 @@ class Table {
     // ------------------------------------------------------------------
     virtual TableIterator& iterator() = 0;
     virtual TableIterator *makeIterator() = 0;
+    virtual TableIterator& iteratorDeletingAsWeGo() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
-    virtual bool insertTuple(TableTuple &source) = 0;
-    virtual bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes) = 0;
-    virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    // The fallible flag is used to denote a change to a persistent table
+    // which is part of a long transaction that has been vetted and can
+    // never fail (e.g. violate a constraint).
+    // The initial use case is a live catalog update that changes table schema and migrates tuples
+    // and/or adds a materialized view.
+    // Constraint checks are bypassed and the change does not make use of "undo" support.
+    virtual bool deleteTuple(TableTuple &tuple, bool fallible=true) = 0;
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    // -- Most callers should be using TempTable::insertTempTuple, anyway.
+    virtual bool insertTuple(TableTuple &tuple) = 0;
 
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
@@ -170,13 +160,6 @@ class Table {
         return m_tupleCount;
     }
 
-    /*
-     * Count of tuples that actively contain user data
-     */
-    int64_t usedTupleCount() const {
-        return m_usedTupleCount;
-    }
-
     virtual int64_t allocatedTupleMemory() const {
         return allocatedBlockCount() * m_tableAllocationSize;
     }
@@ -190,11 +173,17 @@ class Table {
         return m_nonInlinedMemorySize;
     }
 
+    virtual int tupleLimit() const {
+        return INT_MIN;
+    }
+
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------
     int columnIndex(const std::string &name) const;
-    std::vector<std::string> getColumnNames();
+    const std::vector<std::string>& getColumnNames() const {
+        return m_columnNames;
+    }
 
     inline const TupleSchema* schema() const {
         return m_schema;
@@ -208,19 +197,35 @@ class Table {
         return m_columnCount;
     }
 
-    const std::string *columnNames() {
-        return m_columnNames;
-    }
-
     // ------------------------------------------------------------------
     // INDEXES
     // ------------------------------------------------------------------
-    virtual int indexCount() const                      { return 0; }
-    virtual int uniqueIndexCount() const                { return 0; }
-    virtual std::vector<TableIndex*> allIndexes() const { return std::vector<TableIndex*>(); }
-    virtual TableIndex *index(std::string name)         { return NULL; }
-    virtual TableIndex *primaryKeyIndex()               { return NULL; }
-    virtual const TableIndex *primaryKeyIndex() const   { return NULL; }
+    virtual int indexCount() const {
+        return static_cast<int>(m_indexes.size());
+    }
+
+    virtual int uniqueIndexCount() const {
+        return static_cast<int>(m_uniqueIndexes.size());
+    }
+
+    // returned via shallow vector copy -- seems good enough.
+    const std::vector<TableIndex*>& allIndexes() const { return m_indexes; }
+
+    virtual TableIndex *index(std::string name);
+
+    virtual TableIndex *primaryKeyIndex() {
+        return m_pkeyIndex;
+    }
+    virtual const TableIndex *primaryKeyIndex() const {
+        return m_pkeyIndex;
+    }
+
+    void configureIndexStats(CatalogId databaseId);
+
+    // mutating indexes
+    virtual void addIndex(TableIndex *index);
+    virtual void removeIndex(TableIndex *index);
+    virtual void setPrimaryKeyIndex(TableIndex *index);
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -252,15 +257,19 @@ class Table {
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    void loadTuplesFromNoHeader(SerializeInput &serialize_in,
-                                Pool *stringPool = NULL);
+    void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
+                                Pool *stringPool = NULL,
+                                ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                                bool shouldDRStreamRows = false);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
-    void loadTuplesFrom(SerializeInput &serialize_in,
-                        Pool *stringPool = NULL);
+    void loadTuplesFrom(SerializeInputBE &serialize_in,
+                        Pool *stringPool = NULL,
+                        ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                        bool shouldDRStreamRows = false);
 
 
     // ------------------------------------------------------------------
@@ -318,46 +327,71 @@ class Table {
         return false;
     }
 
+    /**
+     * These metrics are needed by some iterators.
+     */
+    uint32_t getTupleLength() const {
+        return m_tupleLength;
+    }
+    int getTableAllocationSize() const {
+        return m_tableAllocationSize;
+    }
+    uint32_t getTuplesPerBlock() const {
+        return m_tuplesPerBlock;
+    }
+
+    virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
+        throwFatalException("Validate partitioning unsupported on this table type");
+        return 0;
+    }
+
 protected:
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(TableTuple &tuple) {
+    virtual void processLoadedTuple(TableTuple &tuple,
+                                    ReferenceSerializeOutput *uniqueViolationOutput,
+                                    int32_t &serializedTupleCount,
+                                    size_t &tupleCountPosition,
+                                    bool shouldDRStreamRow) {
     };
 
-    virtual void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
+    virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {
         throwFatalException("Unsupported operation");
     }
 
 public:
 
     virtual bool equals(voltdb::Table *other);
-    virtual voltdb::TableStats* getTableStats();
+    virtual voltdb::TableStats* getTableStats() = 0;
 
 protected:
     // virtual block management functions
     virtual void nextFreeTuple(TableTuple *tuple) = 0;
+    virtual void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "May not use freeLastScanedBlock with streamed tables or persistent tables.");
+    }
 
     Table(int tableAllocationTargetSize);
     void resetTable();
 
     bool compactionPredicate() {
-        assert(m_tuplesPinnedByUndo == 0);
-        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
+        //Unfortunate work around for the fact that multiple undo quantums cause this to happen
+        //Ideally there would be one per transaction and we could hard fail or
+        //the undo log would only trigger compaction once per transaction
+        if (m_tuplesPinnedByUndo != 0) {
+            return false;
+        }
+        return allocatedTupleCount() - activeTupleCount() > std::max(static_cast<int64_t>((m_tuplesPerBlock * 3)), (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100);  /* using the integer percentage */
     }
 
-    void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
+    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
     // per table-type initialization
     virtual void onSetColumns() {
     };
-
-    double loadFactor() {
-        return static_cast<double>(activeTupleCount()) /
-            static_cast<double>(allocatedTupleCount());
-    }
-
 
     // ------------------------------------------------------------------
     // DATA
@@ -367,17 +401,14 @@ protected:
     TableTuple m_tempTuple;
     boost::scoped_array<char> m_tempTupleMemory;
 
-    // not temptuple. these are for internal use.
-    TableTuple m_tmpTarget1, m_tmpTarget2;
     TupleSchema* m_schema;
 
     // schema as array of string names
-    std::string* m_columnNames;
+    std::vector<std::string> m_columnNames;
     char *m_columnHeaderData;
     int32_t m_columnHeaderSize;
 
     uint32_t m_tupleCount;
-    uint32_t m_usedTupleCount;
     uint32_t m_tuplesPinnedByUndo;
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;
@@ -392,11 +423,18 @@ protected:
     bool m_ownsTupleSchema;
 
     const int m_tableAllocationTargetSize;
+    // This is one block size allocated for this table, equals = m_tuplesPerBlock * m_tupleLength
     int m_tableAllocationSize;
+
+    // indexes
+    std::vector<TableIndex*> m_indexes;
+    std::vector<TableIndex*> m_uniqueIndexes;
+    TableIndex *m_pkeyIndex;
 
   private:
     int32_t m_refcount;
     ThreadLocalPool m_tlPool;
+    int m_compactionThreshold;
 };
 
 }

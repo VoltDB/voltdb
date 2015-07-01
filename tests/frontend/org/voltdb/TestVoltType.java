@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -181,6 +181,20 @@ public class TestVoltType extends TestCase {
             caught = true;
         }
         assertTrue(caught);
+
+        // Test timestamp before epoch
+        usec = -923299922232L;
+        ts1 = new TimestampType(usec);
+        assertEquals(usec, ts1.getTime());
+        ts1string = ts1.toString();
+        ts1prime = new TimestampType(ts1string);
+        assertEquals(usec, ts1prime.getTime());
+
+
+        date = "1966-06-24 10:30:26.123012";
+        ts3 = new TimestampType(date);
+        assertEquals(date, ts3.toString());
+
     }
 
     /* Compare some values that differ by microseconds and by full millis */
@@ -252,6 +266,24 @@ public class TestVoltType extends TestCase {
             }
         }
         fail();
+    }
+
+    public void testTimestampStringRoundTrip() {
+        String[] date_str = {"1900-01-01",
+                             "2000-02-03",
+                             "2100-04-05",
+                             "2012-12-31",
+                             "2001-10-25",
+        };
+        for (int ii=0; ii<date_str.length; ++ii) {
+            try{
+                String str = new TimestampType(date_str[ii]).toString();
+                assertEquals(date_str[ii]+" 00:00:00.000000", str);
+            } catch (Exception e){
+                e.printStackTrace();
+                fail();
+            }
+        }
     }
 
 }

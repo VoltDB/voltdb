@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 
 public class MemoryStats extends StatsSource {
@@ -79,6 +80,8 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("STRINGMEMORY", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("TUPLECOUNT", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("POOLEDMEMORY", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("JAVAMAXHEAP", VoltType.INTEGER));
     }
 
     @Override
@@ -113,6 +116,9 @@ public class MemoryStats extends StatsSource {
         rowValues[columnNameToIndex.get("STRINGMEMORY")] = totals.stringMem;
         rowValues[columnNameToIndex.get("TUPLECOUNT")] = totals.tupleCount;
         rowValues[columnNameToIndex.get("POOLEDMEMORY")] = totals.pooledMem / 1024;
+        //in kb to make math simpler with other mem values.
+        rowValues[columnNameToIndex.get("PHYSICALMEMORY")] = PlatformProperties.getPlatformProperties().ramInMegabytes * 1024;
+        rowValues[columnNameToIndex.get("JAVAMAXHEAP")] = Runtime.getRuntime().maxMemory() / 1024;
         super.updateStatsRow(rowKey, rowValues);
     }
 

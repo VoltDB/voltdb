@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -54,19 +54,12 @@
 
 namespace voltdb {
 
-class SerializeInput;
-class SerializeOutput;
-
 class TupleValueExpression : public AbstractExpression {
   public:
-    TupleValueExpression(int value_idx, std::string tableName, std::string colName)
-        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE)
+    TupleValueExpression(const int tableIdx, const int valueIdx)
+        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE), tuple_idx(tableIdx), value_idx(valueIdx)
     {
-        VOLT_TRACE("OptimizedTupleValueExpression %d %d", m_type, value_idx);
-        this->tuple_idx = 0;
-        this->value_idx = value_idx;
-        this->table_name = tableName;
-        this->column_name = colName;
+        VOLT_TRACE("OptimizedTupleValueExpression %d using tupleIdx %d valueIdx %d", m_type, tableIdx, valueIdx);
     };
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -78,7 +71,7 @@ class TupleValueExpression : public AbstractExpression {
                                               "eval:"
                                               " Couldn't find tuple 1 (possible index scan planning error)");
             }
-            return tuple1->getNValue(this->value_idx);
+            return tuple1->getNValue(value_idx);
         }
         else {
             assert(tuple2);
@@ -88,33 +81,22 @@ class TupleValueExpression : public AbstractExpression {
                                               "eval:"
                                               " Couldn't find tuple 2 (possible index scan planning error)");
             }
-            return tuple2->getNValue(this->value_idx);
+            return tuple2->getNValue(value_idx);
         }
     }
 
     std::string debugInfo(const std::string &spacer) const {
         std::ostringstream buffer;
-        buffer << spacer << "Optimized Column Reference[" << this->value_idx << "]\n";
+        buffer << spacer << "Optimized Column Reference[" << tuple_idx << ", " << value_idx << "]\n";
         return (buffer.str());
     }
 
     int getColumnId() const {return this->value_idx;}
 
-    std::string getTableName() {
-        return table_name;
-    }
-
-    // Don't know this index until the executor examines the expression.
-    void setTupleIndex(int idx) {
-        tuple_idx = idx;
-    }
-
   protected:
 
-    int tuple_idx;           // which tuple. defaults to tuple1
-    int value_idx;           // which (offset) column of the tuple
-    std::string table_name;
-    std::string column_name;
+    const int tuple_idx;           // which tuple. defaults to tuple1
+    const int value_idx;           // which (offset) column of the tuple
 };
 
 }

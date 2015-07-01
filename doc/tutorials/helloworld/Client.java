@@ -15,11 +15,11 @@ public class Client {
         /*
          * Load the database.
          */
-        myApp.callProcedure("Insert", "Hello", "World", "English");
-        myApp.callProcedure("Insert", "Bonjour", "Monde", "French");
-        myApp.callProcedure("Insert", "Hola", "Mundo", "Spanish");
-        myApp.callProcedure("Insert", "Hej", "Verden", "Danish");
-        myApp.callProcedure("Insert", "Ciao", "Mondo", "Italian");
+        myApp.callProcedure("Insert", "English", "Hello", "World");
+        myApp.callProcedure("Insert", "French", "Bonjour", "Monde");
+        myApp.callProcedure("Insert", "Spanish", "Hola", "Mundo");
+        myApp.callProcedure("Insert", "Danish", "Hej", "Verden");
+        myApp.callProcedure("Insert", "Italian", "Ciao", "Mondo");
 
         /*
          * Retrieve the message.

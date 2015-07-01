@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -70,6 +70,24 @@ public interface ClientResponse {
     public static final byte RESPONSE_UNKNOWN = -7;
 
     /**
+     * Status code indicating that the transaction is being restarted.  These are used internally to Volt
+     * and shouldn't leak out to actual clients.
+     */
+    public static final byte TXN_RESTART = -8;
+
+    /**
+     * Status code indicating that the transaction completed and did not roll back, but some part
+     * of the operation didn't succeed. For example, this is returned when a snapshot restore operation
+     * fails to restore one table out of many.
+     */
+    public static final byte OPERATIONAL_FAILURE = -9;
+
+    /**
+     * Default value for the user specified app status code field
+     */
+    public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;
+
+    /**
      * Retrieve the status code returned by the server
      * @return Status code
      */
@@ -104,14 +122,6 @@ public interface ClientResponse {
     public String getAppStatusString();
 
     /**
-     * Get the <code>Exception</code> that caused the stored procedure to fail and roll back.
-     * There is no guarantee that an <code>Exception</code> will be provided.
-     * @return The <code>Exception</code> that caused the procedure to fail if it is available or <code>null</code>
-     *         if none was provided in the response.
-     */
-    public Exception getException();
-
-    /**
      * Get an estimate of the amount of time it took for the database
      * to process the transaction from the time it was received at the initiating node to the time
      * the initiating node got the response and queued it for transmission to the client.
@@ -126,4 +136,11 @@ public interface ClientResponse {
      * @return Time in milliseconds the procedure took to roundtrip from the client to the server
      */
     public int getClientRoundtrip();
+
+    /**
+     * Get the amount of time it took to run the transaction through the Client API, database, and back to the
+     * callback.
+     * @return Time in nanoseconds the procedure took to roundtrip from the client to the server
+     */
+    public long getClientRoundtripNanos();
 }

@@ -1,29 +1,30 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
 
 /**
  * Check update catalog parameters.
  */
-public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
+public class UpdateCatalogAcceptancePolicy extends InvocationValidationPolicy {
+
     public UpdateCatalogAcceptancePolicy(boolean isOn) {
         super(isOn);
     }
@@ -31,37 +32,39 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
     @Override
     public ClientResponseImpl shouldAccept(AuthUser user,
                                 StoredProcedureInvocation invocation,
-                                Config sysProc) {
+                                Procedure sysProc) {
         if (!invocation.procName.equals("@UpdateApplicationCatalog")) {
             return null;
         }
 
         ParameterSet params = invocation.getParams();
-        if (params.toArray().length != 2 ||
-            params.toArray()[0] == null ||
-            params.toArray()[1] == null)
+        // Either the catalog bytes or the deployment string can be null, indicating
+        // that the user doesn't want to change that component.  Null values will
+        // be populated correctly by the AsyncCompilerAgentHelper downstream.
+        if (params.toArray().length != 2)
         {
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0],
                     "UpdateApplicationCatalog system procedure requires exactly " +
                     "two parameters, the catalog bytes and the deployment file " +
-                    "string.",
+                    "string (either of which may be null).",
                     invocation.clientHandle);
         }
-
-        boolean isHex = false;
-        if (params.toArray()[0] instanceof String) {
-            isHex = Encoder.isHexEncodedString((String) params.toArray()[0]);
+        if (params.toArray()[0] != null)
+        {
+            boolean isHex = false;
+            if (params.toArray()[0] instanceof String) {
+                isHex = Encoder.isHexEncodedString((String) params.toArray()[0]);
+            }
+            if (!isHex && !(params.toArray()[0] instanceof byte[])) {
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        "UpdateApplicationCatalog system procedure takes the " +
+                        "catalog bytes as a byte array. The received parameter " +
+                        "is of type " + params.toArray()[0].getClass() + ".",
+                        invocation.clientHandle);
+            }
         }
-        if (!isHex && !(params.toArray()[0] instanceof byte[])) {
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                    new VoltTable[0],
-                    "UpdateApplicationCatalog system procedure takes the " +
-                    "catalog bytes as a byte array. The received parameter " +
-                    "is of type " + params.toArray()[0].getClass() + ".",
-                    invocation.clientHandle);
-        }
-
         return null;
     }
 }

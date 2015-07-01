@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+
+realpath()
+{(
+    local d=$(dirname "$0")
+    local f=$(basename "$0")
+    cd "$d"
+    d=$(pwd)
+    while [ -h "$d/$f" ]; do
+        local l=$(readlink "$f")
+        d=$(dirname "$l")
+        f=$(basename "$l")
+        cd "$d"
+        d=$(pwd)
+    done
+    echo "$d/$f"
+)}
+
+PROGPATH=$(realpath "$0")
+PROG=$(basename "$PROGPATH")
+CONFIG="$PROG.cfg"
+
+TEMPLATE="$PROGPATH.cfg.template"
+
+if [ ! -f run.sh ]; then
+    echo "* Run from a test or example directory, e.g. one with a run.sh. *" 1>&2
+    exit 1
+fi
+
+findroot()
+{(
+    while [ "$PWD" != "/" -a ! -f README.thirdparty -a ! -f README.thirdparty.ent ]; do
+        cd ..
+    done
+    test "$PWD" = "/" || echo "$PWD"
+)}
+
+expand_config_template()
+{
+    local template=$1
+    local config=$2
+    export APPNAME=$(awk '
+        /APPNAME\s*=/ {
+            split($0,a,"=");
+            s=a[2];
+            gsub(/"/,"",s);
+            gsub(/^\s*/,"",s);
+            gsub(/\s*$/,"",s);
+            print s
+        }' < run.sh)
+    export VOLTDB_HOME=$(findroot)
+    if [ -z "$VOLTDB_HOME" ]; then
+        echo "* Could not find source root directory. *" 1>&2
+        exit 1
+    fi
+    unset VOLTDB_DIST 2> /dev/null
+    if [ -d "$VOLTDB_HOME/obj/debug/dist" ]; then
+        VOLTDB_DIST="$VOLTDB_HOME/obj/debug/dist"
+    elif [ -d "$VOLTDB_HOME/obj/release/dist" ]; then
+        VOLTDB_DIST="$VOLTDB_HOME/obj/release/dist"
+    fi
+    if [ -z "$VOLTDB_DIST" ]; then
+        echo "* No distribution was found under $VOLTDB_HOME/obj. *" 1>&2
+        exit 1
+    fi
+    export CLASSPATH_BASE=$({ \
+        \ls -1 "$VOLTDB_DIST/voltdb"/voltdb-*.jar; \
+        \ls -1 "$VOLTDB_DIST/lib"/*.jar; \
+        \ls -1 "$VOLTDB_DIST/lib"/extension/*.jar; \
+    } 2> /dev/null | paste -sd ':' - )
+    # Expand the template by substituting environment variables for ${...}.
+    awk '
+    {
+        while(match($0,"[$]{[^}]*}"))
+        {
+            var=substr($0,RSTART+2,RLENGTH -3)
+            gsub("[$]{"var"}",ENVIRON[var])
+        }
+    }1' < "$template" > "$config"
+}
+
+if [ ! -f "$CONFIG" ]; then
+    echo "Generating \"$CONFIG\" (edit before restarting)..."
+    expand_config_template "$TEMPLATE" "$CONFIG"
+    exit 1
+fi
+
+MODE="$1"
+
+source "$CONFIG"
+for extscript in $EXTSCRIPTS; do
+    echo "Sourcing $extscript..."
+    source "$extscript"
+done
+export CLASSPATH VOLT_ENABLEIV2
+
+TEST_clean()
+{
+    echo "Cleaning compilation output and database files..."
+    \rm -rf "$OBJDIR" debugoutput $COMPILEJAR voltdbroot log server* replica
+}
+
+TEST_compile()
+{
+    buildcatalog
+}
+
+TEST_server()
+{
+    buildcatalog
+    initserver "$@"
+    $VOLTDB create -d $DEPFILE -l $LICENSE -H $LEADERHOST $CREATEJAR 2>&1 | tee output.txt
+}
+
+TEST_replica()
+{
+    initdir replica
+    $VOLTDB replica -d $DEPFILE -l $LICENSE -H $REPLICAHOST $REPLICAJAR 2>&1 | tee output.txt
+}
+
+TEST_client()
+{
+    java -classpath $OBJDIR:$CLASSPATH:$OBJDIR -Dlog4j.configuration=file://$LOG4J $CLIENTCLS $CLIENTOPTS
+    showstatus
+}
+
+TEST_dragent()
+{
+    usedir replica
+    $DRAGENT master $DBMASTER replica localhost 2>&1 | tee dragent.txt
+}
+
+TEST_down()
+{
+    local iface=$GATEIFACE1
+    if [ "$1" = "2" ]; then
+        iface=$GATEIFACE2
+    fi
+    ssh $GATEHOST sudo /sbin/ifdown $iface
+    gateway_ifconfig
+}
+
+TEST_up()
+{
+    local iface=$GATEIFACE1
+    test "$1" = "2" ] && iface=$GATEIFACE2
+    ssh $GATEHOST sudo /sbin/ifup $iface
+    gateway_ifconfig
+}
+
+TEST_gateway()
+{
+    gateway_ifconfig
+    for i in 0 1 2; do
+        echo ""
+        local ip=$(eval "echo \$GATEIP$i")
+        echo "- Interface #$i ($ip) -"
+        ping -c 2 $ip | egrep -v "^$|---"
+    done
+}
+
+TEST_recover()
+{
+    initserver "$@"
+    $VOLTDB recover deployment $DEPFILE license $LICENSE host $LEADERHOST
+}
+
+TEST_recover_replica()
+{
+    usedir replica
+    $VOLTDB replica recover host $REPLICAHOST deployment $DEPFILE license $LICENSE
+}
+
+TEST_rejoin()
+{
+    initserver "$@"
+    $VOLT rejoin -H $LEADERHOST -d $DEPFILE -l $LICENSE $REJOINJAR
+}
+
+TEST_update()
+{
+    useserver "$@"
+    $VOLTADMIN update $UPDATEJAR $DEPFILE
+}
+
+TEST_status()
+{
+    showstatus
+}
+
+TEST_shutdown()
+{
+    $VOLTADMIN shutdown
+}
+
+showstatus()
+{
+    if [ -n "$STATUSQUERY" ]; then
+        echo "Querying database status..."
+        $VOLT sql "$STATUSQUERY"
+    fi
+}
+
+buildcatalog()
+{
+    mkdir -p "$OBJDIR"
+    javac -classpath $CLASSPATH -d "$OBJDIR" $CLIENTJAVA || exit 1
+    if [ -f project.xml ]; then
+        $VOLTDB compile --classpath "$OBJDIR" -o $COMPILEJAR -p project.xml || exit 1
+    else
+        $VOLTDB compile --classpath "$OBJDIR" -o $COMPILEJAR *.sql || exit 1
+    fi
+}
+
+initserver()
+{
+    if [ -z "$1" ]; then
+        echo "* Specify host # 1-n *"
+        exit 1
+    fi
+    local name="server$1"
+    initdir $name
+}
+
+useserver()
+{
+    if [ -z "$1" ]; then
+        echo "* Specify host # 1-n *"
+        exit 1
+    fi
+    local name="server$1"
+    cd $name
+}
+
+initdir()
+{
+    \rm -rf $1
+    mkdir $1
+    cp -v *.jar $1/
+    if [ -n "$OTHERFILES" ]; then
+        cp -v $OTHERFILES $1/
+    fi
+    echo "\
+<?xml version=\"1.0\"?>
+<deployment>
+    <cluster hostcount=\"$HOSTCOUNT\" sitesperhost=\"$SITESPERHOST\" kfactor=\"$KFACTOR\" />
+    <httpd enabled=\"true\">
+        <jsonapi enabled=\"true\" />
+    </httpd>
+    <commandlog enabled=\"$COMMANDLOG\" />
+</deployment>" > $1/$DEPFILE
+    cd $1
+}
+
+usedir()
+{
+    if [ ! -d "$1" ]; then
+        echo "* Subdirectory \"$1\" does not exist. *" 1>&2
+        exit 1
+    fi
+    cd $1
+}
+
+gateway_ifconfig()
+{
+    echo "- Gateway Interfaces -"
+    ssh $GATEHOST sudo /sbin/ifconfig | egrep -i "^[a-z]|[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+"
+}
+
+usage()
+{
+    echo "Usage: $PROG TEST [ ARG ... ]"
+    echo "   Where TEST is one of the following:"
+    set | sort | awk '/\s*TEST_([a-zA-Z0-9_]+)\ +\(\)/ {printf("      %s\n",substr($1,6));}'
+}
+
+if [ $# -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+ACTION=$1
+shift
+TEST_${ACTION} "$@"

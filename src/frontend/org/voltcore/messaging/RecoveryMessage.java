@@ -1,25 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.ArrayList;
 
 /**
  *  Message containing recovery data for a partition/table pair.
@@ -38,8 +36,7 @@ public class RecoveryMessage extends VoltMessage {
     }
 
     private long m_txnId;
-    private List<byte[]> m_addresses;
-    private int m_port;
+    private long m_hsId;
 
     // Is the source site ready to handle the rejoin?
     private boolean m_isSourceReady = true;
@@ -69,7 +66,7 @@ public class RecoveryMessage extends VoltMessage {
      * decided to stop after before syncing so that the recovering partition can start executing stored procedures
      * at the correct txnId.
      */
-    public RecoveryMessage(long sourceHSId, long txnId, List<byte[]> addresses, int port) {
+    public RecoveryMessage(long sourceHSId, long txnId, long hsId) {
         m_subject = Subject.DEFAULT.getId();
         if (sourceHSId == -1) {
             throw new RuntimeException("No way");
@@ -77,8 +74,7 @@ public class RecoveryMessage extends VoltMessage {
         m_sourceHSId = sourceHSId;
         m_recoveryMessagesAvailable = false;
         m_txnId = txnId;
-        m_addresses = addresses;
-        m_port = port;
+        m_hsId = hsId;
     }
 
     /**
@@ -91,7 +87,6 @@ public class RecoveryMessage extends VoltMessage {
      */
     public RecoveryMessage(boolean isSourceReady) {
         m_isSourceReady = isSourceReady;
-        m_addresses = new ArrayList<byte[]>();
     }
 
     @Override
@@ -100,13 +95,8 @@ public class RecoveryMessage extends VoltMessage {
         msgsize +=
             8 + // m_sourceHSId
             8 + // m_txnId
-            4 + // address count
             1 + // is source ready
-            (4 * m_addresses.size()) + // 4 bytes per address
-            4; // m_port
-        for (byte address[] : m_addresses) {
-            msgsize += address.length;
-        }
+            8; // m_hsId
         return msgsize;
     }
 
@@ -116,12 +106,7 @@ public class RecoveryMessage extends VoltMessage {
         buf.putLong( m_sourceHSId);
         buf.putLong( m_txnId);
         buf.put(m_isSourceReady ? 1 : (byte) 0);
-        buf.putInt(m_addresses.size());
-        for (byte address[] : m_addresses) {
-            buf.putInt(address.length);
-            buf.put(address);
-        }
-        buf.putInt( m_port);
+        buf.putLong( m_hsId);
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -135,12 +120,8 @@ public class RecoveryMessage extends VoltMessage {
         return m_sourceHSId;
     }
 
-    public List<byte[]> addresses() {
-        return m_addresses;
-    }
-
-    public int port() {
-        return m_port;
+    public long getHSId() {
+        return m_hsId;
     }
 
     public boolean isSourceReady() {
@@ -153,14 +134,7 @@ public class RecoveryMessage extends VoltMessage {
         m_sourceHSId = buf.getLong();
         m_txnId = buf.getLong();
         m_isSourceReady = buf.get() == 1;
-        int numAddresses = buf.getInt();
-        m_addresses = new ArrayList<byte[]>(numAddresses);
-        for (int ii = 0; ii < numAddresses; ii++) {
-            byte address[] = new byte[buf.getInt()];
-            buf.get(address);
-            m_addresses.add(address);
-        }
-        m_port = buf.getInt();
+        m_hsId = buf.getLong();
 
         assert(buf.capacity() == buf.position());
     }

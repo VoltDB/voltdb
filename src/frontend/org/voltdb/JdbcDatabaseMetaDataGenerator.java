@@ -1,26 +1,33 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb;
 
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
@@ -30,9 +37,23 @@ import org.voltdb.catalog.Table;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.InMemoryJarfile;
 
 public class JdbcDatabaseMetaDataGenerator
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    public static final String JSON_PARTITION_PARAMETER = "partitionParameter";
+    public static final String JSON_PARTITION_PARAMETER_TYPE = "partitionParameterType";
+    public static final String JSON_SINGLE_PARTITION = "singlePartition";
+    public static final String JSON_READ_ONLY = "readOnly";
+    public static final String JSON_PARTITION_COLUMN = "partitionColumn";
+    public static final String JSON_SOURCE_TABLE = "sourceTable";
+    public static final String JSON_LIMIT_PARTITION_ROWS_DELETE_STMT = "limitPartitionRowsDeleteStmt";
+    public static final String JSON_DRED_TABLE = "drEnabled";
+    public static final String JSON_ERROR = "error";
+
     static public final ColumnInfo[] TABLE_SCHEMA =
         new ColumnInfo[] {
                           new ColumnInfo("TABLE_CAT", VoltType.STRING),
@@ -44,7 +65,7 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("TYPE_SCHEM", VoltType.STRING),
                           new ColumnInfo("TYPE_NAME", VoltType.STRING),
                           new ColumnInfo("SELF_REFERENCING_COL_NAME", VoltType.STRING),
-                          new ColumnInfo("REF_GENERATION", VoltType.STRING),
+                          new ColumnInfo("REF_GENERATION", VoltType.STRING)
                          };
 
     static public final ColumnInfo[] COLUMN_SCHEMA =
@@ -138,10 +159,41 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("SPECIFIC_NAME", VoltType.STRING)
         };
 
-    JdbcDatabaseMetaDataGenerator(Catalog catalog)
+    static public final ColumnInfo[] TYPEINFO_SCHEMA =
+        new ColumnInfo[] {
+            new ColumnInfo("TYPE_NAME", VoltType.STRING),
+            new ColumnInfo("DATA_TYPE", VoltType.INTEGER),
+            new ColumnInfo("PRECISION", VoltType.INTEGER),
+            new ColumnInfo("LITERAL_PREFIX", VoltType.STRING),
+            new ColumnInfo("LITERAL_SUFFIX", VoltType.STRING),
+            new ColumnInfo("CREATE_PARAMS", VoltType.STRING),
+            new ColumnInfo("NULLABLE", VoltType.SMALLINT),
+            new ColumnInfo("CASE_SENSITIVE", VoltType.TINYINT), //should be bool...
+            new ColumnInfo("SEARCHABLE", VoltType.SMALLINT),
+            new ColumnInfo("UNSIGNED_ATTRIBUTE", VoltType.TINYINT), //should be bool
+            new ColumnInfo("FIXED_PREC_SCALE", VoltType.TINYINT), //should be bool
+            new ColumnInfo("AUTO_INCREMENT", VoltType.TINYINT), //should be bool
+            new ColumnInfo("LOCAL_TYPE_NAME", VoltType.STRING),
+            new ColumnInfo("MINIMUM_SCALE", VoltType.SMALLINT),
+            new ColumnInfo("MAXIMUM_SCALE", VoltType.SMALLINT),
+            new ColumnInfo("SQL_DATA_TYPE", VoltType.INTEGER),
+            new ColumnInfo("SQL_DATETIME_SUB", VoltType.INTEGER),
+            new ColumnInfo("NUM_PREC_RADIX", VoltType.INTEGER)
+        };
+
+    static public final ColumnInfo[] CLASS_SCHEMA =
+        new ColumnInfo[] {
+            new ColumnInfo("CLASS_NAME", VoltType.STRING),
+            new ColumnInfo("VOLT_PROCEDURE", VoltType.TINYINT),
+            new ColumnInfo("ACTIVE_PROC", VoltType.TINYINT)
+        };
+
+    JdbcDatabaseMetaDataGenerator(Catalog catalog, DefaultProcedureManager defaultProcs, InMemoryJarfile jarfile)
     {
         m_catalog = catalog;
+        m_defaultProcs = defaultProcs;
         m_database = m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        m_jarfile = jarfile;
     }
 
     public VoltTable getMetaData(String selector)
@@ -171,6 +223,16 @@ public class JdbcDatabaseMetaDataGenerator
         {
             result = getProcedureColumns();
         }
+        else if (selector.equalsIgnoreCase("TYPEINFO"))
+        {
+            result = getTypeInfo();
+        }
+        // This selector is not part of the JDBC standard, but we pile on here
+        // because it's a convenient way to get information about the application
+        else if (selector.equalsIgnoreCase("CLASSES"))
+        {
+            result = getClasses();
+        }
         return result;
     }
 
@@ -181,12 +243,15 @@ public class JdbcDatabaseMetaDataGenerator
         {
             type = "VIEW";
         }
-        else if (m_database.getConnectors() != null &&
-                 m_database.getConnectors().get("0") != null &&
-                 m_database.getConnectors().get("0").getTableinfo() != null &&
-                 m_database.getConnectors().get("0").getTableinfo().getIgnoreCase(table.getTypeName()) != null)
+        else if (m_database.getConnectors() != null)
         {
-            type = "EXPORT";
+            for (Connector conn : m_database.getConnectors()) {
+                 if (conn.getTableinfo() != null &&
+                         conn.getTableinfo().getIgnoreCase(table.getTypeName()) != null) {
+                     type = "EXPORT";
+                     break;
+                 }
+            }
         }
         return type;
     }
@@ -196,12 +261,50 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(TABLE_SCHEMA);
         for (Table table : m_database.getTables())
         {
-            // REMARKS and all following columns are always null for us.
+            String type = getTableType(table);
+            Column partColumn;
+            if (type.equals("VIEW")) {
+                partColumn = table.getMaterializer().getPartitioncolumn();
+            }
+            else {
+                partColumn = table.getPartitioncolumn();
+            }
+
+            String remark = null;
+            try {
+                JSONObject jsObj = new JSONObject();
+
+                if (partColumn != null) {
+                    jsObj.put(JSON_PARTITION_COLUMN, partColumn.getName());
+                    if (type.equals("VIEW")) {
+                        jsObj.put(JSON_SOURCE_TABLE, table.getMaterializer().getTypeName());
+                    }
+                }
+
+                String deleteStmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(table);
+                if (deleteStmt != null) {
+                    jsObj.put(JSON_LIMIT_PARTITION_ROWS_DELETE_STMT, deleteStmt);
+                }
+
+                if (table.getIsdred()) {
+                    jsObj.put(JSON_DRED_TABLE, "true");
+                }
+
+                remark = jsObj.length() > 0 ? jsObj.toString() : null;
+
+            } catch (JSONException e) {
+                hostLog.warn("You have encountered an unexpected error while generating results for the " +
+                        "@SystemCatalog procedure call. This error will not affect your database's " +
+                        "operation. Please contact VoltDB support with your log files and a " +
+                        "description of what you were doing when this error occured.", e);
+                remark = "{\"" + JSON_ERROR + "\":\"" + e.getMessage() + "\"}";
+            }
+
             results.addRow(null,
                            null, // no schema name
                            table.getTypeName(),
-                           getTableType(table),
-                           null, // REMARKS
+                           type,
+                           remark, // REMARKS
                            null, // unused TYPE_CAT
                            null, // unused TYPE_SCHEM
                            null, // unused TYPE_NAME
@@ -213,86 +316,28 @@ public class JdbcDatabaseMetaDataGenerator
     }
 
     // Might consider consolidating this into VoltType if we go big on JDBC stuff.
+    // Considered and done
     private int getColumnSqlDataType(VoltType type)
     {
-        int jdbc_sql_type = java.sql.Types.OTHER;
-        switch(type)
-        {
-        case TINYINT:
-            jdbc_sql_type = java.sql.Types.TINYINT;
-            break;
-        case SMALLINT:
-            jdbc_sql_type = java.sql.Types.SMALLINT;
-            break;
-        case INTEGER:
-            jdbc_sql_type = java.sql.Types.INTEGER;
-            break;
-        case BIGINT:
-            jdbc_sql_type = java.sql.Types.BIGINT;
-            break;
-        case FLOAT:
-            jdbc_sql_type = java.sql.Types.DOUBLE;
-            break;
-        case TIMESTAMP:
-            jdbc_sql_type = java.sql.Types.TIMESTAMP;
-            break;
-        case STRING:
-            jdbc_sql_type = java.sql.Types.VARCHAR;
-            break;
-        case DECIMAL:
-            jdbc_sql_type = java.sql.Types.DECIMAL;
-            break;
-        case VARBINARY:
-            jdbc_sql_type = java.sql.Types.VARBINARY;
-            break;
-        default:
-            // XXX What's the right behavior here?
-        }
-        return jdbc_sql_type;
+        return type.getJdbcSqlType();
     }
 
     private String getColumnSqlTypeName(VoltType type)
     {
-        String jdbc_sql_typename = "OTHER";
-        switch(type)
-        {
-        case TINYINT:
-            jdbc_sql_typename = "TINYINT";
-            break;
-        case SMALLINT:
-            jdbc_sql_typename = "SMALLINT";
-            break;
-        case INTEGER:
-            jdbc_sql_typename = "INTEGER";
-            break;
-        case BIGINT:
-            jdbc_sql_typename = "BIGINT";
-            break;
-        case FLOAT:
-            jdbc_sql_typename = "DOUBLE";
-            break;
-        case TIMESTAMP:
-            jdbc_sql_typename = "TIMESTAMP";
-            break;
-        case STRING:
-            jdbc_sql_typename = "VARCHAR";
-            break;
-        case DECIMAL:
-            jdbc_sql_typename = "DECIMAL";
-            break;
-        case VARBINARY:
-            jdbc_sql_typename = "VARBINARY";
-            break;
-        default:
-            // XXX What's the right behavior here?
+        String jdbc_sql_typename = type.toSQLString();
+        if (jdbc_sql_typename == null) {
+            jdbc_sql_typename = "OTHER";
         }
-        return jdbc_sql_typename;
+        return jdbc_sql_typename.toUpperCase();
     }
 
     // Integer[0] is the column size and Integer[1] is the radix
     private Integer[] getColumnSizeAndRadix(Column column)
     {
         Integer[] col_size_radix = {null, null};
+        // This looks similar to VoltType.getTypePrecisionAndRadix.  However,
+        // the String/VARBINARY values depend on the schema, not an intrinsic property
+        // of the type, so it stays here for now.
         VoltType type = VoltType.get((byte) column.getType());
         switch(type)
         {
@@ -329,6 +374,7 @@ public class JdbcDatabaseMetaDataGenerator
 
     private Integer getColumnDecimalDigits(VoltType type)
     {
+        // Would be nice to push this into VoltType someday
         Integer num_dec_digits = null;
         switch(type)
         {
@@ -520,8 +566,37 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getProcedures()
     {
         VoltTable results = new VoltTable(PROCEDURES_SCHEMA);
-        for (Procedure proc : m_database.getProcedures())
+
+        // merge catalog and default procedures
+        SortedSet<Procedure> procedures = new TreeSet<>();
+        for (Procedure proc : m_database.getProcedures()) {
+            procedures.add(proc);
+        }
+        if (m_defaultProcs != null) {
+            for (Procedure proc : m_defaultProcs.m_defaultProcMap.values()) {
+                procedures.add(proc);
+            }
+        }
+
+        for (Procedure proc : procedures)
         {
+            String remark = null;
+            try {
+                JSONObject jsObj = new JSONObject();
+                jsObj.put(JSON_READ_ONLY, proc.getReadonly());
+                jsObj.put(JSON_SINGLE_PARTITION, proc.getSinglepartition());
+                if (proc.getSinglepartition()) {
+                    jsObj.put(JSON_PARTITION_PARAMETER, proc.getPartitionparameter());
+                    jsObj.put(JSON_PARTITION_PARAMETER_TYPE, proc.getPartitioncolumn().getType());
+                }
+                remark = jsObj.toString();
+            } catch (JSONException e) {
+                hostLog.warn("You have encountered an unexpected error while generating results for the " +
+                             "@SystemCatalog procedure call. This error will not affect your database's " +
+                             "operation. Please contact VoltDB support with your log files and a " +
+                             "description of what you were doing when this error occured.", e);
+                remark = "{\"" + JSON_ERROR + "\",\"" + e.getMessage() + "\"}";
+            }
             results.addRow(
                            null,
                            null, // procedure schema
@@ -529,7 +604,7 @@ public class JdbcDatabaseMetaDataGenerator
                            null, // reserved
                            null, // reserved
                            null, // reserved
-                           null, // REMARKS
+                           remark, // REMARKS
                            java.sql.DatabaseMetaData.procedureResultUnknown, // procedure time
                            proc.getTypeName() // specific name
                           );
@@ -565,39 +640,8 @@ public class JdbcDatabaseMetaDataGenerator
     // Integer[0] is the column size and Integer[1] is the radix
     private Integer[] getParamPrecisionAndRadix(ProcParameter param)
     {
-        Integer[] col_size_radix = {null, null};
         VoltType type = VoltType.get((byte) param.getType());
-        switch(type)
-        {
-        //
-        case TINYINT:
-        case SMALLINT:
-        case INTEGER:
-        case BIGINT:
-        case TIMESTAMP:
-            col_size_radix[0] = (type.getLengthInBytesForFixedTypes() * 8) - 1;
-            col_size_radix[1] = 2;
-            break;
-        case FLOAT:
-            col_size_radix[0] = 53;  // magic for double
-            col_size_radix[1] = 2;
-            break;
-        case STRING:
-            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
-            col_size_radix[1] = null;
-            break;
-        case DECIMAL:
-            col_size_radix[0] = VoltDecimalHelper.kDefaultPrecision;
-            col_size_radix[1] = 10;
-            break;
-        case VARBINARY:
-            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
-            col_size_radix[1] = null;
-            break;
-        default:
-            // XXX What's the right behavior here?
-        }
-        return col_size_radix;
+        return type.getTypePrecisionAndRadix();
     }
 
     private int getParamLength(ProcParameter param)
@@ -609,6 +653,7 @@ public class JdbcDatabaseMetaDataGenerator
     private Integer getParamCharOctetLength(ProcParameter param)
     {
         Integer length = null;
+        // Would be nice to push this type-dependent stuff to VoltType someday.
         VoltType type = VoltType.get((byte) param.getType());
         switch(type)
         {
@@ -634,7 +679,19 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getProcedureColumns()
     {
         VoltTable results = new VoltTable(PROCEDURECOLUMNS_SCHEMA);
-        for (Procedure proc : m_database.getProcedures())
+
+        // merge catalog and default procedures
+        SortedSet<Procedure> procedures = new TreeSet<>();
+        for (Procedure proc : m_database.getProcedures()) {
+            procedures.add(proc);
+        }
+        if (m_defaultProcs != null) {
+            for (Procedure proc : m_defaultProcs.m_defaultProcMap.values()) {
+                procedures.add(proc);
+            }
+        }
+
+        for (Procedure proc : procedures)
         {
             for (ProcParameter param : proc.getParameters())
             {
@@ -665,6 +722,69 @@ public class JdbcDatabaseMetaDataGenerator
         return results;
     }
 
+    VoltTable getTypeInfo()
+    {
+        VoltTable results = new VoltTable(TYPEINFO_SCHEMA);
+        for (VoltType type : VoltType.values())
+        {
+            if (type.isJdbcVisible()) {
+                Byte unsigned = null;
+                if (type.isUnsigned() != null) {
+                    unsigned = (byte)(type.isUnsigned() ? 1 : 0);
+                }
+                results.addRow(type.toSQLString().toUpperCase(),
+                        type.getJdbcSqlType(),
+                        type.getTypePrecisionAndRadix()[0],
+                        type.getLiteralPrefix(),
+                        type.getLiteralSuffix(),
+                        type.getCreateParams(),
+                        type.getNullable(),
+                        type.isCaseSensitive() ? 1 : 0,
+                        type.getSearchable(),
+                        unsigned,
+                        0,  // no money types (according to definition) in Volt?
+                        0,  // no auto-increment
+                        type.toSQLString().toUpperCase(),
+                        type.getMinimumScale(),
+                        type.getMaximumScale(),
+                        null,
+                        null,
+                        type.getTypePrecisionAndRadix()[1]
+                        );
+            }
+        }
+        return results;
+    }
+
+    VoltTable getClasses()
+    {
+        VoltTable results = new VoltTable(CLASS_SCHEMA);
+        for (String classname : m_jarfile.getLoader().getClassNames()) {
+            try {
+                Class<?> clazz = m_jarfile.getLoader().loadClass(classname);
+                boolean isProc = VoltProcedure.class.isAssignableFrom(clazz);
+                boolean isActive = false;
+                if (isProc) {
+                    for (Procedure proc : m_database.getProcedures()) {
+                        if (proc.getClassname().equals(clazz.getCanonicalName())) {
+                            isActive = true;
+                            break;
+                        }
+                    }
+                }
+                results.addRow(classname, isProc ? 1 : 0, isActive ? 1 : 0);
+            }
+            catch (Exception e) {
+                // if we can't load a class from the jarfile, just pretend it doesn't
+                // exist.  Other checks when we actually load the classes should
+                // ensure that we don't end up in this state.
+            }
+        }
+        return results;
+    }
+
     private final Catalog m_catalog;
+    private final DefaultProcedureManager m_defaultProcs;
     private final Database m_database;
+    private final InMemoryJarfile m_jarfile;
 }

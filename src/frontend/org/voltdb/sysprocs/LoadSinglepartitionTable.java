@@ -1,43 +1,36 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.sysprocs;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
-import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.messaging.FastDeserializer;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,
@@ -68,6 +61,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      *
      * @param ctx
      *            Internal. Not a user-supplied parameter.
+     * @param partitionParam Partitioning parameter
      * @param tableName
      *            Name of persistent table receiving data.
      * @param table
@@ -77,6 +71,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      * @throws VoltAbortException
      */
     public long run(SystemProcedureExecutionContext ctx,
+                    byte[] partitionParam,
             String tableName, VoltTable table)
             throws VoltAbortException {
 
@@ -102,7 +97,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
 
         // find the insert statement for this table
         String insertProcName = String.format("%s.insert", tableName);
-        Procedure p = ctx.getDatabase().getProcedures().get(insertProcName);
+        Procedure p = ctx.ensureDefaultProcLoaded(insertProcName);
         if (p == null) {
             throw new VoltAbortException(
                     String.format("Unable to locate auto-generated CRUD insert statement for table %s",
@@ -119,7 +114,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
 
         // create a SQLStmt instance on the fly (unusual to do)
         SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
-        ProcedureRunner.initSQLStmt(stmt, catStmt);
+        m_runner.initSQLStmt(stmt, catStmt);
 
         long queued = 0;
         long executed = 0;
@@ -183,65 +178,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      * @return An object suitable for hashing to a partition with The Hashinator
      * @throws Exception thown on error with a descriptive message
      */
-    public static Object partitionValueFromInvocation(CatalogMap<Table> tables, StoredProcedureInvocation spi) throws Exception {
-        String tableName = null;
-        VoltTable table = null;
-        ByteBuffer buf = spi.getSerializedParams();
-
-        spi.getParams();
-
-        // if the params buffer has been decoded
-        if (buf == null) {
-            Object[] params = spi.getParams().toArray();
-            tableName = (String) params[0];
-            table = (VoltTable) params[1];
-        }
-        // if the params buffer is not decoded
-        else {
-            // THE GOAL OF THIS CODE IS TO READ AS LITTLE AS POSSIBLE OF
-            // WHAT MIGHT BE A BIG PARAMETER SET
-            // i.e. read the name of the table and first row of the data provided
-
-            FastDeserializer fds = new FastDeserializer(buf);
-
-            // read the number of parameters
-            int paramLen = fds.readShort();
-            if (paramLen != 2) {
-                throw new Exception("@LoadSinglepartitionTable requres exactly two parameters.");
-            }
-
-            // read the type of the first param, expecting string
-            byte strType = fds.readByte();
-            if (strType != VoltType.STRING.getValue()) {
-                throw new Exception("@LoadSinglepartitionTable expects a String and a VoltTable for parameters (in order).");
-            }
-
-            // read the name of the table targeted
-            tableName = fds.readString();
-
-            // read the type of the second param, expecting table
-            byte tableType = fds.readByte();
-            if (tableType != VoltType.VOLTTABLE.getValue()) {
-                throw new Exception("@LoadSinglepartitionTable expects a String and a VoltTable for parameters (in order).");
-            }
-
-            // read the size of the table and create a buffer for it
-            int tableSize = fds.readInt();
-            ByteBuffer tbuf = buf.slice();
-            tbuf.limit(tableSize);
-
-            // assume the buffer is pointing to the table
-            table = PrivateVoltTableFactory.createVoltTableFromBuffer(tbuf, true);
-        }
-
-        // get the table from the catalog
-        Table catTable = tables.getIgnoreCase(tableName);
-        if (catTable == null) {
-            throw new Exception(
-                    String.format("Unable to find target table \"%s\" for LoadSinglepartitionTable.",
-                            tableName));
-        }
-
+    public static Object partitionValueFromInvocation(Table catTable, VoltTable table) throws Exception {
         if (catTable.getIsreplicated()) {
             throw new Exception("Target table for LoadSinglepartitionTable is replicated.");
         }

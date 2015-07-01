@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -26,52 +26,42 @@ import sys
 import cgi
 import os
 import cPickle
+import decimal
+import datetime
 from distutils.util import strtobool
 from optparse import OptionParser
-from voltdbclient import VoltColumn, VoltTable
+from voltdbclient import VoltColumn, VoltTable, FastSerializer
 
 __quiet = True
 
-def highlight(s, flag = True):
+def highlight(s, flag):
     if not isinstance(s, basestring):
         s = str(s)
     return flag and "<span style=\"color: red\">%s</span>" % (s) or s
 
-def generate_table_str(res):
-    tablestr = {"jni": "", "hsqldb": ""}
+def generate_table_str(res, key):
 
-    for k in tablestr.iterkeys():
-        tmp = []
-        if "Result" in res[k] and res[k]["Result"] != None:
-            for i in xrange(len(res[k]["Result"])):
-                result = []
+    highlights = res.get("highlight")
+    source = res[key].get("Result")
+    if not source:
+        return ""
 
-                result.append("column count: %d" %
-                              (len(res[k]["Result"][i].columns)))
-                result.append("row count: %d" %
-                              (len(res[k]["Result"][i].tuples)))
-                result.append("cols: " +
-                              ", ".join(map(lambda x: str(x),
-                                            res[k]["Result"][i].columns)))
-                result.append("rows -")
-                result.extend(map(lambda x: str(x), res[k]["Result"][i].tuples))
-
-                for j in xrange(len(result)):
-                    if "highlight" in res and \
-                            isinstance(res["highlight"][i], list) and \
-                            j in res["highlight"][i]:
-                        result[j] = highlight(result[j])
-                tmp.append("<br />".join(result))
-            tablestr[k] = "<br />".join(tmp)
-
+    result = []
+    result.append(highlight("column count: %d" % (len(source.columns)), "columns" == highlights))
+    result.append(highlight("row count: %d" % (len(source.tuples)), "tuples" == highlights))
+    result.append("cols: " + ", ".join(map(lambda x: str(x), source.columns)))
+    result.append("rows -")
+    if isinstance(highlights, list):
+        for j in xrange(len(source.tuples)):
+            result.append(highlight(source.tuples[j], j in highlights))
+    else:
+        result.extend(map(lambda x: str(x), source.tuples))
+    tablestr = "<br />".join(result)
     return tablestr
 
 def generate_detail(name, item, output_dir):
-    filename = "%s.html" % (item["id"])
     if output_dir == None:
         return
-
-    tablestr = generate_table_str(item)
 
     details = """
 <html>
@@ -107,15 +97,14 @@ td {width: 50%%}
 </html>
 """ % (cgi.escape(item["SQL"]),
        cgi.escape(item["SQL"]),
-       highlight(item["jni"]["Status"],
-                 "highlight" in item and "Status" in item["highlight"]),
-       highlight(item["hsqldb"]["Status"],
-                 "highlight" in item and "Status" in item["highlight"]),
-       "Info" in item["jni"] and item["jni"]["Info"] or "",
-       "Info" in item["hsqldb"] and item["hsqldb"]["Info"] or "",
-       tablestr["jni"],
-       tablestr["hsqldb"])
+       highlight(item["jni"]["Status"], "Status" == item.get("highlight")),
+       highlight(item["hsqldb"]["Status"], "Status" == item.get("highlight")),
+       item["jni"].get("Info") or "",
+       item["hsqldb"].get("Info") or "",
+       generate_table_str(item, "jni"),
+       generate_table_str(item, "hsqldb"))
 
+    filename = "%s.html" % (item["id"])
     fd = open(os.path.join(output_dir, filename), "w")
     fd.write(details.encode("utf-8"))
     fd.close()
@@ -138,11 +127,17 @@ def print_section(name, mismatches, output_dir):
 </tr>
 """ % (name, len(mismatches))
 
+    temp = []
     for i in mismatches:
         safe_print(i["SQL"])
         detail_page = generate_detail(name, i, output_dir)
-
-        result += """
+        jniStatus = i["jni"]["Status"]
+        if jniStatus < 0:
+            jniStatus = "Error: " + `jniStatus`
+        hsqldbStatus = i["hsqldb"]["Status"]
+        if hsqldbStatus < 0:
+            hsqldbStatus = "Error: " + `hsqldbStatus`
+        temp.append("""
 <tr>
 <td>%s</td>
 <td><a href="%s">%s</a></td>
@@ -151,8 +146,10 @@ def print_section(name, mismatches, output_dir):
 </tr>""" % (i["id"],
             detail_page,
             cgi.escape(i["SQL"]),
-            i["jni"]["Status"],
-            i["hsqldb"]["Status"])
+            jniStatus,
+            hsqldbStatus))
+
+    result += ''.join(temp)
 
     result += """
 </table>
@@ -160,46 +157,98 @@ def print_section(name, mismatches, output_dir):
 
     return result
 
-def is_different(x):
-    """Marks the attributes that are different. Since the whole table will be
+def is_different(x, cntonly):
+    """Notes the attributes that are different. Since the whole table will be
     printed out as a single string.
     the first line is column count,
     the second line is row count,
     the third line is column names and types,
-    and then followed by rows.
+    followed by rows.
     """
 
+    jni = x["jni"]
+    hsql = x["hsqldb"]
     # JNI returns a variety of negative error result values that we
     # can't easily match with the HSQL backend.  Reject only pairs of
     # status values where one of them wasn't an error
-    if x["jni"]["Status"] != x["hsqldb"]["Status"]:
-        if int(x["jni"]["Status"]) > 0 or int(x["hsqldb"]["Status"]) > 0:
-            x["highlight"] = ["Status"]
+    if jni["Status"] != hsql["Status"]:
+        if int(jni["Status"]) > 0 or int(hsql["Status"]) > 0:
+            x["highlight"] = "Status"
+            # print "DEBUG is_different -- one error (0 or less)"
             return True
+        # print "DEBUG is_different -- just different errors (0 or less)"
+        return False;
+    if int(jni["Status"]) <= 0:
+        # print "DEBUG is_different -- same error (0 or less)"
+        return False;
 
-    if "Result" in x["jni"] and "Result" in x["hsqldb"]:
-        x["highlight"] = []
-        if (x["jni"]["Result"] == None or x["hsqldb"]["Result"] == None
-            or len(x["jni"]["Result"]) != len(x["hsqldb"]["Result"])):
-            return True
-        for i in xrange(len(x["jni"]["Result"])):
-            x["highlight"].append([])
-            # Disable column type checking for now because Volt and HSQL don't
-            # promote int types in the same way.
-            # if x["jni"]["Result"][i].columns != x["hsqldb"]["Result"][i].columns:
-            #     x["highlight"][i].append(2) # Column names and types
-            if len(x["jni"]["Result"][i].tuples) != \
-                    len(x["hsqldb"]["Result"][i].tuples):
-                x["highlight"][i].append(1) # Tuple count
-                return True
-            for j in xrange(len(x["jni"]["Result"][i].tuples)):
-                if x["jni"]["Result"][i].tuples[j] != \
-                        x["hsqldb"]["Result"][i].tuples[j]:
-                    x["highlight"][i].append(j + 4) # Offset to the correct row
-        for i in x["highlight"]:
-            if i:
-                return True
+    # print "DEBUG is_different -- same non-error Status? : ", jni["Status"]
 
+    jniResult = jni["Result"]
+    hsqlResult = hsql["Result"]
+    if (not jniResult) or (not hsqlResult):
+        x["highlight"] = "Result"
+        # print "DEBUG is_different -- lacked expected result(s)"
+        return True
+
+    # Disable column type checking for now because Volt and HSQL don't
+    # promote int types in the same way.
+    # if jniResult.columns != hsqlResult.columns:
+    #     x["highlight"] = "Columns"
+    #     return True
+
+    jniColumns= jniResult.columns
+    hsqlColumns = hsqlResult.columns
+    nColumns = len(jniColumns)
+    if nColumns != len(hsqlColumns):
+        x["highlight"] = "Columns"
+        return True;
+    # print "DEBUG is_different -- got same column lengths? ", nColumns
+
+    jniTuples = jniResult.tuples
+    hsqlTuples = hsqlResult.tuples
+
+    if len(jniTuples) != len(hsqlTuples):
+        x["highlight"] = "Tuples"
+        # print "DEBUG is_different -- got different numbers of tuples?"
+        return True
+    # print "DEBUG is_different -- got same numbers of tuples?", len(jniTuples), "namely ", jniTuples
+
+    if cntonly:
+        # print "DEBUG is_different -- count only got FALSE return"
+        return False # The results are close enough to pass a count-only check
+
+    for ii in xrange(len(jniTuples)):
+        if jniTuples[ii] == hsqlTuples[ii]:
+            continue
+        # Work around any false value differences caused by default type differences.
+        # These differences are "properly" ignored by the
+        # Decimal/float != implementation post-python 2.6.
+        column_problem = False # hope for the best.
+        for jj in xrange(nColumns):
+            if jniTuples[ii][jj] == hsqlTuples[ii][jj]:
+                continue
+            if (jniColumns[jj].type == FastSerializer.VOLTTYPE_FLOAT and
+                    hsqlColumns[jj].type == FastSerializer.VOLTTYPE_DECIMAL):
+                if decimal.Decimal(str(jniTuples[ii][jj])) == hsqlTuples[ii][jj]:
+                    ### print "INFO is_different -- Needed float-to-decimal help"
+                    continue
+                print "INFO is_different -- float-to-decimal conversion did not help convert between values:" , \
+                        "jni:(" , jniTuples[ii][jj] , ") and hsql:(" , hsqlTuples[ii][jj] , ")."
+                print "INFO is_different -- float-to-decimal conversion stages:" , \
+                        " from jniTuples[ii][jj] of type:" , type(jniTuples[ii][jj]) , \
+                        " to hsqlTuples[ii][jj] of type:" , type(hsqlTuples[ii][jj]) , \
+                        " via str(jniTuples[ii][jj]):" , str(jniTuples[ii][jj]) , " of type: " , type(str(jniTuples[ii][jj])) , \
+                        " via decimal.Decimal(str(jniTuples[ii][jj])):" , decimal.Decimal(str(jniTuples[ii][jj])) , " of type: " , type(decimal.Decimal(str(jniTuples[ii][jj])))
+            column_problem = True
+        if column_problem:
+            # print "DEBUG is_different -- appending difference highlight? ", ii
+            if not x.get("highlight"):
+                x["highlight"] = []
+            x["highlight"].append(ii)
+    if x.get("highlight"):
+        return True
+    # print "DEBUG is_different -- got FALSE return"
     return False
 
 def usage(prog_name):
@@ -211,8 +260,8 @@ Generates HTML reports based on the given report files. The generated reports
 contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
-def generate_html_reports(seed, statements_path, hsql_path, jni_path,
-                          output_dir, report_all, is_matching = False):
+def generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
+                          output_dir, report_all, cntonly = False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -224,38 +273,38 @@ def generate_html_reports(seed, statements_path, hsql_path, jni_path,
     mismatches = []
     all_results = []
 
-    while True:
-        try:
-            statement = cPickle.load(statements_file)
-        except EOFError:
-            break
+    try:
+        while True:
+            try:
+                statement = cPickle.load(statements_file)
+                # print "DEBUG loaded statement ", statement
+            except EOFError:
+                break
 
-        try:
             jni = cPickle.load(jni_file)
             hsql = cPickle.load(hsql_file)
-        except EOFError as e:
-            raise IOError("Not enough results for generated statements: %s" %
-                          (str(e)))
 
-        count += 1
-        if int(jni["Status"]) != 1:
-            failures += 1
+            count += 1
+            if int(jni["Status"]) != 1:
+                failures += 1
 
-        statement["hsqldb"] = hsql
-        statement["jni"] = jni
-        if is_matching:
-            if not is_different(statement):
+            statement["jni"] = jni
+            statement["hsqldb"] = hsql
+            if is_different(statement, cntonly):
                 mismatches.append(statement)
-        else:
-            if is_different(statement):
-                mismatches.append(statement)
-        if report_all:
-            all_results.append(statement)
+            if report_all:
+                all_results.append(statement)
+
+    except EOFError as e:
+        raise IOError("Not enough results for generated statements: %s" % str(e))
 
     statements_file.close()
     hsql_file.close()
     jni_file.close()
 
+    topLine = getTopSummaryLine()
+    currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
+    keyStats = createSummaryInHTML(count, failures, len(mismatches), seed)
     report = """
 <html>
 <head>
@@ -266,19 +315,22 @@ h2 {text-transform: uppercase}
 </head>
 
 <body>
-Random seed: %s
-<br/>
-Total statements: %d
-<br/>
-Failed (*not* necessarily mismatched) statements: %d
-""" % (seed, count, failures)
+    <h2>Test Suite Name: %s</h2>
+    <h4>Random Seed: <b>%d</b></h4>
+    <p>This report was generated on <b>%s</b></p>
+    <table border=1><tr>%s</tr>
+""" % (suite, seed, currentTime, topLine)
+
+    report += """
+<tr>%s</tr>
+</table>
+""" % (keyStats)
 
     def key(x):
         return int(x["id"])
-    sorted(mismatches, cmp=cmp, key=key)
-
-    report += print_section("Mismatched Statements",
-                            mismatches, output_dir)
+    if(len(mismatches) > 0):
+        sorted(mismatches, cmp=cmp, key=key)
+        report += print_section("Mismatched Statements", mismatches, output_dir)
 
     if report_all:
         report += print_section("Total Statements", all_results, output_dir)
@@ -293,10 +345,54 @@ Failed (*not* necessarily mismatched) statements: %d
         summary.write(report.encode("utf-8"))
         summary.close()
 
-    return (failures, len(mismatches))
+    results = {}
+    results["mis"] = len(mismatches)
+    results["keyStats"] = keyStats
+    return results
+
+def getTopSummaryLine():
+    topLine = """
+<td>Valid</td><td>Valid %</td>
+<td>Invalid</td><td>Invalid %</td>
+<td>Total</td>
+<td>Mismatched</td><td>Mismatched %</td>
+"""
+    return topLine
+
+def createSummaryInHTML(count, failures, misses, seed):
+    passed = count - (failures + misses)
+    passed_ps = fail_ps = cell4misPct = cell4misCnt = color = None
+    if(failures == 0):
+        fail_ps = "0.00%"
+    else:
+        fail_ps = str("{0:.2f}".format((failures/float(count)) * 100)) + "%"
+    if(misses == 0):
+        cell4misPct = "<td align=right>0.00%</td>"
+        cell4misCnt = "<td align=right>0</td>"
+    else:
+        color = "#FF0000" # red
+        mis_ps = "{0:.2f}".format((misses/float(count)) * 100)
+        cell4misPct = "<td align=right bgcolor=" + color + ">" + mis_ps + "%</td>"
+        cell4misCnt = "<td align=right bgcolor=" + color + ">" + str(misses) + "</td>"
+    misRow = cell4misCnt + cell4misPct
+
+    if(passed == count):
+        passed_ps = "100.00%"
+    else:
+        passed_ps = str("{0:.2f}".format((passed/float(count)) * 100)) + "%"
+    stats = """
+<td align=right>%d</td>
+<td align=right>%s</td>
+<td align=right>%d</td>
+<td align=right>%s</td>
+<td align=right>%d</td>%s</tr>
+""" % (passed, passed_ps, failures, fail_ps, count, misRow)
+
+    return stats
 
 def generate_summary(output_dir, statistics):
     fd = open(os.path.join(output_dir, "index.html"), "w")
+    topLine = getTopSummaryLine()
     content = """
 <html>
 <head>
@@ -307,18 +403,34 @@ h2 {text-transform: uppercase}
 </head>
 
 <body>
-Summary:
-<br/>
-<ul>
+<h2>SQL Coverage Test Summary Grouped By Suites:</h2>
+<h3>Random Seed: %d</h3>
+<table border=1>
+<tr>
+<td rowspan=2 align=center>Test Suite</td>
+<td colspan=5 align=center>Statements</td>
+<td colspan=2 align=center>Test Failures</td>
+<td rowspan=2 align=center>Time<br>(min:sec)</td>
+</tr>
+<tr>%s</tr>
+""" % (statistics["seed"], topLine)
+
+    def bullets(name, stats):
+        return "<tr><td><a href=\"%s/index.html\">%s</a></td>%s</tr>" % \
+            (name, name, stats)
+
+    for suiteName in sorted(statistics.iterkeys()):
+        if(suiteName != "seed" and suiteName != "totals" and not suiteName.startswith("time_for_")):
+            content += bullets(suiteName, statistics[suiteName])
+    content += "<tr><td>Totals</td>%s</tr>\n</table>" % statistics["totals"]
+    content += "\n<p>Time: %s for generating all SQL statements" % statistics["time_for_gensql"]
+    content += "\n<br>Time: %s for running all VoltDB (JNI) statements" % statistics["time_for_voltdb"]
+    content += "\n<br>Time: %s for running all HSqlDB statements" % statistics["time_for_hsqldb"]
+    content += "\n<br>Time: %s for comparing all DB results</p>" % statistics["time_for_compare"]
+    content += """
+</body>
+</html>
 """
-
-    def bullets(name, failures, mismatches):
-        return '<li><a href="%s/index.html">%s</a>: ' \
-            '%d failures, %d mismatches</li>' % \
-            (name, name, failures, mismatches)
-
-    for k, v in statistics.iteritems():
-        content += bullets(k, v[0], v[1])
 
     fd.write(content)
     fd.close()
@@ -348,4 +460,4 @@ if __name__ == "__main__":
         __quiet = False
         is_matching = strtobool(options.flag)
 
-    generate_html_reports(data, options.output_dir, options.all, is_matching)
+    generate_html_reports("suite name", data, options.output_dir, options.all, is_matching)

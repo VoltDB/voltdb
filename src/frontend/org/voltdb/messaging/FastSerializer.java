@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,19 +19,21 @@ package org.voltdb.messaging;
 
 import java.io.DataOutput;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.ParameterSet;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  * <code>DataInputStream</code> subclass to write objects that implement
@@ -98,24 +100,24 @@ public class FastSerializer implements DataOutput {
            buffer = DBBPool.wrapBB(ByteBuffer.allocate(initialAllocation));
         }
         this.callback = callback;
-        buffer.b.order(bigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
+        buffer.b().order(bigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
     }
 
     public int size() {
-        return buffer.b.position();
+        return buffer.b().position();
     }
 
     /** Clears the contents of the underlying buffer, making iteady for more writes. */
     public void clear() {
-        buffer.b.clear();
+        buffer.b().clear();
     }
 
     /** Resizes the internal byte buffer with a simple doubling policy, if needed. */
     private final void growIfNeeded(int minimumDesired) {
-        if (buffer.b.remaining() < minimumDesired) {
+        if (buffer.b().remaining() < minimumDesired) {
             // Compute the size of the new buffer
-            int newCapacity = buffer.b.capacity();
-            int newRemaining = newCapacity - buffer.b.position();
+            int newCapacity = buffer.b().capacity();
+            int newRemaining = newCapacity - buffer.b().position();
             while (newRemaining < minimumDesired) {
                 newRemaining += newCapacity;
                 newCapacity *= 2;
@@ -128,13 +130,13 @@ public class FastSerializer implements DataOutput {
             } else {
                 next = DBBPool.wrapBB(ByteBuffer.allocate(newCapacity));
             }
-            buffer.b.flip();
-            next.b.put(buffer.b);
-            assert next.b.remaining() == newRemaining;
+            buffer.b().flip();
+            next.b().put(buffer.b());
+            assert next.b().remaining() == newRemaining;
             buffer.discard();
             buffer = next;
             if (callback != null) callback.onBufferGrow(this);
-            assert(buffer.b.order() == ByteOrder.BIG_ENDIAN);
+            assert(buffer.b().order() == ByteOrder.BIG_ENDIAN);
         }
     }
 
@@ -147,12 +149,12 @@ public class FastSerializer implements DataOutput {
     public static byte[] serialize(FastSerializable object) throws IOException {
         FastSerializer out = new FastSerializer();
         object.writeExternal(out);
-        return out.getBBContainer().b.array();
+        return out.getBBContainer().b().array();
     }
 
     /** @return a reference to the underlying ByteBuffer. */
     public BBContainer getBBContainer() {
-        buffer.b.flip();
+        buffer.b().flip();
         return buffer;
     }
 
@@ -161,11 +163,11 @@ public class FastSerializer implements DataOutput {
      * Just say no to test only code. It will also leak the BBContainer if this FS is being used with a pool.
      */
     public byte[] getBytes() {
-        byte[] retval = new byte[buffer.b.position()];
-        int position = buffer.b.position();
-        buffer.b.rewind();
-        buffer.b.get(retval);
-        assert position == buffer.b.position();
+        byte[] retval = new byte[buffer.b().position()];
+        int position = buffer.b().position();
+        buffer.b().rewind();
+        buffer.b().get(retval);
+        assert position == buffer.b().position();
         return retval;
     }
 
@@ -178,10 +180,10 @@ public class FastSerializer implements DataOutput {
      */
     public ByteBuffer getBuffer() {
         assert(isDirect == false);
-        assert(buffer.b.hasArray());
-        assert(!buffer.b.isDirect());
-        buffer.b.flip();
-        return buffer.b.asReadOnlyBuffer();
+        assert(buffer.b().hasArray());
+        assert(!buffer.b().isDirect());
+        buffer.b().flip();
+        return buffer.b().asReadOnlyBuffer();
     }
 
     /**
@@ -192,7 +194,7 @@ public class FastSerializer implements DataOutput {
      */
     public BBContainer getContainerNoFlip() {
         assert(isDirect == true);
-        assert(buffer.b.isDirect());
+        assert(buffer.b().isDirect());
         return buffer;
     }
 
@@ -204,9 +206,9 @@ public class FastSerializer implements DataOutput {
      * objects.
      */
     public String getHexEncodedBytes() {
-        buffer.b.flip();
-        byte bytes[] = new byte[buffer.b.remaining()];
-        buffer.b.get(bytes);
+        buffer.b().flip();
+        byte bytes[] = new byte[buffer.b().remaining()];
+        buffer.b().get(bytes);
         String hex = Encoder.hexEncode(bytes);
         buffer.discard();
         return hex;
@@ -228,20 +230,13 @@ public class FastSerializer implements DataOutput {
      * wrapping the byte buffer.
      */
     public static void writeString(String string, ByteBuffer buffer) throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
-            buffer.putInt(NULL_STRING_INDICATOR);
+            buffer.putInt(VoltType.NULL_STRING_LENGTH);
             return;
         }
 
-        int len = 0;
-        byte[] strbytes = {};
-        try {
-            strbytes = string.getBytes("UTF-8");
-            len = strbytes.length;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        byte[] strbytes = string.getBytes(Constants.UTF8ENCODING);
+        int len = strbytes.length;
 
         buffer.putInt(len);
         buffer.put(strbytes);
@@ -256,20 +251,13 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeString(String string) throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
-            writeInt(NULL_STRING_INDICATOR);
+            writeInt(VoltType.NULL_STRING_LENGTH);
             return;
         }
 
-        int len = 0;
-        byte[] strbytes = {};
-        try {
-            strbytes = string.getBytes("UTF-8");
-            len = strbytes.length;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        byte[]  strbytes = string.getBytes(Constants.UTF8ENCODING);
+        int len = strbytes.length;
 
         writeInt(len);
         write(strbytes);
@@ -283,19 +271,44 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeVarbinary(byte[] bin) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
-        final int NULL_STRING_INDICATOR = -1;
         if (bin == null) {
-            writeInt(NULL_STRING_INDICATOR);
+            writeInt(VoltType.NULL_STRING_LENGTH);
             return;
         }
 
-        if (bin.length > MAX_LENGTH) {
+        if (bin.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Varbinary exceeds maximum length of "
-                                  + MAX_LENGTH + " bytes.");
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes.");
         }
         writeInt(bin.length);
         write(bin);
+    }
+
+    /**
+     * Write a table using it's ByteBuffer serialization code.
+     */
+    public void writeTable(VoltTable table) throws IOException {
+        int len = table.getSerializedSize();
+        growIfNeeded(len);
+        table.flattenToBuffer(buffer.b());
+    }
+
+    /**
+     * Write an SPI using it's ByteBuffer serialization code.
+     */
+    public void writeInvocation(StoredProcedureInvocation invocation) throws IOException {
+        int len = invocation.getSerializedSize();
+        growIfNeeded(len);
+        invocation.flattenToBuffer(buffer.b());
+    }
+
+    /**
+     * Write a ParameterSet using it's ByteBuffer serialization code.
+     */
+    public void writeParameterSet(ParameterSet params) throws IOException {
+        int len = params.getSerializedSize();
+        growIfNeeded(len);
+        params.flattenToBuffer(buffer.b());
     }
 
     // These writeArray() methods are tested in TestSQLTypesSuite.
@@ -325,7 +338,7 @@ public class FastSerializer implements DataOutput {
                 buf.putInt(-1); // null length prefix
             }
             else {
-                writeArray(values[i], buf);
+                SerializationHelper.writeArray(values[i], buf);
             }
         }
     }
@@ -343,15 +356,6 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    public static void writeArray(byte[] values, ByteBuffer buf) throws IOException {
-        if (values.length > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
-        }
-        buf.putInt(values.length);
-        buf.put(values);
-    }
-
     public void writeArray(byte[][] values) throws IOException {
         if (values.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Array exceeds maximum length of "
@@ -360,7 +364,7 @@ public class FastSerializer implements DataOutput {
         writeShort(values.length);
         for (int i = 0; i < values.length; ++i) {
             if (values[i] == null) {
-                writeInt(-1);
+                writeInt(VoltType.NULL_STRING_LENGTH);
             }
             else {
                 writeArray(values[i]);
@@ -377,17 +381,6 @@ public class FastSerializer implements DataOutput {
         write(values);
     }
 
-    public static void writeArray(short[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            buf.putShort(values[i]);
-        }
-    }
-
     public void writeArray(short[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -396,17 +389,6 @@ public class FastSerializer implements DataOutput {
         writeShort(values.length);
         for (int i = 0; i < values.length; ++i) {
             writeShort(values[i]);
-        }
-    }
-
-    public static void writeArray(int[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            buf.putInt(values[i]);
         }
     }
 
@@ -421,17 +403,6 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    public static void writeArray(long[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            buf.putLong(values[i]);
-        }
-    }
-
     public void writeArray(long[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -440,17 +411,6 @@ public class FastSerializer implements DataOutput {
         writeShort(values.length);
         for (int i = 0; i < values.length; ++i) {
             writeLong(values[i]);
-        }
-    }
-
-    public static void writeArray(double[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            buf.putDouble(values[i]);
         }
     }
 
@@ -476,18 +436,6 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    public static void writeArray(TimestampType[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null) buf.putLong(Long.MIN_VALUE);
-            else buf.putLong(values[i].getTime());
-        }
-    }
-
     public void writeArray(TimestampType[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -500,34 +448,19 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    public static void writeArray(BigDecimal[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null) {
-                VoltDecimalHelper.serializeNull(buf);
-            }
-            else {
-                VoltDecimalHelper.serializeBigDecimal(values[i], buf);
-            }
-        }
-    }
-
     public void writeArray(BigDecimal[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
                                   + Short.MAX_VALUE + " bytes");
         }
         writeShort(values.length);
+        growIfNeeded(16); // sizeof bigdecimal
         for (int i = 0; i < values.length; ++i) {
             if (values[i] == null) {
-                VoltDecimalHelper.serializeNull(this);
+                VoltDecimalHelper.serializeNull(buffer.b());
             }
             else {
-                VoltDecimalHelper.serializeBigDecimal(values[i], this);
+                VoltDecimalHelper.serializeBigDecimal(values[i], buffer.b());
             }
         }
     }
@@ -540,18 +473,18 @@ public class FastSerializer implements DataOutput {
     @Override
     public void write(byte[] b) throws IOException {
         growIfNeeded(b.length);
-        buffer.b.put(b);
+        buffer.b().put(b);
     }
 
     public void write(ByteBuffer b) throws IOException {
         growIfNeeded(b.limit() - b.position());
-        buffer.b.put(b);
+        buffer.b().put(b);
     }
 
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
         growIfNeeded(len);
-        buffer.b.put(b, off, len);
+        buffer.b().put(b, off, len);
     }
 
     @Override
@@ -562,7 +495,7 @@ public class FastSerializer implements DataOutput {
     @Override
     public void writeByte(int v) throws IOException {
         growIfNeeded(Byte.SIZE/8);
-        buffer.b.put((byte) v);
+        buffer.b().put((byte) v);
     }
 
     @Override
@@ -573,7 +506,7 @@ public class FastSerializer implements DataOutput {
     @Override
     public void writeChar(int v) throws IOException {
         growIfNeeded(Character.SIZE/8);
-        buffer.b.putChar((char) v);
+        buffer.b().putChar((char) v);
     }
 
     @Override
@@ -584,31 +517,31 @@ public class FastSerializer implements DataOutput {
     @Override
     public void writeDouble(double v) throws IOException {
         growIfNeeded(Double.SIZE/8);
-        buffer.b.putDouble(v);
+        buffer.b().putDouble(v);
     }
 
     @Override
     public void writeFloat(float v) throws IOException {
         growIfNeeded(Float.SIZE/8);
-        buffer.b.putFloat(v);
+        buffer.b().putFloat(v);
     }
 
     @Override
     public void writeInt(int v) throws IOException {
         growIfNeeded(Integer.SIZE/8);
-        buffer.b.putInt(v);
+        buffer.b().putInt(v);
     }
 
     @Override
     public void writeLong(long v) throws IOException {
         growIfNeeded(Long.SIZE/8);
-        buffer.b.putLong(v);
+        buffer.b().putLong(v);
     }
 
     @Override
     public void writeShort(int v) throws IOException {
         growIfNeeded(Short.SIZE/8);
-        buffer.b.putShort((short) v);
+        buffer.b().putShort((short) v);
     }
 
     @Override
@@ -620,7 +553,7 @@ public class FastSerializer implements DataOutput {
      * return Current position within the underlying buffer, for self-comparison only.
      */
     public int getPosition() {
-        return buffer.b.position();
+        return buffer.b().position();
     }
 
     /**
@@ -628,16 +561,19 @@ public class FastSerializer implements DataOutput {
      * @param pos The position to set to.
      */
     public void setPosition(int pos) {
-        buffer.b.position(pos);
+        buffer.b().position(pos);
     }
 
     public static void writeString(byte[] m_procNameBytes, ByteBuffer buf) throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
         if (m_procNameBytes == null) {
-            buf.putInt(NULL_STRING_INDICATOR);
+            buf.putInt(VoltType.NULL_STRING_LENGTH);
             return;
         }
         buf.putInt(m_procNameBytes.length);
         buf.put(m_procNameBytes);
+    }
+
+    public void discard() {
+        buffer.discard();
     }
 }

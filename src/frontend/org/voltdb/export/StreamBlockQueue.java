@@ -1,34 +1,36 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb.export;
 
-import java.util.ArrayDeque;
-import java.util.Iterator;
-
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
-import org.voltdb.utils.PersistentBinaryDeque;
-import org.voltdb.utils.BinaryDeque;
-import org.voltdb.utils.VoltFile;
-
-import org.voltcore.utils.DBBPool.BBContainer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.utils.BinaryDeque;
+import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltdb.utils.BinaryDeque.TruncatorResponse;
+import org.voltdb.utils.PersistentBinaryDeque;
+import org.voltdb.utils.PersistentBinaryDeque.ByteBufferTruncatorResponse;
+import org.voltdb.utils.VoltFile;
 
 /**
  * A customized queue for StreamBlocks that contain export data. The queue is able to
@@ -57,7 +59,7 @@ public class StreamBlockQueue {
     private final String m_nonce;
 
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
-        m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path));
+        m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
         m_nonce = nonce;
     }
 
@@ -80,7 +82,7 @@ public class StreamBlockQueue {
     private StreamBlock pollPersistentDeque(boolean actuallyPoll) {
         BBContainer cont = null;
         try {
-            cont = m_persistentDeque.poll();
+            cont = m_persistentDeque.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         } catch (IOException e) {
             exportLog.error(e);
         }
@@ -90,16 +92,10 @@ public class StreamBlockQueue {
         } else {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
-            long uso = cont.b.getLong();
-            ByteBuffer buf = cont.b.slice();
+            long uso = cont.b().getLong(0);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
-            StreamBlock block = new StreamBlock( new BBContainer(buf, 0L) {
-                    @Override
-                    public void discard() {
-                        fcont.discard();
-                    }
-                },
+            StreamBlock block = new StreamBlock( fcont,
                 uso,
                 true);
 
@@ -198,12 +194,12 @@ public class StreamBlockQueue {
     public void offer(StreamBlock streamBlock) throws IOException {
         //Already have two blocks, put it in the deque
         if (m_memoryDeque.size() > 1) {
-            m_persistentDeque.offer(streamBlock.asBufferChain());
+            m_persistentDeque.offer(streamBlock.asBBContainer());
         } else {
             //Don't offer into the memory deque if there is anything waiting to be
             //polled out of the persistent deque. Check the persistent deque
             if (pollPersistentDeque(false) != null) {
-               m_persistentDeque.offer( streamBlock.asBufferChain());
+               m_persistentDeque.offer( streamBlock.asBBContainer());
             } else {
             //Persistent deque is empty put this in memory
                m_memoryDeque.offer(streamBlock);
@@ -219,23 +215,25 @@ public class StreamBlockQueue {
      */
     public void sync(boolean nofsync) throws IOException {
         if (m_memoryDeque.peek() != null && !m_memoryDeque.peek().isPersisted()) {
-            ArrayDeque<BBContainer[]> buffersToPush = new ArrayDeque<BBContainer[]>();
-            Iterator<StreamBlock> iter = m_memoryDeque.iterator();
-            while (iter.hasNext()) {
-                StreamBlock sb = iter.next();
+            ArrayDeque<BBContainer> buffersToPush = new ArrayDeque<BBContainer>();
+            while (m_memoryDeque.peek() != null) {
+                StreamBlock sb = m_memoryDeque.peek();
                 if (sb.isPersisted()) {
-                    exportLog.error("Found a persisted export buffer after a memory buffer." +
-                            " This shouldn't happen. Will make a best effort to return all the data " +
-                            " and not leak memory");
                     break;
                 }
-
-                buffersToPush.offer( sb.asBufferChain() );
-                iter.remove();
+                m_memoryDeque.poll();
+                buffersToPush.offer(sb.asBBContainer());
             }
-            m_memoryDeque.clear();
+
             if (!buffersToPush.isEmpty()) {
-                m_persistentDeque.push(buffersToPush.toArray(new BBContainer[0][0]));
+                m_persistentDeque.push(buffersToPush.toArray(new BBContainer[0]));
+            }
+            ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
+            for (int ii = 0; ii < buffersToPush.size(); ii++) {
+                blocks.add(pollPersistentDeque(true));
+            }
+            for (int ii = blocks.size() - 1; ii >= 0; ii--) {
+                m_memoryDeque.offerFirst(blocks.get(ii));
             }
         }
 
@@ -244,29 +242,29 @@ public class StreamBlockQueue {
         }
     }
 
-    public long sizeInBytes() {
+    public long sizeInBytes() throws IOException {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
-            if (b.isPersisted()) {
-                break;
-            }
-            memoryBlockUsage += b.totalUso();
+            memoryBlockUsage += b.unreleasedSize(); //Use only unreleased size, but throw in the USO
+                                                    //to make book keeping consistent when flushed to disk
         }
-        return memoryBlockUsage + m_persistentDeque.sizeInBytes();
+        //Subtract USO from on disk size
+        return memoryBlockUsage + m_persistentDeque.sizeInBytes() - (8 * m_persistentDeque.getNumObjects());
     }
 
     public void close() throws IOException {
         sync(true);
-        m_memoryDeque.clear();
         m_persistentDeque.close();
+        for (StreamBlock sb : m_memoryDeque) {
+            sb.discard();
+        }
+        m_memoryDeque.clear();
     }
 
     public void closeAndDelete() throws IOException {
         m_persistentDeque.closeAndDelete();
         for (StreamBlock sb : m_memoryDeque) {
-            if (!sb.isPersisted()) {
-                sb.deleteContent();
-            }
+            sb.discard();
         }
     }
 
@@ -275,7 +273,8 @@ public class StreamBlockQueue {
         m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
         @Override
-        public ByteBuffer parse(ByteBuffer b) {
+        public TruncatorResponse parse(BBContainer bbc) {
+            ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
                 b.position(b.position() + 8);//Don't need the USO
@@ -295,13 +294,13 @@ public class StreamBlockQueue {
                         //If the truncation point was the first row in the block, the entire block is to be discard
                         //We know it is the first row if the position before the row is after the uso (8 bytes)
                         if (b.position() == 8) {
-                            return ByteBuffer.allocate(0);
+                            return PersistentBinaryDeque.fullTruncateResponse();
                         } else {
                             //Return everything in the block before the truncation point.
                             //Indicate this is the end of the interesting data.
                             b.limit(b.position());
                             b.position(0);
-                            return b;
+                            return new ByteBufferTruncatorResponse(b);
                         }
                     } else {
                         //Not the row we are looking to truncate at. Skip past it keeping in mind

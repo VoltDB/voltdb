@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -45,8 +45,11 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
 
     public VoltTable[] run(long rowid, long ignore)
     {
+        @SuppressWarnings("deprecation")
+        long txid = getVoltPrivateRealTransactionIdDontUseMe();
+
         // Critical for proper determinism: get a cluster-wide consistent Random instance
-        Random rand = getSeededRandomNumberGenerator();
+        Random rand = new Random(txid);
 
         // Check if the record exists first
         voltQueueSQL(check, rowid);
@@ -65,7 +68,7 @@ public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
                 VoltTableRow row = item.fetchRow(0);
                 voltQueueSQL(
                               export
-                            , getTransactionId()
+                            , txid
                             , rowid
                             , row.get( 1, VoltType.TINYINT)
                             , row.get( 2, VoltType.TINYINT)

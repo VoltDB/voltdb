@@ -2,12 +2,25 @@
 
 APPNAME="auction"
 
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
+
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(pwd)/../../../bin"
+    VOLTDB_BIN="$(dirname $(dirname $(dirname $(pwd))))/bin"
+    echo "The VoltDB scripts are not in your PATH."
+    echo "For ease of use, add the VoltDB bin directory: "
+    echo
+    echo $VOLTDB_BIN
+    echo
+    echo "to your PATH."
+    echo
 fi
+# move voltdb commands into path for this script
+PATH=$VOLTDB_BIN:$PATH
+
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
@@ -15,81 +28,81 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
 else
-    VOLTDB_LIB="`pwd`/../../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
-VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
+APPCLASSPATH=$CLASSPATH:$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
 LICENSE="$VOLTDB_VOLTDB/license.xml"
-CSVLOADER="$VOLTDB_BIN/csvloader"
-EXPORTTOFILE="$VOLTDB_BIN/exporttofile"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 
 DATAFILES="src/com/auctionexample/datafiles/"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf debugoutput $APPNAME-*.jar voltdbroot log csvloader_*.*
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj/com/auctionexample/datafiles
-    cp src/com/auctionexample/datafiles/*.txt obj/com/auctionexample/datafiles/
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
-        src/com/auctionexample/*.java \
+function jars() {
+    # compile java source
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH \
+        src/com/auctionexample/*.java
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH \
         procedures/com/auctionexample/*.java \
         procedures/com/auctionexample/debug/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    # build procedure and client jars
+    jar cf $APPNAME-procs.jar -C procedures com
+    jar cf $APPNAME-client.jar -C src com
+    # remove compiled .class files
+    rm -rf procedures/com/auctionexample/*.class \
+        procedures/com/auctionexample/debug/*.class \
+        src/com/auctionexample/*.class
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e $APPNAME-procs.jar ] || [ ! -e $APPNAME-client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host localhost
+    voltdb create -d deployment.xml -l $LICENSE -H localhost
+}
+
+# load schema and procedures
+function init() {
+    jars-ifneeded
+    sqlcmd < auction-ddl.sql
 }
 
 # run the client that drives the example
 function client() {
     # load the csv files
-    $CSVLOADER -f $DATAFILES/items.txt \
-			-p InsertIntoItemAndBid \
-         		--user program \
-         		--password pass
-    $CSVLOADER -f $DATAFILES/categories.txt \
+    csvloader -f $DATAFILES/items.txt \
+            -p InsertIntoItemAndBid \
+                --user program \
+                --password pass
+    csvloader -f $DATAFILES/categories.txt \
                         -p InsertIntoCategory \
                         --user program \
                         --password pass
-    $CSVLOADER -f $DATAFILES/users.txt \
+    csvloader -f $DATAFILES/users.txt \
                         -p InsertIntoUser \
                         --user program \
                         --password pass
-    srccompile
-    java -classpath obj:$CLASSPATH com.auctionexample.Client
-}
-
-function export() {
-    $EXPORTTOFILE \
-        --connect client --servers localhost --type csv \
-        --nonce EXPORTDEMO --user voltdb --password demo
+    jars-ifneeded
+    java -classpath $APPCLASSPATH:$APPNAME-client.jar com.auctionexample.Client
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|client|server|export}"
+    echo "Usage: ./run.sh {clean|init|client|server}"
 }
 
 # Run the target passed as the first arg on the command line

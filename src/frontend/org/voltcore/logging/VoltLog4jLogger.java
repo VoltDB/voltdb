@@ -1,24 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltcore.logging;
 
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
@@ -26,6 +25,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 import org.voltcore.logging.VoltLogger.CoreVoltLogger;
+import org.voltcore.utils.ShutdownHooks;
 
 /**
  * Implements the core logging functionality for VoltLogger specific to
@@ -37,16 +37,18 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         try {
             rb = ResourceBundle.getBundle("org/voltdb/utils/voltdb_logstrings");
         } catch (MissingResourceException e) {
-            System.err.println("Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.");
+            System.err.println("Couldn't find voltdb_logstrings resource bundle. Should be in voltdb_logstrings.properties.");
             e.printStackTrace(System.err);
             org.voltdb.VoltDB.crashLocalVoltDB(
-                    "Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.",
+                    "Couldn't find voltdb_logstrings resource bundle. Should be in voltdb_logstrings.properties.",
                     true, e);
         }
         Logger.getRootLogger().setResourceBundle(rb);
 
-        Runtime.getRuntime().addShutdownHook(
-                new Thread() {
+        // Make the LogManager shutdown hook the last thing to be done,
+        // so that we'll get logging from any other shutdown behavior.
+        ShutdownHooks.registerFinalShutdownAction(
+                new Runnable() {
                     @Override
                     public void run() {
                         LogManager.shutdown();
@@ -54,7 +56,8 @@ public class VoltLog4jLogger implements CoreVoltLogger {
                 });
     }
 
-    /*
+
+   /*
      * Encoding for various log settings that will fit in 3 bits
      */
     public static final int all = 0;
@@ -160,23 +163,13 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         return logLevels;
     }
 
-    @Override
-    public void addSimpleWriterAppender(StringWriter writer) {
-        m_logger.addAppender(new org.apache.log4j.WriterAppender(new org.apache.log4j.SimpleLayout(), writer));
-    }
-
-    @Override
-    public void setLevel(Level level) {
-        m_logger.setLevel(getPriorityForLevel(level));
-    }
-
     /**
      * Static method to change the Log4j config globally.
      * @param xmlConfig The text of a Log4j config file.
      */
     public static void configure(String xmlConfig) {
         DOMConfigurator configurator = new DOMConfigurator();
-        StringReader sr = new StringReader(xmlConfig);
+        StringReader sr = new StringReader(xmlConfig.trim());
         configurator.doConfigure(sr, LogManager.getLoggerRepository());
     }
 

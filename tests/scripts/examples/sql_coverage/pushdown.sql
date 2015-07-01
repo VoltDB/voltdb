@@ -1,27 +1,25 @@
+<grammar.sql>
 -- DML, generate random data first
 
-INSERT INTO P1 VALUES(_value[id], _value[string], _value[int16], _value[float]);
-INSERT INTO R1 VALUES(_value[id], _value[string], _value[int16], _value[float]);
-INSERT INTO P2 VALUES(_value[id], _value[string], _value[int16], _value[int16]);
+DELETE FROM _table
+-- Hard-code a couple of negative IDs into each table to force multiple matches outside the normal
+-- generated id space -- to avoid primary constraint violations, don't use _value in these lines
+INSERT INTO _table VALUES(-1,  'match',        88,            88.88);
+INSERT INTO _table VALUES(-2,  'match',        88,            88.88);
 
--- Distributed limit on a partitioned table
-SELECT _variable[@order] FROM _table order by _variable[@order] limit _value[int:0,100];
--- Distributed limit/offset on a partitioned table
-SELECT _variable[@order] FROM _table order by _variable[@order] limit _value[int:0,100] offset _value[int:0,100];
+INSERT INTO _table VALUES(_id, _value[string], _value[int16 null20], _value[float]);
 
--- Distribute a limit on a distinct scan
-SELECT distinct(_variable[@order]) FROM _table order by _variable[@order] limit _value[int:0,10];
--- Distribute a limit/offset on a distinct scan
-SELECT distinct(_variable[@order]) FROM _table order by _variable[@order] limit _value[int:0,10] offset _value[int:0,10];
+{_optionallimitoffset |= "limit 2"}
+{_optionallimitoffset |= "limit 1 offset 1"}
+--We don't support this -- is it standard SQL?
+--{_optionallimitoffset |= "        offset 1"}
 
--- Combine an aggregate with a limit, both should be pushed down.
-SELECT _variable[@order], _agg(_variable[int:0,1000]) from _table group by _variable[@order] order by _variable[@order] limit 4;
--- Combine an aggregate with a limit/offset, both should be pushed down.
-SELECT _variable[@order], _agg(_variable[int:0,1000]) from _table group by _variable[@order] order by _variable[@order] limit 4 offset 4;
+-- Distribute an optional limit/offset on an optionally distinct scan of an optionally partitioned table
+SELECT _distinct _variable FROM _table ORDER BY 1 _optionallimitoffset
 
--- Combine a of partitioned tables with a pushed-down limit
-SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID < P2.P2_ID order by P1.ID, P2.P2_ID limit 10;
-SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;
--- Combine a of partitioned tables with a pushed-down limit/offset
-SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID < P2.P2_ID order by P1.ID, P2.P2_ID limit 10 offset 10;
-SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10 offset 10;
+-- Throw in a group by and an aggregate
+SELECT _variable[#grouped], _numagg(_variable[numeric]) from _table group by __[#grouped] order by 1, 2 _optionallimitoffset
+
+-- Combine a join of optionally partitioned tables with an optional limit/offset.
+-- Stick to ID equality join to give two partitioned tables a fighting chance.
+SELECT T1.ID, T2._variable from _table T1, _table T2 where T1.ID = T2.ID order by 1, 2 _optionallimitoffset

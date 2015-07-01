@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -73,7 +73,7 @@ public class TestVerbotenPlans extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compile(projectPath, "testout.jar");
+        final boolean success = compiler.compileWithProjectXML(projectPath, "testout.jar");
 
         assertFalse(success);
     }

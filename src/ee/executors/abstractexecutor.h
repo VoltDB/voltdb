@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -46,8 +46,11 @@
 #ifndef VOLTDBNODEABSTRACTEXECUTOR_H
 #define VOLTDBNODEABSTRACTEXECUTOR_H
 
+#include "common/InterruptException.h"
+#include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
+
 #include <cassert>
 
 namespace voltdb {
@@ -69,22 +72,43 @@ class AbstractExecutor {
     bool execute(const NValueArray& params);
 
     /**
-     * Returns true if the output table for the plannode must be cleaned up
-     * after p_execute().  <b>Default is false</b>. This should be overriden in
-     * the receive executor since this is the only place we need to clean up the
-     * output table.
-     */
-    virtual bool needsPostExecuteClear() { return false; }
-
-    /**
      * Returns the plannode that generated this executor.
      */
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+
+    inline void cleanupTempOutputTable()
+    {
+        if (m_tmpOutputTable) {
+            VOLT_TRACE("Clearing output table...");
+            m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+        }
+    }
+
+    inline void cleanupInputTempTable(Table * input_table) {
+        TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
+        if (tmp_input_table) {
+            // No need of its input temp table
+            tmp_input_table->deleteAllTuplesNonVirtual(false);
+        }
+    }
+
+    virtual void cleanupMemoryPool() {
+        // LEAVE as blank on purpose
+    }
+
+    inline bool outputTempTableIsEmpty() const {
+        if (m_tmpOutputTable != NULL) {
+            return m_tmpOutputTable->activeTupleCount() == 0;
+        }
+
+        return true;
+    }
 
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;
         m_tmpOutputTable = NULL;
+        m_engine = engine;
     }
 
     /** Concrete executor classes implement initialization in p_init() */
@@ -95,38 +119,30 @@ class AbstractExecutor {
     virtual bool p_execute(const NValueArray& params) = 0;
 
     /**
-     * Returns true if the output table for the plannode must be
-     * cleared before p_execute().  <b>Default is true (clear each
-     * time)</b>. Override this method if the executor receives a
-     * plannode instance that must not be cleared.
-     * @return true if output table must be cleared; false otherwise.
+     * Set up a multi-column temp output table for those executors that require one.
+     * Called from p_init.
      */
-    virtual bool needsOutputTableClear() { return true; };
+    void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
+
+    /**
+     * Set up a single-column temp output table for DML executors that require one to return their counts.
+     * Called from p_init.
+     */
+    void setDMLCountOutputTable(TempTableLimits* limits);
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
     TempTable* m_tmpOutputTable;
 
-    // cache to avoid runtime virtual function call
-    bool needs_outputtable_clear_cached;
+    /** reference to the engine to call up to the top end */
+    VoltDBEngine* m_engine;
 };
+
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
 {
     assert(m_abstractNode);
-    VOLT_TRACE("Starting execution of plannode(id=%d)...",
-               m_abstractNode->getPlanNodeId());
-
-    if (m_tmpOutputTable)
-    {
-        VOLT_TRACE("Clearing output table...");
-        m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
-    }
-
-    // substitute params for output schema
-    for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {
-        m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
-    }
+    VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
 
     // run the executor
     return p_execute(params);

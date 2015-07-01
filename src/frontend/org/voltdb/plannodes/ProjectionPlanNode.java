@@ -1,35 +1,34 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.compiler.DatabaseEstimates;
-import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanStatistics;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -68,6 +67,13 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     public void setOutputSchema(NodeSchema schema)
     {
         m_outputSchema = schema.clone();
+        m_hasSignificantOutputSchema = true;
+    }
+
+    public void setOutputSchemaWithoutClone(NodeSchema schema)
+    {
+        m_outputSchema = schema;
+        m_hasSignificantOutputSchema = true;
     }
 
     @Override
@@ -77,6 +83,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
         resolveColumnIndexesUsingSchema(input_schema);
+
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
     }
 
     /**
@@ -97,7 +109,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // and update their indexes against the table schema
         for (TupleValueExpression tve : output_tves)
         {
-            int index = inputSchema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
             tve.setColumnIndex(index);
         }
         // DON'T RE-SORT HERE
@@ -126,6 +138,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
             {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),
+                                                         col.getTableAlias(),
                                                          col.getColumnName(),
                                                          col.getColumnAlias());
                 if (agg_col == null)
@@ -142,20 +155,25 @@ public class ProjectionPlanNode extends AbstractPlanNode {
             }
         }
         m_outputSchema = new_schema;
+        m_hasSignificantOutputSchema = true;
+
+        // Generate the output schema for subqueries
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        }
 
         return;
     }
 
     @Override
-    public boolean computeEstimatesRecursively(PlanStatistics stats,
-            Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-        // TODO Auto-generated method stub
-        return super.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
+    public void toJSONString(JSONStringer stringer) throws JSONException {
+        super.toJSONString(stringer);
     }
 
     @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException {
-        super.toJSONString(stringer);
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
     }
 
     @Override

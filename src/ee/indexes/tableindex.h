@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -60,37 +60,123 @@
 
 namespace voltdb {
 
+class AbstractExpression;
+
 /**
  * Parameter for constructing TableIndex. TupleSchema, then key schema
  */
 struct TableIndexScheme {
     TableIndexScheme() {
-        tupleSchema = keySchema = NULL;
+        tupleSchema = NULL;
     }
-    TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                     std::vector<ValueType> columnTypes, bool unique, bool intsOnly,
-                     TupleSchema *tupleSchema) {
-        this->name = name; this->type = type; this->columnIndices = columnIndices;
-        this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->keySchema = NULL;
+
+    TableIndexScheme(std::string a_name, TableIndexType a_type,
+                     const std::vector<int32_t>& a_columnIndices,
+                     const std::vector<AbstractExpression*>& a_indexedExpressions,
+                     AbstractExpression* a_predicate,
+                     bool a_unique, bool a_countable,
+                     const std::string& a_expressionsAsText,
+                     const std::string& a_predicateAsText,
+                     const TupleSchema *a_tupleSchema);
+
+    // TODO: Remove this temporary backward-compatible test-only constructor -- this should go away soon, forcing
+    // column index construction in the ee tests to provide rather than default the empty expressionsAsText string.
+    // TODO: Better yet: move the call to construct the indexId:
+    // Since the expressionsAsText is only used to additionally qualify the index id string, a process that is
+    // initiated (rather awkwardly) from the TypeIndex constructor, it would be less trouble for the VoltDBEngine
+    // (which already knows how) to always construct the entire indexId from the catalog index and pass THAT to
+    // the TableIndexScheme constructor above (fully qualified by expressionsAsText) in place of expressionsAsText.
+    // The small downside is the slightly larger string buffer being subject to the copying and recopying of
+    // TableIndexScheme members on their way to their final embedding in the TableIndex.
+    // This change would eliminate the mostly redundant method for TableIndexScheme-to-indexId conversion.
+    // TableIndexScheme construction in most if not all ee tests could provide a dummy (empty or nonce) value
+    // for indexId. Index Ids seem only to be of interest in catalog-driven processing.
+    TableIndexScheme(std::string a_name, TableIndexType a_type,
+                     const std::vector<int32_t>& a_columnIndices,
+                     const std::vector<AbstractExpression*>& a_indexedExpressions,
+                     bool a_unique, bool a_countable,
+                     const TupleSchema *a_tupleSchema) :
+      name(a_name),
+      type(a_type),
+      columnIndices(a_columnIndices),
+      indexedExpressions(a_indexedExpressions),
+      predicate(NULL),
+      allColumnIndices(a_columnIndices),
+      unique(a_unique),
+      countable(a_countable),
+      expressionsAsText(),
+      predicateAsText(),
+      tupleSchema(a_tupleSchema)
+    {
+    }
+
+    TableIndexScheme(const TableIndexScheme& other) :
+      name(other.name),
+      type(other.type),
+      columnIndices(other.columnIndices),
+      indexedExpressions(other.indexedExpressions),
+      predicate(other.predicate),
+      allColumnIndices(other.allColumnIndices),
+      unique(other.unique),
+      countable(other.countable),
+      expressionsAsText(other.expressionsAsText),
+      predicateAsText(other.predicateAsText),
+      tupleSchema(other.tupleSchema)
+    {}
+
+    TableIndexScheme& operator=(const TableIndexScheme& other)
+    {
+        name = other.name;
+        type = other.type;
+        columnIndices = other.columnIndices;
+        indexedExpressions = other.indexedExpressions;
+        predicate = other.predicate;
+        allColumnIndices = other.allColumnIndices;
+        unique = other.unique;
+        countable = other.countable;
+        expressionsAsText = other.expressionsAsText;
+        predicateAsText = other.predicateAsText;
+        tupleSchema = other.tupleSchema;
+        return *this;
+    }
+
+    static const std::vector<TableIndexScheme> noOptionalIndices()
+    {
+        return std::vector<TableIndexScheme>();
     }
 
     std::string name;
     TableIndexType type;
     std::vector<int32_t> columnIndices;
-    std::vector<ValueType> columnTypes;
+    std::vector<AbstractExpression*> indexedExpressions;
+    AbstractExpression* predicate;
+    // For partial indexes this vector contains index columns indicies plus
+    // columns that are part of the index predicate
+    std::vector<int32_t> allColumnIndices;
     bool unique;
-    bool intsOnly;
-    TupleSchema *tupleSchema;
-    TupleSchema *keySchema;
+    bool countable;
+    std::string expressionsAsText;
+    std::string predicateAsText;
+    const TupleSchema *tupleSchema;
+};
 
+struct IndexCursor {
 public:
-    void setTree() {
-        type = BALANCED_TREE_INDEX;
+    IndexCursor(const TupleSchema * schema) :
+        m_forward(true), m_match(schema)
+    {
+        memset(m_keyIter, 0, sizeof(m_keyIter));
+        memset(m_keyEndIter, 0, sizeof(m_keyEndIter));
     }
-    void setHash() {
-        type = HASH_TABLE_INDEX;
-    }
+
+    ~IndexCursor() {
+    };
+
+    // iteration stuff
+    bool m_forward;  // for tree index ONLY
+    TableTuple m_match;
+    char m_keyIter[16];
+    char m_keyEndIter[16]; // for multiple tree index ONLY
 };
 
 /**
@@ -130,33 +216,31 @@ public:
     /**
      * adds passed value as an index entry linked to given tuple
      */
-    virtual bool addEntry(const TableTuple *tuple) = 0;
+    bool addEntry(const TableTuple *tuple);
 
     /**
      * removes the index entry linked to given value (and tuple
      * pointer, if it's non-unique index).
      */
-    virtual bool deleteEntry(const TableTuple *tuple) = 0;
-
-    /**
-     * removes the index entry linked to old value and re-link it to new value.
-     * The address of the newTupleValue is used as the value in the index (and multimaps) as
-     * well as the key for the new entry.
-     */
-    virtual bool replaceEntry(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
+    bool deleteEntry(const TableTuple *tuple);
 
     /**
      * Update in place an index entry with a new tuple address
      */
-    virtual bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
+    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple,
+                                 const TableTuple &originalTuple);
+
+    /**
+     * Does the key out-of-line strings or binary data?
+     * Used for an optimization when key values are the same.
+     */
+    virtual bool keyUsesNonInlinedMemory() const = 0;
 
     /**
      * just returns whether the value is already stored. no
      * modification occurs.
      */
-    virtual bool exists(const TableTuple* values) = 0;
+    bool exists(const TableTuple* values) const;
 
     /**
      * This method moves to the first tuple equal to given key.  To
@@ -180,12 +264,74 @@ public:
      * @see moveToKeyOrGreater(const TableTuple *)
      * @return true if the value is found. false if not.
      */
-    virtual bool moveToKey(const TableTuple *searchKey) = 0;
+    virtual bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const = 0;
 
     /**
-     * Find location of the specified tuple in the tuple
+     * This method moves to the first tuple equal or greater than
+     * given key.  Use this with nextValue(). This method works for
+     * partial index search where following value might not match with
+     * any entry in this index.
+     *
+     * @see searchKey the value to be searched. this is NOT tuple
+     *      data, but chosen values for this index.  So, searchKey has
+     *      to contain values in this index's entry order.
      */
-    virtual bool moveToTuple(const TableTuple *searchTuple) = 0;
+    virtual void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
+    };
+
+    /**
+     * This method moves to the first tuple greater than given key.
+     * Use this with nextValue().
+     *
+     * @see searchKey the value to be searched. this is NOT tuple
+     *      data, but chosen values for this index.  So, searchKey has
+     *      to contain values in this index's entry order.
+     */
+    virtual bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
+    };
+
+    virtual void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
+    };
+
+    virtual void moveToBeforePriorEntry(IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
+    }
+
+    virtual void moveToPriorEntry(IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToPriorEntry which has no implementation");
+    }
+
+    /**
+     * This method moves to the beginning or the end of the indexes.
+     * Use this with nextValue().
+     *
+     * @see begin true to move to the beginning, false to the end.
+     */
+    virtual void moveToEnd(bool begin, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
+    }
+
+    /**
+     * sets the tuple to point the entry found by
+     * moveToKeyOrGreater().  calls this repeatedly to get all entries
+     * with or following to the search key.
+     *
+     * @return true if any entry to return, false if reached the end
+     * of this index.
+     */
+    virtual TableTuple nextValue(IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+    };
 
     /**
      * sets the tuple to point the entry found by moveToKey().  calls
@@ -194,7 +340,7 @@ public:
      *
      * @return true if any entry to return, false if not.
      */
-    virtual TableTuple nextValueAtKey() = 0;
+    virtual TableTuple nextValueAtKey(IndexCursor& cursor) const = 0;
 
     /**
      * sets the tuple to point the entry next to the one found by
@@ -210,69 +356,22 @@ public:
      *
      * @return true if any entry to return, false if not.
      */
-    virtual bool advanceToNextKey()
+    virtual bool advanceToNextKey(IndexCursor& cursor) const
     {
         throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
     };
 
-    /**
-     * This method moves to the first tuple equal or greater than
-     * given key.  Use this with nextValue(). This method works for
-     * partial index search where following value might not match with
-     * any entry in this index.
-     *
-     * @see searchKey the value to be searched. this is NOT tuple
-     *      data, but chosen values for this index.  So, searchKey has
-     *      to contain values in this index's entry order.
-     */
-    virtual void moveToKeyOrGreater(const TableTuple *searchKey)
+    /** retrieves from a primary key index the persistent tuple matching the given temp tuple */
+    virtual TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const
     {
-        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
-    };
-
-    /**
-     * This method moves to the first tuple greater than given key.
-     * Use this with nextValue().
-     *
-     * @see searchKey the value to be searched. this is NOT tuple
-     *      data, but chosen values for this index.  So, searchKey has
-     *      to contain values in this index's entry order.
-     */
-    virtual void moveToGreaterThanKey(const TableTuple *searchKey)
-    {
-        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
-    };
-
-    /**
-     * This method moves to the beginning or the end of the indexes.
-     * Use this with nextValue().
-     *
-     * @see begin true to move to the beginning, false to the end.
-     */
-    virtual void moveToEnd(bool begin)
-    {
-        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
-    }
-
-    /**
-     * sets the tuple to point the entry found by
-     * moveToKeyOrGreater().  calls this repeatedly to get all entries
-     * with or following to the search key.
-     *
-     * @return true if any entry to return, false if reached the end
-     * of this index.
-     */
-    virtual TableTuple nextValue()
-    {
-        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+        throwFatalException("Invoked TableIndex virtual method uniqueMatchingTuple which has no use on a non-unique index");
     };
 
     /**
      * @return true if lhs is different from rhs in this index, which
      * means replaceEntry has to follow.
      */
-    virtual bool checkForIndexChange(const TableTuple *lhs,
-                                     const TableTuple *rhs) = 0;
+    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const;
 
     /**
      * Currently, UniqueIndex is just a TableIndex with additional checks.
@@ -281,8 +380,57 @@ public:
      */
     inline bool isUniqueIndex() const
     {
-        return is_unique_index_;
+        return m_scheme.unique;
     }
+    /**
+     * Same as isUniqueIndex...
+     */
+    inline bool isCountableIndex() const
+    {
+        return m_scheme.countable;
+    }
+
+    /**
+     * Return TRUE if the index has a predicate.
+     */
+    bool isPartialIndex() const
+    {
+        return getPredicate() != NULL;
+    }
+
+    virtual bool hasKey(const TableTuple *searchKey) const = 0;
+
+    /**
+     * This function only supports countable tree index. It returns the counter value
+     * equal or greater than the serarchKey. It will return the rank with the searchKey
+     * in ascending order including itself.
+     *
+     * @parameter: isUpper means nothing to Unique index. For non-unique index, it will
+     * return the high or low rank according to this boolean flag as true or false,respectively.
+     *
+     * @Return great than rank value as "m_entries.size() + 1"  for given
+     * searchKey that is larger than all keys.
+     */
+    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
+    }
+    /**
+     * This function only supports countable tree index. It returns the counter value
+     * equal or less than the serarchKey. It will return the rank with the searchKey
+     * in ascending order including itself.
+     *
+     * @parameter: isUpper means nothing to Unique index. For non-unique index, it will
+     * return the high or low rank according to this boolean flag as true or false,respectively.
+     *
+     * @Return less than rank value as "m_entries.size()"  for given
+     * searchKey that is larger than all keys.
+     */
+    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
+    }
+
 
     virtual size_t getSize() const = 0;
 
@@ -292,25 +440,52 @@ public:
 
     const std::vector<int>& getColumnIndices() const
     {
-        return column_indices_vector_;
+        return m_scheme.columnIndices;
     }
 
-    const std::vector<ValueType>& getColumnTypes() const
+    // Return all column indicies including the predicate ones
+    const std::vector<int>& getAllColumnIndices() const
     {
-        return column_types_vector_;
+        return m_scheme.allColumnIndices;
     }
 
-    int getColumnCount() const
+    // Provide an empty expressions vector to indicate a simple columns-only index.
+    static const std::vector<AbstractExpression*>& simplyIndexColumns() {
+        static std::vector<AbstractExpression*> emptyExpressionVector;
+        return emptyExpressionVector;
+    }
+
+    const std::vector<AbstractExpression*>& getIndexedExpressions() const
     {
-        return colCount_;
+        return m_scheme.indexedExpressions;
+    }
+
+    const AbstractExpression* getPredicate() const
+    {
+        return m_scheme.predicate;
     }
 
     const std::string& getName() const
     {
-        return name_;
+        return m_scheme.name;
     }
 
-    const TupleSchema * getKeySchema() const
+    void rename(std::string name) {
+        if (m_scheme.name.compare(name) != 0) {
+            m_scheme.name = name;
+            IndexStats *stats = getIndexStats();
+            if (stats) {
+                stats->rename(name);
+            }
+        }
+    }
+
+    const std::string& getId() const
+    {
+        return m_id;
+    }
+
+    const TupleSchema *getKeySchema() const
     {
         return m_keySchema;
     }
@@ -326,36 +501,45 @@ public:
     //TODO Useful implementation of == operator.
     virtual bool equals(const TableIndex *other) const;
 
-    TableIndexScheme getScheme() const {
-        return m_scheme;
-    }
-
     virtual voltdb::IndexStats* getIndexStats();
 
-protected:
-    TableIndex(const TableIndexScheme &scheme);
+    const TupleSchema *getTupleSchema() const
+    {
+        return m_scheme.tupleSchema;
+    }
 
-    const TableIndexScheme m_scheme;
-    TupleSchema* m_keySchema;
-    std::string name_;
-    std::vector<int> column_indices_vector_;
-    std::vector<ValueType> column_types_vector_;
-    ValueType* column_types_;
-    int colCount_;
-    bool is_unique_index_;
-    int* column_indices_;
+protected:
+
+    TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme);
+
+    TableIndexScheme m_scheme;
+    const TupleSchema * const m_keySchema;
+    const std::string m_id;
 
     // counters
-    int m_lookups;
     int m_inserts;
     int m_deletes;
     int m_updates;
-    TupleSchema *m_tupleSchema;
 
     // stats
     IndexStats m_stats;
 
+protected:
+    // Index specific implementations
+    virtual bool addEntryDo(const TableTuple *tuple) = 0;
+    virtual bool deleteEntryDo(const TableTuple *tuple) = 0;
+    virtual bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple,
+                                         const TableTuple &originalTuple) = 0;
+    virtual bool existsDo(const TableTuple* values) const = 0;
+    virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
+
 private:
+
+    // This should always/only be required for unique key indexes used for primary keys.
+    virtual TableIndex *cloneEmptyNonCountingTreeIndex() const {
+        throwFatalException("Primary key index discovered to be non-unique or missing a cloneEmptyTreeIndex implementation.");
+    }
+
     ThreadLocalPool m_tlPool;
 };
 

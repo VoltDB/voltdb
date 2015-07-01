@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,7 +25,6 @@ import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
@@ -33,21 +32,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotTableTask;
 import org.voltdb.messaging.FastSerializer;
 
-import com.google.common.util.concurrent.Callables;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.Callables;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
 
@@ -57,7 +55,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private Runnable m_onCloseHandler = null;
 
     /*
@@ -81,6 +79,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
      * Accept a single write even though simulating a full disk is enabled;
      */
     private volatile boolean m_acceptOneWrite = false;
+    private boolean m_needsFinalClose = true;
 
     @SuppressWarnings("unused")
     private final String m_tableName;
@@ -159,6 +158,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();
+        m_needsFinalClose = !isReplicated;
         final FastSerializer fs = new FastSerializer();
         fs.writeInt(0);//CRC
         fs.writeInt(0);//Header length placeholder
@@ -178,20 +178,26 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
             fs.writeInt(numPartitions);
         }
         final BBContainer container = fs.getBBContainer();
-        container.b.position(4);
-        container.b.putInt(container.b.remaining() - 4);
-        container.b.position(0);
+        container.b().position(4);
+        container.b().putInt(container.b().remaining() - 4);
+        container.b().position(0);
 
         FastSerializer schemaSerializer = new FastSerializer();
-        schemaTable.writeExternal(schemaSerializer);
+        int schemaTableLen = schemaTable.getSerializedSize();
+        ByteBuffer serializedSchemaTable = ByteBuffer.allocate(schemaTableLen);
+        schemaTable.flattenToBuffer(serializedSchemaTable);
+        serializedSchemaTable.flip();
+        schemaSerializer.write(serializedSchemaTable);
         final BBContainer schemaContainer = schemaSerializer.getBBContainer();
-        schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
-        schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length
+        schemaContainer.b().limit(schemaContainer.b().limit() - 4);//Don't want the row count
+        schemaContainer.b().position(schemaContainer.b().position() + 4);//Don't want total table length
 
-        final CRC32 crc = new CRC32();
-        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaContainer.b.remaining());
-        aggregateBuffer.put(container.b);
-        aggregateBuffer.put(schemaContainer.b);
+        final PureJavaCrc32 crc = new PureJavaCrc32();
+        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaContainer.b().remaining());
+        aggregateBuffer.put(container.b());
+        container.discard();
+        aggregateBuffer.put(schemaContainer.b());
+        schemaContainer.discard();
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
 
@@ -212,7 +218,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
          */
         m_acceptOneWrite = true;
         ListenableFuture<?> writeFuture =
-                write(Callables.returning((BBContainer)DBBPool.wrapBB(aggregateBuffer)), false);
+                write(Callables.returning(DBBPool.wrapBB(aggregateBuffer)), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
@@ -236,13 +242,19 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
                     try {
                         m_channel.force(false);
                     } catch (IOException e) {
-                        hostLog.error("Error syncing snapshot", e);
+                        SNAP_LOG.error("Error syncing snapshot", e);
                     }
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }
             }
         }, 1, 1, TimeUnit.SECONDS);
         m_syncTask = syncTask;
+    }
+
+    @Override
+    public boolean needsFinalClose()
+    {
+        return m_needsFinalClose;
     }
 
     @Override
@@ -300,8 +312,8 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         }
 
         if (prependLength) {
-            tupleData.b.putInt(tupleData.b.remaining() - 4);
-            tupleData.b.position(0);
+            tupleData.b().putInt(tupleData.b().remaining() - 4);
+            tupleData.b().position(0);
         }
 
         m_outstandingWriteTasks.incrementAndGet();
@@ -317,17 +329,17 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
 
-                    m_bytesAllowedBeforeSync.acquire(tupleData.b.remaining());
+                    m_bytesAllowedBeforeSync.acquire(tupleData.b().remaining());
 
                     int totalWritten = 0;
-                    while (tupleData.b.hasRemaining()) {
-                        totalWritten += m_channel.write(tupleData.b);
+                    while (tupleData.b().hasRemaining()) {
+                        totalWritten += m_channel.write(tupleData.b());
                     }
                     m_bytesWritten += totalWritten;
                     m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                 } catch (IOException e) {
                     m_writeException = e;
-                    hostLog.error("Error while attempting to write snapshot data to file " + m_file, e);
+                    SNAP_LOG.error("Error while attempting to write snapshot data to file " + m_file, e);
                     m_writeFailed = true;
                     throw e;
                 } finally {
@@ -348,7 +360,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public ListenableFuture<?> write(final Callable<BBContainer> tupleData, SnapshotTableTask context) {
+    public ListenableFuture<?> write(final Callable<BBContainer> tupleData, int tableId) {
         return write(tupleData, true);
     }
 
@@ -370,5 +382,15 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public SnapshotFormat getFormat() {
         return SnapshotFormat.NATIVE;
+    }
+
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
     }
 }

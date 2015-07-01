@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,14 +19,17 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.ExecutionException;
 
-import java.util.List;
-
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
+import org.voltdb.MemoryStats;
+import org.voltdb.ProducerDRGateway;
+import org.voltdb.StartAction;
+import org.voltdb.StatsAgent;
 
 /**
  * Abstracts the top-level interface to create and configure an Iv2
@@ -35,15 +38,25 @@ import org.voltdb.CatalogSpecificPlanner;
 public interface Initiator
 {
     /** Configure an Initiator and prepare it for work */
-    public void configure(BackendTarget backend, String serializedCatalog,
+    public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          StartAction startAction,
+                          StatsAgent agent,
+                          MemoryStats memStats,
+                          CommandLog cl,
+                          ProducerDRGateway nodeDRGateway,
+                          ConsumerDRGateway consumerDRGateway,
+                          boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException;
 
     /** Shutdown an Initiator and its sub-components. */
     public void shutdown();
+
+    /** Ask for the partition ID this initiator is assigned to */
+    public int getPartitionId();
 
     /** Ask for the HSId used to address this Initiator. */
     public long getInitiatorHSId();
@@ -55,7 +68,6 @@ public interface Initiator
     public Term createTerm(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami);
 
-    /** Create a Promotion implementation appropriate for the subclass */
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami);
+    /** Write a viable replay set to the command log */
+    public void enableWritingIv2FaultLog();
 }

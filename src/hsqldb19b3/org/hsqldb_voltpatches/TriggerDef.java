@@ -126,7 +126,7 @@ public class TriggerDef implements Runnable, SchemaObject {
      * @param  table the Table object upon which the indicated operation
      *      fires the trigger
      * @param  triggerClassName the fully qualified named of the class implementing
-     *      the org.hsqldb.Trigger (trigger body) interface
+     *      the org.hsqldb_voltpatches.Trigger (trigger body) interface
      * @param  noWait do not wait for available space on the pending queue; if
      *      the pending queue does not have fewer than nQueueSize queued items,
      *      then overwrite the current tail instead

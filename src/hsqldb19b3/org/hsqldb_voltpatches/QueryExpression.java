@@ -71,24 +71,6 @@ public class QueryExpression {
                             EXCEPT        = 6,
                             UNION_TERM    = 7;
 
-    private static final String[] m_setOperatorNames = new String[] {
-        "NOUNION",
-        "UNION",
-        "UNION_ALL",
-        "INTERSECT",
-        "INTERSECT_ALL",
-        "EXCEPT_ALL",
-        "EXCEPT",
-        "UNION_TERM",
-        };
-
-    public final String operatorName() {
-        if (unionType < 0 || unionType >= m_setOperatorNames.length ) {
-            return "INVALID";
-        }
-        return m_setOperatorNames[unionType];
-    }
-
     //
     int                     columnCount;
     private QueryExpression leftQueryExpression;
@@ -804,4 +786,49 @@ public class QueryExpression {
         leftQueryExpression.getBaseTableNames(set);
         rightQueryExpression.getBaseTableNames(set);
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    private static final String[] m_setOperatorNames = new String[] {
+        "NOUNION",
+        "UNION",
+        "UNION_ALL",
+        "INTERSECT",
+        "INTERSECT_ALL",
+        "EXCEPT_ALL",
+        "EXCEPT",
+        "UNION_TERM",
+        };
+
+    public final String operatorName() {
+        if (unionType < 0 || unionType >= m_setOperatorNames.length ) {
+            return "INVALID";
+        }
+        return m_setOperatorNames[unionType];
+    }
+
+    /**
+     * VoltDB added method to get a union operation type.
+     * @return int representing union operation type.
+     */
+    public int getUnionType() {
+        return unionType;
+    }
+
+    /**
+     * VoltDB added method to get the left expression.
+     * @return QueryExpression Left expression.
+     */
+    public QueryExpression getLeftQueryExpression() {
+        return leftQueryExpression;
+    }
+
+    /**
+     * VoltDB added method to get the right expression.
+     * @return QueryExpression Right expression.
+     */
+    public QueryExpression getRightQueryExpression() {
+        return rightQueryExpression;
+    }
+    /**********************************************************************/
 }

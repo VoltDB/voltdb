@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -20,16 +20,16 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * Forces a flush of committed Export data to the connector queues.
@@ -60,14 +60,6 @@ public class Quiesce extends VoltSystemProcedure {
             if (fragmentId == SysProcFragmentId.PF_quiesce_sites) {
                 // tell each site to quiesce
                 context.getSiteProcedureConnection().quiesce();
-                try {
-                    int result = Runtime.getRuntime().exec("sync").waitFor();
-                    if (result != 0) {
-                        HOST_LOG.error("Quiesce sync invocation returned " + result);
-                    }
-                } catch (Exception e) {
-                    HOST_LOG.error(e);
-                }
                 VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
                 results.addRow(context.getSiteId());
                 return new DependencyPair(DEP_SITES, results);
@@ -98,14 +90,14 @@ public class Quiesce extends VoltSystemProcedure {
             pfs1[0].outputDepId = DEP_SITES;
             pfs1[0].inputDepIds = new int[]{};
             pfs1[0].multipartition = true;
-            pfs1[0].parameters = new ParameterSet();
+            pfs1[0].parameters = ParameterSet.emptyParameterSet();
 
             pfs1[1] = new SynthesizedPlanFragment();
             pfs1[1].fragmentId = SysProcFragmentId.PF_quiesce_processed_sites;
             pfs1[1].outputDepId = DEP_PROCESSED_SITES;
             pfs1[1].inputDepIds = new int[] { DEP_SITES };
             pfs1[1].multipartition = false;
-            pfs1[1].parameters = new ParameterSet();
+            pfs1[1].parameters = ParameterSet.emptyParameterSet();
 
             try {
                 result = executeSysProcPlanFragments(pfs1, DEP_PROCESSED_SITES);

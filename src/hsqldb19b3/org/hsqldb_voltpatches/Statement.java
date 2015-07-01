@@ -31,11 +31,10 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
 /**
  * Base class for compiled statement objects.<p>
@@ -122,7 +121,7 @@ public abstract class Statement {
 
     public abstract String describe(Session session);
 
-    public HsqlName getSchemaName() {
+    public HsqlName getSchemalName() {
         return schemaName;
     }
 
@@ -200,8 +199,7 @@ public abstract class Statement {
         return ResultMetaData.emptyParamMetaData;
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -211,9 +209,11 @@ public abstract class Statement {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session)
-    throws HSQLParseException
+    VoltXMLElement voltGetStatementXML(Session session)
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        throw new RuntimeException("Unsupported method in Statement base class.");
+        throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                "this type of sql statement is not supported or is not not allowed in this context");
     }
+    /**********************************************************************/
 }

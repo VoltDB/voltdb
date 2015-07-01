@@ -1,9 +1,3 @@
-{@insert_vals = "_value[id], _value[string], _value[int32], _value[float]"}
-{@from_tables = "_table, _table"}
-{@col_type = "int"}
-{@cmp_type = "_value[int:0,100]"}
-{@assign_col = "NUM"}
-{@assign_type = "_value[int:0,100]"}
-{@optional_fn = "_pick[@FN1 <options=,ABS>]"}
-{@optional_fn2 = "_pick[@FN2 <options=,ABS>]"}
+<configure-for-joins.sql>
 <advanced-template.sql>
+

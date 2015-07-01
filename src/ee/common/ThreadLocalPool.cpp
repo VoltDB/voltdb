@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/ThreadLocalPool.h"
@@ -22,6 +22,11 @@
 #include "common/SQLException.h"
 
 namespace voltdb {
+// This needs to be >= the VoltType.MAX_VALUE_LENGTH defined in java, currently 1048576.
+// The rationale for making it any larger would be to allow calculating wider "temp" values
+// for use in situations where they are not being stored as column values.
+const int ThreadLocalPool::POOLED_MAX_VALUE_LENGTH = 1048576;
+
 /**
  * Thread local key for storing thread specific memory pools
  */
@@ -156,8 +161,8 @@ ThreadLocalPool::getAllocationSizeForObject(std::size_t length) {
     } else if (length <= 524288 + 262144) {
         return 524288 + 262144;
         //Need space for a length prefix and a backpointer
-    } else if (length <= 1048576 + sizeof(int32_t) + sizeof(void*)) {
-        return 1048576 + sizeof(int32_t) + sizeof(void*);
+    } else if (length <= POOLED_MAX_VALUE_LENGTH + sizeof(int32_t) + sizeof(void*)) {
+        return POOLED_MAX_VALUE_LENGTH + sizeof(int32_t) + sizeof(void*);
     } else {
         // Do this so that we can use this method to compute allocation sizes.
         // Expect callers to check for 0 and throw a FatalException for

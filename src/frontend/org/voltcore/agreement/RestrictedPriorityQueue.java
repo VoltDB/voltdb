@@ -1,32 +1,32 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltcore.agreement;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.PriorityQueue;
 
+import org.apache.zookeeper_voltpatches.ZooDefs.OpCode;
+import org.voltcore.TransactionIdManager;
+import org.voltcore.agreement.AgreementSite.AgreementTransactionState;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
 /**
@@ -62,62 +62,17 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         long m_lastSeenTxnId;
         long m_lastSafeTxnId;
+
+        @Override
+        public String toString() {
+            return "{" + TransactionIdManager.toString(m_lastSeenTxnId) + "," + TransactionIdManager.toString(m_lastSafeTxnId) + "}";
+        }
     }
 
     final LinkedHashMap<Long, LastInitiatorData> m_initiatorData = new LinkedHashMap<Long, LastInitiatorData>();
-    final LinkedList<RoadBlock> m_roadblocks = new LinkedList<RoadBlock>();
-
-    /**
-     * A future transaction point at which RPQ must send an action
-     * message and stall indefinitely.
-     */
-    static class RoadBlock implements Comparable<RoadBlock> {
-        final long m_transactionId;
-        final QueueState m_reason;
-        final VoltMessage m_action;
-
-        RoadBlock(long id, QueueState reason, VoltMessage action) {
-            m_transactionId = id;
-            m_reason = reason;
-            m_action = action;
-        }
-
-        @Override
-        public int compareTo(RoadBlock o) {
-            if (m_transactionId < o.m_transactionId) {
-                return -1;
-            } else if (m_transactionId > o.m_transactionId) {
-                return 1;
-            }
-            return 0;
-        }
-    }
-
-    public void makeRoadBlock(long blockAfter, QueueState blockReason, VoltMessage action) {
-        RoadBlock roadblock = new RoadBlock(blockAfter, blockReason, action);
-        m_roadblocks.add(roadblock);
-        Collections.sort(m_roadblocks);
-    }
-
-    QueueState checkRoadBlock(long txnId) {
-        // System.out.println("Checking roadblock with txnId: " + txnId);
-        RoadBlock roadblock = m_roadblocks.peek();
-        if (roadblock != null && roadblock.m_transactionId < txnId) {
-            roadblock = m_roadblocks.poll();
-            hostLog.info("Delivering roadblock action: " +
-                         roadblock.m_action + " for txnId: " +
-                         roadblock.m_transactionId);
-            if (roadblock.m_action != null) {
-                m_mailbox.deliverFront(roadblock.m_action);
-            }
-            return roadblock.m_reason;
-        }
-        return QueueState.UNBLOCKED;
-    }
 
     long m_newestCandidateTransaction = -1;
     final long m_hsId;
-    long m_txnsPopped = 0;
     QueueState m_state = QueueState.BLOCKED_EMPTY;
     final Mailbox m_mailbox;
     final boolean m_useSafetyDance;
@@ -143,7 +98,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         if (m_state == QueueState.UNBLOCKED) {
             retval = super.peek();
             super.poll();
-            m_txnsPopped++;
             // not BLOCKED_EMPTY
             assert(retval != null);
         }
@@ -190,7 +144,8 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
-    public long noteTransactionRecievedAndReturnLastSeen(long initiatorHSId, long txnId, boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
+    public long noteTransactionRecievedAndReturnLastSeen(long initiatorHSId, long txnId,
+            long lastSafeTxnIdFromInitiator)
     {
         // System.out.printf("Site %d got heartbeat message from initiator %d with txnid/safeid: %d/%d\n",
         //                   m_siteId, initiatorSiteId, txnId, lastSafeTxnIdFromInitiator);
@@ -234,30 +189,13 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     }
 
     /**
-     * Used to poke the PartitionDRGateway with a number that should increase with
-     * time as a lower bound on the txnid of the next real work the EE is going to see.
-     * @return 0 if queue is non-empty, a valid txnid otherwise
-     */
-    public long getEarliestSeenTxnIdAcrossInitiatorsWhenEmpty() {
-        if (m_state != QueueState.BLOCKED_EMPTY)
-            return 0;
-        long txnId = Long.MAX_VALUE;
-        for (LastInitiatorData lid : m_initiatorData.values()) {
-            if (txnId > lid.m_lastSeenTxnId)
-                txnId = lid.m_lastSeenTxnId;
-        }
-        txnId = Math.max(0, txnId);
-        return txnId;
-    }
-
-    /**
      * Remove all pending transactions from the specified initiator
      * and do not require heartbeats from that initiator to proceed.
      * @param initiatorId id of the failed initiator.
      */
     public void gotFaultForInitiator(long initiatorId) {
         // calculate the next minimum transaction w/o our dead friend
-        noteTransactionRecievedAndReturnLastSeen(initiatorId, Long.MAX_VALUE, true, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
+        noteTransactionRecievedAndReturnLastSeen(initiatorId, Long.MAX_VALUE, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
 
         // remove initiator from minimum. txnid scoreboard
         LastInitiatorData remove = m_initiatorData.remove(initiatorId);
@@ -325,32 +263,28 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         // Empty queue
         if (ts == null) {
-            // Roadblocks - heartbeats can drive an empty queue
-            // to the BLOCKED_CLOSED state, too.
-            QueueState checkRoadBlock = checkRoadBlock(m_newestCandidateTransaction);
-            if (checkRoadBlock == QueueState.BLOCKED_CLOSED) {
-                executeStateChange(checkRoadBlock, ts, lid);
-                return m_state;
-            } else {
-                //No roadblock due to heartbeats, switch to BLOCKED_EMPTY
-                newState = QueueState.BLOCKED_EMPTY;
-                executeStateChange(newState, ts, lid);
-                return m_state;
-            }
-
+            //Switch to BLOCKED_EMPTY
+            newState = QueueState.BLOCKED_EMPTY;
+            executeStateChange(newState, ts, lid);
+            return m_state;
         }
         assert (newState == QueueState.UNBLOCKED);
 
-        // Roadblocks - txn drives queue to BLOCKED_CLOSED due to roadblock
-        {
-            newState = checkRoadBlock(ts.txnId);
-            if (newState == QueueState.BLOCKED_CLOSED) {
-                executeStateChange(newState, ts, lid);
-                return m_state;
+        if (ts instanceof AgreementTransactionState) {
+            AgreementTransactionState ats = (AgreementTransactionState)ts;
+            switch (ats.m_request.type) {
+                //For reads see if we can skip global agreement and just do the read
+                case OpCode.exists:
+                case OpCode.getChildren:
+                case OpCode.getChildren2:
+                case OpCode.getData:
+                    newState = QueueState.UNBLOCKED;
+                    executeStateChange(newState, ts, lid);
+                    return newState;
+                default:
+                    break;
             }
         }
-
-        assert (newState == QueueState.UNBLOCKED);
 
         // Sufficient ordering established?
         if (ts.txnId > m_newestCandidateTransaction) {
@@ -463,6 +397,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         }
     }
 
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("State: ").append(m_state);

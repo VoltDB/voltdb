@@ -1,45 +1,45 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
 
-import java.util.ArrayList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-
-import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.licensetool.LicenseApi;
 
-import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
 {
     public boolean rejoining();
+    public boolean rejoinDataPending();
 
-    /*
+    /**
      * Invoked from the command log once this node is marked unfaulted.
-     * Allows its command log to be used for recovery
+     * Allows its command log to be used for recovery.
+     * @param requestId The id, if any, associated with the truncation request.
      */
-    public void recoveryComplete();
+    public void recoveryComplete(String requestId);
 
     public void readBuildInfo(String editionTag);
 
@@ -64,22 +64,27 @@ public interface VoltDBInterface
      */
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
 
+    boolean isMpSysprocSafeToExecute(long txnId);
+
     public void startSampler();
 
     public VoltDB.Configuration getConfig();
     public CatalogContext getCatalogContext();
-    public SiteTracker getSiteTracker();
     public String getBuildString();
     public String getVersionString();
+    /** Can this version of VoltDB run with the version string given? */
+    public boolean isCompatibleVersionString(String versionString);
+    /** Version string that isn't overriden for test used to find native lib */
+    public String getEELibraryVersionString();
     public HostMessenger getHostMessenger();
-    public ArrayList<ClientInterface> getClientInterfaces();
-    public Map<Long, ExecutionSite> getLocalSites();
+    public ClientInterface getClientInterface();
+    public OpsAgent getOpsAgent(OpsSelector selector);
+    // Keep this method to centralize the cast to StatsAgent for
+    // existing code
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
-    public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
-    public MailboxPublisher getMailboxPublisher();
     public SiteTracker getSiteTrackerForSnapshot();
 
     /**
@@ -94,14 +99,25 @@ public interface VoltDBInterface
      * Updates the catalog context stored by this VoltDB without destroying the old one,
      * in case anything still links to it.
      *
-     * @param newCatalogBytes The catalog bytes.
      * @param diffCommands The commands to update the current catalog to the new one.
+     * @param newCatalogBytes The catalog bytes.
+     * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
+     * @param currentTxnId
+     * @param currentTxnTimestamp
      * @param currentTxnId  The transaction ID at which this method is called
-     * @param deploymentCRC The CRC of the deployment file
+     * @param deploymentBytes  The deployment file bytes
+     * @param deploymentHash The SHA-1 hash of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands, byte[] newCatalogBytes,
-           int expectedCatalogVersion, long currentTxnId, long deploymentCRC);
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
+            String diffCommands,
+            byte[] newCatalogBytes,
+            byte[] catalogBytesHash,
+            int expectedCatalogVersion,
+            long currentTxnId,
+            long currentTxnTimestamp,
+            byte[] deploymentBytes,
+            byte[] deploymentHash);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
@@ -110,6 +126,28 @@ public interface VoltDBInterface
      * @return true if the VoltDB is running.
      */
     public boolean isRunning();
+
+    /**
+     * Halt a node used by @StopNode
+     */
+    public void halt();
+
+    /**
+     * @return The number of milliseconds the cluster has been up
+     */
+    public long getClusterUptime();
+
+    /**
+     * @return The time the cluster's Create start action
+     */
+    public long getClusterCreateTime();
+
+    /**
+     * Set the time at which the cluster was created. This method is used when
+     * in the Recover action and @SnapshotRestore paths to assign the cluster
+     * create time that was preserved in the snapshot.
+     */
+    public void setClusterCreateTime(long clusterCreateTime);
 
     /**
      * Notify RealVoltDB that recovery is complete
@@ -137,6 +175,12 @@ public interface VoltDBInterface
 
     public boolean getReplicationActive();
 
+    public ProducerDRGateway getNodeDRGateway();
+
+    public ConsumerDRGateway getConsumerDRGateway();
+
+    public void onSyncSnapshotCompletion();
+
     /**
      * Set the operation mode of this server.
      * @param mode the operational mode to enter
@@ -150,8 +194,16 @@ public interface VoltDBInterface
 
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
 
+    public ScheduledExecutorService getSES(boolean priority);
+
     /**
      * Schedule a work to be performed once or periodically.
+     * No blocking or resource intensive work should be done
+     * from this thread. High priority tasks,
+     * that are known not to do anything risky can use
+     * schedulePriorityWork if they actually have fine grained requirements.
+     * All others should use schedule work
+     * and be aware that they may stomp on each other.
      *
      * @param work
      *            The work to be scheduled
@@ -168,6 +220,26 @@ public interface VoltDBInterface
                              TimeUnit unit);
 
     /**
+     * Schedule a work to be performed once or periodically.
+     * This is for high priority work with fine grained scheduling requirements.
+     * Tasks submitted here must absolutely not do any work in the scheduler thread.
+     * Submit the work to be done to a different thread unless it is absolutely trivial.
+     *
+     * @param work
+     *            The work to be scheduled
+     * @param initialDelay
+     *            The initial delay before the first execution of the work
+     * @param delay
+     *            The delay between each subsequent execution of the work. If
+     *            this is negative, the work will only be executed once after
+     *            the initial delay.
+     * @param unit
+     *            Time unit
+     */
+    public ScheduledFuture<?> schedulePriorityWork(Runnable work, long initialDelay, long delay,
+                             TimeUnit unit);
+
+    /**
      * Return an executor service for running non-blocking but computationally expensive
      * tasks.
      */
@@ -175,8 +247,12 @@ public interface VoltDBInterface
 
     /**
      * Return the license api. This may be null in community editions!
+     * @return License API based on edition.
      */
      public LicenseApi getLicenseApi();
+     //Return JSON string represenation of license information.
+     public String getLicenseInformation();
 
-     public boolean isIV2Enabled();
+
+    public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
 }

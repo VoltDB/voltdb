@@ -37,11 +37,11 @@ public class Client {
          * Load the database.
          */
         try {
-            myApp.callProcedure("Insert", "Hello",   "World",  language[0]);
-            myApp.callProcedure("Insert", "Bonjour", "Monde",  language[1]);
-            myApp.callProcedure("Insert", "Hola",    "Mundo",  language[2]);
-            myApp.callProcedure("Insert", "Hej",     "Verden", language[3]);
-            myApp.callProcedure("Insert", "Ciao",    "Mondo",  language[4]);
+            myApp.callProcedure("Insert", language[0], "Hello",   "World");
+            myApp.callProcedure("Insert", language[1], "Bonjour", "Monde");
+            myApp.callProcedure("Insert", language[2], "Hola",    "Mundo");
+            myApp.callProcedure("Insert", language[3], "Hej",     "Verden");
+            myApp.callProcedure("Insert", language[4], "Ciao",    "Mondo");
         } catch (Exception e) {
                // Not to worry. Ignore constraint violations if we 
                // load this table more than once. 

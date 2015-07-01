@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -46,7 +46,9 @@
 #include <sstream>
 #include <cassert>
 #include <cstdio>
-#include "boost/scoped_array.hpp"
+#include <boost/foreach.hpp>
+#include <boost/scoped_array.hpp>
+
 #include "table.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -65,11 +67,10 @@ namespace voltdb {
 Table::Table(int tableAllocationTargetSize) :
     m_tempTuple(),
     m_schema(NULL),
-    m_columnNames(NULL),
+    m_columnNames(),
     m_columnHeaderData(NULL),
     m_columnHeaderSize(-1),
     m_tupleCount(0),
-    m_usedTupleCount(0),
     m_tuplesPinnedByUndo(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
@@ -78,7 +79,9 @@ Table::Table(int tableAllocationTargetSize) :
     m_name(""),
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
-    m_refcount(0)
+    m_pkeyIndex(NULL),
+    m_refcount(0),
+    m_compactionThreshold(95)
 {
 }
 
@@ -86,15 +89,18 @@ Table::~Table() {
     // not all tables are reference counted but this should be invariant
     assert(m_refcount == 0);
 
+    // clean up indexes
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        delete index;
+    }
+    m_pkeyIndex = NULL;
+
     // clear the schema
     if (m_ownsTupleSchema) {
         TupleSchema::freeTupleSchema(m_schema);
     }
 
     m_schema = NULL;
-    delete[] m_columnNames;
-    m_columnNames = NULL;
-    m_tempTuple.m_data = NULL;
 
     // clear any cached column serializations
     if (m_columnHeaderData)
@@ -102,7 +108,7 @@ Table::~Table() {
     m_columnHeaderData = NULL;
 }
 
-void Table::initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema) {
+void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold) {
 
     // copy the tuple schema
     if (m_ownsTupleSchema) {
@@ -137,8 +143,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 #endif
 
     // initialize column names
-    delete[] m_columnNames;
-    m_columnNames = new std::string[m_columnCount];
+    m_columnNames.resize(m_columnCount);
     for (int i = 0; i < m_columnCount; ++i)
         m_columnNames[i] = columnNames[i];
 
@@ -151,10 +156,9 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
     // set the data to be empty
     m_tupleCount = 0;
 
-    m_tmpTarget1 = TableTuple(m_schema);
-    m_tmpTarget2 = TableTuple(m_schema);
-
     onSetColumns(); // for more initialization
+
+    m_compactionThreshold = compactionThreshold;
 }
 
 // ------------------------------------------------------------------
@@ -361,8 +365,8 @@ bool Table::equals(voltdb::Table *other) {
     if (!(name() == other->name())) return false;
     if (!(tableType() == other->tableType())) return false;
 
-    std::vector<voltdb::TableIndex*> indexes = allIndexes();
-    std::vector<voltdb::TableIndex*> otherIndexes = other->allIndexes();
+    const std::vector<voltdb::TableIndex*>& indexes = allIndexes();
+    const std::vector<voltdb::TableIndex*>& otherIndexes = other->allIndexes();
     if (!(indexes.size() == indexes.size())) return false;
     for (std::size_t ii = 0; ii < indexes.size(); ii++) {
         if (!(indexes[ii]->equals(otherIndexes[ii]))) return false;
@@ -372,7 +376,7 @@ bool Table::equals(voltdb::Table *other) {
     if ((!m_schema->equals(otherSchema))) return false;
 
     voltdb::TableIterator firstTI = iterator();
-    voltdb::TableIterator secondTI = iterator();
+    voltdb::TableIterator secondTI = other->iterator();
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
     while(firstTI.next(firstTuple)) {
@@ -382,40 +386,53 @@ bool Table::equals(voltdb::Table *other) {
     return true;
 }
 
-voltdb::TableStats* Table::getTableStats() {
-    return NULL;
-}
-
-std::vector<std::string> Table::getColumnNames() {
-    std::vector<std::string> columnNames;
-    for (int ii = 0; ii < m_columnCount; ii++) {
-        columnNames.push_back(m_columnNames[ii]);
-    }
-    return columnNames;
-}
-
-void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
-                                   Pool *stringPool) {
+void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
+                                   Pool *stringPool,
+                                   ReferenceSerializeOutput *uniqueViolationOutput,
+                                   bool shouldDRStreamRow) {
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
-    for (int i = 0; i < tupleCount; ++i) {
-        nextFreeTuple(&m_tmpTarget1);
-        m_tmpTarget1.setActiveTrue();
-        m_tmpTarget1.setDirtyFalse();
-        m_tmpTarget1.setPendingDeleteFalse();
-        m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
-        m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
+    TableTuple target(m_schema);
 
-        processLoadedTuple(m_tmpTarget1);
+    //Reserve space for a length prefix for rows that violate unique constraints
+    //If there is no output supplied it will just throw
+    size_t lengthPosition = 0;
+    int32_t serializedTupleCount = 0;
+    size_t tupleCountPosition = 0;
+    if (uniqueViolationOutput != NULL) {
+        lengthPosition = uniqueViolationOutput->reserveBytes(4);
     }
 
-    m_tupleCount += tupleCount;
-    m_usedTupleCount += tupleCount;
+    for (int i = 0; i < tupleCount; ++i) {
+        nextFreeTuple(&target);
+        target.setActiveTrue();
+        target.setDirtyFalse();
+        target.setPendingDeleteFalse();
+        target.setPendingDeleteOnUndoReleaseFalse();
+
+        target.deserializeFrom(serialize_io, stringPool);
+
+        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow);
+    }
+
+    //If unique constraints are being handled, write the length/size of constraints that occured
+    if (uniqueViolationOutput != NULL) {
+        if (serializedTupleCount == 0) {
+            uniqueViolationOutput->writeIntAt(lengthPosition, 0);
+        } else {
+            uniqueViolationOutput->writeIntAt(lengthPosition,
+                                              static_cast<int32_t>(uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t)));
+            uniqueViolationOutput->writeIntAt(tupleCountPosition,
+                                              serializedTupleCount);
+        }
+    }
 }
 
-void Table::loadTuplesFrom(SerializeInput &serialize_io,
-                           Pool *stringPool) {
+void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
+                           Pool *stringPool,
+                           ReferenceSerializeOutput *uniqueViolationOutput,
+                           bool shouldDRStreamRow) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -472,7 +489,104 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialize_io, stringPool);
+    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
+
+bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {
+    BOOST_FOREACH(TableIndex *i2, indexes) {
+        if (i2 == index) {
+            return true;
+        }
+    }
+    return false;
+}
+
+TableIndex *Table::index(std::string name) {
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        if (index->getName().compare(name) == 0) {
+            return index;
+        }
+    }
+    std::stringstream errorString;
+    errorString << "Could not find Index with name " << name << " among {";
+    const char* sep = "";
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        errorString << sep << index->getName();
+        sep = ", ";
+    }
+    errorString << "}";
+    throwFatalException("%s", errorString.str().c_str());
+}
+
+void Table::addIndex(TableIndex *index) {
+    // silently ignore indexes if they've gotten this far
+    if (isExport()) {
+        return;
+    }
+
+    assert(!isExistingTableIndex(m_indexes, index));
+
+    // fill the index with tuples... potentially the slow bit
+    TableTuple tuple(m_schema);
+    TableIterator iter = iterator();
+    while (iter.next(tuple)) {
+        index->addEntry(&tuple);
+    }
+
+    // add the index to the table
+    if (index->isUniqueIndex()) {
+        m_uniqueIndexes.push_back(index);
+    }
+    m_indexes.push_back(index);
+}
+
+void Table::removeIndex(TableIndex *index) {
+    // silently ignore indexes if they've gotten this far
+    if (isExport()) {
+        return;
+    }
+
+    assert(isExistingTableIndex(m_indexes, index));
+
+    std::vector<TableIndex*>::iterator iter;
+    for (iter = m_indexes.begin(); iter != m_indexes.end(); iter++) {
+        if ((*iter) == index) {
+            m_indexes.erase(iter);
+            break;
+        }
+    }
+    for (iter = m_uniqueIndexes.begin(); iter != m_uniqueIndexes.end(); iter++) {
+        if ((*iter) == index) {
+            m_uniqueIndexes.erase(iter);
+            break;
+        }
+    }
+    if (m_pkeyIndex == index) {
+        m_pkeyIndex = NULL;
+    }
+
+    // this should free any memory used by the index
+    delete index;
+}
+
+void Table::setPrimaryKeyIndex(TableIndex *index) {
+    // for now, no calling on non-empty tables
+    assert(activeTupleCount() == 0);
+    assert(isExistingTableIndex(m_indexes, index));
+
+    m_pkeyIndex = index;
+}
+
+void Table::configureIndexStats(CatalogId databaseId)
+{
+    // initialize stats for all the indexes for the table
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        index->getIndexStats()->configure(index->getName() + " stats",
+                                          name(),
+                                          databaseId);
+    }
+
+}
+
 
 }

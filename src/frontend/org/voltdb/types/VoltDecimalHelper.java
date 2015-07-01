@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -21,10 +21,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
+import java.math.RoundingMode;
 import java.nio.ByteBuffer;
-
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
+import java.util.Arrays;
 
 /**
  * A class for serializing and deserializing Volt's 16-byte fixed precision and scale decimal format. The decimal's
@@ -37,8 +36,6 @@ import org.voltdb.messaging.FastSerializer;
  *
  */
 public class VoltDecimalHelper {
-
-
     /**
      * The scale of decimals in Volt
      */
@@ -57,7 +54,7 @@ public class VoltDecimalHelper {
         new BigInteger("-170141183460469231731687303715884105728").toByteArray();
 
     /**
-     * Math context specifying the precision of decimals in Volt
+     * Math context specifying the precision of decimals in Volt.
      */
     private static final MathContext context = new MathContext( kDefaultPrecision );
 
@@ -81,32 +78,52 @@ public class VoltDecimalHelper {
         BigInteger.TEN.pow(12)
     };
 
-    /**
-     * Serialize the null decimal sigil to a the provided {@link org.voltdb.messaging.FastSerializer FastSerializer}
-     * @param out <code>FastSerializer</code> to serialize the decimal into
-     */
-    static public void serializeNull(FastSerializer out) throws IOException {
-        out.write(NULL_INDICATOR);
-    }
+    private final static String m_roundingEnabledProperty = "BIGDECIMAL_ROUND";
 
-    /**
-     * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
-     * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
-     * @param out {@link org.voltdb.messaging.FastSerializer FastSerializer} to serialize the <code>BigDecimal</code> to
-     * @throws IOException Thrown if the precision or scale is out of range
+    private final static String m_defaultRoundingEnablement = "true";
+
+    private final static String m_roundingModeProperty = "BIGDECIMAL_ROUND_POLICY";
+
+    private final static String m_defaultRoundingMode = "HALF_UP";
+
+    /*
+     * This is the class of rounding configurations.  This is really
+     * a pair, dressed up in glad rags.  Note that the only way to set
+     * this is to set both components.
      */
-    static public void serializeBigDecimal(BigDecimal bd, FastSerializer out)
-        throws IOException
-    {
+    private static class RoundingConfiguration {
+        private RoundingMode m_roundingMode;
+        private boolean m_roundingIsEnabled;
+        public RoundingConfiguration(boolean enabled, RoundingMode mode) {
+            m_roundingIsEnabled = enabled;
+            m_roundingMode = mode;
+        }
+        public final RoundingMode getRoundingMode() {
+            return m_roundingMode;
+        }
+        public final Boolean getRoundingIsEnabled() {
+            return m_roundingIsEnabled;
+        }
+        public final void setConfig(boolean enabled, RoundingMode roundingMode) {
+            m_roundingIsEnabled = enabled;
+            m_roundingMode = roundingMode;
+        }
+    };
+
+    private static RoundingConfiguration m_roundingConfiguration
+        = new RoundingConfiguration(Boolean.valueOf(System.getProperty(m_roundingEnabledProperty, m_defaultRoundingEnablement)),
+                                    RoundingMode.valueOf(System.getProperty(m_roundingModeProperty, m_defaultRoundingMode)));
+
+
+    static public byte[] getUnscaledBytes(BigDecimal bd) throws IOException {
         if (bd == null) {
-            serializeNull(out);
-            return;
+            return Arrays.copyOf(NULL_INDICATOR, NULL_INDICATOR.length);
         }
-        final int scale = bd.scale();
-        final int precision = bd.precision();
-        if (scale > 12) {
-            throw new IOException("Scale of " + bd + " is " + scale + " and the max is 12");
+        if (bd.scale() > kDefaultScale) {
+            bd = roundToScale(bd, kDefaultScale, getRoundingMode());
         }
+        int scale = bd.scale();
+        int precision = bd.precision();
         final int precisionMinusScale = precision - scale;
         if ( precisionMinusScale > 26 ) {
             throw new IOException("Precision of " + bd + " to the left of the decimal point is " +
@@ -122,7 +139,7 @@ public class VoltDecimalHelper {
         if (unscaledValue.length > 16) {
             throw new IOException("Precision of " + bd + " is >38 digits");
         }
-        out.write(expandToLength16(unscaledValue, isNegative));
+        return expandToLength16(unscaledValue, isNegative);
     }
 
     /**
@@ -154,11 +171,57 @@ public class VoltDecimalHelper {
         return replacement;
     }
 
+    static public byte[] serializeBigDecimal(BigDecimal bd) {
+        ByteBuffer buf = ByteBuffer.allocate(16);
+        serializeBigDecimal(bd, buf);
+        return buf.array();
+    }
+
+    public static final boolean isRoundingEnabled() {
+        return m_roundingConfiguration.getRoundingIsEnabled();
+    }
+
+    public static synchronized final void setRoundingConfig(boolean enabled, RoundingMode mode) {
+        m_roundingConfiguration.setConfig(enabled, mode);
+    }
+
+    public static final RoundingMode getRoundingMode() {
+        return m_roundingConfiguration.getRoundingMode();
+    }
+
+    /**
+     * Round a BigDecimal number to a scale given the rounding mode.
+     * Note that rounding may return the precision.  For example,
+     * rounding 9.99999 and 9.1999 to a scale of 2 gives 10.00 and 9.20.
+     * The latter has precision 3, and the former has precision 4.
+     * @param bd
+     * @param scale
+     * @return
+     */
+    static private final BigDecimal roundToScale(BigDecimal bd, int scale, RoundingMode mode) throws RuntimeException
+    {
+        int lostScaleDigits = bd.scale() - scale;
+        if (lostScaleDigits <= 0) {
+            return bd;
+        }
+        if (!isRoundingEnabled()) {
+            throw new RuntimeException(String.format("Decimal scale %d is greater than the maximum %d", bd.scale(), kDefaultScale));
+        }
+        int desiredPrecision = bd.precision() - lostScaleDigits;
+        MathContext mc = new MathContext(desiredPrecision, mode);
+        BigDecimal nbd = bd.round(mc);
+        if (nbd.scale() != scale) {
+            nbd = nbd.setScale(scale);
+        }
+        assert(nbd.scale() == scale);
+        return nbd;
+    }
+
     /**
      * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
      * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
      * @param buf {@link java.nio.ByteBuffer ByteBuffer} to serialize the <code>BigDecimal</code> to
-     * @throws RuntimeException Thrown if the precision or scale is out of range
+     * @throws RuntimeException Thrown if the precision is out of range, or the scale is out of range and rounding is not enabled.
      */
     static public void serializeBigDecimal(BigDecimal bd, ByteBuffer buf)
     {
@@ -166,11 +229,11 @@ public class VoltDecimalHelper {
               serializeNull(buf);
               return;
           }
-          final int scale = bd.scale();
-          final int precision = bd.precision();
-          if (scale > 12) {
-              throw new RuntimeException("Scale of " + bd + " is " + scale + " and the max is 12");
+          if (bd.scale() > 12) {
+              bd = roundToScale(bd, kDefaultScale, getRoundingMode());
           }
+          int scale = bd.scale();
+          int precision = bd.precision();
           final int precisionMinusScale = precision - scale;
           if ( precisionMinusScale > 26) {
               throw new RuntimeException("Precision of " + bd + " to the left of the decimal point is " +
@@ -190,29 +253,6 @@ public class VoltDecimalHelper {
     }
 
     /**
-     * Deserialize a Volt fixed precision and scale 16-byte decimal and return
-     * it as a {@link java.math.BigDecimal BigDecimal} .
-     * @param in {@link org.voltdb.messaging.FastDeserializer FastDeserializer} to read from
-     * @throws IOException Thrown by <code>FastDeserializer</code>
-     */
-    public static BigDecimal deserializeBigDecimal(FastDeserializer in)
-        throws IOException
-    {
-        byte decimalBytes[] = new byte[16];
-        in.readFully(decimalBytes);
-        if (java.util.Arrays.equals(decimalBytes, NULL_INDICATOR)) {
-            return null;
-        }
-        final BigDecimal bd = new BigDecimal(new BigInteger(decimalBytes),
-                        kDefaultScale, context);
-        if (bd.precision() > 38) {
-            throw new IOException("Decimal " + bd + " has precision > 38.");
-
-        }
-        return bd;
-    }
-
-    /**
      * Deserialize a Volt fixed precision and scale 16-byte decimal from a String representation
      * @param decimal <code>String</code> representation of the decimal
      */
@@ -222,23 +262,20 @@ public class VoltDecimalHelper {
             return null;
         }
         BigDecimal bd = new BigDecimal(decimal);
-        // enforce scale 12 to make the precision check right
-        if (bd.scale() < 12) {
-            bd.setScale(12);
-        }
         // if the scale is too large, check for trailing zeros
-        if (bd.scale() > 12) {
+        if (bd.scale() > kDefaultScale) {
             bd = bd.stripTrailingZeros();
-            if (bd.scale() > 12) {
-                throw new IOException("Decimal " + bd + " has more then 12 digits of scale");
+            if (bd.scale() > kDefaultScale) {
+                bd = roundToScale(bd, kDefaultScale, getRoundingMode());
             }
-            // enforce scale 12 to make the precision check right
-            if (bd.scale() < 12) {
-                bd.setScale(12);
-            }
+        }
+        // enforce scale 12 to make the precision check right
+        if (bd.scale() < kDefaultScale) {
+            bd = bd.setScale(kDefaultScale);
         }
         if (bd.precision() > 38) {
-            throw new RuntimeException("Decimal " + bd + " has more than  38 digits of precision.");
+            throw new RuntimeException(
+                    "Decimal " + bd + " has more than " + kDefaultPrecision + " digits of precision.");
         }
         return bd;
     }
@@ -263,71 +300,8 @@ public class VoltDecimalHelper {
         return bd;
     }
 
-    public static void main(String args[]) throws Exception {
-        java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(16);
-        java.math.BigDecimal bd = new java.math.BigDecimal("-23325.23425");
-        org.voltdb.types.VoltDecimalHelper.serializeBigDecimal(bd, buffer);
-        buffer.flip();
-        while (buffer.hasRemaining()) {
-            System.out.println(buffer.get());
-        }
-        buffer.flip();
-        System.out.println(org.voltdb.types.VoltDecimalHelper.deserializeBigDecimal(buffer));
-        System.out.println("----");
-        org.voltdb.messaging.FastSerializer fs = new org.voltdb.messaging.FastSerializer();
-        bd = new java.math.BigDecimal("-23325.23425");
-        org.voltdb.types.VoltDecimalHelper.serializeBigDecimal(bd, fs);
-
-        buffer = fs.getBuffer();
-        while (buffer.hasRemaining()) {
-            System.out.println(buffer.get());
-        }
-        buffer.flip();
-
-        org.voltdb.messaging.FastDeserializer fds = new org.voltdb.messaging.FastDeserializer(buffer);
-        System.out.println(org.voltdb.types.VoltDecimalHelper.deserializeBigDecimal(fds));
-
-        System.out.println("---");
-        BigInteger bi = new BigInteger(
-                new byte[] {
-                        -128, 0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        82,
-                        -34,
-                        45,
-                        77,
-                        -58,
-                        38,
-                        -128 });
-        System.out.println(bi);
-        bi = new BigInteger(
-                new byte[] {
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -83,
-                        33,
-                        -46,
-                        -78,
-                        57,
-                        -39,
-                        -128 });
-        System.out.println(bi);
-        System.out.println(new BigDecimal(
-                bi,
-                        kDefaultScale, context));
-
-        System.out.println(deserializeBigDecimal(ByteBuffer.wrap(NULL_INDICATOR)));
+    public static BigDecimal setDefaultScale(BigDecimal bd) {
+        // TODO Auto-generated method stub
+        return bd.setScale(kDefaultScale, getRoundingMode());
     }
 }

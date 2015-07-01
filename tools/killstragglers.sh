@@ -1,27 +1,18 @@
 #!/bin/bash
 
-# kill org.voltdb processes that aren't BenchmarkController
+# Kill any/all java processes that are listening on any port(s)
+# sudo kill if USER is 'test' and we're in the evening test hours and/or on specific volt hosts...
+# If you need to run overnight, schedule with qa.
 
-# list all process pids and the name of the associated executable
-# look for java executables
-# use ps to see the command arguments for those java pids
-# find args that look like an org.voltdb class main entry point
-# that aren't benchmark controller
-# and kill them.
+HOUR=`date +%H`
+DAY=`date +%u`
 
-# as one line:
-# ps cx -o pid -o command  | grep java | awk '{print $1}' | xargs ps -w -w -o pid -o args -p | \
-#  grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}'  | xargs kill -9
-
-# a little more error friendly when no pids are found
-javapids=$(ps cx -o pid -o command  | grep java | awk '{print $1}')
-for javapid in ${javapids}
+if [ $USER = "test" ]; then
+    SUDO=sudo
+fi
+for P in `$SUDO netstat -tnlp | egrep 'LISTEN.*/java' | tr -s \  | cut -d\  -f7 | cut -d\/ -f1 | sort | uniq`
 do
-  voltdbpid=$(ps -w -w -o pid -o args -p $javapid | grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}')
-  for victim in ${voltdbpid}
-  do
-    kill -9 $victim
-  done
+    logger -sp user.notice -t TESTKILL "User $USER $BUILD_TAG Killing `$SUDO ps --no-headers -p $P -o pid,user,command`"
+    $SUDO kill -9 $P
 done
-
-
+exit 0

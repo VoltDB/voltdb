@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -69,10 +69,10 @@
 using std::string;
 
 // A custom assert macro that avoids "unused variable" warnings when compiled
-// away. Inspired by: http://powerof2games.com/node/10
+// away.
 #ifdef NDEBUG
 #undef assert
-#define assert(x) do { (void)sizeof(x); } while(0)
+#define assert(x) ((void)(x))
 #endif
 
 
@@ -308,6 +308,13 @@ ChTempDir::~ChTempDir() {
 
 // TODO: Capture and match client output
 ExpectDeathStatus expectDeath() {
+    // Skip expectDeath in non-debug builds because overwriting memory doesn't
+    // always cause release builds to crash.
+#ifndef DEBUG
+    printf("SKIPPED: expectDeath test due to non-debug build.\n");
+    return SUCCESS;
+#endif
+
     // Create a pipe for the child's output
     int pipe_descriptors[2];
     int error = pipe(pipe_descriptors);

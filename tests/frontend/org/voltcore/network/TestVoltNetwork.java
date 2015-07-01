@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,21 +24,26 @@
 package org.voltcore.network;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
-import java.util.Set;
 import java.util.HashSet;
-import junit.framework.*;
+import java.util.Set;
+
+import jsr166y.ThreadLocalRandom;
+import junit.framework.TestCase;
 
 public class TestVoltNetwork extends TestCase {
 
 
     private static class MockVoltPort extends VoltPort {
-        MockVoltPort(VoltNetwork vn, InputHandler handler) {
-            super (vn, handler, "", vn.m_pool);
+        MockVoltPort(VoltNetwork vn, InputHandler handler) throws UnknownHostException {
+            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool);
         }
 
         @Override
@@ -62,7 +67,7 @@ public class TestVoltNetwork extends TestCase {
         }
 
         @Override
-        public ByteBuffer retrieveNextMessage(Connection c) {
+        public ByteBuffer retrieveNextMessage(NIOReadStream c) {
             // TODO Auto-generated method stub
             return null;
         }
@@ -230,9 +235,9 @@ public class TestVoltNetwork extends TestCase {
         }
     }
 
-    public void testInstallInterests() throws InterruptedException {
+    public void testInstallInterests() throws Exception {
         new MockSelector();
-        VoltNetwork vn = new VoltNetwork( 0, null);
+        VoltNetwork vn = new VoltNetwork( 0, null, "Test");
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
         MockSelectionKey selectionKey = new MockSelectionKey();
         vp.m_selectionKey = selectionKey;
@@ -257,7 +262,7 @@ public class TestVoltNetwork extends TestCase {
         assertEquals(selectionKey.interestOps(), vp.interestOps());
     }
 
-    public void testInvokeCallbacks() throws InterruptedException{
+    public void testInvokeCallbacks() throws Exception{
         MockSelector selector = new MockSelector();
         VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
@@ -272,14 +277,14 @@ public class TestVoltNetwork extends TestCase {
 
         // invoke call backs and see that the volt port has the expected
         // selected operations.
-        vn.invokeCallbacks();
+        vn.invokeCallbacks(ThreadLocalRandom.current());
         assertEquals(SelectionKey.OP_WRITE, vp.readyOps());
 
         // and another time through, should have the new interests selected
         vp.setInterests(SelectionKey.OP_ACCEPT, 0);
         selectionKey.readyOps(SelectionKey.OP_ACCEPT);
         vn.installInterests(vp);
-        vn.invokeCallbacks();
+        vn.invokeCallbacks(ThreadLocalRandom.current());
         vn.shutdown();
         assertEquals(SelectionKey.OP_ACCEPT, vp.readyOps());
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -51,9 +51,9 @@ public class LoadWarehouseReplicated extends VoltProcedure {
                 return null;
 
             // now we know the partition is not loaded yet
-            voltLoadTable("cluster", "database", "ITEM", items);
+            voltLoadTable("cluster", "database", "ITEM", items, false, false);
         }
-        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames);
+        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames, false, false);
         return null;
     }
 

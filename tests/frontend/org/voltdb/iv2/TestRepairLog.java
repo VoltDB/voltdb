@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,22 +23,34 @@
 
 package org.voltdb.iv2;
 
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
-import static org.mockito.Mockito.*;
-
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
+import org.voltdb.ParameterSet;
+import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
-import junit.framework.TestCase;
-import org.junit.Test;
 
-public class TestRepairLog extends TestCase
+public class TestRepairLog
 {
     VoltMessage truncInitMsg(long truncPt, long handle)
     {
@@ -79,6 +91,12 @@ public class TestRepairLog extends TestCase
         @Override
         public void flattenToBuffer(ByteBuffer buf) throws IOException {
         }
+    }
+
+    @BeforeClass
+    static public void initializeHashinator() {
+        TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
     }
 
     @Test
@@ -164,9 +182,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(3, rl.contents(1L, false).size());
         assertEquals(m2, rl.contents(1L, false).get(1).getPayload());
-        assertEquals(2L, rl.contents(1L, false).get(1).getHandle());
+        assertEquals(2L, rl.contents(1L, false).get(1).getTxnId());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
-        assertEquals(3L, rl.contents(1L, false).get(2).getHandle());
+        assertEquals(3L, rl.contents(1L, false).get(2).getTxnId());
     }
 
     @Test
@@ -188,9 +206,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(3, rl.contents(1L, false).size());
         assertEquals(m2, rl.contents(1L, false).get(1).getPayload());
-        assertEquals(2L, rl.contents(1L, false).get(1).getHandle());
+        assertEquals(2L, rl.contents(1L, false).get(1).getTxnId());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
-        assertEquals(3L, rl.contents(1L, false).get(2).getHandle());
+        assertEquals(3L, rl.contents(1L, false).get(2).getTxnId());
     }
 
 
@@ -207,4 +225,163 @@ public class TestRepairLog extends TestCase
         assertEquals(1, rl.contents(1L, false).size());
     }
 
+    // validate the invariants on the RepairLog contents:
+    // Every entry in the log should have a unique, constantly increasing SP handle.
+    // There should be only one FragmentTaskMessage per MP TxnID
+    // There should be at most one FragmentTaskMessage uncovered by a CompleteTransactionMessage
+    // There should be no CompleteTransactionMessages indicating restart
+    private void validateRepairLog(List<Iv2RepairLogResponseMessage> stuff, long binaryLogUniqueId)
+    {
+        long prevHandle = Long.MIN_VALUE;
+        Long mpTxnId = null;
+        for (Iv2RepairLogResponseMessage imsg : stuff) {
+            if (imsg.getSequence() > 0) {
+                assertTrue(imsg.getHandle() > prevHandle);
+                prevHandle = imsg.getHandle();
+                if (imsg.getPayload() instanceof FragmentTaskMessage) {
+                    assertEquals(null, mpTxnId);
+                    mpTxnId = imsg.getTxnId();
+                } else if (imsg.getPayload() instanceof CompleteTransactionMessage) {
+                    // can see bare CompleteTransactionMessage, but if we've got an MP
+                    // in progress this should close it
+                    assertFalse(((CompleteTransactionMessage)imsg.getPayload()).isRestart());
+                    if (mpTxnId != null) {
+                        assertEquals((long)mpTxnId, imsg.getTxnId());
+                    }
+                    mpTxnId = null;
+                }
+            } else {
+                assertTrue(imsg.hasHashinatorConfig());
+                assertEquals(binaryLogUniqueId, imsg.getBinaryLogUniqueId());
+            }
+        }
+    }
+
+    public static long setBinaryLogUniqueId(TransactionInfoBaseMessage msg, UniqueIdGenerator uig) {
+        Iv2InitiateTaskMessage taskMsg = null;
+        if (msg instanceof Iv2InitiateTaskMessage) {
+            taskMsg = (Iv2InitiateTaskMessage) msg;
+        } else if (msg instanceof FragmentTaskMessage) {
+            taskMsg = ((FragmentTaskMessage) msg).getInitiateTask();
+        }
+
+        if (taskMsg != null && taskMsg.getStoredProcedureName().startsWith("@ApplyBinaryLog")) {
+            ParameterSet params = taskMsg.getStoredProcedureInvocation().getParams();
+            long uid = uig.getNextUniqueId();
+            when(params.toArray()).thenReturn(new Object[] {null, 0l, 0l, uid, null});
+            return uid;
+        }
+
+        return Long.MIN_VALUE;
+    }
+
+    @Test
+    public void testFuzz()
+    {
+        TxnEgo sphandle = TxnEgo.makeZero(0);
+        UniqueIdGenerator uig = new UniqueIdGenerator(0, 0);
+        UniqueIdGenerator spbuig = new UniqueIdGenerator(0, 0);
+        UniqueIdGenerator mpbuig = new UniqueIdGenerator(0, 0);
+        sphandle = sphandle.makeNext();
+        RandomMsgGenerator msgGen = new RandomMsgGenerator();
+        RepairLog dut = new RepairLog();
+        long binaryLogSpUniqueId = Long.MIN_VALUE;
+        long binaryLogMpUniqueId = Long.MIN_VALUE;
+        for (int i = 0; i < 4000; i++) {
+            // get next message, update the sphandle according to SpScheduler rules,
+            // but only submit messages that would have been forwarded by the master
+            // to the repair log.
+            TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
+            msg.setSpHandle(sphandle.getTxnId());
+            if (msg instanceof InitiateTaskMessage) {
+                binaryLogSpUniqueId = Math.max(binaryLogSpUniqueId, setBinaryLogUniqueId(msg, spbuig));
+            } else if (msg instanceof FragmentTaskMessage) {
+                binaryLogMpUniqueId = Math.max(binaryLogMpUniqueId, setBinaryLogUniqueId(msg, mpbuig));
+            }
+            sphandle = sphandle.makeNext();
+            if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
+                dut.deliver(msg);
+            }
+        }
+        List<Iv2RepairLogResponseMessage> stuff = dut.contents(1l, false);
+        validateRepairLog(stuff, binaryLogSpUniqueId);
+        // Also check the MP version
+        stuff = dut.contents(1l, true);
+        validateRepairLog(stuff, binaryLogMpUniqueId);
+    }
+
+    @Test
+    public void testPerformance()
+    {
+        RepairLog dut = new RepairLog();
+        // First, add and truncate SP transactions with no MPs
+        dut.deliver(truncInitMsg(Long.MIN_VALUE, 0));
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < 100000; i++)
+        {
+            VoltMessage msg = truncInitMsg(i, i + 1);
+            dut.deliver(msg);
+        }
+        long end = System.currentTimeMillis();
+        long duration1 = end - start;
+        System.out.println("Time to deliver 100,000 SPs: " + duration1);
+
+        // Now, add 40000 MP messages and then see how long it takes to do the SPs
+        dut = new RepairLog();
+        dut.deliver(truncInitMsg(Long.MIN_VALUE, 0));
+        for (int i = 0; i < 40000; i++) {
+            dut.deliver(truncCompleteMsg(Long.MIN_VALUE, i));
+        }
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 100000; i++)
+        {
+            VoltMessage msg = truncInitMsg(i, i + 1);
+            dut.deliver(msg);
+        }
+        end = System.currentTimeMillis();
+        long duration2 = end - start;
+        System.out.println("Time to deliver 100,000 SPs: " + duration2);
+        // rough check, verify that the two don't differ by more than 20%
+        if (duration2 > duration1) {
+            long delta = Math.abs(duration2 - duration1);
+            float deltaPercent = delta / (float)duration1;
+            assertTrue("SP deliver performance with stored MP logs exceeds allowed hit of 20%, was: " +
+                    (deltaPercent * 100) + "%.",
+                    deltaPercent < .20);
+        }
+    }
+
+    @Test
+    public void testComparator()
+    {
+        RepairLog dut = new RepairLog();
+        Random rand = new Random();
+        List<RepairLog.Item> items = new ArrayList<RepairLog.Item>();
+        for (int i = 0; i < 1000000; i++) {
+            RepairLog.Item item = new RepairLog.Item(true, null, rand.nextInt(), i);
+            items.add(item);
+        }
+        Collections.sort(items, dut.m_handleComparator);
+    }
+
+    @Test
+    public void testTrackBinaryLogUniqueId() {
+        // The end unique id for an @ApplyBinaryLogSP invocation is recorded
+        // as its fifth parameter. Create a realistic invocation, deliver it
+        // to the repair log, and see what we get
+        final long endUniqueId = 42;
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("@ApplyBinaryLogSP");
+        spi.setParams(0, endUniqueId - 10, endUniqueId, endUniqueId, new byte[]{0});
+        spi.setOriginalUniqueId(endUniqueId - 10);
+        spi.setOriginalTxnId(endUniqueId -15);
+
+        Iv2InitiateTaskMessage msg =
+                new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, false, true,
+                        spi, 0l, 0l, false);
+        msg.setSpHandle(900l);
+        RepairLog log = new RepairLog();
+        log.deliver(msg);
+        validateRepairLog(log.contents(1l, false), endUniqueId);
+    }
 }

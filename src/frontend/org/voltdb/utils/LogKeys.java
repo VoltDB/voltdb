@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -41,8 +41,8 @@ public enum LogKeys {
     host_Backend_RunDDLFailed,
     host_Backend_ErrorOnShutdown,
     host_ClientInterface_checkForAdhocSQL_SerializationException,
-    host_ClientInterface_unableToRouteSinglePartitionInvocation,
     host_VoltDB_ErrorStartAcceptingConnections,
+    host_VoltDB_ErrorStartHTTPListener,
     host_VoltDB_ServerCompletedInitialization,
     host_VoltDB_StartingNetwork,
     host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts,
@@ -52,6 +52,8 @@ public enum LogKeys {
     host_VoltDB_ExportInitFailure,
     host_VoltDB_CatalogReadFailure,
     host_VoltDB_StartupString,
+    host_VoltDB_StayTunedForLogging,
+    host_VoltDB_StayTunedForNoLogging,
     host_TheHashinator_ExceptionHashingString,
     host_TheHashinator_AttemptedToHashinateNonLongOrString,
     host_Initialiazion_InvalidDDL,
@@ -59,11 +61,10 @@ public enum LogKeys {
     //AUTH
     auth_ClientInterface_ProcedureNotFound,
     auth_ClientInterface_LackingPermissionForProcedure,
-    auth_ClientInterface_LackingPermissionForAdhoc,
+    auth_ClientInterface_LackingPermissionForSql,
     auth_ClientInterface_LackingPermissionForSysproc,
     auth_ClientInterface_LackingPermissionForDefaultproc,
     auth_AuthSystem_NoSuchAlgorithm,
-    auth_AuthSystem_AuthenticatedUser,
     auth_AuthSystem_NoSuchUser,
     auth_AuthSystem_AuthFailedPasswordMistmatch,
 
@@ -86,9 +87,12 @@ public enum LogKeys {
     export_ExportManager_NoLoaderExtensions,
     export_ExportManager_DataDroppedLoaderDead,
 
+    //IMPORT
+    import_ImportManager_NoLoaderExtensions,
+    import_ImportManager_DataDroppedLoaderDead,
+
     //COMPILER
     compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost,
-    compiler_VoltCompiler_FailedToCompileXML,
     compiler_VoltCompiler_CatalogPath,
     compiler_VoltCompiler_NoSuchAlgorithm,
 

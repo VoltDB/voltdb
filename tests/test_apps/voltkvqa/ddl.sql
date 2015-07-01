@@ -4,4 +4,4 @@ CREATE TABLE store
 , value    varbinary(1048576) not null
 , PRIMARY KEY (key)
 );
-
+PARTITION TABLE store ON COLUMN key;

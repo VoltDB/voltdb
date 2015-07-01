@@ -33,8 +33,8 @@ package org.hsqldb_voltpatches.rights;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.lib.StringConverter;
 
 /**

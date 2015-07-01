@@ -36,21 +36,41 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="JOIN">
-        <level value="INFO"/>
-    </logger -->
-
     <!-- logger name="COMPILER">
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHOCPLANNERTHREAD">
+    <!--logger name="HSQLDB_COMPILER">
+        <level  value="DEBUG"/>
+    </logger -->
+
+    <!-- logger name="ADHOC">
         <level value="INFO"/>
     </logger -->
 
     <!-- logger name="EXPORT">
         <level value="INFO"/>
     </logger -->
+
+    <!-- logger name="REJOIN">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="SNAPSHOT">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="IV2TRACE">
+        <level value="TRACE"/>
+    </logger -->
+
+    <!-- logger name="IV2QUEUETRACE">
+        <level value="TRACE"/>
+    </logger -->
+
+    <logger name="TM">
+        <level value="INFO"/>
+    </logger>
 
     <root>
         <priority value="info" />

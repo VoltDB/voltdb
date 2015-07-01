@@ -1,31 +1,32 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb;
 
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltTypeUtil;
 
 /**
  * <p>Represents the interface to a row in a VoltTable result set.</p>
@@ -49,11 +50,11 @@ import org.voltdb.utils.Encoder;
  * <h3>Example</h3>
  *
  * <code>
- * VoltTableRow row = table.fetchRow(5);<br/>
- * System.out.println(row.getString("foo");<br/>
- * row.resetRowPosition();<br/>
- * while (row.advanceRow()) {<br/>
- * &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(row.getLong(7));<br/>
+ * VoltTableRow row = table.fetchRow(5);<br>
+ * System.out.println(row.getString("foo");<br>
+ * row.resetRowPosition();<br>
+ * while (row.advanceRow()) {<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(row.getLong(7));<br>
  * }
  * </code>
  */
@@ -74,6 +75,7 @@ public abstract class VoltTableRow {
     static final int ROW_HEADER_SIZE = Integer.SIZE/8;
     static final int ROW_COUNT_SIZE = Integer.SIZE/8;
     static final int STRING_LEN_SIZE = Integer.SIZE/8;
+    static final int VARBINARY_LEN_SIZE = Integer.SIZE/8;
     static final int INVALID_ROW_INDEX = -1;
 
     /** Stores the row data (and possibly much more) */
@@ -202,6 +204,7 @@ public abstract class VoltTableRow {
     public boolean advanceToRow(int rowIndex) {
         int rows_to_move = rowIndex - m_activeRowIndex;
         m_activeRowIndex = rowIndex;
+
         if (m_activeRowIndex >= getRowCount())
             return false;
         if (rows_to_move < 0) // this is "advance" to row, don't move backwards
@@ -488,11 +491,24 @@ public abstract class VoltTableRow {
         validateColumnType(columnIndex, VoltType.VARBINARY);
         int pos = m_buffer.position();
         m_buffer.position(getOffset(columnIndex));
+        // Sanity check the varbinary size int position.
+        if (VARBINARY_LEN_SIZE > m_buffer.remaining()) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::getVarbinary: Can't read varbinary size as %d byte integer " +
+                    "from buffer with %d bytes remaining.",
+                    VARBINARY_LEN_SIZE, m_buffer.remaining()));
+        }
         int len = m_buffer.getInt();
         if (len == VoltTable.NULL_STRING_INDICATOR) {
             m_wasNull = true;
             m_buffer.position(pos);
             return null;
+        }
+        // Sanity check the size against the remaining buffer size.
+        if (len > m_buffer.remaining()) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::getVarbinary: Can't read %d byte varbinary " +
+                    "from buffer with %d bytes remaining.", len, m_buffer.remaining()));
         }
         m_wasNull = false;
         byte[] data = new byte[len];
@@ -599,11 +615,8 @@ public abstract class VoltTableRow {
     public final java.sql.Timestamp getTimestampAsSqlTimestamp(int columnIndex) {
         final long timestamp = getTimestampAsLong(columnIndex);
         if (m_wasNull) return null;
-        java.sql.Timestamp result = new java.sql.Timestamp(timestamp/1000);
-        // The lower 6 digits of the microsecond timestamp (including the "double-counted" millisecond digits)
-        // must be scaled up to get the 9-digit (rounded) nanosecond value.
-        result.setNanos(((int) (timestamp % 1000000))*1000);
-        return result;
+
+        return VoltTypeUtil.getSqlTimestampFromMicrosSinceEpoch(timestamp);
     }
 
     /**
@@ -622,10 +635,11 @@ public abstract class VoltTableRow {
         return getTimestampAsSqlTimestamp(colIndex);
     }
 
-    /*
-     * Retrieve the BigDecimal value stored in the column
+    /**
+     * <p>Retrieve the {@link BigDecimal} value stored in the column
      * specified by the index. All DECIMAL types have a fixed
-     * scale when represented as BigDecimals.
+     * scale when represented as BigDecimals.</p>
+     *
      * @param columnIndex Index of the column
      * @return BigDecimal representation.
      * @see #wasNull()
@@ -641,7 +655,7 @@ public abstract class VoltTableRow {
     }
 
     /**
-     * Retrieve the BigDecimal value stored in the column
+     * Retrieve the {@link BigDecimal} value stored in the column
      * specified by columnName. All DECIMAL types have a
      * fixed scale when represented as BigDecimals.
      * @param columnName Name of the column
@@ -663,7 +677,8 @@ public abstract class VoltTableRow {
     void putJSONRep(int columnIndex, JSONStringer js) throws JSONException {
         long value; double dvalue;
 
-        switch (getColumnType(columnIndex)) {
+        VoltType columnType = getColumnType(columnIndex);
+        switch (columnType) {
         case TINYINT:
             value = getLong(columnIndex);
             if (value == VoltType.NULL_TINYINT)
@@ -720,6 +735,14 @@ public abstract class VoltTableRow {
             else
                 js.value(dec.toString());
             break;
+        case INVALID:
+            break;
+        case NULL:
+            break;
+        case NUMERIC:
+            break;
+        case VOLTTABLE:
+            break;
         }
     }
 
@@ -729,7 +752,7 @@ public abstract class VoltTableRow {
             throw new RuntimeException("VoltTableRow is in an invalid state. Consider calling advanceRow().");
 
         if ((columnIndex >= getColumnCount()) || (columnIndex < 0)) {
-            throw new IndexOutOfBoundsException("Column index " + columnIndex + " is type greater than the number of columns");
+            throw new IndexOutOfBoundsException("Column index " + columnIndex + " is greater than the number of columns");
         }
         final VoltType columnType = getColumnType(columnIndex);
         for (VoltType type : types)
@@ -739,7 +762,15 @@ public abstract class VoltTableRow {
     }
 
     /** Reads a string from a buffer with a specific encoding. */
-    final String readString(int position, String encoding) {
+    final String readString(int position, Charset encoding) {
+        // Sanity check the string size int position. Note that the eventual
+        // m_buffer.get() does check for underflow, getInt() does not.
+        if (STRING_LEN_SIZE > m_buffer.limit() - position) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::readString: Can't read string size as %d byte integer " +
+                    "from buffer with %d bytes remaining.",
+                    STRING_LEN_SIZE, m_buffer.limit() - position));
+        }
         final int len = m_buffer.getInt(position);
         //System.out.println(len);
 
@@ -751,6 +782,14 @@ public abstract class VoltTableRow {
             throw new RuntimeException("Invalid object length.");
         }
 
+        // Sanity check the size against the remaining buffer size.
+        if (position + STRING_LEN_SIZE + len > m_buffer.limit()) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::readString: Can't read %d byte string " +
+                    "from buffer with %d bytes remaining.",
+                    len, m_buffer.limit() - position - STRING_LEN_SIZE));
+        }
+
         // this is a bit slower than directly getting the array (see below)
         // but that caused bugs
         byte[] stringData = new byte[len];
@@ -759,13 +798,7 @@ public abstract class VoltTableRow {
         m_buffer.get(stringData);
         m_buffer.position(oldPos);
 
-        String retval = null;
-        try {
-            retval = new String(stringData, encoding);
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return retval;
+        return new String(stringData, encoding);
     }
 
 }

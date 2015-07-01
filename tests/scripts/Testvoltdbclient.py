@@ -2,7 +2,7 @@
 # -*- coding: utf-8
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -26,7 +26,7 @@
 import sys
 # add the path to the volt python client, just based on knowing
 # where we are now
-sys.path.append('../../src/py_client')
+sys.path.append('../../lib/python')
 
 import signal
 import unittest
@@ -180,10 +180,6 @@ class TestFastSerializer(unittest.TestCase):
         for i in self.decimalArray:
             self.sendAndCompare(self.fs.VOLTTYPE_DECIMAL, i)
 
-    # def testDecimalString(self):
-    #     for i in self.decimalArray:
-    #         self.sendAndCompare(self.fs.VOLTTYPE_DECIMAL_STRING, i)
-
     def testArray(self):
         self.fs.writeByte(self.ARRAY_BEGIN)
         self.fs.prependLength()
@@ -196,8 +192,6 @@ class TestFastSerializer(unittest.TestCase):
         self.sendArrayAndCompare(self.fs.VOLTTYPE_STRING, self.stringArray)
         self.sendArrayAndCompare(self.fs.VOLTTYPE_TIMESTAMP, self.dateArray)
         self.sendArrayAndCompare(self.fs.VOLTTYPE_DECIMAL, self.decimalArray)
-        # self.sendArrayAndCompare(self.fs.VOLTTYPE_DECIMAL_STRING,
-        #                          self.decimalArray)
 
         self.fs.writeByte(self.ARRAY_END)
         self.fs.prependLength()

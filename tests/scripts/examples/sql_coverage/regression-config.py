@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -64,6 +64,24 @@
               "template": "basic.sql",
               "normalizer": "normalizer.py"},
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
+    "basic-joins": {"schema": "schema.py",
+                    "ddl": "DDL.sql",
+                    "template": "basic-joins.sql",
+                    "normalizer": "normalizer.py"},
+    "basic-int-joins": {"schema": "int-schema.py",
+                    "ddl": "int-DDL.sql",
+                    "template": "basic-int-joins.sql",
+                    "normalizer": "normalizer.py"},
+# THESE ALL SUCCEED, USE THE TEMPLATE INPUT
+    "basic-unions": {"schema": "union-schema.py",
+                     "ddl": "DDL.sql",
+                     "template": "basic-unions.sql",
+                     "normalizer": "normalizer.py"},
+    "mixed-unions": {"schema": "union-schema.py",
+                     "ddl": "DDL.sql",
+                     "template": "mixed-unions.sql",
+                     "normalizer": "normalizer.py"},
+# THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-index": {"schema": "schema.py",
                     "ddl": "index-DDL.sql",
                     "template": "basic.sql",
@@ -73,40 +91,50 @@
                       "ddl": "strings-DDL.sql",
                       "template": "basic-strings.sql",
                       "normalizer": "normalizer.py"},
+# THESE ALL SUCCEED, USE TEMPLATE INPUT
+    "partial-covering": {"schema": "partial-covering-schema.py",
+                         "ddl": "partial-covering-DDL.sql",
+                         "template": "partial-covering.sql",
+                         "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
-    "basic-ints": {"schema": "int-schema.py",
-                   "ddl": "int-DDL.sql",
-                   "template": "regression-basic-ints.sql",
-                   "normalizer": "normalizer.py"},
+    "regression-basic-ints": {"schema": "int-schema.py",
+                              "ddl": "int-DDL.sql",
+                              "template": "regression-basic-ints.sql",
+                              "normalizer": "normalizer.py"},
 # HSQL HAS BAD DEFAULT PRECISION
 # AND VoltDB gives VOLTDB ERROR: Type DECIMAL can't be cast as FLOAT
 # AND HSQLDB backend gives the likes of:
 #   VOLTDB ERROR: UNEXPECTED FAILURE: org.voltdb.ExpectedProcedureException:
 #   HSQLDB Backend DML Error (Scale of 56.11063569750000000000000000000000 is 32 and the max is 12)
 # USE REGRESSION INPUT
-    "basic-decimal": {"schema": "decimal-schema.py",
-                      "ddl": "decimal-DDL.sql",
-                      "template": "regression-basic-decimal.sql",
-                      "normalizer": "normalizer.py"},
+    "regression-basic-decimal": {"schema": "decimal-schema.py",
+                                 "ddl": "DDL.sql",
+                                 "template": "regression-basic-decimal.sql",
+                                 "normalizer": "normalizer.py"},
 # If the ONLY problem was that HSQL HAS BAD DEFAULT PRECISION, we could use the original template input
 # and FUZZY MATCHING, instead.
 # Enable this test to investigate the "DECIMAL can't be cast as FLOAT" and/or "Backend DML Error" issues
 # without being thrown off by HSQL HAS BAD DEFAULT PRECISION issues.
 #    "basic-decimal-fuzzy": {"schema": "decimal-schema.py",
-#                      "ddl": "decimal-DDL.sql",
-#                      "template": "basic-decimal.sql",
-#                      "normalizer": "fuzzynormalizer.py"},
+#                            "ddl": "DDL.sql",
+#                            "template": "basic-decimal.sql",
+#                            "normalizer": "fuzzynormalizer.py"},
 #
 # FLOATING POINT ROUNDING ISSUES BETWEEN VOLT AND HSQL, USE FUZZY MATCHING
-    "basic-timestamp-fuzzy": {"schema": "timestamp-schema.py",
-                              "ddl": "timestamp-DDL.sql",
-                              "template": "basic-timestamp.sql",
-                              "normalizer": "fuzzynormalizer.py"},
+    "basic-timestamp": {"schema": "timestamp-schema.py",
+                        "ddl": "DDL.sql",
+                        "template": "basic-timestamp.sql",
+                        "normalizer": "normalizer.py"},
+    "advanced-timestamp": {"schema": "timestamp-schema.py",
+                           "ddl": "DDL.sql",
+                           "template": "advanced-timestamp.sql",
+                           "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
-    "basic-matview": {"schema": "matview-schema.py",
-                      "ddl": "matview-DDL.sql",
-                      "template": "regression-basic-matview.sql",
-                      "normalizer": "normalizer.py"},
+    "regression-basic-matview": {"schema": "matview-basic-schema.py",
+                                 "ddl": "matview-DDL.sql",
+                                 "template": "regression-basic-matview.sql",
+                                 "normalizer": "normalizer.py"},
+
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "advanced": {"schema": "schema.py",
                  "ddl": "DDL.sql",
@@ -117,33 +145,77 @@
                        "ddl": "index-DDL.sql",
                        "template": "advanced.sql",
                        "normalizer": "normalizer.py"},
+    "advanced-compoundex": {"schema": "schema.py",
+                       "ddl": "compoundex-DDL.sql",
+                       "template": "advanced.sql",
+                       "normalizer": "normalizer.py"},
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "advanced-strings": {"schema": "strings-schema.py",
                          "ddl": "strings-DDL.sql",
                          "template": "advanced-strings.sql",
                          "normalizer": "normalizer.py"},
-# BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
     "advanced-ints": {"schema": "int-schema.py",
                       "ddl": "int-DDL.sql",
-                      "template": "regression-advanced-ints.sql",
+                      "template": "advanced-ints.sql",
                       "normalizer": "normalizer.py"},
+# BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
+    "regression-advanced-ints-cntonly": {"schema": "int-schema.py",
+                                         "ddl": "int-DDL.sql",
+                                         "template": "regression-advanced-ints-cntonly.sql",
+                                         "normalizer": "not-a-normalizer.py"},
+# To test advanced IN/EXISTS
+    "advanced-inexists": {"schema": "schema.py",
+                          "ddl": "DDL.sql",
+                          "template": "advanced-inexists.sql",
+                          "normalizer": "normalizer.py"},
+
+# To test advanced scalar subqueries
+    "advanced-scalar-subquery": {"schema": "schema.py",
+                                 "ddl": "DDL.sql",
+                                 "template": "advanced-scalar-subquery.sql",
+                                 "normalizer": "normalizer.py"},
+
+# To test advanced scalar subqueries containing set operators
+    "advanced-scalar-set-subquery": {"schema": "schema.py",
+                                     "ddl": "DDL.sql",
+                                     "template": "advanced-scalar-set-subquery.sql",
+                                     "normalizer": "normalizer.py"},
+
+# ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
+    "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
+                                 "ddl": "matview-DDL.sql",
+                                 "template": "advanced-matview-nonjoin.sql",
+                                 "normalizer": "normalizer.py"},
+
+    "advanced-matview-join": {"schema": "matview-advanced-join-schema.py",
+                              "ddl": "matview-DDL.sql",
+                              "template": "advanced-matview-join.sql",
+                              "normalizer": "normalizer.py"},
+
+# To test index count
+    "index-count1": {"schema": "index-count1-schema.py",
+                     "ddl": "DDL.sql",
+                     "template": "index-count1.sql",
+                     "normalizer": "normalizer.py"},
+
+# To test index scan: forward scan, reverse scan
+    "index-scan": {"schema": "index-scan-schema.py",
+        "ddl": "index-DDL.sql",
+        "template": "index-scan.sql",
+        "normalizer": "normalizer.py"},
+
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.
     "pushdown": {"schema": "pushdown-schema.py",
-        "ddl": "pushdown-DDL.sql",
-        "template": "pushdown.sql",
-        "normalizer": "normalizer.py"},
-# THESE ALL SUCCEED, USE TEMPLATE INPUT
-    "partial-covering": {"schema": "partial-covering-schema.py",
-        "ddl": "partial-covering-DDL.sql",
-        "template": "partial-covering.sql",
-        "normalizer": "normalizer.py"},
+                 "ddl": "DDL.sql",
+                 "template": "pushdown.sql",
+                 "normalizer": "normalizer.py"},
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION
 # AND VoltDB gives VOLTDB ERROR: Type DECIMAL can't be cast as FLOAT, so keep it disabled, for now.
 # If the only problem were HSQL HAS BAD DEFAULT PRECISION, we could USE FUZZY MATCHING.
 # Enable this test to investigate the "DECIMAL can't be cast as FLOAT" issue
 #    "advanced-decimal-fuzzy": {"schema": "decimal-schema.py",
-#                               "ddl": "decimal-DDL.sql",
+#                               "ddl": "DDL.sql",
 #                               "template": "advanced-decimal.sql",
 #                               "normalizer": "fuzzynormalizer.py"},
 }

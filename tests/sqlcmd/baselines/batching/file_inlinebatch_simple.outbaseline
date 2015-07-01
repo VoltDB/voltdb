@@ -1,0 +1,42 @@
+
+drop procedure p if exists;
+Command succeeded.
+
+drop table t if exists;
+Command succeeded.
+
+create table t (i integer not null);
+Command succeeded.
+
+FILE -inlinebatch EOF
+
+partition table t on column i;
+create index tidx on t(i);
+create procedure p as
+    select * from t;
+
+
+Batch command succeeded.
+
+exec p;
+I 
+--
+
+(Returned 0 rows in #.##s)
+
+explain select * from t;
+EXECUTION_PLAN                 
+-------------------------------
+RETURN RESULTS TO STORED PROCEDURE
+ RECEIVE FROM ALL PARTITIONS
+  SEND PARTITION RESULTS TO COORDINATOR
+   SEQUENTIAL SCAN of "T"
+
+
+(Returned 1 rows in #.##s)
+
+drop procedure p;
+Command succeeded.
+
+drop table t;
+Command succeeded.

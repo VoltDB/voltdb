@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -183,7 +182,6 @@ public class ExpressionColumn extends Expression {
         }
     }
 
-    @Override
     void setAttributesAsColumn(ColumnSchema column, boolean isWritable) {
 
         this.column     = column;
@@ -191,7 +189,6 @@ public class ExpressionColumn extends Expression {
         this.isWritable = isWritable;
     }
 
-    @Override
     SimpleName getSimpleName() {
 
         if (alias != null) {
@@ -209,7 +206,6 @@ public class ExpressionColumn extends Expression {
         return null;
     }
 
-    @Override
     String getAlias() {
 
         if (alias != null) {
@@ -241,9 +237,39 @@ public class ExpressionColumn extends Expression {
         return column.getName();
     }
 
-    @Override
     void collectObjectNames(Set set) {
 
+        // BEGIN Cherry-picked code change from hsqldb-2.3.2
+        switch (opType) {
+
+            case OpTypes.SEQUENCE :
+                HsqlName name = sequence.getName();
+
+                set.add(name);
+
+                return;
+
+            case OpTypes.MULTICOLUMN :
+            case OpTypes.DYNAMIC_PARAM :
+            case OpTypes.ASTERISK :
+            case OpTypes.SIMPLE_COLUMN :
+            case OpTypes.COALESCE :
+                break;
+
+            case OpTypes.PARAMETER :
+            case OpTypes.VARIABLE :
+                break;
+
+            case OpTypes.COLUMN :
+                set.add(column.getName());
+
+                if (column.getName().parent != null) {
+                    set.add(column.getName().parent);
+                }
+
+                return;
+        }
+        /* Disable 13 lines
         if (opType == OpTypes.SEQUENCE) {
             HsqlName name = ((NumberSequence) valueData).getName();
 
@@ -257,9 +283,10 @@ public class ExpressionColumn extends Expression {
         if (column.getName().parent != null) {
             set.add(column.getName().parent);
         }
+        ... disabled 13 lines */
+        // END Cherry-picked code change from hsqldb-2.3.2
     }
 
-    @Override
     String getColumnName() {
 
         if (opType == OpTypes.COLUMN && column != null) {
@@ -269,7 +296,6 @@ public class ExpressionColumn extends Expression {
         return getAlias();
     }
 
-    @Override
     ColumnSchema getColumn() {
         return column;
     }
@@ -278,12 +304,10 @@ public class ExpressionColumn extends Expression {
         return schema;
     }
 
-    @Override
     RangeVariable getRangeVariable() {
         return rangeVariable;
     }
 
-    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -382,7 +406,6 @@ public class ExpressionColumn extends Expression {
         return false;
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         switch (opType) {
@@ -407,7 +430,6 @@ public class ExpressionColumn extends Expression {
         }
     }
 
-    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -423,9 +445,9 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.COLUMN : {
                 Object[] data =
-                    session.sessionContext
-                    .rangeIterators[rangeVariable.rangePosition]
-                    .getCurrent();
+                    (Object[]) session.sessionContext
+                        .rangeIterators[rangeVariable.rangePosition]
+                        .getCurrent();
                 Object value   = data[columnIndex];
                 Type   colType = column.getDataType();
 
@@ -437,8 +459,8 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    session.sessionContext
-                    .rangeIterators[rangePosition].getCurrent();
+                    (Object[]) session.sessionContext
+                        .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -468,7 +490,6 @@ public class ExpressionColumn extends Expression {
         }
     }
 
-    @Override
     public String getSQL() {
 
         switch (opType) {
@@ -498,7 +519,12 @@ public class ExpressionColumn extends Expression {
                     }
                 }
 
+                // A VoltDB extension to allow toSQL on expressions in DDL
+                if (rangeVariable == null || rangeVariable.tableAlias == null) {
+                /* disable 1 line ...
                 if (rangeVariable.tableAlias == null) {
+                ... disabled 1 line */
+                // End of VoltDB extension
                     return column.getName().getSchemaQualifiedStatementName();
                 } else {
                     StringBuffer sb = new StringBuffer();
@@ -536,7 +562,6 @@ public class ExpressionColumn extends Expression {
         }
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -647,7 +672,6 @@ public class ExpressionColumn extends Expression {
         }
     }
 
-    @Override
     public OrderedHashSet getUnkeyedColumns(OrderedHashSet unresolvedSet) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -673,7 +697,6 @@ public class ExpressionColumn extends Expression {
     /**
      * collects all range variables in expression tree
      */
-    @Override
     void collectRangeVariables(RangeVariable[] rangeVariables, Set set) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -691,7 +714,6 @@ public class ExpressionColumn extends Expression {
         }
     }
 
-    @Override
     Expression replaceAliasInOrderBy(Expression[] columns, int length) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -738,7 +760,6 @@ public class ExpressionColumn extends Expression {
         return this;
     }
 
-    @Override
     Expression replaceColumnReferences(RangeVariable range,
                                        Expression[] list) {
 
@@ -757,7 +778,6 @@ public class ExpressionColumn extends Expression {
         return this;
     }
 
-    @Override
     int findMatchingRangeVariableIndex(RangeVariable[] rangeVarArray) {
 
         for (int i = 0; i < rangeVarArray.length; i++) {
@@ -774,7 +794,6 @@ public class ExpressionColumn extends Expression {
     /**
      * return true if given RangeVariable is used in expression tree
      */
-    @Override
     boolean hasReference(RangeVariable range) {
 
         if (range == rangeVariable) {
@@ -792,7 +811,6 @@ public class ExpressionColumn extends Expression {
         return false;
     }
 
-    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {
@@ -818,44 +836,43 @@ public class ExpressionColumn extends Expression {
             case OpTypes.COLUMN :
                 return column == other.getColumn();
 
+            // A VoltDB extension
+            case OpTypes.ASTERISK :
+                return true;
+            // End of VoltDB extension
+
             default :
                 return false;
         }
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
-     * VoltDB added method to get a non-catalog-dependent
+     * VoltDB added method to provide detail for a non-catalog-dependent
      * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
-     * some names.
      * @return XML, correctly indented, representing this object.
      */
-    @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp)
     {
-        VoltXMLElement exp = new VoltXMLElement("unset");
-        // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", this.getUniqueId(session));
-
-        if (opType == OpTypes.ASTERISK) {
-            exp.name = "asterisk";
+        if (tableName != null) {
+            if (rangeVariable != null && rangeVariable.rangeTable != null &&
+                    rangeVariable.tableAlias != null &&
+                    rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+                exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
+            } else {
+                exp.attributes.put("table", tableName.toUpperCase());
+            }
         }
-        else if (isParam) {
-            exp.name = "value";
-            exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
-            exp.attributes.put("isparam", "true");
+        //TODO: also indicate RangeVariable in case table is ambiguus (for self-joins).
+        exp.attributes.put("column", columnName.toUpperCase());
+        if ((alias == null) || (getAlias().length() == 0)) {
+            exp.attributes.put("alias", columnName.toUpperCase());
         }
-        else {
-            exp.name = "columnref";
-            if (tableName != null)
-                exp.attributes.put("table", tableName);
-            exp.attributes.put("column", columnName);
-            exp.attributes.put("alias", (this.alias != null) && (getAlias().length() > 0) ? getAlias() : columnName);
+        if (rangeVariable != null && rangeVariable.tableAlias != null) {
+            exp.attributes.put("tablealias",  rangeVariable.tableAlias.name.toUpperCase());
         }
-
         return exp;
     }
+    /**********************************************************************/
 }

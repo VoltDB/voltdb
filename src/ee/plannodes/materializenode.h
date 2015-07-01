@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -47,11 +47,8 @@
 #define HSTOREMATERIALIZENODE_H
 
 #include "projectionnode.h"
-#include "expressions/abstractexpression.h"
 
 namespace voltdb {
-
-class Table;
 
 /**
  *
@@ -68,23 +65,18 @@ class MaterializePlanNode : public ProjectionPlanNode {
     // something special to populate these columns
     // Andy - 06/25/2008
     //
-    public:
-        MaterializePlanNode(CatalogId id): ProjectionPlanNode(id), batched(false) {
-        }
-        MaterializePlanNode(): ProjectionPlanNode(), batched(false) {
-        }
-        virtual ~MaterializePlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_MATERIALIZE); }
+public:
+    MaterializePlanNode() { }
+    ~MaterializePlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        std::string debugInfo(const std::string &spacer) const;
-
-        bool isBatched() const { return batched; }
-        void setBatched(bool batched) { this->batched = batched; }
-    protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
-        bool batched;
+    bool isBatched() const { return m_batched; }
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
+    bool m_batched;
 };
 
-}
+} // namespace voltdb
 
 #endif

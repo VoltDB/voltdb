@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,17 +23,23 @@
 
 package org.voltdb.utils;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.Test;
-import org.voltdb.VoltDB.START_ACTION;
+import org.voltdb.StartAction;
 
 public class TestCommandLine
 {
     @Test
     public void testCommandLineAndTestOpts()
     {
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(StartAction.CREATE);
         cl.addTestOptions(true);
         cl.setInitialHeap(2048);
         System.out.println(cl);
@@ -56,13 +62,15 @@ public class TestCommandLine
     public void testCopy()
     {
         // Check a naive copy
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(StartAction.CREATE);
         // Set at least the CommandLine local fields to non-defaults
         cl.addTestOptions(true);
         cl.debugPort(1234);
         cl.zkport(4321);
         cl.buildDir("dood");
+        cl.voltRoot("goober");
         cl.javaLibraryPath("sweet");
+        cl.rmiHostName("springsteen");
         cl.log4j("whats");
         cl.voltFilePrefix("mine");
         cl.setInitialHeap(470);
@@ -79,22 +87,40 @@ public class TestCommandLine
     @Test
     public void testStartCommand()
     {
-        CommandLine cl = new CommandLine();
-        cl.startCommand("START");
-        assertTrue(cl.toString().contains("start"));
-        cl.startCommand("CREATE");
+        CommandLine cl = new CommandLine(StartAction.CREATE);
         assertTrue(cl.toString().contains("create"));
         cl.startCommand("RECOVER");
         assertTrue(cl.toString().contains("recover"));
-        cl.startCommand("NONSENSE");
-        assertTrue(cl.toString().contains("start"));
+        cl.startCommand("LIVE    REJOIN");
+        assertTrue(cl.toString().contains("live rejoin"));
+        cl.startCommand("RECOVER    SAFEMODE");
+        assertTrue(cl.toString().contains("recover safemode"));
+        try
+        {
+            cl.startCommand("NONSENSE");
+        }
+        catch (RuntimeException rte)
+        {
+            assertTrue(rte.getMessage().contains("Unknown action"));
+        }
+        try
+        {
+            cl.startCommand("start");
+        }
+        catch (RuntimeException rte)
+        {
+            assertTrue(rte.getMessage().contains("Unknown action"));
+        }
+        cl = new CommandLine(StartAction.LIVE_REJOIN);
+        assertTrue(cl.toString().contains("live rejoin"));
+        cl = new CommandLine(StartAction.SAFE_RECOVER);
+        assertTrue(cl.toString().contains("recover safemode"));
     }
 
     @Test
     public void testRejoin()
     {
-        CommandLine cl = new CommandLine();
-        cl.startCommand("REJOIN");
+        CommandLine cl = new CommandLine(StartAction.REJOIN);
         cl.leader("127.0.0.1:6666");
         System.err.println(cl.toString());
         assertTrue(cl.toString().contains("rejoin host 127.0.0.1:6666"));
@@ -105,8 +131,7 @@ public class TestCommandLine
     @Test
     public void testLiveRejoin()
     {
-        CommandLine cl = new CommandLine();
-        cl.startCommand(START_ACTION.LIVE_REJOIN.name());
+        CommandLine cl = new CommandLine(StartAction.LIVE_REJOIN);
         cl.leader("127.0.0.1:6666");
         System.err.println(cl.toString());
         assertTrue(cl.toString().contains("live rejoin host 127.0.0.1:6666"));
@@ -117,7 +142,7 @@ public class TestCommandLine
     @Test
     public void testInterfaces()
     {
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(StartAction.CREATE);
         assertFalse(cl.toString().contains("internalinterface"));
         assertFalse(cl.toString().contains("externalinterface"));
         cl.internalInterface("10.0.0.10");
@@ -126,5 +151,101 @@ public class TestCommandLine
         cl.externalInterface("192.168.0.123");
         assertTrue(cl.toString().contains("internalinterface 10.0.0.10"));
         assertTrue(cl.toString().contains("externalinterface 192.168.0.123"));
+    }
+
+    /**
+     * Hack to override mutability of the map returned by {@code System.getenv()}
+     * <p>
+     * See {@linkplain http://stackoverflow.com/questions/318239/how-do-i-set-environment-variables-from-java StackOverflow article}
+     * @param envValue new value for VOLTDB_OPTS
+     * @throws Exception
+     */
+    public static void setVoltDbOpts(String envValue) throws Exception
+    {
+        Map<String, String> newenv = new HashMap<String, String>(System.getenv());
+        newenv.put("VOLTDB_OPTS", envValue);
+        Map<String, String> env = System.getenv();
+        Class<?> cl = env.getClass();
+        if("java.util.Collections$UnmodifiableMap".equals(cl.getName())) {
+            Field field = cl.getDeclaredField("m");
+            field.setAccessible(true);
+            Object obj = field.get(env);
+            @SuppressWarnings("unchecked")
+            Map<String, String> map = (Map<String, String>) obj;
+            map.clear();
+            map.putAll(newenv);
+        }
+    }
+
+    @Test
+    public void testExtraJvmOptsAgentSpec() throws Exception
+    {
+        String agentSpec = "-javaagent:/path/to/jolokia-jvm-1.0.1-agent.jar=port=11159,agentContext=/,host=0.0.0.0";
+        setVoltDbOpts(agentSpec);
+
+        CommandLine cl = new CommandLine(StartAction.CREATE);
+        String cmd = cl.toString();
+
+        assertTrue(cmd.contains(" " + agentSpec + " "));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(agentSpec));
+    }
+
+    @Test
+    public void testExtraJvmOptsGcAndPropsSpec() throws Exception
+    {
+        String propOne = "-Done.prop=\"yolanda is a nice gal:\"";
+        String propTwo = "-Dtwo.prop=\"yobo is: a nice guy\"";
+        String propThree = "-Dsingle.quote='In single quote \"bliss\"'";
+        String voltOne   = "enableIv2";
+        String voltTwo   = "project";
+        String voltThree = "\"/a/file/with a space.xml\"";
+        String minHeap = "-Xms1024m";
+        String maxHeap = "-Xmx4096m";
+        String gcSpec  = "-XX:+UseConcMarkSweepGC";
+        String agentSpec = "-javaagent:jolokia.jar=port=11159,desc=\"cool  loking\\ agent\"";
+        setVoltDbOpts(propOne
+                + " " + propTwo
+                + " " + propThree
+                + " -voltdb:" + voltOne
+                + " -voltdb:" + voltTwo
+                + " -voltdb:" + voltThree
+                + " " + agentSpec
+                + " " + minHeap
+                + " " + maxHeap
+                + " " + gcSpec
+                + " -cp one.jar:some/dir/*.jar:tooranda.jar:. -d32"
+                + " -Djava.library.path=/some/diryolanda.so:/tmp/hackme.so"
+                + " sgra rehto emos"); // reverse of 'some other args'
+
+        CommandLine cl = new CommandLine(StartAction.CREATE);
+        String cmd = cl.toString();
+
+        assertTrue(cmd.contains(" " + propOne + " "));
+        assertTrue(cmd.contains(" " + propTwo+ " "));
+        assertTrue(cmd.contains(" " + propThree+ " "));
+        assertTrue(cmd.contains(" " + voltOne + " "));
+        assertTrue(cmd.contains(" " + voltTwo + " "));
+        assertTrue(cmd.contains(" " + voltThree + " "));
+        assertTrue(cmd.contains(" " + agentSpec + " "));
+        assertTrue(cmd.contains(" " + gcSpec + " "));
+        assertTrue(cmd.contains(" sgra rehto emos"));
+
+        assertFalse(cmd.contains(" -cp" ));
+        assertFalse(cmd.contains(" -d32" ));
+        assertFalse(cmd.contains(" -voltdb:" ));
+        assertFalse(cmd.contains("/some/diryolanda.so:/tmp/hackme.so"));
+        assertFalse(cmd.contains("tooranda.jar"));
+        assertFalse(cmd.contains(" " + minHeap + " "));
+        assertFalse(cmd.contains(" " + maxHeap + " "));
+
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propOne));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propTwo));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propThree));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(agentSpec));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(gcSpec));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf("sgra rehto emos"));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltOne));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltTwo));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltThree));
     }
 }

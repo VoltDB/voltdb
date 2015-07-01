@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -28,11 +28,10 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.catalog.StmtParameter;
 import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
@@ -61,8 +60,8 @@ public class HsqlBackend {
             if (m_backend == null) {
                 try {
                     m_backend = new HsqlBackend(siteId);
-                    final String hexDDL = context.database.getSchema();
-                    final String ddl = Encoder.hexDecodeToString(hexDDL);
+                    final String binDDL = context.database.getSchema();
+                    final String ddl = Encoder.decodeBase64AndDecompress(binDDL);
                     final String[] commands = ddl.split("\n");
                     for (String command : commands) {
                         String decoded_cmd = Encoder.hexDecodeToString(command);
@@ -133,8 +132,9 @@ public class HsqlBackend {
 
     public VoltTable runDML(String dml) {
         dml = dml.trim();
-        String indicator = dml.substring(0, 6).toLowerCase();
-        if (indicator.equals("select")) {
+        String indicator = dml.substring(0, 1).toLowerCase();
+        if (indicator.equals("s") || // "s" is for "select ..."
+            indicator.equals("(")) { // "(" is for "(select ... UNION ...)" et. al.
             try {
                 Statement stmt = dbconn.createStatement();
                 sqlLog.l7dlog( Level.DEBUG, LogKeys.sql_Backend_ExecutingDML.name(), new Object[] { dml }, null);
@@ -175,7 +175,6 @@ public class HsqlBackend {
                 while (rs.next()) {
                     Object[] row = new Object[table.getColumnCount()];
                     for (int i = 0; i < table.getColumnCount(); i++) {
-                        // TODO(evanj): JDBC returns 0 instead of null. Put null into the row?
                         if (table.getColumnType(i) == VoltType.STRING)
                             row[i] = rs.getString(i + 1);
                         else if (table.getColumnType(i) == VoltType.TINYINT)
@@ -203,7 +202,12 @@ public class HsqlBackend {
                         } else {
                             throw new ExpectedProcedureException("Trying to read a (currently) unsupported type from a JDBC resultset.");
                         }
+                        if (rs.wasNull()) {
+                            // JDBC returns 0/0.0 instead of null. Put null into the row.
+                            row[i] = null;
+                        }
                     }
+
                     table.addRow(row);
                 }
                 stmt.close();
@@ -259,14 +263,22 @@ public class HsqlBackend {
         }
     }
 
-    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params, List<StmtParameter> sparams) {
+    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params, byte[] paramJavaTypes) {
         //HSQLProcedureWrapper does nothing smart. it just implements this interface with runStatement()
         StringBuilder sqlOut = new StringBuilder(stmt.getText().length() * 2);
 
-        assert(sparams != null);
+        assert(paramJavaTypes != null);
 
         int lastIndex = 0;
         String sql = stmt.getText();
+
+        // if there's no ? in the statmemt, then zero out any auto-parameterization
+        int paramCount = StringUtils.countMatches(sql, "?");
+        if (paramCount == 0) {
+            params = ParameterSet.emptyParameterSet();
+            paramJavaTypes = new byte[0];
+        }
+
         Object[] paramObjs = params.toArray();
         for (int i = 0; i < paramObjs.length; i++) {
             int nextIndex = sql.indexOf('?', lastIndex);
@@ -275,9 +287,7 @@ public class HsqlBackend {
             sqlOut.append(sql, lastIndex, nextIndex);
             lastIndex = nextIndex + 1;
 
-            StmtParameter stmtParam = sparams.get(i);
-            assert(stmtParam != null);
-            VoltType type = VoltType.get((byte) stmtParam.getJavatype());
+            VoltType type = VoltType.get(paramJavaTypes[i]);
 
             if (VoltType.isNullVoltType(paramObjs[i])) {
                 sqlOut.append("NULL");

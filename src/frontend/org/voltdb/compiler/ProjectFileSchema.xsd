@@ -8,8 +8,10 @@
     project.xml. VoltCompiler processes project.xml file using
     the jaxb XML to Java bindings.
 
-    If you modify this schema, you must regenerate the jaxb
-    bindings. It's easy to do:
+    If you modify this schema, the jaxb bindings must be regenerated.
+    It is normally handled by the ant build.
+
+    It's also easy to do manually:
 
     cd src/frontend
     xjc -p org.voltdb.compiler.projectfile org/voltdb/compiler/ProjectFileSchema.xsd
@@ -33,7 +35,6 @@
   <xsd:complexType name="projectType">
     <xsd:all>
       <xsd:element name="info" minOccurs='0' maxOccurs='1' type="infoType"/>
-      <xsd:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xsd:element name="database" minOccurs="1" maxOccurs="1" type="databaseType"/>
     </xsd:all>
   </xsd:complexType>
@@ -44,12 +45,9 @@
       <xsd:element name="name" type="xsd:string"/>
       <xsd:element name="version" type="xsd:string"/>
       <xsd:element name="description" type="xsd:string"/>
+      <xsd:element name="catalog" minOccurs='0' maxOccurs='1' type="xsd:string"/>
+      <xsd:element name="classpath" minOccurs='0' maxOccurs='1' type="xsd:string"/>
     </xsd:all>
-  </xsd:complexType>
-
-  <!-- <security> -->
-  <xsd:complexType name="securityType">
-    <xsd:attribute name="enabled" type="xsd:boolean" default="false"/>
   </xsd:complexType>
 
   <!--  <database> -->
@@ -57,6 +55,7 @@
     <xsd:all>
       <!-- elements of an all group may appear in any order at most once. -->
       <xsd:element name="groups" type="groupsType" minOccurs="0"/>
+      <xsd:element name="roles" type="rolesType" minOccurs="0"/>
       <xsd:element name="schemas" type="schemasType"/>
       <xsd:element name="procedures" type="proceduresType" minOccurs="0"/>
       <xsd:element name="partitions" type="partitionsType" minOccurs="0"/>
@@ -75,12 +74,28 @@
           <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
           <xsd:attribute name="defaultproc" type="xsd:boolean" default="false"/>
           <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="defaultprocread" type="xsd:boolean" default="false"/>
         </xsd:complexType>
       </xsd:element>
     </xsd:sequence>
   </xsd:complexType>
 
-  <!-- <schemas> -->
+  <!-- <roles> -->
+  <xsd:complexType name="rolesType">
+    <xsd:sequence>
+      <xsd:element name="role" minOccurs="1" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:attribute name="name" type="xsd:string" use="required"/>
+          <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="defaultproc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="defaultprocread" type="xsd:boolean" default="false"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+    <!-- <schemas> -->
   <xsd:complexType name="schemasType">
     <xsd:sequence>
       <xsd:element name="schema" minOccurs="1" maxOccurs="unbounded">
@@ -111,6 +126,7 @@
           <xsd:attribute name="class" type="xsd:string" use="required"/>
           <xsd:attribute name="partitioninfo" type="xsd:string"/>
           <xsd:attribute name="groups" type="xsd:string"/>
+          <xsd:attribute name="roles" type="xsd:string"/>
         </xsd:complexType>
       </xsd:element>
     </xsd:sequence>
@@ -156,7 +172,6 @@
         </xsd:complexType>
       </xsd:element>
     </xsd:all>
-    <xsd:attribute name="groups" type="xsd:string"/>
   </xsd:complexType>
 
 </xsd:schema>

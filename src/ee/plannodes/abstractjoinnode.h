@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -48,40 +48,51 @@
 
 #include "abstractplannode.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 class AbstractExpression;
 
 class AbstractJoinPlanNode : public AbstractPlanNode
 {
 public:
-    AbstractJoinPlanNode(CatalogId id);
     AbstractJoinPlanNode();
-    virtual ~AbstractJoinPlanNode();
+    ~AbstractJoinPlanNode();
+    std::string debugInfo(const std::string& spacer) const;
 
-    void setJoinType(JoinType join_type);
-    JoinType getJoinType() const;
-
-    void setPredicate(AbstractExpression* predicate);
-    AbstractExpression* getPredicate() const;
-
-    virtual std::string debugInfo(const std::string& spacer) const;
+    JoinType getJoinType() const { return m_joinType; }
+    AbstractExpression* getPreJoinPredicate() const { return m_preJoinPredicate.get(); }
+    AbstractExpression* getJoinPredicate() const { return m_joinPredicate.get(); }
+    AbstractExpression* getWherePredicate() const { return m_wherePredicate.get(); }
+    const TupleSchema* getTupleSchemaPreAgg() const { return m_tupleSchemaPreAgg; }
+    void getOutputColumnExpressions(std::vector<AbstractExpression*>& outputExpressions) const;
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj);
+    void loadFromJSONObject(PlannerDomValue obj);
 
-    //
+    // This is the outer-table-only join expression. If the outer tuple fails it,
+    // it may still be part of the result set (pending other filtering)
+    // but can't be joined with any tuple from the inner table.
+    // In a left outer join, the failed outer tuple STILL gets null-padded in the output table.
+    boost::scoped_ptr<AbstractExpression> m_preJoinPredicate;
+
     // This is the predicate to figure out whether a joined tuple should
     // be put into the output table
-    //
-    AbstractExpression* m_predicate;
-    //
-    // We currently don't do anything with this...
-    //
+    boost::scoped_ptr<AbstractExpression> m_joinPredicate;
+
+    // The additional filtering criteria specified by the WHERE clause
+    // in case of outer joins. The predicated is applied to the whole
+    // joined tuple after it's assembled
+    boost::scoped_ptr<AbstractExpression> m_wherePredicate;
+
+    // Currently either inner or left outer.
     JoinType m_joinType;
+
+    // output schema pre inline aggregation
+    std::vector<SchemaColumn*> m_outputSchemaPreAgg;
+
+    TupleSchema* m_tupleSchemaPreAgg;
 };
 
-}
+} // namespace voltdb
 
 #endif

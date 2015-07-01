@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,9 +22,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterSet;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
@@ -33,8 +31,6 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     ReplicatedTableSaveFileState(String tableName, long txnId)
     {
         super(tableName, txnId);
@@ -79,9 +75,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         }
         else
         {
-            // Not implemented until we're going to support catalog changes
-            hostLog.error("Unable to convert replicated table " + getTableName() + " to partitioned because " +
-                    "the conversion is currently unsupported.");
+            restore_plan = generateReplicatedToPartitionedPlan(st);
         }
         return restore_plan;
     }
@@ -96,6 +90,43 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
             m_consistencyResult = error;
             throw new IOException(error);
         }
+    }
+
+    private SynthesizedPlanFragment[]
+    generateReplicatedToPartitionedPlan(SiteTracker st)
+    {
+        SynthesizedPlanFragment[] restore_plan = null;
+
+        Integer host = m_hostsWithThisTable.iterator().next();
+
+        // replicated table is small enough for only one site to distribute the task
+        restore_plan = new SynthesizedPlanFragment[2];
+        int restore_plan_index = 0;
+        assert(st.getSitesForHost(host).size() > 0);
+        long site = st.getSitesForHost(host).get(0);
+        restore_plan[restore_plan_index] = constructDistributeReplicatedTableAsPartitionedFragment(site);
+        ++restore_plan_index;
+        restore_plan[restore_plan_index] = constructLoadReplicatedTableAggregatorFragment(true);
+
+        return restore_plan;
+    }
+
+    private SynthesizedPlanFragment
+    constructDistributeReplicatedTableAsPartitionedFragment(long siteId)
+    {
+        int result_dependency_id = getNextDependencyId();
+        SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
+        plan_fragment.fragmentId =
+            SysProcFragmentId.PF_restoreDistributeReplicatedTableAsPartitioned;
+        plan_fragment.multipartition = false;
+        plan_fragment.siteId = siteId;
+        plan_fragment.outputDepId = result_dependency_id;
+        plan_fragment.inputDepIds = new int[] {};
+        addPlanDependencyId(result_dependency_id);
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                result_dependency_id);
+        return plan_fragment;
     }
 
     private SynthesizedPlanFragment[]
@@ -124,13 +155,13 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
             long source_site_id =
                 m_sitesWithThisTable.iterator().next();
             restore_plan[restore_plan_index] =
-                constructDistributeReplicatedTableFragment(source_site_id,
+                constructDistributeReplicatedTableAsReplicatedFragment(source_site_id,
                                                            site_id);
             ++restore_plan_index;
         }
         assert(restore_plan_index == execution_site_ids.size());
         restore_plan[restore_plan_index] =
-            constructLoadReplicatedTableAggregatorFragment();
+            constructLoadReplicatedTableAggregatorFragment(false);
         return restore_plan;
     }
 
@@ -158,46 +189,46 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                result_dependency_id);
         return plan_fragment;
     }
 
     private SynthesizedPlanFragment
-    constructDistributeReplicatedTableFragment(long sourceSiteId,
-                                               long destinationSiteId)
+    constructDistributeReplicatedTableAsReplicatedFragment(long sourceSiteId,
+                                                           long destinationSiteId)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
         plan_fragment.fragmentId =
-            SysProcFragmentId.PF_restoreDistributeReplicatedTable;
+            SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated;
         plan_fragment.multipartition = false;
         plan_fragment.siteId = sourceSiteId;
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), destinationSiteId,
-                             result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                destinationSiteId,
+                result_dependency_id);
         return plan_fragment;
     }
 
     private SynthesizedPlanFragment
-    constructLoadReplicatedTableAggregatorFragment()
+    constructLoadReplicatedTableAggregatorFragment(boolean asPartitioned)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
         plan_fragment.fragmentId =
-            SysProcFragmentId.PF_restoreLoadReplicatedTableResults;
+            SysProcFragmentId.PF_restoreReceiveResultTables;
         plan_fragment.multipartition = false;
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = getPlanDependencyIds();
         setRootDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id,
+                (asPartitioned ? "Aggregating replicated-to-partitioned table restore results"
+                               : "Aggregating replicated table restore results"));
         return plan_fragment;
     }
 

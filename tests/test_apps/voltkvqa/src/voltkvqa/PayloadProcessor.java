@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,11 +24,10 @@ package voltkvqa;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-
-import java.nio.ByteBuffer;
 
 public class PayloadProcessor
 {
@@ -77,7 +76,18 @@ public class PayloadProcessor
     /*
      * Volt deals with 2 megs at the most so 4 megabytes of entropy is plenty
      */
-    private final ByteBuffer entropyBytes = ByteBuffer.allocate (1024 * 1024 * 4);
+    private final ByteBuffer entropyBytesGlobal = ByteBuffer.allocate (1024 * 1024 * 4);
+
+    /*
+     * Create a thread local copy of the buffer because multiple threads will be manipulating the position pointers.
+     * Give each thread it's own wrapper around the global byte buffer.
+     */
+    private final ThreadLocal<ByteBuffer> entropyBytes =
+        new ThreadLocal <ByteBuffer> () {
+            @Override protected ByteBuffer initialValue() {
+                return entropyBytesGlobal.duplicate();
+        }
+    };
 
     public PayloadProcessor(
             int keySize,
@@ -96,8 +106,8 @@ public class PayloadProcessor
         if (entropy < 1 || entropy > 127) {
             throw new IllegalArgumentException("Entropy must be a number between 1 and 127");
         }
-        while (entropyBytes.hasRemaining()) {
-            entropyBytes.put((byte)(Rand.nextInt(127) % Entropy));
+        while (entropyBytes.get().hasRemaining()) {
+            entropyBytes.get().put((byte)(Rand.nextInt(127) % Entropy));
         }
         // Get the base key format string used to generate keys
         this.KeyFormat = "K%1$" + String.valueOf(this.KeySize-1) + "s";
@@ -107,13 +117,12 @@ public class PayloadProcessor
     {
         final String key = String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
         final byte[] rawValue = new byte[this.MinValueSize+this.Rand.nextInt(this.MaxValueSize-this.MinValueSize+1)];
-        if (entropyBytes.remaining() > rawValue.length){
-            entropyBytes.get(rawValue);
+        if (entropyBytes.get().remaining() > rawValue.length){
+            entropyBytes.get().get(rawValue);
         } else {
-            entropyBytes.position(0);
-            entropyBytes.get(rawValue);
+            entropyBytes.get().position(0);
+            entropyBytes.get().get(rawValue);
         }
-
         if (this.UseCompression)
             return new Pair(key, rawValue, gzip(rawValue));
         else

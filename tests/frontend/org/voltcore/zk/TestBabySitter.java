@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,11 +22,14 @@
  */
 package org.voltcore.zk;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.Semaphore;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -36,6 +39,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltZK;
 
 public class TestBabySitter extends ZKTestBase {
 
@@ -50,7 +54,7 @@ public class TestBabySitter extends ZKTestBase {
     @After
     public void tearDown() throws Exception
     {
-        // tearDownZK();
+        tearDownZK();
     }
 
     @Test
@@ -82,6 +86,37 @@ public class TestBabySitter extends ZKTestBase {
         zk.delete("/babysitterroot/" + bs.lastSeenChildren().get(0), -1);
         sem.acquire();
         assertTrue(bs.lastSeenChildren().size() == 1);
+
+        bs.shutdown();
+    }
+
+    @Test
+    public void testChildrenOrdering() throws Exception {
+        final Semaphore sem = new Semaphore(0);
+        final AtomicReference<List<String>> latestChildren = new AtomicReference<List<String>>();
+        BabySitter.Callback cb = new BabySitter.Callback() {
+            @Override
+            public void run(List<String> children) {
+                latestChildren.set(children);
+                sem.release();
+            }
+        };
+
+        ZooKeeper zk = getClient(0);
+        zk.create("/babysitterroot", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        final String node6 = zk.create("/babysitterroot/6_", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        zk.create("/babysitterroot/7_", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        zk.create("/babysitterroot/10_", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(zk, "/babysitterroot", cb);
+        BabySitter bs = pair.getFirst();
+
+        sem.acquire();
+        assertEquals(Lists.newArrayList(6l, 7l, 10l), VoltZK.childrenToReplicaHSIds(latestChildren.get()));
+
+        zk.delete(node6, -1);
+
+        sem.acquire();
+        assertEquals(Lists.newArrayList(7l, 10l), VoltZK.childrenToReplicaHSIds(latestChildren.get()));
 
         bs.shutdown();
     }

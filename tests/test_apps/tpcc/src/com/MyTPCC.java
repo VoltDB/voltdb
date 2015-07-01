@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -230,8 +230,8 @@ public class MyTPCC
     {
         m_helpah = new AppHelper(MyTPCC.class.getCanonicalName());
         m_helpah.add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 180);
-        m_helpah.add("warehouses", "number_of_warehouses", "Number of warehouses", 12);
-        m_helpah.add("scalefactor", "scale_factor", "Scale factor", 1.0);
+        m_helpah.add("warehouses", "number_of_warehouses", "Number of warehouses", 256);
+        m_helpah.add("scalefactor", "scale_factor", "Reduces per-warehouse data by warehouses/scalefactor", 22.0);
         m_helpah.add("skewfactor", "skew_factor", "Skew factor", 0.0);
         m_helpah.add("loadthreads", "number_of_load_threads", "Number of load threads", 4);
         m_helpah.add("ratelimit", "rate_limit", "Rate limit to start from (tps)", 200000);
@@ -266,14 +266,18 @@ public class MyTPCC
 
         try
         {
-            if ((int)(m_clientCon.execute(LoadStatus.class.getSimpleName()).getResults()[0].fetchRow(0).getLong(0)) == 0)
+            try {
+                m_clientCon.execute("@AdHoc", "INSERT INTO LOADER_PERMIT VALUES ( 42 );");
                 (new MyLoader(args, m_clientCon)).run();
-            else
-                while ((int)(m_clientCon.execute(LoadStatus.class.getSimpleName()).getResults()[0].fetchRow(0).getLong(0)) < warehouses)
+                m_clientCon.execute("@AdHoc", "INSERT INTO RUN_PERMIT VALUES ( 42 );");
+            } catch (ProcCallException e) {
+                while ((int)(m_clientCon.execute("@AdHoc", "SELECT COUNT(*) FROM RUN_PERMIT").getResults()[0].fetchRow(0).getLong(0)) < 1)
                     ;
+            }
         }
         catch (Exception e)
         {
+            e.printStackTrace();
             System.exit(-1);
         }
 
@@ -468,13 +472,15 @@ public class MyTPCC
         public void clientCallback(ClientResponse clientResponse)
         {
             // TODO: Necessary?
+            /*
             boolean abortExpected = false;
             if (m_procedureName != null && (m_procedureName.equals(Constants.ORDER_STATUS_BY_NAME)
                 || m_procedureName.equals(Constants.ORDER_STATUS_BY_ID)))
                 abortExpected = true;
-            boolean status = clientResponse.getStatus() == ClientResponse.SUCCESS && abortExpected;
+            boolean status = (clientResponse.getStatus() == ClientResponse.SUCCESS || abortExpected;
             assert status;
-            if (m_transactionType != null)
+            */
+            if (m_transactionType != null && clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 procCounts[m_transactionType.ordinal()].incrementAndGet();
 

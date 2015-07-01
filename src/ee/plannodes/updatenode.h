@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -46,9 +46,6 @@
 #ifndef HSTOREUPDATENODE_H
 #define HSTOREUPDATENODE_H
 
-#include <vector>
-#include "common/common.h"
-#include "common/debuglog.h"
 #include "abstractoperationnode.h"
 
 namespace voltdb {
@@ -57,26 +54,18 @@ namespace voltdb {
  *
  */
 class UpdatePlanNode : public AbstractOperationPlanNode {
-    public:
-        UpdatePlanNode(CatalogId id) : AbstractOperationPlanNode(id), m_updatesIndexes(false) {
-            // Do nothing
-        }
-        UpdatePlanNode() : AbstractOperationPlanNode(), m_updatesIndexes(false) {
-            // Do nothing
-        }
+public:
+    UpdatePlanNode() : m_updatesIndexes(false) { }
+    PlanNodeType getPlanNodeType() const;
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UPDATE); }
+    bool doesUpdateIndexes() { return m_updatesIndexes; }
 
-        std::string debugInfo(const std::string &spacer) const;
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
-        bool doesUpdateIndexes() { return m_updatesIndexes; }
-
-    protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
-
-        bool m_updatesIndexes;
+    bool m_updatesIndexes;
 };
 
-}
+} // namespace voltdb
 
 #endif

@@ -1,3 +1,5 @@
+IMPORT CLASS genqa.procedures.SampleRecord;
+
 -- Partitioned Data Table
 CREATE TABLE partitioned_table
 (
@@ -25,6 +27,7 @@ CREATE TABLE partitioned_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 , PRIMARY KEY (rowid)
 );
+PARTITION TABLE partitioned_table ON COLUMN rowid;
 
 -- Index over rowid_group on Partitioned Data Table
 CREATE INDEX IX_partitioned_table_rowid_group
@@ -68,8 +71,9 @@ CREATE TABLE export_partitioned_table
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-, PRIMARY KEY (rowid)
 );
+PARTITION TABLE export_partitioned_table ON COLUMN rowid;
+
 CREATE TABLE export_mirror_partitioned_table
 (
   txnid                     BIGINT        NOT NULL
@@ -97,6 +101,13 @@ CREATE TABLE export_mirror_partitioned_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 , PRIMARY KEY (rowid)
 );
+PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
+
+CREATE TABLE export_done_table
+(
+  txnid                     BIGINT        NOT NULL
+);
+PARTITION TABLE export_done_table ON COLUMN txnid;
 
 -- Replicated Table
 CREATE TABLE replicated_table
@@ -168,5 +179,30 @@ CREATE TABLE export_replicated_table
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-, PRIMARY KEY (rowid)
 );
+
+CREATE TABLE export_skinny_partitioned_table
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
+
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
+
+PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
+  ON TABLE export_skinny_partitioned_table COLUMN rowid;
+
+EXPORT TABLE export_skinny_partitioned_table;
+EXPORT TABLE export_partitioned_table;
+EXPORT TABLE export_replicated_table;
+EXPORT TABLE export_done_table;

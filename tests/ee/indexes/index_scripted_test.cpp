@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,6 +30,7 @@
 #include <cassert>
 #include <sys/time.h>
 #include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "indexes/tableindex.h"
@@ -60,8 +61,6 @@ const char *kInsertSuccess = "is";
 const char *kInsertFailure = "if";
 const char *kLookupSuccess = "ls";
 const char *kLookupFailure = "lf";
-const char *kUpdateSuccess = "us";
-const char *kUpdateFailure = "uf";
 const char *kDeleteSuccess = "ds";
 const char *kDeleteFailure = "df";
 
@@ -83,6 +82,7 @@ struct Command {
 
 vector<voltdb::TableIndex*> currentIndexes;
 voltdb::TableIndex *currentIndex;
+
 vector<voltdb::ValueType> currentColumnTypes;
 vector<int32_t> currentColumnLengths;
 vector<bool> currentColumnAllowNull;
@@ -113,12 +113,14 @@ bool commandLS(voltdb::TableTuple &key)
 {
     //cout << "running ls" << endl;
     //cout << " candidate key : " << key.tupleLength() << " - " << key.debug("") << endl;
-    bool result = currentIndex->moveToKey(&key);
+    IndexCursor indexCursor(currentIndex->getTupleSchema());
+
+    bool result = currentIndex->moveToKey(&key, indexCursor);
     if (!result) {
         cout << "ls FAIL(moveToKey()) key length: " << key.tupleLength() << endl << key.debug("") << endl;
         return false;
     }
-    voltdb::TableTuple value = currentIndex->nextValueAtKey();
+    voltdb::TableTuple value = currentIndex->nextValueAtKey(indexCursor);
     if (value.isNullTuple()) {
         cout << "ls FAIL(isNullTuple()) key length: " << key.tupleLength() << endl << key.debug("") << endl;
         return false;
@@ -138,23 +140,8 @@ bool commandLF(voltdb::TableTuple &key)
 
     // Don't just call !commandLS(key) here. That does an equality check.
     // Here, the valid test is for existence, not equality.
-    return !(currentIndex->moveToKey(&key));
-}
-
-bool commandUS(voltdb::TableTuple &oldkey, voltdb::TableTuple &newkey)
-{
-    //cout << "running us" << endl;
-    //cout << " candidate key old : " << oldkey.tupleLength() << " - " << oldkey.debug("") << endl;
-    //cout << " candidate key new : " << newkey.tupleLength() << " - " << newkey.debug("") << endl;
-    return currentIndex->replaceEntry(&oldkey, &newkey);
-}
-
-bool commandUF(voltdb::TableTuple &oldkey, voltdb::TableTuple &newkey)
-{
-    //cout << "running uf" << endl;
-    //cout << " candidate key old : " << oldkey.tupleLength() << " - " << oldkey.debug("") << endl;
-    //cout << " candidate key new : " << newkey.tupleLength() << " - " << newkey.debug("") << endl;
-    return !currentIndex->replaceEntry(&oldkey, &newkey);
+    IndexCursor indexCursor(currentIndex->getTupleSchema());
+    return !(currentIndex->moveToKey(&key, indexCursor));
 }
 
 bool commandDS(voltdb::TableTuple &key)
@@ -209,7 +196,7 @@ void setNewCurrent(const char *testName,
     currentColumnLengths = columnLengths;
     currentColumnAllowNull = columnAllowNull;
 
-    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
     schemaCache.push_back(schema);
     // just pack the indices tightly
     vector<int> columnIndices;
@@ -221,35 +208,51 @@ void setNewCurrent(const char *testName,
         voltdb::TableIndex *index;
 
         if (strcmp(indexName, kMultiIntsHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, false, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiIntsTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, false, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            false, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, false, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, false, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            false, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, true, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, true, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            true, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, true, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, true, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            true, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else {
@@ -286,10 +289,6 @@ void runTest()
                 result = commandLS(*command.key);
             else if (command.op == kLookupFailure)
                 result = commandLF(*command.key);
-            else if (command.op == kUpdateSuccess)
-                result = commandUS(*command.key, *command.key2);
-            else if (command.op == kUpdateFailure)
-                result = commandUF(*command.key, *command.key2);
             else if (command.op == kDeleteSuccess)
                 result = commandDS(*command.key);
             else if (command.op == kDeleteFailure)
@@ -510,15 +509,15 @@ int main(int argc, char **argv)
             else if (strcmp(command, kInsertFailure) == 0) cmd.op = kInsertFailure;
             else if (strcmp(command, kLookupSuccess) == 0) cmd.op = kLookupSuccess;
             else if (strcmp(command, kLookupFailure) == 0) cmd.op = kLookupFailure;
-            else if (strcmp(command, kUpdateSuccess) == 0) cmd.op = kUpdateSuccess;
-            else if (strcmp(command, kUpdateFailure) == 0) cmd.op = kUpdateFailure;
             else if (strcmp(command, kDeleteSuccess) == 0) cmd.op = kDeleteSuccess;
             else if (strcmp(command, kDeleteFailure) == 0) cmd.op = kDeleteFailure;
             else {
                 cerr << "Operation code parse error on line: " << line << endl;
                 exit(-1);
             }
-            voltdb::TupleSchema *tupleSchema = voltdb::TupleSchema::createTupleSchema(currentColumnTypes, currentColumnLengths, currentColumnAllowNull, true);
+            voltdb::TupleSchema *tupleSchema = voltdb::TupleSchema::createTupleSchemaForTest(currentColumnTypes,
+                                                                                      currentColumnLengths,
+                                                                                      currentColumnAllowNull);
             schemaCache.push_back(tupleSchema);
             cmd.key = tupleFromString(tuple1, tupleSchema);
             if (tuple2) cmd.key2 = tupleFromString(tuple2, tupleSchema);

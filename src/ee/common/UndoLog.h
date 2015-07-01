@@ -1,25 +1,22 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef UNDOLOG_H_
 #define UNDOLOG_H_
-#include "common/Pool.hpp"
-#include "common/UndoQuantum.h"
-#include "boost/pool/object_pool.hpp"
 
 #include <vector>
 #include <deque>
@@ -27,6 +24,8 @@
 #include <iostream>
 #include <cassert>
 
+#include "common/Pool.hpp"
+#include "common/UndoQuantum.h"
 
 namespace voltdb
 {
@@ -56,15 +55,13 @@ namespace voltdb
             m_lastUndoToken = nextUndoToken;
             Pool *pool = NULL;
             if (m_undoDataPools.size() == 0) {
-                pool = new Pool();
+                pool = new Pool(TEMP_POOL_CHUNK_SIZE, 1);
             } else {
                 pool = m_undoDataPools.back();
                 m_undoDataPools.pop_back();
             }
             assert(pool);
-            UndoQuantum *undoQuantum =
-                new (pool->allocate(sizeof(UndoQuantum)))
-                UndoQuantum(nextUndoToken, pool);
+            UndoQuantum *undoQuantum = new (*pool) UndoQuantum(nextUndoToken, pool);
             m_undoQuantums.push_back(undoQuantum);
             return undoQuantum;
         }
@@ -78,7 +75,12 @@ namespace voltdb
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             // This ensures that undo is only ever called after
-            assert(m_lastReleaseToken < m_lastUndoToken);
+
+            // commenting out this assertion because it isn't valid (hugg 3/29/13)
+            // if you roll back a proc that hasn't done any work, you can run
+            // into this situation. Needs a better fix than this.
+            // assert(m_lastReleaseToken < m_lastUndoToken);
+
             // This ensures that we don't attempt to undo something in
             // the distant past.  In some cases ExecutionSite may hand
             // us the largest token value that definitely doesn't
@@ -103,8 +105,8 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_back();
-                Pool *pool = undoQuantum->getDataPool();
-                undoQuantum->undo();
+                // Destroy the quantum, but retain its pool for reuse.
+                Pool *pool = undoQuantum->undo();
                 pool->purge();
                 m_undoDataPools.push_back(pool);
 
@@ -133,8 +135,8 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_front();
-                Pool *pool = undoQuantum->getDataPool();
-                undoQuantum->release();
+                // Destroy the quantum, but retain its pool for reuse.
+                Pool *pool = undoQuantum->release();
                 pool->purge();
                 m_undoDataPools.push_back(pool);
                 if(undoQuantumToken == undoToken) {

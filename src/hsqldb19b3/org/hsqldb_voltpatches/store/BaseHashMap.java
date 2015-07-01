@@ -143,6 +143,11 @@ public class BaseHashMap {
             throw new IllegalArgumentException();
         }
 
+        // CHERRY PICK to prevent a flaky crash?
+        if (initialCapacity < 3) {
+            initialCapacity = 3;
+        }
+        // End of CHERRY PICK to prevent a flaky crash?
         this.loadFactor      = 1;    // can use any value if necessary
         this.initialCapacity = initialCapacity;
         threshold            = initialCapacity;
@@ -277,7 +282,12 @@ public class BaseHashMap {
                 lastLookup = lookup,
                 lookup = hashIndex.getNextLookup(lookup)) {
             if (isObjectKey) {
+                // A VoltDB extension to prevent an intermittent NPE on catalogUpdate?
+                if (objectKey.equals(objectKeyTable[lookup])) {
+                /* disabled 1 line ...
                 if (objectKeyTable[lookup].equals(objectKey)) {
+                ... disabled 1 line */
+                // End of VoltDB extension
                     break;
                 }
             } else if (isIntKey) {
@@ -1162,6 +1172,13 @@ public class BaseHashMap {
             return false;
         }
 
+        // CHERRY PICK to prevent a flaky crash?
+        if (hashIndex.elementCount == 0) {
+            return false;
+        }
+
+        // End of CHERRY PICK
+
         int lookup = getLookup(key, key.hashCode());
 
         return lookup == -1 ? false
@@ -1169,6 +1186,12 @@ public class BaseHashMap {
     }
 
     protected boolean containsKey(int key) {
+        // CHERRY PICK to prevent a flaky crash?
+        if (hashIndex.elementCount == 0) {
+            return false;
+        }
+
+        // End of CHERRY PICK
 
         int lookup = getLookup(key);
 
@@ -1178,6 +1201,12 @@ public class BaseHashMap {
 
     protected boolean containsKey(long key) {
 
+        // CHERRY PICK to prevent a flaky crash?
+        if (hashIndex.elementCount == 0) {
+            return false;
+        }
+
+        // End of CHERRY PICK
         int lookup = getLookup(key);
 
         return lookup == -1 ? false
@@ -1188,6 +1217,12 @@ public class BaseHashMap {
 
         int lookup = 0;
 
+        // CHERRY PICK to prevent a flaky crash?
+        if (hashIndex.elementCount == 0) {
+            return false;
+        }
+
+        // End of CHERRY PICK
         if (value == null) {
             for (; lookup < hashIndex.newNodePointer; lookup++) {
                 if (objectValueTable[lookup] == null) {
@@ -1451,6 +1486,10 @@ public class BaseHashMap {
             }
 
             if (isList) {
+                // CHERRY PICK to prevent a flaky crash?
+                removeRow(lookup);
+
+                // End of CHERRY PICK
                 lookup--;
             }
         }

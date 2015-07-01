@@ -1,24 +1,28 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.export;
 
-import org.voltcore.network.InputHandler;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 
 /**
  * Interface ExportManager imposes on processors.
@@ -31,6 +35,8 @@ import org.voltcore.logging.VoltLogger;
  */
 public interface ExportDataProcessor  {
 
+    public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
+
     /**
      * Allow the processor access to the Export logger. Processor may
      * log to this logger to produce Export category output.
@@ -39,6 +45,7 @@ public interface ExportDataProcessor  {
     void addLogger(VoltLogger logger);
 
     void setExportGeneration(ExportGeneration generation);
+    public ExportGeneration getExportGeneration();
 
     /**
      * Inform the processor that initialization is complete; commence work.
@@ -51,25 +58,20 @@ public interface ExportDataProcessor  {
     public void queueWork(Runnable r);
 
     /**
-     * A client has connected. Create an InputHandler for it.
-     * @param service The service requested.
-     * @param isAdminPort Whether or not the client is connecting on the admin port
-     * @returns InputHandler or null if unable to create an input handler for the service.
-     */
-    public InputHandler createInputHandler(String service, boolean isAdminPort);
-
-    /**
      * The system is terminating. Cleanup and exit the processor.
      */
     public void shutdown();
 
     /**
-     * Allow connectors to claim responsibility for a service
-     * @param service  Service, see wire protocol login message.
-     * @return  true if connector implements the service.
+     * Pass processor specific processor configuration properties
+     * @param config an instance of {@linkplain Properties}
      */
-    boolean isConnectorForService(String service);
+    public void setProcessorConfig(Map<String, Pair<Properties, Set<String>>> config);
 
-    void bootClient();
+    /**
+     * Pass processor specific processor configuration properties for checking
+     * @param config an instance of {@linkplain Properties}
+     */
+    public void checkProcessorConfig(Properties config);
 
 }

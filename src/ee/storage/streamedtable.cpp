@@ -1,53 +1,54 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "streamedtable.h"
 #include "StreamedTableUndoAction.hpp"
-#include "TupleStreamWrapper.h"
+#include "ExportTupleStream.h"
 #include "common/executorcontext.hpp"
 #include "tableiterator.h"
 
 using namespace voltdb;
 
-StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
-    : Table(1), stats_(this), m_executorContext(ctx), m_wrapper(NULL),
+StreamedTable::StreamedTable(bool exportEnabled)
+    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(NULL),
       m_sequenceNo(0)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
-        m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId);
+        enableStream();
     }
-}
-
-StreamedTable::StreamedTable(int tableAllocationTargetSize)
-    : Table(tableAllocationTargetSize), stats_(this),
-      m_executorContext(NULL), m_wrapper(NULL), m_sequenceNo(0)
-{
-    throwFatalException("Must provide executor context to streamed table constructor.");
 }
 
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
-    StreamedTable * st = new StreamedTable(ctx, true);
+    StreamedTable * st = new StreamedTable(true);
     st->m_wrapper->setDefaultCapacity(wrapperBufSize);
     return st;
 }
 
+//This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
+bool StreamedTable::enableStream() {
+    if (!m_wrapper) {
+        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                           m_executorContext->m_siteId);
+        return true;
+    }
+    return false;
+}
 
 StreamedTable::~StreamedTable()
 {
@@ -86,54 +87,55 @@ bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->currentTxnId(),
+        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
+                                      m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
+                                      m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       source,
-                                      TupleStreamWrapper::INSERT);
+                                      ExportTupleStream::INSERT);
         m_tupleCount++;
-        m_usedTupleCount++;
-
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        Pool *pool = uq->getDataPool();
-        StreamedTableUndoAction *ua =
-          new (pool->allocate(sizeof(StreamedTableUndoAction)))
-          StreamedTableUndoAction(this, mark);
-        uq->registerUndoAction(ua);
+        if (!uq) {
+            // With no active UndoLog, there is no undo support.
+            return true;
+        }
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
     }
     return true;
 }
 
-bool StreamedTable::updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes)
+bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &, TableTuple &, std::vector<TableIndex*> const&, bool)
 {
     throwFatalException("May not update a streamed table.");
+    return true;
 }
 
-bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
+bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
 {
     size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->currentTxnId(),
+        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
+                                      m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
+                                      m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       tuple,
-                                      TupleStreamWrapper::DELETE);
+                                      ExportTupleStream::DELETE);
         m_tupleCount++;
-        m_usedTupleCount++;
-
+        // Infallible delete (schema change with tuple migration & views) is not supported for export tables
+        assert(fallible);
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        Pool *pool = uq->getDataPool();
-        StreamedTableUndoAction *ua =
-          new (pool->allocate(sizeof(StreamedTableUndoAction)))
-          StreamedTableUndoAction(this, mark);
-        uq->registerUndoAction(ua);
+        if (!uq) {
+            // With no active UndoLog, there is no undo support.
+            return true;
+        }
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
     }
     return true;
 }
 
-void StreamedTable::loadTuplesFrom(SerializeInput&, Pool*)
+void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not update a streamed table.");
@@ -143,8 +145,7 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedTxnId,
-                                 m_executorContext->currentTxnId());
+                                 m_executorContext->m_lastCommittedSpHandle);
     }
 }
 

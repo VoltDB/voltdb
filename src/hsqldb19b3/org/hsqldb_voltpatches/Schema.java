@@ -31,13 +31,13 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HashMappedList;
-import org.hsqldb_voltpatches.lib.HsqlArrayList;
+import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.lib.Iterator;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.WrapperIterator;
-import org.hsqldb_voltpatches.rights.Grantee;
 
 public final class Schema implements SchemaObject {
 

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -21,7 +21,28 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.voltdb.plannodes.*;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.DeletePlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.InsertPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.MaterializedScanPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.PartialAggregatePlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
+import org.voltdb.plannodes.TupleScanPlanNode;
+import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.UpdatePlanNode;
 
 /**
  *
@@ -32,8 +53,12 @@ public enum PlanNodeType {
     //
     // Scan Nodes
     //
-    SEQSCAN         (10, SeqScanPlanNode.class),
-    INDEXSCAN       (11, IndexScanPlanNode.class),
+    SEQSCAN          (10, SeqScanPlanNode.class),
+    INDEXSCAN        (11, IndexScanPlanNode.class),
+    INDEXCOUNT       (12, IndexCountPlanNode.class),
+    TABLECOUNT       (13, TableCountPlanNode.class),
+    MATERIALIZEDSCAN (14, MaterializedScanPlanNode.class),
+    TUPLESCAN        (15, TupleScanPlanNode.class),
 
     //
     // Join Nodes
@@ -64,7 +89,7 @@ public enum PlanNodeType {
     PROJECTION      (54, ProjectionPlanNode.class),
     MATERIALIZE     (55, MaterializePlanNode.class),
     LIMIT           (56, LimitPlanNode.class),
-    DISTINCT        (57, DistinctPlanNode.class)
+    PARTIALAGGREGATE(57, PartialAggregatePlanNode.class)
 
     ;
 

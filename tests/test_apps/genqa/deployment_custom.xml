@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="catalog" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export enabled="true" target="custom" exportconnectorclass="customexport.OverflowingServerExportClient" >
+        <configuration>
+            <property name="drain">true</property>
+        </configuration>
+    </export>
+</deployment>

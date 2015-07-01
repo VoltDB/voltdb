@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -61,6 +61,7 @@
 #include "common/tabletuple.h"
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 #include "execution/VoltDBEngine.h"
 
@@ -78,7 +79,9 @@ public:
         m_exceptionBuffer = new char[4096];
         m_engine.setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine.resetReusedResultOutputBuffer();
-        m_engine.initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
+        int partitionCount = 1;
+        m_engine.initialize(0, 0, 0, 0, "", false, DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine.updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
     }
     ~ConstraintTest() {
         delete table;
@@ -89,6 +92,7 @@ protected:
     voltdb::Table* table;
     voltdb::CatalogId database_id;
     voltdb::VoltDBEngine m_engine;
+    char signature[20];
 
     char *m_exceptionBuffer;
 
@@ -103,30 +107,24 @@ protected:
         columnSizes.push_back(size);
         columnNullables.push_back(allow_null);
     };
+
     void setTable(voltdb::TableIndexScheme *pkey = NULL) {
         assert (columnNames.size() == columnTypes.size());
         assert (columnTypes.size() == columnSizes.size());
         assert (columnSizes.size() == columnNullables.size());
-        std::string *names = new std::string[columnNames.size()];
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnNullables, true);
-        for (std::size_t i = 0; i < columnTypes.size(); i++) {
-            names[i] = columnNames[i];
-        }
+        TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnNullables);
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
+        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames, signature);
         if (pkey) {
-            table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
-                                                     "test_table", schema, names, *pkey, -1, false, false);
+            TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
+            assert(pkeyIndex);
+            table->addIndex(pkeyIndex);
+            table->setPrimaryKeyIndex(pkeyIndex);
         }
-        else {
-            table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
-                                                     "test_table", schema, names, -1, false, false);
-        }
-
-        // clean up
-        delete[] names;
     };
+
     void setTable(voltdb::TableIndexScheme &pkey) {
         setTable(&pkey);
     };
@@ -192,10 +190,10 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
     }
 
     std::vector<int> pkey_column_indices;
-    std::vector<voltdb::ValueType> pkey_column_types;
     pkey_column_indices.push_back(0);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    TableIndexScheme pkey("idx_pkey", voltdb::BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, true, NULL);
+    TableIndexScheme pkey("idx_pkey", voltdb::BALANCED_TREE_INDEX,
+                          pkey_column_indices, TableIndex::simplyIndexColumns(),
+                          true, true, NULL);
 
     setTable(pkey);
 
@@ -252,10 +250,10 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
     }
 
     std::vector<int> pkey_column_indices;
-    std::vector<voltdb::ValueType> pkey_column_types;
     pkey_column_indices.push_back(0);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    voltdb::TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, false, NULL);
+    voltdb::TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
+                                  pkey_column_indices, TableIndex::simplyIndexColumns(),
+                                  true, true, NULL);
 
     setTable(pkey);
 
@@ -308,14 +306,12 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
     }
 
     std::vector<int> pkey_column_indices;
-    std::vector<voltdb::ValueType> pkey_column_types;
     pkey_column_indices.push_back(0);
     pkey_column_indices.push_back(2);
     pkey_column_indices.push_back(3);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, false, NULL);
+    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
+                          pkey_column_indices, TableIndex::simplyIndexColumns(),
+                          true, true, NULL);
 
     setTable(pkey);
 
@@ -356,14 +352,12 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
     }
 
     std::vector<int> pkey_column_indices;
-    std::vector<voltdb::ValueType> pkey_column_types;
     pkey_column_indices.push_back(0);
     pkey_column_indices.push_back(2);
     pkey_column_indices.push_back(3);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, false, NULL);
+    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
+                          pkey_column_indices, TableIndex::simplyIndexColumns(),
+                          true, true, NULL);
 
     setTable(pkey);
 

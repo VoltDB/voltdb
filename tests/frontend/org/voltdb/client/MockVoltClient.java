@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,15 +50,22 @@
 
 package org.voltdb.client;
 
+import static org.mockito.Mockito.doReturn;
+
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
 
+import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
 public class MockVoltClient implements Client, ReplicaProcCaller{
@@ -66,7 +73,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         super();
     }
 
-    ProcedureCallback m_callback = null;
+    ProcedureCallback m_lastCallback = null;
+    LinkedBlockingQueue<ProcedureCallback> m_callbacks = new LinkedBlockingQueue<ProcedureCallback>();
     boolean m_nextReturn = true;
 
     @Override
@@ -100,12 +108,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
             }
 
             @Override
-            public Exception getException() {
-                // TODO Auto-generated method stub
-                return null;
-            }
-
-            @Override
             public String getStatusString() {
                 return null;
             }
@@ -128,6 +130,12 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
             @Override
             public String getAppStatusString() {
                 return null;
+            }
+
+            @Override
+            public long getClientRoundtripNanos() {
+                // TODO Auto-generated method stub
+                return 0;
             }
 
         };
@@ -244,6 +252,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     @Override
     public boolean callProcedure(long originalTxnId,
+                                 long originalTimestamp,
                                  ProcedureCallback callback,
                                  String procName,
                                  Object... parameters) throws IOException,
@@ -251,7 +260,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
-        m_callback = callback;
+        m_lastCallback = callback;
+        m_callbacks.add(callback);
         if (originalTxnId <= lastOrigTxnId)
         {
             origTxnIdOrderCorrect = false;
@@ -264,10 +274,20 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         return m_nextReturn;
     }
 
+
     public void pokeLastCallback(final byte status, final String message) throws Exception
     {
         ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
-        m_callback.clientCallback(clientResponse);
+        m_lastCallback.clientCallback(clientResponse);
+    }
+
+    public void pokeAllPendingCallbacks(final byte status, final String message) throws Exception
+    {
+        ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
+        ProcedureCallback callback = null;
+        while ((callback = m_callbacks.poll()) != null) {
+            callback.clientCallback(clientResponse);
+        }
     }
 
     public void setNextReturn(boolean retval)
@@ -281,8 +301,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public ClientResponse callProcedure(long originalTxnId, String procName,
-                                        Object... parameters)
+    public ClientResponse callProcedure(long originalTxnId, long originalTimestamp,
+                                        String procName, Object... parameters)
     throws IOException, NoConnectionsException, ProcCallException
     {
         numCalls += 1;
@@ -301,7 +321,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     @Override
     public ClientStatsContext createStatsContext() {
-        return null;
+        ClientStatsContext mock = Mockito.mock(ClientStatsContext.class);
+        doReturn(mock).when(mock).fetchAndResetBaseline();
+        doReturn(Mockito.mock(ClientStats.class)).when(mock).getStats();
+        return mock;
     }
 
     @Override
@@ -314,4 +337,30 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         // TODO Auto-generated method stub
 
     }
+
+    @Override
+    public List<InetSocketAddress> getConnectedHostList() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) {
+        return null;
+    }
+
+    @Override
+    public ClientResponse updateClasses(File jarPath, String classesToDelete)
+            throws IOException, NoConnectionsException, ProcCallException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean updateClasses(ProcedureCallback callback, File jarPath,
+            String classesToDelete) throws IOException, NoConnectionsException {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
 }

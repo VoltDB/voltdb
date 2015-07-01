@@ -1,0 +1,3 @@
+CREATE TABLE V0 (
+    id BIGINT
+);

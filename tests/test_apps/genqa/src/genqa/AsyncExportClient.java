@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,19 +44,31 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.util.Random;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
-import org.voltdb.client.exampleutils.ClientConnection;
-import org.voltdb.client.exampleutils.ClientConnectionPool;
-import org.voltdb.client.exampleutils.IRateLimiter;
-import org.voltdb.client.exampleutils.LatencyLimiter;
-import org.voltdb.client.exampleutils.RateLimiter;
+import org.voltdb.iv2.TxnEgo;
 
 public class AsyncExportClient
 {
@@ -69,9 +81,11 @@ public class AsyncExportClient
     {
         String m_nonce;
         String m_txnLogPath;
-        FileOutputStream m_curFile = null;
-        OutputStreamWriter m_outs = null;
-        long m_count = 0;
+        AtomicLong m_count = new AtomicLong(0);
+
+        private Map<Integer,File> m_curFiles = new TreeMap<>();
+        private Map<Integer,File> m_baseDirs = new TreeMap<>();
+        private Map<Integer,OutputStreamWriter> m_osws = new TreeMap<>();
 
         public TxnIdWriter(String nonce, String txnLogPath)
         {
@@ -81,74 +95,166 @@ public class AsyncExportClient
             File logPath = new File(m_txnLogPath);
             if (!logPath.exists()) {
                 if (!logPath.mkdir()) {
-                    System.err.println("Problem creating log directory");
+                    System.err.println("Problem creating log directory " + logPath);
                 }
             }
         }
 
-        public void createNewFile() throws IOException
-        {
-            if (m_curFile != null)
-            {
-                m_outs.close();
-                m_curFile.flush();
-                m_curFile.close();
+        public void createNewFile(int partId) throws IOException {
+            File dh = m_baseDirs.get(partId);
+            if (dh == null) {
+                dh = new File(m_txnLogPath, Integer.toString(partId));
+                if (!dh.mkdir()) {
+                    System.err.println("Problem createing log directory " + dh);
+                }
+                m_baseDirs.put(partId, dh);
             }
-            File blah = new File(m_txnLogPath, m_count + "-" + m_nonce + "-txns");
-            m_curFile = new FileOutputStream(blah);
-            m_outs = new OutputStreamWriter(m_curFile);
+            long count = m_count.get();
+            count = count - count % CLIENT_TXNID_FILE_SIZE;
+            File logFH = new File(dh, "active-" + count + "-" + m_nonce + "-txns");
+            OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(logFH));
+
+            m_curFiles.put(partId,logFH);
+            m_osws.put(partId,osw);
         }
 
-        public void write(String txnId) throws IOException
-        {
-            if ((m_count % CLIENT_TXNID_FILE_SIZE) == 0)
-            {
-                createNewFile();
+        public void write(int partId, String rec) throws IOException {
+
+            if ((m_count.get() % CLIENT_TXNID_FILE_SIZE) == 0) {
+                close(false);
             }
-            m_outs.write(txnId);
-            m_count++;
+            OutputStreamWriter osw = m_osws.get(partId);
+            if (osw == null) {
+                createNewFile(partId);
+                osw = m_osws.get(partId);
+            }
+            osw.write(rec);
+            m_count.incrementAndGet();
+        }
+
+        public void close(boolean isLast) throws IOException
+        {
+            for (Map.Entry<Integer,OutputStreamWriter> e: m_osws.entrySet()) {
+
+                int partId = e.getKey();
+                OutputStreamWriter osw = e.getValue();
+
+                if (osw != null) {
+                    osw.close();
+                    File logFH = m_curFiles.get(partId);
+                    File renamed = new File(
+                            m_baseDirs.get(partId),
+                            logFH.getName().substring("active-".length()) + (isLast ? "-last" : "")
+                            );
+                    logFH.renameTo(renamed);
+
+                    e.setValue(null);
+                }
+                m_curFiles.put(partId, null);
+            }
+
         }
     }
 
     static class AsyncCallback implements ProcedureCallback
     {
         private final TxnIdWriter m_writer;
-        public AsyncCallback(TxnIdWriter writer)
+        private final long m_rowid;
+        public AsyncCallback(TxnIdWriter writer, long rowid)
         {
             super();
+            m_rowid = rowid;
             m_writer = writer;
         }
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             // Track the result of the request (Success, Failure)
+            long now = System.currentTimeMillis();
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 TrackingResults.incrementAndGet(0);
+                long txid = clientResponse.getResults()[0].asScalarLong();
+                final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
                 try
                 {
-                    m_writer.write(clientResponse.getResults()[0].asScalarLong() + "\n");
+                    m_writer.write(TxnEgo.getPartitionId(txid),trace);
                 }
                 catch (IOException e)
                 {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
             }
             else
             {
                 TrackingResults.incrementAndGet(1);
+                final String trace = String.format("%d:-1:%d\n", m_rowid, now);
+                try
+                {
+                    m_writer.write(-1,trace);
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
             }
+        }
+    }
+
+    // Connection configuration
+    private final static class ConnectionConfig {
+
+        final long displayInterval;
+        final long duration;
+        final String servers;
+        final int port;
+        final int poolSize;
+        final int rateLimit;
+        final boolean autoTune;
+        final int latencyTarget;
+        final String [] parsedServers;
+        final String procedure;
+        final boolean exportGroups;
+
+        ConnectionConfig( AppHelper apph) {
+            displayInterval = apph.longValue("displayinterval");
+            duration        = apph.longValue("duration");
+            servers         = apph.stringValue("servers");
+            port            = apph.intValue("port");
+            poolSize        = apph.intValue("poolsize");
+            rateLimit       = apph.intValue("ratelimit");
+            autoTune        = apph.booleanValue("autotune");
+            latencyTarget   = apph.intValue("latencytarget");
+            procedure       = apph.stringValue("procedure");
+            parsedServers   = servers.split(",");
+            exportGroups    = apph.booleanValue("exportgroups");
         }
     }
 
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
 
-    // Reference to the database connection we will use
-    private static ClientConnection Con;
-
     private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
+
+    // Connection reference
+    private static final AtomicReference<Client> clientRef = new AtomicReference<Client>();
+
+    // Shutdown flag
+    private static final AtomicBoolean shutdown = new AtomicBoolean(false);
+
+    // Connection Configuration
+    private static ConnectionConfig config;
+
+    // Test startup time
+    private static long benchmarkStartTS;
+
+    // Statistics manager objects from the client
+    private static ClientStatsContext periodicStatsContext;
+    private static ClientStatsContext fullStatsContext;
+
+    static {
+        VoltDB.setDefaultTimezone();
+    }
 
     // Application entry point
     public static void main(String[] args)
@@ -170,31 +276,25 @@ public class AsyncExportClient
                 .add("procedure", "procedure_name", "Procedure to call.", "JiggleExportSinglePartition")
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
-                .add("catalogswap", "Swap catalogs from the client", "true")
+                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
+                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "true")
+                .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .setArguments(args)
             ;
 
+            config = new ConnectionConfig(apph);
+
             // Retrieve parameters
-            final long displayInterval = apph.longValue("displayinterval");
-            final long duration        = apph.longValue("duration");
-            final String servers       = apph.stringValue("servers");
-            final int port             = apph.intValue("port");
-            final int poolSize         = apph.intValue("poolsize");
-            final String procedure     = apph.stringValue("procedure");
-            final long rateLimit       = apph.longValue("ratelimit");
-            final boolean autoTune     = apph.booleanValue("autotune");
-            final double latencyTarget = apph.doubleValue("latencytarget");
             final boolean catalogSwap  = apph.booleanValue("catalogswap");
             final String csv           = apph.stringValue("statsfile");
 
             TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
 
             // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("poolsize", (duration > 0))
-                .validate("ratelimit", (rateLimit > 0))
-                .validate("latencytarget", (latencyTarget > 0))
+            apph.validate("duration", (config.duration > 0))
+                .validate("poolsize", (config.poolSize > 0))
+                .validate("ratelimit", (config.rateLimit > 0))
+                .validate("latencytarget", (config.latencyTarget > 0))
             ;
 
             // Display actual parameters, for reference
@@ -203,55 +303,60 @@ public class AsyncExportClient
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Get a client connection - we retry for a while in case the server hasn't started yet
-            Con = ClientConnectionPool.getWithRetry(servers, port);
+            createClient();
+            connect();
+
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Create a Timer task to display performance data on the procedure
-            Timer timer = new Timer();
+            Timer timer = new Timer(true);
             timer.scheduleAtFixedRate(new TimerTask()
             {
                 @Override
                 public void run()
                 {
-                    System.out.print(Con.getStatistics(procedure));
+                    printStatistics(periodicStatsContext,true);
                 }
             }
-            , displayInterval*1000l
-            , displayInterval*1000l
+            , config.displayInterval*1000l
+            , config.displayInterval*1000l
             );
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
-            IRateLimiter limiter = null;
-            if (autoTune)
-                limiter = new LatencyLimiter(Con, procedure, latencyTarget, rateLimit);
-            else
-                limiter = new RateLimiter(rateLimit);
+            benchmarkStartTS = System.currentTimeMillis();
+            AtomicLong rowId = new AtomicLong(0);
 
             // Run the benchmark loop for the requested duration
-            final long endTime = System.currentTimeMillis() + (1000l * duration);
-            Random rand = new Random();
+            final long endTime = benchmarkStartTS + (1000l * config.duration);
             int swap_count = 0;
             boolean first_cat = false;
             while (endTime > System.currentTimeMillis())
             {
+                long currentRowId = rowId.incrementAndGet();
                 // Post the request, asynchronously
-                Con.executeAsync(new AsyncCallback(writer),
-                                 procedure,
-                                 (long)rand.nextInt(poolSize),
-                                 0);
+                try {
+                    clientRef.get().callProcedure(
+                                                  new AsyncCallback(writer, currentRowId),
+                                                  config.procedure,
+                                                  currentRowId,
+                                                  0);
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
+
                 swap_count++;
                 if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
                 {
                     System.out.println("Changing catalogs...");
-                    Con.updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
+                    clientRef.get().updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
                     first_cat = !first_cat;
                 }
-                // Use the limiter to throttle client activity
-                limiter.throttle();
             }
+            shutdown.compareAndSet(false, true);
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -259,8 +364,19 @@ public class AsyncExportClient
             timer.cancel();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
-            Con.drain();
+            clientRef.get().drain();
+
             Thread.sleep(10000);
+            waitForStreamedAllocatedMemoryZero(clientRef.get());
+            System.out.println("Writing export count as: " + TrackingResults.get(0));
+            //Write to export table to get count to be expected on other side.
+            if (config.exportGroups) {
+                clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
+            }
+            else {
+                clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
+            }
+            writer.close(true);
 
             // Now print application results:
 
@@ -284,12 +400,15 @@ public class AsyncExportClient
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics(procedure).toString(false));
+            printStatistics(fullStatsContext,false);
 
             // Dump statistics to a CSV file
-            Con.saveStatistics(csv);
+            clientRef.get().writeSummaryCSV(
+                    fullStatsContext.getStatsByProc().get(config.procedure),
+                    csv
+                    );
 
-            Con.close();
+            clientRef.get().close();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -300,4 +419,148 @@ public class AsyncExportClient
             x.printStackTrace();
         }
     }
+
+    /**
+     * Connect to a set of servers in parallel. Each will retry until
+     * connection. This call will block until all have connected.
+     *
+     * @param servers A comma separated list of servers using the hostname:port
+     * syntax (where :port is optional).
+     * @throws InterruptedException if anything bad happens with the threads.
+     */
+    static void connect() throws InterruptedException {
+        System.out.println("Connecting to VoltDB...");
+
+        String[] serverArray = config.parsedServers;
+        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+
+        // use a new thread to connect to each server
+        for (final String server : serverArray) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    connectToOneServerWithRetry(server, config.port);
+                    connections.countDown();
+                }
+            }).start();
+        }
+        // block until all have connected
+        connections.await();
+    }
+
+    /**
+     * Connect to a single server with retry. Limited exponential backoff.
+     * No timeout. This will run until the process is killed if it's not
+     * able to connect.
+     *
+     * @param client The client to use for this server
+     * @param server hostname:port or just hostname (hostname can be ip).
+     */
+    static void connectToOneServerWithRetry(String server, int port) {
+        Client client = clientRef.get();
+        int sleep = 1000;
+        while (true) {
+            try {
+                client.createConnection(server, port);
+                break;
+            }
+            catch (Exception e) {
+                System.err.printf("Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
+                try { Thread.sleep(sleep); } catch (Exception interruted) {}
+                if (sleep < 8000) sleep += sleep;
+            }
+        }
+        System.out.printf("Connected to VoltDB node at: %s.\n", server);
+    }
+
+    static Client createClient() {
+        ClientConfig clientConfig = new ClientConfig("", "");
+        clientConfig.setReconnectOnConnectionLoss(true);
+        if (config.autoTune) {
+            clientConfig.enableAutoTune();
+            clientConfig.setAutoTuneTargetInternalLatency(config.latencyTarget);
+        }
+        else {
+            clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
+        }
+        Client client = ClientFactory.createClient(clientConfig);
+        clientRef.set(client);
+
+        periodicStatsContext = client.createStatsContext();
+        fullStatsContext = client.createStatsContext();
+
+        return client;
+    }
+
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    static private synchronized void printStatistics(ClientStatsContext context, boolean resetBaseline) {
+        if (resetBaseline) {
+            context = context.fetchAndResetBaseline();
+        } else {
+            context = context.fetch();
+        }
+
+        ClientStats stats = context
+                .getStatsByProc()
+                .get(config.procedure);
+
+        if (stats == null) return;
+
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
+    }
+
+    /**
+     * Wait for export processor to catch up and have nothing to be exported.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public static void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
+        boolean passed = false;
+
+        VoltTable stats = null;
+        try {
+            System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        } catch (Exception ex) {
+        }
+        while (true) {
+            try {
+                stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            } catch (Exception ex) {
+            }
+            if (stats == null) {
+                Thread.sleep(5000);
+                continue;
+            }
+            boolean passedThisTime = true;
+            while (stats.advanceRow()) {
+                String ttype = stats.getString("TABLE_TYPE");
+                if (ttype.equals("StreamedTable")) {
+                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                        passedThisTime = false;
+                        System.out.println("Partition Not Zero.");
+                        break;
+                    }
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        System.out.println(stats);
+    }
+
 }

@@ -3,52 +3,103 @@
 -- subset of SQL that we claim to support.
 --
 -- In the brave new meta-template world (yeah, okay, kill me), these
--- statements expect that the includer will have set the template
--- @cmp_type to be the _value[???] type that makes sense for the
--- config under test.  So, if the configuration is pushing on string
--- operations, you'll want a line: {@cmp_type = "_value[string]"} in
+-- statements expect that the includer will have set the template macros like
+-- @comparabletype to have a value that makes sense for the schema under test.
+-- So, if the configuration is pushing on string
+-- operations, you'll want a line: {@comparabletype = "string"} in
 -- the template file that includes this one.
+--
+-- Required preprocessor macros (with example values):
+-- {@aftermath = " _math _value[int:1,3]"}
+-- {@agg = "_numagg"}
+-- {@columntype = "decimal"}
+-- {@columnpredicate = "_numericcolumnpredicate"}
+-- {@comparableconstant = "42.42"}
+-- {@comparabletype = "numeric"}
+-- {@fromtables = "_table"}
+-- {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
+-- {@idcol = "ID"}
+-- {@optionalfn = "_numfun"}
+
 
 --SELECT
 -- test select expressions
 --- test simple projection
-SELECT _variable FROM @from_tables
-SELECT _variable, _variable FROM @from_tables
+SELECT _variable[#arg @comparabletype] B1 FROM @fromtables
+SELECT _variable[#arg @comparabletype], _variable B2 FROM @fromtables
 --- test column alias
-SELECT _variable AS DUDE FROM @from_tables
+SELECT _variable[#arg @columntype] AS B3 FROM @fromtables A
 --- test *
-SELECT * FROM @from_tables
+SELECT * FROM @fromtables B4
 --- test simple arithmetic expressions (+, -, *, /) with constant
-SELECT _variable _math _value[int:0,100] FROM @from_tables
+SELECT _variable[#arg @columntype] @aftermath AS B5LITTLEMATH FROM @fromtables A
+
 --- test DISTINCT
-SELECT DISTINCT _variable FROM @from_tables
+SELECT DISTINCT _variable[#arg @comparabletype] B6 FROM @fromtables A
+SELECT DISTINCT _variable[#arg @comparabletype] B6 FROM @fromtables A ORDER BY 1 LIMIT 5
+SELECT DISTINCT _variable[#arg @comparabletype] B6_1, _variable B6_2  FROM @fromtables A
+SELECT DISTINCT _variable[#arg @comparabletype] B6_1, _variable B6_2  FROM @fromtables A ORDER BY 1, 2 LIMIT 5
+
 --- test ALL
-SELECT ALL _variable FROM @from_tables
+SELECT ALL _variable[#arg @comparabletype] B7 FROM @fromtables A
+
 --- test aggregate functions (COUNT, SUM, MAX, MIN, AVG)
-SELECT _agg(_variable) FROM @from_tables
+---- TODO: Re-simplify when the ENG-6176 optimized MIN(NULL) wrong answer bug is fixed.
+---- SELECT  @agg(_variable[#arg @comparabletype]) B8 FROM @fromtables A --->
+{_countormax |= "COUNT"}
+{_countormax |= "MAX"}
+SELECT _countormax(_variable[#arg @comparabletype]) B8 FROM @fromtables A
+
+
+SELECT @agg(_variable[#arg @comparabletype]) B9 FROM @fromtables A WHERE _maybe A._variable[#arg @comparabletype] _cmp @comparableconstant
+
 --- count(*), baby
-SELECT COUNT(*) FROM @from_tables
+-- TODO: migrate cases like this that are not columntype/comparabletype-specific to their own template/suite
+SELECT COUNT(*) FROM @fromtables B10
+
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT * FROM @from_tables WHERE _variable[@col_type] _cmp @cmp_type
+SELECT * FROM @fromtables A WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
+--- test EXISTS/IN operators ()
+SELECT * FROM @fromtables A WHERE EXISTS(SELECT * FROM @fromtables B WHERE _maybe B.@idcol _cmp A.@idcol )
+
 --- test arithmetic operators (+, -, *, /) with comparison ops
-SELECT * FROM @from_tables WHERE (_variable[@col_type] _math _value[int:0,100]) _cmp @cmp_type
+SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
 --- test logic operators (AND) with comparison ops
-SELECT * FROM @from_tables WHERE (_variable[@col_type] _cmp @cmp_type) _logic (_variable _cmp _variable)
+SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
 -- test GROUP BY
-SELECT _variable FROM @from_tables GROUP BY _variable
--- test ORDER BY
-SELECT _variable[@order], _variable FROM @from_tables ORDER BY _variable[@order] _sortorder
--- test LIMIT (with ORDER BY)
-SELECT _variable[@order] FROM @from_tables ORDER BY _variable[@order] LIMIT _value[int:1,10]
--- test OFFSET (with ORDER BY)
-SELECT _variable[@order] FROM @from_tables ORDER BY _variable[@order] LIMIT _value[int:1,10] OFFSET _value[int:1,10]
+SELECT _variable[#grouped @columntype] B14 FROM @fromtables A GROUP BY __[#grouped]
+
+{_optionallimitoffset |= ""}
+{_optionallimitoffset |= "LIMIT _value[int:1,3]"}
+{_optionallimitoffset |= "LIMIT _value[int:1,3] OFFSET _value[int:1,3]"}
+-- OFFSET without LIMIT not supported -- is that SQL standard?
+--{_optionallimitoffset |= "                      OFFSET _value[int:1,3]"}
+
+-- test ORDER BY with optional LIMIT/OFFSET
+-- HSQL disagrees about ordering of NULLs descending, this only shows as an error on limit/offset queries,
+-- so these two statements (DESC sort order and varying limit offset) are kept separate.
+SELECT _variable[#order], _variable B15 FROM @fromtables A ORDER BY __[#order], 2            _optionallimitoffset
+SELECT _variable[#order], _variable B16 FROM @fromtables A ORDER BY __[#order], 2 DESC
+
 -- test GROUP BY count(*)
-SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@order]
--- test GROUP BY ORDER BY COUNT(*) with LIMIT
-SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@order] ORDER BY FOO DESC, _variable[@order] LIMIT _value[int:1,3]
--- test GROUP BY ORDER BY COUNT(*) with OFFSET
-SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@order] ORDER BY FOO DESC, _variable[@order] LIMIT _value[int:1,3] OFFSET _value[int:1,3]
+SELECT _variable[#grouped], COUNT(*) AS B17 FROM @fromtables A GROUP BY __[#grouped]
+-- test GROUP BY ORDER BY COUNT(*) with optional LIMIT/OFFSET
+SELECT _variable[#grouped], COUNT(*) AS B18 FROM @fromtables A GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
+
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
-SELECT * FROM _table[@lhs] INNER JOIN _table[@rhs] ON __[@lhs]._variable = __[@rhs]._variable
-SELECT * FROM _table[@lhs] INNER JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col
+SELECT * FROM @fromtables LHS INNER JOIN @fromtables B19RHS ON LHS.@idcol = B19RHS.@idcol
+-- TODO: If the intent is to support a schema with multiple id-partitioned tables,
+-- this statement is looking for trouble -- might want to migrate it to its own template/suite.
+SELECT * FROM @fromtables LHS INNER JOIN @fromtables B20RHS ON LHS._variable[@columntype] = B20RHS._variable[@comparabletype]
+
+
+--- test IN/EXISTS predicate
+--- Use @columntype instead of @comparabletype because Hsql sometimes return wrong answers between integer and decimal comparison for IN.
+SELECT * FROM @fromtables A WHERE EXISTS ( SELECT * FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
+SELECT * FROM @fromtables A WHERE _variable[@columntype] IN ( SELECT _variable[@columntype] FROM @fromtables B )
+SELECT * FROM @fromtables A WHERE _variable[@comparabletype] _cmp @comparableconstant AND EXISTS ( SELECT * FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
+
+--- test scalar subqueries (ENG-7959)
+SELECT *, (SELECT COUNT(*) FROM @fromtables WHERE _variable[@comparabletype] _cmp B24._variable[@comparabletype]) FROM @fromtables AS B24
+SELECT * FROM @fromtables AS B25 WHERE _variable[numeric] _cmp (SELECT COUNT(*) FROM @fromtables)

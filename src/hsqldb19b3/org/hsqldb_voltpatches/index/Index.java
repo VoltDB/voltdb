@@ -66,10 +66,10 @@
 
 package org.hsqldb_voltpatches.index;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
-import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.types.Type;
@@ -268,12 +268,46 @@ public interface Index extends SchemaObject {
     public int compareRowNonUnique(Object[] a, Object[] b,
                                    int fieldcount);
 
+    /************************* Volt DB Extensions *************************/
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.
+     * @throws HSQLParseException
      */
-    public VoltXMLElement voltGetXML(Session session);
+    public org.hsqldb_voltpatches.VoltXMLElement voltGetIndexXML(Session session, String tableName)
+        throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+
+    /**
+     * VoltDB added method to get a list of indexed expressions that contain one or more non-columns.
+     * @return the list of expressions, or null if indexing only plain column value(s).
+     */
+    public org.hsqldb_voltpatches.Expression[] getExpressions();
+
+    /**
+     * VoltDB added method to allow unique index on partition table without partition key included.
+     * @return true if user wants unique index without uniqueness guarantee on partition table without partition key included.
+     */
+    public boolean isAssumeUnique();
+
+    Index setAssumeUnique(boolean assumeUnique);
+
+    Index withExpressions(org.hsqldb_voltpatches.Expression[] adjustExprs);
+
+    /**
+     * VoltDB added method to get a predicate for a partial index.
+     * @return the partial index predicate , or null.
+     */
+    public org.hsqldb_voltpatches.Expression getPredicate();
+
+    /**
+     * VoltDB added method to get a partial index.
+     * @return the partial index.
+     */
+    Index withPredicate(org.hsqldb_voltpatches.Expression indexPredicate);
+
+    /**********************************************************************/
 }

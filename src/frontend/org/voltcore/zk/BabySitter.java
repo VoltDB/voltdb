@@ -1,40 +1,37 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltcore.zk;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.zookeeper_voltpatches.data.Stat;
+import com.google_voltpatches.common.collect.ImmutableList;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltDB;
 
 /**
  * BabySitter watches a zookeeper node and alerts on appearances
@@ -55,7 +52,7 @@ public class BabySitter
     private final Callback m_cb; // the callback when children change
     private final ZooKeeper m_zk;
     private final ExecutorService m_es;
-    private List<String> m_children = new ArrayList<String>();
+    private volatile List<String> m_children = ImmutableList.of();
     private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
     /**
@@ -68,7 +65,7 @@ public class BabySitter
     }
 
     /** lastSeenChildren returns the last recorded list of children */
-    public synchronized List<String> lastSeenChildren()
+    public List<String> lastSeenChildren()
     {
         if (m_shutdown.get()) {
             throw new RuntimeException("Requested children from shutdown babysitter.");
@@ -86,12 +83,12 @@ public class BabySitter
         m_shutdown.set(true);
     }
 
-    private BabySitter(ZooKeeper zk, String dir, Callback cb)
+    private BabySitter(ZooKeeper zk, String dir, Callback cb, ExecutorService es)
     {
         m_zk = zk;
         m_dir = dir;
         m_cb = cb;
-        m_es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Babysitter-" + dir));
+        m_es = es;
     }
 
     /**
@@ -100,10 +97,43 @@ public class BabySitter
     public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb)
         throws InterruptedException, ExecutionException
     {
-        BabySitter bs = new BabySitter(zk, dir, cb);
-        Future<List<String>> task = bs.m_es.submit(bs.m_eventHandler);
-        List<String> initialChildren = task.get();
+        ExecutorService es = CoreUtils.getCachedSingleThreadExecutor("Babysitter-" + dir, 15000);
+        return blockingFactory(zk, dir, cb, es);
+    }
+
+    /**
+     * Create a new BabySitter and block on reading the initial children list.
+     * Use the provided ExecutorService to queue events to, rather than
+     * creating a private ExecutorService. The initial set of children will be retrieved
+     * in the current thread and not the ExecutorService because it is assumed
+     * this is being called from the ExecutorService
+     */
+    public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb,
+            ExecutorService es)
+        throws InterruptedException, ExecutionException
+    {
+        BabySitter bs = new BabySitter(zk, dir, cb, es);
+        List<String> initialChildren;
+        try {
+            initialChildren = bs.m_eventHandler.call();
+        } catch (Exception e) {
+            throw new ExecutionException(e);
+        }
         return new Pair<BabySitter, List<String>>(bs, initialChildren);
+    }
+
+    /**
+     * Create a new BabySitter and make sure it reads the initial children list.
+     * Use the provided ExecutorService to queue events to, rather than
+     * creating a private ExecutorService.
+     */
+    public static BabySitter nonblockingFactory(ZooKeeper zk, String dir,
+                                                Callback cb, ExecutorService es)
+        throws InterruptedException, ExecutionException
+    {
+        BabySitter bs = new BabySitter(zk, dir, cb, es);
+        bs.m_es.submit(bs.m_eventHandler);
+        return bs;
     }
 
     // eventHandler fetches the new children and resets the watch.
@@ -132,7 +162,12 @@ public class BabySitter
         @Override
         public void process(WatchedEvent event)
         {
-            m_es.submit(m_eventHandler);
+            try {
+                m_es.submit(m_eventHandler);
+            } catch (RejectedExecutionException e) {
+                if (m_shutdown.get()) return;
+                VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", true, e);
+            }
         }
     };
 
@@ -140,10 +175,15 @@ public class BabySitter
     {
         Stat stat = new Stat();
         List<String> zkchildren = m_zk.getChildren(m_dir, m_watcher, stat);
-        ArrayList<String> tmp = new ArrayList<String>(zkchildren.size());
-        tmp.addAll(zkchildren);
-        ZKUtil.sortSequentialNodes(tmp);
-        m_children = Collections.unmodifiableList(tmp);
+        // Sort on the ephemeral sequential part, the prefix is not padded, so string sort doesn't work
+        Collections.sort(zkchildren, new Comparator<String>() {
+            @Override
+            public int compare(String left, String right)
+            {
+                return CoreZK.getSuffixFromChildName(left).compareTo(CoreZK.getSuffixFromChildName(right));
+            }
+        });
+        m_children = ImmutableList.copyOf(zkchildren);
         return m_children;
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -68,14 +68,14 @@ public class LoadWarehouse extends VoltProcedure {
     public VoltTable[] run(short w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
         VoltTable stocks, VoltTable orders, VoltTable neworders, VoltTable orderLines, VoltTable histories)
     throws VoltAbortException {
-        voltLoadTable("cluster", "database", "WAREHOUSE", warehouses);
-        voltLoadTable("cluster", "database", "DISTRICT", districts);
-        voltLoadTable("cluster", "database", "CUSTOMER", customers);
-        voltLoadTable("cluster", "database", "STOCK", stocks);
-        voltLoadTable("cluster", "database", "ORDERS", orders);
-        voltLoadTable("cluster", "database", "NEW_ORDER", neworders);
-        voltLoadTable("cluster", "database", "ORDER_LINE", orderLines);
-        voltLoadTable("cluster", "database", "HISTORY", histories);
+        voltLoadTable("cluster", "database", "WAREHOUSE", warehouses, false, false);
+        voltLoadTable("cluster", "database", "DISTRICT", districts, false, false);
+        voltLoadTable("cluster", "database", "CUSTOMER", customers, false, false);
+        voltLoadTable("cluster", "database", "STOCK", stocks, false, false);
+        voltLoadTable("cluster", "database", "ORDERS", orders, false, false);
+        voltLoadTable("cluster", "database", "NEW_ORDER", neworders, false, false);
+        voltLoadTable("cluster", "database", "ORDER_LINE", orderLines, false, false);
+        voltLoadTable("cluster", "database", "HISTORY", histories, false, false);
         return null;
     }
 }

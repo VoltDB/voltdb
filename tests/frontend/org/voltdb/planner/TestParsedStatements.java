@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,7 +26,6 @@ package org.voltdb.planner;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.ArrayList;
 import java.util.Map.Entry;
 
 import junit.framework.TestCase;
@@ -38,8 +37,6 @@ import org.voltdb.AllTpccSQL;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 public class TestParsedStatements extends TestCase {
@@ -83,24 +80,21 @@ public class TestParsedStatements extends TestCase {
             assertTrue(false);
         }
         // output the xml from hsql to disk for debugging
-        BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString());
+        BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString(), true);
 
         // get a parsed statement from the xml
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, m_db, null);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, null, m_db, null);
+        // analyze expressions
+        // except for "insert" statements that currently do without a joinTree.
+        if (parsedStmt.m_joinTree != null) {
+            parsedStmt.m_joinTree.analyzeJoinExpressions(parsedStmt.m_noTableSelectionList);
+        }
         // output a description of the parsed stmt
-        BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString());
+        BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString(), true);
 
-        int clausesFound = 0;
-        clausesFound += parsedStmt.noTableSelectionList.size();
-        for (Entry<Table, ArrayList<AbstractExpression>> pair : parsedStmt.tableFilterList.entrySet())
-            clausesFound += pair.getValue().size();
-        for (Entry<AbstractParsedStmt.TablePair, ArrayList<AbstractExpression>> pair : parsedStmt.joinSelectionList.entrySet())
-            clausesFound += pair.getValue().size();
-        clausesFound += parsedStmt.multiTableSelectionList.size();
+        assertTrue(parsedStmt.m_noTableSelectionList.isEmpty());
 
         System.out.println(parsedStmt.toString());
-
-        assertEquals(clausesFound, parsedStmt.whereSelectionList.size());
     }
 
     public void testParsedInsertStatements() {
@@ -125,5 +119,16 @@ public class TestParsedStatements extends TestCase {
         for (Entry<String, String> entry : m_allSQL.updates.entrySet()) {
             runSQLTest(entry.getKey(), entry.getValue());
         }
+    }
+
+    public void testParsedInStatements() {
+        runSQLTest("1", "select * from new_order where no_w_id in (5,7);");
+        runSQLTest("2", "select * from new_order where no_w_id in (?);");
+        runSQLTest("3", "select * from new_order where no_w_id in (?,5,3,?);");
+        runSQLTest("4", "select * from new_order where no_w_id not in (?,5,3,?);");
+        runSQLTest("5", "select * from warehouse where w_name not in (?, 'foo');");
+        runSQLTest("6", "select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);");
+        runSQLTest("7", "select * from new_order where no_w_id in (abs(-1), ?, 17761776);");
+        runSQLTest("8", "select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
     }
 }

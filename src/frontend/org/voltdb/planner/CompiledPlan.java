@@ -1,28 +1,34 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.List;
+
 import org.voltdb.ParameterSet;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlanNodeType;
 
@@ -34,6 +40,8 @@ import org.voltdb.types.PlanNodeType;
  *
  */
 public class CompiledPlan {
+
+    public final static int MAX_PARAM_COUNT = 1025; // keep synched with value in EE VoltDBEngine.h
 
     /** A complete plan graph for SP plans and the top part of MP plans */
     public AbstractPlanNode rootPlanGraph;
@@ -58,14 +66,15 @@ public class CompiledPlan {
      */
     public String explainedPlan = null;
 
-    /** A list of parameter names, indexes and types */
-    public VoltType[] parameters = null;
+    /** Parameters and their types in parameter index order */
+    public ParameterValueExpression[] parameters = null;
+    private VoltType[] m_parameterTypes = null;
 
     /** Parameter values, if the planner pulled constants out of the plan */
-    public ParameterSet extractedParamValues = new ParameterSet();
+    private ParameterSet m_extractedParamValues = ParameterSet.emptyParameterSet();
 
-    /** A list of output column ids, indexes and types */
-    public NodeSchema columns = new NodeSchema();
+    /** Compiler generated parameters for cacheble AdHoc queries */
+    private int m_generatedParameterCount = 0;
 
     /**
      * If true, divide the number of tuples changed
@@ -74,52 +83,40 @@ public class CompiledPlan {
      */
     public boolean replicatedTableDML = false;
 
-    /** Does the statment write? */
-    public boolean readOnly = false;
+    /** Does the statement write? */
+    private boolean m_readOnly = false;
 
     /**
-     * The tree representing the full where clause of the SQL
-     * statement that generated this plan. This is not used for
-     * execution, but is of interest to the database designer.
-     * Ultimately, this will end up serialized in the catalog.
-     * Note: this is not serialized when the parent CompiledPlan
-     * instance is serialized (only used for ad hoc sql).
+     * Whether the plan's statement mandates a result with nondeterministic content;
      */
-    public AbstractExpression fullWhereClause = null;
-
-    /**
-     * The plangraph representing the full generated plan with
-     * the lowest cost for this sql statement. This is not used for
-     * execution, but is of interest to the database designer.
-     * Ultimately, this will end up serialized in the catalog.
-     * Note: this is not serialized when the parent CompiledPlan
-     * instance is serialized (only used for ad hoc sql).
-     */
-    public AbstractPlanNode fullWinnerPlan = null;
-
-    /**
-     * Whether the plan's statement mandates a result with deterministic content;
-     */
-    private boolean m_statementIsContentDeterministic = false;
+    private boolean m_statementHasLimitOrOffset = false;
 
     /**
      * Whether the plan's statement mandates a result with deterministic content and order;
      */
     private boolean m_statementIsOrderDeterministic = false;
 
-    private Object m_partitioningKey;
+    /** Which extracted param is the partitioning object (assuming parameterized plans) */
+    public int partitioningKeyIndex = -1;
 
-    void resetPlanNodeIds() {
-        int nextId = resetPlanNodeIds(rootPlanGraph, 1);
+    private Object m_partitioningValue;
+
+    private StatementPartitioning m_partitioning = null;
+
+    public int resetPlanNodeIds(int startId) {
+        int nextId = resetPlanNodeIds(rootPlanGraph, startId);
         if (subPlanGraph != null) {
-            resetPlanNodeIds(subPlanGraph, nextId);
+            nextId = resetPlanNodeIds(subPlanGraph, nextId);
         }
+        return nextId;
     }
 
     private int resetPlanNodeIds(AbstractPlanNode node, int nextId) {
-        node.overrideId(nextId++);
+        nextId = node.overrideId(nextId);
         for (AbstractPlanNode inNode : node.getInlinePlanNodes().values()) {
-            inNode.overrideId(0);
+            // Inline nodes also need their ids to be overridden to make sure
+            // the subquery node ids are also globaly unique
+            nextId = resetPlanNodeIds(inNode, nextId);
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
@@ -135,18 +132,9 @@ public class CompiledPlan {
      * Mark the level of result determinism imposed by the statement,
      * which can save us from a difficult determination based on the plan graph.
      */
-    public void statementGuaranteesDeterminism(boolean content, boolean order) {
-        if (order) {
-            // Can't be order-deterministic without also being content-deterministic.
-            assert (content);
-            m_statementIsContentDeterministic = true;
-            m_statementIsOrderDeterministic = true;
-        } else {
-            assert (m_statementIsOrderDeterministic == false);
-            if (content) {
-                m_statementIsContentDeterministic = true;
-            }
-        }
+    public void statementGuaranteesDeterminism(boolean hasLimitOrOffset, boolean order) {
+        m_statementHasLimitOrOffset = hasLimitOrOffset;
+        m_statementIsOrderDeterministic = order;
     }
 
     /**
@@ -162,15 +150,21 @@ public class CompiledPlan {
     }
 
     /**
+     * Accessor for flag marking the original statement as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     */
+    public boolean hasDeterministicStatement()
+    {
+        return m_statementIsOrderDeterministic;
+    }
+
+    /**
      * Accessor for flag marking the plan as guaranteeing an identical result/effect
      * when "replayed" against the same database state, such as during replication or CL recovery.
      * @return the corresponding value from the first fragment
      */
-    public boolean isContentDeterministic() {
-        if (m_statementIsContentDeterministic) {
-            return true;
-        }
-        return rootPlanGraph.isContentDeterministic();
+    public boolean hasLimitOrOffset() {
+        return m_statementHasLimitOrOffset;
     }
 
     /**
@@ -186,15 +180,25 @@ public class CompiledPlan {
         if (subPlanGraph != null) {
             total += subPlanGraph.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
         }
+        // add full index scans
+        ArrayList<AbstractPlanNode> indexScanNodes = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        if (subPlanGraph != null) {
+            indexScanNodes.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN));
+        }
+        for (AbstractPlanNode node : indexScanNodes) {
+            if (((IndexScanPlanNode)node).getSearchKeyExpressions().isEmpty()) {
+                total++;
+            }
+        }
         return total;
     }
 
-    public void setPartitioningKey(Object object) {
-        m_partitioningKey = object;
+    public void setPartitioningValue(Object object) {
+        m_partitioningValue = object;
     }
 
-    public Object getPartitioningKey() {
-        return m_partitioningKey;
+    public Object getPartitioningValue() {
+        return m_partitioningValue;
     }
 
     public static byte[] bytesForPlan(AbstractPlanNode planGraph) {
@@ -203,6 +207,119 @@ public class CompiledPlan {
         }
 
         PlanNodeList planList = new PlanNodeList(planGraph);
-        return planList.toJSONString().getBytes(VoltDB.UTF8ENCODING);
+        return planList.toJSONString().getBytes(Constants.UTF8ENCODING);
+    }
+
+    // A reusable step extracted from boundParamIndexes so it can be applied to two different
+    // sources of bindings, IndexScans and IndexCounts.
+    private static void setParamIndexes(BitSet ints, List<AbstractExpression> params) {
+        for(AbstractExpression ae : params) {
+            assert(ae instanceof ParameterValueExpression);
+            ParameterValueExpression pve = (ParameterValueExpression) ae;
+            int param = pve.getParameterIndex();
+            ints.set(param);
+        }
+    }
+
+    // An obvious but apparently missing BitSet utility function
+    // to convert the set bits to their integer indexes.
+    private static int[] bitSetToIntVector(BitSet ints) {
+        int intCount = ints.cardinality();
+        if (intCount == 0) {
+            return null;
+        }
+        int[] result = new int[intCount];
+        int nextBit = ints.nextSetBit(0);
+        for (int ii = 0; ii < intCount; ii++) {
+            assert(nextBit != -1);
+            result[ii] = nextBit;
+            nextBit = ints.nextSetBit(nextBit+1);
+        }
+        assert(nextBit == -1);
+        return result;
+    }
+
+    /// Extract a sorted de-duped vector of all the bound parameter indexes in a plan. Or null if none.
+    public int[] boundParamIndexes() {
+        if (parameters.length == 0) {
+            return null;
+        }
+
+        BitSet ints = new BitSet();
+        ArrayList<AbstractPlanNode> ixscans = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        if (subPlanGraph != null) {
+            ixscans.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN));
+        }
+        for (AbstractPlanNode apn : ixscans) {
+            assert(apn instanceof IndexScanPlanNode);
+            IndexScanPlanNode ixs = (IndexScanPlanNode) apn;
+            setParamIndexes(ints, ixs.getBindings());
+        }
+
+        ArrayList<AbstractPlanNode> ixcounts = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT);
+        if (subPlanGraph != null) {
+            ixcounts.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT));
+        }
+        for (AbstractPlanNode apn : ixcounts) {
+            assert(apn instanceof IndexCountPlanNode);
+            IndexCountPlanNode ixc = (IndexCountPlanNode) apn;
+            setParamIndexes(ints, ixc.getBindings());
+        }
+        return bitSetToIntVector(ints);
+    }
+
+    // This is assumed to be called only after parameters has been fully initialized.
+    public VoltType[] parameterTypes() {
+        if (m_parameterTypes == null) {
+            m_parameterTypes = new VoltType[parameters.length];
+            int ii = 0;
+            for (ParameterValueExpression param : parameters) {
+                m_parameterTypes[ii++] = param.getValueType();
+            }
+        }
+        return m_parameterTypes;
+    }
+
+    public boolean extractParamValues(ParameterizationInfo paramzInfo) throws Exception {
+        VoltType[] paramTypes = parameterTypes();
+        if (paramTypes.length > MAX_PARAM_COUNT) {
+            return false;
+        }
+        if (paramzInfo.paramLiteralValues != null) {
+            m_generatedParameterCount = paramzInfo.paramLiteralValues.length;
+        }
+
+        m_extractedParamValues = paramzInfo.extractedParamValues(paramTypes);
+        return true;
+    }
+
+    public ParameterSet extractedParamValues() {
+        return m_extractedParamValues;
+    }
+
+    public boolean isReadOnly() {
+        return m_readOnly;
+    }
+
+    public void setReadOnly(boolean newValue) {
+        m_readOnly = newValue;
+    }
+
+    public void setStatementPartitioning(StatementPartitioning partitioning) {
+        m_partitioning = partitioning;
+    }
+
+    public StatementPartitioning getStatementPartitioning() {
+        return m_partitioning;
+    }
+
+    @Override
+    public String toString() {
+        if (rootPlanGraph != null) {
+            return "CompiledPlan: \n" + rootPlanGraph.toExplainPlanString();
+        }
+        else {
+            return "CompiledPlan: [null plan graph]";
+        }
     }
 }

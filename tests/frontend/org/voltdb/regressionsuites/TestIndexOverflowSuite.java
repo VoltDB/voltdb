@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -53,6 +53,14 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         callWithExpectedRowCount(client, "BasicEQParam", 0, 6000000000L);
         callWithExpectedRowCount(client, "BasicEQParam", 0, -6000000000L);
 
+        callWithExpectedRowCount(client, "BasicGTParam", 0, 1);
+        callWithExpectedRowCount(client, "BasicGTParam", 0, 6000000000L);
+        callWithExpectedRowCount(client, "BasicGTParam", 1, -6000000000L);
+
+        callWithExpectedRowCount(client, "BasicLTParam", 0, 1);
+        callWithExpectedRowCount(client, "BasicLTParam", 1, 6000000000L);
+        callWithExpectedRowCount(client, "BasicLTParam", 0, -6000000000L);
+
         callWithExpectedRowCount(client, "BasicUnderflowEQ", 0);
         callWithExpectedRowCount(client, "BasicUnderflowGT", 1);
         callWithExpectedRowCount(client, "BasicUnderflowLT", 0);
@@ -103,6 +111,8 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         project.addSchema(TestIndexOverflowSuite.class.getResource("indexoverflowsuite-ddl.sql"));
         project.addPartitionInfo("P1", "ID");
         project.addStmtProcedure("BasicEQParam",           "select * from P1 where ID = ?");
+        project.addStmtProcedure("BasicGTParam",           "select * from P1 where ID > ?");
+        project.addStmtProcedure("BasicLTParam",           "select * from P1 where ID < ?");
 
         project.addStmtProcedure("BasicUnderflowEQ",       "select * from P1 where ID = -6000000000");
         project.addStmtProcedure("BasicUnderflowGT",       "select * from P1 where ID > -6000000000");

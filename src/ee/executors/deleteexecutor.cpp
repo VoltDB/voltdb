@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -49,7 +49,6 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "storage/table.h"
-#include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "indexes/tableindex.h"
 #include "storage/tableutil.h"
@@ -70,56 +69,51 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
     assert(m_node);
     assert(m_node->getTargetTable());
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
-    assert(m_targetTable);
 
-    TupleSchema* schema = m_node->generateTupleSchema(false);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      "temp",
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
+    setDMLCountOutputTable(limits);
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {
-        assert(m_node->getInputTables().size() == 0);
+        assert(m_node->getInputTableCount() == 0);
         return true;
     }
 
-    assert(m_node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    assert(m_node->getInputTableCount() == 1);
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
     assert(m_inputTable);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
-    m_targetTuple = TableTuple(m_targetTable->schema());
-
     return true;
 }
 
 bool DeleteExecutor::p_execute(const NValueArray &params) {
-    assert(m_targetTable);
+    // target table should be persistenttable
+    // update target table reference from table delegate
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
+    TableTuple targetTuple(targetTable->schema());
+
     int64_t modified_tuples = 0;
 
     if (m_truncate) {
-        VOLT_TRACE("truncating table %s...", m_targetTable->name().c_str());
+        VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
         // count the truncated tuples as deleted
-        modified_tuples = m_targetTable->activeTupleCount();
+        modified_tuples = targetTable->visibleTupleCount();
 
-        // actually delete all the tuples
-        m_targetTable->deleteAllTuples(true);
+        VOLT_TRACE("Delete all rows from table : %s with %d active, %d visible, %d allocated",
+                   targetTable->name().c_str(),
+                   (int)targetTable->activeTupleCount(),
+                   (int)targetTable->visibleTupleCount(),
+                   (int)targetTable->allocatedTupleCount());
+
+        // actually delete all the tuples: undo by table not by each tuple.
+        targetTable->truncateTable(m_engine);
     }
     else
     {
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-        assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
+        assert(targetTuple.sizeInValues() == targetTable->columnCount());
         TableIterator inputIterator = m_inputTable->iterator();
         while (inputIterator.next(m_inputTuple)) {
             //
@@ -130,16 +124,23 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
             // us the trouble of having to do an index lookup
             //
             void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
-            m_targetTuple.move(targetAddress);
+            targetTuple.move(targetAddress);
 
             // Delete from target table
-            if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
+            if (!targetTable->deleteTuple(targetTuple, true)) {
                 VOLT_ERROR("Failed to delete tuple from table '%s'",
-                           m_targetTable->name().c_str());
+                           targetTable->name().c_str());
                 return false;
             }
         }
-        modified_tuples = m_inputTable->activeTupleCount();
+        modified_tuples = m_inputTable->tempTableTupleCount();
+        VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
+                   (int)modified_tuples,
+                   targetTable->name().c_str(),
+                   (int)targetTable->activeTupleCount(),
+                   (int)targetTable->visibleTupleCount(),
+                   (int)targetTable->allocatedTupleCount());
+
     }
 
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
@@ -152,7 +153,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                    m_node->getOutputTable()->name().c_str());
         return false;
     }
-    m_engine->m_tuplesModified += modified_tuples;
+    m_engine->addToTuplesModified(modified_tuples);
 
     return true;
 }

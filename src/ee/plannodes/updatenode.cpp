@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -42,30 +42,18 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-#include <cstdio>
-#include <sstream>
-#include <stdexcept>
 #include "updatenode.h"
-#include "common/serializeio.h"
-#include "common/FatalException.hpp"
+
+#include <sstream>
 
 namespace voltdb {
 
-void UpdatePlanNode::loadFromJSONObject(json_spirit::Object &obj) {
+PlanNodeType UpdatePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UPDATE; }
+
+void UpdatePlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     AbstractOperationPlanNode::loadFromJSONObject(obj);
-    json_spirit::Value updatesIndexesValue = json_spirit::find_value( obj, "UPDATES_INDEXES");
-    if (updatesIndexesValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "InsertPlanNode::loadFromJSONObject:"
-                                      " Can't find UPDATES_INDEXES value");
-    }
-    m_updatesIndexes = updatesIndexesValue.get_bool();
+    m_updatesIndexes = obj.valueForKey("UPDATES_INDEXES").asBool();
 }
 
-
-std::string UpdatePlanNode::debugInfo(const std::string &spacer) const {
-    return (std::string(""));
-}
-
-}
+} // namespace voltdb

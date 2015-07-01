@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -31,6 +31,7 @@
 #include <iostream>
 #include "boost_ext/FastAllocator.hpp"
 #include "common/ThreadLocalPool.h"
+#include "common/tabletuple.h"
 #include <deque>
 
 namespace voltdb {
@@ -45,6 +46,7 @@ void intrusive_ptr_release(voltdb::TupleBlock * p);
 
 namespace voltdb {
 class Table;
+class TupleMovementListener;
 
 class TruncatedInt {
 public:
@@ -140,7 +142,7 @@ public:
         return m_bucketIndex;
     }
 
-    std::pair<int, int> merge(Table *table, TBPtr source);
+    std::pair<int, int> merge(Table *table, TBPtr source, TupleMovementListener *listener = NULL);
 
     inline std::pair<char*, int> nextFreeTuple() {
         char *retval = NULL;
@@ -221,9 +223,8 @@ public:
         return m_bucket;
     }
 private:
-    uint32_t m_references;
-    Table* m_table;
     char*   m_storage;
+    uint32_t m_references;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
     uint32_t m_activeTuples;
@@ -240,8 +241,19 @@ private:
      **/
     std::deque<TruncatedInt, FastAllocator<TruncatedInt> > m_freeList;
 
-    int m_bucketIndex;
     TBBucketPtr m_bucket;
+    int m_bucketIndex;
+};
+
+/**
+ * Interface for tuple movement notification.
+ */
+class TupleMovementListener {
+public:
+    virtual ~TupleMovementListener() {}
+
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                     TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
 };
 
 }

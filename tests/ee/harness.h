@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -109,7 +109,8 @@ template <typename T>
 class RegisterTest {
 public:
     RegisterTest(TestSuite* suite) {
-        suite->registerTest(&RegisterTest<T>::create);
+        if (suite != NULL)
+            suite->registerTest(&RegisterTest<T>::create);
     }
 
     static Test* create() {
@@ -118,7 +119,7 @@ public:
 };
 
 // Creates a test subclass.
-#define MAGIC_TEST_MACRO(parent_class, suite_name, test_name) \
+#define MAGIC_TEST_MACRO(parent_class, suite_name, test_name, _suite_) \
     class suite_name ## _ ## test_name : public parent_class { \
     public: \
         virtual ~suite_name ## _ ## test_name() {} \
@@ -132,18 +133,61 @@ public:
     }; \
     const char suite_name ## _ ## test_name::suite_name_[] =  #suite_name; \
     const char suite_name ## _ ## test_name::test_name_[] =  #test_name; \
-    static RegisterTest<suite_name ## _ ## test_name> suite_name ## _ ## test_name ## _register(TestSuite::globalInstance()); \
+    static RegisterTest<suite_name ## _ ## test_name> suite_name ## _ ## test_name ## _register(_suite_); \
     void suite_name ## _ ## test_name::run()
 
 // A magic macro to make a test part of a user-defined test subclass.
-#define TEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name)
+#define TEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, TestSuite::globalInstance())
 
 // A magic macro to make a test subclass for a block of code.
-#define TEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name)
+#define TEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, TestSuite::globalInstance())
+
+/*
+ * Define STUPID_UNIT_TWEAK to enable these special capabilities.
+ * Selectively disable tests by prepending the TEST* macros with "NO", e.g.
+ *      NOTEST_F(...).
+ * Define STUPID_UNIT_SOLO to disable all tests except for the one prepended with "SOLO", e.g.
+ *      SOLOTEST_F(...)
+ * Force a breakpoint when any unit test assertion fails.
+ *      #define STUPIDUNIT_ASSERT_BREAKPOINT
+ * IMPORTANT: The build will intentionally fail if STUPIDUNIT_TWEAK is not
+ * defined while there are NOTEST* macros in code. Similarly, it will fail if
+ * STUPID_UNIT_SOLO is not defined while there are SOLOTEST* macros in code.
+ * This prevents accidentally leaving tests disabled.
+ *** DO NOT PUT a STUPIDUNIT_TWEAK #define in the code, or tests may be
+ *** accidentally disabled in the real build! Only define it in an IDE
+ *** configuration or use it manually in a special command line build.
+ */
+#ifdef STUPIDUNIT_TWEAK
+#define NOTEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, NULL)
+#define NOTEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, NULL)
+#endif
+#ifdef STUPIDUNIT_SOLO
+#ifndef STUPIDUNIT_TWEAK
+#error STUPIDUNIT_SOLO is defined without STUPIDUNIT_TWEAK. Do not leave either #define in code!
+#endif
+#undef TEST_F
+#undef TEST
+#define TEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, NULL)
+#define TEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, NULL)
+#define SOLOTEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, TestSuite::globalInstance())
+#define SOLOTEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, TestSuite::globalInstance())
+#endif
+
+// Optionally force a gdb-compatible breakpoint when an assertion triggers.
+#ifdef STUPIDUNIT_ASSERT_BREAKPOINT
+#define STUPIDUNIT_ASSERT_BREAKPOINT_CODE asm volatile("int3;");
+#else
+#define STUPIDUNIT_ASSERT_BREAKPOINT_CODE
+#endif
 
 // Abuse macros to easily define all the EXPECT and ASSERT variants
-#define STUPIDUNIT_MAKE_EXPECT_MACRO(operation, one, two) do { \
-    if (!((one) operation (two))) fail(__FILE__, __LINE__, #one " " #operation " " #two); \
+#define STUPIDUNIT_MAKE_EXPECT_MACRO(operation, one, two) \
+do { \
+    if (!((one) operation (two))) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, #one " " #operation " " #two); \
+    } \
 } while (0)
 
 #define EXPECT_EQ(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(==, one, two)
@@ -153,17 +197,30 @@ public:
 #define EXPECT_GT(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(>, one, two)
 #define EXPECT_GE(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(>=, one, two)
 
-#define EXPECT_TRUE(value) do { \
-    if (!(value)) fail(__FILE__, __LINE__, "Expected true; " #value " is false"); \
+#define EXPECT_TRUE(value) \
+do { \
+    if (!(value)) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, "Expected true; " #value " is false"); \
+    } \
 } while (0)
-#define EXPECT_FALSE(value) do { \
-    if ((value)) fail(__FILE__, __LINE__, "Expected false; " #value " is true"); \
+#define EXPECT_FALSE(value) \
+do { \
+    if ((value)) {\
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, "Expected false; " #value " is true"); \
+    } \
 } while (0)
 
 // The only difference between EXPECT and ASSERT is that ASSERT returns from
 // the test method if the test fails
-#define STUPIDUNIT_MAKE_ASSERT_MACRO(operation, one, two) do { \
-    if (!((one) operation (two))) { fail(__FILE__, __LINE__, #one " " #operation " " #two); return; } \
+#define STUPIDUNIT_MAKE_ASSERT_MACRO(operation, one, two) \
+do { \
+    if (!((one) operation (two))) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, #one " " #operation " " #two); \
+        return; \
+    } \
 } while (0)
 
 #define ASSERT_EQ(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(==, one, two)
@@ -173,11 +230,21 @@ public:
 #define ASSERT_GT(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(>, one, two)
 #define ASSERT_GE(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(>=, one, two)
 
-#define ASSERT_TRUE(value) do { \
-    if (!(value)) { fail(__FILE__, __LINE__, "Expected true; " #value " is false"); return; } \
+#define ASSERT_TRUE(value) \
+do { \
+    if (!(value)) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, "Expected true; " #value " is false"); \
+        return; \
+    } \
 } while (0)
-#define ASSERT_FALSE(value) do { \
-    if ((value)) { fail(__FILE__, __LINE__, "Expected false; " #value " is true"); return; } \
+#define ASSERT_FALSE(value) \
+do { \
+    if ((value)) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, "Expected false; " #value " is true"); \
+        return; \
+    } \
 } while (0)
 
 

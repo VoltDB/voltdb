@@ -1,20 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb.utils;
+
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 import java.io.File;
 import java.io.IOException;
@@ -145,17 +148,22 @@ public class VoltFile extends File {
 
                     FileInputStream fis = new FileInputStream(f);
                     FileOutputStream fos = new FileOutputStream(fInOtherSubroot);
-                    ByteBuffer buf = ByteBuffer.allocateDirect(8192);
                     FileChannel inputChannel = fis.getChannel();
                     FileChannel outputChannel = fos.getChannel();
+                    BBContainer bufC = DBBPool.allocateDirect(8192);
+                    ByteBuffer buf = bufC.b();
 
-                    while (inputChannel.read(buf) != -1) {
-                        buf.flip();
-                        outputChannel.write(buf);
-                        buf.clear();
+                    try {
+                        while (inputChannel.read(buf) != -1) {
+                            buf.flip();
+                            outputChannel.write(buf);
+                            buf.clear();
+                        }
+                        inputChannel.close();
+                        outputChannel.close();
+                    } finally {
+                        bufC.discard();
                     }
-                    inputChannel.close();
-                    outputChannel.close();
                 } else {
                     throw new IOException(fInOtherSubroot + " already exists");
                 }
@@ -199,6 +207,29 @@ public class VoltFile extends File {
             if (!f.delete()) {
                 throw new IOException("Unable to delete file " + f);
             }
+        }
+    }
+
+    /**
+     * Check if the given absolute path is a temp test path.
+     * @param path    An absolute path
+     * @return true if the path contains the magic string in it.
+     */
+    public static boolean isTestPath(final String path) {
+        return path.contains(m_magic);
+    }
+
+    /**
+     * Strip the magic temp test path prefix from the given path
+     * if it is a test path, no-op if it's not.
+     * @param path    An absolute path
+     * @return A new absolute path with the temp test path prefix removed.
+     */
+    public static String removeTestPrefix(final String path) {
+        if (isTestPath(path)) {
+            return path.substring(m_voltFilePrefix.getAbsolutePath().length());
+        } else {
+            return path;
         }
     }
 

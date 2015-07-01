@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -71,11 +71,21 @@ public:
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_left);
-        return m_left->eval(tuple1, tuple2).op_negate();
+        NValue operand = m_left->eval(tuple1, tuple2);
+        // NOT TRUE is FALSE
+        if (operand.isTrue()) {
+            return NValue::getFalse();
+        }
+        // NOT FALSE is TRUE
+        if (operand.isFalse()) {
+            return NValue::getTrue();
+        }
+        // NOT NULL is NULL
+        return operand;
     }
 
     std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "OptimizedOperatorNotExpression");
+        return (spacer + "OperatorNotExpression");
     }
 };
 
@@ -101,6 +111,74 @@ class OperatorIsNullExpression : public AbstractExpression {
        return (spacer + "OperatorIsNullExpression");
    }
 };
+
+class OperatorCastExpression : public AbstractExpression {
+public:
+    OperatorCastExpression(ValueType vt, AbstractExpression *left)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_CAST)
+        , m_targetType(vt)
+    {
+        m_left = left;
+    };
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        assert (m_left);
+        return m_left->eval(tuple1, tuple2).castAs(m_targetType);
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "CastExpression");
+    }
+private:
+    ValueType m_targetType;
+};
+
+class OperatorAlternativeExpression : public AbstractExpression {
+public:
+    OperatorAlternativeExpression(AbstractExpression *left, AbstractExpression *right)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_ALTERNATIVE, left, right)
+    {
+        assert (m_left);
+        assert (m_right);
+    };
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        throwFatalException("OperatorAlternativeExpression::eval function has no implementation.");
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "Operator ALTERNATIVE Expression");
+    }
+
+};
+
+class OperatorCaseWhenExpression : public AbstractExpression {
+public:
+    OperatorCaseWhenExpression(ValueType vt, AbstractExpression *left, OperatorAlternativeExpression *right)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_CASE_WHEN, left, right)
+        , m_returnType(vt)
+    {
+    };
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        assert (m_left);
+        assert (m_right);
+        NValue thenClause = m_left->eval(tuple1, tuple2);
+
+        if (thenClause.isTrue()) {
+            return m_right->getLeft()->eval(tuple1, tuple2).castAs(m_returnType);
+        } else {
+            return m_right->getRight()->eval(tuple1, tuple2).castAs(m_returnType);
+        }
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "Operator CASE WHEN Expression");
+    }
+private:
+    ValueType m_returnType;
+};
+
 
 
 /*
@@ -156,6 +234,21 @@ class OperatorExpression : public AbstractExpression {
     }
 private:
     OPER oper;
+};
+
+class OperatorExistsExpression : public AbstractExpression {
+  public:
+    OperatorExistsExpression(AbstractExpression *left)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_EXISTS, left, NULL)
+    {
+    }
+
+    NValue
+    eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "OperatorExistsExpression");
+    }
 };
 
 

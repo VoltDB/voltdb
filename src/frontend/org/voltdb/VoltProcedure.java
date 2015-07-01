@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -80,12 +80,52 @@ public abstract class VoltProcedure {
     private boolean m_initialized;
 
     /**
-     * Allow VoltProcedures access to their transaction id.
-     * @return transaction id
+     * Returns the VoltDB 3.0 transaction ID which is a sequence number instead
+     * of the time-based ID used in pre-3.0 VoltDB. It is less unique in that sequence numbers can revert
+     * if you load data from one volt database into another via CSV or other external methods
+     * that bypass the combination of snapshot restore/command log replay which maintains these per partition
+     * sequence numbers.
+     *
+     * @deprecated Do not use outside of VoltDB internal code.
+     * @return VoltDB 3.0-esque transaction id.
+     *
      */
-    public long getTransactionId() {
+    @Deprecated
+    public long getVoltPrivateRealTransactionIdDontUseMe() {
         return m_runner.getTransactionId();
     }
+
+    /**
+     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
+     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     *
+     * Allow VoltProcedures access to a unique ID generated for each transaction. Synonym of getUniqueID
+     * that is kept around to support legacy applications
+     *
+     * The id consists of a time based component in the most significant bits followed
+     * by a counter, and then a generator id to allow parallel unique number generation
+     * @return transaction id
+     * @deprecated Use the synonymous getUniqueId() instead
+     */
+    @Deprecated
+    public long getTransactionId() {
+        return m_runner.getUniqueId();
+    }
+
+    /**
+     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
+     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     *
+     * Allow VoltProcedures access to a unique ID generated for each transaction.
+     *
+     * The id consists of a time based component in the most significant bits followed
+     * by a counter, and then a generator id to allow parallel unique number generation
+     * @return An ID that is unique to this transaction
+     */
+    public long getUniqueId() {
+        return m_runner.getUniqueId();
+    }
+
 
     /**
      * End users should not instantiate VoltProcedure instances.
@@ -123,16 +163,23 @@ public abstract class VoltProcedure {
 
         /**
          * Constructs a new AbortException from an existing <code>Throwable</code>.
+         *
+         * @param t Throwable to embed.
          */
         public VoltAbortException(Throwable t) {
             super(t);
             if (t.getMessage() != null) {
                 message = t.getMessage();
             }
+            else if (t.getCause() != null) {
+                message = t.getCause().getMessage();
+            }
         }
 
         /**
          * Constructs a new AbortException with the specified detail message.
+         *
+         * @param msg Exception specific message.
          */
         public VoltAbortException(String msg) {
             message = msg;
@@ -162,6 +209,9 @@ public abstract class VoltProcedure {
     }
 
     /**
+     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
+     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     *
      * Get the time that this procedure was accepted into the VoltDB cluster. This is the
      * effective, but not always actual, moment in time this procedure executes. Use this
      * method to get the current time instead of non-deterministic methods. Note that the
@@ -182,13 +232,14 @@ public abstract class VoltProcedure {
 //    }
 
     /**
-     * Queue the adhoc SQL statement for execution. The adhoc SQL statement will have
-     * to be planned which is orders of magnitude slower then using a precompiled SQL statements.
+     * <p>Queue the adhoc SQL statement for execution. The adhoc SQL statement will have
+     * to be planned which is orders of magnitude slower then using a precompiled SQL statements.</p>
      *
-     * If the query is parameterized it is possible to pass in the parameters.
+     * <p>If the query is parameterized it is possible to pass in the parameters.</p>
      *
-     * This method is experimental and not intended for production use yet.
-     * @deprecated
+     * @deprecated This method is experimental and not intended for production use yet.
+     * @param sql An ad-hoc SQL string to be run transactionally in this procedure.
+     * @param args Parameter values for the SQL string.
      */
     @Deprecated
     public void voltQueueSQLExperimental(String sql, Object... args) {
@@ -196,10 +247,10 @@ public abstract class VoltProcedure {
     }
 
     /**
-     * Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list,
+     * <p>Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list,
      * and an Expectation describing the expected results. If the Expectation is not met then VoltAbortException
-     * will be thrown with a description of the expecation that was not met. This exception must not be
-     * caught from within the procedure.
+     * will be thrown with a description of the expectation that was not met. This exception must not be
+     * caught from within the procedure.</p>
      *
      * @param stmt {@link org.voltdb.SQLStmt Statement} to queue for execution.
      * @param expectation Expectation describing the expected result of executing this SQL statement.
@@ -252,7 +303,8 @@ public abstract class VoltProcedure {
      * code returned by the server. If a procedure sets the status code and then rolls back or causes an error
      * the status code will still be propagated back to the client so it is always necessary to check
      * the server status code first.
-     * @param statusCode
+     *
+     * @param statusCode Byte-long application-specific status code.
      */
     public void setAppStatusCode(byte statusCode) {
         m_runner.setAppStatusCode(statusCode);
@@ -263,18 +315,21 @@ public abstract class VoltProcedure {
      * returned by the server. If a procedure sets the status string and then rolls back or causes an error
      * the status string will still be propagated back to the client so it is always necessary to check
      * the server status code first.
-     * @param statusString
+     *
+     * @param statusString Application specific status string.
      */
     public void setAppStatusString(String statusString) {
         m_runner.setAppStatusString(statusString);
     }
 
     /**
-     * Currently unsupported in VoltDB.
-     * Batch load method for populating a table with a large number of records.
+     * <p>Currently unsupported in VoltDB.</p>
+     * <p>Batch load method for populating a table with a large number of records.</p>
      *
-     * Faster then calling {@link #voltQueueSQL(SQLStmt, Object...)} and {@link #voltExecuteSQL()} to
-     * insert one row at a time.
+     * <p>Faster then calling {@link #voltQueueSQL(SQLStmt, Object...)} and {@link #voltExecuteSQL()} to
+     * insert one row at a time.</p>
+     *
+     * @deprecated This method is not fully tested to be used in all contexts.
      * @param clusterName Name of the cluster containing the database, containing the table
      *                    that the records will be loaded in.
      * @param databaseName Name of the database containing the table to be loaded.
@@ -282,12 +337,15 @@ public abstract class VoltProcedure {
      * @param data {@link org.voltdb.VoltTable VoltTable} containing the records to be loaded.
      *             {@link org.voltdb.VoltTable.ColumnInfo VoltTable.ColumnInfo} schema must match the schema of the table being
      *             loaded.
-     * @throws VoltAbortException
+     * @param returnUniqueViolations If true will not fail on unique violations, will return the violating rows.
+     * @return A byte array representing constraint violations in a semi-opaque format.
+     * @throws VoltAbortException on failure.
      */
-    public void voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data)
+    @Deprecated
+    public byte[] voltLoadTable(String clusterName, String databaseName,
+                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
     throws VoltAbortException
     {
-        m_runner.voltLoadTable(clusterName, databaseName, tableName, data);
+        return m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream);
     }
 }

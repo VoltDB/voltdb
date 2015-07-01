@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -46,7 +46,6 @@
 #ifndef HSTORESEQSCANNODE_H
 #define HSTORESEQSCANNODE_H
 
-#include "common/common.h"
 #include "abstractscannode.h"
 
 namespace voltdb {
@@ -54,41 +53,15 @@ namespace voltdb {
 class AbstractExpression;
 
 /**
- *
+ * Seqential scan plan node
  */
 class SeqScanPlanNode : public AbstractScanPlanNode {
-   public:
-        SeqScanPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            // Do nothing
-        }
-        SeqScanPlanNode() : AbstractScanPlanNode() {
-            // Do nothing
-        }
+public:
+    SeqScanPlanNode()  { }
+    ~SeqScanPlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        /*
-         * If the output table needs to be cleared then this SeqScanNode is for an executor that created
-         * its own output table rather then forwarding a reference to the persistent table being scanned.
-         * It still isn't necessarily safe to delete the output table since an inline projection node/executor
-         * may have created the table (and will also delete it) so check if there is an inline projection node.
-         *
-         * This is a fragile approach to determining whether or not to delete the output table. Maybe
-         * it is safer to have the inline nodes be deleted first and set the output table of the
-         * enclosing plannode to NULL so the delete can be safely repeated.
-         */
-        ~SeqScanPlanNode();
-
-        /**
-         * Moved here from SeqScanExecutor so that the predicate would only be defined in one place.
-         * Need it here to determine whether the output tables needs to be deleted in the destructor.
-         * Couldn't invoke it from the Executor without making a circular dependency
-         */
-        bool needsOutputTableClear() {
-            return getPredicate() != NULL || getInlinePlanNodes().size() > 0;
-        }
-
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEQSCAN); }
-
-        std::string debugInfo(const std::string &spacer) const;
 };
 
 }

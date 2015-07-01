@@ -1,27 +1,27 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.planner;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -50,12 +50,12 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
      * @param partitioning Describes the specified and inferred partition context.
      */
-    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
+    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
     {
         super(db, parsedStmt, partitioning);
 
-        assert(m_parsedStmt.tableList.size() == 1);
-        m_targetTable = m_parsedStmt.tableList.get(0);
+        assert(m_parsedStmt.m_tableList.size() == 1);
+        m_targetTable = m_parsedStmt.m_tableList.get(0);
     }
 
     /**
@@ -65,14 +65,30 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     @Override
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
+            assert (m_parsedStmt.m_joinTree != null);
+            // Clone the node to make make sure that analyze expression is called
+            // only once on the node.
+            JoinNode tableNode = (JoinNode) m_parsedStmt.m_joinTree.clone();
+            // Analyze join conditions
+            tableNode.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
+            // these just shouldn't happen right?
+            assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
+
             m_generatedPlans = true;
-            Table nextTables[] = new Table[0];
-            ArrayList<AccessPath> paths = getRelevantAccessPathsForTable(m_targetTable, nextTables);
-            // for each access path
-            for (AccessPath accessPath : paths) {
-                // get a plan
-                AbstractPlanNode scanPlan = getAccessPlanForTable(m_targetTable, accessPath);
-                m_plans.add(scanPlan);
+            // This is either UPDATE or DELETE statement. Consolidate all expressions
+            // into the WHERE list.
+            tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
+            tableNode.m_joinInnerList.clear();
+            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableScan(),
+                    null,
+                    tableNode.m_whereInnerList,
+                    null));
+
+            for (AccessPath path : tableNode.m_accessPaths) {
+                tableNode.m_currentAccessPath = path;
+
+                AbstractPlanNode plan = getAccessPlanForTable(tableNode);
+                m_plans.add(plan);
             }
 
         }

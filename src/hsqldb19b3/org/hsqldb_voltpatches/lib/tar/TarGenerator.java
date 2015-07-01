@@ -209,6 +209,12 @@ public class TarGenerator {
      * This method does release all of the streams, even if there is a failure.
      */
     public void write() throws IOException, TarMalformatException {
+// A VoltDB extension to generalize the feedback channel
+        write(System.err);
+    }
+
+    public void write(java.io.PrintStream feedback) throws IOException, TarMalformatException {
+// End of VoltDB extension
 
         if (TarFileOutputStream.debug) {
             System.out.println(RB.singleton.getString(RB.WRITE_QUEUE_REPORT,
@@ -219,21 +225,41 @@ public class TarGenerator {
 
         try {
             for (int i = 0; i < entryQueue.size(); i++) {
+// A VoltDB extension to generalize the feedback channel
+                if (feedback != null) feedback.print(Integer.toString(i + 1) + " / "
+/* disable 1 line ...
                 System.err.print(Integer.toString(i + 1) + " / "
+... disabled 1 line */
+// End of VoltDB extension
                                  + entryQueue.size() + ' ');
 
                 entry = (TarEntrySupplicant) entryQueue.get(i);
 
+// A VoltDB extension to generalize the feedback channel
+                if (feedback != null) feedback.print(entry.getPath() + "... ");
+/* disable 1 line ...
                 System.err.print(entry.getPath() + "... ");
+... disabled 1 line */
+// End of VoltDB extension
 
                 if (entry.getDataSize() >= paxThreshold) {
                     entry.makeXentry().write();
+// A VoltDB extension to generalize the feedback channel
+                if (feedback != null) feedback.print("x... ");
+/* disable 1 line ...
                     System.err.print("x... ");
+... disabled 1 line */
+// End of VoltDB extension
                 }
 
                 entry.write();
                 archive.assertAtBlockBoundary();
+// A VoltDB extension to generalize the feedback channel
+                if (feedback != null) feedback.println();
+/* disable 1 line ...
                 System.err.println();
+... disabled 1 line */
+// End of VoltDB extension
             }
 
             archive.finish();
@@ -685,4 +711,75 @@ public class TarGenerator {
 
         // Be conservative, because these files contain passwords
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    public void write(boolean outputToStream, boolean verbose) throws IOException, TarMalformatException {
+
+        if (TarFileOutputStream.debug) {
+            System.out.println(RB.singleton.getString(RB.WRITE_QUEUE_REPORT,
+                    entryQueue.size()));
+        }
+
+        TarEntrySupplicant entry;
+
+        try {
+            for (int i = 0; i < entryQueue.size(); i++) {
+                if (verbose) {
+                    System.out.print(Integer.toString(i + 1) + " / "
+                                     + entryQueue.size() + ' ');
+                }
+
+                entry = (TarEntrySupplicant) entryQueue.get(i);
+
+                if (verbose) {
+                    System.out.print(entry.getPath() + "... ");
+                }
+
+                if (entry.getDataSize() >= paxThreshold) {
+                    entry.makeXentry().write();
+                    if (verbose) {
+                        System.out.print("x... ");
+                    }
+                }
+
+                entry.write();
+                archive.assertAtBlockBoundary();
+
+                if (verbose) {
+                    System.out.println();
+                }
+            }
+
+            if (outputToStream) {
+                archive.finishStream();
+                return;
+            }
+            archive.finish();
+        } catch (IOException ioe) {
+            System.err.println();    // Exception should cause a report
+
+            try {
+
+                // Just release resources from any Entry's input, which may be
+                // left open.
+                for (int i = 0; i < entryQueue.size(); i++) {
+                    ((TarEntrySupplicant) entryQueue.get(i)).close();
+                }
+
+                archive.close();
+            } catch (IOException ne) {
+
+                // Too difficult to report every single error.
+                // More important that the user know about the original Exc.
+            }
+
+            throw ioe;
+        }
+    }
+
+    public TarGenerator(java.util.zip.GZIPOutputStream outputStream) throws IOException {
+        archive = new TarFileOutputStream(outputStream);
+    }
+    /**********************************************************************/
 }

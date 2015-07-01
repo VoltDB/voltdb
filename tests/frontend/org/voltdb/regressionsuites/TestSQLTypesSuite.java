@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.BackendTarget;
@@ -37,10 +38,10 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.exceptions.SQLException;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltTypeUtil;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Delete;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
@@ -49,6 +50,8 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.ParamSetArrays;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Select;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.UpdateDecimal;
+
+import com.google_voltpatches.common.base.Charsets;
 
 public class TestSQLTypesSuite extends RegressionSuite {
 
@@ -76,7 +79,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     }
 
     /** Utility to compare two instances of a VoltType for equality */
-    @SuppressWarnings({ "incomplete-switch", "null" })
+    @SuppressWarnings({ "incomplete-switch" })
     private boolean comparisonHelper(final Object lhs, final Object rhs,
             final VoltType vt) {
         switch (vt) {
@@ -109,7 +112,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                     || ((d2 == VoltType.NULL_FLOAT) && (d1 <= d2))) {
                 return true;
             }
-            return (d1.compareTo(d2) == 0);
+            return (Math.abs(d1 - d2) < 0.0000000001);
         case STRING:
             // System.out.println("\tComparing " + lhs + " == " + rhs);
             if ((lhs == null || lhs == VoltType.NULL_STRING_OR_VARBINARY)
@@ -269,7 +272,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                    new String("ABCDEFABCDEF0123"),
                    new byte[] { 0 },
                    new byte[] { 'a', 'b', 'c' },
-                   new String("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").getBytes()),
+                   new String("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").getBytes(Charsets.UTF_8)),
         new Column("A_POOL_B", VoltType.VARBINARY, false,
                    VoltType.NULL_STRING_OR_VARBINARY,
                    new String("ABCDEFABCDEF0123456789"),
@@ -496,7 +499,43 @@ public class TestSQLTypesSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "SELECT A_TIMESTAMP from ALLOW_NULLS where PKEY > " + lowerBound + ";");
         result = cr.getResults();
         assertEquals(0, result[0].getRowCount());
-}
+    }
+
+    public void testPassingDateAndTimeObjectsBeforeEpochToStatements() throws Exception {
+        final Client client = this.getClient();
+
+        Random rn = new Random();
+
+        for (int i = 0; i < 100; ++i) {
+            long ts = rn.nextLong();
+            long[] timestampValues = {
+                    ts, // random
+                    ts / 1000 * 1000, // even milliseconds
+                    ts / 1000000 * 1000000, // even seconds
+                    ts / 1000000 * -1000000 // even seconds
+            };
+
+            for (long microsecondsSinceEpoch: timestampValues) {
+                TimestampType tst_micro = new TimestampType(microsecondsSinceEpoch);
+
+                // Add 1 more millis from epoch
+                java.sql.Timestamp ts_micro = VoltTypeUtil.getSqlTimestampFromMicrosSinceEpoch(microsecondsSinceEpoch);
+
+                client.callProcedure("Insert", "ALLOW_NULLS", 0, 0, 0, 0, 0,
+                                     null, tst_micro, null,
+                                     null, null, null, null, null, null);
+
+                VoltTable vt;
+                vt = client.callProcedure("@AdHoc", "Select A_TIMESTAMP from allow_nulls where pkey = 0").getResults()[0];
+                assertTrue(vt.advanceRow());
+                assertEquals(microsecondsSinceEpoch, vt.getTimestampAsLong(0));
+                assertEquals(tst_micro, vt.getTimestampAsTimestamp(0));
+                assertEquals(ts_micro, vt.getTimestampAsSqlTimestamp(0));
+
+                client.callProcedure("@AdHoc", "truncate table allow_nulls;");
+            }
+        }
+    }
 
     // ENG-1276
     public void testPassingFloatToDoubleArg() throws Exception {
@@ -588,8 +627,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 client.callProcedure("Insert", params);
             }
             catch (final ProcCallException e) {
-                assertTrue(e.getCause() instanceof SQLException);
-                assertTrue(e.toString().contains("exceeds specified size"));
+                System.err.println(e.getMessage());
+                assertTrue(e.toString().contains("exceeds the size of the VARCHAR"));
                 caught = true;
             }
             assertTrue(caught);
@@ -1234,6 +1273,94 @@ public class TestSQLTypesSuite extends RegressionSuite {
         helper_testInvalidParameterSerializations(client, params);
     }
 
+    public void testEng5013() throws NoConnectionsException, ProcCallException, IOException {
+        Client client = this.getClient();
+
+        client.callProcedure("InsertDecimal", 1, 3.4f);
+        client.callProcedure("InsertDecimal", 2, 3.4d);
+        client.callProcedure("InsertDecimal", 3, 1f);
+        client.callProcedure("InsertDecimal", 4, 1d);
+        client.callProcedure("InsertDecimal", 5, 0.25f);
+        client.callProcedure("InsertDecimal", 6, 0.25d);
+        client.callProcedure("InsertDecimal", 7, 3.3f);
+        client.callProcedure("InsertDecimal", 8, 3.3d);
+
+        try {
+            client.callProcedure("InsertDecimal", 9, Double.MAX_VALUE);
+            fail();
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assertTrue(e.getMessage().contains("has more than 38 digits of precision"));
+        } catch (Exception e) {
+            fail();
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, -Double.MAX_VALUE);
+            fail();
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assertTrue(e.getMessage().contains("has more than 38 digits of precision"));
+        } catch (Exception e) {
+            fail();
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, Float.MAX_VALUE);
+            fail();
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assertTrue(e.getMessage().contains("has more than 38 digits of precision"));
+        } catch (Exception e) {
+            fail();
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, -Float.MAX_VALUE);
+            fail();
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assertTrue(e.getMessage().contains("has more than 38 digits of precision"));
+        } catch (Exception e) {
+            fail();
+        }
+        double nand = 0.0d / 0.0d;
+        float nanf = 0.0f / 0.0f;
+        try {
+            client.callProcedure("InsertDecimal", 9, nand);
+        } catch (ProcCallException e) {
+            // passing a NaN value will cause NumberFormatException, and fail the proceudre call
+            assertTrue(e.getMessage().contains("NumberFormatException"));
+        } catch (Exception e) {
+            fail();
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, nanf);
+            fail();
+        } catch (ProcCallException e) {
+            // passing a NaN value will cause NumberFormatException, and fail the proceudre call
+            assertTrue(e.getMessage().contains("NumberFormatException"));
+        } catch (Exception e) {
+            fail();
+        }
+
+        client.callProcedure("InsertDecimal", 9, Double.MIN_VALUE);
+        client.callProcedure("InsertDecimal", 10, Float.MIN_VALUE);
+
+        // will lose some precision by truncated to .12f
+        client.callProcedure("InsertDecimal", 11, 123456789.01234567890123456789f);
+        VoltTable table;
+        table = client.callProcedure("@AdHoc", "SELECT A_DECIMAL FROM WITH_DEFAULTS WHERE PKEY = 11").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        table.advanceRow();
+        float f = table.getDecimalAsBigDecimal(0).floatValue();
+        assertEquals(123456789.01234567890123456789f, f, 0.000000000001);
+        // will lose some precision by truncated to .12f
+        client.callProcedure("InsertDecimal", 12, 123456789.01234567890123456789d);
+        table = client.callProcedure("@AdHoc", "SELECT A_DECIMAL FROM WITH_DEFAULTS WHERE PKEY = 12").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        table.advanceRow();
+        double d = table.getDecimalAsBigDecimal(0).doubleValue();
+        assertEquals(123456789.01234567890123456789d, d, 0.000000000001);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1253,7 +1380,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
         project.addSchema(TestSQLTypesSuite.class
                 .getResource("sqltypessuite-nonulls-ddl.sql"));
         project.addPartitionInfo("NO_NULLS", "PKEY");
+        project.addPartitionInfo("NO_NULLS_GRP", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
+        project.addPartitionInfo("ALLOW_NULLS_GRP", "PKEY");
         project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
         project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
@@ -1264,6 +1393,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 "PassObjectNull",
                 "insert into ALLOW_NULLS values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
                 "NO_NULLS.PKEY: 0");
+        project.addStmtProcedure("InsertDecimal", "INSERT INTO WITH_DEFAULTS (PKEY, A_DECIMAL) VALUES (?, ?);");
 
         boolean success;
 

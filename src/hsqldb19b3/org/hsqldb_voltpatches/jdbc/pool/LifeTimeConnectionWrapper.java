@@ -31,18 +31,17 @@
 
 package org.hsqldb_voltpatches.jdbc.pool;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
-import java.util.concurrent.Executor;
+import org.hsqldb_voltpatches.jdbc.JDBCConnection;
 
 import javax.sql.ConnectionEvent;
 import javax.sql.ConnectionEventListener;
 import javax.sql.PooledConnection;
 
-import org.hsqldb_voltpatches.jdbc.JDBCConnection;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 // boucherb@users 20051207 - patch 1.8.0.x initial JDBC 4.0 support work
 
@@ -188,26 +187,5 @@ public class LifeTimeConnectionWrapper extends BaseConnectionWrapper {
 
             connectionListener.connectionClosed(connectionEvent);
         }
-    }
-
-    public void setSchema(String schema) throws SQLException {
-        throw new SQLException();
-    }
-
-    public String getSchema() throws SQLException {
-        throw new SQLException();
-    }
-
-    public void abort(Executor executor) throws SQLException {
-        throw new SQLException();
-    }
-
-    public void setNetworkTimeout(Executor executor, int milliseconds)
-            throws SQLException {
-        throw new SQLException();
-    }
-
-    public int getNetworkTimeout() throws SQLException {
-        throw new SQLException();
     }
 }

@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -45,85 +45,85 @@
 
 #include "abstractjoinnode.h"
 
+#include "common/TupleSchema.h"
 #include "expressions/abstractexpression.h"
 
-#include <stdexcept>
+#include "boost/foreach.hpp"
 
-using namespace json_spirit;
-using namespace std;
-using namespace voltdb;
+#include <sstream>
 
-AbstractJoinPlanNode::AbstractJoinPlanNode(CatalogId id)
-    : AbstractPlanNode(id), m_predicate(NULL)
-{
-}
+namespace voltdb {
 
-AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : AbstractPlanNode(), m_predicate(NULL)
-{
-}
+AbstractJoinPlanNode::AbstractJoinPlanNode() { }
 
 AbstractJoinPlanNode::~AbstractJoinPlanNode()
 {
-    delete m_predicate;
-}
-
-JoinType AbstractJoinPlanNode::getJoinType() const
-{
-    return m_joinType;
-}
-
-void AbstractJoinPlanNode::setJoinType(JoinType join_type)
-{
-    m_joinType = join_type;
-}
-
-void AbstractJoinPlanNode::setPredicate(AbstractExpression* predicate)
-{
-    assert(!m_predicate);
-    if (m_predicate != predicate)
-    {
-        delete m_predicate;
+    BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
+        delete scol;
     }
-    m_predicate = predicate;
+
+    TupleSchema::freeTupleSchema(m_tupleSchemaPreAgg);
 }
 
-AbstractExpression* AbstractJoinPlanNode::getPredicate() const
-{
-    return m_predicate;
+void AbstractJoinPlanNode::getOutputColumnExpressions(
+        std::vector<AbstractExpression*>& outputExpressions) const {
+    std::vector<SchemaColumn*> outputSchema;
+    if (m_outputSchemaPreAgg.size() > 0) {
+        outputSchema = m_outputSchemaPreAgg;
+    } else {
+        outputSchema = getOutputSchema();
+    }
+    size_t schemaSize = outputSchema.size();
+
+    for (int i = 0; i < schemaSize; i++) {
+        outputExpressions.push_back(outputSchema[i]->getExpression());
+    }
 }
 
-string AbstractJoinPlanNode::debugInfo(const string& spacer) const
+std::string AbstractJoinPlanNode::debugInfo(const std::string& spacer) const
 {
-    ostringstream buffer;
-    buffer << spacer << "JoinType[" << m_joinType << "]\n";
-    if (m_predicate != NULL)
+    std::ostringstream buffer;
+    buffer << spacer << "JoinType[" << joinToString(m_joinType) << "]\n";
+    if (m_preJoinPredicate != NULL)
     {
-        buffer << m_predicate->debug(spacer);
+        buffer << spacer << "Pre-Join Predicate\n";
+        buffer << m_preJoinPredicate->debug(spacer);
+    }
+    if (m_joinPredicate != NULL)
+    {
+        buffer << spacer << "Join Predicate\n";
+        buffer << m_joinPredicate->debug(spacer);
+    }
+    if (m_wherePredicate != NULL)
+    {
+        buffer << spacer << "Where Predicate\n";
+        buffer << m_wherePredicate->debug(spacer);
     }
     return (buffer.str());
 }
 
 void
-AbstractJoinPlanNode::loadFromJSONObject(Object& obj)
+AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    Value joinTypeValue = find_value(obj, "JOIN_TYPE");
-    if (joinTypeValue == Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractJoinPlanNode::loadFromJSONObject:"
-                                      " Couldn't find JOIN_TYPE value");
-    }
-    m_joinType = stringToJoin(joinTypeValue.get_str());
+    m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 
-    Value predicateValue = find_value(obj, "PREDICATE");
-    if (predicateValue == Value::null)
-    {
-        m_predicate = NULL;
+    m_preJoinPredicate.reset(loadExpressionFromJSONObject("PRE_JOIN_PREDICATE", obj));
+    m_joinPredicate.reset(loadExpressionFromJSONObject("JOIN_PREDICATE", obj));
+    m_wherePredicate.reset(loadExpressionFromJSONObject("WHERE_PREDICATE", obj));
+
+    if (obj.hasKey("OUTPUT_SCHEMA_PRE_AGG")) {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
+            m_outputSchemaPreAgg.push_back(outputColumn);
+        }
+        m_tupleSchemaPreAgg = AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
     }
-    else
-    {
-        Object predicateObject = predicateValue.get_obj();
-        m_predicate = AbstractExpression::buildExpressionTree(predicateObject);
+    else {
+        m_tupleSchemaPreAgg = NULL;
     }
+
 }
+
+} // namespace voltdb

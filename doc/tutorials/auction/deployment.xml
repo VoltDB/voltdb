@@ -1,8 +1,19 @@
 <?xml version="1.0"?>
 <deployment>
-    <cluster hostcount="1" sitesperhost="1" kfactor="0" />
+    <cluster hostcount="1" kfactor="0" />
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="false"/>
+    <export>
+        <configuration stream="oldfile" enabled="true" type="file">
+            <property name="type">csv</property>
+            <property name="nonce">MyExport</property>
+            <property name="period">5</property>
+        </configuration>
+        <configuration stream="newfile" enabled="true" type="file">
+            <property name="type">csv</property>
+            <property name="nonce">Bids</property>
+            <property name="period">3</property>
+        </configuration>
+    </export>
 </deployment>

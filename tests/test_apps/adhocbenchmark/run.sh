@@ -19,7 +19,11 @@ else
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+CLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -50,7 +54,7 @@ function srccompile() {
 function catalog() {
     $GENERATE || exit
     srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -60,8 +64,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost $APPNAME.jar
 }
 
 # run the client that drives the example
@@ -82,13 +85,15 @@ function _benchmark() {
         ${APPNAME}.Benchmark \
         --displayinterval=5 \
         --servers=localhost \
-        --configfile=config.xml \
+        --configfile=cachefriendlyconfig.xml \
         --warmup=5 \
-        --duration=20 \
-#--querytracefile=$1.queries.log.txt \
-        --test=$1
-    echo Sample queries:
-    head -6 $1.queries.out
+        --duration=60 \
+        --test=$1 \
+        --querythrottle=30
+                           ## \
+##        --querytracefile=$1.queries.out
+#    echo Sample queries:
+#    head -6 $1.queries.out
 }
 
 function benchmark-joins() {

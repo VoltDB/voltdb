@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -163,7 +163,7 @@ public class DeletesClient
                             System.out.println("failed insert");
                             System.out.println(response.getStatusString());
                         }
-                        m_expectedInserts--;
+                        m_expectedInserts--; //we don't care if tx fail, but don't get stuck in yield
                     }
                 },
                 Insert.class.getSimpleName(),
@@ -313,9 +313,9 @@ public class DeletesClient
                         else
                         {
                             m_totalRows -= response.getResults()[0].asScalarLong();
-                            m_expectedDeletes--;
                             m_totalDeletedRows += response.getResults()[0].asScalarLong();
                         }
+                        m_expectedDeletes--;  //we don't care if tx fail, but don't get stuck in yield
                     }
                 },
                 "DeleteOldBatches", m_names[i], prune_ts)
@@ -377,8 +377,8 @@ public class DeletesClient
                         else
                         {
                             m_totalRows -= response.getResults()[0].asScalarLong();
-                            m_expectedDeadDeletes--;
                         }
+                        m_expectedDeadDeletes--; //we don't care if tx fail, but don't get stuck in yield
                     }
                 },
                 "DeleteDeceased", m_names[i])
@@ -440,8 +440,8 @@ public class DeletesClient
                             System.out.println("\tBatch has " +
                                                response.getResults()[0].asScalarLong() +
                                                " items");
-                            m_expectedCounts--;
                         }
+                        m_expectedCounts--; //we don't care if tx fail, but don't get stuck in yield
                     }
                 },
                 "CountBatchSize", "", batch)

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -33,24 +33,30 @@
  * A table is export only if any connector's table list marks it as
  * such. Search through the connector's table lists accordingly.
  */
-bool isTableExportOnly(catalog::Database& database, int32_t tableIndex) {
+bool isTableExportOnly(catalog::Database const & database, int32_t tableIndex) {
 
     // no export, no export only tables
     if (database.connectors().size() == 0) {
         return false;
     }
 
-    // there is one well-known-named connector
-    catalog::Connector *connector = database.connectors().get("0");
-
-    // iterate the connector tableinfo list looking for tableindex
-    std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
-    for (it = connector->tableInfo().begin();
-         it != connector->tableInfo().end();
-         it++)
+    // iterate through all connectors
+    std::map<std::string, catalog::Connector*>::const_iterator connIter;
+    for (connIter = database.connectors().begin();
+         connIter != database.connectors().end();
+         connIter++)
     {
-        if (it->second->table()->relativeIndex() == tableIndex) {
-            return it->second->appendOnly();
+        catalog::Connector *connector = connIter->second;
+
+        // iterate the connector tableinfo list looking for tableIndex matches
+        std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
+        for (it = connector->tableInfo().begin();
+             it != connector->tableInfo().end();
+             it++)
+        {
+            if (it->second->table()->relativeIndex() == tableIndex) {
+                return true;
+            }
         }
     }
 
@@ -63,33 +69,43 @@ bool isTableExportOnly(catalog::Database& database, int32_t tableIndex) {
  * a connector's table list and if export is enabled for the
  * database as a whole
  */
-bool isExportEnabledForTable(catalog::Database& database, int32_t tableIndex) {
+bool isExportEnabledForTable(catalog::Database const & database, int32_t tableIndex) {
 
     // export is disabled unless a connector exists
     if (database.connectors().size() == 0) {
         return false;
     }
 
-    // there is one well-known-named connector
-    catalog::Connector *connector = database.connectors().get("0");
-
-    // export is disabled if the connector is disabled
-    if (!(connector->enabled())) {
-        return false;
-    }
-
-    // iterate the connector tableinfo list looking for tableIndex
-    std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
-    for (it = connector->tableInfo().begin();
-         it != connector->tableInfo().end();
-         it++)
+    // iterate through all connectors
+    std::map<std::string, catalog::Connector*>::const_iterator connIter;
+    for (connIter = database.connectors().begin();
+         connIter != database.connectors().end();
+         connIter++)
     {
-        if (it->second->table()->relativeIndex() == tableIndex) {
-            return true;
+        catalog::Connector *connector = connIter->second;
+
+        // skip this connector if disabled
+        if (!connector->enabled()) {
+            continue;
+        }
+
+        // iterate the connector tableinfo list looking for tableIndex matches
+        std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
+        for (it = connector->tableInfo().begin();
+             it != connector->tableInfo().end();
+             it++)
+        {
+            if (it->second->table()->relativeIndex() == tableIndex) {
+                return true;
+            }
         }
     }
 
     return false;
+}
+
+bool isTableMaterialized(const catalog::Table &table) {
+    return table.materializer() != NULL;
 }
 
 

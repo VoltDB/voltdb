@@ -785,7 +785,7 @@ public class Scanner {
                     }
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 boolean result = scanUndelimitedIdentifier();
 
@@ -1055,7 +1055,7 @@ public class Scanner {
 
                 token.dataType = Type.SQL_NUMERIC;
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_NUMERIC :
                 try {
                     BigDecimal decimal = new BigDecimal(token.tokenString);
@@ -1564,6 +1564,8 @@ public class Scanner {
                 }
                 break;
 
+            // A VoltDB extension -- disable broken handling for binary literals
+            /* disable 19 lines ...
             case 'b' :
             case 'B' :
                 if (charAt(currentPosition + 1) == '\'') {
@@ -1583,6 +1585,8 @@ public class Scanner {
                     return;
                 }
                 break;
+            ... disabled 19 lines */
+            // End of VoltDB extension
 
             case 'n' :
             case 'N' :
@@ -1851,6 +1855,12 @@ public class Scanner {
      *      - doesn't allow single digit components
      */
     public TimestampData newTimestamp(String s) {
+
+        // A VoltDB extension -- handle timestamp strings only containing date
+        if (s.length() == 10) {
+            return newDate(s);
+        }
+        // End of VoltDB extension
 
         long    zoneSeconds = 0;
         long    seconds;
@@ -2391,7 +2401,7 @@ public class Scanner {
                     throw Error.error(errorCode);
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
         }
 

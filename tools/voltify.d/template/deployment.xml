@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!--
+Please note that voltify generated the run.sh script assuming a single host,
+which is localhost. If you change the host count in this deployment file you
+may want to update run.sh.  Look for the server() function and its "voltdb
+create" command. Change the "localhost" argument to the appropriate
+coordinating host for your network cluster.
+-->
+<deployment>
+    <cluster hostcount="${host_count}" sitesperhost="${sites_per_host}" kfactor="${kfactor}" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+</deployment>

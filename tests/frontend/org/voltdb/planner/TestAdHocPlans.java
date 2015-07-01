@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class TestAdHocPlans extends AdHocQueryTester {
 
@@ -44,13 +45,13 @@ public class TestAdHocPlans extends AdHocQueryTester {
     @Override
     protected void setUp() throws Exception {
         // For planner-only testing, we shouldn't care about IV2
-        VoltDB.Configuration config = setUpSPDB(false);
-        byte[] bytes = CatalogUtil.toBytes(new File(config.m_pathToCatalog));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        VoltDB.Configuration config = setUpSPDB();
+        byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
-        m_pt = new PlannerTool(context.cluster, context.database);
+        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
+        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
     }
 
     @Override
@@ -59,7 +60,8 @@ public class TestAdHocPlans extends AdHocQueryTester {
     }
 
     public void testSP() throws Exception {
-        runAllAdHocSPtests();
+        //DB is empty so the hashable numbers don't really seem to matter
+        runAllAdHocSPtests(0, 1, 2, 3);
     }
 
     /**
@@ -69,7 +71,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
     public int runQueryTest(String query, int hash, int spPartialSoFar,
             int expected, int validatingSPresult) throws IOException,
             NoConnectionsException, ProcCallException {
-        AdHocPlannedStatement result = m_pt.planSql(query, null, true, false);
+        AdHocPlannedStatement result = m_pt.planSqlForTest(query);
         boolean spPlan = result.toString().contains("ALL: null");
         if ((validatingSPresult == VALIDATING_SP_RESULT) != spPlan) {
             System.out.println("Missed: "+ query);
@@ -78,7 +80,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
             // to set this debugging flag and step into the planner,
             // for a do-over after getting an unexpected result.
             if (m_debugging_set_this_to_retry_failures) {
-                result = m_pt.planSql(query, null, true, false);
+                result = m_pt.planSqlForTest(query);
             }
         }
         assertEquals((validatingSPresult == VALIDATING_SP_RESULT), spPlan);

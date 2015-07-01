@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,6 +26,7 @@
 #include "harness.h"
 #include <iostream>
 #include <cstring>
+#include <boost/scoped_ptr.hpp>
 
 using namespace voltdb;
 using namespace std;
@@ -46,38 +47,38 @@ TEST_F(CompactingPoolTest, basic_ops)
 {
     int32_t size = 17;
     int32_t num_elements = 7;
-    CompactingPool dut(size, num_elements);
+    boost::scoped_ptr<CompactingPool> dut(new CompactingPool(size, num_elements));
 
     // test freeing with just one element is happy
-    void* elem = dut.malloc();
-    EXPECT_EQ(size * num_elements, dut.getBytesAllocated());
-    bool mutated = dut.free(elem);
+    void* elem = dut->malloc();
+    EXPECT_EQ(size * num_elements, dut->getBytesAllocated());
+    bool mutated = dut->free(elem);
     EXPECT_FALSE(mutated);
-    EXPECT_EQ(0, dut.getBytesAllocated());
+    EXPECT_EQ(0, dut->getBytesAllocated());
 
     // fill up a buffer + 1, then free something in the middle and
     // verify that we shrink appropriately
     void* elems[num_elements + 1];
     for (int i = 0; i <= num_elements; i++)
     {
-        elems[i] = dut.malloc();
+        elems[i] = dut->malloc();
         memset(elems[i], i, size);
     }
     EXPECT_EQ(2, *reinterpret_cast<int8_t*>(elems[2]));
-    EXPECT_EQ(size * num_elements * 2, dut.getBytesAllocated());
-    mutated = dut.free(elems[2]);
+    EXPECT_EQ(size * num_elements * 2, dut->getBytesAllocated());
+    mutated = dut->free(elems[2]);
     EXPECT_TRUE(mutated);
     // 2 should now have the last element, filled with num_elements
     EXPECT_EQ(num_elements, *reinterpret_cast<int8_t*>(elems[2]));
     // and we should have shrunk back to 1 buffer
-    EXPECT_EQ(size * num_elements, dut.getBytesAllocated());
+    EXPECT_EQ(size * num_elements, dut->getBytesAllocated());
 
     // add an element and free it and verify that we don't mutate anything else
-    elems[num_elements + 1] = dut.malloc();
-    EXPECT_EQ(size * num_elements * 2, dut.getBytesAllocated());
-    mutated = dut.free(elems[num_elements + 1]);
+    elems[num_elements + 1] = dut->malloc();
+    EXPECT_EQ(size * num_elements * 2, dut->getBytesAllocated());
+    mutated = dut->free(elems[num_elements + 1]);
     EXPECT_FALSE(mutated);
-    EXPECT_EQ(size * num_elements, dut.getBytesAllocated());
+    EXPECT_EQ(size * num_elements, dut->getBytesAllocated());
 }
 
 TEST_F(CompactingPoolTest, bytes_allocated_test)

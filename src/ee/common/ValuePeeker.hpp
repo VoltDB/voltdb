@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -54,6 +54,11 @@ public:
         return value.getInteger();
     }
 
+    static inline bool peekBoolean(const NValue value) {
+        assert(value.getValueType() == VALUE_TYPE_BOOLEAN);
+        return value.getBoolean();
+    }
+
     // cast as int and peek at value. this is used by index code that need a
     // real number from a tuple and the limit node code used to get the limit
     // from an expression.
@@ -77,17 +82,27 @@ public:
         return value.getObjectValue();
     }
 
-    static inline int32_t peekObjectLength(const NValue value) {
+    static inline void* peekObjectValue_withoutNull(const NValue value) {
         assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
                (value.getValueType() == VALUE_TYPE_VARBINARY));
-        return value.getObjectLength();
+        return value.getObjectValue_withoutNull();
     }
 
-    static std::string peekStringCopy(const NValue value) {
+    static inline int32_t peekObjectLength_withoutNull(const NValue value) {
         assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
                (value.getValueType() == VALUE_TYPE_VARBINARY));
-        std::string result(reinterpret_cast<const char*>(value.getObjectValue()),
-                                                         value.getObjectLength());
+        return value.getObjectLength_withoutNull();
+    }
+
+    /**
+     * This function is only used in 'nvalue_test.cpp', why test a function that
+     * is not used in source code? Get rid of it? -xin
+     */
+    static std::string peekStringCopy_withoutNull(const NValue value) {
+        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
+               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        std::string result(reinterpret_cast<const char*>(value.getObjectValue_withoutNull()),
+                                                         value.getObjectLength_withoutNull());
         return result;
     }
 
@@ -107,11 +122,14 @@ public:
     // cast as big int and peek at value. this is used by
     // index code that need a real number from a tuple.
     static inline int64_t peekAsBigInt(const NValue value) {
+        if (value.isNull()) {
+            return INT64_NULL;
+        }
         return value.castAsBigIntAndGetValue();
     }
 
     static inline int64_t peekAsRawInt64(const NValue value) {
-        return value.castAsRawInt64AndGetValue();
+        return value.castAsBigIntAndGetValue();
     }
 };
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,32 +40,45 @@ public class TestCRUDSuite extends RegressionSuite {
         super(name);
     }
 
+    public void testNegativeWrongTypeParam() throws Exception {
+        final Client client = this.getClient();
+        ClientResponse resp = client.callProcedure("P5.insert", -1000);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        resp = client.callProcedure("@AdHoc", "select * from p5;");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(1, resp.getResults().length);
+        VoltTable results = resp.getResults()[0];
+        assertEquals(1, results.getRowCount());
+        assertEquals(1, results.getColumnCount());
+        assertEquals(-1000, results.fetchRow(0).getLong(0));
+    }
+
     public void testPartitionedPkPartitionCol() throws Exception
     {
         final Client client = this.getClient();
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.insert", i, Integer.toHexString(i));
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.select", i);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             VoltTable vt = resp.getResults()[0];
             assertTrue(vt.advanceRow());
-            assertTrue(vt.getLong(0) == i);
+            assertEquals(i, vt.getLong(0));
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.update", i, "STR" + Integer.toHexString(i), i);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.select", i);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             VoltTable vt = resp.getResults()[0];
             assertTrue(vt.advanceRow());
             assertTrue(vt.getString(1).equals("STR" + Integer.toHexString(i)));
@@ -73,13 +86,13 @@ public class TestCRUDSuite extends RegressionSuite {
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.delete", i);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         ClientResponse resp = client.callProcedure("CountP1");
-        assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-        assertTrue(resp.getResults()[0].asScalarLong() == 0);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(0, resp.getResults()[0].asScalarLong());
     }
 
     public void testMultiColPk() throws Exception
@@ -94,36 +107,36 @@ public class TestCRUDSuite extends RegressionSuite {
         final Client client = this.getClient();
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.insert", i, Integer.toHexString(i), i * 100);  // z,x,y
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.select", i*100, Integer.toHexString(i), i); // y,x,z
             VoltTable vt = resp.getResults()[0];
             assertTrue(vt.advanceRow());
-            assertTrue(vt.getLong(0) == i);
+            assertEquals(i, vt.getLong(0));
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.update",
                     i*10, "STR" + Integer.toHexString(i), i*100, // z,x,y (update / table order)
                     i*100, Integer.toHexString(i), i);           // y,x,z (search / index order)
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.select", i*100, "STR" + Integer.toHexString(i), i*10); // y,x,z
             VoltTable vt = resp.getResults()[0];
             assertTrue(vt.advanceRow());
-            assertTrue(vt.getLong(0) == i*10);
+            assertEquals(i*10, vt.getLong(0));
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.delete", i*100, "STR" + Integer.toHexString(i), i*10); // y,x,z
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
     }
@@ -154,14 +167,36 @@ public class TestCRUDSuite extends RegressionSuite {
 
     public void testReplicatedTable() throws Exception
     {
-        Client client = getClient();
+        final Client client = this.getClient();
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("R1.insert", i, Integer.toHexString(i));
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
         try {
-            client.callProcedure("R1.delete", 0, "ABC");
+            client.callProcedure("R1.select", 0, "ABC");
+            fail();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("was not found"));
             return;
         }
-        fail();
+
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("R1.update", i, "STR" + Integer.toHexString(i), i);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("R1.delete", i);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
+        ClientResponse resp = client.callProcedure("CountR1");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(0, resp.getResults()[0].asScalarLong());
     }
 
 
@@ -171,8 +206,8 @@ public class TestCRUDSuite extends RegressionSuite {
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
 
-        // necessary because at least one procedure is required
         project.addStmtProcedure("CountP1", "select count(*) from p1;");
+        project.addStmtProcedure("CountR1", "select count(*) from r1;");
 
         try {
             // a table that should generate procedures
@@ -192,9 +227,9 @@ public class TestCRUDSuite extends RegressionSuite {
             // a partitioned table that should not generate procedures (pkey not partition key)
             project.addLiteralSchema(
                     "CREATE TABLE p3(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
-                    "CREATE UNIQUE INDEX p3_tree_idx ON p3(a1);"
+                    "CREATE ASSUMEUNIQUE INDEX p3_tree_idx ON p3(a1); " +
+                    "PARTITION TABLE P3 ON COLUMN a2;"
             );
-            project.addPartitionInfo("p3", "a2");
 
             // a replicated table (should not generate procedures).
             project.addLiteralSchema(
@@ -208,27 +243,26 @@ public class TestCRUDSuite extends RegressionSuite {
             );
             project.addPartitionInfo("p4", "y");
 
+            // table with a bigint pkey
+            project.addLiteralSchema(
+                    "CREATE TABLE p5(x BIGINT NOT NULL, PRIMARY KEY(x));"
+            );
+            project.addPartitionInfo("p5", "x");
+
         } catch (IOException error) {
             fail(error.getMessage());
         }
 
         // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("crud-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
 
         // CLUSTER
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("crud-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
-        builder.addServerConfig(config);
-
-        // IV2 CLUSTER
-        config = new LocalCluster("sqltypes-iv2cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
-                false, true); // LocalCluster constructor to enable IV2.  We have to drag along the isRejoinTest arg
-        boolean t3 = config.compile(project);
-        assertTrue(t3);
         builder.addServerConfig(config);
 
         return builder;

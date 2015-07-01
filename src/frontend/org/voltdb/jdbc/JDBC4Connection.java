@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -35,20 +35,32 @@ import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 
 public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
+    public static final String COMMIT_THROW_EXCEPTION = "jdbc.committhrowexception";
+    public static final String ROLLBACK_THROW_EXCEPTION = "jdbc.rollbackthrowexception";
+    public static final String QUERYTIMEOUT_UNIT = "jdbc.querytimeout.unit";
+
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
+    protected TimeUnit queryTimeOutUnit = TimeUnit.SECONDS;
     private boolean isClosed = false;
+    private Properties props;
+    private boolean autoCommit = true;
 
-    public JDBC4Connection(JDBC4ClientConnection connection, String user)
+    public JDBC4Connection(JDBC4ClientConnection connection, Properties props)
     {
         this.NativeConnection = connection;
-        this.User = user;
+        this.props = props;
+        this.User = this.props.getProperty("user", "");
+        if (this.props.getProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "Seconds").equalsIgnoreCase("milliseconds")) {
+            this.queryTimeOutUnit = TimeUnit.MILLISECONDS;
+        }
     }
 
     private void checkClosed() throws SQLException
@@ -62,7 +74,6 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void clearWarnings() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
     }
 
     // Releases this Connection object's database and JDBC resources immediately instead of waiting for them to be automatically released.
@@ -85,7 +96,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void commit() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        if (props.getProperty(COMMIT_THROW_EXCEPTION, "true").equalsIgnoreCase("true")) {
+            throw SQLError.noSupport();
+        }
     }
 
     // Factory method for creating Array objects.
@@ -143,14 +156,59 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         }
     }
 
+    /**
+     * Check if the createStatement() options are supported
+     *
+     * See http://docs.oracle.com/javase/7/docs/api/index.html?java/sql/DatabaseMetaData.html
+     *
+     * The following flags are supported:
+     *  - The type must either be TYPE_SCROLL_INSENSITIVE or TYPE_FORWARD_ONLY.
+     *  - The concurrency must be CONCUR_READ_ONLY.
+     *  - The holdability must be CLOSE_CURSORS_AT_COMMIT.
+     *
+     * @param resultSetType  JDBC result set type option
+     * @param resultSetConcurrency  JDBC result set concurrency option
+     * @param resultSetHoldability  JDBC result set holdability option
+     * @throws SQLException  if not supported
+     */
+    private static void checkCreateStatementSupported(
+            int resultSetType, int resultSetConcurrency, int resultSetHoldability)
+                    throws SQLException
+    {
+        if (   (   (resultSetType != ResultSet.TYPE_SCROLL_INSENSITIVE
+                &&  resultSetType != ResultSet.TYPE_FORWARD_ONLY))
+            || resultSetConcurrency != ResultSet.CONCUR_READ_ONLY
+            || resultSetHoldability != ResultSet.CLOSE_CURSORS_AT_COMMIT) {
+            throw SQLError.noSupport();
+        }
+    }
+
+    /**
+     * Check if the createStatement() options are supported
+     *
+     * The following flags are supported:
+     *  - The type must either be TYPE_SCROLL_INSENSITIVE or TYPE_FORWARD_ONLY.
+     *  - The concurrency must be CONCUR_READ_ONLY.
+     *
+     * @param resultSetType  JDBC result set type option
+     * @param resultSetConcurrency  JDBC result set concurrency option
+     * @throws SQLException  if not supported
+     */
+    private static void checkCreateStatementSupported(
+            int resultSetType, int resultSetConcurrency)
+                    throws SQLException
+    {
+        checkCreateStatementSupported(resultSetType, resultSetConcurrency, ResultSet.CLOSE_CURSORS_AT_COMMIT);
+    }
+
     // Creates a Statement object that will generate ResultSet objects with the given type and concurrency.
     @Override
     public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException
     {
-        if (resultSetType == ResultSet.TYPE_SCROLL_INSENSITIVE && resultSetConcurrency == ResultSet.CONCUR_READ_ONLY)
-            return createStatement();
         checkClosed();
-        throw SQLError.noSupport();
+        // Reject options that don't coincide with normal VoltDB behavior.
+        checkCreateStatementSupported(resultSetType, resultSetConcurrency);
+        return createStatement();
     }
 
     // Creates a Statement object that will generate ResultSet objects with the given type, concurrency, and holdability.
@@ -158,7 +216,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        // Reject options that don't coincide with normal VoltDB behavior.
+        checkCreateStatementSupported(resultSetType, resultSetConcurrency, resultSetHoldability);
+        return createStatement();
     }
 
     // Factory method for creating Struct objects.
@@ -170,11 +230,12 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     }
 
     // Retrieves the current auto-commit mode for this Connection object.
+    // We are always auto-committing, but if let's be consistent with the lying.
     @Override
     public boolean getAutoCommit() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport(); // return true always instead?
+        return autoCommit;
     }
 
     // Retrieves this Connection object's current catalog name.
@@ -238,14 +299,14 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public SQLWarning getWarnings() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        return null;
     }
 
     // Retrieves whether this Connection object has been closed.
     @Override
     public boolean isClosed() throws SQLException
     {
-        return isClosed; // TODO: This is retarded: the native VoltDB.Client does not have such a status - we should have this so we can appropriately deal with connection failures!
+        return isClosed;
     }
 
     // Retrieves whether this Connection object is in read-only mode.
@@ -260,7 +321,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     @Override
     public boolean isValid(int timeout) throws SQLException
     {
-        return isClosed; // TODO: This is retarded: the native VoltDB.Client does not have such a status - we should have this so we can appropriately deal with connection failures!
+        return !isClosed;
     }
 
     // Converts the given SQL statement into the system's native SQL grammar.
@@ -360,7 +421,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void rollback() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        if (props.getProperty(ROLLBACK_THROW_EXCEPTION, "true").equalsIgnoreCase("true")) {
+            throw SQLError.noSupport();
+        }
     }
 
     // Undoes all changes made after the given Savepoint object was set.
@@ -376,8 +439,13 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setAutoCommit(boolean autoCommit) throws SQLException
     {
         checkClosed();
-        if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
+        // Always true - error out only if the client is trying to set somethign else
+        if (!autoCommit && (props.getProperty(COMMIT_THROW_EXCEPTION, "true").equalsIgnoreCase("true"))) {
             throw SQLError.noSupport();
+        }
+        else {
+            this.autoCommit = autoCommit;
+        }
     }
 
     // Sets the given catalog name in order to select a subspace of this Connection object's database in which to work.
@@ -482,34 +550,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         return this.NativeConnection.getClientStatsContext();
     }
 
-    // IVoltDBConnection extended method
-    // Return global performance statistics for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounterMap getStatistics()
-    {
-        return this.NativeConnection.getStatistics();
-    }
-
-    // Return performance statistics for a specific procedure, for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounter getStatistics(String procedure)
-    {
-        return this.NativeConnection.getStatistics(procedure);
-    }
-
-    // Return performance statistics for a list of procedures, for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounter getStatistics(String... procedures)
-    {
-        return this.NativeConnection.getStatistics(procedures);
-    }
-
     // Save statistics to a file
-    @Deprecated
     @Override
-    public void saveStatistics(String file) throws IOException
+    public void saveStatistics(ClientStats stats, String file) throws IOException
     {
-        this.NativeConnection.saveStatistics(file);
+        this.NativeConnection.saveStatistics(stats, file);
     }
 
     public void setSchema(String schema) throws SQLException {

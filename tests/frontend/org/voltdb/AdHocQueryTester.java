@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -57,8 +57,13 @@ public abstract class AdHocQueryTester extends TestCase {
 
                 "create table PARTED3 (" +
                 "PARTVAL bigint not null, " +
-                "NONPART bigint not null," +
-                "PRIMARY KEY(NONPART));" +
+                "NONPART bigint not null ASSUMEUNIQUE," +
+                "PRIMARY KEY(NONPART, PARTVAL));" +
+
+                "create table PARTED4 (" +
+                "PARTVAL integer not null, " +
+                "NONPART bigint not null ASSUMEUNIQUE," +
+                "PRIMARY KEY(NONPART, PARTVAL));" +
 
                 "create table REPPED1 (" +
                 "REPPEDVAL bigint not null, " +
@@ -73,8 +78,8 @@ public abstract class AdHocQueryTester extends TestCase {
                 "create view V_PARTED1 (PARTVAL, num_rows, sum_bigint) as " +
                 "select PARTVAL, count(*), sum(NONPART) from PARTED1 group by PARTVAL;" +
 
-                "create view V_SCATTERED1 (NONPART, num_rows, sum_bigint) as " +
-                "select NONPART, count(*), sum(PARTVAL) from PARTED1 group by NONPART;" +
+                "create view V_SCATTERED1 (NONPART, PARTVAL, num_rows, sum_bigint) as " +
+                "select NONPART, PARTVAL, count(*), sum(PARTVAL) from PARTED1 group by NONPART, PARTVAL;" +
 
                 "create view V_REPPED1 (REPPEDVAL, num_rows, sum_bigint) as " +
                 "select REPPEDVAL, count(*), sum(NONPART) from REPPED1 group by REPPEDVAL;" +
@@ -85,6 +90,7 @@ public abstract class AdHocQueryTester extends TestCase {
         builder.addPartitionInfo("PARTED1", "PARTVAL");
         builder.addPartitionInfo("PARTED2", "PARTVAL");
         builder.addPartitionInfo("PARTED3", "PARTVAL");
+        builder.addPartitionInfo("PARTED4", "PARTVAL");
         builder.addProcedures(
                 new Class<?>[] {
                         org.voltdb_testprocs.adhoc.executeSQLMP.class,
@@ -93,7 +99,7 @@ public abstract class AdHocQueryTester extends TestCase {
                         org.voltdb_testprocs.adhoc.executeSQLSPWRITE.class,} );
     }
 
-    public static VoltDB.Configuration setUpSPDB(boolean useIv2) throws IOException, Exception {
+    public static VoltDB.Configuration setUpSPDB() throws IOException, Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
 
@@ -107,7 +113,6 @@ public abstract class AdHocQueryTester extends TestCase {
         VoltDB.Configuration config = new VoltDB.Configuration(new PortGenerator());
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
-        config.m_enableIV2 = useIv2;
         return config;
     }
 
@@ -119,135 +124,143 @@ public abstract class AdHocQueryTester extends TestCase {
      * @throws IOException
      * @throws NoConnectionsException
      */
-    protected void runAllAdHocSPtests() throws NoConnectionsException, IOException, ProcCallException {
+    protected void runAllAdHocSPtests(int hashableA, int hashableB, int hashableC, int hashableD) throws NoConnectionsException, IOException, ProcCallException {
         int spPartialCount = 0;
-        spPartialCount = runQueryTest("SELECT * FROM PARTED1;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED1 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        spPartialCount = runQueryTest("SELECT * FROM PARTED1;", hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 WHERE PARTVAL != %d;", hashableA), hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
-        spPartialCount = runQueryTest("SELECT * FROM PARTED3;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        spPartialCount = runQueryTest("SELECT * FROM PARTED3;", hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 WHERE PARTVAL != %d;", hashableA), hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
-        runQueryTest("SELECT * FROM REPPED1;", 0, 0, 2, VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM REPPED1;", hashableA, 0, 2, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 WHERE PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 WHERE PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 WHERE REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 WHERE PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 WHERE PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 WHERE REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        spPartialCount = runQueryTest("SELECT * FROM V_PARTED1;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_PARTED1 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        spPartialCount = runQueryTest("SELECT * FROM V_PARTED1;", hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_PARTED1 WHERE PARTVAL != %d;", hashableA), hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
-        spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 WHERE NONPART != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1;", hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_SCATTERED1 WHERE NONPART != %d;", hashableA), hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
-        runQueryTest("SELECT * FROM V_REPPED1;", 0, 0, 2, VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM V_REPPED1;", hashableA, 0, 2, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM V_PARTED1 WHERE PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_PARTED1 WHERE PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1 WHERE NONPART = 0;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 WHERE NONPART != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        spPartialCount = runQueryTest(String.format("SELECT * FROM V_SCATTERED1 WHERE NONPART = %d;", hashableA), hashableA, 0, 1, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_SCATTERED1 WHERE NONPART != %d;", hashableA), hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
-        runQueryTest("SELECT * FROM V_REPPED1 WHERE REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_REPPED1 WHERE REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = %d and B.REPPEDVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and B.REPPEDVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = %d and A.PARTVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = %d and A.PARTVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = %d and A.PARTVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and A.REPPEDVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = %d and A.PARTVAL = B.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and A.REPPEDVAL = B.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = %d and B.PARTVAL = A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = %d and B.PARTVAL = A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = %d and B.PARTVAL = A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL = A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = %d and B.REPPEDVAL = A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and B.REPPEDVAL = A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = 0 and A.REPPEDVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = %d and A.PARTVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = %d and A.PARTVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = %d and A.PARTVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = %d and A.REPPEDVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = %d and A.PARTVAL = B.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = %d and A.REPPEDVAL = B.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = %d and B.PARTVAL = A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = %d and B.PARTVAL = A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = %d and B.PARTVAL = A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = %d and B.PARTVAL = A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = %d and B.REPPEDVAL = A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = %d and B.REPPEDVAL = A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and A.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = B.REPPEDVAL and A.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and A.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and A.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = B.REPPEDVAL and A.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = B.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and B.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = B.REPPEDVAL and B.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and A.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and A.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and A.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and A.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and A.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and B.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and B.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
 
         // Selectively try a sampling of these same cases with materialized view tables.
-        runQueryTest("SELECT * FROM V_PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and B.REPPEDVAL = 0;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and B.REPPEDVAL = 0;", 1, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_PARTED1 A, PARTED2 B WHERE A.PARTVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE A.PARTVAL = %d and B.REPPEDVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and B.REPPEDVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        spPartialCount = runQueryTest(String.format("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = %d and B.REPPEDVAL = %d;", hashableA, hashableA), hashableA, 0, 1, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = %d and B.REPPEDVAL = %d;", hashableA, hashableA), hashableB, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
 
-        runQueryTest("SELECT * FROM V_PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and A.NONPART = B.REPPEDVAL;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and A.NONPART = B.REPPEDVAL;", 1, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_PARTED1 A, PARTED2 B WHERE A.PARTVAL = %d and A.PARTVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and A.REPPEDVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE A.PARTVAL = %d and A.PARTVAL = B.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and A.REPPEDVAL = B.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        spPartialCount = runQueryTest(String.format("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = %d and A.NONPART = B.REPPEDVAL;", hashableA), hashableA, 0, 1, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = %d and A.NONPART = B.REPPEDVAL;", hashableA), hashableB, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
 
-        runQueryTest("SELECT * FROM V_PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE B.REPPEDVAL = A.NONPART and B.REPPEDVAL = 0;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE B.REPPEDVAL = A.NONPART and B.REPPEDVAL = 0;", 1, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and B.PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and B.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and B.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        spPartialCount = runQueryTest(String.format("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE B.REPPEDVAL = A.NONPART and B.REPPEDVAL = %d;", hashableA), hashableA, 0, 1, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE B.REPPEDVAL = A.NONPART and B.REPPEDVAL = %d;", hashableA), hashableB, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
 
 /* These queries are not yet supported SP because of B's varying partition key.
-        runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;", 0, 1);
-        runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;", 0, 1);
-        runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;", 0, 1);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = %d and B.PARTVAL != A.PARTVAL;", hashableA), hashableA, 1);
+        runQueryTest(String.format("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = %d and B.PARTVAL != A.PARTVAL;", hashableA), hashableA, 1);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = %d and B.PARTVAL != A.PARTVAL;", hashableA), hashableA, 1);
 */
-        spPartialCount = runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 1, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
+        spPartialCount = runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL != A.REPPEDVAL;", hashableA), hashableA, 0, 1, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL != A.REPPEDVAL;", hashableA), hashableB, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
 
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL != A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL != A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = %d and B.REPPEDVAL != A.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and B.REPPEDVAL != A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-        // spPartialCount = runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        // runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;", 1, spPartialCount, 2, VALIDATING_TOTAL_SP_RESULT);
+        spPartialCount = runQueryTest(String.format("SELECT * FROM PARTED1 A LEFT JOIN PARTED2 B ON A.PARTVAL = %d and B.PARTVAL = A.PARTVAL;", hashableA), hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 A LEFT JOIN PARTED2 B ON A.PARTVAL = %d and B.PARTVAL = A.PARTVAL;", hashableA), hashableB, spPartialCount, 2, NOT_VALIDATING_SP_RESULT);
+        try {
+            runQueryTest(String.format("SELECT * FROM PARTED1 A LEFT JOIN PARTED2 B ON A.PARTVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, NOT_VALIDATING_SP_RESULT);
+        } catch (Exception pce) {
+            assertTrue(pce.toString().contains("insufficient join criteria"));
+        }
+
+        // spPartialCount = runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;"), hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);
+        // runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;"), hashableB, spPartialCount, 2, VALIDATING_TOTAL_SP_RESULT);
 
         // TODO: Three-way join test cases are probably required to cover all code paths through AccessPaths.
     }

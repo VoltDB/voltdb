@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -21,7 +21,11 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import org.json_voltpatches.JSONString;
+import org.voltdb.common.Constants;
 
+/**
+ * Represent a microsecond-accurate VoltDB timestamp type.
+ */
 public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
      * Create a TimestampType from microseconds from epoch.
@@ -36,15 +40,21 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
      * Create a TimestampType from a Java Date class.
      * Microseconds will be rounded to zero.
-     * @param Java Date instance.
+     * @param date Java Date instance.
      */
     public TimestampType(Date date) {
         m_usecs = 0;
         m_date = (Date) date.clone();
     }
 
-    private static long microsFromJDBCformat(String param) {
-        java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(param);
+    private static long microsFromJDBCformat(String param){
+        java.sql.Timestamp sqlTS;
+        if (param.length() == 10) {
+            sqlTS = java.sql.Timestamp.valueOf(param + " 00:00:00.000");
+        }
+        else {
+            sqlTS = java.sql.Timestamp.valueOf(param);
+        }
 
         final long timeInMillis = sqlTS.getTime();
         final long fractionalSecondsInNanos = sqlTS.getNanos();
@@ -56,6 +66,14 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
         return (timeInMillis * 1000) + ((fractionalSecondsInNanos % 1000000)/1000);
     }
 
+    /**
+     * Given a string parseable by the JDBC Timestamp parser, return the fractional component
+     * in milliseconds.
+     *
+     * @param param A timstamp in string format that is parseable by JDBC.
+     * @return The fraction of a second portion of this timestamp expressed in milliseconds.
+     * @throws IllegalArgumentException if the timestamp uses higher than millisecond precision.
+     */
     public static long millisFromJDBCformat(String param) {
         java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(param);
         final long fractionalSecondsInNanos = sqlTS.getNanos();
@@ -126,10 +144,20 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
      */
     @Override
     public String toString() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        String format = sdf.format(m_date);
+        SimpleDateFormat sdf = new SimpleDateFormat(Constants.ODBC_DATE_FORMAT_STRING);
+        Date dateToMillis = m_date;
+        short usecs = m_usecs;
+        if (usecs < 0) {
+            // Negative usecs can occur for dates before 1970.
+            // To be expressed as positive decimals, they must "borrow" a milli from the date
+            // and convert it to 1000 micros.
+            dateToMillis.setTime(dateToMillis.getTime()-1);
+            usecs += 1000;
+        }
+        assert(usecs >= 0);
+        String format = sdf.format(dateToMillis);
         // zero-pad so 1 or 2 digit usecs get appended correctly
-        return format + String.format("%03d", m_usecs);
+        return format + String.format("%03d", usecs);
     }
 
     /**

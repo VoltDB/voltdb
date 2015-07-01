@@ -31,10 +31,10 @@
 
 package org.hsqldb_voltpatches.rowio;
 
-import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.Row;
 
 /**
  * Public interface for writing the data for a database row.

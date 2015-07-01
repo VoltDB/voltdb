@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -32,10 +32,16 @@ public class AccessPath {
     boolean keyIterate = false;
     IndexLookupType lookupType = IndexLookupType.EQ;
     SortDirectionType sortDirection = SortDirectionType.INVALID;
-    ArrayList<AbstractExpression> indexExprs = new ArrayList<AbstractExpression>();
-    ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
-    ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
-    ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
+    // The initial expression is needed to adjust (forward) the start of the reverse
+    // iteration when it had to initially settle for starting at
+    // "greater than a prefix key".
+    final ArrayList<AbstractExpression> initialExpr = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> indexExprs = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<AbstractExpression>();
 
     @Override
     public String toString() {
@@ -66,6 +72,11 @@ public class AccessPath {
         retval += "JOIN EXPRS:\n";
         i = 0;
         for (AbstractExpression expr : joinExprs)
+            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+
+        retval += "ELIMINATED POST FILTER EXPRS:\n";
+        i = 0;
+        for (AbstractExpression expr : eliminatedPostExprs)
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;

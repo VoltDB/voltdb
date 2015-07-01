@@ -34,6 +34,11 @@ package org.hsqldb_voltpatches;
 import java.util.Locale;
 
 import org.hsqldb_voltpatches.persist.HsqlProperties;
+// A VoltDB extension to disable a subpackage dependency
+/* disable 1 line ...
+import org.hsqldb_voltpatches.server.ServerConstants;
+... disabled 1 line */
+// End of VoltDB extension
 
 /*
  * Parses a connection URL into parts.
@@ -176,6 +181,22 @@ public class DatabaseURL {
             type = S_RES;
         } else if (urlImage.startsWith(S_ALIAS, pos)) {
             type = S_ALIAS;
+        } else if (urlImage.startsWith(S_HSQL, pos)) {
+            type      = S_HSQL;
+            port      = ServerConstants.SC_DEFAULT_HSQL_SERVER_PORT;
+            isNetwork = true;
+        } else if (urlImage.startsWith(S_HSQLS, pos)) {
+            type      = S_HSQLS;
+            port      = ServerConstants.SC_DEFAULT_HSQLS_SERVER_PORT;
+            isNetwork = true;
+        } else if (urlImage.startsWith(S_HTTP, pos)) {
+            type      = S_HTTP;
+            port      = ServerConstants.SC_DEFAULT_HTTP_SERVER_PORT;
+            isNetwork = true;
+        } else if (urlImage.startsWith(S_HTTPS, pos)) {
+            type      = S_HTTPS;
+            port      = ServerConstants.SC_DEFAULT_HTTPS_SERVER_PORT;
+            isNetwork = true;
         }
 
         if (type == null) {
@@ -321,4 +342,18 @@ public class DatabaseURL {
 
         return props;
     }
+
+    /************************* Volt DB Extensions *************************/
+    /**
+     * Stub to allow disabling of server package dependency
+     * -- these values probably don't even matter.
+     */
+    private static interface ServerConstants {
+        // default port for each protocol
+        final int SC_DEFAULT_HSQL_SERVER_PORT  = 9001;
+        final int SC_DEFAULT_HSQLS_SERVER_PORT = 554;
+        final int SC_DEFAULT_HTTP_SERVER_PORT  = 80;
+        final int SC_DEFAULT_HTTPS_SERVER_PORT = 443;
+    }
+    /**********************************************************************/
 }

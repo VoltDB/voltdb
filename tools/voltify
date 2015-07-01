@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+
+# This file is part of VoltDB.
+
+# Copyright (C) 2008-2015 VoltDB Inc.
+#
+# This file contains original code and/or modifications of original code.
+# Any modifications made by VoltDB Inc. are licensed under the following
+# terms and conditions:
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
+import sys
+import os
+from toolrunner import env_path_fix, vmain, warning
+
+# Make sure mysql_config is available.
+healthy = env_path_fix('PATH', ['/usr/local/mysql/bin'], ['mysql_config'])
+# On Mac make sure the client library is available.
+if sys.platform == 'darwin':
+    healthy |= env_path_fix('DYLD_LIBRARY_PATH', ['/usr/local/mysql/lib'], ['libmysqlclient.*.dylib'])
+if not healthy:
+    warning('The "mysql-python" module may have problems.',
+            'If errors occur please install, re-install, or repair MySQL,',
+            'or update the environment variable(s) mentioned above.')
+    if sys.platform != 'darwin':
+        warning('You may need to install an additional package with mysql_config.',
+                'E.g. on Ubuntu, "libmysqlclient-dev".')
+
+# Run in an automatically-built virtual environment that includes auto-
+# installed package dependencies.
+vmain(description='External database schema import commands.',
+      standalone=True,
+      packages=('mysql-python', 'ez_setup'),
+      directory=os.getcwd(),
+      verbose=sys.argv[1:]==['-v'],
+      libpath=os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'lib', 'python'))

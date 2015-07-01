@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -87,13 +87,13 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     columnAllowNull.push_back(false);
 
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
+    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
                                                          columnLengths,
-                                                         columnAllowNull,
-                                                         true);
+                                                         columnAllowNull);
 
-    TableIndexScheme scheme("test_index", HASH_TABLE_INDEX, columnIndices,
-                            columnTypes, false, true, schema);
+    TableIndexScheme scheme("test_index", HASH_TABLE_INDEX,
+                            columnIndices, TableIndex::simplyIndexColumns(),
+                            false, false, schema);
     index = TableIndexFactory::getInstance(scheme);
 
     TableTuple *tuple1 = newTuple(schema, 0, 10);
@@ -104,17 +104,12 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
     index->addEntry(tuple3);
 
     TableTuple *tuple4 = newTuple(schema, 0, 10);
-    EXPECT_TRUE(index->replaceEntryNoKeyChange(tuple1, tuple4));
+    EXPECT_TRUE(index->replaceEntryNoKeyChange(*tuple4, *tuple1));
 
+    EXPECT_FALSE(index->exists(tuple1));
     EXPECT_TRUE(index->exists(tuple2));
     EXPECT_TRUE(index->exists(tuple3));
     EXPECT_TRUE(index->exists(tuple4));
-
-    EXPECT_TRUE(index->moveToTuple(tuple4));
-    TableTuple tmp = TableTuple(schema);
-    while(!(tmp = index->nextValueAtKey()).isNullTuple()) {
-        EXPECT_EQ(tmp.address(), tuple4->address());
-    }
 
     delete index;
     TupleSchema::freeTupleSchema(schema);

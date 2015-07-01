@@ -71,24 +71,23 @@ class JavaProc:
 
     # signatures of running processes
     mains = {
-        "Ant process"               : "\\sorg\\.apache\\.tools\\.ant\\.launch\\.Launcher\\s",
-        "VoltDB server process"     : "\\sorg\\.voltdb\\.VoltDB\\s",
-        "JUnit Test Runner process" : "\\sorg\\.apache\\.tools\\.ant\\.taskdefs\\.optional\\.junit.JUnitTestRunner\\s",
-        "Eclipse JUnit process"     : "\\sorg\\.eclipse\\.jdt.junit4\\.runtime\\s"
+        "org.apache.tools.ant.launch.Launcher"                        : "Ant Process",
+        "org.voltdb.VoltDB"                                           : "VoltDB server process",
+        "org.apache.tools.ant.taskdefs.optional.junit.JUnitTestRunner": "JUnit Test Runner process",
+        "org.eclipse.jdt.junit4.runtime"                              : "Eclipse JUnit process",
     }
 
-    def __init__(self, pid):
-        self.pid = pid
-        self.commandline = cmd("ps -w -w -o pid -o args -p %d" % (pid))
+    def __init__(self, jpsline):
+        self.pid, self.classname = (list(jpsline.split()) + ['_unknown_'])[:2]
+        self.pid = int(self.pid)
 
         self.processType = "[unknown java process]"
-        for pname in JavaProc.mains:
-            if re.search(JavaProc.mains[pname], self.commandline):
-                self.processType = pname
+        if self.classname in JavaProc.mains.keys():
+            self.processType = JavaProc.mains[self.classname]
 
         self.tag = ""
         if self.processType == "VoltDB server process":
-            match = re.search("(?<=tag )(\\S)*", self.commandline)
+            match = re.search("(?<=tag )(\\S)*", jpsline)
             if match:
                 self.tag = match.group(0)
         if len(self.tag) > 0:
@@ -98,7 +97,7 @@ class JavaProc:
         return "%d: %s%s" % (self.pid, self.processType, self.tag)
 
 def getProcs():
-    return [JavaProc(int(x)) for x in cmd_readlines("ps cx -o pid -o command  | grep java | awk '{print $1}'")]
+    return [JavaProc(line) for line in cmd_readlines("jps -lm")]
 
 def getPathToResultsFileForTest(testname, outputpath):
     return os.path.join(os.path.abspath(outputpath), "TEST-" + testname + ".xml")
@@ -133,10 +132,10 @@ if __name__ == "__main__":
 
     # check for stranded procs
     procs = getProcs()
-
     # collect stranded procs that shouldn't be stranded (and kill them)
     failures = []
     for proc in procs:
+        #print proc
         if proc.processType in ["VoltDB server process", "JUnit Test Runner process"]:
             # a test was stranded
             logging.error("Found blacklisted process: %s" % (proc))

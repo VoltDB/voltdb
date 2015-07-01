@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,6 +31,7 @@
 #include <boost/unordered_map.hpp>
 #include "harness.h"
 #include "structures/CompactingHashTable.h"
+#include "common/FixUnusedAssertHack.h"
 
 using namespace voltdb;
 using namespace std;

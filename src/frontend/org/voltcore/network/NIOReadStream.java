@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008
@@ -45,6 +45,7 @@
 package org.voltcore.network;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayDeque;
 
@@ -81,28 +82,29 @@ public class NIOReadStream {
 
         int bytesCopied = 0;
         while (bytesCopied < output.length) {
-            BBContainer first = m_readBuffers.peekFirst();
-            if (first == null) {
+            BBContainer firstC = m_readBuffers.peekFirst();
+            if (firstC == null) {
                 // Steal the write buffer
-                m_writeBuffer.b.flip();
+                m_writeBuffer.b().flip();
                 m_readBuffers.add(m_writeBuffer);
-                first = m_writeBuffer;
+                firstC = m_writeBuffer;
                 m_writeBuffer = null;
             }
-            assert first.b.remaining() > 0;
+            ByteBuffer first = firstC.b();
+            assert first.remaining() > 0;
 
             // Copy bytes from first into output
-            int bytesRemaining = first.b.remaining();
+            int bytesRemaining = first.remaining();
             int bytesToCopy = output.length - bytesCopied;
             if (bytesToCopy > bytesRemaining) bytesToCopy = bytesRemaining;
-            first.b.get(output, bytesCopied, bytesToCopy);
+            first.get(output, bytesCopied, bytesToCopy);
             bytesCopied += bytesToCopy;
             m_totalAvailable -= bytesToCopy;
 
-            if (first.b.remaining() == 0) {
+            if (first.remaining() == 0) {
                 // read an entire block: move it to the empty buffers list
                 m_readBuffers.poll();
-                first.discard();
+                firstC.discard();
             }
         }
     }
@@ -119,16 +121,20 @@ public class NIOReadStream {
         int lastRead = 1;
         try {
             while (bytesRead < maxBytes && lastRead > 0) {
+                ByteBuffer writeBuffer = null;
                 if (m_writeBuffer == null) {
                     m_writeBuffer = pool.acquire();
-                    m_writeBuffer.b.clear();
+                    writeBuffer = m_writeBuffer.b();
+                    writeBuffer.clear();
+                } else {
+                    writeBuffer = m_writeBuffer.b();
                 }
 
-                lastRead = channel.read(m_writeBuffer.b);
+                lastRead = channel.read(writeBuffer);
 
                 // EOF, no data read
                 if (lastRead < 0 && bytesRead == 0) {
-                    if (m_writeBuffer.b.position() == 0) {
+                    if (writeBuffer.position() == 0) {
                         m_writeBuffer.discard();
                         m_writeBuffer = null;
                     }
@@ -138,13 +144,16 @@ public class NIOReadStream {
                 //Data read
                 if (lastRead > 0) {
                     bytesRead += lastRead;
-                    if (!m_writeBuffer.b.hasRemaining()) {
-                        m_writeBuffer.b.flip();
+                    if (!writeBuffer.hasRemaining()) {
+                        writeBuffer.flip();
                         m_readBuffers.add(m_writeBuffer);
                         m_writeBuffer = null;
                     } else {
                         break;
                     }
+                } else if (writeBuffer.position() == 0) {
+                    m_writeBuffer.discard();
+                    m_writeBuffer = null;
                 }
             }
         } finally {

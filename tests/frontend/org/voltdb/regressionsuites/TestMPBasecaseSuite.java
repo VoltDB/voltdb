@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,14 +26,16 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.basecase.eng7181;
 
 public class TestMPBasecaseSuite extends RegressionSuite {
 
-    static final Class<?>[] PROCEDURES = {};
+    static final Class<?>[] PROCEDURES = {eng7181.class};
 
     public TestMPBasecaseSuite(String name) {
         super(name);
@@ -121,8 +123,8 @@ public class TestMPBasecaseSuite extends RegressionSuite {
             assertFalse("Failed to produce violation", true);
         }
         catch (ProcCallException e) {
-            assertEquals("Client response is error.",
-                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
+            assertEquals("Client response is not graceful failure.",
+                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
         }
         // verify initial result is unchanged (transactions!)
         ClientResponse resp = client.callProcedure("SumKey");
@@ -164,6 +166,29 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
     }
 
+    // Validate that if the first thing done by a transaction is a read from a
+    // replicated table, that we don't mistakenly fail to create and use undo
+    // tokens on rollback.
+    public void testEng7181() throws Exception
+    {
+        System.out.println("-------------\n\n testEng7181 \n\n-------------");
+        final Client client = this.getClient();
+        ClientResponse resp = client.callProcedure("CountR1");
+        assertEquals(0, resp.getResults()[0].getRowCount());
+        // Add a row
+        resp = client.callProcedure("eng7181", 42, 0);
+        resp = client.callProcedure("CountR1");
+        assertEquals(1, resp.getResults()[0].getRowCount());
+        try {
+            // do borrow work, then insert, then rollback
+            resp = client.callProcedure("eng7181", 43, 1);
+        }
+        catch (ProcCallException pce) {
+        }
+        // Verify rollback happened
+        resp = client.callProcedure("CountR1");
+        assertEquals(1, resp.getResults()[0].getRowCount());
+    }
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
@@ -171,6 +196,7 @@ public class TestMPBasecaseSuite extends RegressionSuite {
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addStmtProcedure("CountP1", "select count(*) from p1;");
+        project.addStmtProcedure("CountR1", "select * from r1;");
 
         // update non-unique, non-partitioning attribute
         project.addStmtProcedure("UpdateP1", "update p1 set b2 = 2");
@@ -190,12 +216,14 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         project.addStmtProcedure("PartitionViolationUpdate", "update p1 set key = 1");
         project.addStmtProcedure("SumKey", "select sum(key) from p1;");
 
+        project.addProcedures(PROCEDURES);
+
         try {
             project.addLiteralSchema(
-                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
+                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL assumeunique, " +
+                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key)); " +
+                    "PARTITION TABLE P1 ON COLUMN key;"
             );
-            project.addPartitionInfo("p1", "key");
 
             // a replicated table (should not generate procedures).
             project.addLiteralSchema(
@@ -222,13 +250,6 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
-        builder.addServerConfig(config);
-
-        // IV2 CLUSTER
-        config = new LocalCluster("sqltypes-iv2cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
-                false, true); // LocalCluster constructor to enable IV2.  We have to drag along the isRejoinTest arg
-        boolean t4 = config.compile(project);
-        assertTrue(t4);
         builder.addServerConfig(config);
 
         return builder;

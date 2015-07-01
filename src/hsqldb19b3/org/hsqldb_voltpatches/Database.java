@@ -153,6 +153,9 @@ public class Database {
     /** true means filesReadOnly but CACHED and TEXT tables are disallowed */
     private boolean                filesInJar;
     public boolean                 sqlEnforceStrictSize;
+    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    public boolean                sqlConvertTruncate     = true;
+    // END Cherry-picked code change from hsqldb-2.2.8
     private boolean                bIgnoreCase;
     private boolean                bReferentialIntegrity;
     private HsqlDatabaseProperties databaseProperties;
@@ -216,7 +219,7 @@ public class Database {
 
 // oj@openoffice.org - changed to file access api
         String fileaccess_class_name =
-            urlProperties.getProperty("fileaccess_class_name");
+            (String) urlProperties.getProperty("fileaccess_class_name");
 
         if (fileaccess_class_name != null) {
             String storagekey = urlProperties.getProperty("storage_key");
@@ -364,9 +367,6 @@ public class Database {
             lobManager.open();
             dbInfo.setWithContent(true);
         } catch (Throwable e) {
-            e.printStackTrace();
-
-
             logger.closeLog(Database.CLOSEMODE_IMMEDIATELY);
             logger.releaseLock();
             setState(DATABASE_SHUTDOWN);
@@ -556,7 +556,6 @@ public class Database {
      *  Called by the garbage collector on this Databases object when garbage
      *  collection determines that there are no more references to it.
      */
-    @Override
     protected void finalize() {
 
         if (getState() != DATABASE_ONLINE) {

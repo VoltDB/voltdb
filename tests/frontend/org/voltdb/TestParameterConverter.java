@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,6 +27,11 @@ package org.voltdb;
 import junit.framework.TestCase;
 
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
+
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.Date;
 
 
 public class TestParameterConverter extends TestCase
@@ -37,7 +42,7 @@ public class TestParameterConverter extends TestCase
     public void testIntegerToInt() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, int.class, null, new Integer(1));
+            tryToMakeCompatible(int.class, new Integer(1));
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1, ((Integer)r).intValue());
     }
@@ -45,15 +50,23 @@ public class TestParameterConverter extends TestCase
     public void testIntToInt() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, int.class, null, 2);
+            tryToMakeCompatible(int.class, 2);
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(2, ((Integer)r).intValue());
+    }
+
+    public void testIntToLong() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(long.class, -1000);
+        assertTrue("expect long", r instanceof Number);
+        assertEquals(-1000L, ((Number)r).longValue());
     }
 
     public void testStringToInt() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, int.class, null, "1000");
+            tryToMakeCompatible(int.class, "1000");
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1000, ((Integer)r).intValue());
     }
@@ -61,7 +74,7 @@ public class TestParameterConverter extends TestCase
     public void testStringToDouble() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, double.class, null, "34.56");
+            tryToMakeCompatible(double.class, "34.56");
         assertTrue("expect double", r.getClass() == Double.class);
         assertEquals(new Double(34.56), ((Double)r).doubleValue());
     }
@@ -70,7 +83,7 @@ public class TestParameterConverter extends TestCase
     public void testStringWithWhitespaceToDouble() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, double.class, null, "  34.56  ");
+            tryToMakeCompatible(double.class, "  34.56  ");
         assertTrue("expect double", r.getClass() == Double.class);
         assertEquals(new Double(34.56), ((Double)r).doubleValue());
     }
@@ -78,7 +91,7 @@ public class TestParameterConverter extends TestCase
     public void testCommasStringIntegerToInt() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, int.class, null, "1,100");
+            tryToMakeCompatible(int.class, "1,100");
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1100, ((Integer)r).intValue());
     }
@@ -86,7 +99,7 @@ public class TestParameterConverter extends TestCase
     public void testCommasStringIntegerToDouble() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, double.class, null, "2,301,100.23");
+            tryToMakeCompatible(double.class, "2,301,100.23");
         assertTrue("expect integer", r.getClass() == Double.class);
         assertEquals(new Double(2301100.23), ((Double)r).doubleValue());
     }
@@ -94,7 +107,7 @@ public class TestParameterConverter extends TestCase
     public void testNULLToInt() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, int.class, null, null);
+            tryToMakeCompatible(int.class, null);
         assertTrue("expect null integer", r.getClass() == Integer.class);
         assertEquals(VoltType.NULL_INTEGER, r);
     }
@@ -103,17 +116,32 @@ public class TestParameterConverter extends TestCase
     {
         TimestampType t = new TimestampType();
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, TimestampType.class, null, t);
+            tryToMakeCompatible(TimestampType.class, t);
         assertTrue("expect timestamp", r.getClass() == TimestampType.class);
         assertEquals(t, r);
     }
 
     public void testStringToVarBinary() throws Exception
     {
-        String t = "1e3a";
+        String t = "1E3A";
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, byte[].class, null, t);
+            tryToMakeCompatible(byte[].class, t);
         assertTrue("expect varbinary", r.getClass() == byte[].class);
-        //assertEquals(t, Encoder.hexDecode((String)r).toString() );
+        assertEquals(t, Encoder.hexEncode((byte[])r));
+    }
+
+    public void testNulls()
+    {
+        assertEquals(VoltType.NULL_TINYINT, ParameterConverter.tryToMakeCompatible(byte.class, VoltType.NULL_TINYINT));
+        assertEquals(VoltType.NULL_SMALLINT, ParameterConverter.tryToMakeCompatible(short.class, VoltType.NULL_SMALLINT));
+        assertEquals(VoltType.NULL_INTEGER, ParameterConverter.tryToMakeCompatible(int.class, VoltType.NULL_INTEGER));
+        assertEquals(VoltType.NULL_BIGINT, ParameterConverter.tryToMakeCompatible(long.class, VoltType.NULL_BIGINT));
+        assertEquals(VoltType.NULL_FLOAT, ParameterConverter.tryToMakeCompatible(double.class, VoltType.NULL_FLOAT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(TimestampType.class, VoltType.NULL_TIMESTAMP));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Timestamp.class, VoltType.NULL_TIMESTAMP));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Date.class, VoltType.NULL_TIMESTAMP));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(java.sql.Date.class, VoltType.NULL_TIMESTAMP));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(String.class, VoltType.NULL_STRING_OR_VARBINARY));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(BigDecimal.class, VoltType.NULL_DECIMAL));
     }
 }

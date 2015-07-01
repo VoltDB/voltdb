@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -30,12 +30,18 @@ import sys
 import os
 from glob import glob
 from optparse import OptionParser
+from zipfile import ZipFile
 import tempfile
 import shutil
 import subprocess
 import pwd
 import grp
+import re
 from copy import copy
+import string
+
+myname = os.path.splitext(os.path.basename(__file__))[0]
+mydir  = os.path.dirname(os.path.realpath(__file__))
 
 #### Utility functions
 
@@ -53,10 +59,11 @@ def _message(f, tag, *msgs):
             else:
                 # Handle multi-line strings
                 try:
-                    t = msg + ' '   # Throws exception if not string
+                    t = msg + ' '   # Raises TypeError if not a string
                     for msg2 in msg.split('\n'):
                         f.write('%s%s\n' % (stag, msg2))
                 except TypeError:
+                    # Handle mult-string iterators
                     if hasattr(msg, '__iter__'):
                         for msg2 in msg:
                             f.write('%s   %s\n' % (stag, msg2))
@@ -67,7 +74,7 @@ def info(*msgs):
     _message(sys.stdout, 'INFO', *msgs)
 
 def debug(*msgs):
-    if Global.options.debug:
+    if meta is not None and meta.options.debug:
         _message(sys.stdout, 'DEBUG', *msgs)
 
 def warning(*msgs):
@@ -78,11 +85,11 @@ def error(*msgs):
 
 def abort(*msgs):
     error(*msgs)
-    _message(sys.stderr, 'FATAL', 'Errors are fatal, aborting execution')
+    _message(sys.stderr, 'FATAL', 'Giving up.')
     sys.exit(1)
 
 def get_dst_path(*dirs):
-    return os.path.join(Global.options.prefix, *dirs)
+    return os.path.join(meta.options.prefix, *dirs)
 
 def run_cmd(cmd, *args):
     fullcmd = cmd
@@ -91,7 +98,7 @@ def run_cmd(cmd, *args):
             fullcmd += ' "%s"' % arg
         else:
             fullcmd += ' %s' % arg
-    if Global.options.dryrun:
+    if meta.options.dryrun:
         print fullcmd
     else:
         retcode = os.system(fullcmd)
@@ -126,7 +133,6 @@ class ChDir(object):
             debug('Changing back to directory "%s"...' % self.olddir)
             os.chdir(self.olddir)
 
-# http://code.activestate.com/recipes/208993-compute-relative-path-from-one-directory-to-anothe
 def relpath(p1, p2):
     '''Calculate the relative path between two directories.'''
     (common, l1, l2) = commonpath(os.path.realpath(p1).split(os.path.sep),
@@ -147,18 +153,17 @@ def commonpath(l1, l2, common=[]):
         return (common, l1, l2)
     return commonpath(l1[1:], l2[1:], common+[l1[0]])
 
-def find_source_root(path):
-    '''Find the root directory of the source tree containing a specified path.'''
+def find_volt_root(path):
+    '''Find the Volt root directory based on specified path.'''
     if os.path.isdir(path):
         dir = path
     else:
         dir = os.path.dirname(path)
     while dir != '/':
-        if (    os.path.exists(os.path.join(dir, 'build.xml'))
-            and os.path.exists(os.path.join(dir, 'third_party'))):
+        if (glob(os.path.join(dir, 'README.thirdparty*'))):
             return dir
         dir = os.path.dirname(dir)
-    abort('Source root directory not found for "%s".\n' % path)
+    abort('Volt root directory not found starting from "%s".' % path)
 
 def format_debian_description(description):
     '''Reformat the control file description for Debian compatibility.'''
@@ -167,52 +172,60 @@ def format_debian_description(description):
     return '\n'.join(desc_lines[:1] + [' %s' % s for s in desc_lines[1:]])
 
 def fix_ownership(path):
-    '''Recursively change ownership to match the source root owner:group.
-    Allows non-root access to directories and files created as root using sudo.'''
+    '''Recursively change ownership to match the source tree owner:group to
+    allow non-root access to directories/files created as root using sudo.'''
     ### Change output directory and package ownership to match root directory ownership.
-    diruid = os.stat(Global.source_root).st_uid
-    dirgid = os.stat(Global.source_root).st_gid
+    diruid = os.stat(meta.volt_root).st_uid
+    dirgid = os.stat(meta.volt_root).st_gid
     if diruid != os.getuid() or dirgid != os.getgid():
         owner_group = ':'.join((pwd.getpwuid(diruid).pw_name, grp.getgrgid(dirgid).gr_name))
         info('Setting ownership of "%s" to %s...' % (path, owner_group))
         run_cmd('chown', '-R', owner_group, path)
 
-#### Globals
+#### Metadata
 
-class Global:
-    options     = None
-    args        = None
-    mydir       = os.path.dirname(os.path.realpath(__file__))
-    source_root = find_source_root(os.getcwd())
-    script_root = find_source_root(os.path.realpath(__file__))
-    # Get the version number.
-    version = None
-    with open(os.path.join(script_root, 'version.txt')) as f:
-        version = f.readline().strip()
-    assert version is not None
-    # Configure for community vs. pro editions.
-    if os.path.exists(os.path.join(source_root, 'mmt.xml')):
-        edition     = 'voltdb-ent'
-        dist_subdir = os.path.join('obj', 'pro', '%s-%s' % (edition, version))
-    else:
-        edition     = 'voltdb'
-        dist_subdir = os.path.join('obj', 'release', 'dist')
-    # Output directory for Debian package building
-    debian_output_root = os.path.join(source_root, 'obj', 'debian')
-    # Property dictionary used for generating Debian control file.
-    control = dict(
-        pkgname     = edition,
-        pkgrelease  = 1,
-        arch        = 'amd64',
-        provides    = 'voltdb',
-        conflicts   = 'voltdb',
-        replaces    = 'voltdb',
-        depends     = 'default-jdk,libc6',
-        priority    = 'extra',
-        section     = 'database',
-        maintainer  = 'VoltDB',
-        pkgversion  = version,
-        description = format_debian_description('''
+class Metadata:
+    def __init__(self, options, args):
+        self.volt_root   = None
+        self.options     = options
+        self.args        = args
+        self.re_volt_jar = re.compile('^voltdb(client)?-[.0-9]+[.]([\w]+\.)*jar$')
+    def initialize(self, version, volt_root, build_root, output_root, clean_up_items):
+        self.version         = version
+        self.volt_root       = volt_root
+        self.build_root  = build_root
+        self.output_root = output_root
+        self.clean_up_items  = clean_up_items
+        # Detect and configure for community vs. pro edition.
+        if os.path.exists(os.path.join(self.volt_root, 'README.thirdparty.ent')):
+            self.edition = 'voltdb-ent'
+            self.summary = 'VoltDB In-Memory Database Enterprise Edition'
+            self.license = 'Proprietary'
+            src_dist_subdir = os.path.join('obj', 'pro', '%s-%s' % (self.edition, self.version))
+        else:
+            self.edition = 'voltdb'
+            self.summary = 'VoltDB In-Memory Database Community Edition'
+            self.license = 'AGPL'
+            src_dist_subdir = os.path.join('obj', 'release', 'dist')
+        # Detect and configure for distribution vs. source tree.
+        if os.path.isdir(os.path.join(self.volt_root, 'obj')):
+            self.dist_subdir = src_dist_subdir
+        else:
+            self.dist_subdir = ''
+        # Property dictionary used for generating Debian control file.
+        self.deb_control = dict(
+            pkgname     = self.edition,
+            pkgrelease  = 1,
+            arch        = 'amd64',
+            provides    = 'voltdb',
+            conflicts   = 'voltdb',
+            replaces    = 'voltdb',
+            depends     = 'openjdk-7-jdk,libc6',
+            priority    = 'extra',
+            section     = 'database',
+            maintainer  = 'VoltDB',
+            pkgversion  = self.version,
+            description = format_debian_description('''
 VoltDB is a blazingly fast NewSQL database system.
 
 It is specifically designed to run on modern scale-out architectures - fast,
@@ -224,9 +237,9 @@ requiring database throughput that can reach millions of operations per second.
 What's more, the applications that use this data must scale on demand, provide
 flawless fault tolerance and enable real-time visibility into the data that
 drives business value.''')
-    )
-    # Template for generating Debian control file.
-    control_template = '''\
+        )
+        # Template for generating Debian control file.
+        self.deb_control_template = '''\
 Package: %(pkgname)s
 Priority: %(priority)s
 Section: %(section)s
@@ -240,6 +253,108 @@ Conflicts: %(conflicts)s
 Replaces: %(replaces)s
 Description: %(description)s
 '''
+        """
+        Developer Notes: so much of voltdb_install.py is hardwired to install voltdb into a tree like {prefix}/voltdb/...
+        In the future it seems desireable to change this to something like {prefix}/{edition}/...
+        Doing so would eliminate the split between pkgname and voltdbdir
+        Also, link /usr/lib/voltdb... to directory /usr/share/voltdb/lib
+        """
+        self.rpm_control = dict(
+            pkgname     = self.edition,
+            pkgversion  = self.version,
+            pkgrelease  = 1,
+            arch        = 'x86_64',
+            provides    = self.edition,
+            conflicts   = self.edition,
+            summary     = self.summary,
+            license     = self.license,
+            maintainer  = 'VoltDB',
+            prefix      = '/usr',
+            voltdbdir = 'voltdb'
+            )
+
+        self.rpm_control_template = '''\
+%%define        __spec_install_post %%{nil}
+%%define          debug_package %%{nil}
+%%define        voltdbdir %(voltdbdir)s
+
+Summary: %(summary)s
+Name: %(pkgname)s
+Version: %(pkgversion)s
+Release: %(pkgrelease)d
+License: %(license)s
+Group: Applications/Databases
+Distribution: .el6
+SOURCE0 : %%{name}-%%{version}.tar.gz
+Vendor: %(maintainer)s
+URL: http://www.voltdb.com
+Provides: %(provides)s
+Conflicts: %(conflicts)s
+Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
+Requires: java-1.7.0-openjdk
+Requires: java-1.7.0-openjdk-devel
+Summary: VoltDB is a blazingly fast in memory (IMDB) NewSQL database system.
+Prefix: %(prefix)s
+
+# this var is ignored by el6 rpmbuild (but not el5 rpmbuild)
+# el6 rpm uses _buildroot in .rpmmacro to do the same thing
+BuildRoot: %%{_buildrootdir}/%%{name}-%%{version}-%%{release}.%%{_arch}
+
+%%description
+VoltDB is a blazingly fast in memory (IMDB) NewSQL database system.
+
+It is specifically designed to run on modern scale-out architectures - fast,
+inexpensive servers connected via high-speed data networks.
+
+VoltDB is aimed at a new generation of database applications - real-time feeds,
+sensor-driven data streams, micro-transactions, low-latency trading systems -
+requiring database throughput that can reach millions of operations per second.
+What's more, the applications that use this data must scale on demand, provide
+flawless fault tolerance and enable real-time visibility into the data that
+drives business value.
+
+%%prep
+%%setup -q
+
+cat << \EOF > %%{name}-req
+#!/bin/sh
+%%{__perl_requires} $* |\
+sed -e '/perl(.*)/d'
+EOF
+
+%%global __perl_requires %%{_builddir}/%%{name}-%%{version}/%%{name}-req
+chmod +x %%{__perl_requires}
+
+%%build
+
+%%install
+
+%%clean
+
+%%files
+%%defattr(-,root,root,-)
+%%include myfiles
+
+%%post
+echo "To make a copy of the VoltDB sample programs run the command: cp -r %%{prefix}/share/%%{voltdbdir}/examples <your-new-examples-directory>"
+echo "Thanks for installing VoltDB!"
+
+%%postun
+# remove voltdb directory tree
+if [ -n "%%{name}" ]; then
+    rm -rf %%{prefix}/lib/%%{voltdbdir}
+    rm -rf %%{prefix}/share/%%{voltdbdir}
+fi
+
+%%changelog
+* Mon Nov 11 2013  Phil Rosegay <support@voltdb.com> 4.0-1
+- GA-4.0
+* Fri Jan 14 2013  Phil Rosegay <support@voltdb.com> 3.0-1
+- GA-3.0
+'''
+
+# Set in main
+meta = None
 
 #### Command class
 
@@ -253,24 +368,25 @@ class Command(object):
 class Action(object):
 
     def __init__(self, dist_dir_or_glob, dst_dir, recursive = True, link_dir = None):
-        self.src_dir_or_glob = os.path.join(Global.dist_subdir, dist_dir_or_glob)
-        self.dst_dir         = dst_dir
-        self.recursive       = recursive
-        self.link_dir        = link_dir
+        self.dist_dir_or_glob = dist_dir_or_glob
+        self.dst_dir          = dst_dir
+        self.recursive        = recursive
+        self.link_dir         = link_dir
         # Prevent overlapping globs from installing the same thing.
         # Prioritize the first one encountered.
         self.installed = set()
 
     def getcmds(self):
-        if os.path.isdir(self.src_dir_or_glob):
-            src_dir_or_glob = os.path.join(self.src_dir_or_glob, '*')
+        full_dist_dir_or_glob = os.path.join(meta.dist_subdir, self.dist_dir_or_glob)
+        if os.path.isdir(full_dist_dir_or_glob):
+            dist_dir_or_glob = os.path.join(full_dist_dir_or_glob, '*')
         else:
-            src_dir_or_glob = self.src_dir_or_glob
-        for cmd in self.getcmds_glob(src_dir_or_glob, get_dst_path(self.dst_dir)):
+            dist_dir_or_glob = full_dist_dir_or_glob
+        for cmd in self.getcmds_glob(dist_dir_or_glob, get_dst_path(self.dst_dir)):
             yield cmd
 
-    def getcmds_glob(self, src_dir_or_glob, dst_dir):
-        for path in glob(src_dir_or_glob):
+    def getcmds_glob(self, dist_dir_or_glob, dst_dir):
+        for path in glob(dist_dir_or_glob):
             name = os.path.basename(path)
             dst_path = os.path.join(dst_dir, name)
             if os.path.isdir(path):
@@ -282,7 +398,7 @@ class Action(object):
                     opts = '-Dps'
                 else:
                     opts = '-Dp'
-                if Global.options.verbose:
+                if meta.options.verbose:
                     opts += 'v'
                 yield Command(None, 'install', opts, path, dst_path)
                 if self.link_dir is not None:
@@ -291,37 +407,42 @@ class Action(object):
                     link_path = os.path.join(link_dir, name)
                     if not os.path.exists(link_path):
                         opts = '-s'
-                        if Global.options.verbose:
+                        if meta.options.verbose:
                             opts += 'v'
                         yield Command(link_dir, 'ln', opts, relpath(link_dir, dst_path), link_path)
                 self.installed.add(path)
 
     def __str__(self):
-        return ('Action: src_dir_or_glob=%(src_dir_or_glob)s '
+        return ('Action: dist_dir_or_glob=%(dist_dir_or_glob)s '
                 'dst_dir=%(dst_dir)s '
                 'recursive=%(recursive)s '
                 'link_dir=%(link_dir)s') % self.__dict__
 
 #### Installation actions
 
-# Files are only processed once, so order matters here.
+# Files are only processed once. Action order matters.
 actions = (
-    Action('doc',           'usr/share/voltdb/doc'),
-    Action('examples',      'usr/share/voltdb/examples'),
-    Action('tools',         'usr/share/voltdb/tools'),
-    Action('bin/*',         'usr/share/voltdb/bin', link_dir = 'usr/bin'),
-    Action('lib/*',         'usr/lib/voltdb'),
-    Action('voltdb/log4j*', 'usr/share/voltdb/voltdb'),
-    Action('voltdb/*',      'usr/lib/voltdb'),
-    Action('*',             'usr/share/voltdb', recursive = False),
+    Action('doc',                     'usr/share/voltdb/doc'),
+    Action('examples',                'usr/share/voltdb/examples'),
+    Action('tools',                   'usr/share/voltdb/tools'),
+    Action('bin/*',                   'usr/share/voltdb/bin', link_dir = 'usr/bin'),
+    Action('lib/*',                   'usr/lib/voltdb'),
+    Action('management/*.jar',        'usr/lib/voltdb'),
+    Action('management/*.sh',         'usr/share/voltdb/management'),
+    Action('management/*.xml',        'usr/share/voltdb/management'),
+    Action('management/*.properties', 'usr/share/voltdb/management'),
+    Action('third_party/python',      'usr/share/voltdb/third_party/python'),
+    Action('voltdb/log4j*',           'usr/share/voltdb/voltdb'),
+    Action('voltdb/*',                'usr/lib/voltdb'),
+    Action('*',                       'usr/share/voltdb', recursive = False),
 )
 
 #### Install
 
 def install():
     ncommands = 0
-    with ChDir(Global.source_root):
-        info('Installing files to prefix "%s"...' % Global.options.prefix)
+    with ChDir(meta.volt_root):
+        info('Installing files from "%s" to prefix "%s"...' % (meta.volt_root, meta.options.prefix))
         for action in actions:
             debug(str(action))
             for cmd in action.getcmds():
@@ -342,7 +463,7 @@ def uninstall():
     # Remove symlinks in usr/bin from usr/share/voltdb/bin
     bin = get_dst_path('usr/share/voltdb/bin')
     opts = '-rf'
-    if Global.options.verbose:
+    if meta.options.verbose:
         opts += 'v'
     # Delete usr/bin symlinks.
     if os.path.isdir(bin):
@@ -409,22 +530,22 @@ def check():
 def debian():
 
     # Change the working directory to the source root directory.
-    with ChDir(Global.source_root):
+    with ChDir(meta.volt_root):
 
         ### Preparation
-        blddir  = os.path.join(Global.debian_output_root, 'build')
-        debdir  = os.path.join(blddir, 'DEBIAN')
-        Global.options.prefix = blddir
-        if os.path.exists(Global.debian_output_root):
-            info('Removing existing output directory "%s"...' % Global.debian_output_root)
-            if not Global.options.dryrun:
-                fix_ownership(Global.debian_output_root)
-                shutil.rmtree(Global.debian_output_root)
+        blddir = os.path.join(meta.build_root, 'build')
+        debdir = os.path.join(blddir, 'DEBIAN')
+        meta.options.prefix = blddir
+        if os.path.exists(meta.build_root):
+            info('Removing existing output directory "%s"...' % meta.build_root)
+            if not meta.options.dryrun:
+                fix_ownership(meta.build_root)
+                shutil.rmtree(meta.build_root)
 
         ### Installation
         install()
         # End a dry run here after displaying the installation actions.
-        if Global.options.dryrun:
+        if meta.options.dryrun:
             return
 
         ### DEBIAN control file generation
@@ -437,87 +558,289 @@ def debian():
         with open(os.path.join(debdir, 'conffiles'), 'w'):
             pass
         # Perform substitutions with control_template to generate DEBIAN/control.
-        # Merge local and Global symbols.
+        # Merge local and global symbols.
         syms = copy(locals())
-        syms.update(Global.control)
+        syms.update(meta.deb_control)
         with open(os.path.join(debdir, 'control'), 'w') as fout:
-            fout.write(Global.control_template % syms)
+            fout.write(meta.deb_control_template % syms)
 
         ### Package creation
-        pkgfile = os.path.join(Global.debian_output_root,
+        pkgfile = os.path.join(meta.output_root,
                                '%(pkgname)s_%(pkgversion)s-%(pkgrelease)d_%(arch)s.deb' % syms)
         info('Creating Debian package "%s"...' % pkgfile)
         run_cmd('dpkg-deb', '-b', blddir, pkgfile)
 
         ### Cleanup
         # Change to non-root ownership of package build output.
-        fix_ownership(Global.debian_output_root)
-        if not Global.options.keep:
+        fix_ownership(meta.build_root)
+        if not meta.options.keep:
             info('Wiping build directory "%s"...' % blddir)
             shutil.rmtree(blddir)
 
         info('Done creating Debian package: %s' % pkgfile)
 
+def rpm():
+
+    blddir = os.path.join(meta.build_root, 'rpmbuild')
+
+    if os.path.exists(meta.build_root):
+        info('Removing existing output directory "%s"...' % meta.build_root)
+        if not meta.options.dryrun:
+            fix_ownership(meta.build_root)
+            shutil.rmtree(meta.build_root)
+
+    # setup the rpmbuild working tree
+    for D in ["BUILD","SOURCES","RPMS","SPECS","SRPMS", "BUILDROOT"]:
+        p = os.path.join(blddir, D)
+        if not os.path.exists(p):
+            os.makedirs(os.path.join(blddir, D))
+
+    with open(os.path.join(os.environ["HOME"], ".rpmmacros"), 'w') as fout:
+        fout.write("%%_topdir\t%s\n" % blddir)
+        fout.write("%_buildrootdir\t%{_topdir}/BUILDROOT\n")
+        fout.write("%_buildroot\t%{_buildrootdir}/%{name}-%{version}-%{release}.%{_arch}\n")
+
+    # assemble the SPEC file
+    syms = copy(locals())
+    syms.update(meta.rpm_control)
+    with open(os.path.join(blddir, 'SPECS', 'voltdb.spec'), 'w') as fout:
+        fout.write(meta.rpm_control_template % syms)
+
+    voltdb_dist = "%(pkgname)s-%(pkgversion)s" % syms
+    voltdb_build = voltdb_dist + "-%(pkgrelease)d.%(arch)s" % syms
+
+    # stage the voltdb distribution files where rpmbuild needs them
+    buildroot = os.path.join(blddir, "BUILDROOT", voltdb_build)
+    meta.options.prefix = buildroot
+    install()
+
+    # make a list of the files that rpmbuild will package
+    # only FILES that go into the rpm should be listed
+    # watch out for spaces and special characters in the filenames, hence the quotes
+    # also spit out command lists for the %post and %preun sections
+    # that will link/unlink the binaries from /usr/bin
+    with ChDir(buildroot):
+        files = []
+        for l in pipe_cmd("find", ".", "-not", "-type", "d"):
+            files.append(string.lstrip(l, '.'))
+
+        links = []
+        for l in pipe_cmd("find", ".", "-type", "l"):
+            print l
+            links.append(string.lstrip(l, '.'))
+
+    with open(os.path.join(blddir, "SPECS", "myfiles"), 'w') as fout:
+        for f in files:
+            fout.write("\"%s\"\n" % f)
+
+    with open(os.path.join(blddir, "SPECS", "preuncmd"), 'w') as uout:
+        for l in links:
+            uout.write("unlink %s\n" % l)
+
+    # make an empty SOURCE tarball to satisfy rpmbuild's need to build something from source
+    rpm_sources = os.path.join(blddir, "SOURCES")
+    os.mkdir(os.path.join(rpm_sources, voltdb_dist))
+    with ChDir(rpm_sources):
+        run_cmd("tar", "-cf", voltdb_dist+".tar.gz", voltdb_dist)
+        os.rmdir(voltdb_dist)
+
+    # build the rpm
+    with ChDir(os.path.join(blddir, "SPECS")):
+        run_cmd("rpmbuild", "-bb", "voltdb.spec")
+
+    # snag our new package
+    shutil.copy(os.path.join(blddir, "RPMS", "x86_64",
+            '%(pkgname)s-%(pkgversion)s-%(pkgrelease)d.%(arch)s.rpm' % syms),
+                 meta.output_root)
+
 #### Clean package building output
 
 def clean():
-    info('Cleaning package building output in "%s"...' % Global.debian_output_root)
-    if not Global.options.dryrun:
-        shutil.rmtree(Global.debian_output_root)
+    info('Cleaning package building output in "%s"...' % meta.build_root)
+    if not meta.options.dryrun:
+        shutil.rmtree(meta.build_root)
+
+#### Extract distribution tarball
+
+def extract_distribution(tarball):
+    if not os.path.isfile(tarball):
+        abort('Distribution file "%s" does not exist.' % tarball)
+    if not tarball.endswith('.tar.gz'):
+        abort('Distribution file "%s" does not have a "tar.gz" extension.' % tarball)
+    full_path = os.path.realpath(tarball)
+    tmpdir = tempfile.mkdtemp(prefix = '%s_' % myname, suffix = '_tmp')
+    with ChDir(tmpdir):
+        info('Extracting distribution tarball to "%s"...' % tmpdir)
+        retcode = os.system('tar xfz "%s"' % full_path)
+        if retcode != 0:
+            abort('Failed to extract distribution tarball "%s" with return code %d.' %
+                        (full_path, retcode))
+        # Expect it to have a single subdirectory with the distribution.
+        subdirs = [d for d in glob('voltdb*') if os.path.isdir(d)]
+        if len(subdirs) == 0:
+            abort('Did not find a voltdb* subdirectory in the distribution tarball.')
+        if len(subdirs) > 1:
+            abort('Found %d voltdb* subdirectories in the distribution tarball.' % len(subdirs))
+    return tmpdir, os.path.realpath(os.path.join(tmpdir, subdirs[0]))
+
+#### Get version number from a distribution directory
+
+def get_distribution_version(dist_dir):
+    glob_pat = os.path.join(dist_dir, 'voltdb', 'voltdb-*.jar')
+    jars = [jar for jar in glob(glob_pat)
+                if meta.re_volt_jar.match(os.path.basename(jar))]
+    if len(jars) == 0:
+        abort('Could not find "%s" matching pattern "%s".'
+                    % (glob_pat, re_volt_jar.pattern))
+    if len(jars) > 1:
+        abort('Found more than one "%s" matching pattern "%s".'
+                    % (glob_pat, re_volt_jar.pattern))
+    # Read buildstring.txt from the jar file.
+    version = None
+    try:
+        info('Reading buildstring.txt from "%s"...' % jars[0])
+        # see http://bugs.python.org/issue5511 Zipfile() with "with" fixed in python 2.7
+        # changed so it will work with python2.6 only for convenience
+        zip = ZipFile(jars[0])
+        f = zip.open('buildstring.txt')
+        version = f.readline().strip().split()[0]
+        assert version is not None
+    except (IOError, OSError, KeyError), e:
+        abort('Error reading buildstring.txt from "%s".' % jars[0], e)
+    finally:
+        f.close()
+    return version
+
+#### Get the version number from a source tree
+
+def get_source_version(source_root):
+    try:
+        with open(os.path.join(source_root, 'version.txt')) as f:
+            version = f.readline().strip()
+    except (IOError, OSError), e:
+        abort('Error reading version.txt from "%s".' % source_root, e)
+    assert version is not None
+    return version
+
+#### Get the output root directory, e.g. for produced packages
+
+def get_output_root():
+    if not meta.options.output:
+        return os.getcwd()
+    output_root = meta.options.output
+    if not os.path.exists(output_root):
+        try:
+            os.makedirs(output_root)
+        except (IOError, OSError), e:
+            abort('Error creating output directory "%s".' % output_root, e)
+    return output_root
 
 #### Command line main
 
 if __name__ == '__main__':
+
+    # Set up command line interface.
     parser = OptionParser(description = '''\
 This script can install, uninstall, validate an installation, and create
 packages for VoltDB. It uses the working directory to determine the active
 source tree. When creating a package it detects whether the source tree is for
-the pro or the community edition and adjusts the package accordingly.''')
-    parser.set_usage('%prog [OPTIONS]')
+the pro or the community edition and adjusts the package accordingly. If a
+distribution tarball is provided this script uses the distribution tree from
+that tarball instead of the working directory.''')
+    parser.set_usage('%prog [OPTIONS] [DISTRIBUTION_TARBALL]')
     parser.add_option('-C', '--clean', action = 'store_true', dest = 'clean',
                       help = 'clean package building output')
     parser.add_option('-c', '--check', action = 'store_true', dest = 'check',
                       help = 'check VoltDB installation')
     parser.add_option('-D', '--debian', action = 'store_true', dest = 'debian',
-                      help = 'create debian package (in %s)'
-                                % relpath(Global.source_root, Global.debian_output_root))
+                      help = 'create debian package')
     parser.add_option('-d', '--debug', action = 'store_true', dest = 'debug',
                       help = 'display debug messages')
     parser.add_option('-i', '--install', action = 'store_true', dest = 'install',
                       help = 'install VoltDB directly (without creating package)')
     parser.add_option('-k', '--keep', action = 'store_true', dest = 'keep',
-                      help = "keep (don't delete) build directory")
+                      help = "keep (don't delete) temporary directories")
     parser.add_option('-n', '--dry-run', action = 'store_true', dest = 'dryrun',
                       help = 'perform dry run without executing actions')
+    parser.add_option('-o', '--output', type = 'string', dest = 'output',
+                      help = 'create package in the specified output directory')
     parser.add_option('-p', '--prefix', type = 'string', dest = 'prefix', default = '/',
                       help = 'specify prefix directory for installation target (default=/)')
+    parser.add_option('-R', '--rpm', action = 'store_true', dest = 'rpm',
+                      help = 'create rpm package')
     parser.add_option('-u', '--uninstall', action = 'store_true', dest = 'uninstall',
                       help = 'uninstall VoltDB')
     parser.add_option('-v', '--verbose', action = 'store_true', dest = 'verbose',
                       help = 'display verbose messages')
-    (Global.options, Global.args) = parser.parse_args()
-    if len(Global.args) > 0:
+    (options, args) = parser.parse_args()
+    if len(args) > 1:
         error('Bad arguments to command line.')
         parser.print_help()
         abort()
-    # Perform the selected actions.
-    acted = False
-    if Global.options.check:
-        check()
-        acted = True
-    if Global.options.uninstall:
-        uninstall()
-        acted = True
-    if Global.options.clean:
-        clean()
-        acted = True
-    if Global.options.debian:
-        debian()
-        acted = True
-    if Global.options.install:
-        install()
-        acted = True
-    # Warn if no action was selected.
-    if not acted:
-        error('No action was selected')
-        parser.print_help()
+
+    # Metadata initialization is in two phases so that options can be in effect
+    # before running commands to initialize for the distribution.
+    # A single argument optionally specifies a distribution tarball. If not
+    # present the script assumes it's running from inside of a source or
+    # distribution directory tree.
+    # Configure debian package building as needed.
+    meta = Metadata(options, args)
+    clean_up_items = []
+    version = None
+    if len(args) == 1:
+        tmpdir, volt_root = extract_distribution(args[0])
+        output_root = get_output_root()
+        version = get_distribution_version(volt_root)
+        clean_up_items.append(tmpdir)
+        if meta.options.debian:
+            build_root  = tempfile.mkdtemp(prefix = '%s_' % myname, suffix = '_deb')
+            clean_up_items.append(build_root)
+        elif meta.options.rpm:
+            build_root  = tempfile.mkdtemp(prefix = '%s_' % myname, suffix = '_rpmbuild')
+            clean_up_items.append(build_root)
+        else:
+            build_root = None
+    else:
+        source_root  = find_volt_root(os.path.realpath(__file__))
+        version      = get_source_version(source_root)
+        volt_root    = find_volt_root(os.getcwd())
+        if meta.options.debian:
+            build_root   = os.path.join(volt_root, 'obj', 'debian')
+        elif meta.options.rpm:
+            build_root   = os.path.join(volt_root, 'obj', 'rpm')
+        output_root  = build_root
+    meta.initialize(version, volt_root, build_root, output_root, clean_up_items)
+
+    # Perform selected actions.
+    try:
+        acted = False
+        if meta.options.check:
+            check()
+            acted = True
+        if meta.options.uninstall:
+            uninstall()
+            acted = True
+        if meta.options.clean:
+            clean()
+            acted = True
+        if meta.options.debian:
+            debian()
+            acted = True
+        if meta.options.rpm:
+            rpm()
+            acted = True
+        if meta.options.install:
+            install()
+            acted = True
+        # Warn if no action was selected.
+        if not acted:
+            error('No action was selected')
+            parser.print_help()
+
+    # Clean up temporary files and directories.
+    finally:
+        if not meta.options.keep:
+            for clean_up_item in meta.clean_up_items:
+                info('Delete temporary: %s' % clean_up_item)
+                if os.path.exists(clean_up_item):
+                    shutil.rmtree(clean_up_item)

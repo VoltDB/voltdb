@@ -1,25 +1,28 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
 
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
-import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public interface CommandLog {
     /**
@@ -27,33 +30,72 @@ public interface CommandLog {
      * @param context
      * @param txnId
      *            The txnId of the truncation snapshot at the end of restore, or
-     *            Long.MIN if there was none.
+     * @param partitionCount
      */
-    public abstract void init(CatalogContext context, long txnId);
+    public abstract void init(
+                                 CatalogContext context,
+                                 long txnId,
+                                 int partitionCount, String coreBinding,
+                                 Map<Integer, Long> perPartitionTxnId);
 
     /**
     *
-    * @param txnId
-    *            The txnId of the truncation snapshot at the end of restore, or
-    *            Long.MIN if there was none.
-    */
-    public abstract void initForRejoin(CatalogContext context, long txnId, boolean isRejoin);
+     * @param txnId
+     *            The txnId of the truncation snapshot at the end of restore, or
+     *            Long.MIN if there was none.
+     * @param partitionCount
+     */
+    public abstract void initForRejoin(
+                                          CatalogContext context,
+                                          long txnId,
+                                          int partitionCount, boolean isRejoin,
+                                          String coreBinding, Map<Integer, Long> perPartitionTxnId);
 
     public abstract boolean needsInitialization();
 
-    public abstract void log(InitiateTaskMessage message);
+    /*
+     *
+     * The listener is will be provided with the handle once the message is durable.
+     *
+     * Returns a listenable future. If the returned future is null, then synchronous command logging
+     * is in use and durability will be indicated via the durability listener. If the returned future
+     * is not null then async command logging is in use. If the command log isn't falling behind the future
+     * will already be completed, but if the command log is falling behind the future will be completed
+     * when the log successfully writes out enough data to the file (although it won't call fsync since async)
+     */
+    public abstract ListenableFuture<Object> log(
+            Iv2InitiateTaskMessage message,
+            long spHandle,
+            int[] involvedPartitions,
+            DurabilityListener listener,
+            Object durabilityHandle);
 
     public abstract void shutdown() throws InterruptedException;
 
     /**
-     * @param failedInitiators
-     * @param faultedTxns
-     * @return null if the logger is not initialized
+     * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
      */
-    public abstract Semaphore logFault(Set<Long> failedInitiators,
-                                       Set<Long> faultedTxns);
+    public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+            int partitionId, long spHandle);
 
-    public abstract void logHeartbeat(final long txnId);
+    public interface DurabilityListener {
+        public void onDurability(ArrayList<Object> durableThings);
+    }
 
-    public abstract long getFaultSequenceNumber();
+    /**
+     * Is Command logging enabled?
+     */
+    public abstract boolean isEnabled();
+
+    /**
+     * Attempt to start a truncation snapshot
+     * If a truncation snapshot is pending, passing false means don't start another one
+     */
+    public void requestTruncationSnapshot(final boolean queueIfPending);
+
+    /**
+     * Statistics-related interface
+     * Implementation should populate the stats based on column name to index mapping
+     */
+    public void populateCommandLogStats(Map<String, Integer> columnNameToIndex, Object[] rowValues);
 }

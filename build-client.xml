@@ -1,0 +1,319 @@
+<?xml version="1.0" ?>
+<project default="default" name="VoltDB-Client">
+
+<!-- GENERAL HELPER MACROS -->
+<macrodef name="envdefault">
+    <attribute name="prop" />
+    <attribute name="var" />
+    <attribute name="default" />
+    <sequential>
+        <condition property="@{prop}" value="${env.@{var}}" else="@{default}">
+            <isset property="env.@{var}" />
+        </condition>
+    </sequential>
+</macrodef>
+
+<macrodef name="invoke-javac16">
+    <attribute name="srcdir"/>
+    <attribute name="destdir" default="${build.client.dir}"/>
+    <attribute name="excludes" default=""/>
+    <attribute name="includes" default=""/>
+    <sequential>
+        <javac
+            target="1.6"
+            source="1.6"
+            bootclasspath="${vendor.lib.dir}/classes-java1.6.jar"
+            srcdir="@{srcdir}"
+            destdir="@{destdir}"
+            excludes="@{excludes}"
+            includes="@{includes}"
+            encoding='UTF-8'
+            debug='true'
+            includeAntRuntime='false'>
+            <classpath refid="project.classpath" />
+        </javac>
+    </sequential>
+</macrodef>
+
+<tstamp/>
+
+<!-- make environment var foo available as env.foo -->
+<property environment="env"/>
+
+<!-- allow env.VOLTBUILD to override "build" property -->
+<envdefault prop="build" var="VOLTBUILD" default="release" />
+
+<property name='base.dir'                    location='.' />
+<property name='build.dir'                   location='obj/${build}' />
+<property name='build.prod.dir'              location='${build.dir}/prod' />
+<property name='build.client.dir'            location='${build.dir}/clientobj' />
+<property name='build.clientsrc.dir'         location='${build.dir}/clientsrc' />
+<property name='build.test.dir'              location='${build.dir}/test' />
+<property name='build.admin.dir'             location='${build.dir}/admin' />
+<property name='raw.dist.dir'                location='${build.dir}' />
+<property name='dist.dir'                    location='${build.dir}/dist' />
+<property name='doc.dir'                     location='doc' />
+<property name='src.gpl.dir'                 location='src/frontend' />
+<property name='lib.dir'                     location='lib' />
+<property name='vendor.src.dir'              location='third_party/java/src' />
+<property name='vendor.lib.dir'              location='third_party/java/jars' />
+<property name='vendor.cpp.dir'              location='third_party/cpp' />
+<property name='depcache'                    value='.depcache' />
+
+<property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
+
+<!-- os.mac is set when build is running on Mac OSX -->
+<condition property="os.mac">
+    <os family="mac"/>
+</condition>
+
+<path id='project.classpath'>
+    <pathelement location='${build.client.dir}' />
+    <fileset dir='${lib.dir}'>
+        <include name='commons-cli-1.2.jar' />
+    </fileset>
+    <fileset dir='${vendor.lib.dir}'>
+        <include name='javaee-api-6.0.jar' />
+    </fileset>
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<fileset id="vendor.src.files" dir="${vendor.src.dir}"
+        includes="com/google_voltpatches/**/*.java
+                  javax/annotation_voltpatches/**/*.java
+                  org/apache/cassandra_voltpatches/MurmurHash3.java
+                  org/apache/commons/cli_voltpatches/**/*.java
+                  org/apache/hadoop_voltpatches/hbase/utils/DirectMemoryUtils.java
+                  org/apache/hadoop_voltpatches/util/PureJavaCrc*.java
+                  org/apache/jute_voltpatches/**/*.java
+                  org/apache/zookeeper_voltpatches/KeeperException.java
+                  org/cliffc_voltpatches/**/*.java
+                  org/HdrHistogram_voltpatches/**/*.java
+                  org/json_voltpatches/**/*.java
+                  org/voltdb/importer/ImportContext.java
+                  org/voltdb/importer/ImportHandlerProxy.java
+                  org/voltdb/importer/Invocation.java
+                  jsr166y/**/*.java
+                  io/netty_voltpatches/NinjaKeySet.java
+                  "
+/>
+
+<fileset id="client.src.files" dir="${src.gpl.dir}"
+        includes="org/voltcore/logging/Level.java
+                  org/voltcore/logging/VoltLogger.java
+                  org/voltcore/logging/VoltUtilLoggingLogger.java
+                  org/voltcore/network/*.java
+
+                  org/voltcore/utils/CoreUtils.java
+                  org/voltcore/utils/COWMap.java
+                  org/voltcore/utils/COWNavigableSet.java
+                  org/voltcore/utils/COWSortedMap.java
+                  org/voltcore/utils/DBBPool.java
+                  org/voltcore/utils/DeferredSerialization.java
+                  org/voltcore/utils/EstTime.java
+                  org/voltcore/utils/EstTimeUpdater.java
+                  org/voltcore/utils/InstanceId.java
+                  org/voltcore/utils/Pair.java
+                  org/voltcore/utils/RateLimitedLogger.java
+                  org/voltcore/utils/Bits.java
+                  org/voltcore/utils/LatencyWatchdog.java
+                  org/voltcore/utils/CompressionStrategy.java
+                  org/voltcore/utils/VoltTypeUtil.java
+
+                  org/voltdb/CLIConfig.java
+                  org/voltdb/client/**/*.java
+                  org/voltdb/ClientResponseImpl.java
+                  org/voltdb/common/Constants.java
+                  org/voltdb/jdbc/**/*.java
+                  org/voltdb/LatencyBucketSet.java
+                  org/voltdb/ParameterConverter.java
+                  org/voltdb/ParameterSet.java
+                  org/voltdb/PrivateVoltTableFactory.java
+                  org/voltdb/parser/JDBCParser.java
+                  org/voltdb/parser/SQL*.java
+                  org/voltdb/types/TimestampType.java
+                  org/voltdb/types/VoltDecimalHelper.java
+                  org/voltdb/utils/Base64.java
+                  org/voltdb/utils/Encoder.java
+                  org/voltdb/utils/SerializationHelper.java
+                  org/voltdb/utils/RowWithMetaData.java
+                  org/voltdb/utils/BulkLoaderErrorHandler.java
+                  org/voltdb/utils/CSVDataLoader.java
+                  org/voltdb/utils/CSVBulkDataLoader.java
+                  org/voltdb/utils/CSVTupleDataLoader.java
+                  org/voltdb/utils/PosixAdvise.java
+                  org/voltdb/utils/VoltTypeUtil.java
+                  org/voltdb/VoltOverflowException.java
+                  org/voltdb/VoltTable.java
+                  org/voltdb/VoltTableRow.java
+                  org/voltdb/VoltType.java
+                  org/voltdb/VoltTypeException.java
+                  org/voltdb/importer/ImportContext.java
+                  org/voltdb/importer/ImportHandlerProxy.java
+                  org/voltdb/importer/Invocation.java
+                  "
+/>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+
+<target name="default"
+    depends="compile, voltdbclient.jar"
+    description="Compile Java client classes builds the client/jdbc Jarfile."
+/>
+
+<!--
+***************************************
+DISTRIBUTION
+***************************************
+-->
+
+<target name="javadoc">
+    <echo message="Building Client API JavaDoc"/>
+    <!-- populate selected client javadoc documentation -->
+    <javadoc
+        destdir="${doc.dir}/javadoc/java-client-api"
+        access="protected"
+        version="true"
+        use="true"
+        failonerror="true"
+        additionalparam="-quiet"
+        Overview='${src.gpl.dir}/overview-public.html'
+        Windowtitle='VoltDB Client APIs'>
+        <link href="${j2se_api}"/>
+        <classpath refid='project.classpath' />
+        <fileset dir="." defaultexcludes="yes">
+            <include name="src/frontend/org/voltdb/VoltTable.java" />
+            <include name="src/frontend/org/voltdb/VoltTableRow.java" />
+            <include name="src/frontend/org/voltdb/VoltType.java" />
+            <include name="src/frontend/org/voltdb/client/Client.java" />
+            <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
+            <include name="src/frontend/org/voltdb/client/ProcedureCallback.java" />
+            <include name="src/frontend/org/voltdb/client/ClientConfig.java" />
+            <include name="src/frontend/org/voltdb/client/ClientFactory.java" />
+            <include name="src/frontend/org/voltdb/client/SyncCallback.java" />
+            <include name="src/frontend/org/voltdb/client/NullCallback.java" />
+            <include name="src/frontend/org/voltdb/client/ProcCallException.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStatusListenerExt.java" />
+            <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStats.java" />
+            <include name="src/frontend/org/voltdb/client/ClientAffinityStats.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
+            <include name="src/frontend/org/voltdb/types/TimestampType.java" />
+        </fileset>
+    </javadoc>
+</target>
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="Remove all voltdb client artifacts.">
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf ${build.client.dir}'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf voltdb/voltdbclient*.jar'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf doc/javadoc/java-client-api/*'"/>
+  </exec>
+</target>
+
+<!--
+***************************************
+STAGING SOURCE FILES
+***************************************
+-->
+
+<target name="stage_src" >
+  <mkdir dir='${build.client.dir}' />
+  <!-- copy source files -->
+  <copy todir="${build.clientsrc.dir}">
+    <fileset refid="vendor.src.files"/>
+    <fileset refid="client.src.files"/>
+  </copy>
+</target>
+
+
+<!--
+***************************************
+JAR BUILDING
+***************************************
+-->
+
+
+<target name="buildinfo">
+  <loadfile property='dist.version' srcFile='version.txt'>
+      <filterchain><striplinebreaks/></filterchain>
+  </loadfile>
+  <exec dir="." executable="tools/getgitinfo.py">
+      <arg line='${dist.version}' />
+  </exec>
+</target>
+
+<target name="voltdbclient.jar" depends="compile, buildinfo">
+    <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
+        <fileset dir="${build.client.dir}" defaultexcludes="yes" >
+            <include name="**" />
+        </fileset>
+        <fileset dir=".">
+            <include name="buildstring.txt"/>
+        </fileset>
+        <fileset dir="src/frontend">
+            <include name="META-INF/**"/>
+        </fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB Inc." />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB client interface libraries"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar>
+</target>
+
+<target name="maven-jars"
+        description = "makes extra .jar files that get pushed to maven repo"
+        depends="stage_src, javadoc, buildinfo">
+  <jar destfile="${build.dir}/voltdbclient-${dist.version}-javadoc.jar"
+       basedir="${doc.dir}/javadoc/java-client-api"
+       />
+  <jar destfile="${build.dir}/voltdbclient-${dist.version}-sources.jar"
+       basedir="${build.clientsrc.dir}"
+       />
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="compile" description="Compile all Java client source" depends="stage_src">
+
+    <!-- copy resources needed -->
+    <copy todir="${build.client.dir}">
+        <fileset dir="${src.gpl.dir}" includes="org/voltdb/jdbc/**/*.properties"/>
+        <fileset dir="${src.gpl.dir}" includes="org/voltdb/client/**/*.properties"/>
+        <fileset dir="${src.gpl.dir}" includes="org/voltdb/*.properties"/>
+    </copy>
+
+    <invoke-javac16 srcdir="${build.clientsrc.dir}">
+    </invoke-javac16>
+
+</target>
+
+<!-- END PROJECT -->
+</project>

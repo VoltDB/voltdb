@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -46,8 +46,10 @@
 #include <cassert>
 #include <iostream>
 #include "indexes/tableindexfactory.h"
+#include "common/SerializableEEException.h"
 #include "common/types.h"
 #include "catalog/index.h"
+#include "expressions/tuplevalueexpression.h"
 #include "indexes/tableindex.h"
 #include "indexes/indexkey.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
@@ -57,181 +59,239 @@
 
 namespace voltdb {
 
+class TableIndexPicker
+{
+    template <class TKeyType>
+    TableIndex *getInstanceForKeyType() const
+    {
+        if (m_scheme.unique) {
+            if (m_type != BALANCED_TREE_INDEX) {
+                return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
+            } else if (m_scheme.countable) {
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
+            } else {
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
+            }
+        } else {
+            if (m_type != BALANCED_TREE_INDEX) {
+                return new CompactingHashMultiMapIndex<TKeyType >(m_keySchema, m_scheme);
+            } else if (m_scheme.countable) {
+                return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
+            } else {
+                return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
+            }
+        }
+    }
+
+    template <std::size_t KeySize>
+    TableIndex *getInstanceIfKeyFits()
+    {
+        if (m_keySize > KeySize) {
+            return NULL;
+        }
+        if (m_intsOnly) {
+            // The IntsKey size parameter ((KeySize-1)/8 + 1) is calculated to be
+            // the number of 8-byte uint64's required to store KeySize packed bytes.
+            return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
+        }
+        // Generic Key
+        if (m_type == HASH_TABLE_INDEX) {
+            VOLT_INFO("Producing a tree index for %s: "
+                      "hash index not currently supported for this index key.\n",
+                      m_scheme.name.c_str());
+            m_type = BALANCED_TREE_INDEX;
+        }
+        // If any indexed expression value can not either be stored "inline" within a (GenericKey) key tuple
+        // or specifically in a non-inlined object shared with the base table (because it is a simple column value),
+        // then the GenericKey will have to reference and maintain its own persistent non-inline storage.
+        // That's exactly what the GenericPersistentKey subtype of GenericKey does. This incurs extra overhead
+        // for object copying and freeing, so is only enabled as needed.
+        if (m_inlinesOrColumnsOnly) {
+            return getInstanceForKeyType<GenericKey<KeySize> >();
+        }
+        return getInstanceForKeyType<GenericPersistentKey<KeySize> >();
+    }
+
+    template <int ColCount>
+    TableIndex *getInstanceForHashedGenericColumns() const
+    {
+        if (m_scheme.unique) {
+            return new CompactingHashUniqueIndex<GenericKey<ColCount> >(m_keySchema, m_scheme);
+        } else {
+            return new CompactingHashMultiMapIndex<GenericKey<ColCount> >(m_keySchema, m_scheme);
+        }
+    }
+
+
+public:
+
+    TableIndex *getInstance()
+    {
+        TableIndex *result;
+/*
+        if ((!m_intsOnly) && (m_type == HASH_TABLE_INDEX)) {
+            switch (colCount) {
+                case 1: return getInstanceForHashedGenericColumns<1>();
+                case 2: return getInstanceForHashedGenericColumns<2>();
+                case 3: return getInstanceForHashedGenericColumns<3>();
+                case 4: return getInstanceForHashedGenericColumns<4>();
+                case 5: return getInstanceForHashedGenericColumns<5>();
+                case 6: return getInstanceForHashedGenericColumns<6>();
+                default: throwFatalException( "We currently only support up to 6 column generic hash indexes..." );
+            }
+        }
+*/
+
+        if ((result = getInstanceIfKeyFits<4>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<8>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<12>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<16>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<24>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<32>())) {
+            return result;
+        }
+
+        // no int specialization beyond this size (32 bytes == 4 'uint64_t's)
+        m_intsOnly = false;
+        //TODO: short term, throw if scheme uses generalized indexed expressions (m_scheme.indexedExpressions.size() > 0)
+
+        if ((result = getInstanceIfKeyFits<48>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<64>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<96>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<128>())) {
+            return result;
+        }
+        if ((result = getInstanceIfKeyFits<256>())) {
+            return result;
+        }
+
+        if (m_scheme.unique) {
+            if (m_scheme.countable) {
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
+            } else {
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
+            }
+        }
+        if (m_scheme.countable) {
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
+        } else {
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
+        }
+    }
+
+    TableIndexPicker(const TupleSchema *keySchema, bool intsOnly, bool inlinesOrColumnsOnly,
+                     const TableIndexScheme &scheme) :
+        m_scheme(scheme),
+        m_keySchema(keySchema),
+        m_keySize(keySchema->tupleLength()),
+        m_intsOnly(intsOnly),
+        m_inlinesOrColumnsOnly(inlinesOrColumnsOnly),
+        m_type(scheme.type)
+    {}
+
+private:
+    const TableIndexScheme &m_scheme;
+    const TupleSchema *m_keySchema;
+    const int m_keySize;
+    bool m_intsOnly;
+    bool m_inlinesOrColumnsOnly;
+    TableIndexType m_type;
+};
+
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
-    int colCount = (int)scheme.columnIndices.size();
-    bool unique = scheme.unique;
-    bool ints_only = scheme.intsOnly;
-    TableIndexType type = scheme.type;
-    std::vector<int32_t> columnIndices = scheme.columnIndices;
-    voltdb::TupleSchema *tupleSchema = scheme.tupleSchema;
-    std::vector<voltdb::ValueType> keyColumnTypes;
+    const TupleSchema *tupleSchema = scheme.tupleSchema;
+    assert(tupleSchema);
+    bool isIntsOnly = true;
+    bool isInlinesOrColumnsOnly = true;
+    std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
-    std::vector<bool> keyColumnAllowNull(colCount, true);
-    for (int i = 0; i < colCount; ++i) {
-        keyColumnTypes.push_back(tupleSchema->columnType(columnIndices[i]));
-        keyColumnLengths.push_back(tupleSchema->columnLength(columnIndices[i]));
-    }
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
-    TableIndexScheme schemeCopy(scheme);
-    schemeCopy.keySchema = keySchema;
-    VOLT_TRACE("Creating index for %s.\n%s", scheme.name.c_str(), keySchema->debug().c_str());
-    const int keySize = keySchema->tupleLength();
-
-    // no int specialization beyond this point
-    if (keySize > sizeof(int64_t) * 4) {
-        ints_only = false;
-    }
-
-    if ((ints_only) && (type == BALANCED_TREE_INDEX) && (unique)) {
-        if (keySize <= sizeof(uint64_t)) {
-            return new CompactingTreeUniqueIndex<IntsKey<1>, IntsComparator<1>, IntsEqualityChecker<1> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 2) {
-            return new CompactingTreeUniqueIndex<IntsKey<2>, IntsComparator<2>, IntsEqualityChecker<2> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 3) {
-            return new CompactingTreeUniqueIndex<IntsKey<3>, IntsComparator<3>, IntsEqualityChecker<3> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 4) {
-            return new CompactingTreeUniqueIndex<IntsKey<4>, IntsComparator<4>, IntsEqualityChecker<4> >(schemeCopy);
-        } else {
-            throwFatalException("We currently only support tree index on unique integer keys of size 32 bytes or smaller...");
+    std::vector<bool> keyColumnInBytes;
+    size_t valueCount = 0;
+    size_t exprCount = scheme.indexedExpressions.size();
+    if (exprCount != 0) {
+        valueCount = exprCount;
+        // TODO: This is where we could gain some extra runtime and space efficiency by
+        // somehow marking which indexed expressions happen to be non-inlined column expressions.
+        // This case is significant because it presents an opportunity for the GenericPersistentKey
+        // index keys to avoid a persistent allocation and copy of an already persistent value.
+        // This could be implemented as a bool attribute of TupleSchema::ColumnInfo that is only
+        // set to true in this special case. It would universally disable deep copying of that
+        // particular "tuple column"'s referenced object.
+        for (size_t ii = 0; ii < valueCount; ++ii) {
+            ValueType exprType = scheme.indexedExpressions[ii]->getValueType();
+            if ( ! isIntegralType(exprType)) {
+                isIntsOnly = false;
+            }
+            bool inBytes = false;
+            uint32_t declaredLength;
+            if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
+                // Setting the column length to TUPLE_SCHEMA_COLUMN_MAX_VALUE_LENGTH constrains the
+                // maximum length of expression values that can be indexed with the same limit
+                // that gets applied to column values.
+                // In theory, indexed expression values could have an independent limit
+                // up to any length that can be allocated via ThreadLocalPool.
+                // Currently, all of these cases are constrained with the same limit,
+                // which is also the default/maximum size for variable columns defined in schema,
+                // as controlled in java by VoltType.MAX_VALUE_LENGTH.
+                // It's not clear whether scheme.indexedExpressions[ii]->getValueSize()
+                // can or should be called for a more useful answer.
+                // There's probably little to gain since expressions usually do not contain enough information
+                // to reliably determine that the result value is always small enough to "inline".
+                declaredLength = TupleSchema::COLUMN_MAX_VALUE_LENGTH;
+                isInlinesOrColumnsOnly = false;
+                if (exprType == VALUE_TYPE_VARCHAR) {
+                    inBytes = true;
+                }
+            } else {
+                declaredLength = NValue::getTupleStorageSize(exprType);
+            }
+            keyColumnTypes.push_back(exprType);
+            keyColumnLengths.push_back(declaredLength);
+            // Use MAX VARCHAR IN BYTES
+            keyColumnInBytes.push_back(inBytes);
+        }
+    } else {
+        valueCount = scheme.columnIndices.size();
+        for (size_t ii = 0; ii < valueCount; ++ii) {
+            const TupleSchema::ColumnInfo *columnInfo = tupleSchema->getColumnInfo(scheme.columnIndices[ii]);
+            ValueType exprType = columnInfo->getVoltType();
+            if ( ! isIntegralType(exprType)) {
+                isIntsOnly = false;
+            }
+            keyColumnTypes.push_back(exprType);
+            keyColumnLengths.push_back(columnInfo->length);
+            keyColumnInBytes.push_back(columnInfo->inBytes);
         }
     }
+    std::vector<bool> keyColumnAllowNull(valueCount, true);
+    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths,
+            keyColumnAllowNull, keyColumnInBytes);
+    assert(keySchema);
+    VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
+    TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);
+    TableIndex *retval = picker.getInstance();
+    return retval;
+}
 
-    if ((ints_only) && (type == BALANCED_TREE_INDEX) && (!unique)) {
-        if (keySize <= sizeof(uint64_t)) {
-            return new CompactingTreeMultiMapIndex<IntsKey<1>, IntsComparator<1>, IntsEqualityChecker<1> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 2) {
-            return new CompactingTreeMultiMapIndex<IntsKey<2>, IntsComparator<2>, IntsEqualityChecker<2> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 3) {
-            return new CompactingTreeMultiMapIndex<IntsKey<3>, IntsComparator<3>, IntsEqualityChecker<3> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 4) {
-            return new CompactingTreeMultiMapIndex<IntsKey<4>, IntsComparator<4>, IntsEqualityChecker<4> >(schemeCopy);
-        } else {
-            throwFatalException( "We currently only support tree index on non-unique integer keys of size 32 bytes or smaller..." );
-        }
-    }
-
-    if ((ints_only) && (type == HASH_TABLE_INDEX) && (unique)) {
-        if (keySize <= sizeof(uint64_t)) {
-            return new CompactingHashUniqueIndex<IntsKey<1>, IntsHasher<1>, IntsEqualityChecker<1> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 2) {
-            return new CompactingHashUniqueIndex<IntsKey<2>, IntsHasher<2>, IntsEqualityChecker<2> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 3) {
-            return new CompactingHashUniqueIndex<IntsKey<3>, IntsHasher<3>, IntsEqualityChecker<3> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 4) {
-            return new CompactingHashUniqueIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
-        } else {
-            throwFatalException( "We currently only support hash index on unique integer keys of size 32 bytes or smaller..." );
-        }
-    }
-
-    if ((ints_only) && (type == HASH_TABLE_INDEX) && (!unique)) {
-        if (keySize <= sizeof(uint64_t)) {
-            return new CompactingHashMultiMapIndex<IntsKey<1>, IntsHasher<1>, IntsEqualityChecker<1> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 2) {
-            return new CompactingHashMultiMapIndex<IntsKey<2>, IntsHasher<2>, IntsEqualityChecker<2> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 3) {
-            return new CompactingHashMultiMapIndex<IntsKey<3>, IntsHasher<3>, IntsEqualityChecker<3> >(schemeCopy);
-        } else if (keySize <= sizeof(int64_t) * 4) {
-            return new CompactingHashMultiMapIndex<IntsKey<4>, IntsHasher<4>, IntsEqualityChecker<4> >(schemeCopy);
-        } else {
-            throwFatalException( "We currently only support hash index on non-unique integer keys of size 32 bytes of smaller..." );
-        }
-    }
-
-    if (/*(type == BALANCED_TREE_INDEX) &&*/ (unique)) {
-        if (type == HASH_TABLE_INDEX) {
-            VOLT_INFO("Producing a tree index for %s: "
-                      "hash index not currently supported for this index key.\n",
-                      scheme.name.c_str());
-        }
-
-        if (keySize <= 4) {
-            return new CompactingTreeUniqueIndex<GenericKey<4>, GenericComparator<4>, GenericEqualityChecker<4> >(schemeCopy);
-        } else if (keySize <= 8) {
-            return new CompactingTreeUniqueIndex<GenericKey<8>, GenericComparator<8>, GenericEqualityChecker<8> >(schemeCopy);
-        } else if (keySize <= 12) {
-            return new CompactingTreeUniqueIndex<GenericKey<12>, GenericComparator<12>, GenericEqualityChecker<12> >(schemeCopy);
-        } else if (keySize <= 16) {
-            return new CompactingTreeUniqueIndex<GenericKey<16>, GenericComparator<16>, GenericEqualityChecker<16> >(schemeCopy);
-        } else if (keySize <= 24) {
-            return new CompactingTreeUniqueIndex<GenericKey<24>, GenericComparator<24>, GenericEqualityChecker<24> >(schemeCopy);
-        } else if (keySize <= 32) {
-            return new CompactingTreeUniqueIndex<GenericKey<32>, GenericComparator<32>, GenericEqualityChecker<32> >(schemeCopy);
-        } else if (keySize <= 48) {
-            return new CompactingTreeUniqueIndex<GenericKey<48>, GenericComparator<48>, GenericEqualityChecker<48> >(schemeCopy);
-        } else if (keySize <= 64) {
-            return new CompactingTreeUniqueIndex<GenericKey<64>, GenericComparator<64>, GenericEqualityChecker<64> >(schemeCopy);
-        } else if (keySize <= 96) {
-            return new CompactingTreeUniqueIndex<GenericKey<96>, GenericComparator<96>, GenericEqualityChecker<96> >(schemeCopy);
-        } else if (keySize <= 128) {
-            return new CompactingTreeUniqueIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
-        } else if (keySize <= 256) {
-            return new CompactingTreeUniqueIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256> >(schemeCopy);
-        } else {
-            return new CompactingTreeUniqueIndex<TupleKey, TupleKeyComparator, TupleKeyEqualityChecker>(schemeCopy);
-        }
-    }
-
-    if (/*(type == BALANCED_TREE_INDEX) &&*/ (!unique)) {
-        if (type == HASH_TABLE_INDEX) {
-            VOLT_INFO("Producing a tree index for %s: "
-                      "hash index not currently supported for this index key.\n",
-                      scheme.name.c_str());
-        }
-
-        if (keySize <= 4) {
-            return new CompactingTreeMultiMapIndex<GenericKey<4>, GenericComparator<4>, GenericEqualityChecker<4> >(schemeCopy);
-        } else if (keySize <= 8) {
-            return new CompactingTreeMultiMapIndex<GenericKey<8>, GenericComparator<8>, GenericEqualityChecker<8> >(schemeCopy);
-        } else if (keySize <= 12) {
-            return new CompactingTreeMultiMapIndex<GenericKey<12>, GenericComparator<12>, GenericEqualityChecker<12> >(schemeCopy);
-        } else if (keySize <= 16) {
-            return new CompactingTreeMultiMapIndex<GenericKey<16>, GenericComparator<16>, GenericEqualityChecker<16> >(schemeCopy);
-        } else if (keySize <= 24) {
-            return new CompactingTreeMultiMapIndex<GenericKey<24>, GenericComparator<24>, GenericEqualityChecker<24> >(schemeCopy);
-        } else if (keySize <= 32) {
-            return new CompactingTreeMultiMapIndex<GenericKey<32>, GenericComparator<32>, GenericEqualityChecker<32> >(schemeCopy);
-        } else if (keySize <= 48) {
-            return new CompactingTreeMultiMapIndex<GenericKey<48>, GenericComparator<48>, GenericEqualityChecker<48> >(schemeCopy);
-        } else if (keySize <= 64) {
-            return new CompactingTreeMultiMapIndex<GenericKey<64>, GenericComparator<64>, GenericEqualityChecker<64> >(schemeCopy);
-        } else if (keySize <= 96) {
-            return new CompactingTreeMultiMapIndex<GenericKey<96>, GenericComparator<96>, GenericEqualityChecker<96> >(schemeCopy);
-        } else if (keySize <= 128) {
-            return new CompactingTreeMultiMapIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
-        } else if (keySize <= 256) {
-            return new CompactingTreeMultiMapIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256> >(schemeCopy);
-        } else {
-            return new CompactingTreeMultiMapIndex<TupleKey, TupleKeyComparator, TupleKeyEqualityChecker>(schemeCopy);
-        }
-    }
-
-    /*if ((type == HASH_TABLE_INDEX) && (unique)) {
-        switch (colCount) {
-            case 1: return new HashTableUniqueIndex<GenericKey<1>, GenericHasher<1>, GenericEqualityChecker<1> >(schemeCopy);
-            case 2: return new HashTableUniqueIndex<GenericKey<2>, GenericHasher<2>, GenericEqualityChecker<2> >(schemeCopy);
-            case 3: return new HashTableUniqueIndex<GenericKey<3>, GenericHasher<3>, GenericEqualityChecker<3> >(schemeCopy);
-            case 4: return new HashTableUniqueIndex<GenericKey<4>, GenericHasher<4>, GenericEqualityChecker<4> >(schemeCopy);
-            case 5: return new HashTableUniqueIndex<GenericKey<5>, GenericHasher<5>, GenericEqualityChecker<5> >(schemeCopy);
-            case 6: return new HashTableUniqueIndex<GenericKey<6>, GenericHasher<6>, GenericEqualityChecker<6> >(schemeCopy);
-            default: throwFatalException( "We currently only support up to 6 column generic hash indexes..." );
-        }
-    }
-
-    if ((type == HASH_TABLE_INDEX) && (!unique)) {
-        switch (colCount) {
-            case 1: return new HashTableMultiMapIndex<GenericKey<1>, GenericHasher<1>, GenericEqualityChecker<1> >(schemeCopy);
-            case 2: return new HashTableMultiMapIndex<GenericKey<2>, GenericHasher<2>, GenericEqualityChecker<2> >(schemeCopy);
-            case 3: return new HashTableMultiMapIndex<GenericKey<3>, GenericHasher<3>, GenericEqualityChecker<3> >(schemeCopy);
-            case 4: return new HashTableMultiMapIndex<GenericKey<4>, GenericHasher<4>, GenericEqualityChecker<4> >(schemeCopy);
-            case 5: return new HashTableMultiMapIndex<GenericKey<5>, GenericHasher<5>, GenericEqualityChecker<5> >(schemeCopy);
-            case 6: return new HashTableMultiMapIndex<GenericKey<6>, GenericHasher<6>, GenericEqualityChecker<6> >(schemeCopy);
-            default: throwFatalException( "We currently only support up to 6 column generic hash indexes..." );
-        }
-    }*/
-
-    throwFatalException("Unsupported index scheme..." );
-    return NULL;
+TableIndex *TableIndexFactory::cloneEmptyTreeIndex(const TableIndex& pkey_index)
+{
+    return pkey_index.cloneEmptyNonCountingTreeIndex();
 }
 
 }

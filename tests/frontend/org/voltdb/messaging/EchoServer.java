@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,7 +27,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -43,6 +45,7 @@ public class EchoServer {
 
     static void echo(byte[] t, byte[] buffer, int length) {
         VoltType type = null;
+        ByteBuffer buf;
 
         if (t[0] == ARRAY_BEGIN) {
             isArray = true;
@@ -106,12 +109,18 @@ public class EchoServer {
                     fs.writeLong(micros);
                     break;
                 case DECIMAL:
-                    BigDecimal bd = VoltDecimalHelper.deserializeBigDecimal(fds);
-                    VoltDecimalHelper.serializeBigDecimal(bd, fs);
+                    BigDecimal bd = VoltDecimalHelper.deserializeBigDecimal(fds.buffer());
+                    buf = ByteBuffer.allocate(16);
+                    VoltDecimalHelper.serializeBigDecimal(bd, buf);
+                    buf.flip();
+                    fs.write(buf);
                     break;
                 case VOLTTABLE:
-                    VoltTable table = fds.readObject(VoltTable.class);
-                    fs.writeObject(table);
+                    VoltTable table = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(fds.buffer());
+                    buf = ByteBuffer.allocate(table.getSerializedSize());
+                    table.flattenToBuffer(buf);
+                    buf.flip();
+                    fs.write(buf);
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);

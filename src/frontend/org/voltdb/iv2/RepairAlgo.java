@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -20,8 +20,6 @@ package org.voltdb.iv2;
 import java.util.concurrent.Future;
 
 import org.voltcore.messaging.VoltMessage;
-
-import org.voltcore.utils.Pair;
 
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
@@ -48,12 +46,27 @@ import org.voltcore.utils.Pair;
  */
 public interface RepairAlgo
 {
+    public static class RepairResult
+    {
+        public final long m_txnId;
+        public final long m_binaryLogDRId;
+        public final long m_binaryLogUniqueId;
+
+        RepairResult(long txnId, long binaryLogDRId, long binaryLogUniqueId) {
+            m_txnId = txnId;
+            m_binaryLogDRId = binaryLogDRId;
+            m_binaryLogUniqueId = binaryLogUniqueId;
+        }
+    }
+
     /**
      * Start a new RepairAlgo. Returns a future that is done when the
      * leadership has been fully assumed and all surviving replicas have been
      * repaired.
+     *
+     * The return value is the largest seen txnid and largest seen unique id
      */
-    public Future<Pair<Boolean, Long>> start();
+    public Future<RepairResult> start();
 
     public boolean cancel();
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,9 +30,8 @@ import java.util.List;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
+import org.voltdb.StartAction;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
@@ -54,28 +53,20 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     boolean m_compiled = false;
     protected String m_pathToDeployment;
     private File m_pathToVoltRoot = null;
-    private final ArrayList<EEProcess> m_siteProcesses = new ArrayList<EEProcess>();
+    private EEProcess m_siteProcess = null;
+    private int m_adminPort;
 
     public LocalSingleProcessServer(String jarFileName, int siteCount,
                                     BackendTarget target)
     {
         assert(jarFileName != null);
         assert(siteCount > 0);
-        final String buildType = System.getenv().get("BUILD");
         m_jarFileName = Configuration.getPathToCatalogForTest(jarFileName);
         m_siteCount = siteCount;
-        if (buildType == null) {
-            m_target = target;
+        if (LocalCluster.isMemcheckDefined() && target.equals(BackendTarget.NATIVE_EE_JNI)) {
+            m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
         } else {
-            if (buildType.startsWith("memcheck")) {
-                if (target.equals(BackendTarget.NATIVE_EE_JNI)) {
-                    m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
-                } else {
-                    m_target = target;//For memcheck
-                }
-            } else {
-                m_target = target;
-            }
+            m_target = target;
         }
     }
 
@@ -125,11 +116,17 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         if (m_compiled) {
             return true;
         }
+        m_adminPort = adminPort;
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
                                      adminPort, adminOnStartup);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 
+    }
+
+    @Override
+    public int getListenerCount() {
+        return 1;
     }
 
     @Override
@@ -140,6 +137,20 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         ArrayList<String> listeners = new ArrayList<String>();
         listeners.add("localhost");
         return listeners;
+    }
+
+    @Override
+    public String getListenerAddress(int hostId) {
+        if (m_server == null)
+            return null;
+        return "localhost";
+    }
+
+    @Override
+    public String getAdminAddress(int hostId) {
+        if (m_server == null)
+            return null;
+        return "localhost:" + m_adminPort;
     }
 
     @Override
@@ -166,10 +177,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public void shutDown() throws InterruptedException {
         m_server.shutdown();
-        for (EEProcess proc : m_siteProcesses) {
-            proc.waitForShutdown();
-        }
-        m_siteProcesses.clear();
+        m_siteProcess.waitForShutdown();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             if (!EEProcess.m_valgrindErrors.isEmpty()) {
                 String failString = "";
@@ -201,16 +209,10 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         // m_jarFileName is already prefixed with test output path.
         config.m_pathToCatalog = m_jarFileName;
         config.m_pathToDeployment = m_pathToDeployment;
-        config.m_startAction = START_ACTION.CREATE;
-        config.m_enableIV2 = VoltDB.checkTestEnvForIv2();
+        config.m_startAction = StartAction.CREATE;
 
-        config.m_ipcPorts = java.util.Collections.synchronizedList(new ArrayList<Integer>());
-        for (int ii = 0; ii < m_siteCount; ii++) {
-            m_siteProcesses.add(new EEProcess(m_target, "LocalSingleProcessServer_site_" + ii + ".log"));
-        }
-        for (EEProcess proc : m_siteProcesses) {
-            config.m_ipcPorts.add(proc.port());
-        }
+        m_siteProcess = new EEProcess(m_target, m_siteCount, "LocalSingleProcessServer.log");
+        config.m_ipcPort = m_siteProcess.port();
 
         m_server = new ServerThread(config);
         m_server.start();
@@ -241,5 +243,14 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public List<File> listFiles(File path) throws IOException {
         throw new UnsupportedOperationException();
+    }
+    @Override
+    public File[] getPathInSubroots(File path) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int getLogicalPartitionCount() {
+        return 1;
     }
 }

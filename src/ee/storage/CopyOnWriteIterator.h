@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #ifndef COPYONWRITEITERATOR_H_
@@ -24,14 +24,17 @@
 
 namespace voltdb {
 class PersistentTable;
+class PersistentTableSurgeon;
 
 class CopyOnWriteIterator : public TupleIterator {
     friend class CopyOnWriteContext;
+
 public:
+
     CopyOnWriteIterator(
         PersistentTable *table,
-        TBMapI start,
-        TBMapI end);
+        PersistentTableSurgeon *surgeon,
+        TBMap blocks);
 
     /**
      * When a tuple is "dirty" it is still active, but will never be a "found" tuple
@@ -59,6 +62,9 @@ public:
     bool next(TableTuple &out);
 
     virtual ~CopyOnWriteIterator() {}
+
+    int64_t countRemaining() const;
+
 private:
     /**
      * Table being iterated over
@@ -66,8 +72,14 @@ private:
     PersistentTable *m_table;
 
     /**
+     * "Surgeon" that can perform deep changes to table.
+     */
+    PersistentTableSurgeon *m_surgeon;
+
+    /**
      * Index of the current block being iterated over
      */
+    TBMap m_blocks;
     TBMapI m_blockIterator;
     TBMapI m_end;
 
@@ -85,6 +97,9 @@ private:
 
     uint32_t m_blockOffset;
     TBPtr m_currentBlock;
+public:
+    int32_t m_skippedDirtyRows;
+    int32_t m_skippedInactiveRows;
 };
 }
 

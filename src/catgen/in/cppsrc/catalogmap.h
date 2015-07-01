@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,10 +22,14 @@
 #ifndef CATALOG_CATALOG_MAP_H_
 #define CATALOG_CATALOG_MAP_H_
 
+#include <boost/algorithm/string.hpp> // for boost::to_upper(std::string)
+
 #include <map>
 #include <string>
 
 namespace catalog {
+
+const char MAP_SEPARATOR = '#';
 
 class Catalog;
 class CatalogType;
@@ -63,11 +67,6 @@ public:
     T * get(const std::string &name) const;
 
     /**
-     * Get the nth item in the map in lexographical (en/us for now) order
-     */
-    T * getAtRelativeIndex(int32_t relativeIndex) const;
-
-    /**
      * How many items are in the map?
      * @return The number of items in the map
      */
@@ -102,9 +101,11 @@ CatalogMap<T>::CatalogMap(Catalog *globalCatalog, CatalogType *parent, const std
 
 template <class T>
 T * CatalogMap<T>::add(const std::string &name) {
-    std::string newPath = m_path + "[" + name + "]";
-    T *retval = new T(m_catalog, m_parent, newPath, name);
-    m_items[name] = retval;
+    std::string childPath = m_path + MAP_SEPARATOR + name;
+    T *retval = new T(m_catalog, m_parent, childPath, name);
+    std::string mapKey = name;
+    boost::to_upper(mapKey);
+    m_items[mapKey] = retval;
 
     // assign all the children of this map a relative index
     int index = 1;
@@ -117,8 +118,9 @@ T * CatalogMap<T>::add(const std::string &name) {
 
 template <class T>
 bool CatalogMap<T>::remove(const std::string &name) {
-    typename std::map<std::string, T*>::iterator iter;
-    iter = m_items.find(name);
+    std::string mapKey = name;
+    boost::to_upper(mapKey);
+    typename std::map<std::string, T*>::iterator iter = m_items.find(mapKey);
     if (iter == m_items.end()) {
         return false;
     }
@@ -136,16 +138,10 @@ bool CatalogMap<T>::remove(const std::string &name) {
 
 template <class T>
 T * CatalogMap<T>::get(const std::string &name) const {
-    return (m_items.find(name) == m_items.end() ? NULL : m_items.find(name)->second);
-}
-
-template <class T>
-T * CatalogMap<T>::getAtRelativeIndex(int32_t relativeIndex) const {
-    typename std::map<std::string, T*>::const_iterator iter;
-    for (iter = m_items.begin(); iter != m_items.end(); iter++)
-        if (iter->second->m_relativeIndex == relativeIndex)
-            return iter->second;
-    return NULL;
+    std::string mapKey = name;
+    boost::to_upper(mapKey);
+    const typename std::map<std::string, T*>::const_iterator found = m_items.find(mapKey);
+    return (found == m_items.end()) ? NULL : found->second;
 }
 
 template <class T>
@@ -169,7 +165,14 @@ void CatalogMap<T>::clear() {
     m_items.clear();
 }
 
-
 } // namespace catalog
+
+// Workaround for type inference when applying BOOST_FOREACH to const CatalogMaps.
+// @See http://www.boost.org/doc/libs/1_35_0/doc/html/foreach/extensibility.html
+#define ENABLE_BOOST_FOREACH_ON_CONST_MAP(CatalogClass)                                  \
+namespace boost {                                                                        \
+    template<> struct range_const_iterator< catalog::CatalogMap<catalog::CatalogClass> > \
+    { typedef catalog::CatalogMap<catalog::CatalogClass>::field_map_iter type; };        \
+}
 
 #endif // CATALOG_CATALOG_MAP_H_

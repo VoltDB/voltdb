@@ -1,32 +1,30 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.expressions;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 public class AggregateExpression extends AbstractExpression {
 
     /** True if this aggregate requires distinct: e.g. count(distinct A) */
-    public boolean m_distinct = false;
+    private boolean m_distinct = false;
 
     public AggregateExpression(ExpressionType type) {
         super(type);
@@ -39,8 +37,27 @@ public class AggregateExpression extends AbstractExpression {
         super();
     }
 
+    public void setDistinct() { m_distinct = true; }
+    public boolean isDistinct() { return m_distinct;  }
+
     @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
+    public boolean equals(Object obj) {
+        if(super.equals(obj) == false) return false;
+
+        if (obj instanceof AggregateExpression == false) return false;
+        AggregateExpression expr = (AggregateExpression) obj;
+        if (m_distinct != expr.isDistinct()) return false;
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = super.hashCode();
+        result += new HashCodeBuilder(17, 31).append(m_distinct).toHashCode();
+        return result;
+    }
+
 
     @Override
     public void finalizeValueTypes()
@@ -79,6 +96,16 @@ public class AggregateExpression extends AbstractExpression {
         default:
             throw new RuntimeException("ERROR: Invalid Expression type '" + type + "' for Expression '" + this + "'");
         }
+    }
+
+    @Override
+    public String explain(String impliedTableName) {
+        ExpressionType type = getExpressionType();
+        if (type == ExpressionType.AGGREGATE_COUNT_STAR) {
+            return "COUNT(*)";
+        }
+        return type.symbol() + ( m_distinct ? " DISTINCT(" : "(" ) +
+            m_left.explain(impliedTableName) + ")";
     }
 
 }

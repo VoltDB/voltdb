@@ -259,7 +259,12 @@ public class Types {
      * to as a type code, that identifies the generic SQL type
      * <code>FLOAT</code>.
      */
+    // A VoltDB extension to disable "FLOAT" as an actual type vs. an alias for DOUBLE
     public static final int FLOAT = SQL_DOUBLE;
+    /* disable 1 line ...
+    public static final int FLOAT = SQL_FLOAT;
+    ... disabled 1 line */
+    // End of VoltDB extension
 
     /**
      * <P>The constant in the Java programming language, sometimes referred
@@ -811,7 +816,12 @@ public class Types {
                 return "DISTINCT";
 
             case Types.SQL_DOUBLE :
+                // A VoltDB extension to force the DOUBLE type to self-identify as "FLOAT"
                 return "FLOAT";
+                /* disable 1 line ...
+                return "DOUBLE";
+                ... disabled 1 line */
+                // End of VoltDB extension
 
             case Types.SQL_FLOAT :
                 return "FLOAT";
@@ -1142,12 +1152,12 @@ public class Types {
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
 
-                // but wrapped by org.hsqldb.Binary
+                // but wrapped by org.hsqldb_voltpatches.Binary
                 return "[B";
 
             case Types.OTHER :
 
-                // but wrapped by org.hsqldb.JavaObject
+                // but wrapped by org.hsqldb_voltpatches.JavaObject
                 return "java.lang.Object";
 
             case Types.SQL_BOOLEAN :

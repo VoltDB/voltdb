@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -50,6 +50,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ProgressMonitorProxy.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
@@ -68,7 +69,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
     assert(node);
-    assert(node->getInputTables().size() == 1);
+    assert(node->getInputTableCount() == 1);
 
     assert(node->getChildren()[0] != NULL);
 
@@ -78,14 +79,23 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
     node->
         setOutputTable(TableFactory::
                        getCopiedTempTable(node->databaseId(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[0],
+                                          node->getInputTable()->name(),
+                                          node->getInputTable(),
                                           limits));
 
     // pickup an inlined limit, if one exists
     limit_node =
         dynamic_cast<LimitPlanNode*>(node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+
+#if defined(VOLT_LOG_LEVEL)
+#if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
+    const std::vector<AbstractExpression*>& sortExprs = node->getSortExpressions();
+    for (int i = 0; i < sortExprs.size(); ++i) {
+        VOLT_TRACE("Sort key[%d]:\n%s", i, sortExprs[i]->debug(true).c_str());
+    }
+#endif
+#endif
 
     return true;
 }
@@ -138,9 +148,9 @@ OrderByExecutor::p_execute(const NValueArray &params)
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
+    TempTable* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     //
@@ -154,25 +164,31 @@ OrderByExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
-    // substitute parameters in the order by expressions
-    for (int i = 0; i < node->getSortExpressions().size(); i++) {
-        node->getSortExpressions()[i]->substitute(params);
-    }
-
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
+    ProgressMonitorProxy pmp(m_engine, this);
     while (iterator.next(tuple))
     {
+        pmp.countdownProgress();
         assert(tuple.isActive());
         xs.push_back(tuple);
     }
     VOLT_TRACE("\n***** Input Table PreSort:\n '%s'",
                input_table->debug().c_str());
-    sort(xs.begin(), xs.end(), TupleComparer(node->getSortExpressions(),
-                                             node->getSortDirections()));
+
+
+    if (limit >= 0 && xs.begin() + limit + offset < xs.end()) {
+        // partial sort
+        partial_sort(xs.begin(), xs.begin() + limit + offset, xs.end(),
+                TupleComparer(node->getSortExpressions(), node->getSortDirections()));
+    } else {
+        // full sort
+        sort(xs.begin(), xs.end(),
+                TupleComparer(node->getSortExpressions(), node->getSortDirections()));
+    }
 
     int tuple_ctr = 0;
     int tuple_skipped = 0;
@@ -188,14 +204,8 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
         VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
                    input_table->debug().c_str());
-        if (!output_table->insertTuple(*it))
-        {
-            VOLT_ERROR("Failed to insert order-by tuple from input table '%s'"
-                       " into output table '%s'",
-                       input_table->name().c_str(),
-                       output_table->name().c_str());
-            return false;
-        }
+        output_table->insertTupleNonVirtual(*it);
+        pmp.countdownProgress();
         //
         // Check whether we have gone past our limit
         //
@@ -204,6 +214,8 @@ OrderByExecutor::p_execute(const NValueArray &params)
         }
     }
     VOLT_TRACE("Result of OrderBy:\n '%s'", output_table->debug().c_str());
+
+    cleanupInputTempTable(input_table);
 
     return true;
 }

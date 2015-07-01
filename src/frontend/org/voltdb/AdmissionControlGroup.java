@@ -1,25 +1,33 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
 
-
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.HdrHistogram_voltpatches.Histogram;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
+import org.voltdb.dtxn.LatencyStats;
 
 /**
  * Manage admission control for incoming requests by tracking the size of outstanding requests
@@ -76,9 +84,23 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     {
         public void onBackpressure();
         public void offBackpressure();
+        public long connectionId();
     }
 
+
+
     private final HashSet<ACGMember> m_members = new HashSet<ACGMember>();
+
+    /*
+     * Reads/writes to the actual InvocationInfo are unsynchronized. There is a single writer
+     * so no issues there, but the reader is unprotected.
+     *
+     * There is only one writer so a single stripe is fine
+     */
+    private final ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
+                 new ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>(1024, .75f, 1);
+
+    private final AbstractHistogram m_latencyInfo = LatencyStats.constructHistogram(true);
 
     public AdmissionControlGroup(int maxBytes, int maxRequests)
     {
@@ -113,6 +135,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         m_members.remove(member);
+        m_connectionStates.remove(member.connectionId());
     }
 
     /*
@@ -158,11 +181,10 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
                             "the next time the condition occurs to avoid log spam");
                 }
                 if (badPendingBytes) {
-                    networkLog.error("Admission control error, negative outstanding transaction byte count (" +
-                            m_pendingTxnBytes + "). " +
-                            "This is error is not fatal, but it does indicate that admission control " +
-                            "is not correctly tracking transaction resource usage. This message will not repeat " +
-                            "the next time the condition occurs to avoid log spam");
+                    networkLog.error(
+                            "Backpressure reports a negative outstanding transaction byte count (" +
+                            m_pendingTxnBytes +
+                            "). No action required.");
                 }
             }
 
@@ -187,11 +209,13 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         if (messageSize < 1) {
             throw new IllegalArgumentException("Message size must be > 0 but was " + messageSize);
         }
+
         m_pendingTxnBytes -= messageSize;
         m_pendingTxnCount--;
         checkAndLogInvariants();
-        if (m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES &&
-            m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS)
+
+        if ((m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES) &&
+            (m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS))
         {
             if (m_hadBackPressure) {
                 hostLog.debug("TXN backpressure ended");
@@ -211,6 +235,14 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         return m_hadBackPressure;
     }
 
+    /**
+     * Used by tests.
+     * @return
+     */
+    public long getPendingBytes() {
+        return m_pendingTxnBytes;
+    }
+
     /*
      * Invoked when queueing response bytes back to a connection. Can be invoked with positive/negative
      * values to indicate whether data is being flushed or added. The same resource pool counter is used
@@ -222,33 +254,65 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      */
     @Override
     public boolean queue(int bytes) {
-        if (bytes > 0) {
-            m_pendingTxnBytes += bytes;
-            checkAndLogInvariants();
-            if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES) {
-                if (!m_hadBackPressure) {
-                    hostLog.debug("TXN back pressure began");
-                    m_hadBackPressure = true;
-                    for (ACGMember m : m_members) {
-                        m.onBackpressure();
-                    }
+        m_pendingTxnBytes += bytes;
+        checkAndLogInvariants();
+
+        if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES) {
+            if (!m_hadBackPressure) {
+                hostLog.debug("TXN back pressure began");
+                m_hadBackPressure = true;
+                for (ACGMember m : m_members) {
+                    m.onBackpressure();
                 }
             }
-        } else {
-            m_pendingTxnBytes += bytes;
-            checkAndLogInvariants();
-            if (m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES &&
-                    m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS) {
-                if (m_hadBackPressure) {
-                    hostLog.debug("TXN backpressure ended");
-                    m_hadBackPressure = false;
-                    for (ACGMember m : m_members) {
-                        m.offBackpressure();
-                    }
+        }
+        else if ((m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES) &&
+                (m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS)) {
+            if (m_hadBackPressure) {
+                hostLog.debug("TXN backpressure ended");
+                m_hadBackPressure = false;
+                for (ACGMember m : m_members) {
+                    m.offBackpressure();
                 }
             }
         }
 
         return false;
+    }
+
+    public void logTransactionCompleted(
+            long connectionId,
+            String connectionHostname,
+            String procedureName,
+            long deltaNanos,
+            byte status) {
+        boolean needToInsert = false;
+        Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
+        if (procInfoMap == null) {
+            procInfoMap = new NonBlockingHashMap<String, InvocationInfo>();
+            needToInsert = true;
+        }
+        InvocationInfo info = procInfoMap.get(procedureName);
+        if(info == null){
+            info = new InvocationInfo(connectionHostname);
+            procInfoMap.put(procedureName, info);
+        }
+        info.processInvocation((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos), status);
+        // ENG-7209 This is to not log the latency value for a snapshot restore, as this just creates
+        // a large initial value in the graph which is not actually relevant to the user.
+        if (!procedureName.equals("@SnapshotRestore")) {
+            m_latencyInfo.recordValue(Math.max(1, Math.min(TimeUnit.NANOSECONDS.toMicros(deltaNanos), m_latencyInfo.getHighestTrackableValue())));
+        }
+        if (needToInsert) {
+            m_connectionStates.put(connectionId, procInfoMap);
+        }
+    }
+
+    public Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> getInitiationStatsIterator() {
+        return m_connectionStates.entrySet().iterator();
+    }
+
+    public AbstractHistogram getLatencyInfo() {
+        return m_latencyInfo;
     }
 }

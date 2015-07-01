@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -72,12 +72,12 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
         //
         // Just copy the table schema of our input table
         //
-        assert(node->getInputTables().size() == 1);
+        assert(node->getInputTableCount() == 1);
         node->
             setOutputTable(TableFactory::
                            getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
+                                              node->getInputTable()->name(),
+                                              node->getInputTable(),
                                               limits));
     }
     return true;
@@ -90,7 +90,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     //
@@ -98,31 +98,35 @@ LimitExecutor::p_execute(const NValueArray &params)
     // we have copy enough tuples for the limit specified by the node
     //
     TableTuple tuple(input_table->schema());
-    TableIterator iterator = input_table->iterator();
-    int tuple_ctr = 0;
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
 
-    int limit = 0, offset = 0;
+    int tuple_ctr = 0;
+    int tuples_skipped = 0;
+    int limit = -1;
+    int offset = -1;
     node->getLimitAndOffsetByReference(params, limit, offset);
 
-    bool start = (offset == 0);
-    while (iterator.next(tuple) && (tuple_ctr < limit))
+    while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
     {
         // TODO: need a way to skip / iterate N items.
-        if (start) {
-            if (!output_table->insertTuple(tuple))
-            {
-                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                           " output table '%s'",
-                           input_table->name().c_str(),
-                           output_table->name().c_str());
-                return false;
-            }
-            tuple_ctr++;
-        } else
+        if (tuples_skipped < offset)
         {
-            start = (iterator.getLocation() >= offset);
+            tuples_skipped++;
+            continue;
+        }
+        tuple_ctr++;
+
+        if (!output_table->insertTuple(tuple))
+        {
+            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                       " output table '%s'",
+                       input_table->name().c_str(),
+                       output_table->name().c_str());
+            return false;
         }
     }
+
+    cleanupInputTempTable(input_table);
 
     return true;
 }

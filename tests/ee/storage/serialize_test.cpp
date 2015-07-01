@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -65,7 +65,6 @@
 #define TUPLES 20
 
 using namespace std;
-using namespace boost;
 using namespace voltdb;
 
 #define NUM_OF_COLUMNS 6
@@ -73,10 +72,11 @@ ValueType col_types[NUM_OF_COLUMNS] = { VALUE_TYPE_TINYINT, VALUE_TYPE_BIGINT, V
 
 class TableSerializeTest : public Test {
     public:
-        TableSerializeTest() {
+        TableSerializeTest() :
+          columnNames(NUM_OF_COLUMNS)
+        {
             this->database_id = 1000;
 
-            columnNames = new std::string[NUM_OF_COLUMNS];
             std::vector<voltdb::ValueType> columnTypes;
             std::vector<int32_t> columnSizes;
             std::vector<bool> columnAllowNull(NUM_OF_COLUMNS, false);
@@ -89,9 +89,8 @@ class TableSerializeTest : public Test {
                 columnSizes.push_back(static_cast<int32_t>(size));
                 columnTypes.push_back(col_types[ctr]);
             }
-            voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
-            table_ = TableFactory::getTempTable(this->database_id, "temp_table",
-                                                schema, columnNames, NULL);
+            voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnAllowNull);
+            table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
 
             for (int64_t i = 1; i <= TUPLES; ++i) {
                 TableTuple &tuple = table_->tempTuple();
@@ -112,13 +111,12 @@ class TableSerializeTest : public Test {
         ~TableSerializeTest() {
             table_->deleteAllTuples(true);
             delete table_;
-            delete []columnNames;
         }
     protected:
         CatalogId database_id;
         CatalogId table_id;
         Table* table_;
-        std::string *columnNames;
+        std::vector<std::string> columnNames;
 };
 
 
@@ -136,12 +134,10 @@ TEST_F(TableSerializeTest, RoundTrip) {
     size_t size = serialize_out.size();
 
     // Deserialize the table: verify that it matches the existing table
-    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
-    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo",
-                                                     schema, columnNames,
-                                                     &limits);
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
     deserialized->loadTuplesFrom(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
@@ -162,16 +158,15 @@ TEST_F(TableSerializeTest, RoundTrip) {
 }
 
 TEST_F(TableSerializeTest, NullStrings) {
-    std::string *columnNames = new std::string[1];
+    std::vector<std::string> columnNames(1);
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_VARCHAR);
     std::vector<int32_t> columnSizes(1, 20);
     std::vector<bool> columnAllowNull(1, false);
-    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
+    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnAllowNull);
     columnNames[0] = "";
     table_->deleteAllTuples(true);
     delete table_;
-    table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema,
-                                        columnNames, NULL);
+    table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
 
     TableTuple& tuple = table_->tempTuple();
     tuple.setNValue(0, ValueFactory::getNullStringValue());
@@ -182,11 +177,10 @@ TEST_F(TableSerializeTest, NullStrings) {
     table_->serializeTo(serialize_out);
 
     // Deserialize the table: verify that it matches the existing table
-    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
     TempTableLimits limits;
     schema = TupleSchema::createTupleSchema(table_->schema());
-    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema,
-                                                     columnNames, &limits);
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
     deserialized->loadTuplesFrom(serialize_in, NULL);
 
     EXPECT_EQ(1, deserialized->activeTupleCount());
@@ -197,14 +191,16 @@ TEST_F(TableSerializeTest, NullStrings) {
     EXPECT_EQ("", deserialized->columnName(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, table_->schema()->columnType(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, deserialized->schema()->columnType(0));
-    EXPECT_EQ(true, table_->schema()->columnIsInlined(0));
+    EXPECT_EQ(false, table_->schema()->columnIsInlined(0));
 
     TableIterator iter = deserialized->iterator();
     TableTuple t(deserialized->schema());
     int count = 0;
     while (iter.next(t)) {
-        EXPECT_EQ(VALUE_TYPE_VARCHAR, tuple.getType(0));
-        EXPECT_EQ(VALUE_TYPE_VARCHAR, t.getType(0));
+        const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(0);
+        EXPECT_EQ(VALUE_TYPE_VARCHAR, columnInfo->getVoltType());
+        const TupleSchema::ColumnInfo *tcolumnInfo = t.getSchema()->getColumnInfo(0);
+        EXPECT_EQ(VALUE_TYPE_VARCHAR, tcolumnInfo->getVoltType());
         EXPECT_TRUE(tuple.getNValue(0).isNull());
         EXPECT_TRUE(t.getNValue(0).isNull());
         EXPECT_TRUE(ValueFactory::getNullStringValue().op_equals(tuple.getNValue(0)).isTrue());
@@ -213,8 +209,6 @@ TEST_F(TableSerializeTest, NullStrings) {
     }
     EXPECT_EQ(1, count);
     delete deserialized;
-    // clean up
-    delete[] columnNames;
 }
 
 int main() {

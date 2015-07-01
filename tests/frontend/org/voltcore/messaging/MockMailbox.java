@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -75,6 +75,7 @@ public class MockMailbox implements Mailbox {
 
         Mailbox dest = postoffice.get(HSId);
         if (dest != null) {
+            message.m_sourceHSId = m_hsId;
             dest.deliver(message);
         }
     }
@@ -84,6 +85,7 @@ public class MockMailbox implements Mailbox {
         for (int i=0; HSIds != null && i < HSIds.length; ++i) {
             Mailbox dest = postoffice.get(HSIds[i]);
             if (dest != null) {
+                message.m_sourceHSId = m_hsId;
                 dest.deliver(message);
             }
         }
@@ -93,7 +95,7 @@ public class MockMailbox implements Mailbox {
         throw new UnsupportedOperationException();
     }
 
-    private static final Subject m_defaultSubjects[] = new Subject[] { Subject.FAILURE_SITE_UPDATE, Subject.DEFAULT };
+    private static final Subject m_defaultSubjects[] = new Subject[] { Subject.SITE_FAILURE_UPDATE, Subject.DEFAULT };
 
     @Override
     public VoltMessage recv() {
@@ -168,8 +170,8 @@ public class MockMailbox implements Mailbox {
         return null;
     }
 
-    public VoltMessage popLastMessage() {
-        return outgoingMessages.pollLast().contents;
+    public VoltMessage pollMessage() {
+        return outgoingMessages.poll().contents;
     }
 
     public boolean noSentMessages() {
@@ -222,14 +224,16 @@ public class MockMailbox implements Mailbox {
 
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 
+    private long m_hsId = 0;
+
     @Override
     public void setHSId(long hsid)
     {
+        m_hsId = hsid;
     }
 
     @Override
     public long getHSId() {
-        // TODO Auto-generated method stub
-        return 0;
+        return m_hsId;
     }
 }

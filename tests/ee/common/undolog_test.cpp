@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -72,13 +72,11 @@ public:
             const int64_t undoToken = (INT64_MIN + 1) + (ii * 3);
             undoTokens.push_back(undoToken);
             voltdb::UndoQuantum *quantum = m_undoLog->generateUndoQuantum(undoToken);
-            voltdb::Pool *pool = quantum->getDataPool();
             std::vector<MockUndoActionHistory*> histories;
             for (int qq = 0; qq < numUndoActions; qq++) {
                 MockUndoActionHistory *history = new MockUndoActionHistory();
                 histories.push_back(history);
-                MockUndoAction *undoAction = new (pool->allocate(sizeof(MockUndoAction))) MockUndoAction(history);
-                quantum->registerUndoAction(undoAction);
+                quantum->registerUndoAction(new (*quantum) MockUndoAction(history));
             }
             m_undoActionHistoryByQuantum.push_back(histories);
         }
@@ -97,7 +95,7 @@ public:
     }
 
     /*
-     * Confirm all actions were undone in the correct order.
+     * Confirm all actions were undone in FILO order.
      */
     void confirmUndoneActionHistoryOrder(std::vector<MockUndoActionHistory*> histories, int &expectedStartingIndex) {
         for (std::vector<MockUndoActionHistory*>::reverse_iterator i = histories.rbegin();
@@ -112,11 +110,11 @@ public:
     }
 
     /*
-     * Confirm all actions were released in the correct order
+     * Confirm all actions were released in FIFO order.
      */
     void confirmReleaseActionHistoryOrder(std::vector<MockUndoActionHistory*> histories, int &expectedStartingIndex) {
-        for (std::vector<MockUndoActionHistory*>::reverse_iterator i = histories.rbegin();
-             i != histories.rend();
+        for (std::vector<MockUndoActionHistory*>::iterator i = histories.begin();
+             i != histories.end();
              i++) {
             const MockUndoActionHistory *history = *i;
             ASSERT_TRUE(history->m_released);

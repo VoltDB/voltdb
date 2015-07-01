@@ -1,0 +1,82 @@
+This application is based on the examples/voter.  Its current differences:
+- Based on vote app as of wan beta
+- rejected (too many) votes are counted and returned by the vote procedure.
+  This is useful for testing replication - since the hash of the replication
+  result will be checked against the hash of the original result.  Differences
+  will acause replication failure.
+- procedure are implemeted as DDL inline groovy procedures (see ddl) 
+
+Voter application
+===========================
+
+This example application simulates a phone based election process. Voters (based on phone numbers generated randomly by the client application) are allowed a limited number of votes.
+
+Many attributes of the application are customizable through arguments passed to the client, including:
+
+  - The number of contestants (between 1 and 12)
+  - How many votes are allowed per telephone number
+  - How long the sample client runs
+  - The maximum number of transactions the client will attempt per second
+  - When to start recording performance statistics
+  - How frequently to report those statistics
+
+These attributes can be adjusted by modifying the arguments to the "client" target in run.sh.
+
+Additional arguments allow the client to automatically tune itself for optimal performance
+
+  - Target average stored procedure call (SPC) latency (in ms)
+  - Adjustment rate: the tuning process will decrease requested SPC/s to FACTOR*observed-SPC/s until the target latency is reached
+  - auto-tuning interval (in seconds)
+
+Measuring Performance
+---------------------
+
+The main goal of the voter application is to demonstrate the performance possibilities of VoltDB:
+
+- Stored procedures are invoked asynchronously.
+- The client application supports rate control (the number of transactions per second to send to the servers), which can be modified in the run.sh file.
+- The client also records and reports thoughput and latency.
+
+As delivered, the example runs both client and server on a single node (like the other examples). However, it can easily be reconfigured to run any combination of clients and servers.
+
+- The servers support multiple clients at one time
+- Single node or multi-node clusters are supported
+
+To test the example on a different configuration, simply edit run.sh, listing one server node as the lead node when building the catalog and using a comma-separated list of the server addresses as an argument to the client. See the comments in the build script for details.
+
+Interpreting the Results
+------------------------
+The default client configuration will allow the system to automatically tune itself for optimal performance, regardless of your underlying hardware and cluster deployment.
+
+The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion SP Calls per second - 1B SPC/s).  Within 5 second, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency of approximately 10 ms.
+
+You can also turn Auto-Tuning off to experiment with different loads and better understand why proper tuning is key to getting the most of your specific VoltDB deployment.
+
+Rate-limiting your clients (or adding cluster nodes) is essential to preventing "fire-hosing" your server (cluster) and will ensure you get proper application responsiveness (latency) while maximizing througput (TPS) for your hardware configuration.
+
+The "Voter" application is specifically designed for benchmarking to give you a good feel for the type of performance VoltDB is capable of on your hardware.
+
+For more on benchmarking and tips on application tuning, make sure you visit the VoltDB blog:
+ - http://voltdb.com/search/node/benchmark
+ - http://voltdb.com/search/node/tuning
+
+run.sh actions
+-----------
+
+run.sh               : compile all Java clients, build the catalog, and
+                      start the server
+
+run.sh srccompile    : compile all Java clients
+
+run.sh server        : start the server
+
+run.sh client        : start the client, more than 1 client is permitted
+
+run.sh sync-benchmark: start the synchronous client, more than 1 client is permitted.
+
+run.sh jdbc-benchmark: start the JDBC client, more than 1 client is permitted.
+
+run.sh catalog       : build the catalog
+
+run.sh clean         : remove compiled files
+

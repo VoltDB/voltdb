@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -23,20 +23,20 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "P1": {
+    "P_DECIMAL": {
         "columns": (("CASH", FastSerializer.VOLTTYPE_DECIMAL),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("CREDIT", FastSerializer.VOLTTYPE_DECIMAL),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
-        "partitions": (),
-        "indexes": ("ID")
+        "partitions": ("ID",),
+        "indexes": ("ID",)
         },
-    "R1": {
+    "R_DECIMAL": {
         "columns": (("CASH", FastSerializer.VOLTTYPE_DECIMAL),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("CREDIT", FastSerializer.VOLTTYPE_DECIMAL),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
-        "indexes": ("ID")
+        "indexes": ("ID",)
         }
     }

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -24,25 +24,26 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltcore.utils.Pair;
 
 
 
 public class PartitionedTableSaveFileState extends TableSaveFileState
 {
     private static final VoltLogger LOG = new VoltLogger(PartitionedTableSaveFileState.class.getName());
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     public PartitionedTableSaveFileState(String tableName, long txnId)
     {
@@ -118,9 +119,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
         else
         {
-            // XXX Not implemented until we're going to support catalog changes
-            hostLog.error("Unable to convert partitioned table " + getTableName() + " to replicated because " +
-                "the conversion is currently unsupported.");
+            restore_plan = generatePartitionedToReplicatedPlan(st);
         }
         return restore_plan;
     }
@@ -146,6 +145,51 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             m_consistencyResult = error;
             throw new IOException(error);
         }
+    }
+
+    private SynthesizedPlanFragment[] generatePartitionedToReplicatedPlan(SiteTracker st) {
+        ArrayList<SynthesizedPlanFragment> restorePlan = new ArrayList<SynthesizedPlanFragment>();
+        Set<Integer> coveredPartitions = new HashSet<Integer>();
+
+        Iterator<Entry<Integer, Set<Pair<Integer, Integer>>>> partitionAtHostItr =
+                m_partitionsAtHost.entrySet().iterator();
+
+        // looping through all current hosts having .vpt files of this table
+        while(partitionAtHostItr.hasNext()) {
+            Entry<Integer, Set<Pair<Integer, Integer>>> partitionAtHost = partitionAtHostItr.next();
+            Integer host = partitionAtHost.getKey();
+            List<Integer> loadPartitions = new ArrayList<Integer>();
+            List<Integer> loadOrigHosts = new ArrayList<Integer>();
+            Set<Pair<Integer, Integer>> partitionAndOrigHostSet = partitionAtHost.getValue();
+            Iterator<Pair<Integer, Integer>> itr = partitionAndOrigHostSet.iterator();
+
+            // calculate which available partitions not yet been covered and put
+            // its partition_id and orig_host_id in loadPartitions and loadOrigHosts
+            while(itr.hasNext()) {
+                Pair<Integer, Integer> pair = itr.next();
+                if(!coveredPartitions.contains(pair.getFirst())) {
+                    loadPartitions.add(pair.getFirst());
+                    loadOrigHosts.add(pair.getSecond());
+                    coveredPartitions.add(pair.getFirst());
+                }
+            }
+
+            // if there are some work to do
+            if(loadPartitions.size() > 0){
+                int[] relevantPartitionIds = com.google_voltpatches.common.primitives.Ints.toArray(loadPartitions);
+                int[] originalHosts = com.google_voltpatches.common.primitives.Ints.toArray(loadOrigHosts);
+                List<Long> sitesAtHost = st.getSitesForHost(host);
+
+                // for each site of this host, generate one work fragment and let them execute in parallel
+                for(Long site : sitesAtHost) {
+                    restorePlan.add(constructDistributePartitionedTableFragment(
+                            site, relevantPartitionIds, originalHosts, true));
+                }
+            }
+        }
+        restorePlan.add(constructDistributePartitionedTableAggregatorFragment(true));
+        assert(coveredPartitions.size() == m_partitionsSeen.size());
+        return restorePlan.toArray(new SynthesizedPlanFragment[0]);
     }
 
     private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(SiteTracker st) {
@@ -214,7 +258,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             }
         }
 
-        hostLog.info("Distribution plan for table " + getTableName());
+        SNAP_LOG.info("Distribution plan for table " + getTableName());
         for (Integer host : m_partitionsAtHost.keySet()) {
             List<Integer> uncoveredPartitionsAtHostList = hostsToUncoveredPartitions
                     .get(host);
@@ -240,7 +284,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             for (Integer partition : uncoveredPartitionsAtHostList) {
                 sb.append(partition).append(' ');
             }
-            hostLog.info(sb.toString());
+            SNAP_LOG.info(sb.toString());
 
             /*
              * Assigning the FULL workload to each site. At the actual host
@@ -249,52 +293,55 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
              */
             for (Long site : sitesAtHost) {
                 restorePlan.add(constructDistributePartitionedTableFragment(
-                        site, uncoveredPartitionsAtHost, originalHostsArray));
+                        site, uncoveredPartitionsAtHost, originalHostsArray, false));
             }
         }
         restorePlan
-                .add(constructDistributePartitionedTableAggregatorFragment());
+                .add(constructDistributePartitionedTableAggregatorFragment(false));
         return restorePlan.toArray(new SynthesizedPlanFragment[0]);
     }
 
     private SynthesizedPlanFragment
     constructDistributePartitionedTableFragment(
-            long distributorSiteId,
-            int uncoveredPartitionsAtHost[],
-            int originalHostsArray[])
+            long distributorSiteId,     // site which will execute this plan fragment
+            int uncoveredPartitionsAtHost[],    // which partitions' data in the .vpt files will be extracted as TableSaveFile
+            int originalHostsArray[],           // used to locate .vpt files
+            boolean asReplicated)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
         plan_fragment.fragmentId =
-            SysProcFragmentId.PF_restoreDistributePartitionedTable;
+                (asReplicated ? SysProcFragmentId.PF_restoreDistributePartitionedTableAsReplicated
+                              : SysProcFragmentId.PF_restoreDistributePartitionedTableAsPartitioned);
         plan_fragment.multipartition = false;
         plan_fragment.siteId = distributorSiteId;
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(),
-                             originalHostsArray,
-                             uncoveredPartitionsAtHost,
-                             result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                originalHostsArray,
+                uncoveredPartitionsAtHost,
+                result_dependency_id);
         return plan_fragment;
     }
 
     private SynthesizedPlanFragment
-    constructDistributePartitionedTableAggregatorFragment()
+    constructDistributePartitionedTableAggregatorFragment(boolean asReplicated)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
         plan_fragment.fragmentId =
-            SysProcFragmentId.PF_restoreDistributePartitionedTableResults;
+            SysProcFragmentId.PF_restoreReceiveResultTables;
         plan_fragment.multipartition = false;
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = getPlanDependencyIds();
         setRootDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                result_dependency_id,
+                (asReplicated ?
+                        "Aggregating partitioned-to-replicated table restore results"
+                        : "Aggregating partitioned table restore results"));
         return plan_fragment;
     }
 

@@ -2,6 +2,8 @@
 
 APPNAME="genqa"
 APPNAME2="genqa2"
+APPNAME3="eggenqa"
+APPNAME4="eggenqa2"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -20,19 +22,29 @@ else
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+CLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
+
+# ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
+ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
+RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
+CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar"
 VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
+VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
-
 EXPORTDATA="exportdata"
+EXPORTDATAREMOTE="localhost:${PWD}/${EXPORTDATA}"
 CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar $APPNAME3.jar $APPNAME4.jar voltdbroot voltdbroot
+    rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
 # compile the source code for procedures and the client
@@ -43,6 +55,8 @@ function srccompile() {
         src/$APPNAME/procedures/*.java
     javac -classpath $CLASSPATH -d obj \
         src/$APPNAME2/procedures/*.java
+    javac -classpath $CLASSPATH -d obj \
+        src/customexport/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -50,12 +64,14 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
-    $VOLTCOMPILER obj project2.xml $APPNAME2.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
+    $VOLTDB compile --classpath obj -o $APPNAME2.jar ddl2.sql
+    $VOLTDB compile --classpath obj -o $APPNAME3.jar ddl3.sql
+    $VOLTDB compile --classpath obj -o $APPNAME4.jar ddl4.sql
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
-    rm -rf $CLIENTLOG
+    rm -fR $CLIENTLOG
     mkdir $CLIENTLOG
     if [ $? != 0 ]; then exit; fi
 }
@@ -65,9 +81,82 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
+
+# run the voltdb server locally with kafka connector
+function server-kafka() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+function server-rabbitmq() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment-rabbitmq.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+# run the voltdb server locally with mysql connector
+function server-mysql() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_mysql.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+# run the voltdb server locally with postgresql connector
+function server-pg() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+# run the voltdb server locally
+function server-legacy() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_legacy.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+function server-custom() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # Get custom class in jar
+    cd obj
+    jar cvf ../customexport.jar customexport/*
+    cd ..
+    cp customexport.jar $VOLTDB_LIB/extension/customexport.jar
+    # run the server
+    $VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+# run the voltdb server locally
+function server1() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 --internalport=3024 $APPNAME.jar
+}
+
+function server2() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:21216 --adminport=21215 --internalport=3022 --zkport=2182 $APPNAME.jar
+}
+
+function server3() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 --internalport==3023 --adminport=21213 --port=21214 --zkport=2183 $APPNAME.jar
+}
+
 
 # run the client that drives the example
 function client() {
@@ -89,7 +178,7 @@ function async-benchmark() {
         --servers=localhost \
         --port=21212 \
         --procedure=JiggleSinglePartition \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --wait=0 \
         --ratelimit=100000 \
         --autotune=true \
@@ -100,9 +189,10 @@ function async-export() {
     srccompile
     rm -rf $CLIENTLOG/*
     mkdir $CLIENTLOG
+    echo file:/${PWD}/../../log4j-allconsole.xml
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
-        --duration=900 \
+        --duration=120 \
         --servers=localhost \
         --port=21212 \
         --poolsize=100000 \
@@ -128,7 +218,7 @@ function sync-benchmark() {
         --servers=localhost \
         --port=21212 \
         --procedure=JiggleSinglePartition \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --wait=0
 }
 
@@ -152,42 +242,21 @@ function jdbc-benchmark() {
         --wait=0
 }
 
-function export-tofile() {
-    rm -rf $EXPORTDATA/*
-    mkdir $EXPORTDATA
-    java -classpath obj:$CLASSPATH:obj org.voltdb.exportclient.ExportToFileClient \
-        --connect client \
-        --servers localhost \
-        --type csv \
-        --outdir ./$EXPORTDATA \
-        --nonce export \
-        --period 1
-}
-
-function export-tosqoop() {
-    echo "Running sqoop export process"
-    #rm -rf $EXPORTDATA
-    #Change these if sqoop or hadoop are installed elsewhere
-    export SQOOP_HOME="/usr/lib/sqoop"
-    export HADOOP_HOME="/usr/lib/hadoop"
-    H_PATH="$HADOOP_HOME/*:$HADOOP_HOME/conf:$HADOOP_HOME/lib/*"
-    S_PATH="$SQOOP_HOME/*:$SQOOP_HOME/lib/*"
-    export CLASSPATH="$CLASSPATH:$H_PATH:$S_PATH"
-    java org.voltdb.hadoop.VoltDBSqoopExportClient \
-       --connect client \
-       --servers localhost \
-       --verbose \
-       --period 3 \
-       --target-dir /tmp/sqoop-export \
-       --nonce ExportData
-}
-
-
-function exportverify() {
-    java -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
+function export-on-server-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportOnServerVerifier \
+        $EXPORTDATAREMOTE \
         4 \
-        $EXPORTDATA \
         $CLIENTLOG
+}
+
+function export-kafka-server-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
+        genqa.ExportKafkaOnServerVerifier kafka2:7181 voltdbexport
+}
+
+function export-rabbitmq-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/rabbitmq/rabbitmq-client-3.3.4.jar \
+        genqa.ExportRabbitMQVerifier kafka1 test test systest
 }
 
 function help() {

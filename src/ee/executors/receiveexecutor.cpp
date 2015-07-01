@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -60,27 +60,11 @@ bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
 {
     VOLT_TRACE("init Receive Executor");
-    assert(limits);
 
-    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(abstract_node);
-    assert(node);
+    assert(dynamic_cast<ReceivePlanNode*>(abstract_node));
 
-    //
-    // Construct the output table
-    //
-    TupleSchema* schema = node->generateTupleSchema(true);
-    int num_of_columns = static_cast<int>(node->getOutputSchema().size());
-    std::string* column_names = new std::string[num_of_columns];
-    for (int ctr = 0; ctr < num_of_columns; ctr++)
-    {
-        column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
-    }
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                    "temp",
-                                                    schema,
-                                                    column_names,
-                                                    limits));
-    delete[] column_names;
+    // Create output table based on output schema from the plan
+    setTempOutputTable(limits);
     return true;
 }
 

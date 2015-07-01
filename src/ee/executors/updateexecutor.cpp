@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -44,7 +44,9 @@
  */
 
 #include <cassert>
-#include "boost/scoped_ptr.hpp"
+#include <boost/scoped_ptr.hpp>
+#include <boost/foreach.hpp>
+
 #include "updateexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -62,6 +64,7 @@
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
+#include "storage/ConstraintFailureException.h"
 
 using namespace std;
 using namespace voltdb;
@@ -73,30 +76,16 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);
     assert(m_node);
-    assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    assert(m_node->getInputTableCount() == 1);
+    // input table should be temptable
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable());
     assert(m_inputTable);
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
-    assert(m_targetTable);
-    assert(m_node->getTargetTable());
 
-    TupleSchema* schema = m_node->generateTupleSchema(false);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      "temp",
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
+    // target table should be persistenttable
+    PersistentTable*targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
 
-    // record if a full index update is needed, or if these checks can be skipped
-    m_updatesIndexes = m_node->doesUpdateIndexes();
+    setDMLCountOutputTable(limits);
 
     AbstractPlanNode *child = m_node->getChildren()[0];
     ProjectionPlanNode *proj_node = NULL;
@@ -115,7 +104,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     }
 
     vector<string> output_column_names = proj_node->getOutputColumnNames();
-    vector<string> targettable_column_names = m_targetTable->getColumnNames();
+    const vector<string> &targettable_column_names = targetTable->getColumnNames();
 
     /*
      * The first output column is the tuple address expression and it isn't part of our output so we skip
@@ -133,28 +122,48 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_inputTargetMap.size() == (output_column_names.size() - 1));
     m_inputTargetMapSize = (int)m_inputTargetMap.size();
     m_inputTuple = TableTuple(m_inputTable->schema());
-    m_targetTuple = TableTuple(m_targetTable->schema());
 
-    m_partitionColumn = m_targetTable->partitionColumn();
-    m_partitionColumnIsString = false;
-    if (m_partitionColumn != -1) {
-        if (m_targetTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
-            m_partitionColumnIsString = true;
-        }
-    }
+    // for target table related info.
+    m_partitionColumn = targetTable->partitionColumn();
 
     return true;
 }
 
 bool UpdateExecutor::p_execute(const NValueArray &params) {
     assert(m_inputTable);
-    assert(m_targetTable);
+
+    // target table should be persistenttable
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
+    TableTuple targetTuple = TableTuple(targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-    VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", m_targetTable->debug().c_str());
+    VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug().c_str());
+
+    // determine which indices are updated by this executor
+    // iterate through all target table indices and see if they contain
+    // columns mutated by this executor
+    std::vector<TableIndex*> indexesToUpdate;
+    const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
+    BOOST_FOREACH(TableIndex *index, allIndexes) {
+        bool indexKeyUpdated = false;
+        BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
+            std::pair<int, int> updateColInfo; // needs to be here because of macro failure
+            BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
+                if (updateColInfo.second == colIndex) {
+                    indexKeyUpdated = true;
+                    break;
+                }
+            }
+            if (indexKeyUpdated) break;
+        }
+        if (indexKeyUpdated) {
+            indexesToUpdate.push_back(index);
+        }
+    }
 
     assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-    assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
+    assert(targetTuple.sizeInValues() == targetTable->columnCount());
     TableIterator input_iterator = m_inputTable->iterator();
     while (input_iterator.next(m_inputTuple)) {
         //
@@ -165,7 +174,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         // the trouble of having to do an index lookup
         //
         void *target_address = m_inputTuple.getNValue(0).castAsAddress();
-        m_targetTuple.move(target_address);
+        targetTuple.move(target_address);
 
         // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
         // the values that we need to. The key thing to note here is that we
@@ -174,7 +183,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         // bringing garbage with it, we're only going to copy what we really
         // need to into the target tuple.
         //
-        TableTuple &tempTuple = m_targetTable->getTempTupleInlined(m_targetTuple);
+        TableTuple &tempTuple = targetTable->getTempTupleInlined(targetTuple);
         for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
             tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
                                 m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
@@ -189,22 +198,24 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
-                VOLT_ERROR("Mispartitioned tuple in single-partition plan for"
-                           " table '%s'", m_targetTable->name().c_str());
-                return false;
+                throw ConstraintFailureException(
+                         dynamic_cast<PersistentTable*>(targetTable),
+                         tempTuple,
+                         "An update to a partitioning column triggered a partitioning error. "
+                         "Updating a partitioning column is not supported. Try delete followed by insert.");
             }
         }
 
-        if (!m_targetTable->updateTuple(tempTuple, m_targetTuple,
-                                        m_updatesIndexes)) {
+        if (!targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                                                           indexesToUpdate)) {
             VOLT_INFO("Failed to update tuple from table '%s'",
-                      m_targetTable->name().c_str());
+                      targetTable->name().c_str());
             return false;
         }
     }
 
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->activeTupleCount()));
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->tempTableTupleCount()));
     // try to put the tuple into the output table
     if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
         VOLT_ERROR("Failed to insert tuple count (%ld) into"
@@ -214,12 +225,12 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         return false;
     }
 
-    VOLT_TRACE("TARGET TABLE - AFTER: %s\n", m_targetTable->debug().c_str());
+    VOLT_TRACE("TARGET TABLE - AFTER: %s\n", targetTable->debug().c_str());
     // TODO lets output result table here, not in result executor. same thing in
     // delete/insert
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_inputTable->activeTupleCount();
+    m_engine->addToTuplesModified(m_inputTable->tempTableTupleCount());
 
     return true;
 }

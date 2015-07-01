@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
-# VoltDB is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-# VoltDB is distributed in the hope that it will be useful,
+# This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# GNU Affero General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
+# You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 """
@@ -58,7 +58,7 @@ def javaobjectify( x ):
     elif x[-1] == '?': return x.rstrip('?')
     else: raise Exception( 'bad type: ' + x )
 
-def genjava( classes, prepath, postpath, package ):
+def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     ##########
     # SETUP
     ##########
@@ -69,7 +69,10 @@ def genjava( classes, prepath, postpath, package ):
     os.system( interp( "cp $prepath/CatalogType.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogMap.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogException.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/CatalogChangeGroup.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogDiffEngine.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/DRCatalogDiffEngine.java $postpath", locals() ) )
 
     ##########
     # WRITE THE SOURCE FILES
@@ -102,41 +105,56 @@ def genjava( classes, prepath, postpath, package ):
             if ftype == "String":
                 write( interp( '    String m_$fname = new String();', locals() ) )
             elif field.type[-1] == '?':
-                pass # don't keep local cached vars for references
+                write( interp( '    Catalog.CatalogReference<$ftype> m_$fname = new CatalogReference<>();', locals() ) )
             else:
                 write( interp( '    $ftype m_$fname;', locals() ) )
         write( '' )
 
-        # setBaseValues
-        write( '    void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {' )
-        write( '        super.setBaseValues(catalog, parent, path, name);')
+        # initChildMaps
+        write( '    @Override' )
+        write( '    void initChildMaps() {' )
         for field in cls.fields:
             ftype = javatypify( field.type )
             fname = field.name
             realtype = field.type[:-1]
             #methname = fname.capitalize()
             if field.type[-1] == '*':
-                write( interp( '        m_$fname = new $ftype(catalog, this, path + "/" + "$fname", $realtype.class);', locals() ) )
-                write( interp( '        m_childCollections.put("$fname", m_$fname);', locals() ) )
-            elif field.type[-1] == '?':
-                write( interp( '        m_fields.put("$fname", null);', locals() ) )
-            else:
-                write( interp( '        m_fields.put("$fname", m_$fname);', locals() ) )
+                write( interp( '        m_$fname = new $ftype(getCatalog(), this, "$fname", $realtype.class, m_parentMap.m_depth + 1);', locals() ) )
         write( '    }\n' )
 
-        # update
-        write ( '    void update() {' )
+        # getFields
+        write(                        '    public String[] getFields() {' )
+        write(                        '        return new String[] {' )
         for field in cls.fields:
-            ftype = javatypify( field.type )
-            fobjtype = javaobjectify( field.type )
+            if field.type[-1] != '*':
+                fname = field.name
+                write( interp(        '            "$fname",', locals() ) )
+        write(                        '        };' )
+        write(                        '    };\n' )
+
+        # getChildCollections;
+        write(                        '    String[] getChildCollections() {' )
+        write(                        '        return new String[] {' )
+        for field in cls.fields:
+            if field.type[-1] == '*':
+                fname = field.name
+                write( interp(        '            "$fname",', locals() ) )
+        write(                        '        };' )
+        write(                        '    };\n' )
+
+
+        #getField
+        write(             '    public Object getField(String field) {' )
+        write(             '        switch (field) {' )
+        for field in cls.fields:
             fname = field.name
-            realtype = field.type[:-1]
             methname = fname.capitalize()
-            if field.type[-1] == '?':
-                pass # don't keep local cached vars for references
-            elif field.type[-1] != '*':
-                write( interp( '        m_$fname = ($fobjtype) m_fields.get("$fname");', locals() ) )
-        write( '    }\n' )
+            write( interp( '        case "$fname":', locals() ) )
+            write( interp( '            return get$methname();', locals() ) )
+        write( interp(     '        default:', locals() ) )
+        write( interp(     '            throw new CatalogException("Unknown field");', locals() ) )
+        write(             '        }' )
+        write(             '    }\n' )
 
         # getter methods
         for field in cls.fields:
@@ -148,15 +166,7 @@ def genjava( classes, prepath, postpath, package ):
                 write('    /** GETTER:', field.comment, '*/')
             write( interp( '    public $ftype get$methname() {', locals() ) )
             if field.type[-1] == '?':
-                write( interp( '        Object o = getField("$fname");', locals() ) )
-                write( interp( '        if (o instanceof UnresolvedInfo) {', locals() ) )
-                write( interp( '            UnresolvedInfo ui = (UnresolvedInfo) o;', locals() ) )
-                write( interp( '            $ftype retval = ($ftype) m_catalog.getItemForRef(ui.path);', locals() ) )
-                write( interp( '            assert(retval != null);', locals() ) )
-                write( interp( '            m_fields.put("$fname", retval);', locals() ) )
-                write( interp( '            return retval;', locals() ) )
-                write( interp( '        }', locals() ) )
-                write( interp( '        return ($ftype) o;', locals() ) )
+                write( interp( '        return m_$fname.get();', locals() ) )
             else:
                 write( interp( '        return m_$fname;', locals() ) )
             write( '    }\n' )
@@ -173,10 +183,96 @@ def genjava( classes, prepath, postpath, package ):
                 write('    /** SETTER:', field.comment, '*/')
             write( interp( '    public void set$methname($ftype value) {', locals() ) )
             if field.type[-1] == '?':
-                write( interp( '        m_fields.put("$fname", value);', locals() ) )
+                write( interp( '        m_$fname.set(value);', locals() ) )
             else:
-                write( interp( '        m_$fname = value; m_fields.put("$fname", value);', locals() ) )
+                write( interp( '        m_$fname = value;', locals() ) )
             write( '    }\n' )
+
+        # set
+        write(                     '    @Override' )
+        write(                     '    void set(String field, String value) {' )
+        write(                     '        if ((field == null) || (value == null)) {' )
+        write(                     '            throw new CatalogException("Null value where it shouldn\'t be.");' )
+        write(                     '        }\n' )
+
+        write(                     '        switch (field) {' )
+        for field in cls.fields:
+            if field.type[-1] == '*':
+                # skip child collections for set
+                continue
+            fname = field.name
+            ftype = javatypify( field.type )
+            write( interp(         '        case "$fname":', locals() ) )
+            if field.type[-1] == '?':
+                write(             '            value = value.trim();' )
+                write(             '            if (value.startsWith("null")) value = null;' )
+                write(             '            assert((value == null) || value.startsWith("/"));' )
+                write( interp(     '            m_$fname.setUnresolved(value);', locals() ) )
+            elif ftype == "int":
+                write(             '            assert(value != null);' )
+                write( interp(     '            m_$fname = Integer.parseInt(value);', locals() ) )
+            elif ftype == "boolean":
+                write(             '            assert(value != null);' )
+                write( interp(     '            m_$fname = Boolean.parseBoolean(value);', locals() ) )
+            elif ftype == "String":
+                write(             '            value = value.trim();' )
+                write(             '            if (value.startsWith("null")) value = null;' )
+                write(             '            if (value != null) {')
+                write(             '                assert(value.startsWith("\\"") && value.endsWith("\\""));' )
+                write(             '                value = value.substring(1, value.length() - 1);' )
+                write(             '            }' )
+                write( interp(     '            m_$fname = value;', locals() ) )
+            write(                 '            break;' )
+        write( interp(             '        default:', locals() ) )
+        write( interp(             '            throw new CatalogException("Unknown field");', locals() ) )
+        write(                     '        }' )
+        write(                     '    }\n' )
+
+        # copyFields
+        write(                     '    @Override' )
+        write(                     '    void copyFields(CatalogType obj) {' )
+        if len(cls.fields) > 0:
+            write(                 '        // this is safe from the caller' )
+            write( interp(         '        $clsname other = ($clsname) obj;\n', locals() ) )
+            for field in cls.fields:
+                ftype = javatypify( field.type )
+                fname = field.name
+                if ftype in ["int", "boolean", "String"]:
+                    write( interp( '        other.m_$fname = m_$fname;', locals() ) )
+                elif field.type[-1] == '?':
+                    write( interp( '        other.m_$fname.setUnresolved(m_$fname.getPath());', locals() ) )
+                elif field.type[-1] == '*':
+                    write( interp( '        other.m_$fname.copyFrom(m_$fname);', locals() ) )
+        write(                     '    }\n' )
+
+        # equals
+        write(             '    public boolean equals(Object obj) {' )
+        write(             '        // this isn\'t really the convention for null handling' )
+        write(             '        if ((obj == null) || (obj.getClass().equals(getClass()) == false))' )
+        write(             '            return false;\n' )
+
+        write(             '        // Do the identity check' )
+        write(             '        if (obj == this)' )
+        write(             '            return true;\n' )
+
+        write(             '        // this is safe because of the class check' )
+        write(             '        // it is also known that the childCollections var will be the same' )
+        write(             '        //  from the class check' )
+        write( interp(     '        $clsname other = ($clsname) obj;\n', locals() ) )
+
+        write(             '        // are the fields / children the same? (deep compare)' )
+        for field in cls.fields:
+            ftype = javatypify( field.type )
+            fname = field.name
+            if ftype in ["int", "boolean"]:
+                write( interp( '        if (m_$fname != other.m_$fname) return false;', locals() ) )
+            else:
+                write( interp( '        if ((m_$fname == null) != (other.m_$fname == null)) return false;', locals() ) )
+                write( interp( '        if ((m_$fname != null) && !m_$fname.equals(other.m_$fname)) return false;', locals() ) )
+        write('')
+
+        write(             '        return true;' )
+        write(             '    }\n' )
 
         # wrap up
         write( '}' )
@@ -193,7 +289,7 @@ def cpptypify( x ):
     elif x[-1] == '?': return 'CatalogType*'
     else: raise Exception( 'bad type: ' + x )
 
-def gencpp( classes, prepath, postpath ):
+def gencpp( classes, javaOnlyClasses, prepath, postpath ):
     ##########
     # SETUP
     ##########
@@ -209,10 +305,22 @@ def gencpp( classes, prepath, postpath ):
     # WRITE THE SOURCE FILES
     ##########
     for cls in reversed( classes ):
+        # skip classes that don't need to be in c++
+        if not cls.hasEE:
+            continue
+
         clsname = cls.name
 
-        referencedClasses = []
+        actualFields = []
         for field in cls.fields:
+            classType = field.type[:-1]
+            if (field.type[-1] == "*") or (field.type[-1] == '?'):
+                if classType in javaOnlyClasses:
+                    continue
+            actualFields.append(field)
+
+        referencedClasses = []
+        for field in actualFields:
             classType = field.type[:-1]
             if (field.type[-1] == "*") or (field.type[-1] == '?'):
                 if classType not in referencedClasses:
@@ -257,7 +365,7 @@ def gencpp( classes, prepath, postpath ):
         write( '    ' + clsname + '(Catalog * catalog, CatalogType * parent, const std::string &path, const std::string &name);' )
 
         # Field Member variables.
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             write( interp( '    $ftype $privname;', locals() ) )
@@ -281,7 +389,7 @@ def gencpp( classes, prepath, postpath ):
         write('    ~' + clsname + '();\n');
 
         # getter methods
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             pubname = field.name
@@ -316,7 +424,7 @@ def gencpp( classes, prepath, postpath ):
         write ( '#include <cassert>' )
         write ( interp( '#include "$filename.h"', locals() ) )
         write ( '#include "catalog.h"' )
-        otherhdrs = ['#include "%s.h"' % field.type[:-1].lower() for field in cls.fields if field.type[-1] in ['*', '?'] ]
+        otherhdrs = ['#include "%s.h"' % field.type[:-1].lower() for field in actualFields if field.type[-1] in ['*', '?'] ]
         uniques = {}
         for hdr in otherhdrs:
             uniques[hdr] = hdr
@@ -326,20 +434,20 @@ def gencpp( classes, prepath, postpath ):
         write ( 'using namespace std;\n' )
 
         # write the constructor
-        mapcons = ["m_%s(catalog)" % field.name for field in cls.fields if field.type[-1] == '*']
+        mapcons = ["m_%s(catalog)" % field.name for field in actualFields if field.type[-1] == '*']
         write ( interp( '$clsname::$clsname(Catalog *catalog, CatalogType *parent, const string &path, const string &name)', locals() ) )
         comma = ''
         if len(mapcons): comma = ','
         write ( interp( ': CatalogType(catalog, parent, path, name)$comma', locals()))
 
-        mapcons = ["m_%s(catalog, this, path + \"/\" + \"%s\")" % (field.name, field.name) for field in cls.fields if field.type[-1] == '*']
+        mapcons = ["m_%s(catalog, this, path + \"/\" + \"%s\")" % (field.name, field.name) for field in actualFields if field.type[-1] == '*']
         if len(mapcons) > 0:
             write( "  " + ", ".join(mapcons))
         write('{')
 
         # init the fields and childCollections
         write( '    CatalogValue value;' )
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             pubname = field.name
@@ -351,7 +459,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write the destructor
         write(clsname + '::~' + clsname + '() {');
-        for field in cls.fields:
+        for field in actualFields:
             if field.type[-1] == '*':
                 ftype = field.type.rstrip('*')
                 itr = ftype.lower() + '_iter'
@@ -367,7 +475,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write update()
         write ( interp( 'void $clsname::update() {', locals() ) )
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             pubname = field.name
@@ -383,7 +491,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write add(...)
         write ( interp( 'CatalogType * $clsname::addChild(const std::string &collectionName, const std::string &childName) {', locals() ) )
-        for field in cls.fields:
+        for field in actualFields:
             if field.type[-1] == "*":
                 privname = 'm_' + field.name
                 pubname = field.name
@@ -395,7 +503,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write getChild(...)
         write ( interp( 'CatalogType * $clsname::getChild(const std::string &collectionName, const std::string &childName) const {', locals() ) )
-        for field in cls.fields:
+        for field in actualFields:
             if field.type[-1] == "*":
                 privname = 'm_' + field.name
                 pubname = field.name
@@ -405,8 +513,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write removeChild(...)
         write ( interp( 'bool $clsname::removeChild(const std::string &collectionName, const std::string &childName) {', locals() ) )
-        write ( interp( '    assert (m_childCollections.find(collectionName) != m_childCollections.end());', locals() ) )
-        for field in cls.fields:
+        for field in actualFields:
             if field.type[-1] == "*":
                 privname = 'm_' + field.name
                 pubname = field.name
@@ -417,7 +524,7 @@ def gencpp( classes, prepath, postpath ):
         write ( '}\n' )
 
         # write field getters
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             pubname = field.name
@@ -444,8 +551,8 @@ def main():
     java_prepath = 'in/javasrc'
     java_postpath = 'out/javasrc'
     f =  file( specpath )
-    classes = parse( f.read() )
-    genjava( classes, java_prepath, java_postpath, javapkg )
-    gencpp( classes, cpp_prepath, cpp_postpath )
+    classes, javaOnlyClasses = parse( f.read() )
+    genjava( classes, javaOnlyClasses, java_prepath, java_postpath, javapkg )
+    gencpp( classes, javaOnlyClasses, cpp_prepath, cpp_postpath )
 
 main()

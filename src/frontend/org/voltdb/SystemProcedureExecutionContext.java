@@ -1,26 +1,29 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb;
 
-import java.util.HashMap;
+import java.util.List;
 
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
 
 public interface SystemProcedureExecutionContext {
@@ -28,13 +31,7 @@ public interface SystemProcedureExecutionContext {
 
     public Cluster getCluster();
 
-    public long getLastCommittedTxnId();
-
-    public long getCurrentTxnId();
-
-    public long getNextUndo();
-
-    public HashMap<String, ProcedureRunner> getProcedures();
+    public long getSpHandleForSnapshotDigest();
 
     public long getSiteId();
 
@@ -49,7 +46,9 @@ public interface SystemProcedureExecutionContext {
 
     public int getCatalogVersion();
 
-    public SiteTracker getSiteTracker();
+    public byte[] getCatalogHash();
+
+    public byte[] getDeploymentHash();
 
     // Separate SiteTracker accessor for IV2 use.
     // Snapshot services that need this can get a SiteTracker in IV2, but
@@ -58,11 +57,30 @@ public interface SystemProcedureExecutionContext {
 
     public int getNumberOfPartitions();
 
+    public void setNumberOfPartitions(int partitionCount);
+
     public SiteProcedureConnection getSiteProcedureConnection();
 
     public SiteSnapshotConnection getSiteSnapshotConnection();
 
     public void updateBackendLogLevels();
 
-    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context, CatalogSpecificPlanner csp);
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
+            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation);
+
+    public TheHashinator getCurrentHashinator();
+
+    public Procedure ensureDefaultProcLoaded(String procName);
+
+    /**
+     * Update the EE hashinator with the given configuration.
+     */
+    public void updateHashinator(TheHashinator hashinator);
+
+    boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
+
+    public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
+
+    Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                               List<DBBPool.BBContainer> outputBuffers);
 }

@@ -27,7 +27,7 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import com.google.common.base.Preconditions;
+import com.google_voltpatches.common.base.Preconditions;
 
 public class DirectMemoryUtils {
   /**
@@ -65,31 +65,4 @@ public class DirectMemoryUtils {
     return 0;
   }
 
-  /**
-   * DirectByteBuffers are garbage collected by using a phantom reference and a
-   * reference queue. Every once a while, the JVM checks the reference queue and
-   * cleans the DirectByteBuffers. However, as this doesn't happen
-   * immediately after discarding all references to a DirectByteBuffer, it's
-   * easy to OutOfMemoryError yourself using DirectByteBuffers. This function
-   * explicitly calls the Cleaner method of a DirectByteBuffer.
-   *
-   * @param toBeDestroyed
-   *          The DirectByteBuffer that will be "cleaned". Utilizes reflection.
-   *
-   */
-  public static void destroyDirectByteBuffer(ByteBuffer toBeDestroyed)
-      throws IllegalArgumentException, IllegalAccessException,
-      InvocationTargetException, SecurityException, NoSuchMethodException {
-
-    Preconditions.checkArgument(toBeDestroyed.isDirect(),
-        "toBeDestroyed isn't direct!");
-
-    Method cleanerMethod = toBeDestroyed.getClass().getMethod("cleaner");
-    cleanerMethod.setAccessible(true);
-    Object cleaner = cleanerMethod.invoke(toBeDestroyed);
-    Method cleanMethod = cleaner.getClass().getMethod("clean");
-    cleanMethod.setAccessible(true);
-    cleanMethod.invoke(cleaner);
-
-  }
 }

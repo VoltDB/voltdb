@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -58,6 +58,14 @@
 #include <cstdlib>
 #include <cstdio>
 #include "harness.h"
+
+// A custom assert macro that avoids "unused variable" warnings when compiled
+// away.
+#ifdef NDEBUG
+#undef assert
+#define assert(x) ((void)(x))
+#endif
+
 
 using std::string;
 using stupidunit::ChTempDir;
@@ -229,6 +237,13 @@ bool testAssertTrue() {
 
 // Test the EXPECT_DEATH macro. Note: This should *not* produce any output.
 TEST(ExpectDeath, FailsToDie) {
+    // Skip expectDeath in non-debug builds because overwriting memory doesn't
+    // always cause release builds to crash.
+#ifndef DEBUG
+    printf("SKIPPED: testing expectDeath due to non-debug build.\n");
+    return;
+#endif
+
     static const char MSG[] = "THIS TEXT SHOULD BE CAPTURED AND NOT VISIBLE";
     class DeathTest : public TestTemplate {
     public:
@@ -267,7 +282,7 @@ TEST(ChTempDir, Simple) {
 
         // Create a file in the temporary directory
         string name = tempdir.name() + "/..foo";
-        int fd = open(name.c_str(), O_CREAT);
+        int fd = open(name.c_str(), O_CREAT, 666);
         EXPECT_NE(0, fd);
         int status = close(fd);
         EXPECT_EQ(0, status);
@@ -404,7 +419,7 @@ const struct BasicTest tests[] = {
     ADD_TEST(testAssertTrue),
 };
 #undef ADD_TEST
-static const int TESTS_SIZE = sizeof(tests)/sizeof(*tests);
+static const size_t TESTS_SIZE = sizeof(tests)/sizeof(*tests);
 
 int main() {
     int failure_count = 0;

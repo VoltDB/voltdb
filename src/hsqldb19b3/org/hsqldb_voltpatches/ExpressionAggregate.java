@@ -31,9 +31,9 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
+import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
@@ -64,12 +64,10 @@ public class ExpressionAggregate extends Expression {
         nodes               = e.nodes;
     }
 
-    @Override
     boolean isSelfAggregate() {
         return true;
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb   = new StringBuffer(64);
@@ -139,7 +137,6 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -206,7 +203,6 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
-    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -219,7 +215,6 @@ public class ExpressionAggregate extends Expression {
         return unresolvedSet;
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -235,7 +230,6 @@ public class ExpressionAggregate extends Expression {
         dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
     }
 
-    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {
@@ -283,67 +277,5 @@ public class ExpressionAggregate extends Expression {
         }
 
         return ((SetFunction) currValue).getValue();
-    }
-
-    /*************** VOLTDB *********************/
-
-    /**
-     * VoltDB added method to get a non-catalog-dependent
-     * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
-     * some names.
-     * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
-     */
-    @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
-    {
-        String element = null;
-        switch (opType) {
-        case OpTypes.LIMIT:             element = "limit"; break;
-        case OpTypes.ADD:               element = "add"; break;
-        case OpTypes.SUBTRACT:          element = "subtract"; break;
-        case OpTypes.MULTIPLY:          element = "multiply"; break;
-        case OpTypes.DIVIDE:            element = "divide"; break;
-        case OpTypes.EQUAL:             element = "equal"; break;
-        case OpTypes.NOT_EQUAL:         element = "notequal"; break;
-        case OpTypes.GREATER:           element = "greaterthan"; break;
-        case OpTypes.GREATER_EQUAL:     element = "greaterthanorequalto"; break;
-        case OpTypes.SMALLER:           element = "lessthan"; break;
-        case OpTypes.SMALLER_EQUAL:     element = "lessthanorequalto"; break;
-        case OpTypes.AND:               element = "and"; break;
-        case OpTypes.OR:                element = "or"; break;
-        case OpTypes.IN:                element = "in"; break;
-        case OpTypes.COUNT:             element = "count"; break;
-        case OpTypes.SUM:               element = "sum"; break;
-        case OpTypes.MIN:               element = "min"; break;
-        case OpTypes.MAX:               element = "max"; break;
-        case OpTypes.AVG:               element = "avg"; break;
-        case OpTypes.SQL_FUNCTION:      element = "function"; break;
-        case OpTypes.SIMPLE_COLUMN:     element = "simplecolumn"; break;
-        case OpTypes.IS_NULL:           element = "is_null"; break;
-        case OpTypes.NOT:               element = "not"; break;
-        default:
-            throw new HSQLParseException("Unsupported Aggregate Operation: " +
-                                         String.valueOf(opType));
-        }
-
-        VoltXMLElement exp = new VoltXMLElement("operation");
-
-        exp.attributes.put("id", getUniqueId(session));
-        exp.attributes.put("type", element);
-        if ((this.alias != null) && (getAlias().length() > 0)) {
-            exp.attributes.put("alias", getAlias());
-        }
-        if (this.isDistinctAggregate) {
-            exp.attributes.put("distinct", "true");
-        }
-        for (Expression expr : nodes) {
-            VoltXMLElement vxmle = expr.voltGetXML(session);
-            exp.children.add(vxmle);
-            assert(vxmle != null);
-        }
-
-        return exp;
     }
 }

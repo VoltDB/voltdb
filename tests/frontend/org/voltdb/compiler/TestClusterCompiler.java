@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,9 +27,11 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
 import junit.framework.TestCase;
+import org.voltdb.VoltDB;
 
 public class TestClusterCompiler extends TestCase
 {
@@ -82,5 +84,65 @@ public class TestClusterCompiler extends TestCase
             }
         }
         fail();
+    }
+
+    public void testAddHostToNonKsafe() throws JSONException
+    {
+        ClusterConfig config = new ClusterConfig(1, 6, 0);
+        JSONObject topo = config.getTopology(Arrays.asList(0));
+        assertEquals(1, topo.getInt("hostcount"));
+        assertEquals(6, topo.getInt("sites_per_host"));
+        assertEquals(0, topo.getInt("kfactor"));
+        assertEquals(6, topo.getJSONArray("partitions").length());
+
+        ClusterConfig.addHosts(1, topo);
+        assertEquals(2, topo.getInt("hostcount"));
+        assertEquals(0, topo.getInt("kfactor"));
+    }
+
+    public void testAddHostsToNonKsafe() throws JSONException
+    {
+        ClusterConfig config = new ClusterConfig(2, 6, 0);
+        JSONObject topo = config.getTopology(Arrays.asList(0, 1));
+        assertEquals(2, topo.getInt("hostcount"));
+        assertEquals(6, topo.getInt("sites_per_host"));
+        assertEquals(0, topo.getInt("kfactor"));
+        assertEquals(12, topo.getJSONArray("partitions").length());
+
+        VoltDB.ignoreCrash = true;
+        try {
+            ClusterConfig.addHosts(2, topo);
+            fail("Shouldn't allow adding more than one node");
+        } catch (AssertionError e) {}
+    }
+
+    public void testAddHostsToKsafe() throws JSONException
+    {
+        ClusterConfig config = new ClusterConfig(2, 6, 1);
+        JSONObject topo = config.getTopology(Arrays.asList(0, 1));
+        assertEquals(2, topo.getInt("hostcount"));
+        assertEquals(6, topo.getInt("sites_per_host"));
+        assertEquals(1, topo.getInt("kfactor"));
+        assertEquals(6, topo.getJSONArray("partitions").length());
+
+        ClusterConfig.addHosts(2, topo);
+        assertEquals(4, topo.getInt("hostcount"));
+        assertEquals(1, topo.getInt("kfactor"));
+    }
+
+    public void testAddMoreThanKsafeHosts() throws JSONException
+    {
+        ClusterConfig config = new ClusterConfig(2, 6, 1);
+        JSONObject topo = config.getTopology(Arrays.asList(0, 1));
+        assertEquals(2, topo.getInt("hostcount"));
+        assertEquals(6, topo.getInt("sites_per_host"));
+        assertEquals(1, topo.getInt("kfactor"));
+        assertEquals(6, topo.getJSONArray("partitions").length());
+
+        VoltDB.ignoreCrash = true;
+        try {
+            ClusterConfig.addHosts(3, topo);
+            fail("Shouldn't allow adding more than ksafe + 1 node");
+        } catch (AssertionError e) {}
     }
 }

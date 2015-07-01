@@ -1,23 +1,22 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltcore.logging;
 
-import java.io.StringWriter;
 import java.util.logging.Logger;
 
 /**
@@ -92,19 +91,9 @@ public class VoltUtilLoggingLogger implements VoltLogger.CoreVoltLogger {
     }
 
     @Override
-    public void addSimpleWriterAppender(StringWriter writer) {
-        m_logger.log(java.util.logging.Level.INFO, "This logger doesn't support appenders. You need Log4j.");
-    }
-
-    @Override
     public long getLogLevels(VoltLogger[] loggers) {
         System.err.printf("This logger doesn't support getting log levels. You need Log4j.\n");
         return 0;
-    }
-
-    @Override
-    public void setLevel(Level level) {
-        m_logger.setLevel(getPriorityForLevel(level));
     }
 
 }

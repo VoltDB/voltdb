@@ -212,10 +212,6 @@ public class TableBase {
     public final Index getIndex(int i) {
         return indexList[i];
     }
-    
-    public Index[] getIndexes() {
-        return indexList;
-    }
 
     /**
      *  Returns the indexes
@@ -290,6 +286,12 @@ public class TableBase {
 
         for (int i = 0; i < indexList.length; i++) {
             Index index     = indexList[i];
+            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose.
+            // Expression-based indexes are not suitable for row identification.
+            if (index.getExpressions() != null) {
+                continue;
+            }
+            // End of VoltDB extension
             int[] cols      = index.getColumns();
             int   colsCount = index.getVisibleColumns();
 
@@ -403,7 +405,12 @@ public class TableBase {
                                      boolean constraint, boolean forward) {
 
         if (primaryKeyCols == null) {
+            // A VoltDB extension to support matview-based indexes
+            primaryKeyCols = new int[0];
+            /* disable 1 line ...
             throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
+            ... disabled 1 line */
+            // End of VoltDB extension
         }
 
         int    s     = columns.length;

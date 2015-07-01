@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.persist.PersistentStore;
@@ -129,7 +128,7 @@ public class ExpressionLogical extends Expression {
                     isColumnEqual = true;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case OpTypes.GREATER_EQUAL :
             case OpTypes.GREATER :
             case OpTypes.SMALLER :
@@ -208,7 +207,6 @@ public class ExpressionLogical extends Expression {
         return new ExpressionLogical(OpTypes.AND, e1, e2);
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(64);
@@ -366,7 +364,6 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -472,7 +469,6 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -638,9 +634,24 @@ public class ExpressionLogical extends Expression {
 
         if (nodes[LEFT].opType == OpTypes.ROW
                 || nodes[RIGHT].opType == OpTypes.ROW) {
+            // A VoltDB extension to allow row subqueries (C1, C2) = (SELECT C1, C2 FROM ...)
+            if (nodes[RIGHT].opType == OpTypes.TABLE_SUBQUERY) {
+                assert(nodes[RIGHT].subQuery != null);
+                if (nodes[LEFT].nodes.length != nodes[RIGHT].subQuery.getTable().columnCount) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+            } else if (nodes[LEFT].opType == OpTypes.TABLE_SUBQUERY) {
+                assert(nodes[LEFT].subQuery != null);
+                if (nodes[LEFT].subQuery.getTable().columnCount != nodes[RIGHT].nodes.length) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+            } else if (nodes[LEFT].nodes.length != nodes[RIGHT].nodes.length) {
+            /* Disable 3 lines ...
             if (nodes[LEFT].opType != OpTypes.ROW
                     || nodes[RIGHT].opType != OpTypes.ROW
                     || nodes[LEFT].nodes.length != nodes[RIGHT].nodes.length) {
+            ... disabled 3 lines. */
+            // End of VoltDB extension
                 throw Error.error(ErrorCode.X_42564);
             }
 
@@ -663,6 +674,10 @@ public class ExpressionLogical extends Expression {
                                            nodes[RIGHT])) {
 
                     // compatibility for scalars only
+                // A VoltDB extension to support X'..' as numeric literals
+                } else if (voltConvertBinaryIntegerLiteral(session, nodes[LEFT],
+                            nodes[RIGHT])) {
+                    // End VoltDB extension
                 } else {
                     throw Error.error(ErrorCode.X_42562);
                 }
@@ -807,6 +822,21 @@ public class ExpressionLogical extends Expression {
             if (type == null) {
                 type = nodes[RIGHT].nodeDataTypes[i];
             }
+            // A VoltDB extension to support "IN ?"
+            else if (i == 0 && degree == 1 &&
+                    nodes[RIGHT].opType == OpTypes.DYNAMIC_PARAM &&
+                    nodes[RIGHT].nodeDataTypes != null &&
+                    nodes[RIGHT].nodeDataTypes.length == 1 &&
+                    nodes[RIGHT].nodeDataTypes[0] == null) {
+                if (type.isIntegralType()) {
+                    // promote parameter type to vector of BIGINT regardless of exact LHS integer scale.
+                    nodes[RIGHT].nodeDataTypes[0] = Type.SQL_BIGINT;
+                }
+                else {
+                    nodes[RIGHT].nodeDataTypes[0] = type;
+                }
+            }
+            // End of VoltDB extension to support "IN ?"
 
             if (type == null) {
                 throw Error.error(ErrorCode.X_42567);
@@ -820,7 +850,6 @@ public class ExpressionLogical extends Expression {
         resolveTypesForAllAny(session);
     }
 
-    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -830,8 +859,8 @@ public class ExpressionLogical extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    session.sessionContext
-                    .rangeIterators[rangePosition].getCurrent();
+                    (Object[]) session.sessionContext
+                        .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -929,7 +958,7 @@ public class ExpressionLogical extends Expression {
                 if (exprSubType == OpTypes.ANY_QUANTIFIED
                         || exprSubType == OpTypes.ALL_QUANTIFIED) {
                     return testAllAnyCondition(
-                        session, nodes[LEFT].getRowValue(session));
+                        session, (Object[]) nodes[LEFT].getRowValue(session));
                 }
 
                 Object o1 = nodes[LEFT].getValue(session);
@@ -1006,8 +1035,8 @@ public class ExpressionLogical extends Expression {
             return null;
         }
 
-        Object[] leftList  = left;
-        Object[] rightList = right;
+        Object[] leftList  = (Object[]) left;
+        Object[] rightList = (Object[]) right;
 
         for (int i = 0; i < nodes[LEFT].nodes.length; i++) {
             if (leftList[i] == null) {
@@ -1468,7 +1497,6 @@ public class ExpressionLogical extends Expression {
         ((ExpressionLogical) nodes[RIGHT]).distributeOr();
     }
 
-    @Override
     Expression getIndexableExpression(RangeVariable rangeVar) {
 
         switch (opType) {
@@ -1497,7 +1525,7 @@ public class ExpressionLogical extends Expression {
                                           : null;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case OpTypes.GREATER :
             case OpTypes.GREATER_EQUAL :
             case OpTypes.SMALLER :
@@ -1527,7 +1555,7 @@ public class ExpressionLogical extends Expression {
                     return this;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 return null;
         }
@@ -1690,65 +1718,26 @@ public class ExpressionLogical extends Expression {
 
         return true;
     }
-
-    /*************** VOLTDB *********************/
-
+    // A VoltDB extension to support X'..' as numeric literals
     /**
-     * VoltDB added method to get a non-catalog-dependent
-     * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
-     * some names.
-     * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * If one child is an integer, and the other is a VARBINARY literal, try to convert the
+     * literal to an integer.
      */
-    @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
-    {
-        String element = null;
-        switch (opType) {
-        case OpTypes.LIMIT:             element = "limit"; break;
-        case OpTypes.ADD:               element = "add"; break;
-        case OpTypes.SUBTRACT:          element = "subtract"; break;
-        case OpTypes.MULTIPLY:          element = "multiply"; break;
-        case OpTypes.DIVIDE:            element = "divide"; break;
-        case OpTypes.EQUAL:             element = "equal"; break;
-        case OpTypes.NOT_EQUAL:         element = "notequal"; break;
-        case OpTypes.GREATER:           element = "greaterthan"; break;
-        case OpTypes.GREATER_EQUAL:     element = "greaterthanorequalto"; break;
-        case OpTypes.SMALLER:           element = "lessthan"; break;
-        case OpTypes.SMALLER_EQUAL:     element = "lessthanorequalto"; break;
-        case OpTypes.AND:               element = "and"; break;
-        case OpTypes.OR:                element = "or"; break;
-        case OpTypes.IN:                element = "in"; break;
-        case OpTypes.COUNT:             element = "count"; break;
-        case OpTypes.SUM:               element = "sum"; break;
-        case OpTypes.MIN:               element = "min"; break;
-        case OpTypes.MAX:               element = "max"; break;
-        case OpTypes.AVG:               element = "avg"; break;
-        case OpTypes.SQL_FUNCTION:      element = "function"; break;
-        case OpTypes.IS_NULL:           element = "is_null"; break;
-        case OpTypes.NOT:               element = "not"; break;
-        case OpTypes.LIKE:              element = "like"; break;
-        // Handle some of the unsupported OpTypes with slightly more informative messages.
-        default:
-            throw new HSQLParseException("Unsupported Logical Operation: #" +
-                                         String.valueOf(opType));
+    private boolean voltConvertBinaryIntegerLiteral(Session session, Expression lhs, Expression rhs) {
+        Expression nonIntegralExpr;
+        int whichChild;
+        if (lhs.dataType.isIntegralType()) {
+            nonIntegralExpr = rhs;
+            whichChild = RIGHT;
+        }
+        else if (rhs.dataType.isIntegralType()) {
+            nonIntegralExpr = lhs;
+            whichChild = LEFT;
+        } else {
+            return false;
         }
 
-        VoltXMLElement exp = new VoltXMLElement("operation");
-        // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", getUniqueId(session));
-
-        exp.attributes.put("type", element);
-        if ((this.alias != null) && (getAlias().length() > 0)) {
-            exp.attributes.put("alias", getAlias());
-        }
-        for (Expression expr : nodes) {
-            VoltXMLElement vxmle = expr.voltGetXML(session);
-            exp.children.add(vxmle);
-            assert(vxmle != null);
-        }
-
-        return exp;
+        return ExpressionValue.voltMutateToBigintType(nonIntegralExpr, this, whichChild);
     }
+    // End VoltDB extension
 }

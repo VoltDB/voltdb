@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -24,15 +24,18 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 
 public class SnapshotConverter {
+    private static final VoltLogger CONSOLE_LOG = new VoltLogger("CONSOLE");
 
     /**
      * @param args
@@ -44,6 +47,7 @@ public class SnapshotConverter {
         File outdir = null;
         String type = null;
         char delimiter = '\0';
+
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
             if (arg.equals("--help")) {
@@ -73,6 +77,14 @@ public class SnapshotConverter {
                 if (invalidDir) {
                     System.exit(-1);
                 }
+            } else if (arg.equals("--timezone")) {
+                if (args.length < ii + 1) {
+                    System.err.println("Error: Not enough args following --timezone");
+                    printHelpAndQuit(-1);
+                }
+                String tzId = args[ii + 1];
+                ii++;
+                VoltTableUtil.tz = TimeZone.getTimeZone(tzId);
             } else if (arg.equals("--table")) {
                 if (args.length < ii + 1) {
                     System.err.println("Error: Not enough args following --tables");
@@ -154,24 +166,24 @@ public class SnapshotConverter {
             printHelpAndQuit(-1);
         }
 
-        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
+        Map<String, Snapshot> snapshots = new TreeMap<String, Snapshot>();
         HashSet<String> snapshotNames = new HashSet<String>();
         snapshotNames.add(snapshotName);
         SpecificSnapshotFilter filter = new SpecificSnapshotFilter(snapshotNames);
         for (File directory : directories) {
-            SnapshotUtil.retrieveSnapshotFiles( directory, snapshots, filter, 0, false);
+            SnapshotUtil.retrieveSnapshotFiles( directory, snapshots, filter, false, CONSOLE_LOG);
         }
 
         if (snapshots.size() > 1) {
             System.err.println("Error: Found " + snapshots.size() + " snapshots with specified name");
             int ii = 0;
-            for (Map.Entry<Long, Snapshot> entry : snapshots.entrySet()) {
-                System.err.println("Snapshot " + ii + " taken " + new Date(entry.getKey()));
+            for (Snapshot entry : snapshots.values()) {
+                System.err.println("Snapshot " + ii + " taken " + new Date(entry.getInstanceId().getTimestamp()));
                 System.err.println("Files: ");
-                for (File digest : entry.getValue().m_digests) {
+                for (File digest : entry.m_digests) {
                     System.err.println("\t" + digest.getPath());
                 }
-                for (Map.Entry<String, TableFiles> e2 : entry.getValue().m_tableFiles.entrySet()) {
+                for (Map.Entry<String, TableFiles> e2 : entry.m_tableFiles.entrySet()) {
                     System.err.println("\t" + e2.getKey());
                     for (File tableFile : e2.getValue().m_files) {
                         System.err.println("\t\t" + tableFile.getPath());
@@ -293,7 +305,7 @@ public class SnapshotConverter {
     private static void printHelpAndQuit( int code) {
         System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --help");
         System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --dir dir1 --dir dir2 --dir dir3" +
-                "--table table1 --table table2 --table table3 --type CSV|TSV --outdir dir snapshot_name");
+                "--table table1 --table table2 --table table3 --type CSV|TSV --outdir dir snapshot_name --timezone GMT+0");
         System.exit(code);
     }
 }

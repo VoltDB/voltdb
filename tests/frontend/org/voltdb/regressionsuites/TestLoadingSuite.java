@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,6 +28,7 @@ import java.io.IOException;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -69,7 +70,8 @@ public class TestLoadingSuite extends RegressionSuite {
         table = m_template.clone(100);
         table.addRow(1, 1, 1, "1", 1.0);
         table.addRow(2, 1, 2, "2", 2.0);
-        r = client.callProcedure("@LoadSinglepartitionTable", "PARTITIONED", table);
+        r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(1),
+                "PARTITIONED", table);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
         assertEquals(1, r.getResults().length);
         assertEquals(2, r.getResults()[0].asScalarLong());
@@ -77,9 +79,12 @@ public class TestLoadingSuite extends RegressionSuite {
 
         // test failure to load replicated table from SP proc
         try {
-            r = client.callProcedure("@LoadSinglepartitionTable", "REPLICATED", table);
+            r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(1),
+                    "REPLICATED", table);
             fail(); // prev stmt should throw exception
-        } catch (ProcCallException e) {}
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+        }
         assertEquals(0, countReplicatedRows(client));
 
         // test rollback for constraint
@@ -87,9 +92,12 @@ public class TestLoadingSuite extends RegressionSuite {
         table.addRow(3, 2, 3, "3", 3.0);
         table.addRow(3, 2, 3, "3", 3.0);
         try {
-            r = client.callProcedure("@LoadSinglepartitionTable", "PARTITIONED", table);
+            r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(2),
+                    "PARTITIONED", table);
             fail(); // prev stmt should throw exception
-        } catch (ProcCallException e) {}
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+        }
         // 2 rows in the db from the previous test (3 for hsql)
         if (isHSQL()) // sadly, hsql is not super transactional as a backend
             assertEquals(3, countPartitionedRows(client));

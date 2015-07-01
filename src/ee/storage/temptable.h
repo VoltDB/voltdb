@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -91,17 +91,33 @@ class TempTable : public Table {
         return new TableIterator(this, m_data.begin());
     }
 
+    TableIterator& iteratorDeletingAsWeGo() {
+        m_iter.reset(m_data.begin());
+        m_iter.setTempTableDeleteAsGo(true);
+        return m_iter;
+    }
+
     virtual ~TempTable();
 
     // ------------------------------------------------------------------
-    // OPERATIONS
+    // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    void deleteAllTuples(bool freeAllocatedStrings);
-    bool insertTuple(TableTuple &source);
-    bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
+    virtual void deleteAllTuples(bool freeAllocatedStrings);
+    // Deleting a tuple from temp table is not supported. use deleteAllTuples instead
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool deleteTuple(TableTuple &tuple, bool);
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    // -- Most callers should be using TempTable::insertTempTuple, anyway.
+    virtual bool insertTuple(TableTuple &tuple);
+    // Updating temp tuples is not required in production code
+    // -- it may be used in tests, though, for no especially good reason.
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                TableTuple &sourceTupleWithNewValues,
+                                                std::vector<TableIndex*> const &indexesToUpdate,
+                                                bool);
 
-    // deleting tuple from temp table is not supported. use deleteAllTuples instead
-    bool deleteTuple(TableTuple &tuple, bool);
+
     void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
 
     /**
@@ -114,8 +130,13 @@ class TempTable : public Table {
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
-    void insertTupleNonVirtual(TableTuple &source);
-    void updateTupleNonVirtual(TableTuple &source, TableTuple &target);
+    void insertTempTuple(TableTuple &source);
+    // Deprecating this ugly name, and bogus return value. For now it's a wrapper.
+    bool insertTupleNonVirtual(TableTuple &source) { insertTempTuple(source); return true; };
+
+    bool isTempTableEmpty() { return m_tupleCount == 0; }
+
+    int64_t tempTableTupleCount() const { return m_tupleCount; }
 
     // ------------------------------------------------------------------
     // INDEXES
@@ -126,12 +147,10 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     // UTILITIY
     // ------------------------------------------------------------------
-    std::string tableType() const;
-    void getNextFreeTupleInlined(TableTuple *tuple);
-    voltdb::TableStats* getTableStats();
+    virtual std::string tableType() const;
+    virtual voltdb::TableStats* getTableStats();
 
     // ptr to global integer tracking temp table memory allocated per frag
-    // should be null for persistent tables
     TempTableLimits* m_limits;
 
   protected:
@@ -144,6 +163,9 @@ class TempTable : public Table {
 
     TBPtr allocateNextBlock();
     void nextFreeTuple(TableTuple *tuple);
+
+    void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator);
+    std::vector<TBPtr>::iterator getDataEndBlockIterator();
 
     virtual void onSetColumns() {
         m_data.clear();
@@ -158,44 +180,36 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
 
     // First get the next free tuple by
     // grabbing a tuple at the end of our chunk of memory
-
-     nextFreeTuple(&m_tmpTarget1);
-    ++m_tupleCount;
-    m_usedTupleCount++;
+    TableTuple target(m_schema);
+    TempTable::nextFreeTuple(&target);
 
     //
     // Then copy the source into the target. Pass false for heapAllocateStrings.
     // Don't allocate space for the strings on the heap because the strings are being copied from the source
     // are owned by a PersistentTable or part of the EE string pool.
     //
-    m_tmpTarget1.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
-    m_tmpTarget1.setActiveTrue();
+    target.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
+    target.setActiveTrue();
 }
 
-inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
+inline void TempTable::insertTempTuple(TableTuple &source) {
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
     // grab a tuple at the end of our chunk of memory
     //
-    nextFreeTuple(&m_tmpTarget1);
-    ++m_tupleCount;
-    m_usedTupleCount++;
+    TableTuple target(m_schema);
+    TempTable::nextFreeTuple(&target);
 
     //
     // Then copy the source into the target. Pass false for heapAllocateStrings.
     // Don't allocate space for the strings on the heap because the strings are being copied from the source
     // are owned by a PersistentTable or part of the EE string pool.
     //
-    m_tmpTarget1.copy(source); // tuple in freelist must be already cleared
-    m_tmpTarget1.setActiveTrue();
-    m_tmpTarget1.setPendingDeleteFalse();
-    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
-}
-
-inline void TempTable::updateTupleNonVirtual(TableTuple &source, TableTuple &target) {
-    // Copy the source tuple into the target
-    target.copy(source);
+    target.copy(source); // tuple in freelist must be already cleared
+    target.setActiveTrue();
+    target.setPendingDeleteFalse();
+    target.setPendingDeleteOnUndoReleaseFalse();
 }
 
 inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
@@ -208,17 +222,21 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     // Don't call deleteTuple() here.
     const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
     if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
+        TableTuple target(m_schema);
         TableIterator iter(this, m_data.begin());
         while (iter.hasNext()) {
-            iter.next(m_tmpTarget1);
-            m_tmpTarget1.freeObjectColumns();
+            iter.next(target);
+            target.freeObjectColumns();
         }
     }
 
     m_tupleCount = 0;
     while (m_data.size() > 1) {
+        // This block of temp table may have been clean up already
+        // because of delete as we go feature.
+        TBPtr blockPtr = m_data.back();
         m_data.pop_back();
-        if (m_limits) {
+        if (m_limits && blockPtr) {
             m_limits->reduceAllocated(m_tableAllocationSize);
         }
     }
@@ -253,9 +271,22 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
 
     std::pair<char*, int> pair = block->nextFreeTuple();
     tuple->move(pair.first);
+    ++m_tupleCount;
     return;
 }
 
+inline void TempTable::freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+    if (m_data.begin() != nextBlockIterator) {
+        nextBlockIterator--;
+        // somehow we preserve the first block
+        if (m_data.begin() != nextBlockIterator) {
+            *nextBlockIterator = NULL;
+            if (m_limits) {
+                m_limits->reduceAllocated(m_tableAllocationSize);
+            }
+        }
+    }
+}
 
 }
 
