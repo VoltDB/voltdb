@@ -282,7 +282,6 @@ try:
     print "++++++++++++starting the Mac-side build"
     with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
         versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
-        assert versionCentos == versionMac
         buildCommunity()
         # copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
         # buildPro()
@@ -297,6 +296,7 @@ except Exception as e:
 try:
     with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
         versionCentos = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
+        assert versionCentos == versionMac
         if oneOff:
             releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
                 (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
