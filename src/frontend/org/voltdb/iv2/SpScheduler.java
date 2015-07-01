@@ -990,13 +990,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
-        if (m_cl.isEnabled()) {
-            m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), cl.isEnabled());
-            m_cl.registerDurabilityListener(m_durabilityListener);
-        }
-        else {
-
-        }
+        m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), cl.isEnabled());
+        m_cl.registerDurabilityListener(m_durabilityListener);
     }
 
     @Override
