@@ -290,7 +290,7 @@ try:
         # copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
 except Exception as e:
     print "Could not build MAC kit. Exception: " + str(e)
-    print "Type " + type(e)
+    print "Type " + str(type(e))
     build_errors=True
 
 # build kits on 5f
@@ -320,7 +320,7 @@ try:
 except Exception as e:
     print "Could not build LINUX kit: " + str(e)
     print "Could not build MAC kit. Exception: " + str(e)
-    print "Type " + type(e)
+    print "Type " + str(type(e))
     build_errors=True
 
 # build debian kit
@@ -345,7 +345,7 @@ try:
 except Exception as e:
     print "Could not build debian kit: " + str(e)
     print "Could not build MAC kit. Exception: " + str(e)
-    print "Type " + type(e)
+    print "Type " + str(type(e))
     build_errors=True
 
 try:
@@ -371,7 +371,7 @@ try:
 except Exception as e:
     print "Could not build rpm kit: " + str(e)
     print "Could not build MAC kit. Exception: " + str(e)
-    print "Type " + type(e)
+    print "Type " + str(type(e))
     build_errors=True
 
 computeChecksums(releaseDir)
