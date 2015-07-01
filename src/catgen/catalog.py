@@ -73,6 +73,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     os.system( interp( "cp $prepath/CatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/DRCatalogDiffEngine.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/DatabaseParameter.java $postpath", locals() ) )
 
     ##########
     # WRITE THE SOURCE FILES

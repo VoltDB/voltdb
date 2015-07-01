@@ -66,18 +66,31 @@ public class SQLParser extends SQLPatternFactory
     //========== Private Parsing Data ==========
 
     /**
-     * Pattern: SET <KEY> <VALUE>
+     * Pattern: SET <PARAMETER NAME> <PARAMETER VALUE>
      *
      * Capture groups:
-     *  (1) key
-     *  (2) value
+     *  (1) parameter name
+     *  (2) parameter value
      */
-    private static final Pattern SET_KEY_VALUE = Pattern.compile(
+    private static final Pattern SET_GLOBAL_PARAM = Pattern.compile(
             "(?i)" +                            // (ignore case)
             "\\A" +                             // (start statement)
             "SET" +                             // SET
-            "\\s+(\\w+)" +                      // (1) KEY
-            "\\s*=\\s*(\\w+)" +                 // (2) VALUE
+            "\\s+([\\w_]+)" +                   // (1) PARAMETER NAME
+            "\\s*=\\s*([\\w_]+)" +              // (2) PARAMETER VALUE
+            "\\s*;\\z"                          // (end statement)
+            );
+    /**
+     * Pattern: SHOW <PARAMETER NAME>
+     *
+     * Capture groups:
+     *  (1) parameter name
+     */
+    private static final Pattern SHOW_GLOBAL_PARAM = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "SHOW" +                            // SHOW
+            "\\s+([\\w_]+)" +                   // (1) PARAMETER NAME
             "\\s*;\\z"                          // (end statement)
             );
     /**
@@ -322,7 +335,9 @@ public class SQLParser extends SQLPatternFactory
             "\\AREPLICATE|" +
             "\\AEXPORT|" +
             "\\AIMPORT|" +
-            "\\ADR" +
+            "\\ADR|" +
+            "\\ASET|" +
+            "\\ASHOW" +
             ")" +                                  // end (group 1)
             "\\s" +                                // one required whitespace to terminate keyword
             "");
@@ -520,6 +535,25 @@ public class SQLParser extends SQLPatternFactory
 
     //========== Public Interface ==========
 
+    /**
+     * Match statement against set global parameter pattern
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchSetGlobalParam(String statement)
+    {
+        return SET_GLOBAL_PARAM.matcher(statement);
+    }
+
+    /**
+     * Match statement against show global parameter pattern
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchShowGlobalParam(String statement)
+    {
+        return SHOW_GLOBAL_PARAM.matcher(statement);
+    }
     /**
      * Match statement against pattern for all VoltDB-specific statement preambles
      * TODO: Much more useful would be a String parseVoltDBSpecificDdlStatementPreamble

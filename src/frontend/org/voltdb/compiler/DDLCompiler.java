@@ -58,6 +58,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.DatabaseParameter;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -803,6 +804,43 @@ public class DDLCompiler {
             return true;
         }
 
+        statementMatcher = SQLParser.matchSetGlobalParam(statement);
+        if (statementMatcher.matches()) {
+            String name = statementMatcher.group(1).toUpperCase();
+            String value = statementMatcher.group(2).toUpperCase();
+            switch (name) {
+                case DatabaseParameter.DR_MODE:
+                    if (value.equals("ACTIVE_ACTIVE")) {
+                        db.setIsactiveactivedred(true);
+                    }
+                    else if (value.equals("ACTIVE_PASSIVE") || value.equals("DEFAULT")) {
+                        db.setIsactiveactivedred(false);
+                    }
+                    else {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid parameter value for %s. Candidate values are ACTIVE_ACTIVE, ACTIVE_PASSIVE/DEFAULT", name));
+                    }
+                    break;
+                default:
+                    throw m_compiler.new VoltCompilerException(String.format(
+                        "Unknown global parameter: %s. Candidate parameters are %s", name, DatabaseParameter.DR_MODE));
+            }
+            return true;
+        }
+
+        statementMatcher = SQLParser.matchShowGlobalParam(statement);
+        if (statementMatcher.matches()) {
+            String name = statementMatcher.group(1).toUpperCase();
+            switch (name) {
+                case DatabaseParameter.DR_MODE:
+                    System.out.println(name + ": " + (db.getIsactiveactivedred() ? "ACTIVE_ACTIVE" : "ACTIVE_PASSIVE"));
+                    break;
+                default:
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Unknown global parameter: %s. Candidate parameters are %s", name, DatabaseParameter.DR_MODE));
+            }
+            return true;
+        }
         /*
          * if no correct syntax regex matched above then at this juncture
          * the statement is syntax incorrect
