@@ -426,8 +426,8 @@ public class TestExpressionUtil extends TestCase {
             new OperatorExpression(ExpressionType.OPERATOR_MINUS, lit, bint);
 
         lit_bint.normalizeOperandTypes_recurse();
-        assertEquals(lit.m_valueType, VoltType.FLOAT);
-        assertEquals(lit.m_valueSize, VoltType.FLOAT.getLengthInBytesForFixedTypes());
+        assertEquals(lit.m_valueType, VoltType.DECIMAL);
+        assertEquals(lit.m_valueSize, VoltType.DECIMAL.getLengthInBytesForFixedTypes());
         assertEquals(bint.m_valueType, VoltType.BIGINT);
         assertEquals(bint.m_valueSize, VoltType.BIGINT.getLengthInBytesForFixedTypes());
 

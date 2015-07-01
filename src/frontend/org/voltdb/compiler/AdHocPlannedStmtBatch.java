@@ -111,6 +111,14 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             Object[] extractedValues, VoltType[] paramTypes,
             Object[] userParams, int partitionParamIndex, byte[] catalogHash)
     {
+        return mockStatementBatch(replySiteId, sql, extractedValues, paramTypes, userParams, partitionParamIndex, catalogHash, true, false);
+    }
+
+    public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId, String sql,
+            Object[] extractedValues, VoltType[] paramTypes,
+            Object[] userParams, int partitionParamIndex, byte[] catalogHash,
+            boolean readOnly, boolean isAdmin)
+    {
         // Mock up a dummy completion handler to satisfy the dummy work request.
         AsyncCompilerWorkCompletionHandler dummyHandler = new AsyncCompilerWorkCompletionHandler() {
 
@@ -124,14 +132,15 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                                                                                 sql,
                                                                                 userParams,
                                                                                 false, // mock inferred partitioning
-                                                                                null, dummyHandler);
+                                                                                null, dummyHandler,
+                                                                                isAdmin);
         // Mock up dummy results from the work request.
         CorePlan core = new CorePlan(new byte[0],
                 partitionParamIndex == -1 ? new byte[20] : null,
                 new byte[20],
                 partitionParamIndex == -1 ? new byte[20] : null,
                 false,
-                true,
+                readOnly,
                 paramTypes,
                 catalogHash);
         AdHocPlannedStatement s = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),

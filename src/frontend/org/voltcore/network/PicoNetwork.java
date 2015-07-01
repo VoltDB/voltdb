@@ -64,7 +64,6 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
-import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.CancelledKeyException;
@@ -146,7 +145,10 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         m_thread.setDaemon(true);
         try {
             sc.configureBlocking(false);
-            sc.setOption(StandardSocketOptions.TCP_NODELAY, true);
+            // Cannot use sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
+            // because that is available only in java 7. This class is included in
+            // client build with -source 1.6.
+            sc.socket().setTcpNoDelay(true);
             m_selector = Selector.open();
             m_interestOps = SelectionKey.OP_READ;
             m_key = m_sc.register(m_selector, m_interestOps);
