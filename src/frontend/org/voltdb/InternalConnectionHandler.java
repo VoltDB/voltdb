@@ -42,7 +42,6 @@ public class InternalConnectionHandler {
     // Atomically allows the catalog reference to change between access
     private final AtomicLong m_failedCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
-    private boolean m_stopped = false;
 
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTIONS", 5000);
 
@@ -61,7 +60,7 @@ public class InternalConnectionHandler {
 
     public boolean callProcedure(long backPressureTimeout, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) { // TODO: we need to allow resume when memory goes back lower
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED) { // TODO: we need to allow resume when memory goes back lower
             m_logger.warn("Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
@@ -98,9 +97,6 @@ public class InternalConnectionHandler {
             try {
                 int nanos = 500 * counter++;
                 Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
-                if (m_stopped) {
-                    return false;
-                }
                 //We have reached max timeout.
                 if (System.nanoTime() - start > backPressureTimeout) {
                     return false;
