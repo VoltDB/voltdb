@@ -193,8 +193,10 @@ public class LocalCluster implements VoltServerConfig {
         assert (hostCount > 0);
 
         m_additionalProcessEnv = env==null ? new HashMap<String, String>() : env;
-        // always set use.javalib for LocalCluster so that Eclipse runs will always be OK.
-        m_additionalProcessEnv.put(EELibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
+        if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
+            // set use.javalib for LocalCluster so that Eclipse runs will be OK.
+            m_additionalProcessEnv.put(EELibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
+        }
         // get the name of the calling class
         StackTraceElement[] traces = Thread.currentThread().getStackTrace();
         m_callingClassName = "UnknownClass";
