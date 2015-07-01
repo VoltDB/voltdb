@@ -93,8 +93,8 @@ int main() {
         } else {
             allocatedBuffers++;
         }
-        buffers[idx] = malloc(BUFFER_SIZE);
         sz = MIN_BUFFER_FILL + (rand() % BUFFER_FILL_RANGE);
+        buffers[idx] = malloc(sz > BUFFER_SIZE ? sz : BUFFER_SIZE);
         memset(buffers[idx], 0, sz);
         if (i % (APPROX_STATS_SECONDS * 200) == 0) {
             printf("Progress - %f, fill ratio - %f\n",
