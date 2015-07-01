@@ -1284,6 +1284,8 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_nativeDeleteCha
 SHAREDLIB_JNIEXPORT jobject JNICALL Java_org_voltcore_utils_DBBPool_nativeAllocateUnsafeByteBuffer
   (JNIEnv *jniEnv, jclass, jlong size) {
     char *memory = new char[size];
+    // Touching all the bits tend to make a difference in memory usage in KVM.
+    memset(memory, 0, size);
     jobject buffer = jniEnv->NewDirectByteBuffer( memory, size);
     if (buffer == NULL) {
         jniEnv->ExceptionDescribe();
