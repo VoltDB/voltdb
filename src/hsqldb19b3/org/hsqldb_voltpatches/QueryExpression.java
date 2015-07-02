@@ -1188,5 +1188,52 @@ public class QueryExpression implements RangeGroup {
     public QueryExpression getRightQueryExpression() {
         return rightQueryExpression;
     }
+
+    public String voltDescribe(Session session, int blanks) {
+
+        StringBuffer sb;
+        String       temp;
+        sb = new StringBuffer();
+
+        switch (unionType) {
+
+            case UNION :
+                temp = Tokens.T_UNION;
+                break;
+
+            case UNION_ALL :
+                temp = Tokens.T_UNION + ' ' + Tokens.T_ALL;
+                break;
+
+            case INTERSECT :
+                temp = Tokens.T_INTERSECT;
+                break;
+
+            case INTERSECT_ALL :
+                temp = Tokens.T_INTERSECT + ' ' + Tokens.T_ALL;
+                break;
+
+            case EXCEPT :
+                temp = Tokens.T_EXCEPT;
+                break;
+
+            case EXCEPT_ALL :
+                temp = Tokens.T_EXCEPT + ' ' + Tokens.T_ALL;
+                break;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "QueryExpression");
+        }
+
+        sb.append(Expression.indentStr(blanks, true, false)).append(temp);
+        sb.append(Expression.indentStr(blanks, true, false)).append("Left Query=[");
+        sb.append(Expression.indentStr(blanks, true, false)).append(leftQueryExpression.voltDescribe(session, blanks + 2));
+        sb.append(Expression.indentStr(blanks, true, false)).append("]");
+        sb.append(Expression.indentStr(blanks, true, false)).append("Right Query=[");
+        sb.append(Expression.indentStr(blanks, true, false)).append(rightQueryExpression.voltDescribe(session, blanks + 2));
+        sb.append(Expression.indentStr(blanks, true, false)).append("]");
+
+        return sb.toString();
+    }
     // End of VoltDB extension
 }

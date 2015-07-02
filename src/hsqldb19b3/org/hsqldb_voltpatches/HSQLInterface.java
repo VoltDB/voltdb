@@ -308,6 +308,7 @@ public class HSQLInterface {
      */
     public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
+        m_logger.debug(String.format("SQL: %s\n", sql));;
         Statement cs = null;
         // clear the expression node id set for determinism
         sessionProxy.resetVoltNodeIds();
@@ -343,6 +344,17 @@ public class HSQLInterface {
         if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
         }
+        if (m_logger.isDebugEnabled()) {
+           try {
+               /*
+                * Sometimes exceptions happen.
+                */
+               m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.voltDescribe(sessionProxy, 0)));
+           } catch (Exception ex) {
+               System.out.printf("Exception: %s\n", ex.getMessage());
+               ex.printStackTrace(System.out);
+           }
+        }
 
         VoltXMLElement xml = cs.voltGetStatementXML(sessionProxy);
         if (m_logger.isDebugEnabled()) {
@@ -350,8 +362,6 @@ public class HSQLInterface {
                /*
                 * Sometimes exceptions happen.
                 */
-               m_logger.debug(String.format("SQL: %s\n", sql));;
-               m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
                m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
            } catch (Exception ex) {
                System.out.printf("Exception: %s\n", ex.getMessage());

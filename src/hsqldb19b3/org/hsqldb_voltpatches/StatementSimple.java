@@ -223,4 +223,10 @@ public class StatementSimple extends Statement {
     public boolean isCatalogChange() {
         return false;
     }
+
+    // A VoltDB Extension to print HSQLDB ASTs
+    public String voltDescribe(Session session, int blanks) {
+        return "";
+    }
+    // end of VoltDB extension
 }

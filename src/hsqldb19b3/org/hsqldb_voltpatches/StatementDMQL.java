@@ -963,7 +963,7 @@ public abstract class StatementDMQL extends Statement {
                     assert(index < displayCols.size());
                     Expression column = displayCols.get(index);
                     e.setLeftNode(column);
-                    VoltXMLElement xml = e.voltGetXML(session, displayCols, ignoredColsIndexes, i);
+                    VoltXMLElement xml = e.voltGetXML(session, displayCols, ignoredColsIndexes, i, null, parameters);
                     orderCols.children.add(xml);
                 }
             }
@@ -1201,7 +1201,7 @@ public abstract class StatementDMQL extends Statement {
         if (havingCondition != null) {
             VoltXMLElement having = new VoltXMLElement("having");
             query.children.add(having);
-            VoltXMLElement havingExpr = havingCondition.voltGetXML(session, select.displayCols, ignoredColsIndexes, 0);
+            VoltXMLElement havingExpr = havingCondition.voltGetXML(session, select.displayCols, ignoredColsIndexes, 0, null, parameters);
             having.children.add(havingExpr);
         }
 
@@ -1210,7 +1210,7 @@ public abstract class StatementDMQL extends Statement {
             if (ignoredColsIndexes.contains(jj)) {
                 continue;
             }
-            VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
+            VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj, null, parameters);
             cols.children.add(xml);
             assert(xml != null);
         }
@@ -1234,7 +1234,7 @@ public abstract class StatementDMQL extends Statement {
 
             for (int jj=0; jj < groupByCols.size(); ++jj) {
                 Expression expr = groupByCols.get(jj);
-                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
+                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj, null, parameters);
                 groupCols.children.add(xml);
             }
         }
@@ -1245,7 +1245,7 @@ public abstract class StatementDMQL extends Statement {
             query.children.add(orderCols);
             for (int jj=0; jj < orderByCols.size(); ++jj) {
                 Expression expr = orderByCols.get(jj);
-                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
+                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj, null, parameters);
                 orderCols.children.add(xml);
             }
         }
@@ -1356,6 +1356,246 @@ public abstract class StatementDMQL extends Statement {
                 parameter.attributes.put("isvector", "true");
             }
         }
+    }
+
+    /**
+     * Retrieves a String representation of this object.
+     */
+    public String voltDescribe(Session session, int blanks) {
+        try {
+            return voltDescribeImpl(session, blanks);
+        } catch (Throwable e) {
+            e.printStackTrace();
+
+            return e.toString();
+        }
+    }
+
+    String voltDescribeImpl(Session session, int blanks) throws Exception {
+        StringBuffer sb;
+        sb = new StringBuffer();
+        switch (type) {
+            case StatementTypes.SELECT_CURSOR : {
+                sb.append(queryExpression.voltDescribe(session, blanks+2))
+                  .append(Expression.indentStr(blanks, true, false));
+                voltAppendParms(sb, blanks+2)
+                  .append(Expression.indentStr(blanks, true, false));
+                voltAppendSubqueries(session, sb, blanks+2)
+                  .append(Expression.indentStr(blanks, true, false));
+                return sb.toString();
+            }
+            case StatementTypes.INSERT : {
+                if (queryExpression == null) {
+                    sb.append("INSERT VALUES [");
+                    sb.append(Expression.indentStr(blanks + 2, true, false));
+                    voltAppendMultiColumns(sb, insertColumnMap, blanks + 2)
+                        .append(Expression.indentStr(blanks + 2, true, false));
+                    voltAppendTable(sb, blanks + 2)
+                        .append(Expression.indentStr(blanks + 2, true, false));
+                    voltAppendParms(sb, blanks + 2)
+                        .append(Expression.indentStr(blanks + 2, true, false));
+                    voltAppendSubqueries(session, sb, 2)
+                        .append(Expression.indentStr(blanks, true, false))
+                        .append(']');
+                    return sb.toString();
+                } else {
+                    sb.append("INSERT SELECT [")
+                      .append(Expression.indentStr(blanks + 2, true, false));
+                    voltAppendColumns(sb, insertColumnMap, blanks)
+                      .append(Expression.indentStr(blanks + 2, true, false));
+                    voltAppendTable(sb, blanks)
+                      .append(Expression.indentStr(blanks + 2, true, false));
+                    sb.append(queryExpression.voltDescribe(session, blanks))
+                      .append(Expression.indentStr(blanks + 2, true, false));
+                    voltAppendParms(sb, blanks)
+                      .append(Expression.indentStr(blanks + 2, true, false));
+                    voltAppendSubqueries(session, sb, blanks+2)
+                      .append(Expression.indentStr(blanks, true, false))
+                      .append(']');
+                    return sb.toString();
+                }
+            }
+            case StatementTypes.UPDATE_WHERE : {
+                sb.append("UPDATE [")
+                  .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendColumns(sb, updateColumnMap, blanks)
+                      .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendTable(sb, blanks)
+                     .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendCondition(session, sb, blanks);
+                for (int i = 0; i < targetRangeVariables.length; i++) {
+                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                      .append(targetRangeVariables[i].voltDescribe(session, blanks));
+                }
+                sb.append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendParms(sb, blanks)
+                    .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendSubqueries(session, sb, blanks+2)
+                    .append(Expression.indentStr(blanks, true, false))
+                    .append(']');
+                return sb.toString();
+            }
+            case StatementTypes.DELETE_WHERE : {
+                sb.append("DELETE [")
+                    .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendTable(sb, blanks + 2)
+                    .append(Expression.indentStr(blanks + 4, true, false));
+                voltAppendCondition(session, sb, blanks + 2);
+
+                for (int i = 0; i < targetRangeVariables.length; i++) {
+                    sb.append(Expression.indentStr(blanks + 6, true, false))
+                      .append(targetRangeVariables[i].voltDescribe(session, blanks + 4));
+                }
+                sb.append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendParms(sb, blanks + 4)
+                   .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendSubqueries(session, sb, blanks + 2)
+                   .append(Expression.indentStr(blanks + 2, true, false))
+                   .append(']');
+                return sb.toString();
+            }
+            case StatementTypes.CALL : {
+                sb.append("CALL[]");
+                return sb.toString();
+            }
+            case StatementTypes.MERGE : {
+                sb.append("MERGE [")
+                  .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendMultiColumns(sb, insertColumnMap, blanks + 2)
+                  .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendColumns(sb, updateColumnMap, blanks + 2)
+                  .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendTable(sb, blanks + 2)
+                  .append(Expression.indentStr(blanks + 2, true, false));
+                voltAppendCondition(session, sb, blanks + 2);
+
+                for (int i = 0; i < targetRangeVariables.length; i++) {
+                    sb.append(Expression.indentStr(blanks + 4, true, false))
+                      .append(targetRangeVariables[i].voltDescribe(session, blanks + 4));
+                }
+                sb.append(Expression.indentStr(blanks+2, true, false));
+                voltAppendParms(sb, blanks + 2)
+                  .append(Expression.indentStr(blanks+2, true, false));
+                voltAppendSubqueries(session, sb, blanks+2)
+                  .append(Expression.indentStr(blanks+2, true, false))
+                  .append(']');
+
+                return sb.toString();
+            }
+            default : {
+                return "UNKNOWN";
+            }
+        }
+    }
+
+    private StringBuffer voltAppendSubqueries(Session session,
+                                              StringBuffer sb,
+                                              int blanks) {
+        sb.append("SUBQUERIES[");
+        for (int i = 0; i < subqueries.length; i++) {
+            sb.append(Expression.indentStr(blanks+2, true, false))
+              .append("[level=")
+              .append(subqueries[i].depth)
+              .append("]")
+              .append(Expression.indentStr(blanks+2, true, false));
+            if (subqueries[i].queryExpression == null) {
+                sb.append("value expression");
+            } else {
+                sb.append(subqueries[i].queryExpression.voltDescribe(session, blanks));
+            }
+            sb.append(Expression.indentStr(blanks, true, false))
+              .append("]");
+        }
+        sb.append(Expression.indentStr(blanks, true, false))
+          .append(']');
+        return sb;
+    }
+
+    private StringBuffer voltAppendTable(StringBuffer sb, int blanks) {
+
+        sb.append("TABLE[").append(targetTable.getName().name).append(']');
+
+        return sb;
+    }
+
+    private StringBuffer voltAppendSourceTable(StringBuffer sb, int blanks) {
+
+        sb.append("SOURCE TABLE[").append(sourceTable.getName().name).append(
+            ']');
+
+        return sb;
+    }
+
+    private StringBuffer voltAppendColumns(StringBuffer sb, int[] columnMap, int blanks) {
+
+        if (columnMap == null || updateExpressions.length == 0) {
+            return sb;
+        }
+
+        sb.append("COLUMNS = [");
+        for (int i = 0; i < columnMap.length; i++) {
+            sb.append(Expression.indentStr(blanks, true, false))
+              .append(columnMap[i])
+              .append(": ")
+              .append(targetTable.getColumn(columnMap[i]).getNameString());
+        }
+
+        for (int i = 0; i < updateExpressions.length; i++) {
+            sb.append(Expression.indentStr(blanks, true, false))
+              .append('[')
+              .append(updateExpressions[i]).append(']');
+        }
+        sb.append(Expression.indentStr(blanks, true, false)).append(']');
+        return sb;
+    }
+
+    private StringBuffer voltAppendMultiColumns(StringBuffer sb, int[] columnMap, int blanks) {
+
+        // todo - multiColVals is always null
+        if (columnMap == null || multiColumnValues == null) {
+            return sb;
+        }
+
+        sb.append("COLUMNS = [");
+        for (int j = 0; j < multiColumnValues.length; j++) {
+            for (int i = 0; i < columnMap.length; i++) {
+                sb.append(Expression.indentStr(blanks + 2, true, false))
+                  .append(columnMap[i])
+                  .append(": ")
+                  .append(targetTable.getColumn(columnMap[i]).getName().name)
+                  .append("[")
+                  .append(multiColumnValues[j][i])
+                  .append(']');
+            }
+        }
+        sb.append(Expression.indentStr(blanks, true, false))
+          .append(']');
+        return sb;
+    }
+
+    private StringBuffer voltAppendParms(StringBuffer sb, int blanks) {
+        sb.append("PARAMETERS = [");
+        for (int i = 0; i < parameters.length; i++) {
+            sb.append(Expression.indentStr(blanks + 2, true, false))
+              .append('@')
+              .append(i)
+              .append('[')
+              .append(parameters[i].voltDescribe(null, blanks + 2))
+              .append(']');
+        }
+
+        sb.append(Expression.indentStr(blanks, true, false))
+          .append(']');
+        return sb;
+    }
+
+    private StringBuffer voltAppendCondition(Session session, StringBuffer sb, int blanks) {
+        return condition == null ? sb.append("CONDITION []\n")
+                                 : sb.append("CONDITION [")
+                                     .append(Expression.indentStr(blanks + 2, true, false))
+                                     .append(condition.voltDescribe(session, blanks + 2))
+                                     .append(Expression.indentStr(blanks + 2, true, false))
+                                     .append("]");
     }
     // End of VoltDB extension
 }

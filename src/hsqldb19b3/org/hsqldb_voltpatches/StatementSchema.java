@@ -1311,7 +1311,7 @@ public class StatementSchema extends Statement {
 
                     // A VoltDB extension to support indexed expressions,
                     // the assume unique attribute, and partial indexes
-                    org.hsqldb_voltpatches.index.Index addedIndex = 
+                    org.hsqldb_voltpatches.index.Index addedIndex =
                     // End of VoltDB extension
                     tableWorks.addIndex(indexColumns, name, unique);
                     // A VoltDB extension to support assume unique attribute
@@ -1602,4 +1602,10 @@ public class StatementSchema extends Statement {
     public Object[] getArguments() {
         return arguments;
     }
+
+    // A VoltDB extension to print HSQLDB ASTs
+    public String voltDescribe(Session session, int blanks) {
+        return sql;
+    }
+    // end of VoltDB extension
 }
