@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,59 +32,44 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.result.Result;
 
 /**
  * Implementation of SQL TRIGGER objects.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.2
  * @since 1.9.0
  */
 public class TriggerDefSQL extends TriggerDef {
 
     OrderedHashSet references;
 
-    public TriggerDefSQL(HsqlNameManager.HsqlName name, String when,
-                         String operation, boolean forEachRow, Table table,
+    public TriggerDefSQL(HsqlNameManager.HsqlName name, int when,
+                         int operation, boolean forEachRow, Table table,
                          Table[] transitions, RangeVariable[] rangeVars,
                          Expression condition, String conditionSQL,
-                         int[] updateColumns,
-                         StatementDMQL[] compiledStatements,
-                         String procedureSQL, OrderedHashSet references) {
+                         int[] updateColumns, Routine routine) {
 
-        this.name               = name;
-        this.actionTimingString = when;
-        this.eventTimingString  = operation;
-        this.forEachRow         = forEachRow;
-        this.table              = table;
-        this.transitions        = transitions;
-        this.rangeVars          = rangeVars;
-        this.condition          = condition == null ? Expression.EXPR_TRUE
-                                                    : condition;
-        this.updateColumns      = updateColumns;
-        this.statements         = compiledStatements;
-        this.conditionSQL       = conditionSQL;
-        this.procedureSQL       = procedureSQL;
-        this.references         = references;
-        hasTransitionRanges = transitions[OLD_ROW] != null
-                              || transitions[NEW_ROW] != null;
-        hasTransitionTables = transitions[OLD_TABLE] != null
-                              || transitions[NEW_TABLE] != null;
+        super(name, when, operation, forEachRow, table, transitions,
+              rangeVars, condition, conditionSQL, updateColumns);
 
-        setUpIndexesAndTypes();
-
-        //
+        this.routine    = routine;
+        this.references = routine.getReferences();
     }
 
     public OrderedHashSet getReferences() {
-        return references;
+        return routine.getReferences();
     }
 
     public OrderedHashSet getComponents() {
         return null;
     }
 
-    public void compile(Session session) {}
+    public void compile(Session session, SchemaObject parentObject) {
+
+        routine.compile(session, null);
+    }
 
     public String getClassName() {
         return null;
@@ -101,99 +86,36 @@ public class TriggerDefSQL extends TriggerDef {
     synchronized void pushPair(Session session, Object[] oldData,
                                Object[] newData) {
 
-        if (transitions[OLD_ROW] != null) {
-            rangeVars[OLD_ROW].getIterator(session).currentData = oldData;
+        Result result = Result.updateZeroResult;
+
+        session.sessionContext.push();
+
+        if (rangeVars[OLD_ROW] != null || rangeVars[NEW_ROW] != null) {
+            session.sessionContext.triggerArguments = new Object[][] {
+                oldData, newData
+            };
         }
 
-        if (transitions[NEW_ROW] != null) {
-            rangeVars[NEW_ROW].getIterator(session).currentData = newData;
+        if (condition.testCondition(session)) {
+            int variableCount = routine.getVariableCount();
+
+            session.sessionContext.routineVariables =
+                new Object[variableCount];
+            result = routine.statement.execute(session);
         }
 
-        if (!condition.testCondition(session)) {
-            return;
-        }
+        session.sessionContext.pop();
 
-        for (int i = 0; i < statements.length; i++) {
-            statements[i].execute(session);
+        if (result.isError()) {
+            throw result.getException();
         }
     }
 
     public String getSQL() {
 
-        boolean      isBlock = statements.length > 1;
-        StringBuffer sb      = new StringBuffer(256);
+        StringBuffer sb = getSQLMain();
 
-        sb.append(Tokens.T_CREATE).append(' ');
-        sb.append(Tokens.T_TRIGGER).append(' ');
-        sb.append(name.statementName).append(' ');
-        sb.append(actionTimingString).append(' ');
-        sb.append(eventTimingString).append(' ');
-        sb.append(Tokens.T_ON).append(' ');
-        sb.append(table.getName().statementName).append(' ');
-
-        if (hasTransitionRanges || hasTransitionTables) {
-            sb.append(Tokens.T_REFERENCING).append(' ');
-
-            String separator = "";
-
-            if (transitions[OLD_ROW] != null) {
-                sb.append(Tokens.T_OLD).append(' ').append(Tokens.T_ROW);
-                sb.append(' ').append(Tokens.T_AS).append(' ');
-                sb.append(transitions[OLD_ROW].getName().statementName);
-
-                separator = Tokens.T_COMMA;
-            }
-
-            if (transitions[NEW_ROW] != null) {
-                sb.append(separator);
-                sb.append(Tokens.T_NEW).append(' ').append(Tokens.T_ROW);
-                sb.append(' ').append(Tokens.T_AS).append(' ');
-                sb.append(transitions[NEW_ROW].getName().statementName);
-
-                separator = Tokens.T_COMMA;
-            }
-
-            if (transitions[OLD_TABLE] != null) {
-                sb.append(separator);
-                sb.append(Tokens.T_OLD).append(' ').append(Tokens.T_TABLE);
-                sb.append(' ').append(Tokens.T_AS).append(' ');
-                sb.append(transitions[OLD_TABLE].getName().statementName);
-
-                separator = Tokens.T_COMMA;
-            }
-
-            if (transitions[NEW_TABLE] != null) {
-                sb.append(separator);
-                sb.append(Tokens.T_OLD).append(' ').append(Tokens.T_TABLE);
-                sb.append(' ').append(Tokens.T_AS).append(' ');
-                sb.append(transitions[NEW_TABLE].getName().statementName);
-            }
-
-            sb.append(' ');
-        }
-
-        if (forEachRow) {
-            sb.append(Tokens.T_FOR).append(' ');
-            sb.append(Tokens.T_EACH).append(' ');
-            sb.append(Tokens.T_ROW).append(' ');
-        }
-
-        if (condition != Expression.EXPR_TRUE) {
-            sb.append(Tokens.T_WHEN).append(' ');
-            sb.append(Tokens.T_OPENBRACKET).append(conditionSQL);
-            sb.append(Tokens.T_CLOSEBRACKET).append(' ');
-        }
-
-        if (isBlock) {
-            sb.append(Tokens.T_BEGIN).append(' ').append(Tokens.T_ATOMIC);
-            sb.append(' ');
-        }
-
-        sb.append(procedureSQL).append(' ');
-
-        if (isBlock) {
-            sb.append(Tokens.T_END);
-        }
+        sb.append(routine.statement.getSQL());
 
         return sb.toString();
     }

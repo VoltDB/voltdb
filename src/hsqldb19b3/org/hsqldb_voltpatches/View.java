@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,8 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
 // fredt@users 20020420 - patch523880 by leptipre@users - VIEW support - modified
@@ -42,51 +44,40 @@ import org.hsqldb_voltpatches.lib.OrderedHashSet;
  *
  * @author leptipre@users
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.7.0
  */
 public class View extends TableDerived {
 
-    SubQuery viewSubQuery;
-    String   statement;
+    private String statement;
 
     //
-    HsqlName[] columnNames;
-
-    /** schema at the time of compilation */
-    HsqlName compileTimeSchema;
-
-    /**
-     * List of subqueries in this view in order of materialization. Last
-     * element is the view itself.
-     */
-    SubQuery[] viewSubqueries;
+    private HsqlName[] columnNames;
 
     /**
      * Names of SCHEMA objects referenced in VIEW
      */
-    OrderedHashSet schemaObjectNames;
+    private OrderedHashSet schemaObjectNames;
 
     /**
      * check option
      */
-    int check;
+    private int checkOption;
 
     //
     private Table baseTable;
 
     //
-    Expression checkExpression;
+    boolean isTriggerInsertable;
+    boolean isTriggerUpdatable;
+    boolean isTriggerDeletable;
 
-    View(Session session, Database db, HsqlName name, HsqlName[] columnNames,
-            String definition, int check) {
+    View(Database db, HsqlName name, HsqlName[] columnNames, int check) {
 
         super(db, name, TableBase.VIEW_TABLE);
 
-        this.columnNames  = columnNames;
-        this.statement    = definition;
-        this.check        = check;
-        compileTimeSchema = session.getSchemaHsqlName(null);
+        this.columnNames = columnNames;
+        this.checkOption = check;
     }
 
     public int getType() {
@@ -104,30 +95,25 @@ public class View extends TableDerived {
     /**
      * Compiles the query expression and sets up the columns.
      */
-    public void compile(Session session) {
+    public void compile(Session session, SchemaObject parentObject) {
 
-        if (!database.schemaManager.schemaExists(compileTimeSchema.name)) {
-            compileTimeSchema = session.getSchemaHsqlName(null);
-        }
-
-        session.setSchema(compileTimeSchema.name);
-
-        ParserDQL p = new ParserDQL(session, new Scanner(statement));
+        ParserDQL p = new ParserDQL(session, new Scanner(statement), null);
 
         p.read();
 
-        viewSubQuery    = p.XreadViewSubquery(this);
-        queryExpression = viewSubQuery.queryExpression;
+        TableDerived viewSubQueryTable = p.XreadViewSubqueryTable(this, true);
+
+        queryExpression = viewSubQueryTable.queryExpression;
 
         if (getColumnCount() == 0) {
             if (columnNames == null) {
                 columnNames =
-                    viewSubQuery.queryExpression.getResultColumnNames();
+                    viewSubQueryTable.queryExpression.getResultColumnNames();
             }
 
             if (columnNames.length
-                    != viewSubQuery.queryExpression.getColumnCount()) {
-                throw Error.error(ErrorCode.X_42593, tableName.statementName);
+                    != viewSubQueryTable.queryExpression.getColumnCount()) {
+                throw Error.error(ErrorCode.X_42593, getName().statementName);
             }
 
             TableUtil.setColumnsInSchemaTable(
@@ -135,33 +121,18 @@ public class View extends TableDerived {
         }
 
         //
-        viewSubqueries = p.compileContext.getSubqueries();
-
-        for (int i = 0; i < viewSubqueries.length; i++) {
-            if (viewSubqueries[i].parentView == null) {
-                viewSubqueries[i].parentView = this;
-            }
-        }
-
-        //
-        viewSubQuery.getTable().view       = this;
-        viewSubQuery.getTable().columnList = columnList;
         schemaObjectNames = p.compileContext.getSchemaObjectNames();
-        baseTable                          = queryExpression.getBaseTable();
+        canRecompile      = true;
+        baseTable         = queryExpression.getBaseTable();
 
         if (baseTable == null) {
             return;
         }
 
-        switch (check) {
+        switch (checkOption) {
 
             case SchemaObject.ViewCheckModes.CHECK_NONE :
-                break;
-
             case SchemaObject.ViewCheckModes.CHECK_LOCAL :
-                checkExpression = queryExpression.getCheckCondition();
-                break;
-
             case SchemaObject.ViewCheckModes.CHECK_CASCADE :
                 break;
 
@@ -199,15 +170,84 @@ public class View extends TableDerived {
         return queryExpression.getBaseTableColumnMap();
     }
 
-    public int getCheckOption() {
-        return check;
+    public boolean isTriggerInsertable() {
+        return isTriggerInsertable;
     }
 
-    /**
-     * Returns the query expression for the view.
-     */
-    public String getStatement() {
-        return statement;
+    public boolean isTriggerUpdatable() {
+        return isTriggerUpdatable;
+    }
+
+    public boolean isTriggerDeletable() {
+        return isTriggerDeletable;
+    }
+
+    public boolean isInsertable() {
+        return isTriggerInsertable ? false
+                                   : super.isInsertable();
+    }
+
+    public boolean isUpdatable() {
+        return isTriggerUpdatable ? false
+                                  : super.isUpdatable();
+    }
+
+    void addTrigger(TriggerDef td, HsqlName otherName) {
+
+        switch (td.operationType) {
+
+            case StatementTypes.INSERT :
+                if (isTriggerInsertable) {
+                    throw Error.error(ErrorCode.X_42538);
+                }
+
+                isTriggerInsertable = true;
+                break;
+
+            case StatementTypes.DELETE_WHERE :
+                if (isTriggerDeletable) {
+                    throw Error.error(ErrorCode.X_42538);
+                }
+
+                isTriggerDeletable = true;
+                break;
+
+            case StatementTypes.UPDATE_WHERE :
+                if (isTriggerUpdatable) {
+                    throw Error.error(ErrorCode.X_42538);
+                }
+
+                isTriggerUpdatable = true;
+                break;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "View");
+        }
+
+        super.addTrigger(td, otherName);
+    }
+
+    void removeTrigger(TriggerDef td) {
+
+        switch (td.operationType) {
+
+            case StatementTypes.INSERT :
+                isTriggerInsertable = false;
+                break;
+
+            case StatementTypes.DELETE_WHERE :
+                isTriggerDeletable = false;
+                break;
+
+            case StatementTypes.UPDATE_WHERE :
+                isTriggerUpdatable = false;
+                break;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "View");
+        }
+
+        super.removeTrigger(td);
     }
 
     /**
@@ -217,22 +257,46 @@ public class View extends TableDerived {
         throw Error.error(ErrorCode.X_28000);
     }
 
-    public void collectAllFunctionExpressions(OrderedHashSet collector) {
-
-        // filter schemaObjectNames
+    public int getCheckOption() {
+        return checkOption;
     }
 
-    /************************* Volt DB Extensions *************************/
+    /**
+     * Returns the query expression for the view.
+     */
+    public String getStatement() {
+        return statement;
+    }
+
+    public void setStatement(String sql) {
+        statement = sql;
+    }
+
+    public TableDerived newDerivedTable(Session session) {
+
+        TableDerived td;
+        ParserDQL p = new ParserDQL(session, new Scanner(),
+                                    session.parser.compileContext);
+
+        p.reset(statement);
+        p.read();
+
+        td = p.XreadViewSubqueryTable(this, false);
+
+        return td;
+    }
+    // A VoltDB extension to export abstract parse trees
 
     /**
-     * VoltDB added method to get a non-catalog-dependent
+     * VoltDB added method to get an abstract parse tree
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * @return VoltXMLElement, a free-form (schema-less) abstract parse tree.
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
-    VoltXMLElement voltGetTableXML(Session session) throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
+    VoltXMLElement voltGetTableXML(Session session)
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = super.voltGetTableXML(session);
 
@@ -240,5 +304,5 @@ public class View extends TableDerived {
         table.attributes.put("query", statement);
         return table;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

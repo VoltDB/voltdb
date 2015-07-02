@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,20 +32,49 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.rights.User;
 import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.IntervalSecondData;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
- * Implementation of Statement for SQL commands.<p>
+ * Implementation of Statement for SQL session statements.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.6
  * @since 1.9.0
  */
 public class StatementSession extends Statement {
+
+    public final static StatementSession commitNoChainStatement =
+        new StatementSession(StatementTypes.COMMIT_WORK,
+                             new Object[]{ Boolean.FALSE });
+    public final static StatementSession rollbackNoChainStatement =
+        new StatementSession(StatementTypes.ROLLBACK_WORK,
+                             new Object[]{ Boolean.FALSE });
+    public final static StatementSession commitAndChainStatement =
+        new StatementSession(StatementTypes.COMMIT_WORK,
+                             new Object[]{ Boolean.TRUE });
+    public final static StatementSession rollbackAndChainStatement =
+        new StatementSession(StatementTypes.ROLLBACK_WORK,
+                             new Object[]{ Boolean.TRUE });
+
+    static {
+        commitNoChainStatement.sql   = Tokens.T_COMMIT;
+        commitAndChainStatement.sql  = Tokens.T_COMMIT + ' ' + Tokens.T_CHAIN;
+        rollbackNoChainStatement.sql = Tokens.T_ROLLBACK;
+        rollbackAndChainStatement.sql = Tokens.T_ROLLBACK + ' '
+                                        + Tokens.T_CHAIN;
+        commitNoChainStatement.compileTimestamp    = Long.MAX_VALUE;
+        commitAndChainStatement.compileTimestamp   = Long.MAX_VALUE;
+        rollbackNoChainStatement.compileTimestamp  = Long.MAX_VALUE;
+        rollbackAndChainStatement.compileTimestamp = Long.MAX_VALUE;
+    }
 
     Expression[] expressions;
     Object[]     parameters;
@@ -56,6 +85,7 @@ public class StatementSession extends Statement {
 
         this.expressions       = args;
         isTransactionStatement = false;
+        isLogged               = false;
 
         switch (type) {
 
@@ -64,6 +94,7 @@ public class StatementSession extends Statement {
             case StatementTypes.SET_NAMES :
             case StatementTypes.SET_ROLE :
             case StatementTypes.SET_SCHEMA :
+            case StatementTypes.SET_CATALOG :
             case StatementTypes.SET_SESSION_AUTHORIZATION :
             case StatementTypes.SET_COLLATION :
                 group = StatementTypes.X_SQL_SESSION;
@@ -71,7 +102,7 @@ public class StatementSession extends Statement {
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500,
-                                         "StateemntCommand");
+                                         "StateemntSession");
         }
     }
 
@@ -104,7 +135,7 @@ public class StatementSession extends Statement {
             case StatementTypes.ALLOCATE_DESCRIPTOR :
             case StatementTypes.DEALLOCATE_DESCRIPTOR :
             case StatementTypes.DEALLOCATE_PREPARE :
-                group = StatementTypes.X_DYNAMIC;
+                group = StatementTypes.X_SQL_DYNAMIC;
                 break;
 
             //
@@ -131,7 +162,7 @@ public class StatementSession extends Statement {
             case StatementTypes.PREPARABLE_DYNAMIC_DELETE_CURSOR :
             case StatementTypes.PREPARABLE_DYNAMIC_UPDATE_CURSOR :
             case StatementTypes.PREPARE :
-                group = StatementTypes.X_DYNAMIC;
+                group = StatementTypes.X_SQL_DYNAMIC;
                 break;
 
             // logged by session
@@ -140,16 +171,21 @@ public class StatementSession extends Statement {
                 break;
 
             //
+            case StatementTypes.SET_COLLATION :
             case StatementTypes.SET_CONNECTION :
             case StatementTypes.SET_CONSTRAINT :
             case StatementTypes.SET_DESCRIPTOR :
-            case StatementTypes.SET_CATALOG :
             case StatementTypes.SET_SESSION_CHARACTERISTICS :
             case StatementTypes.SET_TRANSFORM_GROUP :
             case StatementTypes.SET_SESSION_RESULT_MAX_ROWS :
             case StatementTypes.SET_SESSION_RESULT_MEMORY_ROWS :
             case StatementTypes.SET_SESSION_AUTOCOMMIT :
                 group = StatementTypes.X_HSQLDB_SESSION;
+                break;
+
+            case StatementTypes.SET_SESSION_SQL_IGNORECASE :
+                isLogged = true;
+                group    = StatementTypes.X_HSQLDB_SESSION;
                 break;
 
             // logged by session if necessary
@@ -163,9 +199,14 @@ public class StatementSession extends Statement {
                 group = StatementTypes.X_SQL_TRANSACTION;
                 break;
 
+            case StatementTypes.DECLARE_SESSION_TABLE :
+            case StatementTypes.DROP_TABLE :
+                group = StatementTypes.X_SQL_SESSION;
+                break;
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500,
-                                         "StatementCommand");
+                                         "StatementSession");
         }
     }
 
@@ -173,9 +214,10 @@ public class StatementSession extends Statement {
 
         super(type);
 
-        this.isTransactionStatement = true;
-        this.readTableNames         = readNames;
-        writeTableNames             = writeNames;
+        isTransactionStatement = true;
+        isLogged               = false;
+        readTableNames         = readNames;
+        writeTableNames        = writeNames;
 
         switch (type) {
 
@@ -185,13 +227,19 @@ public class StatementSession extends Statement {
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500,
-                                         "StatementCommand");
+                                         "StatementSession");
         }
     }
 
     public Result execute(Session session) {
 
-        Result result = getResult(session);
+        Result result;
+
+        try {
+            result = getResult(session);
+        } catch (Throwable t) {
+            result = Result.newErrorResult(t, null);
+        }
 
         if (result.isError()) {
             result.getException().setStatementType(group, type);
@@ -201,9 +249,9 @@ public class StatementSession extends Statement {
 
         try {
             if (isLogged) {
-                session.database.logger.writeToLog(session, sql);
+                session.database.logger.writeOtherStatement(session, sql);
             }
-        } catch (HsqlException e) {
+        } catch (Throwable e) {
             return Result.newErrorResult(e, sql);
         }
 
@@ -229,7 +277,7 @@ public class StatementSession extends Statement {
             //
             case StatementTypes.COMMIT_WORK : {
                 try {
-                    boolean chain = parameters != null;
+                    boolean chain = ((Boolean) parameters[0]).booleanValue();
 
                     session.commit(chain);
 
@@ -310,8 +358,10 @@ public class StatementSession extends Statement {
 
                 try {
                     name = (String) expressions[0].getValue(session);
+                    name = (String) Type.SQL_VARCHAR.trim(session, name, ' ',
+                                                          true, true);
 
-                    if (session.database.getCatalogName().equals(name)) {
+                    if (session.database.getCatalogName().name.equals(name)) {
                         return Result.updateZeroResult;
                     }
 
@@ -332,7 +382,7 @@ public class StatementSession extends Statement {
                 if (expressions[0].getType() == OpTypes.VALUE
                         && expressions[0].getConstantValueNoCheck(session)
                            == null) {
-                    session.timeZoneSeconds = session.sessionTimeZoneSeconds;
+                    session.setZoneSeconds(session.sessionTimeZoneSeconds);
 
                     return Result.updateZeroResult;
                 }
@@ -352,9 +402,9 @@ public class StatementSession extends Statement {
                         if (single && data != null && data[0] != null) {
                             value = data[0];
 
-                            result.getNavigator().close();
+                            result.getNavigator().release();
                         } else {
-                            result.getNavigator().close();
+                            result.getNavigator().release();
 
                             return Result.newErrorResult(
                                 Error.error(ErrorCode.X_22009), sql);
@@ -374,7 +424,7 @@ public class StatementSession extends Statement {
 
                 if (-DTIType.timezoneSecondsLimit <= seconds
                         && seconds <= DTIType.timezoneSecondsLimit) {
-                    session.timeZoneSeconds = (int) seconds;
+                    session.setZoneSeconds((int) seconds);
 
                     return Result.updateZeroResult;
                 }
@@ -390,24 +440,33 @@ public class StatementSession extends Statement {
 
             case StatementTypes.SET_ROLE : {
                 String  name;
-                Grantee role;
+                Grantee role = null;
 
                 try {
                     name = (String) expressions[0].getValue(session);
-                    role = session.database.granteeManager.getRole(name);
+
+                    if (name != null) {
+                        name = (String) Type.SQL_VARCHAR.trim(session, name,
+                                                              ' ', true, true);
+                        role = session.database.granteeManager.getRole(name);
+                    }
                 } catch (HsqlException e) {
                     return Result.newErrorResult(
                         Error.error(ErrorCode.X_0P000), sql);
                 }
 
-                if (role == null) {
+                if (session.isInMidTransaction()) {
                     return Result.newErrorResult(
-                        Error.error(ErrorCode.X_0P000), sql);
+                        Error.error(ErrorCode.X_25001), sql);
+                }
+
+                if (role == null) {
+                    session.setRole(null);
                 }
 
                 if (session.getGrantee().hasRole(role)) {
+                    session.setRole(role);
 
-                    /** @todo 1.9.0 - implement */
                     return Result.updateZeroResult;
                 } else {
                     return Result.newErrorResult(
@@ -425,10 +484,12 @@ public class StatementSession extends Statement {
                         name = (String) expressions[0].getValue(session);
                     }
 
+                    name = (String) Type.SQL_VARCHAR.trim(session, name, ' ',
+                                                          true, true);
                     schema =
                         session.database.schemaManager.getSchemaHsqlName(name);
 
-                    session.setSchema(schema.name);
+                    session.setCurrentSchemaHsqlName(schema);
 
                     return Result.updateZeroResult;
                 } catch (HsqlException e) {
@@ -446,6 +507,8 @@ public class StatementSession extends Statement {
                     String password = null;
 
                     user = (String) expressions[0].getValue(session);
+                    user = (String) Type.SQL_VARCHAR.trim(session, user, ' ',
+                                                          true, true);
 
                     if (expressions[1] != null) {
                         password = (String) expressions[1].getValue(session);
@@ -465,14 +528,22 @@ public class StatementSession extends Statement {
                         throw Error.error(ErrorCode.X_28501);
                     }
 
+                    // override the actual SQL at runtime
                     sql = userObject.getConnectUserSQL();
 
                     if (userObject == session.getGrantee()) {
                         return Result.updateZeroResult;
                     }
 
+                    if (password == null && !session.isProcessingLog()
+                            && userObject.isAdmin()
+                            && !session.getGrantee().isAdmin()) {
+                        throw Error.error(ErrorCode.X_28000);
+                    }
+
                     if (session.getGrantee().canChangeAuthorisation()) {
                         session.setUser((User) userObject);
+                        session.setRole(null);
                         session.resetSchema();
 
                         return Result.updateZeroResult;
@@ -513,7 +584,7 @@ public class StatementSession extends Statement {
             case StatementTypes.START_TRANSACTION :
                 startTransaction = true;
 
-            // $FALL-THROUGH$
+            // fall through
             case StatementTypes.SET_TRANSACTION : {
                 try {
                     if (parameters[0] != null) {
@@ -552,10 +623,13 @@ public class StatementSession extends Statement {
                 }
             }
             case StatementTypes.DECLARE_VARIABLE : {
-                ColumnSchema variable = (ColumnSchema) parameters[0];
+                ColumnSchema[] variables = (ColumnSchema[]) parameters[0];
 
                 try {
-                    session.sessionContext.addSessionVariable(variable);
+                    for (int i = 0; i < variables.length; i++) {
+                        session.sessionContext.addSessionVariable(
+                            variables[i]);
+                    }
 
                     return Result.updateZeroResult;
                 } catch (HsqlException e) {
@@ -576,9 +650,68 @@ public class StatementSession extends Statement {
 
                 return Result.updateZeroResult;
             }
+            case StatementTypes.SET_SESSION_SQL_IGNORECASE : {
+                try {
+                    boolean mode = ((Boolean) parameters[0]).booleanValue();
+
+                    session.setIgnoreCase(mode);
+
+                    return Result.updateZeroResult;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
+            case StatementTypes.DECLARE_SESSION_TABLE : {
+                Table         table           = (Table) parameters[0];
+                HsqlArrayList tempConstraints = (HsqlArrayList) parameters[1];
+                StatementDMQL statement       = (StatementDMQL) parameters[2];
+
+                try {
+                    if (tempConstraints.size() != 0) {
+                        table =
+                            ParserDDL.addTableConstraintDefinitions(session,
+                                table, tempConstraints, null, false);
+                    }
+
+                    table.compile(session, null);
+                    session.sessionContext.addSessionTable(table);
+
+                    if (table.hasLobColumn) {
+                        throw Error.error(ErrorCode.X_42534);
+                    }
+
+                    if (statement != null) {
+                        Result result = statement.execute(session);
+
+                        table.insertIntoTable(session, result);
+                    }
+
+                    return Result.updateZeroResult;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
+            case StatementTypes.DROP_TABLE : {
+                HsqlName name     = (HsqlName) parameters[0];
+                Boolean  ifExists = (Boolean) parameters[1];
+                Table table =
+                    session.sessionContext.findSessionTable(name.name);
+
+                if (table == null) {
+                    if (ifExists.booleanValue()) {
+                        return Result.updateZeroResult;
+                    } else {
+                        throw Error.error(ErrorCode.X_42501, name.name);
+                    }
+                }
+
+                session.sessionContext.dropSessionTable(name.name);
+
+                return Result.updateZeroResult;
+            }
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500,
-                                         "CompiledStateemntCommand");
+                                         "StatementSession");
         }
     }
 
@@ -588,5 +721,13 @@ public class StatementSession extends Statement {
 
     public String describe(Session session) {
         return sql;
+    }
+
+    public boolean isCatalogLock() {
+        return false;
+    }
+
+    public boolean isCatalogChange() {
+        return false;
     }
 }

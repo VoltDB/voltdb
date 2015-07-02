@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,33 +31,44 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.lib.HashMappedList;
-import org.hsqldb_voltpatches.rights.Grantee;
-import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
+import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.WrapperIterator;
+import org.hsqldb_voltpatches.rights.Grantee;
 
+/**
+ * Representation of a Schema.
+ *
+ * @author Fred Toussi (fredt@users dot sourceforge.net)
+ *
+ * @version 2.0.1
+ * @since 1.9.0
+*/
 public final class Schema implements SchemaObject {
 
-    HsqlName        name;
-    SchemaObjectSet triggerLookup;
-    SchemaObjectSet constraintLookup;
-    SchemaObjectSet indexLookup;
-    SchemaObjectSet tableLookup;
-    SchemaObjectSet sequenceLookup;
-    SchemaObjectSet typeLookup;
-    SchemaObjectSet charsetLookup;
-    SchemaObjectSet collationLookup;
-    SchemaObjectSet procedureLookup;
-    SchemaObjectSet functionLookup;
-    SchemaObjectSet assertionLookup;
-    HashMappedList  tableList;
-    HashMappedList  sequenceList;
-    Grantee         owner;
+    private HsqlName name;
+    SchemaObjectSet  triggerLookup;
+    SchemaObjectSet  constraintLookup;
+    SchemaObjectSet  indexLookup;
+    SchemaObjectSet  tableLookup;
+    SchemaObjectSet  sequenceLookup;
+    SchemaObjectSet  typeLookup;
+    SchemaObjectSet  charsetLookup;
+    SchemaObjectSet  collationLookup;
+    SchemaObjectSet  procedureLookup;
+    SchemaObjectSet  functionLookup;
+    SchemaObjectSet  specificRoutineLookup;
+    SchemaObjectSet  assertionLookup;
+    HashMappedList   tableList;
+    HashMappedList   sequenceList;
+    long             changeTimestamp;
 
-    Schema(HsqlName name, Grantee owner) {
+    public Schema(HsqlName name, Grantee owner) {
 
         this.name        = name;
         triggerLookup    = new SchemaObjectSet(SchemaObject.TRIGGER);
@@ -70,11 +81,12 @@ public final class Schema implements SchemaObject {
         collationLookup  = new SchemaObjectSet(SchemaObject.COLLATION);
         procedureLookup  = new SchemaObjectSet(SchemaObject.PROCEDURE);
         functionLookup   = new SchemaObjectSet(SchemaObject.FUNCTION);
-        assertionLookup  = new SchemaObjectSet(SchemaObject.ASSERTION);
-        tableList        = (HashMappedList) tableLookup.map;
-        sequenceList     = (HashMappedList) sequenceLookup.map;
-        this.owner       = owner;
-        name.owner       = owner;
+        specificRoutineLookup =
+            new SchemaObjectSet(SchemaObject.SPECIFIC_ROUTINE);
+        assertionLookup = new SchemaObjectSet(SchemaObject.ASSERTION);
+        tableList       = (HashMappedList) tableLookup.map;
+        sequenceList    = (HashMappedList) sequenceLookup.map;
+        name.owner      = owner;
     }
 
     public int getType() {
@@ -94,7 +106,7 @@ public final class Schema implements SchemaObject {
     }
 
     public Grantee getOwner() {
-        return owner;
+        return name.owner;
     }
 
     public OrderedHashSet getReferences() {
@@ -105,7 +117,11 @@ public final class Schema implements SchemaObject {
         return null;
     }
 
-    public void compile(Session session) {}
+    public void compile(Session session, SchemaObject parentObject) {}
+
+    public long getChangeTimestamp() {
+        return changeTimestamp;
+    }
 
     public String getSQL() {
 
@@ -113,9 +129,20 @@ public final class Schema implements SchemaObject {
 
         sb.append(Tokens.T_CREATE).append(' ');
         sb.append(Tokens.T_SCHEMA).append(' ');
-        sb.append(name.statementName).append(' ');
+        sb.append(getName().statementName).append(' ');
         sb.append(Tokens.T_AUTHORIZATION).append(' ');
-        sb.append(owner.getStatementName());
+        sb.append(getOwner().getName().getStatementName());
+
+        return sb.toString();
+    }
+
+    static String getSetSchemaSQL(HsqlName schemaName) {
+
+        StringBuffer sb = new StringBuffer();
+
+        sb.append(Tokens.T_SET).append(' ');
+        sb.append(Tokens.T_SCHEMA).append(' ');
+        sb.append(schemaName.statementName);
 
         return sb.toString();
     }
@@ -123,35 +150,13 @@ public final class Schema implements SchemaObject {
     public String[] getSQLArray(OrderedHashSet resolved,
                                 OrderedHashSet unresolved) {
 
-        HsqlArrayList list = new HsqlArrayList();
-        StringBuffer  sb   = new StringBuffer(128);
+        HsqlArrayList list      = new HsqlArrayList();
+        String        setSchema = getSetSchemaSQL(name);
 
-        sb.append(Tokens.T_CREATE).append(' ');
-        sb.append(Tokens.T_SCHEMA).append(' ');
-        sb.append(name.statementName).append(' ');
-        sb.append(Tokens.T_AUTHORIZATION).append(' ');
-        sb.append(owner.getStatementName());
-        list.add(sb.toString());
-        sb.setLength(0);
-        sb.append(Tokens.T_SET).append(' ');
-        sb.append(Tokens.T_SCHEMA).append(' ');
-        sb.append(name.statementName);
-        list.add(sb.toString());
+        list.add(setSchema);
 
         //
         String[] subList;
-
-        subList = charsetLookup.getSQL(resolved, unresolved);
-
-        list.addAll(subList);
-
-        subList = collationLookup.getSQL(resolved, unresolved);
-
-        list.addAll(subList);
-
-        subList = typeLookup.getSQL(resolved, unresolved);
-
-        list.addAll(subList);
 
         subList = sequenceLookup.getSQL(resolved, unresolved);
 
@@ -174,6 +179,10 @@ public final class Schema implements SchemaObject {
         list.addAll(subList);
 
 //
+        if (list.size() == 1) {
+            return new String[]{};
+        }
+
         String[] array = new String[list.size()];
 
         list.toArray(array);
@@ -219,8 +228,79 @@ public final class Schema implements SchemaObject {
         return array;
     }
 
+    public void addSimpleObjects(OrderedHashSet unresolved) {
+
+        Iterator it = specificRoutineLookup.map.values().iterator();
+
+        while (it.hasNext()) {
+            Routine routine = (Routine) it.next();
+
+            if (routine.dataImpact == Routine.NO_SQL
+                    || routine.dataImpact == Routine.CONTAINS_SQL) {
+                unresolved.add(routine);
+            }
+        }
+
+        unresolved.addAll(typeLookup.map.values());
+        unresolved.addAll(charsetLookup.map.values());
+        unresolved.addAll(collationLookup.map.values());
+    }
+
     boolean isEmpty() {
-        return sequenceList.isEmpty() && tableList.isEmpty();
+
+        return sequenceLookup.isEmpty() && tableLookup.isEmpty()
+               && typeLookup.isEmpty() && charsetLookup.isEmpty()
+               && collationLookup.isEmpty() && specificRoutineLookup.isEmpty();
+    }
+
+    public SchemaObjectSet getObjectSet(int type) {
+
+        switch (type) {
+
+            case SchemaObject.SEQUENCE :
+                return sequenceLookup;
+
+            case SchemaObject.TABLE :
+            case SchemaObject.VIEW :
+                return tableLookup;
+
+            case SchemaObject.CHARSET :
+                return charsetLookup;
+
+            case SchemaObject.COLLATION :
+                return collationLookup;
+
+            case SchemaObject.PROCEDURE :
+                return procedureLookup;
+
+            case SchemaObject.FUNCTION :
+                return functionLookup;
+
+            case SchemaObject.ROUTINE :
+                return functionLookup;
+
+            case SchemaObject.SPECIFIC_ROUTINE :
+                return specificRoutineLookup;
+
+            case SchemaObject.DOMAIN :
+            case SchemaObject.TYPE :
+                return typeLookup;
+
+            case SchemaObject.ASSERTION :
+                return assertionLookup;
+
+            case SchemaObject.TRIGGER :
+                return triggerLookup;
+
+            case SchemaObject.INDEX :
+                return indexLookup;
+
+            case SchemaObject.CONSTRAINT :
+                return constraintLookup;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "Schema");
+        }
     }
 
     Iterator schemaObjectIterator(int type) {
@@ -252,6 +332,9 @@ public final class Schema implements SchemaObject {
                 return new WrapperIterator(
                     functions, procedureLookup.map.values().iterator());
 
+            case SchemaObject.SPECIFIC_ROUTINE :
+                return specificRoutineLookup.map.values().iterator();
+
             case SchemaObject.DOMAIN :
             case SchemaObject.TYPE :
                 return typeLookup.map.values().iterator();
@@ -263,13 +346,23 @@ public final class Schema implements SchemaObject {
                 return triggerLookup.map.values().iterator();
 
             case SchemaObject.INDEX :
+                return indexLookup.map.values().iterator();
+
             case SchemaObject.CONSTRAINT :
+                return constraintLookup.map.values().iterator();
+
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "SchemaManager");
+                throw Error.runtimeError(ErrorCode.U_S0500, "Schema");
         }
     }
 
-    void clearStructures() {
+    void release() {
+
+        for (int i = 0; i < tableList.size(); i++) {
+            Table table = (Table) tableList.get(i);
+
+            table.terminateTriggers();
+        }
 
         tableList.clear();
         sequenceList.clear();

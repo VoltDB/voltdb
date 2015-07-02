@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -56,6 +56,7 @@ import java.util.Calendar;
 
 //#ifdef JAVA4
 import java.sql.ParameterMetaData;
+import java.util.ArrayList;
 
 //#endif JAVA4
 //#ifdef JAVA6
@@ -64,13 +65,13 @@ import java.sql.RowId;
 import java.sql.SQLXML;
 
 //#endif JAVA6
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
 import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.SchemaObject;
+import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.StatementTypes;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.CharArrayWriter;
 import org.hsqldb_voltpatches.lib.CountdownInputStream;
@@ -78,17 +79,22 @@ import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 import org.hsqldb_voltpatches.lib.StringConverter;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
 import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.result.ResultLob;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.result.ResultProperties;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BlobDataID;
+import org.hsqldb_voltpatches.types.BlobInputStream;
 import org.hsqldb_voltpatches.types.ClobDataID;
+import org.hsqldb_voltpatches.types.ClobInputStream;
 import org.hsqldb_voltpatches.types.JavaObjectData;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
-/* $Id: JDBCPreparedStatement.java 2993 2009-05-12 16:20:39Z fredt $ */
+/* $Id: JDBCPreparedStatement.java 5313 2014-01-14 20:33:08Z fredt $ */
 
 // changes by fredt
 // SimpleDateFormat objects moved out of methods to improve performance
@@ -162,9 +168,10 @@ import org.hsqldb_voltpatches.types.Type;
  * <div class="ReleaseSpecificDocumentation">
  * <h3>HSQLDB-Specific Information:</h3> <p>
  *
- * From version 1.9.0, the implementation meets the JDBC specification
+ * From version 2.0, the implementation meets the JDBC specification
  * requirment that any existing ResultSet is closed when execute() or
- * executeQuery() methods are called.
+ * executeQuery() methods are called. The connection property close_result=true
+ * is required for this behaviour.
  * <p>
  * JDBCPreparedStatement objects are backed by
  * a true compiled parameteric representation. Hence, there are now significant
@@ -193,7 +200,7 @@ import org.hsqldb_voltpatches.types.Type;
  * in SQL dialects across different drivers) and caching for possible reuse the
  * PreparedStatement objects derived from the recorded text. <p>
  *
- * Starting with 1.9.0, when built under a JDBC 4 environment, statement caching
+ * Starting with 2.0, when built under a JDBC 4 environment, statement caching
  * can be transparently enabled or disabled on a statement-by-statement basis by
  * invoking setPoolable(true | false), respectively, upon Statement objects of
  * interest. <p>
@@ -248,9 +255,9 @@ import org.hsqldb_voltpatches.types.Type;
  * </div>
  * <!-- end release-specific documentation -->
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.1
  * @since 1.7.2
  * @see JDBCConnection#prepareStatement
  * @see JDBCResultSet
@@ -271,7 +278,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized ResultSet executeQuery() throws SQLException {
 
-        checkStatementType(StatementTypes.RETURN_RESULT);
+        if (statementRetType != StatementTypes.RETURN_RESULT) {
+            checkStatementType(StatementTypes.RETURN_RESULT);
+        }
         fetchResult();
 
         return getResultSet();
@@ -295,7 +304,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int executeUpdate() throws SQLException {
 
-        checkStatementType(StatementTypes.RETURN_COUNT);
+        if (statementRetType != StatementTypes.RETURN_COUNT) {
+            checkStatementType(StatementTypes.RETURN_COUNT);
+        }
         fetchResult();
 
         return resultIn.getUpdateCount();
@@ -346,8 +357,8 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
      * HSQLDB supports BOOLEAN type for boolean values. This method can also
-     * be used to set the value of a parameter of the SQL type BIT, which is
-     * a bit string.
+     * be used to set the value of a parameter of the SQL type BIT(1), which is
+     * a bit string consisting of a 0 or 1.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -396,6 +407,19 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setShort(int parameterIndex,
                                       short x) throws SQLException {
+
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
+        checkSetParameterIndex(parameterIndex);
+
+        if (parameterTypes[parameterIndex - 1].typeCode
+                == Types.SQL_SMALLINT) {
+            parameterValues[--parameterIndex] = Integer.valueOf(x);
+            parameterSet[parameterIndex]      = Boolean.TRUE;
+
+            return;
+        }
         setIntParameter(parameterIndex, x);
     }
 
@@ -413,6 +437,18 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setInt(int parameterIndex,
                                     int x) throws SQLException {
+
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
+        checkSetParameterIndex(parameterIndex);
+
+        if (parameterTypes[parameterIndex - 1].typeCode == Types.SQL_INTEGER) {
+            parameterValues[--parameterIndex] = Integer.valueOf(x);
+            parameterSet[parameterIndex]      = Boolean.TRUE;
+
+            return;
+        }
         setIntParameter(parameterIndex, x);
     }
 
@@ -430,6 +466,18 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setLong(int parameterIndex,
                                      long x) throws SQLException {
+
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
+        checkSetParameterIndex(parameterIndex);
+
+        if (parameterTypes[parameterIndex - 1].typeCode == Types.SQL_BIGINT) {
+            parameterValues[--parameterIndex] = Long.valueOf(x);
+            parameterSet[parameterIndex]      = Boolean.TRUE;
+
+            return;
+        }
         setLongParameter(parameterIndex, x);
     }
 
@@ -524,7 +572,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB represents all XXXCHAR values internally as
+     * Including 2.0, HSQLDB represents all XXXCHAR values internally as
      * java.lang.String objects; there is no appreciable difference between
      * CHAR, VARCHAR and LONGVARCHAR.
      * </div>
@@ -552,7 +600,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB represents all XXXBINARY values the same way
+     * Including 2.0, HSQLDB represents all XXXBINARY values the same way
      * internally; there is no appreciable difference between BINARY,
      * VARBINARY and LONGVARBINARY as far as JDBC is concerned.
      * </div>
@@ -671,8 +719,14 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * From 1.9.0 this method uses the US-ASCII character encoding to convert bytes
+     * From HSQLDB 2.0 this method uses the US-ASCII character encoding to convert bytes
      * from the stream into the characters of a String.<p>
+     * This method does not use streaming to send the data,
+     * whether the target is a CLOB or other binary object.<p>
+     *
+     * For long streams (larger than a few megabytes) with CLOB targets,
+     * it is more efficient to use a version of setCharacterStream which takes
+     * the a length parameter.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -684,23 +738,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setAsciiStream(int parameterIndex,
             java.io.InputStream x, int length) throws SQLException {
-
-        checkSetParameterIndex(parameterIndex, true);
-
-        if (x == null) {
-            throw Util.nullArgument("x");
-        }
-
-        try {
-            String s = StringConverter.inputStreamToString(x, "US-ASCII");
-
-            if (s.length() > length) {
-                s = s.substring(0, length);
-            }
-            setParameter(parameterIndex, s);
-        } catch (IOException e) {
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR);
-        }
+        setAsciiStream(parameterIndex, x, (long) length);
     }
 
     /**
@@ -734,7 +772,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * the JDBC3 specification (the stream is treated as though it has UTF16
      * encoding). <p>
      *
-     * Starting with 1.9.0, this method behaves according to the JDBC4
+     * Starting with 2.0, this method behaves according to the JDBC4
      * specification (the stream is treated as though it has UTF-8
      * encoding, as defined in the Java Virtual Machine Specification) when
      * built under JDK 1.6+; otherwise, it behaves as defined by the JDBC3
@@ -762,20 +800,20 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public synchronized void setUnicodeStream(int parameterIndex,
             java.io.InputStream x, int length) throws SQLException {
 
-        checkSetParameterIndex(parameterIndex, true);
+        checkSetParameterIndex(parameterIndex);
 
         String    msg = null;
         final int ver = JDBCDatabaseMetaData.JDBC_MAJOR;
 
         if (x == null) {
-            throw Util.nullArgument("x");
+            throw JDBCUtil.nullArgument("x");
         }
 
         // CHECKME:  Is JDBC4 clarification of UNICODE stream format retroactive?
         if ((ver < 4) && (length % 2 != 0)) {
             msg = "Odd length argument for UTF16 encoded stream: " + length;
 
-            throw Util.invalidArgument(msg);
+            throw JDBCUtil.invalidArgument(msg);
         }
 
         String       encoding = (ver < 4) ? "UTF16"
@@ -794,8 +832,8 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 writer.write(buff, 0, charsRead);
             }
         } catch (IOException ex) {
-            throw Util.sqlException(ErrorCode.SERVER_TRANSFER_CORRUPTED,
-                                    ex.toString());
+            throw JDBCUtil.sqlException(ErrorCode.SERVER_TRANSFER_CORRUPTED,
+                                    ex.toString(), ex);
         }
         setParameter(parameterIndex, writer.toString());
     }
@@ -852,14 +890,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void clearParameters() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
         ArrayUtil.fillArray(parameterValues, null);
-        ArrayUtil.clearArray(ArrayUtil.CLASS_CODE_BOOLEAN, parameterSet, 0,
-                             parameterSet.length);
-        ArrayUtil.clearArray(ArrayUtil.CLASS_CODE_BOOLEAN, parameterStream, 0,
-                             parameterStream.length);
+        ArrayUtil.fillArray(parameterSet, null);
         ArrayUtil.clearArray(ArrayUtil.CLASS_CODE_LONG, streamLengths, 0,
-                             parameterStream.length);
+                             streamLengths.length);
     }
 
     //----------------------------------------------------------------------
@@ -1039,11 +1076,8 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Up to 1.8.0.x, prepared statements do not generate
+     * If the statatement is a call to a PROCEDURE, it may return multiple
      * multiple fetchable results. <p>
-     *
-     * In future versions, it will be possible that statements
-     * generate multiple fetchable results under certain conditions.
      *
      * </div>
      *
@@ -1090,8 +1124,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void addBatch() throws SQLException {
 
-        checkClosed();
-        connection.clearWarningsNoCheck();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
         checkParametersSet();
 
         if (!isBatch) {
@@ -1103,7 +1138,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         try {
             performPreExecute();
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
 
         int      len              = parameterValues.length;
@@ -1134,6 +1169,8 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
+     * From HSQLDB 2.0 this method uses streaming to send data
+     * when the target is a CLOB.<p>
      * HSQLDB represents CHARACTER and related SQL types as UTF16 Unicode
      * internally, so this method does not perform any conversion.
      * </div>
@@ -1165,7 +1202,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0 HSQLDB does not support the SQL REF type. Calling this method
+     * Including 2.0 HSQLDB does not support the SQL REF type. Calling this method
      * throws an exception.
      *
      * </div>
@@ -1179,7 +1216,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * JDBCParameterMetaData)
      */
     public void setRef(int parameterIndex, Ref x) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     /**
@@ -1221,7 +1258,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public synchronized void setBlob(int parameterIndex,
                                      Blob x) throws SQLException {
 
-        checkSetParameterIndex(parameterIndex, false);
+        checkSetParameterIndex(parameterIndex);
 
         Type outType = parameterTypes[parameterIndex - 1];
 
@@ -1237,7 +1274,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
                 break;
             default :
-                throw Util.invalidArgument();
+                throw JDBCUtil.invalidArgument();
         }
     }
 
@@ -1256,14 +1293,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
             return;
         }
-        checkSetParameterIndex(parameterIndex, true);
 
         final long length = x.length();
 
         if (length > Integer.MAX_VALUE) {
             String msg = "Maximum Blob input octet length exceeded: " + length;    // NOI18N
 
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
         }
 
         try {
@@ -1272,9 +1308,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 (int) length);
 
             setParameter(parameterIndex, out.toByteArray());
-        } catch (IOException e) {
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR,
-                                    e.toString());
+        } catch (Throwable e) {
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR,
+                                    e.toString(), e);
         }
     }
 
@@ -1316,7 +1352,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public synchronized void setClob(int parameterIndex,
                                      Clob x) throws SQLException {
 
-        checkSetParameterIndex(parameterIndex, false);
+        checkSetParameterIndex(parameterIndex);
 
         Type outType = parameterTypes[parameterIndex - 1];
 
@@ -1332,7 +1368,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
                 return;
             default :
-                throw Util.invalidArgument();
+                throw JDBCUtil.invalidArgument();
         }
     }
 
@@ -1348,14 +1384,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
             return;
         }
-        checkSetParameterIndex(parameterIndex, false);
 
         final long length = x.length();
 
         if (length > Integer.MAX_VALUE) {
             String msg = "Max Clob input character length exceeded: " + length;    // NOI18N
 
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
         }
 
         try {
@@ -1363,9 +1398,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
             CharArrayWriter writer = new CharArrayWriter(reader, (int) length);
 
             setParameter(parameterIndex, writer.toString());
-        } catch (IOException e) {
-            throw Util.sqlException(ErrorCode.SERVER_TRANSFER_CORRUPTED,
-                                    e.toString());
+        } catch (Throwable e) {
+            throw JDBCUtil.sqlException(ErrorCode.SERVER_TRANSFER_CORRUPTED,
+                                    e.toString(), e);
         }
     }
 
@@ -1380,8 +1415,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Incuding 1.9.0, HSQLDB does not support the SQL ARRAY type. Calling this method
-     * throws an exception.
+     * From version 2.0, HSQLDB supports the SQL ARRAY type.
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1396,7 +1430,45 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setArray(int parameterIndex,
                                       Array x) throws SQLException {
-        throw Util.notSupported();
+
+        checkParameterIndex(parameterIndex);
+
+        Type type = this.parameterMetaData.columnTypes[parameterIndex - 1];
+
+        if (!type.isArrayType()) {
+            throw JDBCUtil.sqlException(ErrorCode.X_42561);
+        }
+
+        if (x == null) {
+            setParameter(parameterIndex, null);
+
+            return;
+        }
+
+        Object[] data = null;
+
+        if (x instanceof JDBCArray) {
+            data = (Object[]) ((JDBCArray) x).getArrayInternal();
+        } else {
+            Object object = x.getArray();
+
+            if (object instanceof Object[]) {
+                Type     baseType = type.collectionBaseType();
+                Object[] array    = (Object[]) object;
+
+                data = new Object[array.length];
+
+                for (int i = 0; i < data.length; i++) {
+                    data[i] = baseType.convertJavaToSQL(session, array[i]);
+                }
+            } else {
+
+                // if foreign data is not Object[]
+                throw JDBCUtil.notSupported();
+            }
+        }
+        parameterValues[parameterIndex - 1] = data;
+        parameterSet[parameterIndex - 1]    = Boolean.TRUE;
     }
 
     /**
@@ -1439,14 +1511,16 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized ResultSetMetaData getMetaData() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (statementRetType != StatementTypes.RETURN_RESULT) {
             return null;
         }
 
         if (resultSetMetaData == null) {
-            boolean isUpdatable  = rsConcurrency == ResultSet.CONCUR_UPDATABLE;
+            boolean isUpdatable  = ResultProperties.isUpdatable(rsProperties);
             boolean isInsertable = isUpdatable;
 
             if (isInsertable) {
@@ -1459,7 +1533,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 }
             }
             resultSetMetaData = new JDBCResultSetMetaData(resultMetaData,
-                    isUpdatable, isInsertable, connection.connProperties);
+                    isUpdatable, isInsertable, connection);
         }
 
         return resultSetMetaData;
@@ -1489,30 +1563,44 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public synchronized void setDate(int parameterIndex, Date x,
                                      Calendar cal) throws SQLException {
 
-        checkSetParameterIndex(parameterIndex, false);
+        checkSetParameterIndex(parameterIndex);
 
         int i = parameterIndex - 1;
 
         if (x == null) {
             parameterValues[i] = null;
+            parameterSet[i]    = Boolean.TRUE;
 
             return;
         }
 
-        Type outType    = parameterTypes[i];
-        long millis = HsqlDateTime.convertToNormalisedDate(x.getTime(), cal);
-        int  zoneOffset = HsqlDateTime.getZoneMillis(cal, millis);
+        Type outType = parameterTypes[i];
+        Calendar calendar   = cal == null ? session.getCalendar()
+                : cal;
+
+        long millis  = HsqlDateTime.convertMillisFromCalendar(calendar,
+            x.getTime());
+
+        millis = HsqlDateTime.getNormalisedDate(millis);
 
         switch (outType.typeCode) {
 
             case Types.SQL_DATE :
             case Types.SQL_TIMESTAMP :
+                parameterValues[i] = new TimestampData(millis / 1000);
+
+                break;
             case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
+                int zoneOffset = HsqlDateTime.getZoneMillis(calendar, millis);
+
+                parameterValues[i] = new TimestampData(millis / 1000, 0,
+                        zoneOffset / 1000);
+
                 break;
             default :
-                throw Util.sqlException(ErrorCode.X_42561);
+                throw JDBCUtil.sqlException(ErrorCode.X_42561);
         }
-        parameterValues[i] = new TimestampData((millis + zoneOffset) / 1000);
+        parameterSet[i] = Boolean.TRUE;
     }
 
     /**
@@ -1549,39 +1637,40 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public synchronized void setTime(int parameterIndex, Time x,
                                      Calendar cal) throws SQLException {
 
-        checkSetParameterIndex(parameterIndex, false);
+        checkSetParameterIndex(parameterIndex);
 
         int i = parameterIndex - 1;
 
         if (x == null) {
             parameterValues[i] = null;
+            parameterSet[i]    = Boolean.TRUE;
 
             return;
         }
 
-        Type outType    = parameterTypes[i];
-        long millis     = x.getTime();
-        int  zoneOffset = 0;
+        Type     outType    = parameterTypes[i];
+        long     millis     = x.getTime();
+        int      zoneOffset = 0;
+        Calendar calendar   = cal == null ? session.getCalendar()
+                : cal;
 
-        if (cal != null) {
-            zoneOffset = HsqlDateTime.getZoneMillis(cal, millis);
-        }
+        millis = HsqlDateTime.convertMillisFromCalendar(calendar, millis);
+        millis = HsqlDateTime.convertToNormalisedTime(millis);
 
         switch (outType.typeCode) {
 
             case Types.SQL_TIME :
-                millis     += zoneOffset;
-                zoneOffset = 0;
-
-            // $FALL-THROUGH$
+                break;
             case Types.SQL_TIME_WITH_TIME_ZONE :
+                zoneOffset = HsqlDateTime.getZoneMillis(calendar, millis);
+
                 break;
             default :
-                throw Util.sqlException(ErrorCode.X_42561);
+                throw JDBCUtil.sqlException(ErrorCode.X_42561);
         }
-        millis = HsqlDateTime.convertToNormalisedTime(millis);
         parameterValues[i] = new TimeData((int) (millis / 1000), 0,
                 zoneOffset / 1000);
+        parameterSet[i] = Boolean.TRUE;
     }
 
     /**
@@ -1601,10 +1690,12 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * When a setXXX method is used to set a parameter of type
      * TIMESTAMP WITH TIME ZONE or TIME WITH TIME ZONE the time zone (including
      * Daylight Saving Time) of the Calendar is used as time zone.<p>
+     * In this case, if the Calendar argument is null, then the default Calendar
+     * for the clients JVM is used as the Calendar<p>
      *
      * When this method is used to set a parameter of type TIME or
      * TIME WITH TIME ZONE, then the nanosecond value of the Timestamp object
-     * is used if the TIME parameter accepts fractional seconds.
+     * is used if the TIME parameter accepts fractional seconds.<p>
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1621,49 +1712,57 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public synchronized void setTimestamp(int parameterIndex, Timestamp x,
             Calendar cal) throws SQLException {
 
-        checkSetParameterIndex(parameterIndex, false);
+        checkSetParameterIndex(parameterIndex);
 
         int i = parameterIndex - 1;
 
         if (x == null) {
             parameterValues[i] = null;
+            parameterSet[i]    = Boolean.TRUE;
 
             return;
         }
 
-        Type outType    = parameterTypes[i];
-        long millis     = x.getTime();
-        int  zoneOffset = 0;
+        Type     outType    = parameterTypes[i];
+        long     millis     = x.getTime();
+        int      zoneOffset = 0;
+        Calendar calendar   = cal == null ? session.getCalendar()
+                : cal;
 
-        if (cal != null) {
-            zoneOffset = HsqlDateTime.getZoneMillis(cal, millis);
-        }
+        millis = HsqlDateTime.convertMillisFromCalendar(calendar, millis);
 
         switch (outType.typeCode) {
 
-            case Types.SQL_TIMESTAMP :
-                millis     += zoneOffset;
-                zoneOffset = 0;
-
-            // $FALL-THROUGH$
             case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
+                zoneOffset = HsqlDateTime.getZoneMillis(calendar, millis);
+
+            // fall through
+            case Types.SQL_TIMESTAMP :
                 parameterValues[i] = new TimestampData(millis / 1000,
                         x.getNanos(), zoneOffset / 1000);
 
                 break;
             case Types.SQL_TIME :
-                millis     += zoneOffset;
-                zoneOffset = 0;
+                millis = HsqlDateTime.getNormalisedTime(millis);
+                parameterValues[i] = new TimeData((int) (millis / 1000),
+                        x.getNanos(), 0);
 
-            // $FALL-THROUGH$
+                break;
             case Types.SQL_TIME_WITH_TIME_ZONE :
+                zoneOffset = HsqlDateTime.getZoneMillis(calendar, millis);
                 parameterValues[i] = new TimeData((int) (millis / 1000),
                         x.getNanos(), zoneOffset / 1000);
 
                 break;
+            case Types.SQL_DATE :
+                millis             = HsqlDateTime.getNormalisedDate(millis);
+                parameterValues[i] = new TimestampData(millis / 1000);
+
+                break;
             default :
-                throw Util.sqlException(ErrorCode.X_42561);
+                throw JDBCUtil.sqlException(ErrorCode.X_42561);
         }
+        parameterSet[i] = Boolean.TRUE;
     }
 
     /**
@@ -1771,11 +1870,6 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * results in an exception. The size of the returned array equals the
      * number of commands that were executed successfully.<p>
      *
-     * When the product is built under the JAVA1 target, an exception
-     * is never thrown and it is the responsibility of the client software to
-     * check the size of the  returned update count array to determine if any
-     * batch items failed.  To build and run under the JAVA2 target, JDK/JRE
-     * 1.3 or higher must be used.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -1796,12 +1890,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int[] executeBatch() throws SQLException {
 
-        checkClosed();
-        connection.clearWarningsNoCheck();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
         checkStatementType(StatementTypes.RETURN_COUNT);
 
         if (!isBatch) {
-            throw Util.sqlExceptionSQL(ErrorCode.X_07506);
+            throw JDBCUtil.sqlExceptionSQL(ErrorCode.X_07506);
         }
         generatedResult = null;
 
@@ -1810,9 +1905,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         resultIn = null;
 
         try {
-            resultIn = connection.sessionProxy.execute(resultOut);
+            resultIn = session.execute(resultOut);
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         } finally {
             performPostExecute();
             resultOut.getNavigator().clear();
@@ -1820,8 +1915,8 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
             isBatch = false;
         }
 
-        if (resultIn.isError()) {
-            throw Util.sqlException(resultIn);
+        if (resultIn.mode == ResultConstants.ERROR) {
+            throw JDBCUtil.sqlException(resultIn);
         }
 
         RowSetNavigator navigator    = resultIn.getNavigator();
@@ -1877,7 +1972,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @throws SQLException always
      */
     public void addBatch(String sql) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     /**
@@ -1890,7 +1985,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized ResultSet executeQuery(
             String sql) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     /**
@@ -1902,7 +1997,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @return nothing
      */
     public boolean execute(String sql) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     /**
@@ -1914,7 +2009,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @return nothing
      */
     public int executeUpdate(String sql) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     /**
@@ -1938,15 +2033,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
             // need to free the prepared statements on the server - it is done
             // by Connection.close()
             if (!connection.isClosed) {
-                connection.sessionProxy.execute(
-                    Result.newFreeStmtRequest(statementID));
+                session.execute(Result.newFreeStmtRequest(statementID));
             }
         } catch (HsqlException e) {
             he = e;
         }
         parameterValues   = null;
         parameterSet      = null;
-        parameterStream   = null;
         parameterTypes    = null;
         parameterModes    = null;
         resultMetaData    = null;
@@ -1954,12 +2047,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         resultSetMetaData = null;
         pmd               = null;
         connection        = null;
+        session           = null;
         resultIn          = null;
         resultOut         = null;
         isClosed          = true;
 
         if (he != null) {
-            throw Util.sqlException(he);
+            throw JDBCUtil.sqlException(he);
         }
     }
 
@@ -2023,7 +2117,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB does not support the DATALINK SQL type for which this
+     * Including 2.0, HSQLDB does not support the DATALINK SQL type for which this
      * method is intended. Calling this method throws an exception.
      *
      * </div>
@@ -2038,7 +2132,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 //#ifdef JAVA4
     public void setURL(int parameterIndex,
                        java.net.URL x) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA4
@@ -2071,7 +2165,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         checkClosed();
 
         if (pmd == null) {
-            pmd = new JDBCParameterMetaData(parameterMetaData);
+            pmd = new JDBCParameterMetaData(connection, parameterMetaData);
         }
 
         // NOTE:  pmd is declared as Object to avoid yet another #ifdef.
@@ -2087,32 +2181,32 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 //#ifdef JAVA4
     public int executeUpdate(String sql,
                              int autoGeneratedKeys) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     public boolean execute(String sql,
                            int autoGeneratedKeys) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     public int executeUpdate(String sql,
                              int[] columnIndexes) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     public boolean execute(String sql,
                            int[] columnIndexes) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     public int executeUpdate(String sql,
                              String[] columnNames) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     public boolean execute(String sql,
                            String[] columnNames) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA4
@@ -2135,7 +2229,10 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB supports this featur. <p>
+     * HSQLDB supports this feature. <p>
+     *
+     * This is used with CallableStatement objects that return multiple
+     * ResultSet objects.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -2181,10 +2278,25 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Supported in 1.9.0.x <p>
+     * Starting with version 2.0, HSQLDB supports this feature with single-row and
+     * multi-row insert, update and merge statements. <p>
+     *
+     * This method returns a result set only if
+     * the executeUpdate methods that was used is one of the three methods that
+     * have the extra parameter indicating return of generated keys<p>
+     *
+     * If the executeUpaged method did not specify the columns which represent
+     * the auto-generated keys the IDENTITY column or GENERATED column(s) of the
+     * table are returned.<p>
+     *
+     * The executeUpdate methods with column indexes or column names return the
+     * post-insert or post-update values of the specified columns, whether the
+     * columns are generated or not. This allows values that have been modified
+     * by execution of triggers to be returned.<p>
      *
      * If column names or indexes provided by the user in the executeUpdate()
-     * method calls are not correct, an empty result is returned.
+     * method calls do not correspond to table columns (incorrect names or
+     * indexes larger than the coloum count), an empty result is returned.
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -2209,14 +2321,6 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * generated by this <code>Statement</code> object.
      * <!-- end generic documentation -->
      *
-     * <!-- start release-specific documentation -->
-     * <div class="ReleaseSpecificDocumentation">
-     * <h3>HSQLDB-Specific Information:</h3> <p>
-     *
-     * Starting with 1.7.2, this method returns HOLD_CURSORS_OVER_COMMIT
-     * </div>
-     * <!-- end release-specific documentation -->
-     *
      * @return either <code>ResultSet.HOLD_CURSORS_OVER_COMMIT</code> or
      *         <code>ResultSet.CLOSE_CURSORS_AT_COMMIT</code>
      * @exception SQLException if a database access error occurs or
@@ -2226,9 +2330,11 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 //#ifdef JAVA4
     public synchronized int getResultSetHoldability() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
-        return rsHoldability;
+        return ResultProperties.getJDBCHoldability(rsProperties);
     }
 
 //#endif JAVA4
@@ -2239,7 +2345,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * method close has been called on it, or if it is automatically closed.
      * @return true if this <code>Statement</code> object is closed; false if it is still open
      * @throws SQLException if a database access error occurs
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized boolean isClosed() {
         return isClosed;
@@ -2256,12 +2362,12 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * this method is called on a closed <code>PreparedStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
      *
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 
 //#ifdef JAVA6
     public void setRowId(int parameterIndex, RowId x) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA6
@@ -2281,7 +2387,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      *  error could occur ; if a database access error occurs; or
      * this method is called on a closed <code>PreparedStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized void setNString(int parameterIndex,
                                         String value) throws SQLException {
@@ -2301,7 +2407,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      *  error could occur ; if a database access error occurs; or
      * this method is called on a closed <code>PreparedStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized void setNCharacterStream(int parameterIndex,
             Reader value, long length) throws SQLException {
@@ -2318,7 +2424,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      *  error could occur ; if a database access error occurs; or
      * this method is called on a closed <code>PreparedStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 
 //#ifdef JAVA6
@@ -2348,7 +2454,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * marker in the SQL statement, or if the length specified is less than zero.
      *
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized void setClob(int parameterIndex, Reader reader,
                                      long length) throws SQLException {
@@ -2366,6 +2472,16 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * sent to the server as a <code>BLOB</code>.  When the <code>setBinaryStream</code> method is used,
      * the driver may have to do extra work to determine whether the parameter
      * data should be send to the server as a <code>LONGVARBINARY</code> or a <code>BLOB</code>
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <h3>HSQLDB-Specific Information:</h3> <p>
+     *
+     * In HSQLDB 2.0, this method uses streaming to send the data when the
+     * stream is assigned to a BLOB target. For other binary targets the
+     * stream is read on the client side and a byte array is sent.
+     * </div>
+     * <!-- end release-specific documentation -->
+     *
      * @param parameterIndex index of the first parameter is 1,
      * the second is 2, ...
      * @param inputStream An object that contains the data to set the parameter
@@ -2379,7 +2495,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * the specfied length.
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
      *
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized void setBlob(int parameterIndex,
                                      InputStream inputStream,
@@ -2407,7 +2523,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * this method is called on a closed <code>PreparedStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
      *
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized void setNClob(int parameterIndex, Reader reader,
                                       long length) throws SQLException {
@@ -2429,13 +2545,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * the <code>SQLXML</code> object
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
      *
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 
 //#ifdef JAVA6
     public void setSQLXML(int parameterIndex,
                           SQLXML xmlObject) throws SQLException {
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA6
@@ -2456,23 +2572,59 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * Java stream object or your own subclass that implements the
      * standard interface.
      *
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <h3>HSQLDB-Specific Information:</h3> <p>
+     *
+     * From HSQLDB 2.0 this method uses the US-ASCII character encoding to convert bytes
+     * from the stream into the characters of a String.<p>
+     * This method does not use streaming to send the data,
+     * whether the target is a CLOB or other binary object.<p>
+     *
+     * For long streams (larger than a few megabytes) with CLOB targets,
+     * it is more efficient to use a version of setCharacterStream which takes
+     * the a length parameter.
+     * </div>
+     * <!-- end release-specific documentation -->
      * @param parameterIndex the first parameter is 1, the second is 2, ...
      * @param x the Java input stream that contains the ASCII parameter value
      * @param length the number of bytes in the stream
      * @exception SQLException if a database access error occurs or
      * this method is called on a closed <code>PreparedStatement</code>
-     * @since JDK 1.6 b86, HSQLDB 1.9.0
+     * @since JDK 1.6 b86, HSQLDB 2.0
      */
     public synchronized void setAsciiStream(int parameterIndex,
             java.io.InputStream x, long length) throws SQLException {
 
-        if (length > Integer.MAX_VALUE) {
-            Util.sqlException(ErrorCode.X_22001);
+        if (length < 0) {
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
+                                    "length: " + length);
         }
-        setAsciiStream(parameterIndex, x, (int) length);
+        setAscStream(parameterIndex, x, (long) length);
     }
 
-    /** @todo 1.9.0 - implement streaming and remove length limits */
+    void setAscStream(int parameterIndex, java.io.InputStream x,
+                      long length) throws SQLException {
+
+        if (length > Integer.MAX_VALUE) {
+            JDBCUtil.sqlException(ErrorCode.X_22001);
+        }
+
+        if (x == null) {
+            throw JDBCUtil.nullArgument("x");
+        }
+
+        try {
+            String s = StringConverter.inputStreamToString(x, "US-ASCII");
+
+            if (length >= 0 && s.length() > length) {
+                s = s.substring(0, (int) length);
+            }
+            setParameter(parameterIndex, s);
+        } catch (IOException e) {
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, null, e);
+        }
+    }
 
     /**
      * Sets the designated parameter to the given input stream, which will have
@@ -2486,53 +2638,66 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * Java stream object or your own subclass that implements the
      * standard interface.
      *
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <h3>HSQLDB-Specific Information:</h3> <p>
+     *
+     * This method uses streaming to send the data when the
+     * stream is assigned to a BLOB target. For other binary targets the
+     * stream is read on the client side and a byte array is sent.
+     * </div>
+     * <!-- end release-specific documentation -->
+     *
      * @param parameterIndex the first parameter is 1, the second is 2, ...
      * @param x the java input stream which contains the binary parameter value
      * @param length the number of bytes in the stream
      * @exception SQLException if a database access error occurs or
      * this method is called on a closed <code>PreparedStatement</code>
-     * @since JDK 1.6 b86, HSQLDB 1.9.0
+     * @since JDK 1.6 b86, HSQLDB 2.0
      */
     public synchronized void setBinaryStream(int parameterIndex,
             java.io.InputStream x, long length) throws SQLException {
 
         if (length < 0) {
-            throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
                                     "length: " + length);
         }
+        setBinStream(parameterIndex, x, length);
+    }
 
-        if (x instanceof BlobInputStream) {
-            throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
-                                    "invalid InputStream");
+    private void setBinStream(int parameterIndex, java.io.InputStream x,
+                              long length) throws SQLException {
+
+        if (isClosed || connection.isClosed) {
+            checkClosed();
         }
-        checkSetParameterIndex(parameterIndex, true);
 
         if (parameterTypes[parameterIndex - 1].typeCode == Types.SQL_BLOB) {
-            streamLengths[parameterIndex - 1] = length;
-
-            setParameter(parameterIndex, x);
+            setBlobParameter(parameterIndex, x, length);
 
             return;
         }
 
+        if (length > Integer.MAX_VALUE) {
+            String msg = "Maximum Blob input length exceeded: " + length;
+
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+        }
+
         try {
-            if (length > Integer.MAX_VALUE) {
-                String msg = "Maximum Blob input length exceeded: " + length;
+            HsqlByteArrayOutputStream output;
 
-                throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+            if (length < 0) {
+                output = new HsqlByteArrayOutputStream(x);
+            } else {
+                output = new HsqlByteArrayOutputStream(x, (int) length);
             }
-
-            HsqlByteArrayOutputStream output =
-                new HsqlByteArrayOutputStream(x, (int) length);
-
             setParameter(parameterIndex, output.toByteArray());
-        } catch (IOException e) {
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR,
-                                    e.toString());
+        } catch (Throwable e) {
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR,
+                                    e.toString(), e);
         }
     }
-
-    /** @todo 1.9.0 - implement streaming and remove length limits */
 
     /**
      * Sets the designated parameter to the given <code>Reader</code>
@@ -2547,53 +2712,63 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * Java stream object or your own subclass that implements the
      * standard interface.
      *
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <h3>HSQLDB-Specific Information:</h3> <p>
+     *
+     * This method uses streaming to send data
+     * when the target is a CLOB.<p>
+     * </div>
+     * <!-- end release-specific documentation -->
      * @param parameterIndex the first parameter is 1, the second is 2, ...
      * @param reader the <code>java.io.Reader</code> object that contains the
      *        Unicode data
      * @param length the number of characters in the stream
      * @exception SQLException if a database access error occurs or
      * this method is called on a closed <code>PreparedStatement</code>
-     * @since JDK 1.6 b86, HSQLDB 1.9.0
+     * @since JDK 1.6 b86, HSQLDB 2.0
      */
     public synchronized void setCharacterStream(int parameterIndex,
             java.io.Reader reader, long length) throws SQLException {
 
         if (length < 0) {
-            throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
                                     "length: " + length);
         }
+        setCharStream(parameterIndex, reader, length);
+    }
 
-        if (reader instanceof ClobInputStream) {
-            throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
-                                    "invalid Reader");
-        }
-        checkSetParameterIndex(parameterIndex, true);
+    private void setCharStream(int parameterIndex, java.io.Reader reader,
+                               long length) throws SQLException {
+
+        checkSetParameterIndex(parameterIndex);
 
         if (parameterTypes[parameterIndex - 1].typeCode == Types.SQL_CLOB) {
-            streamLengths[parameterIndex - 1] = length;
-
-            setParameter(parameterIndex, reader);
+            setClobParameter(parameterIndex, reader, length);
 
             return;
         }
 
+        if (length > Integer.MAX_VALUE) {
+            String msg = "Maximum Clob input length exceeded: " + length;
+
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+        }
+
         try {
-            if (length > Integer.MAX_VALUE) {
-                String msg = "Maximum Clob input length exceeded: " + length;
+            CharArrayWriter writer;
 
-                throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+            if (length < 0) {
+                writer = new CharArrayWriter(reader);
+            } else {
+                writer = new CharArrayWriter(reader, (int) length);
             }
-
-            CharArrayWriter writer = new CharArrayWriter(reader, (int) length);
-
             setParameter(parameterIndex, writer.toString());
-        } catch (IOException e) {
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR,
-                                    e.toString());
+        } catch (Throwable e) {
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR,
+                                    e.toString(), e);
         }
     }
-
-    /** @todo 1.9.0 - implement streaming and remove length limits */
 
     /**
      * Sets the designated parameter to the given input stream.
@@ -2610,6 +2785,18 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * it might be more efficient to use a version of
      * <code>setAsciiStream</code> which takes a length parameter.
      *
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <h3>HSQLDB-Specific Information:</h3> <p>
+     *
+     * In HSQLDB 2.0, this method does not use streaming to send the data,
+     * whether the target is a CLOB or other binary object.
+     *
+     * For long streams (larger than a few megabytes), it is more efficient to
+     * use a version of setCharacterStream which takes the a length parameter.
+     * </div>
+     * <!-- end release-specific documentation -->
+     *
      * @param parameterIndex the first parameter is 1, the second is 2, ...
      * @param x the Java input stream that contains the ASCII parameter value
      * @exception SQLException if parameterIndex does not correspond to a parameter
@@ -2620,7 +2807,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public void setAsciiStream(int parameterIndex,
                                java.io.InputStream x) throws SQLException {
-        throw Util.notSupported();
+        setAscStream(parameterIndex, x, -1);
     }
 
     /** @todo 1.9.0 - implement streaming and remove length limits */
@@ -2639,6 +2826,21 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * it might be more efficient to use a version of
      * <code>setBinaryStream</code> which takes a length parameter.
      *
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <h3>HSQLDB-Specific Information:</h3> <p>
+     *
+     * This method does not use streaming to send the data,
+     * whether the target is a CLOB or other binary object.<p>
+     *
+     * For long streams (larger than a few megabytes) with CLOB targets,
+     * it is more efficient to use a version of setCharacterStream which takes
+     * the a length parameter.
+     * </div>
+     * <!-- end release-specific documentation -->
+     *
      * @param parameterIndex the first parameter is 1, the second is 2, ...
      * @param x the java input stream which contains the binary parameter value
      * @exception SQLException if parameterIndex does not correspond to a parameter
@@ -2649,7 +2851,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setBinaryStream(int parameterIndex,
             java.io.InputStream x) throws SQLException {
-        throw Util.notSupported();
+        setBinStream(parameterIndex, x, -1);
     }
 
     /** @todo 1.9.0 - implement streaming and remove length limits */
@@ -2670,6 +2872,18 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * it might be more efficient to use a version of
      * <code>setCharacterStream</code> which takes a length parameter.
      *
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <h3>HSQLDB-Specific Information:</h3> <p>
+     *
+     * In HSQLDB 2.0, this method does not use streaming to send the data,
+     * whether the target is a CLOB or other binary object.
+     *
+     * For long streams (larger than a few megabytes), it is more efficient to
+     * use a version of setCharacterStream which takes the a length parameter.
+     * </div>
+     * <!-- end release-specific documentation -->
+     *
      * @param parameterIndex the first parameter is 1, the second is 2, ...
      * @param reader the <code>java.io.Reader</code> object that contains the
      *        Unicode data
@@ -2681,7 +2895,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public void setCharacterStream(int parameterIndex,
                                    java.io.Reader reader) throws SQLException {
-        throw Util.notSupported();
+        setCharStream(parameterIndex, reader, -1);
     }
 
     /** @todo 1.9.0 - implement streaming and remove length limits */
@@ -2711,7 +2925,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public void setNCharacterStream(int parameterIndex,
                                     Reader value) throws SQLException {
-        throw Util.notSupported();
+        setCharStream(parameterIndex, value, -1);
     }
 
     /** @todo 1.9.0 - implement streaming and remove length limits */
@@ -2740,7 +2954,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public void setClob(int parameterIndex,
                         Reader reader) throws SQLException {
-        throw Util.notSupported();
+        setCharStream(parameterIndex, reader, -1);
     }
 
     /** @todo 1.9.0 - implement streaming and remove length limits */
@@ -2772,7 +2986,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public void setBlob(int parameterIndex,
                         InputStream inputStream) throws SQLException {
-        throw Util.notSupported();
+        setBinStream(parameterIndex, inputStream, -1);
     }
 
     /** @todo 1.9.0 - implement streaming and remove length limits */
@@ -2802,7 +3016,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public void setNClob(int parameterIndex,
                          Reader reader) throws SQLException {
-        throw Util.notSupported();
+        setCharStream(parameterIndex, reader, -1);
     }
 
     /**
@@ -2833,7 +3047,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int getMaxFieldSize() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         return 0;
     }
@@ -2880,10 +3096,12 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setMaxFieldSize(int max) throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (max < 0) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
     }
 
@@ -2904,7 +3122,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int getMaxRows() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         return maxRows;
     }
@@ -2927,10 +3147,12 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setMaxRows(int max) throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (max < 0) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
         maxRows = max;
     }
@@ -2960,9 +3182,11 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int getQueryTimeout() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
-        return 0;
+        return queryTimeout;
     }
 
     /**
@@ -2981,9 +3205,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, calls to this method are ignored; HSQLDB waits an
-     * unlimited amount of time for statement execution
-     * requests to return.
+     * The maximum number of seconds to wait is 32767.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -2996,11 +3218,18 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setQueryTimeout(int seconds) throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (seconds < 0) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
+
+        if (seconds > Short.MAX_VALUE) {
+            seconds = Short.MAX_VALUE;
+        }
+        queryTimeout = seconds;
     }
 
     /**
@@ -3015,7 +3244,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB does <i>not</i> support aborting an SQL
+     * Including 2.0, HSQLDB does <i>not</i> support aborting an SQL
      * statement; calls to this method are ignored.
      * </div>
      * <!-- end release-specific documentation -->
@@ -3050,8 +3279,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB never produces Statement warnings;
-     * this method always returns null.
+     * From 1.9 HSQLDB, produces Statement warnings.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -3062,9 +3290,11 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized SQLWarning getWarnings() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
-        return null;
+        return rootWarning;
     }
 
     /**
@@ -3080,7 +3310,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Supported in HSQLDB 1.9.0.1.
+     * Supported in HSQLDB 1.9.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -3089,8 +3319,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void clearWarnings() throws SQLException {
 
-        checkClosed();
-
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
         rootWarning = null;
     }
 
@@ -3119,7 +3350,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB does not support named cursors;
+     * Including 2.0, HSQLDB does not support named cursors;
      * calls to this method are ignored.
      * </div>
      * <!-- end release-specific documentation -->
@@ -3227,7 +3458,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * Setting any other value would throw an <code>SQLException</code>
      * stating that the operation is not supported. <p>
      *
-     * Starting with 1.9.0, HSQLDB accepts any valid value.
+     * Starting with 2.0, HSQLDB accepts any valid value.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -3244,12 +3475,14 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public synchronized void setFetchDirection(
             int direction) throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (direction != JDBCResultSet.FETCH_FORWARD
                 && direction != JDBCResultSet.FETCH_REVERSE
                 && direction != JDBCResultSet.FETCH_UNKNOWN) {
-            throw Util.notSupported();
+            throw JDBCUtil.notSupported();
         }
         fetchDirection = direction;
     }
@@ -3270,7 +3503,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      *
      * Up to 1.8.0.x, HSQLDB always returned FETCH_FORWARD.
      *
-     * Starting with 1.9.0, HSQLDB returns FETCH_FORWARD by default, or
+     * Starting with 2.0, HSQLDB returns FETCH_FORWARD by default, or
      * whatever value has been explicitly assigned by invoking
      * <code>setFetchDirection</code>.
      * .
@@ -3287,7 +3520,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int getFetchDirection() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         return fetchDirection;
     }
@@ -3322,10 +3557,12 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void setFetchSize(int rows) throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (rows < 0) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
         fetchSize = rows;
     }
@@ -3358,7 +3595,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int getFetchSize() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         return fetchSize;
     }
@@ -3387,9 +3626,11 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int getResultSetConcurrency() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
-        return rsConcurrency;
+        return ResultProperties.getJDBCConcurrency(rsProperties);
     }
 
     /**
@@ -3417,11 +3658,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized int getResultSetType() throws SQLException {
 
-// fredt - omit checkClosed() in order to be able to handle the result of a
-// SHUTDOWN query
-        checkClosed();
+        // fredt - omit checkClosed() in order to be able to handle the result of a
+        // SHUTDOWN query
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
-        return rsScrollability;
+        return ResultProperties.getJDBCScrollability(rsProperties);
     }
 
     /**
@@ -3450,7 +3693,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized void clearBatch() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (isBatch) {
             resultOut.getNavigator().clear();
@@ -3471,7 +3716,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     public synchronized Connection getConnection() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         return connection;
     }
@@ -3500,13 +3747,14 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @throws SQLException if this method is called on a closed
      * <code>Statement</code>
      * <p>
-     * @since JDK 1.6 Build 81, HSQLDB 1.9.0
+     * @since JDK 1.6 Build 81, HSQLDB 2.0
      */
     public synchronized void setPoolable(
             boolean poolable) throws SQLException {
 
-        checkClosed();
-
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
         this.poolable = poolable;
     }
 
@@ -3519,13 +3767,15 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @throws SQLException if this method is called on a closed
      * <code>Statement</code>
      * <p>
-     * @since JDK 1.6 Build 81, HSQLDB 1.9.0
+     * @since JDK 1.6 Build 81, HSQLDB 2.0
      * <p>
      * @see #setPoolable(boolean) setPoolable(boolean)
      */
     public synchronized boolean isPoolable() throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         return this.poolable;
     }
@@ -3547,7 +3797,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @param iface A Class defining an interface that the result must implement.
      * @return an object that implements the interface. May be a proxy for the actual implementing object.
      * @throws java.sql.SQLException If no object found that implements the interface
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     @SuppressWarnings("unchecked")
@@ -3557,7 +3807,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
             return (T) this;
         }
 
-        throw Util.invalidArgument("iface: " + iface);
+        throw JDBCUtil.invalidArgument("iface: " + iface);
     }
 
 //#endif JAVA6
@@ -3575,7 +3825,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @return true if this implements the interface or directly or indirectly wraps an object that does.
      * @throws java.sql.SQLException  if an error occurs while determining whether this is a wrapper
      * for an object with the given interface.
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public boolean isWrapperFor(
@@ -3609,9 +3859,11 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                           String[] generatedNames) throws HsqlException,
                               SQLException {
 
-        isResult   = false;
-        connection = c;
-        sql        = c.nativeSQL(sql);
+        isResult              = false;
+        connection            = c;
+        connectionIncarnation = connection.incarnation;
+        session               = c.sessionProxy;
+        sql                   = c.nativeSQL(sql);
 
         int[] keyIndexes = null;
 
@@ -3624,31 +3876,49 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         }
         resultOut = Result.newPrepareStatementRequest();
 
-        resultOut.setPrepareOrExecuteProperties(sql, 0, 0, 0, resultSetType,
-                resultSetConcurrency, resultSetHoldability, generatedKeys,
-                generatedIndexes, generatedNames);
+        int props = ResultProperties.getValueForJDBC(resultSetType,
+            resultSetConcurrency, resultSetHoldability);
 
-        Result in = connection.sessionProxy.execute(resultOut);
+        resultOut.setPrepareOrExecuteProperties(sql, 0, 0, 0, queryTimeout,
+                props, generatedKeys, generatedIndexes, generatedNames);
 
-        if (in.isError()) {
-            throw Util.sqlException(in);
+        Result in = session.execute(resultOut);
+
+        if (in.mode == ResultConstants.ERROR) {
+            throw JDBCUtil.sqlException(in);
         }
+        rootWarning = null;
+
+        Result current = in;
+
+        while (current.getChainedResult() != null) {
+            current = current.getUnlinkChainedResult();
+
+            if (current.isWarning()) {
+                SQLWarning w = JDBCUtil.sqlWarning(current);
+
+                if (rootWarning == null) {
+                    rootWarning = w;
+                } else {
+                    rootWarning.setNextWarning(w);
+                }
+            }
+        }
+        connection.setWarnings(rootWarning);
+
         statementID       = in.getStatementID();
         statementRetType  = in.getStatementType();
         resultMetaData    = in.metaData;
         parameterMetaData = in.parameterMetaData;
         parameterTypes    = parameterMetaData.getParameterTypes();
         parameterModes    = parameterMetaData.paramModes;
-        rsScrollability   = in.rsScrollability;
-        rsConcurrency     = in.rsConcurrency;
-        rsHoldability     = in.rsHoldability;
+        rsProperties      = in.rsProperties;
 
         //
         int paramCount = parameterMetaData.getColumnCount();
 
         parameterValues = new Object[paramCount];
-        parameterSet    = new boolean[paramCount];
-        parameterStream = new boolean[paramCount];
+        parameterSet    = new Boolean[paramCount];
         streamLengths   = new long[paramCount];
 
         //
@@ -3676,8 +3946,10 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     JDBCPreparedStatement(JDBCConnection c, Result result) {
 
-        isResult   = true;
-        connection = c;
+        isResult              = true;
+        connection            = c;
+        connectionIncarnation = connection.incarnation;
+        session               = c.sessionProxy;
 
         int paramCount = result.metaData.getExtendedColumnCount();
 
@@ -3685,8 +3957,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         parameterTypes    = result.metaData.columnTypes;
         parameterModes    = new byte[paramCount];
         parameterValues   = new Object[paramCount];
-        parameterSet      = new boolean[paramCount];
-        parameterStream   = new boolean[paramCount];
+        parameterSet      = new Boolean[paramCount];
         streamLengths     = new long[paramCount];
 
         //
@@ -3715,10 +3986,23 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
         if (type != statementRetType) {
             if (statementRetType == StatementTypes.RETURN_COUNT) {
-                throw Util.sqlException(ErrorCode.X_07503);
+                throw JDBCUtil.sqlException(ErrorCode.X_07504);
             } else {
-                throw Util.sqlException(ErrorCode.X_07504);
+                throw JDBCUtil.sqlException(ErrorCode.X_07503);
             }
+        }
+    }
+
+    protected void checkParameterIndex(int i) throws SQLException {
+
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
+
+        if (i < 1 || i > parameterValues.length) {
+            String msg = "parameter index out of range: " + i;
+
+            throw JDBCUtil.outOfRangeArgument(msg);
         }
     }
 
@@ -3727,43 +4011,24 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * setting an IN or IN OUT parameter value. <p>
      *
      * @param i The parameter index to check
-     * @param isStream true if parameter is a stream
      * @throws SQLException if the specified parameter index is invalid
      */
-    protected void checkSetParameterIndex(int i,
-            boolean isStream) throws SQLException {
+    protected void checkSetParameterIndex(int i) throws SQLException {
 
-        String msg;
-
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (i < 1 || i > parameterValues.length) {
-            msg = "parameter index out of range: " + i;
+            String msg = "parameter index out of range: " + i;
 
-            throw Util.outOfRangeArgument(msg);
+            throw JDBCUtil.outOfRangeArgument(msg);
         }
 
-        if (isStream) {
-            parameterStream[i - 1] = true;
-            parameterSet[i - 1]    = false;
-        } else {
-            parameterStream[i - 1] = false;
-            parameterSet[i - 1]    = true;
-        }
+        if (parameterModes[i - 1] == SchemaObject.ParameterModes.PARAM_OUT) {
+            String msg = "Not IN or INOUT mode for parameter: " + i;
 
-        int mode = parameterModes[i - 1];
-
-        switch (mode) {
-
-            case SchemaObject.ParameterModes.PARAM_UNKNOWN :
-            case SchemaObject.ParameterModes.PARAM_IN :
-            case SchemaObject.ParameterModes.PARAM_INOUT :
-                break;
-            case SchemaObject.ParameterModes.PARAM_OUT :
-            default :
-                msg = "Not IN or INOUT mode: " + mode + " for parameter: " + i;
-
-                throw Util.invalidArgument(msg);
+            throw JDBCUtil.invalidArgument(msg);
         }
     }
 
@@ -3778,12 +4043,14 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
         String msg;
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         if (i < 1 || i > parameterValues.length) {
             msg = "parameter index out of range: " + i;
 
-            throw Util.outOfRangeArgument(msg);
+            throw JDBCUtil.outOfRangeArgument(msg);
         }
 
         int mode = parameterModes[i - 1];
@@ -3799,7 +4066,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 msg = "Not OUT or INOUT mode: " + mode + " for parameter: "
                       + i;
 
-                throw Util.invalidArgument(msg);
+                throw JDBCUtil.invalidArgument(msg);
         }
     }
 
@@ -3820,8 +4087,8 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
         for (int i = 0; i < parameterSet.length; i++) {
             if (parameterModes[i] != SchemaObject.ParameterModes.PARAM_OUT) {
-                if (!parameterSet[i] && !parameterStream[i]) {
-                    throw Util.sqlException(ErrorCode.JDBC_PARAMETER_NOT_SET);
+                if (parameterSet[i] == null) {
+                    throw JDBCUtil.sqlException(ErrorCode.JDBC_PARAMETER_NOT_SET);
                 }
             }
         }
@@ -3837,12 +4104,13 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     void setParameter(int i, Object o) throws SQLException {
 
-        checkSetParameterIndex(i, false);
+        checkSetParameterIndex(i);
 
         i--;
 
         if (o == null) {
             parameterValues[i] = null;
+            parameterSet[i]    = Boolean.TRUE;
 
             return;
         }
@@ -3859,46 +4127,41 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                         break;
                     }
                 } catch (HsqlException e) {
-                    Util.throwError(e);
+                    JDBCUtil.throwError(e);
                 }
-                Util.throwError(Error.error(ErrorCode.X_42565));
-
-                break;
+                JDBCUtil.throwError(Error.error(ErrorCode.X_42563));
             case Types.SQL_BIT :
             case Types.SQL_BIT_VARYING :
-                if (o instanceof Boolean) {
-                    if (outType.precision == 1) {
-                        byte[] bytes = ((Boolean) o).booleanValue()
-                                       ? new byte[] { -0x80 }
-                                       : new byte[] { 0 };
-
-                        o = new BinaryData(bytes, 1);
+                try {
+                    if (o instanceof Boolean) {
+                        o = outType.convertToDefaultType(session, o);
 
                         break;
                     }
-                    Util.throwError(Error.error(ErrorCode.X_42565));
-                }
 
-                try {
+                    if (o instanceof Integer) {
+                        o = outType.convertToDefaultType(session, o);
+
+                        break;
+                    }
+
                     if (o instanceof byte[]) {
-                        o = outType.convertToDefaultType(
-                            connection.sessionProxy, o);
+                        o = outType.convertToDefaultType(session, o);
 
                         break;
                     }
 
                     if (o instanceof String) {
-                        o = outType.convertToDefaultType(
-                            connection.sessionProxy, o);
+                        o = outType.convertToDefaultType(session, o);
 
                         break;
                     }
                 } catch (HsqlException e) {
-                    Util.throwError(e);
+                    JDBCUtil.throwError(e);
                 }
-                Util.throwError(Error.error(ErrorCode.X_42565));
+                JDBCUtil.throwError(Error.error(ErrorCode.X_42563));
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
                 if (o instanceof byte[]) {
@@ -3909,17 +4172,40 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
                 try {
                     if (o instanceof String) {
-                        o = outType.convertToDefaultType(
-                            connection.sessionProxy, o);
+                        o = outType.convertToDefaultType(session, o);
 
                         break;
                     }
                 } catch (HsqlException e) {
-                    Util.throwError(e);
+                    JDBCUtil.throwError(e);
                 }
-                Util.throwError(Error.error(ErrorCode.X_42565));
+                JDBCUtil.throwError(Error.error(ErrorCode.X_42563));
 
                 break;
+            case Types.SQL_ARRAY :
+                if (o instanceof Array) {
+                    setArray(i + 1, (Array) o);
+
+                    return;
+                }
+
+                if (o instanceof ArrayList) {
+                    o = ((ArrayList) o).toArray();
+                }
+
+                if (o instanceof Object[]) {
+                    Type     baseType = outType.collectionBaseType();
+                    Object[] array    = (Object[]) o;
+                    Object[] data     = new Object[array.length];
+
+                    for (int j = 0; j < data.length; j++) {
+                        data[j] = baseType.convertJavaToSQL(session, array[j]);
+                    }
+                    o = data;
+
+                    break;
+                }
+                JDBCUtil.throwError(Error.error(ErrorCode.X_42563));
             case Types.SQL_BLOB :
                 setBlobParameter(i + 1, o);
 
@@ -3935,20 +4221,18 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
             case Types.SQL_TIMESTAMP : {
                 try {
                     if (o instanceof String) {
-                        o = outType.convertToType(connection.sessionProxy, o,
+                        o = outType.convertToType(session, o,
                                 Type.SQL_VARCHAR);
 
                         break;
                     }
-                    o = outType.convertJavaToSQL(connection.sessionProxy, o);
+                    o = outType.convertJavaToSQL(session, o);
 
                     break;
                 } catch (HsqlException e) {
-                    Util.throwError(e);
+                    JDBCUtil.throwError(e);
                 }
             }
-
-            // $FALL-THROUGH$
             case Types.TINYINT :
             case Types.SQL_SMALLINT :
             case Types.SQL_INTEGER :
@@ -3960,31 +4244,62 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
             case Types.SQL_DECIMAL :
                 try {
                     if (o instanceof String) {
-                        o = outType.convertToType(connection.sessionProxy, o,
+                        o = outType.convertToType(session, o,
                                 Type.SQL_VARCHAR);
 
                         break;
+                    } else if (o instanceof Boolean) {
+                        boolean value = ((Boolean) o).booleanValue();
+
+                        o = value ? Integer.valueOf(1)
+                                  : Integer.valueOf(0);
                     }
-                    o = outType.convertToDefaultType(connection.sessionProxy,
-                            o);
+                    o = outType.convertToDefaultType(session, o);
 
                     break;
                 } catch (HsqlException e) {
-                    Util.throwError(e);
+                    JDBCUtil.throwError(e);
+                }
+            case Types.SQL_VARCHAR : {
+                if (o instanceof String) {
+                    break;
+                } else {
+                    try {
+                        o = outType.convertToDefaultType(session, o);
+
+                        break;
+                    } catch (HsqlException e) {
+                        JDBCUtil.throwError(e);
+                    }
+                }
+            }
+            case Types.SQL_CHAR :
+                if (outType.precision == 1) {
+                    if (o instanceof Character) {
+                        o = new String(new char[] {
+                            ((Character) o).charValue() });
+
+                        break;
+                    } else if (o instanceof Boolean) {
+                        o = ((Boolean) o).booleanValue() ? "1"
+                                : "0";
+
+                        break;
+                    }
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
                 try {
-                    o = outType.convertToDefaultType(connection.sessionProxy,
-                            o);
+                    o = outType.convertToDefaultType(session, o);
 
                     break;
                 } catch (HsqlException e) {
-                    Util.throwError(e);
+                    JDBCUtil.throwError(e);
                 }
         }
         parameterValues[i] = o;
+        parameterSet[i]    = Boolean.TRUE;
     }
 
     /**
@@ -3995,28 +4310,65 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @throws SQLException
      */
     void setClobParameter(int i, Object o) throws SQLException {
+        setClobParameter(i, o, 0);
+    }
+
+    void setClobParameter(int i, Object o,
+                          long streamLength) throws SQLException {
 
         if (o instanceof JDBCClobClient) {
-            if (o instanceof JDBCClobClient) {
-                throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
-                                        "invalid Clob");
+            JDBCClobClient clob = (JDBCClobClient) o;
+
+            if (!clob.session.getDatabaseUniqueName().equals(
+                    session.getDatabaseUniqueName())) {
+                streamLength = clob.length();
+
+                Reader is = clob.getCharacterStream();
+
+                parameterValues[i - 1] = is;
+                streamLengths[i - 1]   = streamLength;
+                parameterSet[i - 1]    = Boolean.FALSE;
+
+                return;
             }
+            parameterValues[i - 1] = o;
+            parameterSet[i - 1]    = Boolean.TRUE;
+
+            return;
         } else if (o instanceof Clob) {
             parameterValues[i - 1] = o;
-            parameterSet[i - 1]    = true;
+            parameterSet[i - 1]    = Boolean.TRUE;
 
             return;
         } else if (o instanceof ClobInputStream) {
-            throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
-                                    "invalid Reader");
+            ClobInputStream is = (ClobInputStream) o;
+
+            if (is.session.getDatabaseUniqueName().equals(
+                    session.getDatabaseUniqueName())) {
+                throw JDBCUtil.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
+                                        "invalid Reader");
+            }
+            parameterValues[i - 1] = o;
+            streamLengths[i - 1]   = streamLength;
+            parameterSet[i - 1]    = Boolean.FALSE;
+
+            return;
         } else if (o instanceof Reader) {
             parameterValues[i - 1] = o;
-            parameterStream[i - 1] = true;
+            streamLengths[i - 1]   = streamLength;
+            parameterSet[i - 1]    = Boolean.FALSE;
+
+            return;
+        } else if (o instanceof String) {
+            JDBCClob clob = new JDBCClob((String) o);
+
+            parameterValues[i - 1] = clob;
+            parameterSet[i - 1]    = false;
 
             return;
         }
 
-        throw Util.invalidArgument();
+        throw JDBCUtil.invalidArgument();
     }
 
     /**
@@ -4026,26 +4378,69 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      * @param o Object
      */
     void setBlobParameter(int i, Object o) throws SQLException {
+        setBlobParameter(i, o, 0);
+    }
+
+    void setBlobParameter(int i, Object o,
+                          long streamLength) throws SQLException {
 
         if (o instanceof JDBCBlobClient) {
-            throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
-                                    "invalid Clob");
+            JDBCBlobClient blob = (JDBCBlobClient) o;
+
+            if (!blob.session.getDatabaseUniqueName().equals(
+                    session.getDatabaseUniqueName())) {
+                streamLength = blob.length();
+
+                InputStream is = blob.getBinaryStream();
+
+                parameterValues[i - 1] = is;
+                streamLengths[i - 1]   = streamLength;
+                parameterSet[i - 1]    = Boolean.FALSE;
+
+                return;
+            }
+
+            // in the same database
+            parameterValues[i - 1] = o;
+            parameterSet[i - 1]    = Boolean.TRUE;
+
+            return;
         } else if (o instanceof Blob) {
             parameterValues[i - 1] = o;
-            parameterSet[i - 1]    = true;
+            parameterSet[i - 1]    = Boolean.FALSE;
 
             return;
         } else if (o instanceof BlobInputStream) {
-            throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
-                                    "invalid InputStream");
+            BlobInputStream is = (BlobInputStream) o;
+
+            if (is.session.getDatabaseUniqueName().equals(
+                    session.getDatabaseUniqueName())) {
+                throw JDBCUtil.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
+                                        "invalid Reader");
+            }
+
+            // in the same database ? see if it blocks in
+            parameterValues[i - 1] = o;
+            streamLengths[i - 1]   = streamLength;
+            parameterSet[i - 1]    = Boolean.FALSE;
+
+            return;
         } else if (o instanceof InputStream) {
             parameterValues[i - 1] = o;
-            parameterStream[i - 1] = true;
+            streamLengths[i - 1]   = streamLength;
+            parameterSet[i - 1]    = Boolean.FALSE;
+
+            return;
+        } else if (o instanceof byte[]) {
+            JDBCBlob blob = new JDBCBlob((byte[]) o);
+
+            parameterValues[i - 1] = blob;
+            parameterSet[i - 1]    = Boolean.TRUE;
 
             return;
         }
 
-        throw Util.invalidArgument();
+        throw JDBCUtil.invalidArgument();
     }
 
     /**
@@ -4056,7 +4451,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     void setIntParameter(int i, int value) throws SQLException {
 
-        checkSetParameterIndex(i, false);
+        checkSetParameterIndex(i);
 
         int outType = parameterTypes[i - 1].typeCode;
 
@@ -4065,25 +4460,27 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
             case Types.TINYINT :
             case Types.SQL_SMALLINT :
             case Types.SQL_INTEGER : {
-                Object o = new Integer(value);
+                Object o = Integer.valueOf(value);
 
                 parameterValues[i - 1] = o;
+                parameterSet[i - 1]    = Boolean.TRUE;
 
                 break;
             }
             case Types.SQL_BIGINT : {
-                Object o = new Long(value);
+                Object o = Long.valueOf(value);
 
                 parameterValues[i - 1] = o;
+                parameterSet[i - 1]    = Boolean.TRUE;
 
                 break;
             }
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
             case Types.OTHER :
-                throw Util.sqlException(Error.error(ErrorCode.X_42565));
+                throw JDBCUtil.sqlException(Error.error(ErrorCode.X_42563));
             default :
-                setParameter(i, new Integer(value));
+                setParameter(i, Integer.valueOf(value));
         }
     }
 
@@ -4097,24 +4494,25 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     void setLongParameter(int i, long value) throws SQLException {
 
-        checkSetParameterIndex(i, false);
+        checkSetParameterIndex(i);
 
         int outType = parameterTypes[i - 1].typeCode;
 
         switch (outType) {
 
             case Types.SQL_BIGINT :
-                Object o = new Long(value);
+                Object o = Long.valueOf(value);
 
                 parameterValues[i - 1] = o;
+                parameterSet[i - 1]    = Boolean.TRUE;
 
                 break;
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
             case Types.OTHER :
-                throw Util.sqlException(Error.error(ErrorCode.X_42565));
+                throw JDBCUtil.sqlException(Error.error(ErrorCode.X_42563));
             default :
-                setParameter(i, new Long(value));
+                setParameter(i, Long.valueOf(value));
         }
     }
 
@@ -4136,32 +4534,40 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 BlobDataID blob = null;
 
                 if (value instanceof JDBCBlobClient) {
+
+                    // check or fix id mismatch
                     blob = ((JDBCBlobClient) value).blob;
                     id   = blob.getId();
                 } else if (value instanceof Blob) {
                     long length = ((Blob) value).length();
 
-                    blob = connection.sessionProxy.createBlob(length);
+                    blob = session.createBlob(length);
                     id   = blob.getId();
 
                     InputStream stream = ((Blob) value).getBinaryStream();
-                    ResultLob resultLob = ResultLob.newLobCreateBlobRequest(
-                        connection.sessionProxy.getId(), id, stream, length);
+                    ResultLob resultLob =
+                        ResultLob.newLobCreateBlobRequest(session.getId(), id,
+                            stream, length);
 
-                    connection.sessionProxy.allocateResultLob(resultLob, null);
+                    session.allocateResultLob(resultLob, null);
                     resultOut.addLobResult(resultLob);
                 } else if (value instanceof InputStream) {
                     long length = streamLengths[i];
 
-                    blob = connection.sessionProxy.createBlob(length);
+                    long createLength = length > 0 ? length : 0;
+
+                    blob = session.createBlob(createLength);
                     id   = blob.getId();
 
                     InputStream stream = (InputStream) value;
-                    ResultLob resultLob = ResultLob.newLobCreateBlobRequest(
-                        connection.sessionProxy.getId(), id, stream, length);
+                    ResultLob resultLob =
+                        ResultLob.newLobCreateBlobRequest(session.getId(), id,
+                            stream, length);
 
-                    connection.sessionProxy.allocateResultLob(resultLob, null);
+                    session.allocateResultLob(resultLob, null);
                     resultOut.addLobResult(resultLob);
+                } else if (value instanceof BlobDataID) {
+                    blob = (BlobDataID) value;
                 }
                 parameterValues[i] = blob;
             } else if (parameterTypes[i].typeCode == Types.SQL_CLOB) {
@@ -4170,33 +4576,39 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
                 if (value instanceof JDBCClobClient) {
 
-                    // fix id mismatch
+                    // check or fix id mismatch
                     clob = ((JDBCClobClient) value).clob;
                     id   = clob.getId();
                 } else if (value instanceof Clob) {
                     long   length = ((Clob) value).length();
                     Reader reader = ((Clob) value).getCharacterStream();
 
-                    clob = connection.sessionProxy.createClob(length);
+                    clob = session.createClob(length);
                     id   = clob.getId();
 
-                    ResultLob resultLob = ResultLob.newLobCreateClobRequest(
-                        connection.sessionProxy.getId(), id, reader, length);
+                    ResultLob resultLob =
+                        ResultLob.newLobCreateClobRequest(session.getId(), id,
+                            reader, length);
 
-                    connection.sessionProxy.allocateResultLob(resultLob, null);
+                    session.allocateResultLob(resultLob, null);
                     resultOut.addLobResult(resultLob);
                 } else if (value instanceof Reader) {
                     long length = streamLengths[i];
 
-                    clob = connection.sessionProxy.createClob(length);
+                    long createLength = length > 0 ? length : 0;
+
+                    clob = session.createClob(createLength);
                     id   = clob.getId();
 
                     Reader reader = (Reader) value;
-                    ResultLob resultLob = ResultLob.newLobCreateClobRequest(
-                        connection.sessionProxy.getId(), id, reader, length);
+                    ResultLob resultLob =
+                        ResultLob.newLobCreateClobRequest(session.getId(), id,
+                            reader, length);
 
-                    connection.sessionProxy.allocateResultLob(resultLob, null);
+                    session.allocateResultLob(resultLob, null);
                     resultOut.addLobResult(resultLob);
+                } else if (value instanceof ClobDataID) {
+                    clob = (ClobDataID) value;
                 }
                 parameterValues[i] = clob;
             }
@@ -4211,13 +4623,14 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
      */
     void fetchResult() throws SQLException {
 
-        checkClosed();
-        connection.clearWarningsNoCheck();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
         closeResultData();
         checkParametersSet();
 
         if (isBatch) {
-            throw Util.sqlExceptionSQL(ErrorCode.X_07505);
+            throw JDBCUtil.sqlExceptionSQL(ErrorCode.X_07505);
         }
 
         //
@@ -4225,28 +4638,35 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
             resultOut.setPreparedResultUpdateProperties(parameterValues);
         } else {
             resultOut.setPreparedExecuteProperties(parameterValues, maxRows,
-                    fetchSize);
+                    fetchSize, rsProperties, queryTimeout);
         }
 
         try {
             performPreExecute();
 
-            resultIn = connection.sessionProxy.execute(resultOut);
+            resultIn = session.execute(resultOut);
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         } finally {
             performPostExecute();
         }
 
-        if (resultIn.isError()) {
-            throw Util.sqlException(resultIn);
+        if (resultIn.mode == ResultConstants.ERROR) {
+            throw JDBCUtil.sqlException(resultIn);
+        }
+
+        if (resultIn.isData()) {
+            currentResultSet = new JDBCResultSet(connection, this, resultIn,
+                    resultIn.metaData);
+        } else if (statementRetType == StatementTypes.RETURN_RESULT) {
+            getMoreResults();
         }
     }
 
     boolean isAnyParameterSet() {
 
         for (int i = 0; i < parameterValues.length; i++) {
-            if (parameterSet[i]) {
+            if (parameterSet[i] != null) {
                 return true;
             }
         }
@@ -4254,14 +4674,18 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
         return false;
     }
 
+    /**
+     * processes chained warnings and any generated columns result set
+     */
+    void performPostExecute() throws SQLException {
+        super.performPostExecute();
+    }
+
     /** The parameter values for the next non-batch execution. */
     protected Object[] parameterValues;
 
     /** Flags for bound variables. */
-    protected boolean[] parameterSet;
-
-    /** Flags for bound stream variables. */
-    protected boolean[] parameterStream;
+    protected Boolean[] parameterSet;
 
     /** The SQL types of the parameters. */
     protected Type[] parameterTypes;
@@ -4307,8 +4731,11 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     /** Is part of a Result. */
     protected final boolean isResult;
 
-    /************************* Volt DB Extensions *************************/
-
+    /** The session attribute of the connection */
+    protected SessionInterface session;
+    // A VoltDB extension to disable the JDBC closeOnCompletion functionality
+    // TODO: this could be refactored from leaf classes into JDBCStatementBase,
+    // possibly within JDBCStatementBase.checkClose
     public void closeOnCompletion() throws SQLException {
         throw new SQLException();
     }
@@ -4316,5 +4743,5 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public boolean isCloseOnCompletion() throws SQLException {
         throw new SQLException();
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,63 +32,45 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.result.ResultMetaData;
-import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
  * Implementation of Statement for simple PSM control statements.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.1
  * @since 1.9.0
  */
 public class StatementSimple extends Statement {
 
     String     sqlState;
+    Expression messageExpression;
     HsqlName   label;
-    Expression expression;
 
     //
     ColumnSchema[] variables;
     int[]          variableIndexes;
 
-    /**
-     * for RETURN and flow control
-     */
-    StatementSimple(int type, Expression expression) {
-
-        super(type, StatementTypes.X_SQL_CONTROL);
-
-        isTransactionStatement = false;
-        this.expression        = expression;
-    }
-
     StatementSimple(int type, HsqlName label) {
 
         super(type, StatementTypes.X_SQL_CONTROL);
 
+        references             = new OrderedHashSet();
         isTransactionStatement = false;
         this.label             = label;
     }
 
-    StatementSimple(int type, String sqlState) {
+    StatementSimple(int type, String sqlState, Expression message) {
 
         super(type, StatementTypes.X_SQL_CONTROL);
 
+        references             = new OrderedHashSet();
         isTransactionStatement = false;
         this.sqlState          = sqlState;
-    }
-
-    StatementSimple(int type, ColumnSchema[] variables, Expression e,
-                    int[] indexes) {
-
-        super(type, StatementTypes.X_SQL_CONTROL);
-
-        isTransactionStatement = false;
-        this.expression        = e;
-        this.variables         = variables;
-        variableIndexes        = indexes;
+        this.messageExpression = message;
     }
 
     public String getSQL() {
@@ -97,13 +79,16 @@ public class StatementSimple extends Statement {
 
         switch (type) {
 
-            /** @todo 1.9.0 - add the exception */
             case StatementTypes.SIGNAL :
-                sb.append(Tokens.T_SIGNAL);
+                sb.append(Tokens.T_SIGNAL).append(' ');
+                sb.append(Tokens.T_SQLSTATE);
+                sb.append(' ').append('\'').append(sqlState).append('\'');
                 break;
 
             case StatementTypes.RESIGNAL :
-                sb.append(Tokens.T_RESIGNAL);
+                sb.append(Tokens.T_RESIGNAL).append(' ');
+                sb.append(Tokens.T_SQLSTATE);
+                sb.append(' ').append('\'').append(sqlState).append('\'');
                 break;
 
             case StatementTypes.ITERATE :
@@ -112,29 +97,6 @@ public class StatementSimple extends Statement {
 
             case StatementTypes.LEAVE :
                 sb.append(Tokens.T_LEAVE).append(' ').append(label);
-                break;
-
-            case StatementTypes.RETURN :
-/*
-                sb.append(Tokens.T_RETURN);
-
-                if (expression != null) {
-                    sb.append(' ').append(expression.getSQL());
-                }
-                break;
-*/
-                return sql;
-
-            case StatementTypes.CONDITION :
-                sb.append(expression.getSQL());
-                break;
-
-            case StatementTypes.ASSIGNMENT :
-
-                /** @todo - cover row assignment */
-                sb.append(Tokens.T_SET).append(' ');
-                sb.append(variables[0].getName().statementName).append(' ');
-                sb.append('=').append(' ').append(expression.getSQL());
                 break;
         }
 
@@ -158,7 +120,13 @@ public class StatementSimple extends Statement {
 
     public Result execute(Session session) {
 
-        Result result = getResult(session);
+        Result result;
+
+        try {
+            result = getResult(session);
+        } catch (Throwable t) {
+            result = Result.newErrorResult(t, null);
+        }
 
         if (result.isError()) {
             result.getException().setStatementType(group, type);
@@ -174,73 +142,29 @@ public class StatementSimple extends Statement {
             /** @todo - check sqlState against allowed values */
             case StatementTypes.SIGNAL :
             case StatementTypes.RESIGNAL :
-                HsqlException ex = Error.error("sql routine error", sqlState,
-                                               -1);
+                HsqlException ex = Error.error(getMessage(session), sqlState);
 
                 return Result.newErrorResult(ex);
 
             case StatementTypes.ITERATE :
             case StatementTypes.LEAVE :
-            case StatementTypes.RETURN :
-            case StatementTypes.CONDITION :
-                return this.getResultValue(session);
+                return Result.newPSMResult(type, label.name, null);
 
-            case StatementTypes.ASSIGNMENT : {
-                try {
-                    performAssignment(session);
-
-                    return Result.updateZeroResult;
-                } catch (HsqlException e) {
-                    return Result.newErrorResult(e);
-                }
-            }
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "");
         }
     }
 
-    void performAssignment(Session session) {
+    String getMessage(Session session) {
 
-        Object[] values;
-
-        if (expression.getType() == OpTypes.ROW) {
-            values = expression.getRowValue(session);
-        } else if (expression.getType() == OpTypes.TABLE_SUBQUERY) {
-            values = expression.subQuery.queryExpression.getSingleRowValues(
-                session);
-
-            if (values == null) {
-                return;
-            }
-        } else {
-            values = new Object[1];
-            values[0] = expression.getValue(session,
-                                            variables[0].getDataType());
+        if (messageExpression == null) {
+            return null;
         }
 
-        for (int j = 0; j < values.length; j++) {
-            Object[] data = ValuePool.emptyObjectArray;
-
-            switch (variables[j].getType()) {
-
-                case SchemaObject.PARAMETER :
-                    data = session.sessionContext.routineArguments;
-                    break;
-
-                case SchemaObject.VARIABLE :
-                    data = session.sessionContext.routineVariables;
-                    break;
-            }
-
-            int colIndex = variableIndexes[j];
-
-            data[colIndex] =
-                variables[j].getDataType().convertToDefaultType(session,
-                    values[j]);
-        }
+        return (String) messageExpression.getValue(session);
     }
 
-    public void resolve() {
+    public void resolve(Session session) {
 
         boolean resolved = false;
 
@@ -248,14 +172,6 @@ public class StatementSimple extends Statement {
 
             case StatementTypes.SIGNAL :
             case StatementTypes.RESIGNAL :
-                resolved = true;
-                break;
-
-            case StatementTypes.RETURN :
-                if (root.isProcedure()) {
-                    throw Error.error(ErrorCode.X_42602);
-                }
-
                 resolved = true;
                 break;
 
@@ -287,14 +203,6 @@ public class StatementSimple extends Statement {
                 resolved = true;
                 break;
 
-            case StatementTypes.ASSIGNMENT :
-                resolved = true;
-                break;
-
-            case StatementTypes.CONDITION :
-                resolved = true;
-                break;
-
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "");
         }
@@ -304,36 +212,15 @@ public class StatementSimple extends Statement {
         }
     }
 
-    public void setParent(StatementCompound statement) {
-        parent = statement;
-    }
-
-    public void setRoot(Routine routine) {
-        root = routine;
-    }
-
-    public boolean hasGeneratedColumns() {
-        return false;
-    }
-
     public String describe(Session session) {
         return "";
     }
 
-    private Result getResultValue(Session session) {
+    public boolean isCatalogLock() {
+        return false;
+    }
 
-        try {
-            Object value = null;
-
-            if (expression != null) {
-                value = expression.getValue(session);
-            }
-
-            return Result.newPSMResult(type, label == null ? null
-                                                           : label
-                                                           .name, value);
-        } catch (HsqlException e) {
-            return Result.newErrorResult(e);
-        }
+    public boolean isCatalogChange() {
+        return false;
     }
 }

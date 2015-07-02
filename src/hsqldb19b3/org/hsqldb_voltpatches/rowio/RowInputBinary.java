@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,9 +36,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.lib.StringConverter;
-import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BlobData;
 import org.hsqldb_voltpatches.types.BlobDataID;
@@ -51,6 +50,7 @@ import org.hsqldb_voltpatches.types.JavaObjectData;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  *  Provides methods for reading the data for a row from a
@@ -59,17 +59,13 @@ import org.hsqldb_voltpatches.types.Type;
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.0
  */
-public class RowInputBinary extends RowInputBase
-implements org.hsqldb_voltpatches.rowio.RowInputInterface {
+public class RowInputBinary extends RowInputBase implements RowInputInterface {
 
+    public boolean          ignoreDataErrors;
     private RowOutputBinary out;
-
-    public RowInputBinary() {
-        super();
-    }
 
     public RowInputBinary(byte[] buf) {
         super(buf);
@@ -93,7 +89,7 @@ implements org.hsqldb_voltpatches.rowio.RowInputInterface {
     public String readString() throws IOException {
 
         int    length = readInt();
-        String s      = StringConverter.readUTF(buf, pos, length);
+        String s      = StringConverter.readUTF(buffer, pos, length);
 
         s   = ValuePool.getString(s);
         pos += length;
@@ -101,7 +97,7 @@ implements org.hsqldb_voltpatches.rowio.RowInputInterface {
         return s;
     }
 
-    protected boolean checkNull() throws IOException {
+    public boolean readNull() throws IOException {
 
         int b = readByte();
 
@@ -196,7 +192,7 @@ implements org.hsqldb_voltpatches.rowio.RowInputInterface {
 
         readFully(b);
 
-        return new BinaryData(b, length);
+        return BinaryData.getBitData(b, length);
     }
 
     protected BinaryData readBinary() throws IOException {
@@ -215,6 +211,46 @@ implements org.hsqldb_voltpatches.rowio.RowInputInterface {
         long id = super.readLong();
 
         return new BlobDataID(id);
+    }
+
+    protected Object[] readArray(Type type) throws IOException {
+
+        type = type.collectionBaseType();
+
+        int      size = readInt();
+        Object[] data = new Object[size];
+
+        for (int i = 0; i < size; i++) {
+            data[i] = readData(type);
+        }
+
+        return data;
+    }
+
+    /**
+     * Nulls in array are treated as 0
+     */
+    public int[] readIntArray() throws IOException {
+
+        int   size = readInt();
+        int[] data = new int[size];
+
+        for (int i = 0; i < size; i++) {
+            if (!readNull()) {
+                data[i] = readInt();
+            }
+        }
+
+        return data;
+    }
+
+    public Object[] readData(Type[] colTypes) throws IOException {
+
+        if (ignoreDataErrors) {
+            return new Object[colTypes.length];
+        }
+
+        return super.readData(colTypes);
     }
 
     // helper methods
@@ -238,8 +274,8 @@ implements org.hsqldb_voltpatches.rowio.RowInputInterface {
         }
 
         for (int i = 0; i < c.length; i++) {
-            int ch1 = buf[pos++] & 0xff;
-            int ch2 = buf[pos++] & 0xff;
+            int ch1 = buffer[pos++] & 0xff;
+            int ch2 = buffer[pos++] & 0xff;
 
             c[i] = (char) ((ch1 << 8) + (ch2));
         }
@@ -257,7 +293,7 @@ implements org.hsqldb_voltpatches.rowio.RowInputInterface {
         if (out != null) {
             out.reset(rowsize);
 
-            buf = out.getBuffer();
+            buffer = out.getBuffer();
         }
 
         super.reset();
@@ -268,12 +304,12 @@ implements org.hsqldb_voltpatches.rowio.RowInputInterface {
      *  byte[] buffer by an external routine.
      *
      */
-    public void resetRow(int filepos, int rowsize) throws IOException {
+    public void resetRow(long filepos, int rowsize) {
 
         if (out != null) {
             out.reset(rowsize);
 
-            buf = out.getBuffer();
+            buffer = out.getBuffer();
         }
 
         super.resetRow(filepos, rowsize);

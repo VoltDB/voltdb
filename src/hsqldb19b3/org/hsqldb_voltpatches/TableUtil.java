@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,93 +39,47 @@ import org.hsqldb_voltpatches.types.Type;
  * Utility functions to set up special tables.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.7
  * @since 1.9.0
  */
 public class TableUtil {
 
-    static Table newTable(Database database, int type,
-                          HsqlName tableHsqlName) {
+    static Table newSingleColumnTable(Database database, HsqlName tableName,
+                                      int tableType, HsqlName colName,
+                                      Type colType) {
 
-        switch (type) {
+        TableDerived table;
 
-            case TableBase.TEMP_TEXT_TABLE :
-            case TableBase.TEXT_TABLE : {
-                return new TextTable(database, tableHsqlName, type);
-            }
-            default : {
-                return new Table(database, tableHsqlName, type);
-            }
-        }
+        table = new TableDerived(database, tableName, tableType);
+
+        ColumnSchema column = new ColumnSchema(colName, colType, false, true,
+                                               null);
+
+        table.addColumn(column);
+        table.createPrimaryKeyConstraint(table.getName(), new int[]{ 0 },
+                                         true);
+
+        return table;
     }
 
-    static TableDerived newSubqueryTable(Database database,
-                                         QueryExpression queryExpression) {
+    static void setTableIndexesForSubquery(Table table, boolean fullIndex,
+                                           boolean uniqueRows) {
 
-        HsqlName name = database.nameManager.getSubqueryTableName();
-
-        try {
-            return new TableDerived(database, name, TableBase.SYSTEM_SUBQUERY,
-                                    queryExpression);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    static Table newLookupTable(Database database) {
-
-        try {
-            TableDerived table = TableUtil.newSubqueryTable(database, null);
-            ColumnSchema column =
-                new ColumnSchema(HsqlNameManager.getAutoColumnName(0),
-                                 Type.SQL_INTEGER, false, true, null);
-
-            table.addColumn(column);
-            table.createPrimaryKey(new int[]{ 0 });
-
-            return table;
-        } catch (HsqlException e) {
-            return null;
-        }
-    }
-
-    /**
-     * For table subqueries
-     */
-    static void setTableColumnsForSubquery(Table table,
-                                           QueryExpression queryExpression,
-                                           boolean fullIndex) {
-
-        table.columnList  = queryExpression.getColumns();
-        table.columnCount = queryExpression.getColumnCount();
-
-        table.createPrimaryKey();
+        int[] cols = null;
 
         if (fullIndex) {
-            int[] colIndexes = null;
+            cols = new int[table.getColumnCount()];
 
-            colIndexes = table.getNewColumnMap();
-
-            ArrayUtil.fillSequence(colIndexes);
-
-            table.fullIndex = table.createIndexForColumns(colIndexes);
+            ArrayUtil.fillSequence(cols);
         }
-    }
 
-    static void setTableColumnsForSubquery(Table table, Type[] types,
-                                           boolean fullIndex) {
+        table.createPrimaryKey(null, uniqueRows ? cols
+                                                : null, false);
 
-        addAutoColumns(table, types);
-        table.createPrimaryKey();
-
-        if (fullIndex) {
-            int[] colIndexes = null;
-
-            colIndexes = table.getNewColumnMap();
-
-            ArrayUtil.fillSequence(colIndexes);
-
-            table.fullIndex = table.createIndexForColumns(colIndexes);
+        if (uniqueRows) {
+            table.fullIndex = table.getPrimaryIndex();
+        } else if (fullIndex) {
+            table.fullIndex = table.createIndexForColumns(null, cols);
         }
     }
 

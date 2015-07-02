@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,23 +33,58 @@ package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
+import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.Set;
+import org.hsqldb_voltpatches.map.ValuePool;
+import org.hsqldb_voltpatches.navigator.RangeIterator;
+import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of column, variable, parameter, etc. access operations.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class ExpressionColumn extends Expression {
 
-    public final static ExpressionColumn[] emptyArray =
+    public static final ExpressionColumn[] emptyArray =
         new ExpressionColumn[]{};
+    static final SimpleName rownumName =
+        HsqlNameManager.getSimpleName("ROWNUM", false);
+
+    //
+    public final static HashMappedList diagnosticsList = new HashMappedList();
+    final static String[] diagnosticsVariableTokens    = new String[] {
+        Tokens.T_NUMBER, Tokens.T_MORE, Tokens.T_ROW_COUNT
+    };
+    public final static int            idx_number      = 0;
+    public final static int            idx_more        = 1;
+    public final static int            idx_row_count   = 2;
+
+    static {
+        for (int i = 0; i < diagnosticsVariableTokens.length; i++) {
+            HsqlName name = HsqlNameManager.newSystemObjectName(
+                diagnosticsVariableTokens[i], SchemaObject.VARIABLE);
+            Type type = Type.SQL_INTEGER;
+
+            if (diagnosticsVariableTokens[i] == Tokens.T_MORE) {
+                type = Type.SQL_CHAR;
+            }
+
+            ColumnSchema col = new ColumnSchema(name, type, false, false,
+                                                null);
+
+            diagnosticsList.add(diagnosticsVariableTokens[i], col);
+        }
+    }
 
     //
     ColumnSchema  column;
@@ -62,49 +97,47 @@ public class ExpressionColumn extends Expression {
     NumberSequence sequence;
     boolean        isWritable;    // = false; true if column of writable table
 
+    //
+    boolean isParam;
+
+    //
+
     /**
-     * Creates a OpCodes.COLUMN expression
+     * Creates a OpTypes.COLUMN expression
      */
     ExpressionColumn(String schema, String table, String column) {
 
         super(OpTypes.COLUMN);
 
-        this.schema = schema;
-        tableName   = table;
-        columnName  = column;
+        this.schema     = schema;
+        this.tableName  = table;
+        this.columnName = column;
     }
 
     ExpressionColumn(ColumnSchema column) {
 
         super(OpTypes.COLUMN);
 
-        columnName = column.getName().name;
+        this.column   = column;
+        this.dataType = column.getDataType();
+        columnName    = column.getName().name;
     }
 
-    ExpressionColumn(RangeVariable rangeVar, ColumnSchema column) {
-
-        super(OpTypes.COLUMN);
-
-        columnIndex = rangeVar.rangeTable.findColumn(column.getName().name);
-
-        setAttributesAsColumn(rangeVar, columnIndex);
-    }
-
-    ExpressionColumn(RangeVariable rangeVar, ColumnSchema column, int index) {
+    ExpressionColumn(RangeVariable rangeVar, int index) {
 
         super(OpTypes.COLUMN);
 
         columnIndex = index;
 
-        setAttributesAsColumn(rangeVar, columnIndex);
+        setAutoAttributesAsColumn(rangeVar, columnIndex);
     }
 
     /**
-     * Creates a temporary OpCodes.COLUMN expression
+     * Creates a temporary OpTypes.COLUMN expression
      */
     ExpressionColumn(Expression e, int colIndex, int rangePosition) {
 
-        this(OpTypes.SIMPLE_COLUMN);
+        super(OpTypes.SIMPLE_COLUMN);
 
         dataType           = e.dataType;
         columnIndex        = colIndex;
@@ -122,7 +155,22 @@ public class ExpressionColumn extends Expression {
 
         if (type == OpTypes.DYNAMIC_PARAM) {
             isParam = true;
+        } else if (type == OpTypes.ROWNUM) {
+            columnName = rownumName.name;
+            dataType   = Type.SQL_INTEGER;
         }
+    }
+
+    /**
+     * For diagnostics vars
+     */
+    ExpressionColumn(int type, int columnIndex) {
+
+        super(type);
+
+        this.column      = (ColumnSchema) diagnosticsList.get(columnIndex);
+        this.columnIndex = columnIndex;
+        this.dataType    = column.dataType;
     }
 
     ExpressionColumn(Expression[] nodes, String name) {
@@ -145,40 +193,56 @@ public class ExpressionColumn extends Expression {
     }
 
     /**
-     * Creates a OpCodes.SEQUENCE expression
+     * Creates a OpTypes.SEQUENCE expression
      */
-    ExpressionColumn(NumberSequence sequence) {
+    ExpressionColumn(NumberSequence sequence, int opType) {
 
-        super(OpTypes.SEQUENCE);
+        super(opType);
 
         this.sequence = sequence;
         dataType      = sequence.getDataType();
     }
 
+    void setAutoAttributesAsColumn(RangeVariable range, int i) {
+
+        columnIndex   = i;
+        column        = range.getColumn(i);
+        dataType      = column.getDataType();
+        columnName    = range.getColumnAlias(i).name;
+        tableName     = range.getTableAlias().name;
+        rangeVariable = range;
+
+        rangeVariable.addColumn(columnIndex);
+    }
+
     void setAttributesAsColumn(RangeVariable range, int i) {
 
-        if (range.variables != null) {
-            columnIndex   = i;
-            column        = range.getColumn(i);
-            dataType      = column.getDataType();
-            rangeVariable = range;
-        } else {
-            Table t = range.getTable();
+        columnIndex   = i;
+        column        = range.getColumn(i);
+        dataType      = column.getDataType();
+        rangeVariable = range;
 
-            columnIndex = i;
-            column      = range.getColumn(i);
-            dataType    = column.getDataType();
-            columnName  = column.getName().name;
-            tableName   = t.getName().name;
-            schema      = t.getSchemaName().name;
+        rangeVariable.addColumn(columnIndex);
+    }
 
-            if (alias == null && range.hasColumnAlias()) {
-                alias = range.getColumnAliasName(i);
-            }
+    public byte getNullability() {
 
-            rangeVariable = range;
+        switch (opType) {
 
-            rangeVariable.addColumn(columnIndex);
+            case OpTypes.COLUMN :
+                if (nullability == SchemaObject.Nullability.NULLABLE_UNKNOWN) {
+                    return column.getNullability();
+                }
+
+                return nullability;
+
+            case OpTypes.COALESCE :
+            case OpTypes.SEQUENCE :
+            case OpTypes.ROWNUM :
+                return SchemaObject.Nullability.NO_NULLS;
+
+            default :
+                return SchemaObject.Nullability.NULLABLE_UNKNOWN;
         }
     }
 
@@ -195,12 +259,18 @@ public class ExpressionColumn extends Expression {
             return alias;
         }
 
+        if (rangeVariable != null && rangeVariable.hasColumnAlias()) {
+            return rangeVariable.getColumnAlias(columnIndex);
+        }
+
         if (column != null) {
             return column.getName();
         }
 
         if (opType == OpTypes.COALESCE) {
             return nodes[LEFT].getSimpleName();
+        } else if (opType == OpTypes.ROWNUM) {
+            return rownumName;
         }
 
         return null;
@@ -212,34 +282,19 @@ public class ExpressionColumn extends Expression {
             return alias.name;
         }
 
-        if (opType == OpTypes.COLUMN) {
-            return columnName;
-        }
+        switch (opType) {
 
-        if (opType == OpTypes.COALESCE) {
-            return columnName;
+            case OpTypes.COLUMN :
+            case OpTypes.COALESCE :
+            case OpTypes.ROWNUM :
+                return columnName;
         }
 
         return "";
     }
 
-    public String getBaseColumnName() {
-
-        if (opType == OpTypes.COLUMN && rangeVariable != null) {
-            return rangeVariable.getTable().getColumn(
-                columnIndex).getName().name;
-        }
-
-        return null;
-    }
-
-    public HsqlName getBaseColumnHsqlName() {
-        return column.getName();
-    }
-
     void collectObjectNames(Set set) {
 
-        // BEGIN Cherry-picked code change from hsqldb-2.3.2
         switch (opType) {
 
             case OpTypes.SEQUENCE :
@@ -269,34 +324,28 @@ public class ExpressionColumn extends Expression {
 
                 return;
         }
-        /* Disable 13 lines
-        if (opType == OpTypes.SEQUENCE) {
-            HsqlName name = ((NumberSequence) valueData).getName();
-
-            set.add(name);
-
-            return;
-        }
-
-        set.add(column.getName());
-
-        if (column.getName().parent != null) {
-            set.add(column.getName().parent);
-        }
-        ... disabled 13 lines */
-        // END Cherry-picked code change from hsqldb-2.3.2
     }
 
     String getColumnName() {
 
-        if (opType == OpTypes.COLUMN && column != null) {
-            return column.getName().name;
+        switch (opType) {
+
+            case OpTypes.COLUMN :
+            case OpTypes.PARAMETER :
+            case OpTypes.VARIABLE :
+                if (column != null) {
+                    return column.getName().name;
+                }
+
+                if (columnName != null) {
+                    return columnName;
+                }
         }
 
         return getAlias();
     }
 
-    ColumnSchema getColumn() {
+    public ColumnSchema getColumn() {
         return column;
     }
 
@@ -308,8 +357,9 @@ public class ExpressionColumn extends Expression {
         return rangeVariable;
     }
 
-    public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
-            int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
+    public HsqlList resolveColumnReferences(Session session,
+            RangeGroup rangeGroup, int rangeCount, RangeGroup[] rangeGroups,
+            HsqlList unresolvedSet, boolean acceptsSequences) {
 
         switch (opType) {
 
@@ -319,19 +369,33 @@ public class ExpressionColumn extends Expression {
                 }
                 break;
 
+            case OpTypes.ROWNUM :
             case OpTypes.MULTICOLUMN :
             case OpTypes.DYNAMIC_PARAM :
             case OpTypes.ASTERISK :
             case OpTypes.SIMPLE_COLUMN :
-            case OpTypes.COALESCE :
+            case OpTypes.DIAGNOSTICS_VARIABLE :
                 break;
 
-            case OpTypes.PARAMETER :
-            case OpTypes.VARIABLE :
+            case OpTypes.COALESCE :
+                for (int i = 0; i < nodes.length; i++) {
+                    nodes[i].resolveColumnReferences(session, rangeGroup,
+                                                     rangeGroups,
+                                                     unresolvedSet);
+                }
+                break;
+
             case OpTypes.COLUMN :
+            case OpTypes.PARAMETER :
+            case OpTypes.VARIABLE : {
+                boolean resolved       = false;
+                boolean tableQualified = tableName != null;
+
                 if (rangeVariable != null) {
                     return unresolvedSet;
                 }
+
+                RangeVariable[] rangeVarArray = rangeGroup.getRangeVariables();
 
                 for (int i = 0; i < rangeCount; i++) {
                     RangeVariable rangeVar = rangeVarArray[i];
@@ -340,8 +404,103 @@ public class ExpressionColumn extends Expression {
                         continue;
                     }
 
-                    if (resolveColumnReference(rangeVar)) {
-                        return unresolvedSet;
+                    if (resolved) {
+                        if (session.database.sqlEnforceRefs) {
+                            if (resolvesDuplicateColumnReference(rangeVar)) {
+                                String message = getColumnName();
+
+                                if (alias != null) {
+                                    StringBuffer sb =
+                                        new StringBuffer(message);
+
+                                    sb.append(' ').append(Tokens.T_AS).append(
+                                        ' ').append(alias.getStatementName());
+
+                                    message = sb.toString();
+                                }
+
+                                throw Error.error(ErrorCode.X_42580, message);
+                            }
+                        }
+                    } else {
+                        if (resolveColumnReference(rangeVar, false)) {
+                            resolved = true;
+
+                            if (!session.database.sqlEnforceRefs) {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (resolved) {
+                    return unresolvedSet;
+                }
+
+                if (session.database.sqlSyntaxOra
+                        || session.database.sqlSyntaxDb2) {
+                    if (acceptsSequences && tableName != null) {
+                        if (Tokens.T_CURRVAL.equals(columnName)
+                                || Tokens.T_PREVVAL.equals(columnName)) {
+                            NumberSequence seq =
+                                session.database.schemaManager.getSequence(
+                                    tableName, session.getSchemaName(schema),
+                                    false);
+
+                            if (seq != null) {
+                                opType     = OpTypes.SEQUENCE_CURRENT;
+                                dataType   = seq.getDataType();
+                                sequence   = seq;
+                                schema     = null;
+                                tableName  = null;
+                                columnName = null;
+                                resolved   = true;
+                            }
+                        } else if (Tokens.T_NEXTVAL.equals(columnName)) {
+                            NumberSequence seq =
+                                session.database.schemaManager.getSequence(
+                                    tableName, session.getSchemaName(schema),
+                                    false);
+
+                            if (seq != null) {
+                                opType     = OpTypes.SEQUENCE;
+                                dataType   = seq.getDataType();
+                                sequence   = seq;
+                                schema     = null;
+                                tableName  = null;
+                                columnName = null;
+                                resolved   = true;
+                            }
+                        }
+                    }
+                }
+
+                if (resolved) {
+                    return unresolvedSet;
+                }
+
+                for (int idx = rangeGroups.length - 1; idx >= 0; idx--) {
+                    rangeVarArray = rangeGroups[idx].getRangeVariables();
+
+                    for (int i = 0; i < rangeVarArray.length; i++) {
+                        RangeVariable rangeVar = rangeVarArray[i];
+
+                        if (rangeVar == null) {
+                            continue;
+                        }
+
+                        if (resolveColumnReference(rangeVar, true)) {
+                            if (opType == OpTypes.COLUMN) {
+                                rangeGroup.setCorrelated();
+
+                                for (int idxx = rangeGroups.length - 1;
+                                        idxx > idx; idxx--) {
+                                    rangeGroups[idxx].setCorrelated();
+                                }
+                            }
+
+                            return unresolvedSet;
+                        }
                     }
                 }
 
@@ -350,12 +509,14 @@ public class ExpressionColumn extends Expression {
                 }
 
                 unresolvedSet.add(this);
+            }
         }
 
         return unresolvedSet;
     }
 
-    public boolean resolveColumnReference(RangeVariable rangeVar) {
+    private boolean resolveColumnReference(RangeVariable rangeVar,
+                                           boolean outer) {
 
         if (tableName == null) {
             Expression e = rangeVar.getColumnExpression(columnName);
@@ -367,11 +528,19 @@ public class ExpressionColumn extends Expression {
 
                 return true;
             }
+        }
 
-            if (rangeVar.variables != null) {
-                int colIndex = rangeVar.findColumn(columnName);
+        int colIndex = rangeVar.findColumn(schema, tableName, columnName);
 
-                if (colIndex == -1) {
+        if (colIndex == -1) {
+            return false;
+        }
+
+        switch (rangeVar.rangeType) {
+
+            case RangeVariable.PARAMETER_RANGE :
+            case RangeVariable.VARIALBE_RANGE : {
+                if (tableName != null) {
                     return false;
                 }
 
@@ -381,29 +550,60 @@ public class ExpressionColumn extends Expression {
                         == SchemaObject.ParameterModes.PARAM_OUT) {
                     return false;
                 } else {
-                    opType = rangeVar.isVariable ? OpTypes.VARIABLE
-                                                 : OpTypes.PARAMETER;
-
-                    setAttributesAsColumn(rangeVar, colIndex);
-
-                    return true;
+                    opType = rangeVar.rangeType
+                             == RangeVariable.VARIALBE_RANGE ? OpTypes.VARIABLE
+                                                             : OpTypes
+                                                             .PARAMETER;
                 }
+
+                break;
+            }
+            case RangeVariable.TRANSITION_RANGE : {
+                if (tableName == null) {
+                    return false;
+                }
+
+                if (schema != null) {
+                    return false;
+                }
+
+                opType = OpTypes.TRANSITION_VARIABLE;
+
+                break;
+            }
+            default : {
+                break;
             }
         }
 
-        if (!rangeVar.resolvesTableName(this)) {
-            return false;
+        setAttributesAsColumn(rangeVar, colIndex);
+
+        return true;
+    }
+
+    boolean resolvesDuplicateColumnReference(RangeVariable rangeVar) {
+
+        if (tableName == null) {
+            Expression e = rangeVar.getColumnExpression(columnName);
+
+            if (e != null) {
+                return false;
+            }
         }
 
-        int colIndex = rangeVar.findColumn(columnName);
+        switch (rangeVar.rangeType) {
 
-        if (colIndex != -1) {
-            setAttributesAsColumn(rangeVar, colIndex);
+            case RangeVariable.PARAMETER_RANGE :
+            case RangeVariable.VARIALBE_RANGE :
+            case RangeVariable.TRANSITION_RANGE :
+                return false;
 
-            return true;
+            default :
+                int colIndex = rangeVar.findColumn(schema, tableName,
+                                                   columnName);
+
+                return colIndex != -1;
         }
-
-        return false;
     }
 
     public void resolveTypes(Session session, Expression parent) {
@@ -418,6 +618,8 @@ public class ExpressionColumn extends Expression {
 
             case OpTypes.COALESCE : {
                 Type type = null;
+
+                nullability = SchemaObject.Nullability.NO_NULLS;
 
                 for (int i = 0; i < nodes.length; i++) {
                     type = Type.getAggregateType(nodes[i].dataType, type);
@@ -437,32 +639,39 @@ public class ExpressionColumn extends Expression {
             case OpTypes.DEFAULT :
                 return null;
 
+            case OpTypes.DIAGNOSTICS_VARIABLE : {
+                return getDiagnosticsVariable(session);
+            }
             case OpTypes.VARIABLE : {
                 return session.sessionContext.routineVariables[columnIndex];
             }
             case OpTypes.PARAMETER : {
                 return session.sessionContext.routineArguments[columnIndex];
             }
+            case OpTypes.TRANSITION_VARIABLE : {
+                return session.sessionContext
+                    .triggerArguments[rangeVariable.rangePosition][columnIndex];
+            }
             case OpTypes.COLUMN : {
-                Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangeVariable.rangePosition]
-                        .getCurrent();
-                Object value   = data[columnIndex];
-                Type   colType = column.getDataType();
+                RangeIterator[] iterators =
+                    session.sessionContext.rangeIterators;
+                Object value =
+                    iterators[rangeVariable.rangePosition].getCurrent(
+                        columnIndex);
 
-                if (!dataType.equals(colType)) {
-                    value = dataType.convertToType(session, value, colType);
+                if (dataType != column.dataType) {
+                    value = dataType.convertToType(session, value,
+                                                   column.dataType);
                 }
 
                 return value;
             }
             case OpTypes.SIMPLE_COLUMN : {
-                Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                Object value =
+                    session.sessionContext.rangeIterators[rangePosition]
+                        .getCurrent(columnIndex);
 
-                return data[columnIndex];
+                return value;
             }
             case OpTypes.COALESCE : {
                 Object value = null;
@@ -483,11 +692,22 @@ public class ExpressionColumn extends Expression {
             case OpTypes.SEQUENCE : {
                 return session.sessionData.getSequenceValue(sequence);
             }
+            case OpTypes.SEQUENCE_CURRENT : {
+                return session.sessionData.getSequenceCurrent(sequence);
+            }
+            case OpTypes.ROWNUM : {
+                return ValuePool.getInt(session.sessionContext.rownum);
+            }
             case OpTypes.ASTERISK :
             case OpTypes.MULTICOLUMN :
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "ExpressionColumn");
         }
+    }
+
+    private Object getDiagnosticsVariable(Session session) {
+        return session.sessionContext.diagnosticsVariables[columnIndex];
     }
 
     public String getSQL() {
@@ -504,18 +724,36 @@ public class ExpressionColumn extends Expression {
                 return "*";
 
             case OpTypes.COALESCE :
-
-//                return columnName;
                 return alias.getStatementName();
 
+            case OpTypes.DIAGNOSTICS_VARIABLE :
             case OpTypes.VARIABLE :
             case OpTypes.PARAMETER :
+                return column.getName().statementName;
+
+            case OpTypes.ROWNUM : {
+                StringBuffer sb = new StringBuffer(Tokens.T_ROWNUM);
+
+                sb.append('(').append(')');
+
+                return sb.toString();
+            }
             case OpTypes.COLUMN : {
                 if (column == null) {
                     if (alias != null) {
                         return alias.getStatementName();
                     } else {
-                        return columnName;
+                        if (tableName == null) {
+                            return columnName;
+                        }
+
+                        StringBuffer sb = new StringBuffer();
+
+                        sb.append(tableName);
+                        sb.append('.');
+                        sb.append(columnName);
+
+                        return sb.toString();
                     }
                 }
 
@@ -558,15 +796,14 @@ public class ExpressionColumn extends Expression {
                 return sb.toString();
             }
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "ExpressionColumn");
         }
     }
 
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
-
-        sb.append('\n');
 
         for (int i = 0; i < blanks; i++) {
             sb.append(' ');
@@ -603,14 +840,11 @@ public class ExpressionColumn extends Expression {
 
             case OpTypes.COLUMN :
                 sb.append(Tokens.T_COLUMN).append(": ");
-                sb.append(column.getName().name);
+                sb.append(column.getName().getSchemaQualifiedStatementName());
 
                 if (alias != null) {
                     sb.append(" AS ").append(alias.name);
                 }
-
-                sb.append(' ').append(Tokens.T_TABLE).append(": ").append(
-                    tableName);
                 break;
 
             case OpTypes.DYNAMIC_PARAM :
@@ -628,11 +862,13 @@ public class ExpressionColumn extends Expression {
             // shouldn't get here
         }
 
+        sb.append('\n');
+
         return sb.toString();
     }
 
     /**
-     * Returns the table name for a column expression as a string
+     * Returns the table name used in query
      *
      * @return table name
      */
@@ -656,19 +892,36 @@ public class ExpressionColumn extends Expression {
     static void checkColumnsResolved(HsqlList set) {
 
         if (set != null && !set.isEmpty()) {
-            ExpressionColumn e  = (ExpressionColumn) set.get(0);
-            StringBuffer     sb = new StringBuffer();
+            StringBuffer sb = new StringBuffer();
+            Expression   e  = (Expression) set.get(0);
 
-            if (e.schema != null) {
-                sb.append(e.schema + '.');
+            if (e instanceof ExpressionColumn) {
+                ExpressionColumn c = (ExpressionColumn) e;
+
+                if (c.schema != null) {
+                    sb.append(c.schema + '.');
+                }
+
+                if (c.tableName != null) {
+                    sb.append(c.tableName + '.');
+                }
+
+                sb.append(c.getColumnName());
+
+                throw Error.error(ErrorCode.X_42501, sb.toString());
+            } else {
+                OrderedHashSet newSet = new OrderedHashSet();
+
+                e.collectAllExpressions(newSet,
+                                        Expression.columnExpressionSet,
+                                        Expression.emptyExpressionSet);
+
+                // throw with column name
+                checkColumnsResolved(newSet);
+
+                // throw anyway if not found
+                throw Error.error(ErrorCode.X_42501);
             }
-
-            if (e.tableName != null) {
-                sb.append(e.tableName + '.');
-            }
-
-            throw Error.error(ErrorCode.X_42501,
-                              sb.toString() + e.getColumnName());
         }
     }
 
@@ -697,37 +950,69 @@ public class ExpressionColumn extends Expression {
     /**
      * collects all range variables in expression tree
      */
-    void collectRangeVariables(RangeVariable[] rangeVariables, Set set) {
+    OrderedHashSet collectRangeVariables(OrderedHashSet set) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
-                nodes[i].collectRangeVariables(rangeVariables, set);
+                set = nodes[i].collectRangeVariables(set);
+            }
+        }
+
+        if (rangeVariable != null) {
+            if (set == null) {
+                set = new OrderedHashSet();
+            }
+
+            set.add(rangeVariable);
+        }
+
+        return set;
+    }
+
+    OrderedHashSet collectRangeVariables(RangeVariable[] rangeVariables,
+                                         OrderedHashSet set) {
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] != null) {
+                set = nodes[i].collectRangeVariables(rangeVariables, set);
             }
         }
 
         if (rangeVariable != null) {
             for (int i = 0; i < rangeVariables.length; i++) {
                 if (rangeVariables[i] == rangeVariable) {
-                    set.add(rangeVariables[i]);
+                    if (set == null) {
+                        set = new OrderedHashSet();
+                    }
+
+                    set.add(rangeVariable);
+
+                    break;
                 }
             }
         }
+
+        return set;
     }
 
-    Expression replaceAliasInOrderBy(Expression[] columns, int length) {
+    Expression replaceAliasInOrderBy(Session session, Expression[] columns,
+                                     int length) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] == null) {
                 continue;
             }
 
-            nodes[i] = nodes[i].replaceAliasInOrderBy(columns, length);
+            nodes[i] = nodes[i].replaceAliasInOrderBy(session, columns,
+                    length);
         }
 
         switch (opType) {
 
             case OpTypes.COALESCE :
             case OpTypes.COLUMN : {
+                int matchIndex = -1;
+
                 for (int i = 0; i < length; i++) {
                     SimpleName aliasName = columns[i].alias;
                     String     alias     = aliasName == null ? null
@@ -735,24 +1020,52 @@ public class ExpressionColumn extends Expression {
 
                     if (schema == null && tableName == null
                             && columnName.equals(alias)) {
-                        return columns[i];
+                        if (matchIndex < 0) {
+                            matchIndex = i;
+                        } else if (session.database.sqlEnforceRefs) {
+                            String message = getColumnName();
+
+                            throw Error.error(ErrorCode.X_42580, message);
+                        }
                     }
+                }
+
+                if (matchIndex >= 0) {
+                    return columns[matchIndex];
                 }
 
                 for (int i = 0; i < length; i++) {
                     if (columns[i] instanceof ExpressionColumn) {
                         if (this.equals(columns[i])) {
-                            return columns[i];
+                            if (matchIndex < 0) {
+                                matchIndex = i;
+                            } else if (session.database.sqlEnforceRefs) {
+                                String message = getColumnName();
+
+                                throw Error.error(ErrorCode.X_42580, message);
+                            }
                         }
 
                         if (tableName == null && schema == null
                                 && columnName
                                     .equals(((ExpressionColumn) columns[i])
                                         .columnName)) {
-                            return columns[i];
+                            if (matchIndex < 0) {
+                                matchIndex = i;
+                            } else if (session.database.sqlEnforceRefs) {
+                                String message = getColumnName();
+
+                                throw Error.error(ErrorCode.X_42580, message);
+                            }
                         }
                     }
                 }
+
+                if (matchIndex >= 0) {
+                    return columns[matchIndex];
+                }
+
+                break;
             }
             default :
         }
@@ -778,19 +1091,6 @@ public class ExpressionColumn extends Expression {
         return this;
     }
 
-    int findMatchingRangeVariableIndex(RangeVariable[] rangeVarArray) {
-
-        for (int i = 0; i < rangeVarArray.length; i++) {
-            RangeVariable rangeVar = rangeVarArray[i];
-
-            if (rangeVar.resolvesTableName(this)) {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
     /**
      * return true if given RangeVariable is used in expression tree
      */
@@ -811,6 +1111,9 @@ public class ExpressionColumn extends Expression {
         return false;
     }
 
+    /**
+     * SIMPLE_COLUMN expressions can be of different Expression subclass types
+     */
     public boolean equals(Expression other) {
 
         if (other == this) {
@@ -833,20 +1136,124 @@ public class ExpressionColumn extends Expression {
             case OpTypes.COALESCE :
                 return nodes == other.nodes;
 
+            case OpTypes.VARIABLE :
+            case OpTypes.PARAMETER :
             case OpTypes.COLUMN :
-                return column == other.getColumn();
+                return column == other.getColumn()
+                       && rangeVariable == other.getRangeVariable();
 
             // A VoltDB extension
             case OpTypes.ASTERISK :
                 return true;
             // End of VoltDB extension
-
             default :
                 return false;
         }
     }
 
-    /************************* Volt DB Extensions *************************/
+    void replaceRangeVariables(RangeVariable[] ranges,
+                               RangeVariable[] newRanges) {
+
+        for (int i = 0; i < nodes.length; i++) {
+            nodes[i].replaceRangeVariables(ranges, newRanges);
+        }
+
+        for (int i = 0; i < ranges.length; i++) {
+            if (rangeVariable == ranges[i]) {
+                rangeVariable = newRanges[i];
+
+                break;
+            }
+        }
+    }
+
+    void resetColumnReferences() {
+        rangeVariable = null;
+        columnIndex   = -1;
+    }
+
+    public boolean isIndexable(RangeVariable range) {
+
+        if (opType == OpTypes.COLUMN) {
+            return rangeVariable == range;
+        }
+
+        return false;
+    }
+
+    public boolean isUnresolvedParam() {
+        return isParam && dataType == null;
+    }
+
+    boolean isDynamicParam() {
+        return isParam;
+    }
+
+    RangeVariable[] getJoinRangeVariables(RangeVariable[] ranges) {
+
+        if (opType == OpTypes.COLUMN) {
+            return new RangeVariable[]{ rangeVariable };
+        }
+
+        return RangeVariable.emptyArray;
+    }
+
+    /**
+     * For normal tables only. We don't want to create an index on
+     * each column that is checked.
+     */
+    double costFactor(Session session, RangeVariable range, int operation) {
+
+        if (range.rangeTable instanceof TableDerived) {
+            return 1024;
+        }
+
+        PersistentStore store = range.rangeTable.getRowStore(session);
+        int indexType = range.rangeTable.indexTypeForColumn(session,
+            columnIndex);
+        double factor;
+
+        switch (indexType) {
+
+            case Index.INDEX_UNIQUE :
+                if (operation == OpTypes.EQUAL) {
+                    factor = 1;
+                } else {
+                    factor = store.elementCount() / 2.0;
+                }
+                break;
+
+            case Index.INDEX_NON_UNIQUE :
+                if (operation == OpTypes.EQUAL) {
+                    factor = store.elementCount() / 8.0;
+
+                    if (factor > 1024) {
+                        factor = 1024;
+                    }
+                } else {
+                    factor = store.elementCount() / 2.0;
+                }
+                break;
+
+            case Index.INDEX_NONE :
+            default :
+                factor = store.elementCount();
+                break;
+        }
+
+        return factor < Index.minimumSelectivity ? Index.minimumSelectivity
+                                                 : factor;
+    }
+
+    public Expression duplicate() {
+
+        if (opType == OpTypes.PARAMETER) {
+            return this;
+        }
+
+        return super.duplicate();
+    }
+    // A VoltDB extension to export abstract parse trees
 
     /**
      * VoltDB added method to provide detail for a non-catalog-dependent
@@ -855,14 +1262,21 @@ public class ExpressionColumn extends Expression {
      */
     VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp)
     {
-        if (tableName != null) {
-            if (rangeVariable != null && rangeVariable.rangeTable != null &&
-                    rangeVariable.tableAlias != null &&
-                    rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-                exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
-            } else {
-                exp.attributes.put("table", tableName.toUpperCase());
-            }
+        if (rangeVariable != null && rangeVariable.rangeTable != null &&
+                rangeVariable.tableAlias != null &&
+                rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+            exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
+        } 
+        else if (tableName != null) {
+            exp.attributes.put("table", tableName.toUpperCase());
+        }
+        // This case was introduced to cover columns in the where clause of
+        // an update statement.
+        else if (rangeVariable != null && rangeVariable.rangeTable != null &&
+                rangeVariable.rangeTable.tableName != null &&
+                rangeVariable.rangeTable.tableName.getNameString() != null) {
+            exp.attributes.put("table",
+                    rangeVariable.rangeTable.tableName.getNameString().toUpperCase());
         }
         //TODO: also indicate RangeVariable in case table is ambiguus (for self-joins).
         exp.attributes.put("column", columnName.toUpperCase());
@@ -874,5 +1288,5 @@ public class ExpressionColumn extends Expression {
         }
         return exp;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

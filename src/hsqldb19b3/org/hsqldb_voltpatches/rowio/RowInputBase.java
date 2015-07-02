@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,10 +34,9 @@ package org.hsqldb_voltpatches.rowio;
 import java.io.IOException;
 import java.math.BigDecimal;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlException;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.HsqlByteArrayInputStream;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BlobData;
@@ -47,6 +46,7 @@ import org.hsqldb_voltpatches.types.IntervalSecondData;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Base class for reading the data for a database row in different formats.
@@ -55,7 +55,7 @@ import org.hsqldb_voltpatches.types.Type;
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.0
  */
 abstract class RowInputBase extends HsqlByteArrayInputStream {
@@ -63,7 +63,7 @@ abstract class RowInputBase extends HsqlByteArrayInputStream {
     static final int NO_POS = -1;
 
     // fredt - initialisation may be unnecessary as it's done in resetRow()
-    protected int filePos = NO_POS;
+    protected long filePos = NO_POS;
     protected int size;
 
     RowInputBase() {
@@ -80,7 +80,7 @@ abstract class RowInputBase extends HsqlByteArrayInputStream {
         size = buf.length;
     }
 
-    public int getPos() {
+    public long getPos() {
 
         if (filePos == NO_POS) {
 
@@ -100,7 +100,7 @@ abstract class RowInputBase extends HsqlByteArrayInputStream {
     public abstract String readString() throws IOException;
 
 // fredt@users - comment - methods used for SQL types
-    protected abstract boolean checkNull() throws IOException;
+    protected abstract boolean readNull() throws IOException;
 
     protected abstract String readChar(Type type) throws IOException;
 
@@ -140,133 +140,140 @@ abstract class RowInputBase extends HsqlByteArrayInputStream {
 
     protected abstract BlobData readBlob() throws IOException;
 
+    protected abstract Object[] readArray(Type type) throws IOException;
+
     /**
      *  reads row data from a stream using the JDBC types in colTypes
      *
      * @param  colTypes
      * @throws  IOException
-     * @throws  HsqlException
      */
-    public Object[] readData(Type[] colTypes)
-    throws IOException, HsqlException {
+    public Object[] readData(Type[] colTypes) throws IOException {
 
         int      l    = colTypes.length;
         Object[] data = new Object[l];
-        Object   o;
-        Type     type;
 
         for (int i = 0; i < l; i++) {
-            if (checkNull()) {
-                continue;
-            }
+            Type type = colTypes[i];
 
-            o    = null;
-            type = colTypes[i];
-
-            switch (type.typeCode) {
-
-                case Types.SQL_ALL_TYPES :
-                case Types.SQL_CHAR :
-                case Types.SQL_VARCHAR :
-                case Types.VARCHAR_IGNORECASE :
-                    o = readChar(type);
-                    break;
-
-                case Types.TINYINT :
-                case Types.SQL_SMALLINT :
-                    o = readSmallint();
-                    break;
-
-                case Types.SQL_INTEGER :
-                    o = readInteger();
-                    break;
-
-                case Types.SQL_BIGINT :
-                    o = readBigint();
-                    break;
-
-                //fredt although REAL is now Double, it is read / written in
-                //the old format for compatibility
-                case Types.SQL_REAL :
-                case Types.SQL_FLOAT :
-                case Types.SQL_DOUBLE :
-                    o = readReal();
-                    break;
-
-                case Types.SQL_NUMERIC :
-                case Types.SQL_DECIMAL :
-                    o = readDecimal(type);
-                    break;
-
-                case Types.SQL_DATE :
-                    o = readDate(type);
-                    break;
-
-                case Types.SQL_TIME :
-                case Types.SQL_TIME_WITH_TIME_ZONE :
-                    o = readTime(type);
-                    break;
-
-                case Types.SQL_TIMESTAMP :
-                case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
-                    o = readTimestamp(type);
-                    break;
-
-                case Types.SQL_INTERVAL_YEAR :
-                case Types.SQL_INTERVAL_YEAR_TO_MONTH :
-                case Types.SQL_INTERVAL_MONTH :
-                    o = readYearMonthInterval(type);
-                    break;
-
-                case Types.SQL_INTERVAL_DAY :
-                case Types.SQL_INTERVAL_DAY_TO_HOUR :
-                case Types.SQL_INTERVAL_DAY_TO_MINUTE :
-                case Types.SQL_INTERVAL_DAY_TO_SECOND :
-                case Types.SQL_INTERVAL_HOUR :
-                case Types.SQL_INTERVAL_HOUR_TO_MINUTE :
-                case Types.SQL_INTERVAL_HOUR_TO_SECOND :
-                case Types.SQL_INTERVAL_MINUTE :
-                case Types.SQL_INTERVAL_MINUTE_TO_SECOND :
-                case Types.SQL_INTERVAL_SECOND :
-                    o = readDaySecondInterval(type);
-                    break;
-
-                case Types.SQL_BOOLEAN :
-                    o = readBoole();
-                    break;
-
-                case Types.OTHER :
-                    o = readOther();
-                    break;
-
-                case Types.SQL_CLOB :
-                    o = readClob();
-                    break;
-
-                case Types.SQL_BLOB :
-                    o = readBlob();
-                    break;
-
-                case Types.SQL_BINARY :
-                case Types.SQL_VARBINARY :
-                    o = readBinary();
-                    break;
-
-                case Types.SQL_BIT :
-                case Types.SQL_BIT_VARYING :
-                    o = readBit();
-                    break;
-
-                default :
-                    throw Error.runtimeError(ErrorCode.U_S0500,
-                                             "RowInputBase "
-                                             + type.getNameString());
-            }
-
-            data[i] = o;
+            data[i] = readData(type);
         }
 
         return data;
+    }
+
+    public Object readData(Type type) throws IOException {
+
+        Object o = null;
+
+        if (readNull()) {
+            return null;
+        }
+
+        switch (type.typeCode) {
+
+            case Types.SQL_ALL_TYPES :
+                break;
+
+            case Types.SQL_CHAR :
+            case Types.SQL_VARCHAR :
+                o = readChar(type);
+                break;
+
+            case Types.TINYINT :
+            case Types.SQL_SMALLINT :
+                o = readSmallint();
+                break;
+
+            case Types.SQL_INTEGER :
+                o = readInteger();
+                break;
+
+            case Types.SQL_BIGINT :
+                o = readBigint();
+                break;
+
+            case Types.SQL_REAL :
+            case Types.SQL_FLOAT :
+            case Types.SQL_DOUBLE :
+                o = readReal();
+                break;
+
+            case Types.SQL_NUMERIC :
+            case Types.SQL_DECIMAL :
+                o = readDecimal(type);
+                break;
+
+            case Types.SQL_DATE :
+                o = readDate(type);
+                break;
+
+            case Types.SQL_TIME :
+            case Types.SQL_TIME_WITH_TIME_ZONE :
+                o = readTime(type);
+                break;
+
+            case Types.SQL_TIMESTAMP :
+            case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
+                o = readTimestamp(type);
+                break;
+
+            case Types.SQL_INTERVAL_YEAR :
+            case Types.SQL_INTERVAL_YEAR_TO_MONTH :
+            case Types.SQL_INTERVAL_MONTH :
+                o = readYearMonthInterval(type);
+                break;
+
+            case Types.SQL_INTERVAL_DAY :
+            case Types.SQL_INTERVAL_DAY_TO_HOUR :
+            case Types.SQL_INTERVAL_DAY_TO_MINUTE :
+            case Types.SQL_INTERVAL_DAY_TO_SECOND :
+            case Types.SQL_INTERVAL_HOUR :
+            case Types.SQL_INTERVAL_HOUR_TO_MINUTE :
+            case Types.SQL_INTERVAL_HOUR_TO_SECOND :
+            case Types.SQL_INTERVAL_MINUTE :
+            case Types.SQL_INTERVAL_MINUTE_TO_SECOND :
+            case Types.SQL_INTERVAL_SECOND :
+                o = readDaySecondInterval(type);
+                break;
+
+            case Types.SQL_BOOLEAN :
+                o = readBoole();
+                break;
+
+            case Types.OTHER :
+                o = readOther();
+                break;
+
+            case Types.SQL_CLOB :
+                o = readClob();
+                break;
+
+            case Types.SQL_BLOB :
+                o = readBlob();
+                break;
+
+            case Types.SQL_ARRAY :
+                o = readArray(type);
+                break;
+
+            case Types.SQL_BINARY :
+            case Types.SQL_VARBINARY :
+                o = readBinary();
+                break;
+
+            case Types.SQL_BIT :
+            case Types.SQL_BIT_VARYING :
+                o = readBit();
+                break;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "RowInputBase - "
+                                         + type.getNameString());
+        }
+
+        return o;
     }
 
     /**
@@ -274,27 +281,46 @@ abstract class RowInputBase extends HsqlByteArrayInputStream {
      *  byte[] buffer by an external routine.
      *
      */
-    public void resetRow(int filepos, int rowsize) throws IOException {
+    public void resetRow(long filepos, int rowsize) {
 
         mark = 0;
 
         reset();
 
-        if (buf.length < rowsize) {
-            buf = new byte[rowsize];
+        if (buffer.length < rowsize) {
+            buffer = new byte[rowsize];
         }
 
-        filePos = filepos;
-        size    = count = rowsize;
-        pos     = 4;
-        buf[0]  = (byte) ((rowsize >>> 24) & 0xFF);
-        buf[1]  = (byte) ((rowsize >>> 16) & 0xFF);
-        buf[2]  = (byte) ((rowsize >>> 8) & 0xFF);
-        buf[3]  = (byte) ((rowsize >>> 0) & 0xFF);
+        filePos   = filepos;
+        size      = count = rowsize;
+        pos       = 4;
+        buffer[0] = (byte) ((rowsize >>> 24) & 0xFF);
+        buffer[1] = (byte) ((rowsize >>> 16) & 0xFF);
+        buffer[2] = (byte) ((rowsize >>> 8) & 0xFF);
+        buffer[3] = (byte) ((rowsize >>> 0) & 0xFF);
+    }
+
+    /**
+     *  Used to reset the row, ready for a new row to be written into the
+     *  byte[] buffer by an external routine.
+     *
+     */
+    public void resetBlock(long filepos, int rowsize) {
+
+        mark = 0;
+
+        reset();
+
+        if (buffer.length < rowsize) {
+            buffer = new byte[rowsize];
+        }
+
+        filePos   = filepos;
+        size      = count = rowsize;
     }
 
     public byte[] getBuffer() {
-        return buf;
+        return buffer;
     }
 
     public int skipBytes(int n) throws IOException {

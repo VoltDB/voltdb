@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,10 +36,13 @@ import java.lang.reflect.Modifier;
 import java.sql.ParameterMetaData;
 import java.sql.SQLException;
 
+import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.types.DateTimeType;
+import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.Type;
 
-/* $Id: JDBCParameterMetaData.java 2944 2009-03-21 22:53:43Z fredt $ */
+/* $Id: JDBCParameterMetaData.java 5160 2013-02-02 20:10:25Z fredt $ */
 
 /** @todo 1.9.0 - implement internal support for INOUT, OUT return parameter */
 
@@ -63,10 +66,10 @@ import org.hsqldb_voltpatches.types.Type;
  * types and properties for each parameter marker in a <code>CallableStatement</code>
  * object.
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
- * @version 1.9.0
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
+ * @version 2.0.1
  * @since JDK 1.4, HSQLDB 1.7.2
- * @revised JDK 1.6, HSQLDB 1.9.0
+ * @revised JDK 1.6, HSQLDB 2.0
  */
 //#ifdef JAVA6
 public class JDBCParameterMetaData implements ParameterMetaData,
@@ -123,7 +126,9 @@ public class JDBCParameterMetaData
 
         checkRange(param);
 
-        return rmd.columnTypes[--param].isNumberType();
+        Type type = translateType(rmd.columnTypes[--param]);
+
+        return type.isNumberType();
     }
 
     /**
@@ -145,7 +150,7 @@ public class JDBCParameterMetaData
 
         checkRange(param);
 
-        Type type = rmd.columnTypes[--param];
+        Type type = translateType(rmd.columnTypes[--param]);
 
         if (type.isDateTimeType()) {
             return type.displaySize();
@@ -173,7 +178,9 @@ public class JDBCParameterMetaData
 
         checkRange(param);
 
-        return rmd.columnTypes[--param].scale;
+        Type type = translateType(rmd.columnTypes[--param]);
+
+        return type.scale;
     }
 
     /**
@@ -189,7 +196,9 @@ public class JDBCParameterMetaData
 
         checkRange(param);
 
-        return rmd.columnTypes[--param].getJDBCTypeCode();
+        Type type = translateType(rmd.columnTypes[--param]);
+
+        return type.getJDBCTypeCode();
     }
 
     /**
@@ -205,7 +214,9 @@ public class JDBCParameterMetaData
 
         checkRange(param);
 
-        return rmd.columnTypes[--param].getNameString();
+        Type type = translateType(rmd.columnTypes[--param]);
+
+        return type.getNameString();
     }
 
     /**
@@ -225,7 +236,9 @@ public class JDBCParameterMetaData
 
         checkRange(param);
 
-        return rmd.columnTypes[--param].getJDBCClassName();
+        Type type = translateType(rmd.columnTypes[--param]);
+
+        return type.getJDBCClassName();
     }
 
     /**
@@ -265,7 +278,7 @@ public class JDBCParameterMetaData
      * @param iface A Class defining an interface that the result must implement.
      * @return an object that implements the interface. May be a proxy for the actual implementing object.
      * @throws java.sql.SQLException If no object found that implements the interface
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     @SuppressWarnings("unchecked")
@@ -275,7 +288,7 @@ public class JDBCParameterMetaData
             return (T) this;
         }
 
-        throw Util.invalidArgument("iface: " + iface);
+        throw JDBCUtil.invalidArgument("iface: " + iface);
     }
 
 //#endif JAVA6
@@ -293,7 +306,7 @@ public class JDBCParameterMetaData
      * @return true if this implements the interface or directly or indirectly wraps an object that does.
      * @throws java.sql.SQLException  if an error occurs while determining whether this is a wrapper
      * for an object with the given interface.
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public boolean isWrapperFor(
@@ -322,7 +335,8 @@ public class JDBCParameterMetaData
     String[] classNames;
 
     /** The number of parameters in the described statement */
-    int parameterCount;
+    int             parameterCount;
+    private boolean translateTTIType;
 
     /**
      * Creates a new instance of JDBCParameterMetaData. <p>
@@ -330,9 +344,34 @@ public class JDBCParameterMetaData
      * @param metaData A ResultMetaData object describing the statement parameters
      * @throws SQLException never - reserved for future use
      */
-    JDBCParameterMetaData(ResultMetaData metaData) throws SQLException {
+    JDBCParameterMetaData(JDBCConnection conn,
+                          ResultMetaData metaData) throws SQLException {
+
         rmd            = metaData;
         parameterCount = rmd.getColumnCount();
+
+        if (conn.clientProperties != null) {
+            translateTTIType = conn.clientProperties.isPropertyTrue(
+                HsqlDatabaseProperties.jdbc_translate_tti_types);
+        }
+    }
+
+    /**
+     * Translates an INTERVAL type to VARCHAR.
+     * Removes time zone from datetime types.
+     *
+     */
+    private Type translateType(Type type) {
+
+        if (this.translateTTIType) {
+            if (type.isIntervalType()) {
+                type = ((IntervalType) type).getCharacterType();
+            } else if (type.isDateTimeTypeWithZone()) {
+                type = ((DateTimeType) type).getDateTimeTypeWithoutZone();
+            }
+        }
+
+        return type;
     }
 
     /**
@@ -348,7 +387,7 @@ public class JDBCParameterMetaData
         if (param < 1 || param > parameterCount) {
             String msg = param + " is out of range";
 
-            throw Util.outOfRangeArgument(msg);
+            throw JDBCUtil.outOfRangeArgument(msg);
         }
     }
 

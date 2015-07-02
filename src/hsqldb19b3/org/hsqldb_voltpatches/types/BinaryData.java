@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,14 +34,10 @@ package org.hsqldb_voltpatches.types;
 import java.io.DataInput;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-// A VoltDB extension to support X'..' as integer literals
-import java.math.BigInteger;
-// End VoltDB extension
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.SessionInterface;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 
 /**
@@ -49,17 +45,33 @@ import org.hsqldb_voltpatches.lib.ArrayUtil;
  * A Binary object instance always wraps a non-null byte[] object.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.7.2
  */
 public class BinaryData implements BlobData {
 
-    public final static BinaryData zeroLengthBinary =
-        new BinaryData(new byte[0], false);
+    public static final BinaryData singleBitZero =
+        new BinaryData(new byte[]{ 0 }, 1);
+    public static final BinaryData singleBitOne =
+        new BinaryData(new byte[]{ -0x80 }, 1);
+    public static final byte[] zeroLengthBytes = new byte[0];
+    public static final BinaryData zeroLengthBinary =
+        new BinaryData(zeroLengthBytes, false);
     long             id;
     protected byte[] data;
     private boolean  isBits;
     private long     bitLength;
+    private int      hashCode = 0;
+
+    public static BinaryData getBitData(byte[] data, long bitLength) {
+
+        if (bitLength == 1) {
+            return data[0] == 0 ? singleBitZero
+                                : singleBitOne;
+        }
+
+        return new BinaryData(data, bitLength);
+    }
 
     /**
      * This constructor is used inside the engine when an already serialized
@@ -89,11 +101,13 @@ public class BinaryData implements BlobData {
 
         data = new byte[(int) length];
 
-        System.arraycopy(b1.getBytes(), 0, data, 0, (int) b1.length(session));
-        System.arraycopy(b2.getBytes(), 0, data, (int) b1.length(session),
+        System.arraycopy(b1.getBytes(session, 0, (int) b1.length(session)), 0,
+                         data, 0, (int) b1.length(session));
+        System.arraycopy(b2.getBytes(session, 0, (int) b2.length(session)), 0,
+                         data, (int) b1.length(session),
                          (int) b2.length(session));
 
-        this.bitLength = (b1.length(session) + b2.length(session)) * 8;
+        this.bitLength = (int) length * 8;
     }
 
     public BinaryData(byte[] data, long bitLength) {
@@ -162,8 +176,8 @@ public class BinaryData implements BlobData {
         return new BlobInputStream(session, this, pos, length(session));
     }
 
-    public int setBytes(SessionInterface session, long pos, byte[] bytes,
-                        int offset, int length) {
+    public void setBytes(SessionInterface session, long pos, byte[] bytes,
+                         int offset, int length) {
 
         if (!isInLimits(data.length, pos, 0)) {
             throw new IndexOutOfBoundsException();
@@ -176,24 +190,28 @@ public class BinaryData implements BlobData {
         System.arraycopy(bytes, offset, data, (int) pos, length);
 
         bitLength = data.length * 8;
-
-        return length;
     }
 
-    public int setBytes(SessionInterface session, long pos, byte[] bytes) {
+    public void setBytes(SessionInterface session, long pos, byte[] bytes) {
+        setBytes(session, pos, bytes, 0, bytes.length);
+    }
+
+    public void setBytes(SessionInterface session, long pos, BlobData b,
+                         long offset, long length) {
+
+        if (length > Integer.MAX_VALUE) {
+            throw new IndexOutOfBoundsException();
+        }
+
+        byte[] bytes = b.getBytes(session, offset, (int) length);
 
         setBytes(session, pos, bytes, 0, bytes.length);
-
-        return bytes.length;
     }
 
-    public long setBinaryStream(SessionInterface session, long pos,
+    public void setBinaryStream(SessionInterface session, long pos,
                                 InputStream in) {
-        return 0;
-    }
 
-    public OutputStream setBinaryStream(SessionInterface session, long pos) {
-        return null;
+        //
     }
 
     public void truncate(SessionInterface session, long len) {
@@ -229,14 +247,14 @@ public class BinaryData implements BlobData {
             return -1;
         }
 
-        byte[] bytes = pattern.getBytes();
+        byte[] bytes = pattern.getBytes(session, 0,
+                                        (int) pattern.length(session));
 
         return position(session, bytes, start);
     }
 
+    /** @todo - implement */
     public long nonZeroLength(SessionInterface session) {
-
-        // temp
         return data.length;
     }
 
@@ -267,6 +285,30 @@ public class BinaryData implements BlobData {
 
     public boolean isBinary() {
         return true;
+    }
+
+    public boolean equals(Object other) {
+
+        if (other instanceof BinaryData) {
+            return Type.SQL_VARBINARY.compare(null, this, other) == 0;
+        }
+
+        return false;
+    }
+
+    public int hashCode() {
+
+        if (hashCode == 0) {
+            int code = 0;
+
+            for (int i = 0; i < data.length && i < 32; i++) {
+                code = code * 31 + (0xff & data[i]);
+            }
+
+            hashCode = code;
+        }
+
+        return hashCode;
     }
     // A VoltDB extension to allow X'..' as integer constants
     /**
@@ -309,8 +351,8 @@ public class BinaryData implements BlobData {
             dataWithLeadingZeros[j] = data[j - lenDiff];
         }
 
-        BigInteger bi = new BigInteger(dataWithLeadingZeros);
+        java.math.BigInteger bi = new java.math.BigInteger(dataWithLeadingZeros);
         return bi.longValue();
     }
-    // End VoltDB extension
+    // End of VoltDB extension
 }

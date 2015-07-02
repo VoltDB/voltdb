@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,9 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.lib.HashSet;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.result.Result;
 
@@ -60,7 +62,7 @@ public class StatementHandler extends Statement {
 
     //
     OrderedIntHashSet conditionGroups = new OrderedIntHashSet();
-    HashSet           conditionStates = new HashSet();
+    OrderedHashSet    conditionStates = new OrderedHashSet();
     Statement         statement;
 
     //
@@ -132,8 +134,19 @@ public class StatementHandler extends Statement {
     }
 
     public String[] getConditionStates() {
-        return (String[]) conditionStates.toArray(
-            new String[conditionStates.size()]);
+        String[] array = new String[conditionStates.size()];
+        conditionStates.toArray(array);
+        return array;
+    }
+
+    public void resolve(Session session) {
+
+        if (statement != null) {
+            statement.resolve(session);
+
+            readTableNames  = statement.getTableNamesForRead();
+            writeTableNames = statement.getTableNamesForWrite();
+        }
     }
 
     public Result execute(Session session) {
@@ -147,6 +160,15 @@ public class StatementHandler extends Statement {
 
     public String describe(Session session) {
         return "";
+    }
+
+    public OrderedHashSet getReferences() {
+
+        if (statement == null) {
+            return new OrderedHashSet();
+        }
+
+        return statement.getReferences();
     }
 
     public String getSQL() {
@@ -197,5 +219,13 @@ public class StatementHandler extends Statement {
         }
 
         return sb.toString();
+    }
+
+    public boolean isCatalogLock() {
+        return false;
+    }
+
+    public boolean isCatalogChange() {
+        return false;
     }
 }

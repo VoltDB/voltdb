@@ -1466,9 +1466,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // sub-selected table must have an alias
         //
         failToCompile("select A, ABS(C) FROM (SELECT A A1, C FROM R1) T1",
-                "user lacks privilege or object not found: A");
+                "object not found: A");
         failToCompile("select A+1, ABS(C) FROM (SELECT A A1, C FROM R1) T1",
-                "user lacks privilege or object not found: A");
+                "object not found: A");
 
         // (2)
         // sub-selected table must have an alias

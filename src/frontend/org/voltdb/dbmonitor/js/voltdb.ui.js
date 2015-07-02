@@ -2238,6 +2238,26 @@ var showHideGraph = function (userpreferences) {
         $("#divCommandLog").hide();
     }
 
+    if (VoltDbUI.isCommandLogEnabled == 'true') {
+        if (userpreferences["CommandLogStat"] == true) {
+            $("#chartCommandLogging").show();
+        } else {
+            $("#chartCommandLogging").hide();
+        }
+    } else {
+        $("#chartCommandLogging").hide();
+    }
+
+    if (VoltDbUI.isCommandLogEnabled == 'true') {
+        if (userpreferences["CommandLogTables"] == true) {
+            $("#divCommandLog").show();
+        } else {
+            $("#divCommandLog").hide();
+        }
+    } else {
+        $("#divCommandLog").hide();
+    }
+
     adjustGraphSpacing();
     ChangeGraphLabelColor();
     ChangeTableProcedureLabelColor();

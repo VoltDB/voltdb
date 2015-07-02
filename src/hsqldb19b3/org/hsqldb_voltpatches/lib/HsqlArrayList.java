@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,12 +32,13 @@
 package org.hsqldb_voltpatches.lib;
 
 import java.lang.reflect.Array;
+import java.util.Comparator;
 
 // fredt@users - 1.8.0, 1.9.0 - enhancements
 
 /**
  * Intended as an asynchronous alternative to Vector.  Use HsqlLinkedList
- * instead if its better suited.
+ * instead if it's better suited.
  *
  * @author dnordahl@users
  * @version 1.9.0
@@ -69,7 +70,7 @@ public class HsqlArrayList extends BaseList implements HsqlList {
         }
     }
 */
-    private static final int   DEFAULT_INITIAL_CAPACITY = 10;
+    private static final int   DEFAULT_INITIAL_CAPACITY = 8;
     private static final float DEFAULT_RESIZE_FACTOR    = 2.0f;
     Object[]                   elementData;
     Object[]                   reserveElementData;
@@ -91,10 +92,14 @@ public class HsqlArrayList extends BaseList implements HsqlList {
      * Creates a new instance of HsqlArrayList that minimizes the size when
      * empty
      */
-    public HsqlArrayList(boolean minimize) {
+    public HsqlArrayList(int initialCapacity, boolean minimize) {
 
 //        reporter.initCounter++;
-        elementData     = new Object[DEFAULT_INITIAL_CAPACITY];
+        if (initialCapacity < DEFAULT_INITIAL_CAPACITY) {
+            initialCapacity = DEFAULT_INITIAL_CAPACITY;
+        }
+
+        elementData     = new Object[initialCapacity];
         minimizeOnClear = minimize;
     }
 
@@ -107,11 +112,11 @@ public class HsqlArrayList extends BaseList implements HsqlList {
                 "Invalid initial capacity given");
         }
 
-        if (initialCapacity == 0) {
-            elementData = new Object[1];
-        } else {
-            elementData = new Object[initialCapacity];
+        if (initialCapacity < DEFAULT_INITIAL_CAPACITY) {
+            initialCapacity = DEFAULT_INITIAL_CAPACITY;
         }
+
+        elementData = new Object[initialCapacity];
     }
 
     /** Inserts an element at the given index */
@@ -217,10 +222,10 @@ public class HsqlArrayList extends BaseList implements HsqlList {
 
         elementCount--;
 
+        elementData[elementCount] = null;
+
         if (elementCount == 0) {
             clear();
-        } else {
-            elementData[elementCount] = null;
         }
 
         return removedObj;
@@ -310,6 +315,9 @@ public class HsqlArrayList extends BaseList implements HsqlList {
         elementCount = 0;
     }
 
+    /**
+     * Increase or reduce the size, setting discarded or added elements to null.
+     */
     public void setSize(int newSize) {
 
         if (newSize == 0) {
@@ -376,13 +384,13 @@ public class HsqlArrayList extends BaseList implements HsqlList {
         return a;
     }
 
-    public void sort(ObjectComparator c) {
+    public void sort(Comparator c) {
 
         if (elementCount < 2) {
             return;
         }
 
-        Sort.sort(elementData, c, 0, elementCount - 1);
+        ArraySort.sort(elementData, 0, elementCount, c);
     }
 
     public Object[] getArray() {

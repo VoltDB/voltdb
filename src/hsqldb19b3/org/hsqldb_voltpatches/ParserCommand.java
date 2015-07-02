@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,20 +32,25 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-import org.hsqldb_voltpatches.lib.ArrayUtil;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
-import org.hsqldb_voltpatches.scriptio.ScriptWriterBase;
-import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.result.ResultProperties;
+import org.hsqldb_voltpatches.rights.User;
+import org.hsqldb_voltpatches.types.Charset;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Parser for session and management statements
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.2
  * @since 1.9.0
  */
 public class ParserCommand extends ParserDDL {
@@ -54,12 +59,12 @@ public class ParserCommand extends ParserDDL {
         super(session, t);
     }
 
-    Statement compileStatement() {
+    Statement compileStatement(int props) {
 
-        Statement cs = compilePart();
+        Statement cs = compilePart(props);
 
         if (token.tokenType == Tokens.X_ENDPARSE) {
-            if (cs.getSchemalName() == null) {
+            if (cs.getSchemaName() == null) {
                 cs.setSchemaHsqlName(session.getCurrentSchemaHsqlName());
             }
 
@@ -69,7 +74,7 @@ public class ParserCommand extends ParserDDL {
         throw unexpectedToken();
     }
 
-    HsqlArrayList compileStatements(String sql, int returnType) {
+    HsqlArrayList compileStatements(String sql, Result cmd) {
 
         HsqlArrayList list = new HsqlArrayList();
         Statement     cs   = null;
@@ -81,16 +86,28 @@ public class ParserCommand extends ParserDDL {
                 break;
             }
 
-            compileContext.reset();
+            try {
+                lastError = null;
+                cs        = compilePart(cmd.getExecuteProperties());
+            } catch (HsqlException e) {
+                if (lastError != null && lastError.getLevel() > e.getLevel()) {
+                    throw lastError;
+                }
 
-            cs = compilePart();
-
-            if (cs == null) {
-                list.add(cs);
-            } else {
-                list.add(cs);
+                throw e;
             }
+
+            if (!cs.isExplain
+                    && cs.getParametersMetaData().getColumnCount() > 0) {
+                throw Error.error(ErrorCode.X_42575);
+            }
+
+            cs.setCompileTimestamp(
+                database.txManager.getGlobalChangeTimestamp());
+            list.add(cs);
         }
+
+        int returnType = cmd.getStatementType();
 
         if (returnType != StatementTypes.RETURN_ANY) {
             int group = cs.getGroup();
@@ -100,17 +117,20 @@ public class ParserCommand extends ParserDDL {
                     throw Error.error(ErrorCode.X_07503);
                 }
             } else if (returnType == StatementTypes.RETURN_RESULT) {
-                throw Error.error(ErrorCode.X_07504);
+
+                // allow update count statements to return an empty result set
+                // throw Error.error(ErrorCode.X_07504);
             }
         }
 
         return list;
     }
 
-    private Statement compilePart() {
+    private Statement compilePart(int props) {
 
-        Statement cs = null;
+        Statement cs;
 
+        compileContext.reset();
         setParsePosition(getPosition());
 
         if (token.tokenType == Tokens.X_STARTPARSE) {
@@ -122,37 +142,47 @@ public class ParserCommand extends ParserDDL {
             // DQL
             case Tokens.WITH :
             case Tokens.OPENBRACKET :
-            case Tokens.VALUES :
-            case Tokens.TABLE :
-            case Tokens.SELECT : {
-                cs = compileCursorSpecification();
+            case Tokens.SELECT :
+            case Tokens.TABLE : {
+                cs = compileCursorSpecification(RangeGroup.emptyArray, props,
+                                                false);
+
+                break;
+            }
+            case Tokens.VALUES : {
+                RangeGroup[] ranges =
+                    session.sessionContext.sessionVariableRangeGroups;
+
+                compileContext.setOuterRanges(ranges);
+
+                cs = compileShortCursorSpecification(props);
 
                 break;
             }
 
             // DML
             case Tokens.INSERT : {
-                cs = compileInsertStatement(RangeVariable.emptyArray);
+                cs = compileInsertStatement(RangeGroup.emptyArray);
 
                 break;
             }
             case Tokens.UPDATE : {
-                cs = compileUpdateStatement(RangeVariable.emptyArray);
+                cs = compileUpdateStatement(RangeGroup.emptyArray);
 
                 break;
             }
             case Tokens.MERGE : {
-                cs = compileMergeStatement(RangeVariable.emptyArray);
+                cs = compileMergeStatement(RangeGroup.emptyArray);
 
                 break;
             }
             case Tokens.DELETE : {
-                cs = compileDeleteStatement(RangeVariable.emptyArray);
+                cs = compileDeleteStatement(RangeGroup.emptyArray);
 
                 break;
             }
             case Tokens.TRUNCATE : {
-                cs = compileDeleteStatement(RangeVariable.emptyArray);
+                cs = compileTruncateStatement();
 
                 break;
             }
@@ -160,7 +190,7 @@ public class ParserCommand extends ParserDDL {
             // PROCEDURE
             case Tokens.CALL : {
                 cs = compileCallStatement(
-                    session.sessionContext.sessionVariablesRange, false);
+                    session.sessionContext.sessionVariableRangeGroups, false);
 
                 break;
             }
@@ -168,6 +198,12 @@ public class ParserCommand extends ParserDDL {
             // SQL SESSION
             case Tokens.SET :
                 cs = compileSet();
+                break;
+
+            // diagnostic
+            case Tokens.GET :
+                cs = compileGetStatement(
+                    session.sessionContext.sessionVariableRangeGroups);
                 break;
 
             case Tokens.START :
@@ -208,6 +244,10 @@ public class ParserCommand extends ParserDDL {
                 cs = compileGrantOrRevoke();
                 break;
 
+            case Tokens.COMMENT :
+                cs = compileComment();
+                break;
+
             // HSQL SESSION
             case Tokens.LOCK :
                 cs = compileLock();
@@ -238,20 +278,35 @@ public class ParserCommand extends ParserDDL {
                 cs = compileCheckpoint();
                 break;
 
-            case Tokens.EXPLAIN :
-                cs = compileExplainPlan();
-                break;
+            case Tokens.EXPLAIN : {
+                int position = getPosition();
 
+                cs = compileExplainPlan();
+
+                cs.setSQL(getLastPart(position));
+
+                break;
+            }
             case Tokens.DECLARE :
-                cs = compileSessionVariableDeclaration();
+                cs = compileDeclare();
                 break;
 
             default :
                 throw unexpectedToken();
         }
 
-        if (cs.type != StatementTypes.SET_SESSION_AUTHORIZATION) {
-            cs.setSQL(getLastPart());
+        // SET_SESSION_AUTHORIZATION is translated dynamically at runtime for logging
+        switch (cs.type) {
+
+            // these are set at compile time for logging
+            case StatementTypes.COMMIT_WORK :
+            case StatementTypes.ROLLBACK_WORK :
+            case StatementTypes.SET_USER_PASSWORD :
+            case StatementTypes.EXPLAIN_PLAN :
+                break;
+
+            default :
+                cs.setSQL(getLastPart());
         }
 
         if (token.tokenType == Tokens.SEMICOLON) {
@@ -261,12 +316,33 @@ public class ParserCommand extends ParserDDL {
         return cs;
     }
 
-    private Statement compileSessionVariableDeclaration() {
+    private Statement compileDeclare() {
 
-        ColumnSchema variable = readLocalVariableDeclarationOrNull();
-        Object[]     args     = new Object[]{ variable };
-        Statement cs = new StatementSession(StatementTypes.DECLARE_VARIABLE,
-                                            args);
+        Statement    cs;
+        ColumnSchema variables[];
+
+        cs = compileDeclareLocalTableOrNull();
+
+        if (cs != null) {
+            return cs;
+        }
+
+        variables = readLocalVariableDeclarationOrNull();
+
+        if (variables != null) {
+            Object[] args = new Object[]{ variables };
+
+            cs = new StatementSession(StatementTypes.DECLARE_VARIABLE, args);
+
+            return cs;
+        }
+
+        cs = compileDeclareCursor(RangeGroup.emptyArray, false);
+
+        if (cs == null) {
+            throw lastError == null ? unexpectedToken()
+                                    : lastError;
+        }
 
         return cs;
     }
@@ -278,21 +354,15 @@ public class ParserCommand extends ParserDDL {
         read();
 
         if (token.tokenType == Tokens.X_VALUE) {
-            if (token.dataType.typeCode != Types.SQL_CHAR) {
-                throw Error.error(ErrorCode.X_42581);
-            }
-
-            name = token.tokenString;
-
-            read();
+            name = readQuotedString();
         }
 
+        HsqlName[] names =
+            database.schemaManager.getCatalogAndBaseTableNames();
         Object[] args = new Object[]{ name };
-        Statement cs = new StatementCommand(StatementTypes.DATABASE_SCRIPT,
-                                            args, database.getCatalogName(),
-                                            null);
 
-        return cs;
+        return new StatementCommand(StatementTypes.DATABASE_SCRIPT, args,
+                                    null, names);
     }
 
     private Statement compileConnect() {
@@ -307,9 +377,12 @@ public class ParserCommand extends ParserDDL {
         userName = token.tokenString;
 
         read();
-        readThis(Tokens.PASSWORD);
 
-        password = readPassword();
+        if (!session.isProcessingLog()) {
+            readThis(Tokens.PASSWORD);
+
+            password = readPassword();
+        }
 
         Expression[] args = new Expression[] {
             new ExpressionValue(userName, Type.SQL_VARCHAR),
@@ -322,7 +395,7 @@ public class ParserCommand extends ParserDDL {
         return cs;
     }
 
-    private Statement compileSetDefault() {
+    private StatementCommand compileSetDefault() {
 
         read();
 
@@ -340,20 +413,18 @@ public class ParserCommand extends ParserDDL {
                 Object[] args = new Object[]{ schema };
 
                 return new StatementCommand(
-                    StatementTypes.SET_DATABASE_DEFAULT_INITIAL_SCHEMA, args,
-                    null, null);
+                    StatementTypes.SET_DATABASE_DEFAULT_INITIAL_SCHEMA, args);
             }
             case Tokens.RESULT : {
                 read();
                 readThis(Tokens.MEMORY);
-                readThis(Tokens.SIZE);
+                readThis(Tokens.ROWS);
 
-                int      size = readInteger();
-                Object[] args = new Object[]{ new Integer(size) };
+                Integer  size = readIntegerObject();
+                Object[] args = new Object[]{ size };
 
                 return new StatementCommand(
-                    StatementTypes.SET_DATABASE_RESULT_MEMORY_ROWS, args,
-                    null, null);
+                    StatementTypes.SET_DATABASE_RESULT_MEMORY_ROWS, args);
             }
             case Tokens.TABLE : {
                 read();
@@ -376,42 +447,58 @@ public class ParserCommand extends ParserDDL {
 
                 read();
 
-                Object[] args = new Object[]{ Integer.valueOf(type) };
+                Object[] args = new Object[]{ ValuePool.getInt(type) };
 
                 return new StatementCommand(
-                    StatementTypes.SET_DATABASE_DEFAULT_TABLE_TYPE, args,
-                    null, null);
+                    StatementTypes.SET_DATABASE_DEFAULT_TABLE_TYPE, args);
+            }
+            case Tokens.ISOLATION : {
+                read();
+                readThis(Tokens.LEVEL);
+
+                int level;
+
+                switch (token.tokenType) {
+
+                    case Tokens.READ :
+                        read();
+                        readThis(Tokens.COMMITTED);
+
+                        level = SessionInterface.TX_READ_COMMITTED;
+                        break;
+
+                    case Tokens.SERIALIZABLE :
+                        read();
+
+                        level = SessionInterface.TX_SERIALIZABLE;
+                        break;
+
+                    default :
+                        throw unexpectedToken();
+                }
+
+                Object[] args = new Object[]{ ValuePool.getInt(level) };
+
+                return new StatementCommand(
+                    StatementTypes.SET_DATABASE_DEFAULT_ISOLATION_LEVEL, args);
             }
             default :
                 throw unexpectedToken();
         }
     }
 
-    private Statement compileSetProperty() {
+    private StatementCommand compileSetProperty() {
 
+        // command is a no-op from 1.9
         read();
 
-        String                 property;
-        Object                 value;
-        HsqlDatabaseProperties props;
+        String property;
+        Object value;
 
         checkIsSimpleName();
         checkIsDelimitedIdentifier();
 
         property = token.tokenString;
-        props    = database.getProperties();
-
-        boolean isboolean  = props.isBoolean(token.tokenString);
-        boolean isintegral = props.isIntegral(token.tokenString);
-        boolean isstring   = props.isString(token.tokenString);
-
-        if (!(isboolean || isintegral || isstring)) {
-            throw Error.error(ErrorCode.X_42511);
-        }
-
-        int typeCode = isboolean ? Types.SQL_BOOLEAN
-                                 : isintegral ? Types.SQL_INTEGER
-                                              : Types.SQL_CHAR;
 
         read();
 
@@ -423,10 +510,6 @@ public class ParserCommand extends ParserDDL {
             checkIsValue();
 
             value = token.tokenValue;
-
-            if (token.dataType.typeCode != typeCode) {
-                throw Error.error(ErrorCode.X_42565, token.tokenString);
-            }
         }
 
         read();
@@ -436,18 +519,44 @@ public class ParserCommand extends ParserDDL {
         };
 
         return new StatementCommand(StatementTypes.SET_DATABASE_PROPERTY,
-                                    args, null, null);
+                                    args);
     }
 
     private Statement compileSet() {
 
         int position = super.getPosition();
 
-        session.setScripting(false);
         read();
 
         switch (token.tokenType) {
 
+            case Tokens.CATALOG : {
+                read();
+
+                Expression e = XreadValueSpecificationOrNull();
+
+                if (e == null) {
+                    HsqlName name = readSchemaName();
+                    Object[] args = new Object[]{ name };
+
+                    return new StatementSession(StatementTypes.SET_CATALOG,
+                                                args);
+                }
+
+                if (!e.getDataType().isCharacterType()) {
+                    throw Error.error(ErrorCode.X_0P000);
+                }
+
+                if (e.getType() != OpTypes.VALUE
+                        && (e.getType() != OpTypes.SQL_FUNCTION
+                            || !((FunctionSQL) e).isValueFunction())) {
+                    throw Error.error(ErrorCode.X_0P000);
+                }
+
+                Expression[] args = new Expression[]{ e };
+
+                return new StatementSession(StatementTypes.SET_CATALOG, args);
+            }
             case Tokens.SCHEMA : {
                 read();
 
@@ -474,6 +583,75 @@ public class ParserCommand extends ParserDDL {
                 Expression[] args = new Expression[]{ e };
 
                 return new StatementSession(StatementTypes.SET_SCHEMA, args);
+            }
+            case Tokens.NO : {
+                read();
+                readThis(Tokens.COLLATION);
+
+                HsqlArrayList charsets = null;
+
+                if (readIfThis(Tokens.FOR)) {
+                    charsets = new HsqlArrayList();
+
+                    while (true) {
+                        SchemaObject charset =
+                            readSchemaObjectName(SchemaObject.CHARSET);
+
+                        charsets.add(charset);
+
+                        if (token.tokenType == Tokens.COMMA) {
+                            read();
+
+                            continue;
+                        }
+
+                        break;
+                    }
+                }
+
+                Object[] args = new Object[] {
+                    null, Boolean.FALSE, charsets
+                };
+
+                return new StatementSession(StatementTypes.SET_COLLATION,
+                                            args);
+            }
+            case Tokens.COLLATION : {
+                read();
+
+                Expression e = XreadValueSpecificationOrNull();
+
+                if (e == null || !e.getDataType().isCharacterType()) {
+                    throw Error.error(ErrorCode.X_2H000);
+                }
+
+                HsqlArrayList charsets = null;
+
+                if (readIfThis(Tokens.FOR)) {
+                    charsets = new HsqlArrayList();
+
+                    while (true) {
+                        SchemaObject charset =
+                            readSchemaObjectName(SchemaObject.CHARSET);
+
+                        charsets.add(charset);
+
+                        if (token.tokenType == Tokens.COMMA) {
+                            read();
+
+                            continue;
+                        }
+
+                        break;
+                    }
+                }
+
+                Object[] args = new Object[] {
+                    e, Boolean.TRUE, charsets
+                };
+
+                return new StatementSession(StatementTypes.SET_COLLATION,
+                                            args);
             }
             case Tokens.TIME : {
                 read();
@@ -505,8 +683,8 @@ public class ParserCommand extends ParserDDL {
             case Tokens.AUTOCOMMIT : {
                 read();
 
-                boolean  mode = processTrueOrFalse();
-                Object[] args = new Object[]{ Boolean.valueOf(mode) };
+                Boolean  mode = processTrueOrFalseObject();
+                Object[] args = new Object[]{ mode };
 
                 return new StatementSession(
                     StatementTypes.SET_SESSION_AUTOCOMMIT, args);
@@ -516,69 +694,26 @@ public class ParserCommand extends ParserDDL {
             case Tokens.READONLY : {
                 read();
 
-                boolean  readonly = processTrueOrFalse();
-                Object[] args     = new Object[]{ Boolean.valueOf(readonly) };
+                Boolean  readonly = processTrueOrFalseObject();
+                Object[] args     = new Object[]{ readonly };
 
                 return new StatementSession(
                     StatementTypes.SET_SESSION_CHARACTERISTICS, args);
             }
-            case Tokens.LOGSIZE : {
-                read();
-                checkDatabaseUpdateAuthorisation();
-
-                int      size = readInteger();
-                Object[] args = new Object[]{ new Integer(size) };
-
-                return new StatementCommand(
-                    StatementTypes.SET_DATABASE_FILES_LOG_SIZE, args, null,
-                    null);
-            }
-            case Tokens.SCRIPTFORMAT : {
-                read();
-                checkDatabaseUpdateAuthorisation();
-
-                switch (token.tokenType) {
-
-                    case Tokens.TEXT :
-                    case Tokens.BINARY :
-                    case Tokens.COMPRESSED :
-                        break;
-
-                    default :
-                        throw unexpectedToken();
-                }
-
-                int mode = ArrayUtil.find(ScriptWriterBase.LIST_SCRIPT_FORMATS,
-                                          token.tokenString);
-
-                if (mode == 0 || mode == 1 || mode == 3) {}
-                else {
-                    throw unexpectedToken();
-                }
-
-                read();
-
-                Object[] args = new Object[]{ new Integer(mode) };
-
-                return new StatementCommand(
-                    StatementTypes.SET_DATABASE_SCRIPT_FORMAT, args,
-                    database.getCatalogName(), null);
-            }
             case Tokens.IGNORECASE : {
                 read();
 
-                boolean  mode = processTrueOrFalse();
-                Object[] args = new Object[]{ Boolean.valueOf(mode) };
+                Boolean  mode = processTrueOrFalseObject();
+                Object[] args = new Object[]{ mode };
 
-                return new StatementCommand(
-                    StatementTypes.SET_DATABASE_SQL_IGNORECASE, args, null,
-                    null);
+                return new StatementSession(
+                    StatementTypes.SET_SESSION_SQL_IGNORECASE, args);
             }
             case Tokens.MAXROWS : {
                 read();
 
-                int      size = readInteger();
-                Object[] args = new Object[]{ new Integer(size) };
+                Integer  size = readIntegerObject();
+                Object[] args = new Object[]{ size };
 
                 return new StatementSession(
                     StatementTypes.SET_SESSION_RESULT_MAX_ROWS, args);
@@ -607,120 +742,13 @@ public class ParserCommand extends ParserDDL {
 
                 read();
 
-                Object[] args = new Object[]{ Integer.valueOf(type) };
+                Object[] args = new Object[]{ ValuePool.getInt(type) };
 
                 return new StatementCommand(
-                    StatementTypes.SET_DATABASE_DEFAULT_TABLE_TYPE, args,
-                    null, null);
-            }
-            case Tokens.RESULT : {
-                read();
-                readThis(Tokens.MEMORY);
-                readThis(Tokens.SIZE);
-
-                int      size = readInteger();
-                Object[] args = new Object[]{ new Integer(size) };
-
-                return new StatementSession(
-                    StatementTypes.SET_SESSION_RESULT_MEMORY_ROWS, args);
+                    StatementTypes.SET_DATABASE_DEFAULT_TABLE_TYPE, args);
             }
             case Tokens.TABLE : {
-                read();
-
-                Table    t    = readTableName();
-                Object[] args = new Object[] {
-                    t.tableName, null
-                };
-
-                switch (token.tokenType) {
-
-                    default : {
-                        throw unexpectedToken();
-                    }
-                    case Tokens.SOURCE :
-                        read();
-
-                        return compileTextTableSource(t);
-
-                    case Tokens.READ : {
-                        read();
-
-                        boolean readonly = false;
-
-                        if (token.tokenType == Tokens.WRITE) {}
-                        else {
-                            readThis(Tokens.ONLY);
-
-                            readonly = true;
-                        }
-
-                        args[1] = Boolean.valueOf(readonly);
-
-                        return new StatementCommand(
-                            StatementTypes.SET_TABLE_READONLY, args, null,
-                            t.getName());
-                    }
-
-                    // deprecated
-                    case Tokens.READONLY : {
-                        read();
-
-                        boolean readonly = processTrueOrFalse();
-
-                        args[1] = Boolean.valueOf(readonly);
-
-                        return new StatementCommand(
-                            StatementTypes.SET_TABLE_READONLY, args, null,
-                            t.getName());
-                    }
-                    case Tokens.INDEX : {
-                        String value;
-
-                        read();
-                        checkIsValue();
-
-                        value = token.tokenString;
-
-                        read();
-
-                        args[1] = value;
-
-                        return new StatementCommand(
-                            StatementTypes.SET_TABLE_INDEX, args, null, null);
-                    }
-                    case Tokens.TYPE : {
-                        read();
-
-                        int newType;
-
-                        if (token.tokenType == Tokens.CACHED) {
-                            newType = TableBase.CACHED_TABLE;
-                        } else if (token.tokenType == Tokens.MEMORY) {
-                            newType = TableBase.MEMORY_TABLE;
-                        } else {
-                            throw Error.error(ErrorCode.X_42581);
-                        }
-
-                        read();
-
-                        args[1] = new Integer(newType);
-
-                        return new StatementCommand(
-                            StatementTypes.SET_TABLE_TYPE, args, null,
-                            t.getName());
-                    }
-                }
-            }
-            case Tokens.CHECKPOINT : {
-                read();
-                readThis(Tokens.DEFRAG);
-
-                int      size = readInteger();
-                Object[] args = new Object[]{ new Integer(size) };
-
-                return new StatementCommand(
-                    StatementTypes.SET_DATABASE_FILES_DEFRAG, args, null,
-                    null);
+                return compileSetTable();
             }
             case Tokens.WRITE_DELAY : {
                 read();
@@ -756,18 +784,29 @@ public class ParserCommand extends ParserDDL {
                     null);
             }
             case Tokens.PASSWORD : {
-                String password;
+                String  password;
+                boolean isDigest = false;
 
                 read();
+
+                if (readIfThis(Tokens.DIGEST)) {
+                    isDigest = true;
+                }
 
                 password = readPassword();
 
                 Object[] args = new Object[] {
-                    null, password
+                    null, password, isDigest
                 };
+                Statement cs =
+                    new StatementCommand(StatementTypes.SET_USER_PASSWORD,
+                                         args);
+                String sql = User.getSetCurrentPasswordDigestSQL(
+                    database.granteeManager, password, isDigest);
 
-                return new StatementCommand(StatementTypes.SET_USER_PASSWORD,
-                                            args, null, null);
+                cs.setSQL(sql);
+
+                return cs;
             }
             case Tokens.INITIAL : {
                 read();
@@ -789,182 +828,13 @@ public class ParserCommand extends ParserDDL {
                 };
 
                 return new StatementCommand(
-                    StatementTypes.SET_USER_INITIAL_SCHEMA, args, null, null);
+                    StatementTypes.SET_USER_INITIAL_SCHEMA, args);
+            }
+            case Tokens.FILES : {
+                return compileSetFilesProperty();
             }
             case Tokens.DATABASE : {
-                read();
-
-                String name;
-
-                switch (token.tokenType) {
-
-                    case Tokens.BACKUP : {
-                        read();
-                        checkDatabaseUpdateAuthorisation();
-                        readThis(Tokens.INCREMENT);
-
-                        boolean  flag = processTrueOrFalse();
-                        Object[] args = new Object[]{ Boolean.valueOf(flag) };
-
-                        return new StatementCommand(
-                            StatementTypes.SET_DATABASE_FILES_BACKUP_INCREMENT,
-                            args, database.getCatalogName(), null);
-                    }
-                    case Tokens.COLLATION : {
-                        read();
-                        checkIsSimpleName();
-
-                        name = token.tokenString;
-
-                        read();
-
-                        Object[] args = new Object[]{ name };
-
-                        return new StatementCommand(
-                            StatementTypes.SET_DATABASE_SQL_COLLATION, args,
-                            null, null);
-                    }
-                    case Tokens.DEFAULT : {
-                        return compileSetDefault();
-                    }
-                    case Tokens.EVENT : {
-                        read();
-                        readThis(Tokens.LOG);
-                        readThis(Tokens.LEVEL);
-
-                        int      value = readInteger();
-                        Object[] args = new Object[]{ Integer.valueOf(value) };
-
-                        return new StatementCommand(
-                            StatementTypes.SET_DATABASE_FILES_EVENT_LOG, args,
-                            null, null);
-                    }
-                    case Tokens.FILES : {
-                        read();
-
-                        int     type  = 0;
-                        boolean flag  = false;
-                        int     value = 0;
-
-                        switch (token.tokenType) {
-
-                            case Tokens.LOCK : {
-                                read();
-
-                                flag = processTrueOrFalse();
-                                type = StatementTypes.SET_DATABASE_FILES_LOCK;
-
-                                break;
-                            }
-                            case Tokens.READ : {
-                                read();
-
-                                type = StatementTypes
-                                    .SET_DATABASE_FILES_READ_ONLY;
-
-                                if (readIfThis(Tokens.ONLY)) {
-                                    flag = true;
-                                } else {
-                                    readThis(Tokens.WRITE);
-
-                                    flag = false;
-                                }
-
-                                if (readIfThis(Tokens.FILES)) {
-                                    type = StatementTypes
-                                        .SET_DATABASE_FILES_READ_ONLY_FILES;
-                                }
-
-                                flag = processTrueOrFalse();
-
-                                break;
-                            }
-                            case Tokens.CACHE : {
-                                read();
-
-                                if (readIfThis(Tokens.SIZE)) {
-                                    value = readInteger();
-                                    type = StatementTypes
-                                        .SET_DATABASE_FILES_CACHE_SIZE;
-                                } else if (readIfThis(Tokens.ROWS)) {
-                                    value = readInteger();
-                                    type = StatementTypes
-                                        .SET_DATABASE_FILES_CACHE_FILE_SCALE;
-                                } else if (readIfThis(Tokens.FILE)) {
-                                    readThis(Tokens.SCALE);
-
-                                    value = readInteger();
-                                    type = StatementTypes
-                                        .SET_DATABASE_FILES_CACHE_FILE_SCALE;
-                                }
-
-                                break;
-                            }
-                            case Tokens.DEFRAG : {
-                                read();
-
-                                type = StatementTypes
-                                    .SET_DATABASE_FILES_DEFRAG;
-                                value = readInteger();
-
-                                break;
-                            }
-                            case Tokens.NIO : {
-                                read();
-
-                                type = StatementTypes.SET_DATABASE_FILES_NIO;
-                                flag = processTrueOrFalse();
-
-                                break;
-                            }
-                            default :
-                                unexpectedToken();
-                        }
-
-                        Object[] args = new Object[] {
-                            new Integer(value), Boolean.valueOf(flag)
-                        };
-
-                        return new StatementCommand(type, args, null, null);
-                    }
-                    case Tokens.REFERENTIAL_INTEGRITY : {
-                        read();
-
-                        boolean  mode = processTrueOrFalse();
-                        Object[] args = new Object[]{ Boolean.valueOf(mode) };
-
-                        return new StatementCommand(
-                            StatementTypes
-                                .SET_DATABASE_SQL_REFERENTIAL_INTEGRITY, args,
-                                    null, null);
-                    }
-                    case Tokens.TRANSACTION : {
-                        read();
-                        readThis(Tokens.CONTROL);
-
-                        boolean mvcc = false;
-
-                        if (token.tokenType == Tokens.MVCC) {
-                            read();
-
-                            mvcc = true;
-                        } else {
-                            readThis(Tokens.LOCKS);
-                        }
-
-                        Object[] args = new Object[]{ Boolean.valueOf(mvcc) };
-
-                        return new StatementCommand(
-                            StatementTypes.SET_DATABASE_TRANSACTION_CONTROL,
-                            args, null, null);
-                    }
-                    case Tokens.PROPERTY : {
-                        return compileSetProperty();
-                    }
-                    default : {
-                        throw unexpectedToken();
-                    }
-                }
+                return compileSetDatabaseProperty();
             }
             case Tokens.PROPERTY : {
                 return compileSetProperty();
@@ -973,9 +843,761 @@ public class ParserCommand extends ParserDDL {
                 rewind(position);
 
                 return compileSetStatement(
+                    session.sessionContext.sessionVariableRangeGroups,
                     session.sessionContext.sessionVariablesRange);
             }
         }
+    }
+
+    StatementCommand compileSetTable() {
+
+        read();
+
+        Table    table = readTableName();
+        Object[] args  = new Object[] {
+            table.getName(), null
+        };
+
+        switch (token.tokenType) {
+
+            default : {
+                throw unexpectedToken();
+            }
+            case Tokens.SOURCE :
+                read();
+
+                return compileTableSource(table);
+
+            case Tokens.READ : {
+                read();
+
+                boolean readonly = false;
+
+                if (token.tokenType == Tokens.WRITE) {
+                    read();
+                } else {
+                    readThis(Tokens.ONLY);
+
+                    readonly = true;
+                }
+
+                args[1] = Boolean.valueOf(readonly);
+
+                return new StatementCommand(StatementTypes.SET_TABLE_READONLY,
+                                            args, null,
+                                            new HsqlName[]{ table.getName() });
+            }
+
+            // deprecated
+            case Tokens.READONLY : {
+                read();
+
+                Boolean readonly = processTrueOrFalseObject();
+
+                args[1] = readonly;
+
+                return new StatementCommand(StatementTypes.SET_TABLE_READONLY,
+                                            args, null,
+                                            new HsqlName[]{ table.getName() });
+            }
+            case Tokens.INDEX : {
+                String value;
+
+                read();
+                checkIsValue();
+
+                value = token.tokenString;
+
+                read();
+
+                args[1] = value;
+
+                return new StatementCommand(StatementTypes.SET_TABLE_INDEX,
+                                            args, null,
+                                            new HsqlName[]{ table.getName() });
+            }
+            case Tokens.TYPE : {
+                read();
+
+                int newType;
+
+                if (token.tokenType == Tokens.CACHED) {
+                    newType = TableBase.CACHED_TABLE;
+                } else if (token.tokenType == Tokens.MEMORY) {
+                    newType = TableBase.MEMORY_TABLE;
+                } else {
+                    throw unexpectedToken();
+                }
+
+                read();
+
+                args[1] = new Integer(newType);
+
+                return new StatementCommand(StatementTypes.SET_TABLE_TYPE,
+                                            args, null,
+                                            new HsqlName[]{ table.getName() });
+            }
+            case Tokens.CLUSTERED : {
+                read();
+                readThis(Tokens.ON);
+
+                OrderedHashSet set = new OrderedHashSet();
+
+                readThis(Tokens.OPENBRACKET);
+                readSimpleColumnNames(set, table, false);
+                readThis(Tokens.CLOSEBRACKET);
+
+                int[] colIndex = table.getColumnIndexes(set);
+
+                args[1] = colIndex;
+
+                return new StatementCommand(StatementTypes.SET_TABLE_CLUSTERED,
+                                            args, null,
+                                            new HsqlName[]{ table.getName() });
+            }
+            case Tokens.NEW : {
+                read();
+                readThis(Tokens.SPACE);
+
+                args = new Object[]{ table.getName() };
+
+                HsqlName[] writeLockNames =
+                    database.schemaManager.getCatalogAndBaseTableNames(
+                        table.getName());
+
+                return new StatementCommand(
+                    StatementTypes.SET_TABLE_NEW_TABLESPACE, args, null,
+                    writeLockNames);
+            }
+            case Tokens.SPACE : {
+                read();
+
+                Integer id = super.readIntegerObject();
+
+                args = new Object[] {
+                    table.getName(), id
+                };
+
+                HsqlName[] writeLockNames =
+                    database.schemaManager.getCatalogAndBaseTableNames(
+                        table.getName());
+
+                return new StatementCommand(
+                    StatementTypes.SET_TABLE_SET_TABLESPACE, args, null,
+                    writeLockNames);
+            }
+        }
+    }
+
+    StatementCommand compileSetDatabaseProperty() {
+
+        read();
+
+        String name;
+
+        checkDatabaseUpdateAuthorisation();
+
+        switch (token.tokenType) {
+
+            case Tokens.AUTHENTICATION : {
+                read();
+                readThis(Tokens.FUNCTION);
+
+                Routine  routine = readCreateDatabaseAuthenticationFunction();
+                Object[] args    = new Object[]{ routine };
+
+                return new StatementCommand(
+                    StatementTypes.SET_DATABASE_AUTHENTICATION, args, null,
+                    null);
+            }
+            case Tokens.COLLATION : {
+                Boolean padSpace = null;
+
+                read();
+                checkIsSimpleName();
+
+                name = token.tokenString;
+
+                read();
+
+                if (readIfThis(Tokens.NO)) {
+                    readThis(Tokens.PAD);
+
+                    padSpace = Boolean.FALSE;
+                } else if (readIfThis(Tokens.PAD)) {
+                    readThis(Tokens.SPACE);
+
+                    padSpace = Boolean.TRUE;
+                }
+
+                if (padSpace == null) {
+                    if (session.isProcessingScript()
+                            && database.getProperties().isVersion18()) {
+                        padSpace = Boolean.FALSE;
+                    } else {
+                        padSpace = Boolean.TRUE;
+                    }
+                }
+
+                Object[] args = new Object[] {
+                    name, padSpace
+                };
+
+                return new StatementCommand(
+                    StatementTypes.SET_DATABASE_SQL_COLLATION, args, null,
+                    null);
+            }
+            case Tokens.DEFAULT : {
+                return compileSetDefault();
+            }
+            case Tokens.EVENT : {
+                read();
+                readThis(Tokens.LOG);
+
+                boolean sqlLog = readIfThis(Tokens.SQL);
+
+                readThis(Tokens.LEVEL);
+
+                Integer  value = readIntegerObject();
+                Object[] args  = new Object[] {
+                    value, sqlLog
+                };
+
+                return new StatementCommand(
+                    StatementTypes.SET_DATABASE_FILES_EVENT_LOG, args, null,
+                    null);
+            }
+            case Tokens.GC : {
+                read();
+
+                Integer  size = readIntegerObject();
+                Object[] args = new Object[]{ size };
+
+                return new StatementCommand(StatementTypes.SET_DATABASE_GC,
+                                            args, null, null);
+            }
+            case Tokens.PASSWORD : {
+                read();
+
+                switch (token.tokenType) {
+
+                    case Tokens.CHECK : {
+                        read();
+                        readThis(Tokens.FUNCTION);
+
+                        Routine  routine = readCreatePasswordCheckFunction();
+                        Object[] args    = new Object[]{ routine };
+
+                        return new StatementCommand(
+                            StatementTypes.SET_DATABASE_PASSWORD_CHECK, args,
+                            null, null);
+                    }
+                    case Tokens.DIGEST : {
+                        read();
+
+                        name = readQuotedString();
+
+                        Object[] args = new Object[]{ name };
+
+                        return new StatementCommand(
+                            StatementTypes.SET_DATABASE_PASSWORD_DIGEST, args,
+                            null, null);
+                    }
+                    default :
+                        throw unexpectedToken();
+                }
+            }
+            case Tokens.REFERENTIAL : {
+                read();
+                readThis(Tokens.INTEGRITY);
+
+                boolean  mode = processTrueOrFalse();
+                Object[] args = new Object[]{ Boolean.valueOf(mode) };
+
+                return new StatementCommand(
+                    StatementTypes.SET_DATABASE_SQL_REFERENTIAL_INTEGRITY,
+                    args, null, null);
+            }
+            case Tokens.SQL : {
+                read();
+
+                int     type     = StatementTypes.SET_DATABASE_SQL;
+                Boolean flag     = Boolean.TRUE;
+                Integer value    = Integer.valueOf(0);
+                String  property = null;
+
+                switch (token.tokenType) {
+
+                    case Tokens.NAMES :
+                        read();
+
+                        property = HsqlDatabaseProperties.sql_enforce_names;
+                        flag     = processTrueOrFalseObject();
+                        break;
+
+                    case Tokens.REGULAR :
+                        read();
+                        readThis(Tokens.NAMES);
+
+                        property = HsqlDatabaseProperties.sql_regular_names;
+                        flag     = processTrueOrFalseObject();
+                        break;
+
+                    case Tokens.REFERENCES :
+                        read();
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_enforce_refs;
+                        break;
+
+                    case Tokens.SIZE :
+                        read();
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_enforce_size;
+                        break;
+
+                    case Tokens.TYPES :
+                        read();
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_enforce_types;
+                        break;
+
+                    case Tokens.TDC :
+                        read();
+
+                        if (readIfThis(Tokens.DELETE)) {
+                            property = HsqlDatabaseProperties.sql_enforce_tdcd;
+                        } else {
+                            readThis(Tokens.UPDATE);
+
+                            property = HsqlDatabaseProperties.sql_enforce_tdcu;
+                        }
+
+                        flag = processTrueOrFalseObject();
+                        break;
+
+                    case Tokens.TRANSLATE :
+                        read();
+                        readThis(Tokens.TTI);
+                        readThis(Tokens.TYPES);
+
+                        flag = processTrueOrFalseObject();
+                        property =
+                            HsqlDatabaseProperties.jdbc_translate_tti_types;
+                        break;
+
+                    case Tokens.CONCAT_WORD :
+                        read();
+                        readThis(Tokens.NULLS);
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_concat_nulls;
+                        break;
+
+                    case Tokens.NULLS :
+                        read();
+
+                        if (readIfThis(Tokens.FIRST)) {
+                            property = HsqlDatabaseProperties.sql_nulls_first;
+                        } else {
+                            readThis(Tokens.ORDER);
+
+                            property = HsqlDatabaseProperties.sql_nulls_order;
+                        }
+
+                        flag = processTrueOrFalseObject();
+                        break;
+
+                    case Tokens.UNIQUE :
+                        read();
+                        readThis(Tokens.NULLS);
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_unique_nulls;
+                        break;
+
+                    case Tokens.CONVERT :
+                        read();
+                        readThis(Tokens.TRUNCATE);
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_convert_trunc;
+                        break;
+
+                    case Tokens.AVG :
+                        read();
+                        readThis(Tokens.SCALE);
+
+                        value    = readIntegerObject();
+                        property = HsqlDatabaseProperties.sql_avg_scale;
+                        break;
+
+                    case Tokens.DOUBLE :
+                        read();
+                        readThis(Tokens.NAN);
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_double_nan;
+                        break;
+
+                    case Tokens.LONGVAR :
+                        read();
+                        readThis(Tokens.IS);
+                        readThis(Tokens.LOB);
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_longvar_is_lob;
+                        break;
+
+                    case Tokens.IGNORECASE :
+                        read();
+
+                        flag     = processTrueOrFalseObject();
+                        property = HsqlDatabaseProperties.sql_ignore_case;
+                        break;
+
+                    case Tokens.SYNTAX :
+                        read();
+
+                        if (token.tokenString.equals(Tokens.T_DB2)) {
+                            read();
+
+                            property = HsqlDatabaseProperties.sql_syntax_db2;
+                        } else if (token.tokenString.equals(Tokens.T_MSS)) {
+                            read();
+
+                            property = HsqlDatabaseProperties.sql_syntax_mss;
+                        } else if (token.tokenString.equals(Tokens.T_MYS)) {
+                            read();
+
+                            property = HsqlDatabaseProperties.sql_syntax_mys;
+                        } else if (token.tokenString.equals(Tokens.T_ORA)) {
+                            read();
+
+                            property = HsqlDatabaseProperties.sql_syntax_ora;
+                        } else if (token.tokenString.equals(Tokens.T_PGS)) {
+                            read();
+
+                            property = HsqlDatabaseProperties.sql_syntax_pgs;
+                        } else {
+                            throw unexpectedToken();
+                        }
+
+                        flag = processTrueOrFalseObject();
+                        break;
+
+                    default :
+                        throw unexpectedToken();
+                }
+
+                Object[] args = new Object[] {
+                    property, flag, value
+                };
+
+                return new StatementCommand(type, args, null, null);
+            }
+            case Tokens.TEXT : {
+                read();
+                readThis(Tokens.TABLE);
+                readThis(Tokens.DEFAULTS);
+
+                String   source = readQuotedString();
+                Object[] args   = new Object[]{ source };
+
+                return new StatementCommand(
+                    StatementTypes.SET_DATABASE_TEXT_SOURCE, args, null, null);
+            }
+            case Tokens.TRANSACTION : {
+                read();
+
+                if (readIfThis(Tokens.ROLLBACK)) {
+                    readThis(Tokens.ON);
+
+                    if (!readIfThis(Tokens.DEADLOCK)) {
+                        readThis(Tokens.CONFLICT);
+                    }
+
+                    Boolean mode = processTrueOrFalseObject();
+                    StatementCommand cs = new StatementCommand(
+                        StatementTypes.SET_DATABASE_TRANSACTION_CONFLICT,
+                        new Object[]{ mode }, null, null);
+
+                    return cs;
+                }
+
+                readThis(Tokens.CONTROL);
+
+                int mode = TransactionManager.LOCKS;
+
+                switch (token.tokenType) {
+
+                    case Tokens.MVCC :
+                        read();
+
+                        mode = TransactionManager.MVCC;
+                        break;
+
+                    case Tokens.MVLOCKS :
+                        read();
+
+                        mode = TransactionManager.MVLOCKS;
+                        break;
+
+                    case Tokens.LOCKS :
+                        read();
+
+                        mode = TransactionManager.LOCKS;
+                        break;
+                }
+
+                HsqlName[] names =
+                    database.schemaManager.getCatalogAndBaseTableNames();
+                Object[] args = new Object[]{ ValuePool.getInt(mode) };
+                StatementCommand cs = new StatementCommand(
+                    StatementTypes.SET_DATABASE_TRANSACTION_CONTROL, args,
+                    null, names);
+
+                return cs;
+            }
+            case Tokens.UNIQUE : {
+                read();
+                readThis(Tokens.NAME);
+                isUndelimitedSimpleName();
+
+                name = token.tokenString;
+
+                read();
+
+                if (name.length() != 16) {
+                    throw Error.error(ErrorCode.X_42555);
+                }
+
+                if (!Charset.isInSet(name, Charset.unquotedIdentifier)
+                        || !Charset.startsWith(name,
+                                               Charset.uppercaseLetters)) {
+                    throw Error.error(ErrorCode.X_42501);
+                }
+
+                Object[] args = new Object[]{ name };
+
+                return new StatementCommand(
+                    StatementTypes.SET_DATABASE_UNIQUE_NAME, args, null, null);
+            }
+            default : {
+                throw unexpectedToken();
+            }
+        }
+    }
+
+    StatementCommand compileSetFilesProperty() {
+
+        read();
+
+        int        type  = 0;
+        Boolean    flag  = null;
+        Integer    value = null;
+        Boolean    mode  = null;
+        HsqlName[] names = database.schemaManager.getCatalogNameArray();
+
+        checkDatabaseUpdateAuthorisation();
+
+        switch (token.tokenType) {
+
+            case Tokens.CACHE : {
+                read();
+
+                if (readIfThis(Tokens.SIZE)) {
+                    value = readIntegerObject();
+                    type  = StatementTypes.SET_DATABASE_FILES_CACHE_SIZE;
+                } else {
+                    readThis(Tokens.ROWS);
+
+                    value = readIntegerObject();
+                    type  = StatementTypes.SET_DATABASE_FILES_CACHE_ROWS;
+                }
+
+                if (readIfThis(Tokens.NO)) {
+                    readThis(Tokens.CHECK);
+
+                    mode = Boolean.TRUE;
+                }
+
+                break;
+            }
+            case Tokens.CHECK : {
+                read();
+
+                value = readIntegerObject();
+                type  = StatementTypes.SET_DATABASE_FILES_CHECK;
+                names = database.schemaManager.getCatalogNameArray();
+
+                break;
+            }
+            case Tokens.SCALE : {
+                read();
+
+                value = readIntegerObject();
+                type  = StatementTypes.SET_DATABASE_FILES_SCALE;
+                names = database.schemaManager.getCatalogAndBaseTableNames();
+
+                break;
+            }
+            case Tokens.SPACE : {
+                read();
+
+                if (token.tokenType == Tokens.TRUE) {
+                    flag = Boolean.TRUE;
+
+                    read();
+                } else if (token.tokenType == Tokens.FALSE) {
+                    flag = Boolean.FALSE;
+
+                    read();
+                } else {
+                    value = readIntegerObject();
+                }
+
+                type  = StatementTypes.SET_DATABASE_FILES_SPACE;
+                names = database.schemaManager.getCatalogAndBaseTableNames();
+
+                break;
+            }
+            case Tokens.LOB : {
+                read();
+
+                if (readIfThis(Tokens.SCALE)) {
+                    value = readIntegerObject();
+                    type  = StatementTypes.SET_DATABASE_FILES_LOBS_SCALE;
+                } else {
+                    readThis(Tokens.COMPRESSED);
+
+                    type = StatementTypes.SET_DATABASE_FILES_LOBS_COMPRESSED;
+                    flag = processTrueOrFalseObject();
+                }
+
+                names = database.schemaManager.getCatalogAndBaseTableNames();
+
+                break;
+            }
+            case Tokens.DEFRAG : {
+                read();
+
+                type  = StatementTypes.SET_DATABASE_FILES_DEFRAG;
+                value = readIntegerObject();
+
+                break;
+            }
+            case Tokens.NIO : {
+                read();
+
+                if (readIfThis(Tokens.SIZE)) {
+                    value = readIntegerObject();
+                } else {
+                    flag = processTrueOrFalseObject();
+                }
+
+                type = StatementTypes.SET_DATABASE_FILES_NIO;
+
+                break;
+            }
+            case Tokens.BACKUP : {
+                read();
+
+                type = StatementTypes.SET_DATABASE_FILES_BACKUP_INCREMENT;
+
+                readThis(Tokens.INCREMENT);
+
+                flag = processTrueOrFalseObject();
+
+                break;
+            }
+            case Tokens.LOG : {
+                read();
+
+                if (readIfThis(Tokens.SIZE)) {
+                    type  = StatementTypes.SET_DATABASE_FILES_LOG_SIZE;
+                    value = readIntegerObject();
+                } else {
+                    type = StatementTypes.SET_DATABASE_FILES_LOG;
+                    flag = processTrueOrFalseObject();
+                }
+
+                break;
+            }
+            case Tokens.TEMP : {
+                read();
+                readThis(Tokens.PATH);
+
+                type  = StatementTypes.SET_DATABASE_FILES_TEMP_PATH;
+                value = readIntegerObject();
+
+                break;
+            }
+            case Tokens.WRITE : {
+                read();
+                readThis(Tokens.DELAY);
+
+                type = StatementTypes.SET_DATABASE_FILES_WRITE_DELAY;
+
+                int delay = 0;
+
+                if (token.tokenType == Tokens.TRUE) {
+                    delay = database.getProperties().getDefaultWriteDelay();
+
+                    read();
+                } else if (token.tokenType == Tokens.FALSE) {
+                    delay = 0;
+
+                    read();
+                } else {
+                    delay = this.readInteger();
+
+                    if (delay < 0) {
+                        delay = 0;
+                    }
+
+                    if (token.tokenType == Tokens.MILLIS) {
+                        read();
+                    } else {
+                        delay *= 1000;
+                    }
+                }
+
+                value = new Integer(delay);
+
+                break;
+            }
+            case Tokens.SCRIPT : {
+                read();
+                readThis(Tokens.FORMAT);
+
+                if (token.tokenType == Tokens.TEXT) {
+                    read();
+
+                    value = new Integer(0);
+                } else {
+                    readThis(Tokens.COMPRESSED);
+
+                    value = new Integer(3);
+                }
+
+                type = StatementTypes.SET_DATABASE_FILES_SCRIPT_FORMAT;
+
+                break;
+            }
+            default :
+                throw unexpectedToken();
+        }
+
+        Object[] args = new Object[2];
+
+        args[0] = flag == null ? (Object) value
+                               : (Object) flag;
+        args[1] = mode;
+
+        return new StatementCommand(type, args, null, names);
     }
 
     Object[] processTransactionCharacteristics() {
@@ -1056,6 +1678,15 @@ public class ParserCommand extends ParserDDL {
 
                     break;
                 }
+                case Tokens.COMMA : {
+                    if (args[0] == null && args[1] == null) {
+                        throw unexpectedToken();
+                    }
+
+                    read();
+
+                    break;
+                }
                 default : {
                     break outerloop;
                 }
@@ -1067,27 +1698,6 @@ public class ParserCommand extends ParserDDL {
         }
 
         return args;
-    }
-
-    /**
-     * Retrieves boolean value corresponding to the next token.
-     *
-     * @return   true if next token is "TRUE"; false if next token is "FALSE"
-     * @throws  HsqlException if the next token is neither "TRUE" or "FALSE"
-     */
-    private boolean processTrueOrFalse() {
-
-        if (token.tokenType == Tokens.TRUE) {
-            read();
-
-            return true;
-        } else if (token.tokenType == Tokens.FALSE) {
-            read();
-
-            return false;
-        } else {
-            throw unexpectedToken();
-        }
     }
 
     /**
@@ -1114,11 +1724,15 @@ public class ParserCommand extends ParserDDL {
             readThis(Tokens.CHAIN);
         }
 
-        String    sql  = getLastPart();
-        Object[]  args = new Object[]{ Boolean.valueOf(chain) };
-        Statement cs = new StatementSession(StatementTypes.COMMIT_WORK, args);
+        String sql = chain ? StatementSession.commitAndChainStatement.sql
+                           : StatementSession.commitNoChainStatement.sql;
+        Statement st = new StatementSession(StatementTypes.COMMIT_WORK,
+                                            new Object[]{
+                                                Boolean.valueOf(chain) });
 
-        return cs;
+        st.setSQL(sql);
+
+        return st;
     }
 
     private Statement compileStartTransaction() {
@@ -1170,13 +1784,14 @@ public class ParserCommand extends ParserDDL {
             break outerloop;
         }
 
-        HsqlName[] readTableNames = new HsqlName[readSet.size()];
-
-        readSet.toArray(readTableNames);
-
         HsqlName[] writeTableNames = new HsqlName[writeSet.size()];
 
         writeSet.toArray(writeTableNames);
+        readSet.removeAll(writeTableNames);
+
+        HsqlName[] readTableNames = new HsqlName[readSet.size()];
+
+        readSet.toArray(readTableNames);
 
         Statement cs =
             new StatementSession(StatementTypes.TRANSACTION_LOCK_TABLE,
@@ -1191,6 +1806,10 @@ public class ParserCommand extends ParserDDL {
         String  savepoint = null;
 
         read();
+
+        if (token.tokenType == Tokens.WORK) {
+            read();
+        }
 
         if (token.tokenType == Tokens.TO) {
             read();
@@ -1208,10 +1827,6 @@ public class ParserCommand extends ParserDDL {
 
             return cs;
         } else {
-            if (token.tokenType == Tokens.WORK) {
-                read();
-            }
-
             if (token.tokenType == Tokens.AND) {
                 read();
 
@@ -1225,12 +1840,15 @@ public class ParserCommand extends ParserDDL {
             }
         }
 
-        String   sql  = getLastPart();
-        Object[] args = new Object[]{ Boolean.valueOf(chain) };
-        Statement cs = new StatementSession(StatementTypes.ROLLBACK_WORK,
-                                            args);
+        String sql = chain ? StatementSession.rollbackAndChainStatement.sql
+                           : StatementSession.rollbackNoChainStatement.sql;
+        Statement st = new StatementSession(StatementTypes.ROLLBACK_WORK,
+                                            new Object[]{
+                                                Boolean.valueOf(chain) });
 
-        return cs;
+        st.setSQL(sql);
+
+        return st;
     }
 
     private Statement compileSavepoint() {
@@ -1267,42 +1885,58 @@ public class ParserCommand extends ParserDDL {
 
     private Statement compileSessionSettings() {
 
-        if (token.tokenType == Tokens.CHARACTERISTICS) {
-            read();
-            readThis(Tokens.AS);
+        switch (token.tokenType) {
 
-            Object[] args = processTransactionCharacteristics();
+            case Tokens.CHARACTERISTICS : {
+                read();
+                readThis(Tokens.AS);
+                readThis(Tokens.TRANSACTION);
 
-            return new StatementSession(
-                StatementTypes.SET_SESSION_CHARACTERISTICS, args);
-        } else if (token.tokenType == Tokens.AUTHORIZATION) {
-            read();
+                Object[] args = processTransactionCharacteristics();
 
-            Expression e = XreadValueSpecificationOrNull();
-
-            if (e == null) {
-                throw Error.error(ErrorCode.X_42584);
+                return new StatementSession(
+                    StatementTypes.SET_SESSION_CHARACTERISTICS, args);
             }
+            case Tokens.AUTHORIZATION : {
+                read();
 
-            e.resolveTypes(session, null);
+                Expression e = XreadValueSpecificationOrNull();
 
-            if (e.isParam()) {
-                e.dataType = Type.SQL_VARCHAR;
+                if (e == null) {
+                    throw Error.error(ErrorCode.X_42584);
+                }
+
+                e.resolveTypes(session, null);
+
+                if (e.isUnresolvedParam()) {
+                    e.dataType = Type.SQL_VARCHAR;
+                }
+
+                if (e.dataType == null || !e.dataType.isCharacterType()) {
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
+                Expression[] args = new Expression[] {
+                    e, null
+                };
+
+                return new StatementSession(
+                    StatementTypes.SET_SESSION_AUTHORIZATION, args);
             }
+            case Tokens.RESULT : {
+                read();
+                readThis(Tokens.MEMORY);
+                readThis(Tokens.ROWS);
 
-            if (e.dataType == null || !e.dataType.isCharacterType()) {
-                throw Error.error(ErrorCode.X_42565);
+                Integer  size = readIntegerObject();
+                Object[] args = new Object[]{ size };
+
+                return new StatementSession(
+                    StatementTypes.SET_SESSION_RESULT_MEMORY_ROWS, args);
             }
-
-            Expression[] args = new Expression[] {
-                e, null
-            };
-
-            return new StatementSession(
-                StatementTypes.SET_SESSION_AUTHORIZATION, args);
+            default :
+                throw unexpectedToken();
         }
-
-        throw unexpectedToken();
     }
 
     private Statement compileSetRole() {
@@ -1312,7 +1946,7 @@ public class ParserCommand extends ParserDDL {
         if (token.tokenType == Tokens.NONE) {
             read();
 
-            e = new ExpressionOp(null, Type.SQL_VARCHAR);
+            e = new ExpressionValue(null, Type.SQL_VARCHAR);
         } else {
             e = XreadValueSpecificationOrNull();
 
@@ -1346,22 +1980,22 @@ public class ParserCommand extends ParserDDL {
         if (token.tokenType == Tokens.LOCAL) {
             read();
 
-            e = new ExpressionValue(null, Type.SQL_VARCHAR);
+            e = new ExpressionValue(null, Type.SQL_INTERVAL_HOUR_TO_MINUTE);
         } else {
             e = XreadIntervalValueExpression();
 
-            HsqlList unresolved =
-                e.resolveColumnReferences(RangeVariable.emptyArray, null);
+            HsqlList unresolved = e.resolveColumnReferences(session,
+                RangeGroup.emptyGroup, RangeGroup.emptyArray, null);
 
             ExpressionColumn.checkColumnsResolved(unresolved);
             e.resolveTypes(session, null);
 
             if (e.dataType == null) {
-                throw Error.error(ErrorCode.X_42565);
+                throw Error.error(ErrorCode.X_42563);
             }
 
             if (e.dataType.typeCode != Types.SQL_INTERVAL_HOUR_TO_MINUTE) {
-                throw Error.error(ErrorCode.X_42565);
+                throw Error.error(ErrorCode.X_42563);
             }
         }
 
@@ -1422,19 +2056,22 @@ public class ParserCommand extends ParserDDL {
 
     private Statement compileBackup() {
 
+        String  path;
+        Boolean blockingMode = null;    // defaults to blocking
+        Boolean scriptMode   = null;    // defaults to non-script
+        Boolean compression  = null;    // defaults to compressed
+        Boolean files        = null;    // defaults to false
+
         read();
         readThis(Tokens.DATABASE);
         readThis(Tokens.TO);
-        checkIsValue();
-        readQuotedString();
 
-        String path = token.tokenString;
+        path = readQuotedString();
+        path = path.trim();
 
-        read();
-
-        Boolean blockingMode = null;    // Default to non-blocking
-        Boolean scriptMode   = null;    // Default to non-script
-        Boolean compression  = null;    // Defaults to compressed
+        if (path.length() == 0) {
+            throw unexpectedToken(path);
+        }
 
         outerLoop:
         while (true) {
@@ -1482,6 +2119,10 @@ public class ParserCommand extends ParserDDL {
 
                         read();
                     } else if (token.tokenType == Tokens.BLOCKING) {
+                        if (blockingMode != null) {
+                            throw unexpectedToken();
+                        }
+
                         blockingMode = Boolean.FALSE;
 
                         read();
@@ -1490,33 +2131,54 @@ public class ParserCommand extends ParserDDL {
                     }
                     break;
 
+                case Tokens.AS :
+                    if (files != null) {
+                        throw unexpectedToken();
+                    }
+
+                    read();
+                    readThis(Tokens.FILES);
+
+                    files = Boolean.TRUE;
+                    break;
+
                 default :
                     break outerLoop;
             }
         }
 
-        /**
-         * @todo: This block is TEMPORARY.  Will be removed when we implement
-         * Non-Blocking and SCRIPT mode.
-         */
-        if (scriptMode != null) {
-            throw unsupportedFeature("SCRIPT");
+        if (scriptMode == null) {
+            scriptMode = Boolean.FALSE;
         }
 
-        scriptMode = Boolean.FALSE;
-
         if (blockingMode == null) {
-            throw unexpectedTokenRequire("BLOCKING");
+            blockingMode = Boolean.TRUE;
         }
 
         if (compression == null) {
             compression = Boolean.TRUE;
         }
 
-        return new StatementCommand(StatementTypes.DATABASE_BACKUP,
-                                    new Object[] {
-            path, blockingMode, scriptMode, compression,
-        }, null, null);
+        if (files == null) {
+            files = Boolean.FALSE;
+        }
+
+        if (scriptMode) {
+            if (!blockingMode) {
+                throw unexpectedToken(Tokens.T_NOT);
+            }
+        }
+
+        HsqlName[] names =
+            blockingMode ? database.schemaManager.getCatalogAndBaseTableNames()
+                         : HsqlName.emptyArray;
+        Object[] args = new Object[] {
+            path, blockingMode, scriptMode, compression, files
+        };
+        Statement cs = new StatementCommand(StatementTypes.DATABASE_BACKUP,
+                                            args, null, names);
+
+        return cs;
     }
 
     private Statement compileCheckpoint() {
@@ -1539,13 +2201,25 @@ public class ParserCommand extends ParserDDL {
             throw unexpectedToken();
         }
 
-        String   sql       = getLastPart();
-        Object[] args      = new Object[]{ Boolean.valueOf(defrag) };
-        HsqlName writeName = defrag ? database.getCatalogName()
-                                    : null;
+        HsqlName[] names =
+            database.schemaManager.getCatalogAndBaseTableNames();
+        Object[] args = new Object[]{ Boolean.valueOf(defrag) };
         Statement cs = new StatementCommand(StatementTypes.DATABASE_CHECKPOINT,
-                                            args, database.getCatalogName(),
-                                            writeName);
+                                            args, null, names);
+
+        return cs;
+    }
+
+    public static Statement getAutoCheckpointStatement(Database database) {
+
+        HsqlName[] names =
+            database.schemaManager.getCatalogAndBaseTableNames();
+        Object[] args = new Object[]{ Boolean.FALSE };
+        Statement cs = new StatementCommand(StatementTypes.DATABASE_CHECKPOINT,
+                                            args, null, names);
+
+        cs.setCompileTimestamp(database.txManager.getGlobalChangeTimestamp());
+        cs.setSQL(Tokens.T_CHECKPOINT);
 
         return cs;
     }
@@ -1569,23 +2243,22 @@ public class ParserCommand extends ParserDDL {
         readThis(Tokens.PLAN);
         readThis(Tokens.FOR);
 
-        cs                 = compilePart();
-        cs.writeTableNames = HsqlName.emptyArray;
-        cs.readTableNames  = HsqlName.emptyArray;
+        cs = compilePart(ResultProperties.defaultPropsValue);
 
         cs.setDescribe();
 
-        return cs;
+        return new StatementCommand(StatementTypes.EXPLAIN_PLAN,
+                                    new Object[]{ cs });
     }
 
-    private Statement compileTextTableSource(Table t) {
+    private StatementCommand compileTableSource(Table t) {
 
         boolean  isSourceHeader = false;
         boolean  isDesc         = false;
         String   source;
         Object[] args = new Object[5];
 
-        args[0] = t.tableName;
+        args[0] = t.getName();
 
         if (!t.isText()) {
             Exception e = Error.error(ErrorCode.X_S0522);
@@ -1600,7 +2273,7 @@ public class ParserCommand extends ParserDDL {
             args[1] = Boolean.TRUE;
 
             return new StatementCommand(StatementTypes.SET_TABLE_SOURCE, args,
-                                        null, t.getName());
+                                        null, new HsqlName[]{ t.getName() });
         } else if (token.tokenType == Tokens.OFF) {
             read();
 
@@ -1609,22 +2282,20 @@ public class ParserCommand extends ParserDDL {
             args[1] = Boolean.FALSE;
 
             return new StatementCommand(StatementTypes.SET_TABLE_SOURCE, args,
-                                        null, t.getName());
+                                        null, new HsqlName[]{ t.getName() });
         } else if (token.tokenType == Tokens.HEADER) {
             read();
 
             isSourceHeader = true;
         }
 
-        if (token.tokenType != Tokens.X_DELIMITED_IDENTIFIER
-                && (token.tokenType != Tokens.X_VALUE
-                    || !token.dataType.isCharacterType())) {
-            throw Error.error(ErrorCode.X_42581);
+        if (token.tokenType == Tokens.X_DELIMITED_IDENTIFIER) {
+            source = token.tokenString;
+
+            read();
+        } else {
+            source = readQuotedString();
         }
-
-        source = token.tokenString;
-
-        read();
 
         if (!isSourceHeader && token.tokenType == Tokens.DESC) {
             isDesc = true;
@@ -1638,7 +2309,10 @@ public class ParserCommand extends ParserDDL {
         args[3] = Boolean.valueOf(isDesc);
         args[4] = Boolean.valueOf(isSourceHeader);
 
-        return new StatementCommand(StatementTypes.SET_TABLE_SOURCE, args,
-                                    null, t.getName());
+        int type = isSourceHeader ? StatementTypes.SET_TABLE_SOURCE_HEADER
+                                  : StatementTypes.SET_TABLE_SOURCE;
+
+        return new StatementCommand(type, args, null,
+                                    new HsqlName[]{ t.getName() });
     }
 }

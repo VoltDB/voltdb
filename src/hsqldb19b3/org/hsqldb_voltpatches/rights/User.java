@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,27 +31,30 @@
 
 package org.hsqldb_voltpatches.rights;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.StringConverter;
 
 /**
  * A User Object extends Grantee with password for a
  * particular database user.<p>
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
  * @author Blaine Simpson (blaine dot simpson at admc dot com)
  *
- * @version 1.9.0
+ * @version 2.3.2
  * @since 1.8.0
  */
 public class User extends Grantee {
 
     /** password. */
     private String password;
+    public boolean isLocalOnly;
+    public boolean isExternalOnly;
 
     /** default schema when new Sessions started (defaults to PUBLIC schema) */
     private HsqlName initialSchema = null;
@@ -60,6 +63,7 @@ public class User extends Grantee {
      * Constructor
      */
     User(HsqlName name, GranteeManager manager) {
+
         super(name, manager);
 
         if (manager != null) {
@@ -73,17 +77,22 @@ public class User extends Grantee {
 
         sb.append(Tokens.T_CREATE).append(' ').append(Tokens.T_USER);
         sb.append(' ').append(granteeName.statementName).append(' ');
-        sb.append(Tokens.T_PASSWORD).append(' ');
-        sb.append('\'').append(password).append('\'');
+        sb.append(Tokens.T_PASSWORD).append(' ').append(Tokens.T_DIGEST);
+        sb.append(' ').append('\'').append(password).append('\'');
 
         return sb.toString();
     }
 
-    public void setPassword(String password) {
+    public String getPasswordDigest() {
+        return password;
+    }
 
-        /** @todo - introduce complexity interface */
-        // checkComplexity(password);
-        // requires: UserManager.createSAUser(), UserManager.createPublicUser()
+    public void setPassword(String password, boolean isDigest) {
+
+        if (!isDigest) {
+            password = granteeManager.digest(password);
+        }
+
         this.password = password;
     }
 
@@ -93,7 +102,9 @@ public class User extends Grantee {
      */
     public void checkPassword(String value) {
 
-        if (!value.equals(password)) {
+        String digest = granteeManager.digest(value);
+
+        if (!digest.equals(password)) {
             throw Error.error(ErrorCode.X_28000);
         }
     }
@@ -113,7 +124,7 @@ public class User extends Grantee {
 
         HsqlName schema =
             granteeManager.database.schemaManager.findSchemaHsqlName(
-                getNameString());
+                getName().getNameString());
 
         if (schema == null) {
             return granteeManager.database.schemaManager
@@ -134,55 +145,77 @@ public class User extends Grantee {
         initialSchema = schema;
     }
 
-    /**
-     * Returns the ALTER USER DDL character sequence that preserves the
-     * this user's current password value and mode. <p>
-     *
-     * @return  the DDL
-     */
-    public String getAlterUserSQL() {
-
-        StringBuffer sb = new StringBuffer();
-
-        sb.append(Tokens.T_ALTER).append(' ');
-        sb.append(Tokens.T_USER).append(' ');
-        sb.append(getStatementName()).append(' ');
-        sb.append(Tokens.T_SET).append(' ');
-        sb.append(Tokens.T_PASSWORD).append(' ');
-        sb.append('"').append(password).append('"');
-
-        return sb.toString();
-    }
-
     public String getInitialSchemaSQL() {
 
         StringBuffer sb = new StringBuffer();
 
         sb.append(Tokens.T_ALTER).append(' ');
         sb.append(Tokens.T_USER).append(' ');
-        sb.append(getStatementName()).append(' ');
+        sb.append(getName().getStatementName()).append(' ');
         sb.append(Tokens.T_SET).append(' ');
         sb.append(Tokens.T_INITIAL).append(' ');
         sb.append(Tokens.T_SCHEMA).append(' ');
-        sb.append(initialSchema.statementName);
+        sb.append(initialSchema.getStatementName());
 
         return sb.toString();
     }
 
     /**
-     * Returns the DDL string
-     * sequence that creates this user.
+     * Returns the DDL string for local authentication.
      *
      */
-    public String getCreateUserSQL() {
+    public String getLocalUserSQL() {
 
         StringBuffer sb = new StringBuffer(64);
 
-        sb.append(Tokens.T_CREATE).append(' ');
+        sb.append(Tokens.T_ALTER).append(' ');
         sb.append(Tokens.T_USER).append(' ');
-        sb.append(getStatementName()).append(' ');
-        sb.append(Tokens.T_PASSWORD).append(' ');
-        sb.append(StringConverter.toQuotedString(password, '"', true));
+        sb.append(getName().getStatementName()).append(' ');
+        sb.append(Tokens.T_SET).append(' ').append(Tokens.T_LOCAL);
+        sb.append(' ').append(Tokens.T_TRUE);
+
+        return sb.toString();
+    }
+
+    /**
+     * Returns the SQL string for setting password digest.
+     *
+     */
+    public String getSetUserPasswordDigestSQL(String password,
+            boolean isDigest) {
+
+        if (!isDigest) {
+            password = granteeManager.digest(password);
+        }
+
+        StringBuffer sb = new StringBuffer(64);
+
+        sb.append(Tokens.T_ALTER).append(' ');
+        sb.append(Tokens.T_USER).append(' ');
+        sb.append(getName().getStatementName()).append(' ');
+        sb.append(Tokens.T_SET).append(' ');
+        sb.append(Tokens.T_PASSWORD).append(' ').append(Tokens.T_DIGEST);
+        sb.append(' ').append('\'').append(password).append('\'');
+
+        return sb.toString();
+    }
+
+    /**
+     * Returns the SQL string for setting password digest.
+     *
+     */
+    public static String getSetCurrentPasswordDigestSQL(GranteeManager manager,
+            String password, boolean isDigest) {
+
+        if (!isDigest) {
+            password = manager.digest(password);
+        }
+
+        StringBuffer sb = new StringBuffer(64);
+
+        sb.append(Tokens.T_SET).append(' ');
+        sb.append(Tokens.T_PASSWORD).append(' ').append(Tokens.T_DIGEST);
+        sb.append(' ').append('\'').append(password).append('\'');
 
         return sb.toString();
     }
@@ -201,7 +234,8 @@ public class User extends Grantee {
         sb.append(Tokens.T_SET).append(' ');
         sb.append(Tokens.T_SESSION).append(' ');
         sb.append(Tokens.T_AUTHORIZATION).append(' ');
-        sb.append(StringConverter.toQuotedString(getNameString(), '\'', true));
+        sb.append(StringConverter.toQuotedString(getName().getNameString(),
+                '\'', true));
 
         return sb.toString();
     }

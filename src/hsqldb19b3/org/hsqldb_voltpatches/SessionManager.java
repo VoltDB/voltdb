@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,7 @@ import org.hsqldb_voltpatches.rights.User;
  * Responsible for managing opening and closing of sessions.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.7.2
  */
 public class SessionManager {
@@ -66,10 +66,10 @@ public class SessionManager {
 
         User sysUser = db.getUserManager().getSysUser();
 
-        sysSession = new Session(db, sysUser, false, false, false,
-                                 sessionIdCount++, 0);
-        sysLobSession = new Session(db, sysUser, true, true, false,
-                                    sessionIdCount++, 0);
+        sysSession = new Session(db, sysUser, false, false, sessionIdCount++,
+                                 null, 0);
+        sysLobSession = new Session(db, sysUser, true, false,
+                                    sessionIdCount++, null, 0);
     }
 
     /**
@@ -94,18 +94,32 @@ public class SessionManager {
      * @param db the database to which the new Session is initially connected
      * @param user the Session User
      * @param readonly the ReadOnly attribute for the new Session
-     * @param forLog true when session is for reading a log
      * @param timeZoneSeconds the session time zone second interval
      * @return Session
      */
     public synchronized Session newSession(Database db, User user,
-                                           boolean readonly, boolean forLog,
+                                           boolean readonly,
+                                           boolean autoCommit,
+                                           String zoneString,
                                            int timeZoneSeconds) {
 
-        Session s = new Session(db, user, !forLog, !forLog, readonly,
-                                sessionIdCount, timeZoneSeconds);
+        Session s = new Session(db, user, autoCommit, readonly,
+                                sessionIdCount, zoneString, timeZoneSeconds);
 
-        s.isProcessingLog = forLog;
+        sessionMap.put(sessionIdCount, s);
+
+        sessionIdCount++;
+
+        return s;
+    }
+
+    public synchronized Session newSessionForLog(Database db) {
+
+        boolean autoCommit = db.databaseProperties.isVersion18();
+        Session s = new Session(db, db.getUserManager().getSysUser(),
+                                autoCommit, false, sessionIdCount, null, 0);
+
+        s.isProcessingLog = true;
 
         sessionMap.put(sessionIdCount, s);
 
@@ -120,7 +134,11 @@ public class SessionManager {
     public Session getSysSessionForScript(Database db) {
 
         Session session = new Session(db, db.getUserManager().getSysUser(),
-                                      false, false, false, 0, 0);
+                                      false, false, 0, null, 0);
+
+        // some old 1.8.0 do not have SET SCHEMA PUBLIC
+        session.setCurrentSchemaHsqlName(
+            db.schemaManager.defaultSchemaHsqlName);
 
         session.isProcessingScript = true;
 
@@ -147,24 +165,28 @@ public class SessionManager {
     }
 
     /**
-     * Retrieves the common SYS Session.
+     * Retrieves a transient transaction session.
      */
-    public Session getSysSession(String schema, User user) {
+    public Session newSysSession() {
 
-        sysSession.currentSchema =
-            sysSession.database.schemaManager.getSchemaHsqlName(schema);
-        sysSession.isProcessingScript = false;
-        sysSession.isProcessingLog    = false;
+        Session session = new Session(sysSession.database,
+                                      sysSession.getUser(), false, false,
+                                      sessionIdCount, null, 0);
 
-        sysSession.setUser(user);
+        session.currentSchema =
+            sysSession.database.schemaManager.getDefaultSchemaHsqlName();
 
-        return sysSession;
+        sessionMap.put(sessionIdCount, session);
+
+        sessionIdCount++;
+
+        return session;
     }
 
     public Session newSysSession(HsqlName schema, User user) {
 
         Session session = new Session(sysSession.database, user, false, false,
-                                      false, 0, 0);
+                                      0, null, 0);
 
         session.currentSchema = schema;
 
@@ -174,7 +196,7 @@ public class SessionManager {
     /**
      * Closes all Sessions registered with this SessionManager.
      */
-    public synchronized void closeAllSessions() {
+    public void closeAllSessions() {
 
         // don't disconnect system user; need it to save database
         Session[] sessions = getAllSessions();
@@ -192,10 +214,13 @@ public class SessionManager {
     }
 
     /**
-     * Removes all Sessions registered with this SessionManager.
+     * Closes all sessions and system
      */
-    synchronized void clearAll() {
-        sessionMap.clear();
+    synchronized void close() {
+
+        closeAllSessions();
+        sysSession.close();
+        sysLobSession.close();
     }
 
     /**
@@ -242,7 +267,7 @@ public class SessionManager {
         for (int i = 0; it.hasNext(); i++) {
             Session session = (Session) it.next();
 
-            if (userName.equals(session.getGrantee().getNameString())) {
+            if (userName.equals(session.getUser().getName().getNameString())) {
                 return true;
             }
         }
@@ -257,7 +282,7 @@ public class SessionManager {
         for (int i = 0; it.hasNext(); i++) {
             Session session = (Session) it.next();
 
-            if (session.currentSchema == schema.name) {
+            if (session.getCurrentSchemaHsqlName() == schema.getName()) {
                 session.resetSchema();
             }
         }
@@ -270,9 +295,9 @@ public class SessionManager {
         for (int i = 0; it.hasNext(); i++) {
             Session session = (Session) it.next();
 
-            session.resetSchema();
+            session.loggedSchema = null;
         }
 
-        sysLobSession.resetSchema();
+        this.sysLobSession.loggedSchema = null;
     }
 }

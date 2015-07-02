@@ -256,6 +256,8 @@ public class PlannerTool {
                 }
             } catch (Exception e) {
                 throw new RuntimeException("Error compiling query: " + e.toString(), e);
+            } catch (AssertionError ae) {
+                throw new RuntimeException("Assertion Error compiling query: " + ae.toString(), ae);
             }
 
             if (plan == null) {

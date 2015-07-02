@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,10 +41,12 @@ import java.util.regex.Pattern;
 
 /**
  * Pax Interchange Format object constituted from an Input Stream.
- * <P/>
+ * <P>
  * Right now, the only Pax property that we support directly is "size".
+ * </P> <P>
  */
-public class PIFData extends HashMap {
+public class PIFData extends HashMap<String, String> {
+    static final long serialVersionUID = 3086795680582315773L;
 
     private static Pattern pifRecordPattern =
         Pattern.compile("\\d+ +([^=]+)=(.*)");
@@ -62,9 +64,9 @@ public class PIFData extends HashMap {
     public PIFData(InputStream stream)
     throws TarMalformatException, IOException {
 
+        BufferedReader br = null;
         try {
-            BufferedReader br =
-                new BufferedReader(new InputStreamReader(stream, "UTF-8"));
+            br = new BufferedReader(new InputStreamReader(stream, "UTF-8"));
             String  s, k, v;
             Matcher m;
             int     lineNum = 0;
@@ -80,7 +82,7 @@ public class PIFData extends HashMap {
 
                 if (!m.matches()) {
                     throw new TarMalformatException(
-                        RB.singleton.getString(RB.PIF_MALFORMAT, lineNum, s));
+                        RB.pif_malformat.getString(lineNum, s));
                 }
 
                 k = m.group(1);
@@ -93,17 +95,21 @@ public class PIFData extends HashMap {
                 }
             }
         } finally {
-            stream.close();
+            try {
+                stream.close();
+            } finally {
+                br = null;  // Encourage buffer GC
+            }
         }
 
-        String sizeString = (String) get("size");
+        String sizeString = get("size");
 
         if (sizeString != null) {
             try {
                 sizeObject = Long.valueOf(sizeString);
             } catch (NumberFormatException nfe) {
                 throw new TarMalformatException(
-                    RB.singleton.getString(RB.PIF_MALFORMAT_SIZE, sizeString));
+                    RB.pif_malformat_size.getString(sizeString));
             }
         }
     }

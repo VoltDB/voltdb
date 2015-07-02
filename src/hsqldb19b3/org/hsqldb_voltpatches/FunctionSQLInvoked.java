@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,33 +31,65 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.ArrayListIdentity;
+import org.hsqldb_voltpatches.lib.HsqlList;
+import org.hsqldb_voltpatches.lib.Set;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.store.ValuePool;
-
-import java.lang.reflect.InvocationTargetException;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of SQL-invoked user-defined function calls - PSM and JRT
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public class FunctionSQLInvoked extends Expression {
 
     RoutineSchema routineSchema;
     Routine       routine;
+    Expression    condition = Expression.EXPR_TRUE;    // needed for equals() method
 
     FunctionSQLInvoked(RoutineSchema routineSchema) {
 
-        super(OpTypes.FUNCTION);
+        super(routineSchema.isAggregate() ? OpTypes.USER_AGGREGATE
+                                          : OpTypes.FUNCTION);
 
         this.routineSchema = routineSchema;
     }
 
     public void setArguments(Expression[] newNodes) {
         this.nodes = newNodes;
+    }
+
+    public HsqlList resolveColumnReferences(Session session,
+            RangeGroup rangeGroup, int rangeCount, RangeGroup[] rangeGroups,
+            HsqlList unresolvedSet, boolean acceptsSequences) {
+
+        HsqlList conditionSet = condition.resolveColumnReferences(session,
+            rangeGroup, rangeCount, rangeGroups, null, false);
+
+        if (conditionSet != null) {
+            ExpressionColumn.checkColumnsResolved(conditionSet);
+        }
+
+        if (isSelfAggregate()) {
+            if (unresolvedSet == null) {
+                unresolvedSet = new ArrayListIdentity();
+            }
+
+            unresolvedSet.add(this);
+
+            return unresolvedSet;
+        } else {
+            return super.resolveColumnReferences(session, rangeGroup,
+                                                 rangeCount, rangeGroups,
+                                                 unresolvedSet,
+                                                 acceptsSequences);
+        }
     }
 
     public void resolveTypes(Session session, Expression parent) {
@@ -81,37 +113,54 @@ public class FunctionSQLInvoked extends Expression {
         }
 
         dataType = routine.getReturnType();
+
+        condition.resolveTypes(session, null);
     }
 
-    public Object getValue(Session session) {
+    private Object getValueInternal(Session session, Object[] aggregateData) {
 
+        boolean  isValue       = false;
         int      variableCount = routine.getVariableCount();
         Result   result;
-        int      extraArg    = routine.javaMethodWithConnection ? 1
-                                                                : 0;
-        Object[] data        = ValuePool.emptyObjectArray;
-        Object   returnValue = null;
-        boolean push = routine.isPSM() || routine.dataImpact != Routine.NO_SQL;
+        int      extraArg = routine.javaMethodWithConnection ? 1
+                                                             : 0;
+        Object[] data     = ValuePool.emptyObjectArray;
+        boolean  push     = true;
 
         if (extraArg + nodes.length > 0) {
-            data = new Object[nodes.length + extraArg];
+            if (opType == OpTypes.USER_AGGREGATE) {
+                data = new Object[routine.getParameterCount()];
 
-            if (extraArg > 0) {
-                data[0] = session.getInternalConnection();
+                for (int i = 0; i < aggregateData.length; i++) {
+                    data[i + 1] = aggregateData[i];
+                }
+            } else {
+                data = new Object[nodes.length + extraArg];
+            }
+
+            if (!routine.isPSM()) {
+                Object connection = session.getInternalConnection();
+
+                if (extraArg > 0) {
+                    data[0] = connection;
+                }
             }
         }
 
+        Type[] dataTypes = routine.getParameterTypes();
+
         for (int i = 0; i < nodes.length; i++) {
             Expression e     = nodes[i];
-            Object     value = e.getValue(session, e.dataType);
+            Object     value = e.getValue(session, dataTypes[i]);
 
             if (value == null) {
                 if (routine.isNullInputOutput()) {
                     return null;
                 }
 
-                if (!routine.parameterNullable[i]) {
-                    throw Error.error(ErrorCode.X_39004);
+                if (!routine.getParameter(i).isNullable()) {
+                    return Result.newErrorResult(
+                        Error.error(ErrorCode.X_39004));
                 }
             }
 
@@ -123,78 +172,165 @@ public class FunctionSQLInvoked extends Expression {
             }
         }
 
-        if (push) {
-            session.sessionContext.push();
-        }
+        result = routine.invoke(session, data, aggregateData, push);
 
-        if (routine.isPSM()) {
-            session.sessionContext.routineArguments = data;
-            session.sessionContext.routineVariables =
-                ValuePool.emptyObjectArray;
-
-            if (variableCount > 0) {
-                session.sessionContext.routineVariables =
-                    new Object[variableCount];
-            }
-
-            result = routine.statement.execute(session);
-
-            if (result.isError()) {}
-            else if (result.isSimpleValue()) {
-                returnValue = result.getValueObject();
-            } else {
-                result = Result.newErrorResult(
-                    Error.error(ErrorCode.X_2F005, routine.getName().name),
-                    null);
-            }
-        } else {
-            try {
-                returnValue = routine.javaMethod.invoke(null, data);
-
-                if (routine.returnsTable()) {
-
-                    // convert ResultSet to table
-                } else {
-                    returnValue = dataType.convertJavaToSQL(session,
-                            returnValue);
-                }
-
-                result = Result.updateZeroResult;
-            } catch (InvocationTargetException e) {
-                result = Result.newErrorResult(
-                    Error.error(ErrorCode.X_46000, routine.getName().name),
-                    null);
-            } catch (IllegalAccessException e) {
-                result = Result.newErrorResult(
-                    Error.error(ErrorCode.X_46000, routine.getName().name),
-                    null);
-            } catch (Throwable e) {
-                result = Result.newErrorResult(
-                    Error.error(ErrorCode.X_46000, routine.getName().name),
-                    null);
-            }
-        }
-
-        if (push) {
-            if (result.isError()) {
-                session.rollbackToSavepoint();
-            }
-
-            session.sessionContext.pop();
-        }
+        session.releaseInternalConnection();
 
         if (result.isError()) {
             throw result.getException();
         }
 
+        if (isValue) {
+            return result.valueData;
+        } else {
+            return result;
+        }
+    }
+
+    public Object getValue(Session session) {
+
+        if (opType == OpTypes.SIMPLE_COLUMN) {
+            Object value =
+                session.sessionContext.rangeIterators[rangePosition]
+                    .getCurrent(columnIndex);
+
+            return value;
+        }
+
+        Object returnValue = getValueInternal(session, null);
+
+        if (returnValue instanceof Result) {
+            Result result = (Result) returnValue;
+
+            if (result.isError()) {
+                throw result.getException();
+            } else if (result.isSimpleValue()) {
+                returnValue = result.getValueObject();
+            } else if (result.isData()) {
+                returnValue = result;
+            } else {
+                throw Error.error(ErrorCode.X_2F005, routine.getName().name);
+            }
+        }
+
         return returnValue;
     }
 
-    public String getSQL() {
-        return Tokens.T_FUNCTION;
+    public Result getResult(Session session) {
+
+        Object value = getValueInternal(session, null);
+
+        if (value instanceof Result) {
+            return (Result) value;
+        }
+
+        return Result.newPSMResult(value);
     }
 
-    public String describe(Session session) {
-        return super.describe(session);
+    void collectObjectNames(Set set) {
+        set.add(routine.getSpecificName());
+    }
+
+    public String getSQL() {
+
+        StringBuffer sb = new StringBuffer();
+
+        sb.append(routineSchema.getName().getSchemaQualifiedStatementName());
+        sb.append('(');
+
+        int nodeCount = nodes.length;
+
+        if (opType == OpTypes.USER_AGGREGATE) {
+            nodeCount = 1;
+        }
+
+        for (int i = 0; i < nodeCount; i++) {
+            if (i != 0) {
+                sb.append(',');
+            }
+
+            sb.append(nodes[i].getSQL());
+        }
+
+        sb.append(')');
+
+        return sb.toString();
+    }
+
+    public String describe(Session session, int blanks) {
+        return super.describe(session, blanks);
+    }
+
+    boolean isSelfAggregate() {
+        return routineSchema.isAggregate();
+    }
+
+    public boolean isDeterministic() {
+        return routine.isDeterministic();
+    }
+
+    public boolean equals(Expression other) {
+
+        if (other instanceof FunctionSQLInvoked) {
+            FunctionSQLInvoked o = (FunctionSQLInvoked) other;
+
+            if (opType == other.opType && routineSchema == o.routineSchema
+                    && routine == o.routine && condition.equals(o.condition)) {
+                return super.equals(other);
+            }
+        }
+
+        return false;
+    }
+
+    public Object updateAggregatingValue(Session session, Object currValue) {
+
+        if (!condition.testCondition(session)) {
+            return currValue;
+        }
+
+        Object[] array = (Object[]) currValue;
+
+        if (array == null) {
+            array = new Object[3];
+        }
+
+        array[0] = Boolean.FALSE;
+
+        getValueInternal(session, array);
+
+        return array;
+    }
+
+    public Object getAggregatedValue(Session session, Object currValue) {
+
+        Object[] array = (Object[]) currValue;
+
+        if (array == null) {
+            array = new Object[3];
+        }
+
+        array[0] = Boolean.TRUE;
+
+        Result result = (Result) getValueInternal(session, array);
+        Object returnValue;
+
+        if (result.isError()) {
+            throw result.getException();
+        } else {
+            return result.getValueObject();
+        }
+    }
+
+    public Expression getCondition() {
+        return condition;
+    }
+
+    public boolean hasCondition() {
+        return condition != null && !condition.isTrue();
+    }
+
+    public void setCondition(Expression e) {
+        condition = e;
     }
 }

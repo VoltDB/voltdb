@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,24 +50,25 @@ import java.util.zip.GZIPInputStream;
  * It is concerned with reading and writing blocks of data in conformance with
  * Tar formatting, in a way convenient to those who want to get the header and
  * data blocks.
- * <P>
+ * </P> <P>
  * Asymmetric to the Tar file writing side, the bufferBlocks setting here is
  * used only for to adjust read buffer size (for file data reads), so the user
  * can compromise between available memory and performance.  Small buffer sizes
  * will always work, but will incur more reads; on the other hand, buffer sizes
  * larger than the largest component file is just a waste of memory.
- * <P/>
+ * </P> <P>
  * We assume the responsibility to manage the setting because the decision
  * should be based on available RAM more than anything else (therefore, we can't
  * set a good value automatically).
- * <P/>
+ * </P> <P>
  * As alluded to above, headers are read in separate reads, regardless of the
  * readBufferBlocks setting.  readBufferBlocks is used for reading
  * <I>file data</I>.
- * <P/>
+ * </P> <P>
  * I have purposefully not implemented skip(), because, though I haven't tested
  * it, I believe our readBlock() and readBlocks() methods are at least as fast,
  * since we use the larges read buffer within limits the user has set.
+ * </P>
  */
 public class TarFileInputStream {
 
@@ -113,11 +114,12 @@ public class TarFileInputStream {
      * This class does no validation or enforcement of file naming conventions.
      * If desired, the caller should enforce extensions like "tar" and
      * "tar.gz" (and that they match the specified compression type).
-     * <P/>
+     * <P>
      * This object will automatically release its I/O resources when you get
      * false back from a readNextHeaderBlock() call.
      * If you abort before then, you must call the close() method like for a
      * normal InputStream.
+     * </P>
      *
      * @see #close()
      * @see #readNextHeaderBlock()
@@ -130,8 +132,8 @@ public class TarFileInputStream {
         }
 
         if (!sourceFile.canRead()) {
-            throw new IOException(RB.singleton.getString(RB.READ_DENIED,
-                    sourceFile.getAbsolutePath()));
+            throw new IOException(
+                RB.read_denied.getString(sourceFile.getAbsolutePath()));
         }
 
         this.readBufferBlocks = readBufferBlocks;
@@ -152,8 +154,7 @@ public class TarFileInputStream {
 
             default :
                 throw new IllegalArgumentException(
-                    RB.singleton.getString(
-                        RB.COMPRESSION_UNKNOWN, compressionType));
+                    RB.compression_unknown.getString(compressionType));
         }
     }
 
@@ -165,12 +166,13 @@ public class TarFileInputStream {
      * This class and subclasses should read from the underlying readStream
      * <b>ONLY WITH THIS METHOD</b>.
      * That way we can be confident that bytesRead will always be accurate.
-     * <P>
+     * </P> <P>
      * This method is different from a typical Java byte array read command
      * in that when reading tar files <OL>
      *   <LI>we always know ahead-of-time how many bytes we should read, and
      *   <LI>we always want to read quantities of bytes in multiples of 512.
      * </OL>
+     * </P>
      *
      * @param blocks  How many 512 blocks to read.
      * @throws IOException for an I/O error on the underlying InputStream
@@ -195,7 +197,7 @@ public class TarFileInputStream {
 
         if (i != blocks * 512) {
             throw new TarMalformatException(
-                RB.singleton.getString(RB.INSUFFICIENT_READ, blocks * 512, i));
+                RB.insufficient_read.getString(blocks * 512, i));
         }
     }
 
@@ -224,8 +226,8 @@ public class TarFileInputStream {
                 return;
                 /* disable 3 lines ...
                 throw new EOFException(
-                    RB.singleton.getString(
-                        RB.DECOMPRESS_RANOUT, bytesSoFar, requiredBytes));
+                    RB.decompression_ranout.getString(
+                        bytesSoFar, requiredBytes));
                 ... disabled 3 lines */
                 // End of VoltDB extension
             }
@@ -243,6 +245,7 @@ public class TarFileInputStream {
      * contain what you want.
      * E.g. you know that the very first block of a tar file should contain
      * a Tar Entry header block.
+     * </P>
      *
      * @see #readNextHeaderBlock
      */
@@ -256,6 +259,7 @@ public class TarFileInputStream {
      * <P>
      * readNextHeaderBlock continues working through the Tar File from the
      * current point until it finds a block with a non-0 first byte.
+     * </P>
      *
      * @return  True if a header block was read and place at beginning of the
      *          readBuffer array.  False if EOF was encountered without finding
@@ -297,6 +301,15 @@ public class TarFileInputStream {
      * @see java.io.Closeable
      */
     public void close() throws IOException {
-        readStream.close();
+
+        if (readStream == null) {
+            return;
+        }
+
+        try {
+            readStream.close();
+        } finally {
+            readStream = null;    // Encourage buffer GC
+        }
     }
 }

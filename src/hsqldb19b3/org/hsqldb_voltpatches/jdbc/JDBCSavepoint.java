@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,7 +34,7 @@ package org.hsqldb_voltpatches.jdbc;
 import java.sql.SQLException;
 import java.sql.Savepoint;
 
-/* $Id: JDBCSavepoint.java 762 2009-01-12 01:55:08Z fredt $ */
+/* $Id: JDBCSavepoint.java 5160 2013-02-02 20:10:25Z fredt $ */
 
 // Revision 1.10  2006/07/12 12:38:22  boucherb
 // - full synch up to Mustang b90
@@ -54,7 +54,7 @@ import java.sql.Savepoint;
  * <h3>HSQLDB-Specific Information:</h3> <p>
  *
  * SQL 2003 standard does not support unnamed savepoints. However, this
- * feature is supported from version 1.9.0.<p>
+ * feature is supported from version 2.0.<p>
  *
  * If the connection is autoCommit, setting savepoints has no effect as any
  * such savepoint is cleared upon the execution of the first transactional
@@ -76,22 +76,26 @@ public class JDBCSavepoint implements Savepoint {
     JDBCSavepoint(String name, JDBCConnection conn) throws SQLException {
 
         if (name == null) {
-            throw Util.nullArgument("name");
+            throw JDBCUtil.nullArgument("name");
         }
 
         if (conn == null) {
-            throw Util.nullArgument("conn");
+            throw JDBCUtil.nullArgument("conn");
         }
+
         this.name       = name;
+        this.id         = -1;
         this.connection = conn;
     }
 
     JDBCSavepoint(JDBCConnection conn) throws SQLException {
 
         if (conn == null) {
-            throw Util.nullArgument("conn");
+            throw JDBCUtil.nullArgument("conn");
         }
+
         this.id         = conn.getSavepointID();
+        this.name       = "SYSTEM_SAVEPOINT_" + id;
         this.connection = conn;
     }
 
@@ -104,11 +108,11 @@ public class JDBCSavepoint implements Savepoint {
      */
     public int getSavepointId() throws SQLException {
 
-        if (name == null) {
+        if (id != -1) {
             return id;
         }
 
-        throw Util.notSupported();
+        throw JDBCUtil.notSupported();
     }
 
     /**
@@ -121,11 +125,11 @@ public class JDBCSavepoint implements Savepoint {
      */
     public String getSavepointName() throws SQLException {
 
-        if (name == null) {
-            throw Util.notSupported();
+        if (id == -1) {
+            return name;
         }
 
-        return name;
+        throw JDBCUtil.notSupported();
     }
 
     public String toString() {

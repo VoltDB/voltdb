@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,7 +34,8 @@ package org.hsqldb_voltpatches.lib;
 import java.io.IOException;
 
 /**
- * An interface that supports the commonly used methods of java.io.RandomAccessFile.
+ * An interface that is used by OpenOffice.org. New versions should use the
+ * org.hsqldb_voltpatches.persist.RandomAccessInterface instead
  *
  * @author Ocke Janssen oj@openoffice.org
  * @version 1.8.0

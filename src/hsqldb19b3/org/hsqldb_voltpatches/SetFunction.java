@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,28 +31,34 @@
 
 package org.hsqldb_voltpatches;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.HashSet;
-import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.map.ValuePool;
+import org.hsqldb_voltpatches.types.ArrayType;
 import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.IntervalMonthData;
 import org.hsqldb_voltpatches.types.IntervalSecondData;
 import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.NumberType;
+import org.hsqldb_voltpatches.types.RowType;
+import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
-
-import java.io.Serializable;
+import org.hsqldb_voltpatches.types.Type.TypedComparator;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Implementation of SQL set functions (currently only aggregate functions).
  * This reduces temporary Object creation by SUM and AVG functions for
  * INTEGER and narrower types.
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.2
  *
  */
@@ -62,12 +68,14 @@ public class SetFunction implements Serializable {
     private boolean isDistinct;
 
     //
-    private int  setType;
-    private int  dataType;
-    private Type type;
+    private int       setType;
+    private int       typeCode;
+    private Type      type;
+    private ArrayType arrayType;
+    private Type      returnType;
 
     //
-    private int count;
+    private long count;
 
     //
     private boolean    hasNull;
@@ -78,14 +86,29 @@ public class SetFunction implements Serializable {
     private BigDecimal currentBigDecimal;
     private Object     currentValue;
 
-    SetFunction(int setType, Type type, boolean isDistinct) {
+    SetFunction(Session session, int setType, Type type, Type returnType,
+                boolean isDistinct, ArrayType arrayType) {
 
-        this.setType = setType;
-        this.type    = type;
+        this.setType    = setType;
+        this.type       = type;
+        this.returnType = returnType;
 
         if (isDistinct) {
             this.isDistinct = true;
+            this.arrayType  = arrayType;
             distinctValues  = new HashSet();
+
+            if (type.isRowType() || type.isArrayType()) {
+                TypedComparator comparator = Type.newComparator(session);
+                SortAndSlice    sort       = new SortAndSlice();
+                int length = type.isRowType()
+                             ? ((RowType) type).getTypesArray().length
+                             : 1;
+
+                sort.prepareMultiColumn(length);
+                comparator.setType(type, sort);
+                distinctValues.setComparator(comparator);
+            }
         }
 
         if (setType == OpTypes.VAR_SAMP || setType == OpTypes.STDDEV_SAMP) {
@@ -93,10 +116,10 @@ public class SetFunction implements Serializable {
         }
 
         if (type != null) {
-            dataType = type.typeCode;
+            typeCode = type.typeCode;
 
             if (type.isIntervalType()) {
-                dataType = Types.SQL_INTERVAL;
+                typeCode = Types.SQL_INTERVAL;
             }
         }
     }
@@ -105,8 +128,6 @@ public class SetFunction implements Serializable {
 
         if (item == null) {
             hasNull = true;
-
-            session.addWarning(Error.error(ErrorCode.W_01003));
 
             return;
         }
@@ -124,7 +145,7 @@ public class SetFunction implements Serializable {
 
             case OpTypes.AVG :
             case OpTypes.SUM : {
-                switch (dataType) {
+                switch (typeCode) {
 
                     case Types.TINYINT :
                     case Types.SQL_SMALLINT :
@@ -133,11 +154,12 @@ public class SetFunction implements Serializable {
 
                         return;
 
-                    case Types.SQL_INTERVAL :
+                    case Types.SQL_INTERVAL : {
                         if (item instanceof IntervalSecondData) {
-                            addLong(((IntervalSecondData) item).units);
+                            addLong(((IntervalSecondData) item).getSeconds());
 
-                            currentLong += ((IntervalSecondData) item).nanos;
+                            currentLong +=
+                                ((IntervalSecondData) item).getNanos();
 
                             if (Math.abs(currentLong)
                                     >= DTIType.nanoScaleFactors[0]) {
@@ -151,7 +173,25 @@ public class SetFunction implements Serializable {
                         }
 
                         return;
+                    }
+                    case Types.SQL_DATE :
+                    case Types.SQL_TIMESTAMP :
+                    case Types.SQL_TIMESTAMP_WITH_TIME_ZONE : {
+                        addLong(((TimestampData) item).getSeconds());
 
+                        currentLong += ((TimestampData) item).getNanos();
+
+                        if (Math.abs(currentLong)
+                                >= DTIType.nanoScaleFactors[0]) {
+                            addLong(currentLong / DTIType.nanoScaleFactors[0]);
+
+                            currentLong %= DTIType.nanoScaleFactors[0];
+                        }
+
+                        currentDouble = ((TimestampData) item).getZone();
+
+                        return;
+                    }
                     case Types.SQL_BIGINT :
                         addLong(((Number) item).longValue());
 
@@ -176,7 +216,7 @@ public class SetFunction implements Serializable {
                         return;
 
                     default :
-                        throw Error.error(ErrorCode.X_42565);
+                        throw Error.error(ErrorCode.X_42563);
                 }
             }
             case OpTypes.MIN : {
@@ -186,7 +226,7 @@ public class SetFunction implements Serializable {
                     return;
                 }
 
-                if (type.compare(currentValue, item) > 0) {
+                if (type.compare(session, currentValue, item) > 0) {
                     currentValue = item;
                 }
 
@@ -199,7 +239,7 @@ public class SetFunction implements Serializable {
                     return;
                 }
 
-                if (type.compare(currentValue, item) < 0) {
+                if (type.compare(session, currentValue, item) < 0) {
                     currentValue = item;
                 }
 
@@ -207,7 +247,7 @@ public class SetFunction implements Serializable {
             }
             case OpTypes.EVERY :
                 if (!(item instanceof Boolean)) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 every = every && ((Boolean) item).booleanValue();
@@ -216,7 +256,7 @@ public class SetFunction implements Serializable {
 
             case OpTypes.SOME :
                 if (!(item instanceof Boolean)) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 some = some || ((Boolean) item).booleanValue();
@@ -231,15 +271,39 @@ public class SetFunction implements Serializable {
 
                 return;
 
+            case OpTypes.USER_AGGREGATE :
+                currentValue = item;
+
+                return;
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "SetFunction");
         }
     }
 
-    Object getValue() {
+    Object getValue(Session session) {
+
+        if (hasNull) {
+            session.addWarning(Error.error(ErrorCode.W_01003));
+        }
 
         if (setType == OpTypes.COUNT) {
-            return ValuePool.getInt(count);
+
+            // todo - strings embedded in array or row
+            if (count > 0 && isDistinct && type.isCharacterType()) {
+                Object[] array = new Object[distinctValues.size()];
+
+                distinctValues.toArray(array);
+
+                SortAndSlice sort = new SortAndSlice();
+
+                sort.prepareSingleColumn(0);
+                arrayType.sort(session, array, sort);
+
+                count = arrayType.deDuplicate(session, array, sort);
+            }
+
+            return ValuePool.getLong(count);
         }
 
         if (count == 0) {
@@ -249,18 +313,23 @@ public class SetFunction implements Serializable {
         switch (setType) {
 
             case OpTypes.AVG : {
-                switch (dataType) {
+                switch (typeCode) {
 
                     case Types.TINYINT :
                     case Types.SQL_SMALLINT :
                     case Types.SQL_INTEGER :
-                        return new Long(currentLong / count);
+                        if (returnType.scale != 0) {
+                            return returnType.divide(session, currentLong,
+                                                     count);
+                        }
+
+                        return Long.valueOf(currentLong / count);
 
                     case Types.SQL_BIGINT : {
                         long value = getLongSum().divide(
                             BigInteger.valueOf(count)).longValue();
 
-                        return new Long(value);
+                        return Long.valueOf(value);
                     }
                     case Types.SQL_REAL :
                     case Types.SQL_FLOAT :
@@ -269,9 +338,13 @@ public class SetFunction implements Serializable {
 
                     case Types.SQL_NUMERIC :
                     case Types.SQL_DECIMAL :
-                        return currentBigDecimal.divide(new BigDecimal(count),
-                                                        BigDecimal.ROUND_DOWN);
-
+                        if (returnType.scale == type.scale) {
+                            return currentBigDecimal.divide(
+                                new BigDecimal(count), BigDecimal.ROUND_DOWN);
+                        } else {
+                            return returnType.divide(session,
+                                                     currentBigDecimal, count);
+                        }
                     case Types.SQL_INTERVAL : {
                         BigInteger bi =
                             getLongSum().divide(BigInteger.valueOf(count));
@@ -290,18 +363,32 @@ public class SetFunction implements Serializable {
                                 bi.longValue(), (IntervalType) type);
                         }
                     }
+                    case Types.SQL_DATE :
+                    case Types.SQL_TIMESTAMP :
+                    case Types.SQL_TIMESTAMP_WITH_TIME_ZONE : {
+                        BigInteger bi =
+                            getLongSum().divide(BigInteger.valueOf(count));
+
+                        if (!NumberType.isInLongLimits(bi)) {
+                            throw Error.error(ErrorCode.X_22015);
+                        }
+
+                        return new TimestampData(bi.longValue(),
+                                                 (int) currentLong,
+                                                 (int) currentDouble);
+                    }
                     default :
                         throw Error.runtimeError(ErrorCode.U_S0500,
                                                  "SetFunction");
                 }
             }
             case OpTypes.SUM : {
-                switch (dataType) {
+                switch (typeCode) {
 
                     case Types.TINYINT :
                     case Types.SQL_SMALLINT :
                     case Types.SQL_INTEGER :
-                        return new Long(currentLong);
+                        return Long.valueOf(currentLong);
 
                     case Types.SQL_BIGINT :
                         return new BigDecimal(getLongSum());
@@ -357,6 +444,9 @@ public class SetFunction implements Serializable {
             case OpTypes.VAR_SAMP :
                 return getVariance();
 
+            case OpTypes.USER_AGGREGATE :
+                return currentValue;
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "SetFunction");
         }
@@ -368,10 +458,10 @@ public class SetFunction implements Serializable {
      * SELECT statements contain aggregates.
      *
      */
-    static Type getType(int setType, Type type) {
+    static Type getType(Session session, int setType, Type type) {
 
         if (setType == OpTypes.COUNT) {
-            return Type.SQL_INTEGER;
+            return Type.SQL_BIGINT;
         }
 
         // A VoltDB extension to handle aggfnc(*) syntax errors.
@@ -384,32 +474,47 @@ public class SetFunction implements Serializable {
             throw Error.error(ErrorCode.U_S0500);
         }
         // End of VoltDB extension
-        int dataType = type.isIntervalType() ? Types.SQL_INTERVAL
+        int typeCode = type.isIntervalType() ? Types.SQL_INTERVAL
                                              : type.typeCode;
 
         switch (setType) {
 
-            case OpTypes.AVG : {
-                switch (dataType) {
+            case OpTypes.AVG :
+            case OpTypes.MEDIAN : {
+                switch (typeCode) {
 
                     case Types.TINYINT :
                     case Types.SQL_SMALLINT :
                     case Types.SQL_INTEGER :
                     case Types.SQL_BIGINT :
+                    case Types.SQL_NUMERIC :
+                    case Types.SQL_DECIMAL :
+                        int scale = session.database.sqlAvgScale;
+
+                        if (scale <= type.scale) {
+                            return type;
+                        }
+
+                        int digits = ((NumberType) type).getDecimalPrecision();
+
+                        return NumberType.getNumberType(Types.SQL_DECIMAL,
+                                                        digits + scale, scale);
+
                     case Types.SQL_REAL :
                     case Types.SQL_FLOAT :
                     case Types.SQL_DOUBLE :
-                    case Types.SQL_NUMERIC :
-                    case Types.SQL_DECIMAL :
                     case Types.SQL_INTERVAL :
+                    case Types.SQL_DATE :
+                    case Types.SQL_TIMESTAMP :
+                    case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
                         return type;
 
                     default :
-                        throw Error.error(ErrorCode.X_42565);
+                        throw Error.error(ErrorCode.X_42563);
                 }
             }
             case OpTypes.SUM : {
-                switch (dataType) {
+                switch (typeCode) {
 
                     case Types.TINYINT :
                     case Types.SQL_SMALLINT :
@@ -426,7 +531,7 @@ public class SetFunction implements Serializable {
 
                     case Types.SQL_NUMERIC :
                     case Types.SQL_DECIMAL :
-                        return Type.getType(type.typeCode, 0,
+                        return Type.getType(type.typeCode, null, null,
                                             type.precision * 2, type.scale);
 
                     case Types.SQL_INTERVAL :
@@ -435,11 +540,15 @@ public class SetFunction implements Serializable {
                             type.scale);
 
                     default :
-                        throw Error.error(ErrorCode.X_42565);
+                        throw Error.error(ErrorCode.X_42563);
                 }
             }
             case OpTypes.MIN :
             case OpTypes.MAX :
+                if (type.isArrayType() || type.isLobType()) {
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
                 return type;
 
             case OpTypes.EVERY :
@@ -458,11 +567,14 @@ public class SetFunction implements Serializable {
                 }
                 break;
 
+            case OpTypes.USER_AGGREGATE :
+                return type;
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "SetFunction");
         }
 
-        throw Error.error(ErrorCode.X_42565);
+        throw Error.error(ErrorCode.X_42563);
     }
 
     // long sum - originally a separate class

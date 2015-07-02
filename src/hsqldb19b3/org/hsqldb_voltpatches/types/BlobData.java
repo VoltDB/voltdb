@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,6 @@
 package org.hsqldb_voltpatches.types;
 
 import java.io.InputStream;
-import java.io.OutputStream;
 
 import org.hsqldb_voltpatches.SessionInterface;
 
@@ -64,15 +63,14 @@ public interface BlobData extends LobData {
 
     boolean isBits();
 
-    int setBytes(SessionInterface session, long pos, byte[] bytes, int offset,
-                 int len);
+    void setBytes(SessionInterface session, long pos, byte[] bytes,
+                  int offset, int len);
 
-    int setBytes(SessionInterface session, long pos, byte[] bytes);
+    void setBytes(SessionInterface session, long pos, byte[] bytes);
 
-    public long setBinaryStream(SessionInterface session, long pos,
-                                InputStream in);
+    void setBytes(SessionInterface session, long pos, BlobData b, long offset, long length);
 
-    OutputStream setBinaryStream(SessionInterface session, long pos);
+    void setBinaryStream(SessionInterface session, long pos, InputStream in);
 
     void truncate(SessionInterface session, long len);
 

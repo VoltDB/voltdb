@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,11 +33,10 @@ package org.hsqldb_voltpatches.lib;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 
-/* $Id: ClosableByteArrayOutputStream.java 2946 2009-03-22 17:44:48Z fredt $ */
+/* $Id: ClosableByteArrayOutputStream.java 5221 2013-03-30 10:57:58Z fredt $ */
 
 /**
  * @todo - finer-grained synchronization to reduce average

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@ import java.sql.SQLException;
 import java.util.Properties;
 
 import org.hsqldb_voltpatches.DatabaseURL;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 
@@ -117,6 +117,7 @@ import org.hsqldb_voltpatches.persist.HsqlProperties;
  * use some of the more advanced features available under the JDBC 2
  * specification. <p>
  *
+ * </div> <!-- end release-specific documentation -->
  * <hr>
  *
  * <b>JDBC 4.0 notes:</b><p>
@@ -136,9 +137,10 @@ import org.hsqldb_voltpatches.persist.HsqlProperties;
  * <code>Class.forName()</code> will continue to work without modification. <p>
  *
  * <hr>
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
+ * @revised JDK 1.7, HLSQLDB 2.0.1
  * </div> <!-- end release-specific documentation -->
  *
  * @see org.hsqldb_voltpatches.jdbc.JDBCConnection
@@ -219,7 +221,8 @@ public class JDBCDriver implements Driver {
      *          applications where it is not easy to configure the environment
      *          to shutdown the database. Examples reported by users include
      *          web application servers, where the closing of the last
-     *          connection conicides with the web app being shut down.</li>
+     *          connection coincides with the web application being shut down.
+     *          </li>
      *
      *      <li><code>default_schema</code> - backwards compatibility feature.
      *          To be used for clients written before HSQLDB schema support.
@@ -242,6 +245,18 @@ public class JDBCDriver implements Driver {
      */
     public Connection connect(String url,
                               Properties info) throws SQLException {
+
+        if (url.regionMatches(true, 0, DatabaseURL.S_URL_INTERNAL, 0,
+                              DatabaseURL.S_URL_INTERNAL.length())) {
+            JDBCConnection conn = (JDBCConnection) threadConnection.get();
+
+            if (conn == null) {
+                return null;
+            }
+
+            return conn;
+        }
+
         return getConnection(url, info);
     }
 
@@ -269,16 +284,28 @@ public class JDBCDriver implements Driver {
         if (props == null) {
 
             // supposed to be an HSQLDB driver url but has errors
-            throw Util.invalidArgument();
+            throw JDBCUtil.invalidArgument();
         } else if (props.isEmpty()) {
 
             // is not an HSQLDB driver url
             return null;
         }
+
+        long timeout = 0;
+
+        if (info != null) {
+            timeout = HsqlProperties.getIntegerProperty(info, "loginTimeout", 0);
+        }
+
         props.addProperties(info);
 
-        long timeout = DriverManager.getLoginTimeout();
+        if (timeout == 0) {
+            timeout = DriverManager.getLoginTimeout();
+        }
 
+        // @todo:  maybe impose some sort of sane restriction
+        //         on network connections regarless of user
+        //         specification?
         if (timeout == 0) {
 
             // no timeout restriction
@@ -291,7 +318,7 @@ public class JDBCDriver implements Driver {
             return new JDBCConnection(props);
         }
 
-        /** @todo:  Better: ThreadPool? HsqlTimer with callback? */
+        // @todo: Better: ThreadPool? HsqlTimer with callback?
         final JDBCConnection[] conn = new JDBCConnection[1];
         final SQLException[]   ex   = new SQLException[1];
         Thread                 t    = new Thread() {
@@ -326,6 +353,11 @@ public class JDBCDriver implements Driver {
             // potential of arbitrary behavior.
             t.stop();
         } catch (Exception e) {
+        } finally {
+            try {
+                t.setContextClassLoader(null);
+            } catch (Throwable th) {
+            }
         }
 
         if (ex[0] != null) {
@@ -336,7 +368,7 @@ public class JDBCDriver implements Driver {
             return conn[0];
         }
 
-        throw Util.sqlException(ErrorCode.X_08501);
+        throw JDBCUtil.sqlException(ErrorCode.X_08501);
     }
 
     /**
@@ -348,15 +380,24 @@ public class JDBCDriver implements Driver {
      * @return  true if this driver can connect to the given URL
      */
 
-    // fredt@users - patch 1.7.0 - allow mixedcase url's
+// fredt@users - patch 1.7.0 - allow mixedcase url's
     public boolean acceptsURL(String url) {
 
         if (url == null) {
             return false;
         }
 
-        return url.regionMatches(true, 0, DatabaseURL.S_URL_PREFIX, 0,
-                                 DatabaseURL.S_URL_PREFIX.length());
+        if (url.regionMatches(true, 0, DatabaseURL.S_URL_PREFIX, 0,
+                              DatabaseURL.S_URL_PREFIX.length())) {
+            return true;
+        }
+
+        if (url.regionMatches(true, 0, DatabaseURL.S_URL_INTERNAL, 0,
+                              DatabaseURL.S_URL_INTERNAL.length())) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -464,7 +505,7 @@ public class JDBCDriver implements Driver {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     *  HSQLDB 1.9.0 is aimed to be compliant with JDBC 4.0 specification.
+     *  HSQLDB 2.0 is aimed to be compliant with JDBC 4.0 specification.
      *  It supports SQL 92 Entry Level and beyond.
      * </div> <!-- end release-specific documentation -->
      *
@@ -482,17 +523,54 @@ public class JDBCDriver implements Driver {
         return true;
     }
 
+    //------------------------- JDBC 4.1 -----------------------------------
+
+    /**
+     * Return the parent Logger of all the Loggers used by this driver. This
+     * should be the Logger farthest from the root Logger that is
+     * still an ancestor of all of the Loggers used by this driver. Configuring
+     * this Logger will affect all of the log messages generated by the driver.
+     * In the worst case, this may be the root Logger.
+     *
+     * @return the parent Logger for this driver
+     * @throws SQLFeatureNotSupportedException if the driver does not use <code>java.util.logging<code>.
+     * @since JDK 1.7 M11 2010/09/10 (b123), HSQLDB 2.0.1
+     */
+//#ifdef JAVA6
+    public java.util.logging
+            .Logger getParentLogger() throws java.sql
+                .SQLFeatureNotSupportedException {
+        throw (java.sql.SQLFeatureNotSupportedException) JDBCUtil.notSupported();
+    }
+
+//#endif
+    public static JDBCDriver driverInstance;
+
     static {
         try {
-            DriverManager.registerDriver(new JDBCDriver());
+            driverInstance = new JDBCDriver();
+
+            DriverManager.registerDriver(driverInstance);
         } catch (Exception e) {
         }
     }
 
-    /************************* Volt DB Extensions *************************/
+    /**
+     * As a separate instance of this class is registered with DriverManager
+     * for each class loader, the threadConnection is not declared as static.
+     * The registered instance is kept to allow access to the its
+     * threadConnection.
+     *
+     */
 
-    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
-        throw new java.sql.SQLFeatureNotSupportedException();
-    }
-    /**********************************************************************/
+//#ifdef JAVA6
+    public final ThreadLocal<JDBCConnection> threadConnection =
+        new ThreadLocal<JDBCConnection>();
+
+//#else
+/*
+    public final ThreadLocal threadConnection = new ThreadLocal();
+*/
+
+//#endif JAVA6
 }

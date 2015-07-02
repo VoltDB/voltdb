@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,49 +32,40 @@
 package org.hsqldb_voltpatches.persist;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Enumeration;
 import java.util.Properties;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.FileAccess;
 import org.hsqldb_voltpatches.lib.FileUtil;
-import org.hsqldb_voltpatches.lib.java.JavaSystem;
-import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.lib.HashMap;
+import org.hsqldb_voltpatches.map.ValuePool;
 
 /**
  * Wrapper for java.util.Properties to limit values to Specific types and
  * allow saving and loading.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.0
  */
 public class HsqlProperties {
 
-    // column number mappings
-    public static final int indexName         = 0;
-    public static final int indexType         = 1;
-    public static final int indexClass        = 2;
-    public static final int indexIsRange      = 3;
-    public static final int indexDefaultValue = 4;
-    public static final int indexRangeLow     = 5;
-    public static final int indexRangeHigh    = 6;
-    public static final int indexValues       = 7;
-    public static final int indexLimit        = 9;
-
     //
+    public static final int ANY_ERROR        = 0;
     public static final int NO_VALUE_FOR_KEY = 1;
     protected String        fileName;
+    protected String        fileExtension = "";
     protected Properties    stringProps;
-    protected int[]         errorCodes = new int[0];
-    protected String[]      errorKeys  = new String[0];
+    protected int[]         errorCodes = ValuePool.emptyIntArray;
+    protected String[]      errorKeys  = ValuePool.emptyStringArray;
     protected boolean       resource   = false;
     protected FileAccess    fa;
+    protected HashMap       metaData;
 
     public HsqlProperties() {
         stringProps = new Properties();
@@ -82,18 +73,25 @@ public class HsqlProperties {
     }
 
     public HsqlProperties(String fileName) {
-
-        stringProps   = new Properties();
-        this.fileName = fileName;
-        fa            = FileUtil.getDefaultInstance();
+        this(fileName, ".properties");
     }
 
-    public HsqlProperties(String fileName, FileAccess accessor, boolean b) {
+    public HsqlProperties(String fileName, String fileExtension) {
 
-        stringProps   = new Properties();
-        this.fileName = fileName;
-        resource      = b;
-        fa            = accessor;
+        stringProps        = new Properties();
+        this.fileName      = fileName;
+        this.fileExtension = fileExtension;
+        fa                 = FileUtil.getFileUtil();
+    }
+
+    public HsqlProperties(HashMap meta, String fileName, FileAccess accessor,
+                          boolean b) {
+
+        stringProps        = new Properties();
+        this.fileName      = fileName;
+        this.fileExtension = ".properties";
+        fa                 = accessor;
+        metaData           = meta;
     }
 
     public HsqlProperties(Properties props) {
@@ -136,58 +134,22 @@ public class HsqlProperties {
     }
 
     public int getIntegerProperty(String key, int defaultValue) {
+        return getIntegerProperty(stringProps, key, defaultValue);
+    }
 
-        String prop = getProperty(key);
+    public static int getIntegerProperty(Properties props, String key,
+                                         int defaultValue) {
+
+        String prop = props.getProperty(key);
 
         try {
             if (prop != null) {
+                prop         = prop.trim();
                 defaultValue = Integer.parseInt(prop);
             }
         } catch (NumberFormatException e) {}
 
         return defaultValue;
-    }
-
-    public int getIntegerProperty(String key, int defaultValue, int minimum,
-                                  int maximum) {
-
-        String  prop     = getProperty(key);
-        boolean badvalue = false;
-
-        try {
-            defaultValue = Integer.parseInt(prop);
-        } catch (NumberFormatException e) {}
-
-        if (defaultValue < minimum) {
-            defaultValue = minimum;
-            badvalue     = true;
-        } else if (defaultValue > maximum) {
-            defaultValue = maximum;
-            badvalue     = true;
-        }
-
-        return defaultValue;
-    }
-
-    /**
-     * Choice limited to values list, defaultValue must be in the values list.
-     */
-    public int getIntegerProperty(String key, int defaultValue, int[] values) {
-
-        String prop  = getProperty(key);
-        int    value = defaultValue;
-
-        try {
-            if (prop != null) {
-                value = Integer.parseInt(prop);
-            }
-        } catch (NumberFormatException e) {}
-
-        if (ArrayUtil.find(values, value) == -1) {
-            return defaultValue;
-        }
-
-        return value;
     }
 
     public boolean isPropertyTrue(String key) {
@@ -202,6 +164,8 @@ public class HsqlProperties {
             return defaultValue;
         }
 
+        value = value.trim();
+
         return value.toLowerCase().equals("true");
     }
 
@@ -215,12 +179,13 @@ public class HsqlProperties {
             return;
         }
 
-        Enumeration keys = props.keys();
+        Enumeration keys = props.propertyNames();
 
         while (keys.hasMoreElements()) {
-            Object key = keys.nextElement();
+            String key   = (String) keys.nextElement();
+            String value = props.getProperty(key);
 
-            this.stringProps.put(key, props.get(key));
+            this.stringProps.put(key, value);
         }
     }
 
@@ -234,31 +199,34 @@ public class HsqlProperties {
     }
 
 // oj@openoffice.org
-    public boolean checkFileExists() throws IOException {
+    public boolean propertiesFileExists() {
 
-        String propFilename = fileName + ".properties";
+        if (fileName == null) {
+            return false;
+        }
+
+        String propFilename = fileName + fileExtension;
 
         return fa.isStreamElement(propFilename);
     }
 
     public boolean load() throws Exception {
 
-        if (!checkFileExists()) {
-            return false;
-        }
-
         if (fileName == null || fileName.length() == 0) {
             throw new FileNotFoundException(
                 Error.getMessage(ErrorCode.M_HsqlProperties_load));
         }
 
+        if (!propertiesFileExists()) {
+            return false;
+        }
+
         InputStream fis           = null;
-        String      propsFilename = fileName + ".properties";
+        String      propsFilename = fileName + fileExtension;
 
 // oj@openoffice.org
         try {
-            fis = resource ? getClass().getResourceAsStream(propsFilename)
-                           : fa.openInputStreamElement(propsFilename);
+            fis = fa.openInputStreamElement(propsFilename);
 
             stringProps.load(fis);
         } finally {
@@ -280,7 +248,7 @@ public class HsqlProperties {
                 Error.getMessage(ErrorCode.M_HsqlProperties_load));
         }
 
-        String filestring = fileName + ".properties";
+        String filestring = fileName + fileExtension;
 
         save(filestring);
     }
@@ -295,16 +263,16 @@ public class HsqlProperties {
 
         OutputStream        fos = fa.openOutputStreamElement(fileString);
         FileAccess.FileSync outDescriptor = fa.getFileSync(fos);
+        String name = HsqlDatabaseProperties.PRODUCT_NAME + " "
+                      + HsqlDatabaseProperties.THIS_FULL_VERSION;
 
-        JavaSystem.saveProperties(
-            stringProps,
-            HsqlDatabaseProperties.PRODUCT_NAME + " "
-            + HsqlDatabaseProperties.THIS_FULL_VERSION, fos);
+        stringProps.store(fos, name);
         fos.flush();
         outDescriptor.sync();
         fos.close();
 
-        return;
+        outDescriptor = null;
+        fos           = null;
     }
 
     /**
@@ -312,7 +280,7 @@ public class HsqlProperties {
      * is populated during construction or addition of elements and is used
      * outside this class to act upon the errors.
      */
-    private void addError(int code, String key) {
+    protected void addError(int code, String key) {
 
         errorCodes = (int[]) ArrayUtil.resizeArray(errorCodes,
                 errorCodes.length + 1);
@@ -433,6 +401,19 @@ public class HsqlProperties {
         return errorKeys;
     }
 
+    public void validate() {}
+
+    // column number mappings
+    public static final int indexName         = 0;
+    public static final int indexType         = 1;
+    public static final int indexClass        = 2;
+    public static final int indexIsRange      = 3;
+    public static final int indexDefaultValue = 4;
+    public static final int indexRangeLow     = 5;
+    public static final int indexRangeHigh    = 6;
+    public static final int indexValues       = 7;
+    public static final int indexLimit        = 9;
+
     public static Object[] getMeta(String name, int type,
                                    String defaultValue) {
 
@@ -440,7 +421,7 @@ public class HsqlProperties {
 
         row[indexName]         = name;
         row[indexType]         = ValuePool.getInt(type);
-        row[indexClass]        = "java.lang.String";
+        row[indexClass]        = "String";
         row[indexDefaultValue] = defaultValue;
 
         return row;
@@ -453,7 +434,7 @@ public class HsqlProperties {
 
         row[indexName]         = name;
         row[indexType]         = ValuePool.getInt(type);
-        row[indexClass]        = "boolean";
+        row[indexClass]        = "Boolean";
         row[indexDefaultValue] = defaultValue ? Boolean.TRUE
                                               : Boolean.FALSE;
 
@@ -467,7 +448,7 @@ public class HsqlProperties {
 
         row[indexName]         = name;
         row[indexType]         = ValuePool.getInt(type);
-        row[indexClass]        = "int";
+        row[indexClass]        = "Integer";
         row[indexDefaultValue] = ValuePool.getInt(defaultValue);
         row[indexValues]       = values;
 
@@ -481,13 +462,91 @@ public class HsqlProperties {
 
         row[indexName]         = name;
         row[indexType]         = ValuePool.getInt(type);
-        row[indexClass]        = "int";
+        row[indexClass]        = "Integer";
         row[indexDefaultValue] = ValuePool.getInt(defaultValue);
         row[indexIsRange]      = Boolean.TRUE;
         row[indexRangeLow]     = ValuePool.getInt(rangeLow);
         row[indexRangeHigh]    = ValuePool.getInt(rangeHigh);
 
         return row;
+    }
+
+    /**
+     * Perfoms any range checking for property and return an error message
+     */
+    public static String validateProperty(String key, String value,
+                                          Object[] meta) {
+
+        if (meta[indexClass].equals("Boolean")) {
+            value = value.toLowerCase();
+
+            if (value.equals("true") || value.equals("false")) {
+                return null;
+            }
+
+            return "invalid boolean value for property: " + key;
+        }
+
+        if (meta[indexClass].equals("String")) {
+            return null;
+        }
+
+        if (meta[indexClass].equals("Integer")) {
+            int number = Integer.parseInt(value);
+
+            if (Boolean.TRUE.equals(meta[indexIsRange])) {
+                int low  = ((Integer) meta[indexRangeLow]).intValue();
+                int high = ((Integer) meta[indexRangeHigh]).intValue();
+
+                if (number < low || high < number) {
+                    return "value outside range for property: " + key;
+                }
+            }
+
+            if (meta[indexValues] != null) {
+                int[] values = (int[]) meta[indexValues];
+
+                if (ArrayUtil.find(values, number) == -1) {
+                    return "value not supported for property: " + key;
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    public boolean validateProperty(String name, int number) {
+
+        Object[] meta = (Object[]) metaData.get(name);
+
+        if (meta == null) {
+            return false;
+        }
+
+        if (meta[indexClass].equals("Integer")) {
+            if (Boolean.TRUE.equals(meta[indexIsRange])) {
+                int low  = ((Integer) meta[indexRangeLow]).intValue();
+                int high = ((Integer) meta[indexRangeHigh]).intValue();
+
+                if (number < low || high < number) {
+                    return false;
+                }
+            }
+
+            if (meta[indexValues] != null) {
+                int[] values = (int[]) meta[indexValues];
+
+                if (ArrayUtil.find(values, number) == -1) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     public String toString() {

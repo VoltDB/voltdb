@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,18 +31,26 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.2
  * @since 1.9.0
  */
 public class LongKeyHashMap extends BaseHashMap {
 
     Set        keySet;
     Collection values;
+
+    //
+    ReentrantReadWriteLock           lock = new ReentrantReadWriteLock(true);
+    ReentrantReadWriteLock.ReadLock  readLock  = lock.readLock();
+    ReentrantReadWriteLock.WriteLock writeLock = lock.writeLock();
 
     public LongKeyHashMap() {
         this(16);
@@ -54,41 +62,123 @@ public class LongKeyHashMap extends BaseHashMap {
               BaseHashMap.objectKeyOrValue, false);
     }
 
+    public Lock getReadLock() {
+        return readLock;
+    }
+
+    public Lock getWriteLock() {
+        return writeLock;
+    }
+
     public Object get(long key) {
 
-        int lookup = getLookup(key);
+        readLock.lock();
 
-        if (lookup != -1) {
-            return objectValueTable[lookup];
+        try {
+            int lookup = getLookup(key);
+
+            if (lookup != -1) {
+                return objectValueTable[lookup];
+            }
+
+            return null;
+        } finally {
+            readLock.unlock();
         }
-
-        return null;
     }
 
     public Object put(long key, Object value) {
-        return super.addOrRemove(key, 0, null, value, false);
+
+        writeLock.lock();
+
+        try {
+            return super.addOrRemove(key, 0, null, value, false);
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     public boolean containsValue(Object value) {
-        return super.containsValue(value);
+
+        readLock.lock();
+
+        try {
+            return super.containsValue(value);
+        } finally {
+            readLock.unlock();
+        }
     }
 
     public Object remove(long key) {
-        return super.addOrRemove(key, 0, null, null, true);
+
+        writeLock.lock();
+
+        try {
+            return super.addOrRemove(key, 0, null, null, true);
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     public boolean containsKey(long key) {
-        return super.containsKey(key);
+
+        readLock.lock();
+
+        try {
+            return super.containsKey(key);
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    public void clear() {
+
+        writeLock.lock();
+
+        try {
+            super.clear();
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    public Object[] toArray() {
+
+        readLock.lock();
+
+        try {
+            if (isEmpty()) {
+                return emptyObjectArray;
+            }
+
+            Object[] array = new Object[size()];
+            int      i     = 0;
+            Iterator it    = LongKeyHashMap.this.new BaseHashIterator(false);
+
+            while (it.hasNext()) {
+                array[i++] = it.next();
+            }
+
+            return array;
+        } finally {
+            readLock.unlock();
+        }
     }
 
     public int getOrderedMatchCount(int[] array) {
 
         int i = 0;
 
-        for (; i < array.length; i++) {
-            if (!super.containsKey(array[i])) {
-                break;
+        readLock.lock();
+
+        try {
+            for (; i < array.length; i++) {
+                if (!super.containsKey(array[i])) {
+                    break;
+                }
             }
+        } finally {
+            readLock.unlock();
         }
 
         return i;

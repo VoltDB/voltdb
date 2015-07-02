@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,7 +42,7 @@ import java.util.NoSuchElementException;
  * but does not shrink when it gets empty.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.0
  */
 public class HsqlDeque extends BaseList implements HsqlList {
@@ -93,7 +93,32 @@ public class HsqlDeque extends BaseList implements HsqlList {
     }
 
     public void add(int i, Object o) throws IndexOutOfBoundsException {
-        throw new java.lang.RuntimeException();
+
+        if (i == elementCount) {
+            add(o);
+
+            return;
+        }
+
+        resetCapacity();
+
+        int index = getInternalIndex(i);
+
+        if (index < endindex && endindex < list.length) {
+            System.arraycopy(list, index, list, index + 1, endindex - index);
+
+            endindex++;
+        } else {
+            System.arraycopy(list, firstindex, list, firstindex - 1,
+                             index - firstindex);
+
+            firstindex--;
+            index--;
+        }
+
+        list[index] = o;
+
+        elementCount++;
     }
 
     public Object set(int i, Object o) throws IndexOutOfBoundsException {
@@ -226,6 +251,10 @@ public class HsqlDeque extends BaseList implements HsqlList {
             if (list[index] == value) {
                 return i;
             }
+
+            if (value != null && value.equals(list[index])) {
+                return i;
+            }
         }
 
         return -1;
@@ -310,5 +339,22 @@ public class HsqlDeque extends BaseList implements HsqlList {
         }
 
         list = newList;
+    }
+
+    public void toArray(Object[] array) {
+
+        int tempCount = list.length - firstindex;
+
+        if (tempCount > elementCount) {
+            tempCount = elementCount;
+        }
+
+        System.arraycopy(list, firstindex, array, 0, tempCount);
+
+        if (endindex <= firstindex) {
+            System.arraycopy(list, 0, array, tempCount, endindex);
+
+            endindex = list.length + endindex;
+        }
     }
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,11 +31,14 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+
 /**
  * Implementation of ORDER BY operations
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public class ExpressionOrderBy extends Expression {
@@ -49,6 +52,8 @@ public class ExpressionOrderBy extends Expression {
 
         nodes       = new Expression[UNARY];
         nodes[LEFT] = e;
+        collation   = e.collation;
+        e.collation = null;
     }
 
     /**
@@ -68,8 +73,8 @@ public class ExpressionOrderBy extends Expression {
     /**
      * Set an ORDER BY column NULL ordering
      */
-    void setNullsLast() {
-        isNullsLast = true;
+    void setNullsLast(boolean value) {
+        isNullsLast = value;
     }
 
     /**
@@ -87,11 +92,16 @@ public class ExpressionOrderBy extends Expression {
 
         nodes[LEFT].resolveTypes(session, parent);
 
-        if (nodes[LEFT].isParam) {
+        if (nodes[LEFT].isUnresolvedParam()) {
             throw Error.error(ErrorCode.X_42567);
         }
 
         dataType = nodes[LEFT].dataType;
+
+        if (collation != null && !dataType.isCharacterType()) {
+            throw Error.error(ErrorCode.X_2H000,
+                              collation.getName().statementName);
+        }
     }
 
     public String getSQL() {
@@ -106,6 +116,11 @@ public class ExpressionOrderBy extends Expression {
             sb.append(nodes[LEFT].getSQL());
         }
 
+        if (collation != null) {
+            sb.append(' ').append(
+                collation.getName().getSchemaQualifiedStatementName());
+        }
+
         if (isDescending) {
             sb.append(' ').append(Tokens.T_DESC);
         }
@@ -117,17 +132,14 @@ public class ExpressionOrderBy extends Expression {
 
         StringBuffer sb = new StringBuffer();
 
-        sb.append('\n');
-
-        for (int i = 0; i < blanks; i++) {
-            sb.append(' ');
-        }
-
-        sb.append(Tokens.T_ORDER).append(' ').append(Tokens.T_BY);
-        sb.append(' ');
+        sb.append(getLeftNode().describe(session, blanks));
 
         if (isDescending) {
-            sb.append(Tokens.T_DESC).append(' ');
+            for (int i = 0; i < blanks; i++) {
+                sb.append(' ');
+            }
+
+            sb.append(Tokens.T_DESC).append('\n');
         }
 
         return sb.toString();

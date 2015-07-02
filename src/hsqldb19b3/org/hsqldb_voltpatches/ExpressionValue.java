@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,14 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.types.Type;
-// A VoltDB extension to allow X'..' as numeric literals
-import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.BinaryData;
 
-import java.math.BigInteger;
-// End VoltDB extension
 /**
  * Implementation of value access operations.
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
  * @version 1.9.0
  * @since 1.9.0
@@ -55,9 +52,14 @@ public class ExpressionValue extends Expression {
 
         super(OpTypes.VALUE);
 
-        nodes     = Expression.emptyExpressionArray;
+        nodes     = Expression.emptyArray;
         dataType  = datatype;
         valueData = o;
+    }
+
+    public byte getNullability() {
+        return valueData == null ? SchemaObject.Nullability.NULLABLE
+                                 : SchemaObject.Nullability.NO_NULLS;
     }
 
     public String getSQL() {
@@ -72,7 +74,7 @@ public class ExpressionValue extends Expression {
                 return dataType.convertToSQLString(valueData);
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+                throw Error.runtimeError(ErrorCode.U_S0500, "ExpressionValue");
         }
     }
 
@@ -89,14 +91,24 @@ public class ExpressionValue extends Expression {
         switch (opType) {
 
             case OpTypes.VALUE :
-                sb.append("VALUE = ").append(valueData);
+                sb.append("VALUE = ").append(
+                    dataType.convertToSQLString(valueData));
                 sb.append(", TYPE = ").append(dataType.getNameString());
 
                 return sb.toString();
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+                throw Error.runtimeError(ErrorCode.U_S0500, "ExpressionValue");
         }
+    }
+
+    Object getValue(Session session, Type type) {
+
+        if (dataType == type || valueData == null) {
+            return valueData;
+        }
+
+        return type.convertToType(session, valueData, dataType);
     }
 
     public Object getValue(Session session) {
@@ -121,12 +133,12 @@ public class ExpressionValue extends Expression {
                 return false;
             }
 
-            BinaryData data = (BinaryData)exprVal.valueData;
+            org.hsqldb_voltpatches.types.BinaryData data = (org.hsqldb_voltpatches.types.BinaryData)exprVal.valueData;
             parent.nodes[childIndex] = new ExpressionValue(data.toLong(), Type.SQL_BIGINT);
 
             return true;
         }
         return false;
     }
-    // End VoltDB extension
+    // End of VoltDB extension
 }

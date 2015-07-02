@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,20 +31,20 @@
 
 package org.hsqldb_voltpatches.rowio;
 
+import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.Row;
 
 /**
  * Public interface for writing the data for a database row.
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.7.0
  */
-public interface RowOutputInterface {
+public interface RowOutputInterface extends Cloneable {
 
     void writeEnd();
 
@@ -56,6 +56,8 @@ public interface RowOutputInterface {
 
     void writeByte(int i);
 
+    void writeChar(int i);
+
     void writeShort(int i);
 
     void writeInt(int i);
@@ -64,14 +66,11 @@ public interface RowOutputInterface {
 
     void writeLong(long i);
 
-    void writeRow(Object[] data, Type[] types);
-
-    void writeData(Object[] data, Type[] types);
+    void writeData(Row row, Type[] types);
 
     void writeData(int l, Type[] types, Object[] data, HashMappedList cols,
                    int[] primarykeys);
 
-    // independent of the this object, calls only a static method
     int getSize(Row row);
 
     int getStorageSize(int size);
@@ -79,13 +78,19 @@ public interface RowOutputInterface {
     // returns the underlying HsqlByteArrayOutputStream
     HsqlByteArrayOutputStream getOutputStream();
 
-    // sets the byte[] buffer
-    public void setBuffer(byte[] mainBuffer);
+    byte[] getBuffer();
 
     // resets the byte[] buffer, ready for processing new row
     void reset();
 
+    // performs reset() and ensures byte[] buffer is at least newSize
+    void reset(int newSize);
+
+    // sets the byte[] buffer
+    void reset(byte[] mainBuffer);
+
     // returns the current size
     int size();
 
+    RowOutputInterface duplicate();
 }

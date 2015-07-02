@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  * This class does not store null keys.
@@ -50,8 +50,8 @@ public class HashMap extends BaseHashMap {
     }
 
     public HashMap(int initialCapacity) throws IllegalArgumentException {
-        super(initialCapacity, BaseHashMap.objectKeyOrValue, BaseHashMap.objectKeyOrValue,
-              false);
+        super(initialCapacity, BaseHashMap.objectKeyOrValue,
+              BaseHashMap.objectKeyOrValue, false);
     }
 
     public Object get(Object key) {
@@ -90,6 +90,30 @@ public class HashMap extends BaseHashMap {
             Object key = it.next();
 
             put(key, t.get(key));
+        }
+    }
+
+    public void valuesToArray(Object[] array) {
+
+        Iterator it = values().iterator();
+        int      i  = 0;
+
+        while (it.hasNext()) {
+            array[i] = it.next();
+
+            i++;
+        }
+    }
+
+    public void keysToArray(Object[] array) {
+
+        Iterator it = keySet().iterator();
+        int      i  = 0;
+
+        while (it.hasNext()) {
+            array[i] = it.next();
+
+            i++;
         }
     }
 

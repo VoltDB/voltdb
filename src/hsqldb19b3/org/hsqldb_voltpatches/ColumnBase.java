@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,7 @@ import org.hsqldb_voltpatches.types.Type;
  * Base implementation of variables, columns of result or table.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.9.0
  */
 public class ColumnBase {
@@ -48,9 +48,9 @@ public class ColumnBase {
     private String    catalog;
     private boolean   isWriteable;
     private boolean   isSearchable;
-    protected byte     parameterMode;
+    protected byte    parameterMode;
     protected boolean isIdentity;
-    protected byte     nullability;
+    protected byte    nullability = SchemaObject.Nullability.NULLABLE;
     protected Type    dataType;
 
     ColumnBase() {}
@@ -62,6 +62,18 @@ public class ColumnBase {
         this.schema  = schema;
         this.table   = table;
         this.name    = name;
+    }
+
+    public ColumnBase(String catalog, ColumnSchema other) {
+
+        this.catalog      = catalog;
+        this.schema       = other.getSchemaNameString();
+        this.table        = other.getTableNameString();
+        this.name         = other.getNameString();
+        this.nullability  = other.getNullability();
+        this.isIdentity   = other.isIdentity();
+        this.isSearchable = other.isSearchable();
+        this.isWriteable  = other.isWriteable();
     }
 
     public String getNameString() {
@@ -119,12 +131,16 @@ public class ColumnBase {
         return isWriteable;
     }
 
+    public void setWriteable(boolean value) {
+        isWriteable = value;
+    }
+
     public boolean isSearchable() {
         return isSearchable;
     }
 
-    public void setWriteable(boolean value) {
-        isWriteable = value;
+    public void setSearchable(boolean value) {
+        isSearchable = value;
     }
 
     public Type getDataType() {

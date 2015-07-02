@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.StatementTypes;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
 
@@ -44,8 +45,9 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * java.sql.PreparedStatement. Contains common members and methods.
  *
  * @author fredt@usrs
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
+ * @revised JDK 1.7, HSQLDB 2.0.1
  */
 
 /**
@@ -63,6 +65,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * There is no real relation between the current state fo an Statement instance
  * and the various ResultSets that it may have returned for different queries.
  */
+
 /**
  * @todo 1.9.0 - review the following issues:
  *
@@ -74,7 +77,7 @@ class JDBCStatementBase {
 
     /**
      * Whether this Statement has been explicitly closed.  A JDBCConnection
-     * object now explicitly closes all of its open JDBC*Statement objects
+     * object now explicitly closes all of its open JDBC Statement objects
      * when it is closed.
      */
     volatile boolean isClosed;
@@ -103,14 +106,8 @@ class JDBCStatementBase {
     /** The currently existing generated key Result */
     protected Result generatedResult;
 
-    /** The result set type obtained by executing this statement. */
-    protected int rsScrollability = JDBCResultSet.TYPE_FORWARD_ONLY;
-
-    /** The result set concurrency obtained by executing this statement. */
-    protected int rsConcurrency = JDBCResultSet.CONCUR_READ_ONLY;
-
-    /** The result set holdability obtained by executing this statement. */
-    protected int rsHoldability = JDBCResultSet.HOLD_CURSORS_OVER_COMMIT;
+    /** The combined result set properties obtained by executing this statement. */
+    protected int rsProperties;
 
     /** Used by this statement to communicate non-batched requests. */
     protected Result resultOut;
@@ -130,7 +127,13 @@ class JDBCStatementBase {
     /** Counter for ResultSet in getMoreResults(). */
     protected int resultSetCounter;
 
-    /** Implementation in subclasses **/
+    /** Query timeout in seconds */
+    protected int queryTimeout;
+
+    /** connection generation */
+    int connectionIncarnation;
+
+    /** Implementation in subclasses */
     public synchronized void close() throws SQLException {}
 
     /**
@@ -141,12 +144,17 @@ class JDBCStatementBase {
     void checkClosed() throws SQLException {
 
         if (isClosed) {
-            throw Util.sqlException(ErrorCode.X_07501);
+            throw JDBCUtil.sqlException(ErrorCode.X_07501);
         }
 
         if (connection.isClosed) {
             close();
-            throw Util.sqlException(ErrorCode.X_08503);
+
+            throw JDBCUtil.sqlException(ErrorCode.X_08503);
+        }
+
+        if (connectionIncarnation != connection.incarnation) {
+            throw JDBCUtil.sqlException(ErrorCode.X_08503);
         }
     }
 
@@ -163,13 +171,15 @@ class JDBCStatementBase {
             return;
         }
 
+        rootWarning = null;
+
         Result current = resultIn;
 
         while (current.getChainedResult() != null) {
             current = current.getUnlinkChainedResult();
 
             if (current.getType() == ResultConstants.WARNING) {
-                SQLWarning w = Util.sqlWarning(current);
+                SQLWarning w = JDBCUtil.sqlWarning(current);
 
                 if (rootWarning == null) {
                     rootWarning = w;
@@ -178,15 +188,15 @@ class JDBCStatementBase {
                 }
             } else if (current.getType() == ResultConstants.ERROR) {
                 errorResult = current;
-            } else if (current.getType() == ResultConstants.DATA) {
+            } else if (current.getType() == ResultConstants.GENERATED) {
                 generatedResult = current;
+            } else if (current.getType() == ResultConstants.DATA) {
+                resultIn.addChainedResult(current);
             }
         }
 
-        if (resultIn.isData()) {
-            currentResultSet = new JDBCResultSet(connection.sessionProxy,
-                    this, resultIn, resultIn.metaData,
-                    connection.connProperties);
+        if (rootWarning != null) {
+            connection.setWarnings(rootWarning);
         }
     }
 
@@ -195,16 +205,29 @@ class JDBCStatementBase {
         checkClosed();
 
         return (resultIn == null || resultIn.isData()) ? -1
-                : resultIn.getUpdateCount();
+                                                       : resultIn
+                                                       .getUpdateCount();
     }
-
 
     ResultSet getResultSet() throws SQLException {
 
         checkClosed();
 
         ResultSet result = currentResultSet;
-        currentResultSet = null;
+
+        if(!connection.isCloseResultSet) {
+            currentResultSet = null;
+        }
+
+        if (result == null) {
+
+            // if statement has been used with executeQuery and the result is update count
+            // return an empty result for 1.8 compatibility
+            if (resultOut.getStatementType() == StatementTypes.RETURN_RESULT) {
+                return JDBCResultSet.newEptyResultSet();
+            }
+        }
+
         return result;
     }
 
@@ -213,26 +236,33 @@ class JDBCStatementBase {
     }
 
     /**
-     * Note yet correct for multiple ResultSets. Should keep track of the
+     * Not yet correct for multiple ResultSets. Should keep track of all
      * previous ResultSet objects to be able to close them
      */
     boolean getMoreResults(int current) throws SQLException {
+
         checkClosed();
 
-        if (resultIn == null || !resultIn.isData()) {
+        if (resultIn == null) {
             return false;
         }
 
-        if (resultSetCounter == 0) {
-            resultSetCounter++;
+        resultIn = resultIn.getChainedResult();
+
+        if (currentResultSet != null) {
+            if( current != KEEP_CURRENT_RESULT) {
+                currentResultSet.close();
+            }
+        }
+
+        currentResultSet = null;
+
+        if (resultIn != null) {
+            currentResultSet = new JDBCResultSet(connection, this, resultIn,
+                                                 resultIn.metaData);
+
             return true;
         }
-
-        if (currentResultSet != null && current != KEEP_CURRENT_RESULT) {
-            currentResultSet.close();
-        }
-
-        resultIn = null;
 
         return false;
     }
@@ -246,9 +276,10 @@ class JDBCStatementBase {
         if (generatedResult == null) {
             generatedResult = Result.emptyGeneratedResult;
         }
-        generatedResultSet = new JDBCResultSet(connection.sessionProxy, null,
-                generatedResult, generatedResult.metaData,
-                connection.connProperties);
+
+        generatedResultSet = new JDBCResultSet(connection, null,
+                                               generatedResult,
+                                               generatedResult.metaData);
 
         return generatedResultSet;
     }
@@ -265,20 +296,58 @@ class JDBCStatementBase {
         if (generatedResultSet != null) {
             generatedResultSet.close();
         }
+
         generatedResultSet = null;
         generatedResult    = null;
         resultIn           = null;
+        currentResultSet   = null;
     }
 
     /**
      * JDBC 3 constants
      */
-    static final int CLOSE_CURRENT_RESULT = 1;
-    static final int KEEP_CURRENT_RESULT = 2;
-    static final int CLOSE_ALL_RESULTS = 3;
-    static final int SUCCESS_NO_INFO = -2;
-    static final int EXECUTE_FAILED = -3;
+    static final int CLOSE_CURRENT_RESULT  = 1;
+    static final int KEEP_CURRENT_RESULT   = 2;
+    static final int CLOSE_ALL_RESULTS     = 3;
+    static final int SUCCESS_NO_INFO       = -2;
+    static final int EXECUTE_FAILED        = -3;
     static final int RETURN_GENERATED_KEYS = 1;
-    static final int NO_GENERATED_KEYS = 2;
+    static final int NO_GENERATED_KEYS     = 2;
 
+    //--------------------------JDBC 4.1 -----------------------------
+
+    /**
+     * Specifies that this {@code Statement} will be closed when all its
+     * dependent result sets are closed. If execution of the {@code Statement}
+     * does not produce any result sets, this method has no effect.
+     * <p>
+     * <strong>Note:</strong> Multiple calls to {@code closeOnCompletion} do
+     * not toggle the effect on this {@code Statement}. However, a call to
+     * {@code closeOnCompletion} does effect both the subsequent execution of
+     * statements, and statements that currently have open, dependent,
+     * result sets.
+     *
+     * @throws SQLException if this method is called on a closed
+     * {@code Statement}
+     * @since JDK 1.7 M11 2010/09/10 (b123), HSQLDB 2.0.1
+     */
+    public void closeOnCompletion() throws SQLException {
+        checkClosed();
+    }
+
+    /**
+     * Returns a value indicating whether this {@code Statement} will be
+     * closed when all its dependent result sets are closed.
+     * @return {@code true} if the {@code Statement} will be closed when all
+     * of its dependent result sets are closed; {@code false} otherwise
+     * @throws SQLException if this method is called on a closed
+     * {@code Statement}
+     * @since JDK 1.7 M11 2010/09/10 (b123), HSQLDB 2.0.1
+     */
+    public boolean isCloseOnCompletion() throws SQLException {
+
+        checkClosed();
+
+        return false;
+    }
 }

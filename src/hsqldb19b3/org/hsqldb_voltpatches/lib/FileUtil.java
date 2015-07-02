@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,52 +34,63 @@ package org.hsqldb_voltpatches.lib;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URL;
 import java.util.Random;
 
 import org.hsqldb_voltpatches.lib.java.JavaSystem;
 
 /**
- * A collection of static file management methods.<p>
+ * A collection of file management methods.<p>
  * Also provides the default FileAccess implementation
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
  * @author Ocke Janssen oj@openoffice.org
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.7.2
  */
 public class FileUtil implements FileAccess {
 
-    private static FileUtil fileUtil = new FileUtil();
+    private static FileUtil      fileUtil      = new FileUtil();
+    private static FileAccessRes fileAccessRes = new FileAccessRes();
 
     /** Creates a new instance of FileUtil */
     FileUtil() {}
 
-    public static FileUtil getDefaultInstance() {
+    public static FileUtil getFileUtil() {
         return fileUtil;
     }
 
-    public boolean isStreamElement(java.lang.String elementName) {
-        return (new File(elementName)).exists();
+    public static FileAccess getFileAccess(boolean isResource) {
+        return isResource ? (FileAccess) fileAccessRes
+                          : (FileAccess) fileUtil;
     }
 
-    public java.io.InputStream openInputStreamElement(
-            java.lang.String streamName) throws java.io.IOException {
+    public boolean isStreamElement(java.lang.String elementName) {
+        return new File(elementName).exists();
+    }
+
+    public InputStream openInputStreamElement(java.lang.String streamName)
+    throws java.io.IOException {
 
         try {
             return new FileInputStream(new File(streamName));
         } catch (Throwable e) {
-            throw toIOException(e);
+            throw JavaSystem.toIOException(e);
         }
     }
 
-    public void createParentDirs(java.lang.String filename) {
+    public void createParentDirs(String filename) {
         makeParentDirectories(new File(filename));
     }
 
-    public void removeElement(java.lang.String filename) {
+    public void removeElement(String filename) {
 
         if (isStreamElement(filename)) {
             delete(filename);
@@ -88,7 +99,7 @@ public class FileUtil implements FileAccess {
 
     public void renameElement(java.lang.String oldName,
                               java.lang.String newName) {
-        renameOverwrite(oldName, newName);
+        renameWithOverwrite(oldName, newName);
     }
 
     public java.io.OutputStream openOutputStreamElement(
@@ -120,7 +131,7 @@ public class FileUtil implements FileAccess {
      * Delete the named file
      */
     public boolean delete(String filename) {
-        return (new File(filename)).delete();
+        return new File(filename).delete();
     }
 
     /**
@@ -139,14 +150,14 @@ public class FileUtil implements FileAccess {
      *       machine terminates
      */
     public void deleteOnExit(File f) {
-        JavaSystem.deleteOnExit(f);
+        f.deleteOnExit();
     }
 
     /**
      * Return true or false based on whether the named file exists.
      */
     public boolean exists(String filename) {
-        return (new File(filename)).exists();
+        return new File(filename).exists();
     }
 
     public boolean exists(String fileName, boolean resource, Class cla) {
@@ -156,7 +167,7 @@ public class FileUtil implements FileAccess {
         }
 
         return resource ? null != cla.getResource(fileName)
-                        : FileUtil.getDefaultInstance().exists(fileName);
+                        : FileUtil.getFileUtil().exists(fileName);
     }
 
     /**
@@ -166,26 +177,26 @@ public class FileUtil implements FileAccess {
      * If a file with oldname does not exist, no file will exist after the
      * operation.
      */
-    private boolean renameOverwrite(String oldname, String newname) {
+    private boolean renameWithOverwrite(String oldname, String newname) {
 
-        boolean deleted = delete(newname);
+        File file = new File(oldname);
 
-        if (exists(oldname)) {
-            File file = new File(oldname);
+        delete(newname);
 
-            return file.renameTo(new File(newname));
+        boolean renamed = file.renameTo(new File(newname));
+
+        if (renamed) {
+            return true;
         }
 
-        return deleted;
-    }
+        System.gc();
+        delete(newname);
 
-    public static IOException toIOException(Throwable e) {
-
-        if (e instanceof IOException) {
-            return (IOException) e;
-        } else {
-            return new IOException(e.toString());
+        if (exists(newname)) {
+            new File(newname).renameTo(new File(newDiscardFileName(newname)));
         }
+
+        return file.renameTo(new File(newname));
     }
 
     /**
@@ -195,7 +206,7 @@ public class FileUtil implements FileAccess {
      * @return the absolute path
      */
     public String absolutePath(String path) {
-        return (new File(path)).getAbsolutePath();
+        return new File(path).getAbsolutePath();
     }
 
     /**
@@ -244,7 +255,7 @@ public class FileUtil implements FileAccess {
 
     /**
      * Retrieves the canonical path for the given path, or the absolute
-     * path if attemting to retrieve the canonical path fails.
+     * path if attempting to retrieve the canonical path fails.
      *
      * @param path the path for which to retrieve the canonical or
      *      absolute path
@@ -293,28 +304,297 @@ public class FileUtil implements FileAccess {
         }
     }
 
-    public static class FileSync implements FileAccess.FileSync {
-
-        FileDescriptor outDescriptor;
-
-        FileSync(FileOutputStream os) throws java.io.IOException {
-            outDescriptor = os.getFD();
-        }
-
-        public void sync() throws java.io.IOException {
-            outDescriptor.sync();
-        }
-    }
-
     public FileAccess.FileSync getFileSync(java.io.OutputStream os)
     throws java.io.IOException {
         return new FileSync((FileOutputStream) os);
     }
 
-    public static String getParentDirectory(String path) {
+    public static class FileSync implements FileAccess.FileSync {
 
-        File file = new File(path);
+        FileDescriptor outDescriptor;
 
-        return file.getParent();
+        FileSync(FileOutputStream os) throws IOException {
+            outDescriptor = os.getFD();
+        }
+
+        public void sync() throws IOException {
+            outDescriptor.sync();
+        }
+    }
+
+    public static class FileAccessRes implements FileAccess {
+
+        public boolean isStreamElement(String fileName) {
+
+            URL url = null;
+
+            try {
+                url = getClass().getResource(fileName);
+
+                if (url == null) {
+                    ClassLoader cl =
+                        Thread.currentThread().getContextClassLoader();
+
+                    if (cl != null) {
+                        url = cl.getResource(fileName);
+                    }
+                }
+            } catch (Throwable t) {
+
+                //
+            }
+
+            return url != null;
+        }
+
+        public InputStream openInputStreamElement(final String fileName)
+        throws IOException {
+
+            InputStream fis = null;
+
+            try {
+                fis = getClass().getResourceAsStream(fileName);
+
+                if (fis == null) {
+                    ClassLoader cl =
+                        Thread.currentThread().getContextClassLoader();
+
+                    if (cl != null) {
+                        fis = cl.getResourceAsStream(fileName);
+                    }
+                }
+            } catch (Throwable t) {
+
+                //
+            } finally {
+                if (fis == null) {
+                    throw new FileNotFoundException(fileName);
+                }
+            }
+
+            return fis;
+        }
+
+        public void createParentDirs(java.lang.String filename) {}
+
+        public void removeElement(java.lang.String filename) {}
+
+        public void renameElement(java.lang.String oldName,
+                                  java.lang.String newName) {}
+
+        public java.io.OutputStream openOutputStreamElement(String streamName)
+        throws IOException {
+            throw new IOException();
+        }
+
+        public FileAccess.FileSync getFileSync(OutputStream os)
+        throws IOException {
+            throw new IOException();
+        }
+    }
+
+    /**
+     * Utility method for user applications. Attempts to delete all the files
+     * for the database as listed by the getDatabaseFileList() method. If any
+     * of the current, main database files cannot be deleted, it is renamed
+     * by adding a suffixe containting a hexadecimal timestamp portion and
+     * the ".old" extension. Also deletes the ".tmp" directory.
+     *
+     * @param dbNamePath full path or name of database (without a file extension)
+     * @return currently always true
+     */
+    public static boolean deleteOrRenameDatabaseFiles(String dbNamePath) {
+
+        DatabaseFilenameFilter filter = new DatabaseFilenameFilter(dbNamePath);
+        File[] fileList = filter.getExistingFileListInDirectory();
+
+        for (int i = 0; i < fileList.length; i++) {
+            fileList[i].delete();
+        }
+
+        File tempDir = new File(filter.canonicalFile.getPath() + ".tmp");
+
+        if (tempDir.isDirectory()) {
+            File[] tempList = tempDir.listFiles();
+
+            for (int i = 0; i < tempList.length; i++) {
+                tempList[i].delete();
+            }
+
+            tempDir.delete();
+        }
+
+        fileList = filter.getExistingMainFileSetList();
+
+        if (fileList.length == 0) {
+            return true;
+        }
+
+        System.gc();
+
+        for (int i = 0; i < fileList.length; i++) {
+            fileList[i].delete();
+        }
+
+        fileList = filter.getExistingMainFileSetList();
+
+        for (int i = 0; i < fileList.length; i++) {
+            fileList[i].renameTo(
+                new File(newDiscardFileName(fileList[i].getPath())));
+        }
+
+        return true;
+    }
+
+    /**
+     * Utility method for user applications. Returns a list of files that
+     * currently exist for a database. The list includes current database files
+     * as well as ".new", and ".old" versions of the files, plus any app logs.
+     *
+     * @param dbNamePath full path or name of database (without a file extension)
+     */
+    public static File[] getDatabaseFileList(String dbNamePath) {
+
+        DatabaseFilenameFilter filter = new DatabaseFilenameFilter(dbNamePath);
+
+        return filter.getExistingFileListInDirectory();
+    }
+
+    /**
+     * Returns a list of existing main files for a database. The list excludes
+     * non-essential files.
+     *
+     * @param dbNamePath full path or name of database (without a file extension)
+     */
+    public static File[] getDatabaseMainFileList(String dbNamePath) {
+
+        DatabaseFilenameFilter filter = new DatabaseFilenameFilter(dbNamePath,
+            false);
+
+        return filter.getExistingFileListInDirectory();
+    }
+
+    static int discardSuffixLength = 9;
+
+    public static String newDiscardFileName(String filename) {
+
+        String timestamp = StringUtil.toPaddedString(
+            Integer.toHexString((int) System.currentTimeMillis()),
+            discardSuffixLength - 1, '0', true);
+        String discardName = filename + "." + timestamp + ".old";
+
+        return discardName;
+    }
+
+    static class DatabaseFilenameFilter implements FilenameFilter {
+
+        String[]        suffixes      = new String[] {
+            ".backup", ".properties", ".script", ".data", ".log", ".lobs",
+        };
+        String[]        extraSuffixes = new String[] {
+            ".lck", ".sql.log", ".app.log"
+        };
+        private String  dbName;
+        private File    parent;
+        private File    canonicalFile;
+        private boolean extraFiles;
+
+        DatabaseFilenameFilter(String dbNamePath) {
+            this(dbNamePath, true);
+        }
+
+        DatabaseFilenameFilter(String dbNamePath, boolean extras) {
+
+            canonicalFile = new File(dbNamePath);
+
+            try {
+                canonicalFile = canonicalFile.getCanonicalFile();
+            } catch (Exception e) {}
+
+            dbName     = canonicalFile.getName();
+            parent     = canonicalFile.getParentFile();
+            extraFiles = extras;
+        }
+
+        public File[] getCompleteMainFileSetList() {
+
+            File[] fileList = new File[suffixes.length];
+
+            for (int i = 0; i < suffixes.length; i++) {
+                fileList[i] = new File(canonicalFile.getPath() + suffixes[i]);
+            }
+
+            return fileList;
+        }
+
+        public File[] getExistingMainFileSetList() {
+
+            File[]        fileList = getCompleteMainFileSetList();
+            HsqlArrayList list     = new HsqlArrayList();
+
+            for (int i = 0; i < fileList.length; i++) {
+                if (fileList[i].exists()) {
+                    list.add(fileList[i]);
+                }
+            }
+
+            fileList = new File[list.size()];
+
+            list.toArray(fileList);
+
+            return fileList;
+        }
+
+        public File[] getExistingFileListInDirectory() {
+
+            File[] list = parent.listFiles(this);
+
+            return list == null ? new File[]{}
+                                : list;
+        }
+
+        /**
+         * Accepts all main files as well as ".new" and ".old" versions.
+         */
+        public boolean accept(File dir, String name) {
+
+            if (parent.equals(dir) && name.indexOf(dbName) == 0) {
+                String suffix = name.substring(dbName.length());
+
+                if (extraFiles) {
+                    for (int i = 0; i < extraSuffixes.length; i++) {
+                        if (suffix.equals(extraSuffixes[i])) {
+                            return true;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < suffixes.length; i++) {
+                    if (suffix.equals(suffixes[i])) {
+                        return true;
+                    }
+
+                    if (!extraFiles) {
+                        continue;
+                    }
+
+                    if (suffix.startsWith(suffixes[i])) {
+                        if (name.endsWith(".new")) {
+                            if (suffix.length() == suffixes[i].length() + 4) {
+                                return true;
+                            }
+                        } else if (name.endsWith(".old")) {
+                            if (suffix.length()
+                                    == suffixes[i].length()
+                                       + discardSuffixLength + 4) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
     }
 }

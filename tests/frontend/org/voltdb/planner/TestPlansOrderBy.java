@@ -167,13 +167,18 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testTableAgg() {
-        validatePlan("SELECT SUM(T_D0) from T", false, true, false, false, true);
-        validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T", false, true, false, false, true);
-
-        validatePlan("SELECT SUM(T_D0) from T ORDER BY T_D0, T_D1",
-                false, true, false, false, true);
-        validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T ORDER BY T_D0, T_D1",
-                false, true, false, false, true);
+        String queryList[] = {
+                "SELECT COUNT(*) FROM T",
+                "SELECT SUM(T_D0) FROM T",
+                "SELECT SUM(T_D0), COUNT(*), AVG(T_D1) FROM T",
+                };
+        for (String query : queryList) {
+            validatePlan(query, false, true, false, false, true);
+            // Arguably, this meaningless use of ORDER BY should be tagged
+            // as invalid rather than as a no-op -- it IS so tagged in hsql232.
+            //TODO: decide and test either way.
+            ////validatePlan(query + " ORDER BY T_D0, T_D1", false, true, false, false, true);
+        }
     }
 
     public void testOrderByCountStar() {

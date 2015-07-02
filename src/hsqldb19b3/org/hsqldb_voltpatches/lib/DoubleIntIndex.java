@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,13 +44,14 @@ import java.util.NoSuchElementException;
  * findXXX() methods return the array index into the list
  * pair containing a matching key or value, or  or -1 if not found.<p>
  *
- * Sorting methods originally contributed by Tony Lai.
+ * Sorting methods originally contributed by Tony Lai (tony_lai@users dot sourceforge.net).
+ * Non-recursive implementation of fast quicksort added by Sergio Bossa sbtourist@users dot sourceforge.net)
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.8.0
+ * @version 2.3.0
  * @since 1.8.0
  */
-public class DoubleIntIndex implements IntLookup {
+public class DoubleIntIndex implements IntLookup, LongLookup {
 
     private int           count = 0;
     private int           capacity;
@@ -135,6 +136,42 @@ public class DoubleIntIndex implements IntLookup {
         return capacity;
     }
 
+    public int[] getKeys() {
+        return keys;
+    }
+
+    public int[] getValues() {
+        return values;
+    }
+
+    public long getTotalValues() {
+
+        long total = 0;
+
+        for (int i = 0; i < count; i++) {
+            total += values[i];
+        }
+
+        return total;
+    }
+
+    public void setSize(int newSize) {
+        count = newSize;
+    }
+
+    public synchronized boolean addUnsorted(long key, long value) {
+
+        if (key > Integer.MAX_VALUE || key < Integer.MIN_VALUE) {
+            throw new java.lang.IllegalArgumentException();
+        }
+
+        if (value > Integer.MAX_VALUE || value < Integer.MIN_VALUE) {
+            throw new java.lang.IllegalArgumentException();
+        }
+
+        return addUnsorted((int) key, (int) value);
+    }
+
     /**
      * Adds a pair into the table.
      *
@@ -158,7 +195,7 @@ public class DoubleIntIndex implements IntLookup {
                     sorted = false;
                 }
             } else {
-                if (value < keys[count - 1]) {
+                if (key < keys[count - 1]) {
                     sorted = false;
                 }
             }
@@ -192,8 +229,16 @@ public class DoubleIntIndex implements IntLookup {
             }
         }
 
-        if (count != 0 && value < values[count - 1]) {
-            return false;
+        if (count != 0) {
+            if (sortOnValues) {
+                if (value < values[count - 1]) {
+                    return false;
+                }
+            } else {
+                if (key < keys[count - 1]) {
+                    return false;
+                }
+            }
         }
 
         hasChanged    = true;
@@ -249,18 +294,31 @@ public class DoubleIntIndex implements IntLookup {
         return true;
     }
 
+    public int add(long key, long value) {
+
+        if (key > Integer.MAX_VALUE || key < Integer.MIN_VALUE) {
+            throw new java.lang.IllegalArgumentException();
+        }
+
+        if (value > Integer.MAX_VALUE || value < Integer.MIN_VALUE) {
+            throw new java.lang.IllegalArgumentException();
+        }
+
+        return add((int) key, (int) value);
+    }
+
     /**
-     * Adds a pair, maintaining sorted order
+     * Adds a pair, maintaining sort order on
      * current search target column.
      * @param key the key
      * @param value the value
-     * @return true or false depending on success
+     * @return index of added key or -1 if full
      */
-    public synchronized boolean add(int key, int value) {
+    public synchronized int add(int key, int value) {
 
         if (count == capacity) {
             if (fixedSize) {
-                return false;
+                return -1;
             } else {
                 doubleCapacity();
             }
@@ -276,7 +334,7 @@ public class DoubleIntIndex implements IntLookup {
         int i = binarySlotSearch();
 
         if (i == -1) {
-            return false;
+            return i;
         }
 
         hasChanged = true;
@@ -290,10 +348,19 @@ public class DoubleIntIndex implements IntLookup {
 
         count++;
 
-        return true;
+        return i;
     }
 
-    public int lookupFirstEqual(int key) throws NoSuchElementException {
+    public long lookup(long key) throws NoSuchElementException {
+
+        if (key > Integer.MAX_VALUE || key < Integer.MIN_VALUE) {
+            throw new NoSuchElementException();
+        }
+
+        return lookup((int) key);
+    }
+
+    public int lookup(int key) throws NoSuchElementException {
 
         if (sortOnValues) {
             sorted       = false;
@@ -309,8 +376,47 @@ public class DoubleIntIndex implements IntLookup {
         return getValue(i);
     }
 
-    public int lookupFirstGreaterEqual(int key)
-    throws NoSuchElementException {
+    public long lookup(long key, long def) {
+
+        if (key > Integer.MAX_VALUE || key < Integer.MIN_VALUE) {
+            return def;
+        }
+
+        if (sortOnValues) {
+            sorted       = false;
+            sortOnValues = false;
+        }
+
+        int i = findFirstEqualKeyIndex((int) key);
+
+        if (i == -1) {
+            return def;
+        }
+
+        return getValue(i);
+    }
+
+    public int lookup(int key, int def) {
+
+        if (sortOnValues) {
+            sorted       = false;
+            sortOnValues = false;
+        }
+
+        int i = findFirstEqualKeyIndex(key);
+
+        if (i == -1) {
+            return def;
+        }
+
+        return getValue(i);
+    }
+
+    public void clear() {
+        removeAll();
+    }
+
+    public int lookupFirstGreaterEqual(int key) throws NoSuchElementException {
 
         if (sortOnValues) {
             sorted       = false;
@@ -422,32 +528,6 @@ public class DoubleIntIndex implements IntLookup {
     }
 
     /**
-     * Returns the index of the lowest element > the given search target
-     *     @return the index
-     */
-    private int binaryGreaterSearch() {
-
-        int low     = 0;
-        int high    = count;
-        int mid     = 0;
-        int compare = 0;
-
-        while (low < high) {
-            mid     = (low + high) / 2;
-            compare = compare(mid);
-
-            if (compare < 0) {
-                high = mid;
-            } else {
-                low = mid + 1;
-            }
-        }
-
-        return low == count ? -1
-                            : low;
-    }
-
-    /**
      * Returns the index of the lowest element >= the given search target,
      * or count
      *     @return the index
@@ -501,7 +581,62 @@ public class DoubleIntIndex implements IntLookup {
         return low;
     }
 
+    public synchronized void sort() {
+        fastQuickSort();
+    }
+
+    /**
+     * fast quicksort using a stack on the heap to reduce stack use
+     */
     private synchronized void fastQuickSort() {
+
+        DoubleIntIndex indices   = new DoubleIntIndex(32, false);
+        int            threshold = 16;
+
+        indices.push(0, count - 1);
+
+        while (indices.size() > 0) {
+            int start = indices.peekKey();
+            int end   = indices.peekValue();
+
+            indices.pop();
+
+            if (end - start >= threshold) {
+                int pivot = partition(start, end, start + ((end - start) / 2));
+
+                indices.push(start, pivot - 1);
+                indices.push(pivot + 1, end);
+            } else {
+                insertionSort(start, end);
+            }
+        }
+
+        sorted = true;
+    }
+
+    private int partition(int start, int end, int pivot) {
+
+        int store = start;
+
+        swap(pivot, end);
+
+        for (int i = start; i <= end - 1; i++) {
+            if (lessThan(i, end)) {
+                swap(i, store);
+
+                store++;
+            }
+        }
+
+        swap(store, end);
+
+        return store;
+    }
+
+    /**
+     * fast quicksort with recursive quicksort implementation
+     */
+    private synchronized void fastQuickSortRecursive() {
 
         quickSort(0, count - 1);
         insertionSort(0, count - 1);
@@ -511,7 +646,7 @@ public class DoubleIntIndex implements IntLookup {
 
     private void quickSort(int l, int r) {
 
-        int M = 4;
+        int M = 16;
         int i;
         int j;
         int v;
@@ -574,7 +709,7 @@ public class DoubleIntIndex implements IntLookup {
         }
     }
 
-    private void moveAndInsertRow(int i, int j) {
+    protected void moveAndInsertRow(int i, int j) {
 
         int col1 = keys[i];
         int col2 = values[i];
@@ -585,14 +720,7 @@ public class DoubleIntIndex implements IntLookup {
         values[j] = col2;
     }
 
-    private void doubleCapacity() {
-
-        keys     = (int[]) ArrayUtil.resizeArray(keys, capacity * 2);
-        values   = (int[]) ArrayUtil.resizeArray(values, capacity * 2);
-        capacity *= 2;
-    }
-
-    private void swap(int i1, int i2) {
+    protected void swap(int i1, int i2) {
 
         int col1 = keys[i1];
         int col2 = values[i1];
@@ -603,9 +731,62 @@ public class DoubleIntIndex implements IntLookup {
         values[i2] = col2;
     }
 
-    private void moveRows(int fromIndex, int toIndex, int rows) {
+    /**
+     * Check if targeted column value in the row indexed i is less than the
+     * search target object.
+     * @param i the index
+     * @return -1, 0 or +1
+     */
+    protected int compare(int i) {
+
+        if (sortOnValues) {
+            if (targetSearchValue > values[i]) {
+                return 1;
+            } else if (targetSearchValue < values[i]) {
+                return -1;
+            }
+        } else {
+            if (targetSearchValue > keys[i]) {
+                return 1;
+            } else if (targetSearchValue < keys[i]) {
+                return -1;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Check if row indexed i is less than row indexed j
+     * @param i the first index
+     * @param j the second index
+     * @return true or false
+     */
+    protected boolean lessThan(int i, int j) {
+
+        if (sortOnValues) {
+            if (values[i] < values[j]) {
+                return true;
+            }
+        } else {
+            if (keys[i] < keys[j]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected void moveRows(int fromIndex, int toIndex, int rows) {
         System.arraycopy(keys, fromIndex, keys, toIndex, rows);
         System.arraycopy(values, fromIndex, values, toIndex, rows);
+    }
+
+    protected void doubleCapacity() {
+
+        keys     = (int[]) ArrayUtil.resizeArray(keys, capacity * 2);
+        values   = (int[]) ArrayUtil.resizeArray(values, capacity * 2);
+        capacity *= 2;
     }
 
     public void removeRange(int start, int limit) {
@@ -625,29 +806,11 @@ public class DoubleIntIndex implements IntLookup {
         count = 0;
     }
 
-    /**
-     * Check if targeted column value in the row indexed i is less than the
-     * search target object.
-     * @param i the index
-     * @return -1, 0 or +1
-     */
-    private int compare(int i) {
+    public void copyTo(DoubleIntIndex other) {
 
-        if (sortOnValues) {
-            if (targetSearchValue > values[i]) {
-                return 1;
-            } else if (targetSearchValue < values[i]) {
-                return -1;
-            }
-        } else {
-            if (targetSearchValue > keys[i]) {
-                return 1;
-            } else if (targetSearchValue < keys[i]) {
-                return -1;
-            }
-        }
-
-        return 0;
+        System.arraycopy(keys, 0, other.keys, 0, count);
+        System.arraycopy(values, 0, other.values, 0, count);
+        other.setSize(count);
     }
 
     public final synchronized void remove(int position) {
@@ -663,23 +826,41 @@ public class DoubleIntIndex implements IntLookup {
     }
 
     /**
-     * Check if row indexed i is less than row indexed j
-     * @param i the first index
-     * @param j the second index
-     * @return true or false
+     * peek the key at top of stack
+     * @return int key
      */
-    private boolean lessThan(int i, int j) {
+    private int peekKey() {
+        return getKey(count - 1);
+    }
 
-        if (sortOnValues) {
-            if (values[i] < values[j]) {
-                return true;
-            }
-        } else {
-            if (keys[i] < keys[j]) {
-                return true;
-            }
+    /**
+     * peek the value at top of stack
+     * @return int value
+     */
+    private int peekValue() {
+        return getValue(count - 1);
+    }
+
+    /**
+     * pop the pair at top of stack
+     * @return boolean if there was an element
+     */
+    private boolean pop() {
+
+        if (count > 0) {
+            count--;
+
+            return true;
         }
 
         return false;
+    }
+
+    /**
+     * push key, value pair
+     * @return boolean true if susseful
+     */
+    private boolean push(int key, int value) {
+        return addUnsorted(key, value);
     }
 }

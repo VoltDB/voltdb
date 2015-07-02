@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,7 +34,7 @@ package org.hsqldb_voltpatches;
 import java.io.IOException;
 
 import org.hsqldb_voltpatches.index.NodeAVL;
-import org.hsqldb_voltpatches.index.NodeAVLMemoryPointer;
+import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
 
@@ -47,18 +47,26 @@ import org.hsqldb_voltpatches.rowio.RowOutputInterface;
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.8.0
+ * @version 2.2.9
  * @version 1.7.0
  */
-public class RowAVLDiskData extends RowAVLDisk {
+public class RowAVLDiskData extends RowAVL {
+
+    PersistentStore store;
+    int             accessCount;
+    boolean         hasDataChanged;
+    int             storageSize;
 
     /**
      *  Constructor for new rows.
      */
-    public RowAVLDiskData(TableBase t, Object[] o) {
+    public RowAVLDiskData(PersistentStore store, TableBase t, Object[] o) {
 
         super(t, o);
 
+        setNewNodes(store);
+
+        this.store     = store;
         hasDataChanged = true;
     }
 
@@ -66,32 +74,61 @@ public class RowAVLDiskData extends RowAVLDisk {
      *  Constructor when read from the disk into the Cache. The link with
      *  the Nodes is made separetly.
      */
-    public RowAVLDiskData(TableBase t,
-                          RowInputInterface in)
-                          throws IOException {
+    public RowAVLDiskData(PersistentStore store, TableBase t,
+                          RowInputInterface in) throws IOException {
 
-        tTable         = t;
-        tableId        = t.getId();
+        super(t, (Object[]) null);
+
+        setNewNodes(store);
+
         position       = in.getPos();
         storageSize    = in.getSize();
-        rowData        = in.readData(tTable.getColumnTypes());
+        rowData        = in.readData(table.getColumnTypes());
         hasDataChanged = false;
+        this.store     = store;
+    }
+
+    public void getRowData(TableBase t,
+                                      RowInputInterface in)
+                                      throws IOException {
+        rowData = in.readData(t.getColumnTypes());
+    }
+
+    public void setData(Object[] data) {
+        this.rowData = data;
+    }
+
+    public Object[] getData() {
+
+        Object[] data = rowData;
+
+        if (data == null) {
+            store.get(this, true);
+
+            data = rowData;
+
+            this.keepInMemory(false);
+        } else {
+            accessCount++;
+        }
+
+        return data;
     }
 
     /**
      *  Used when data is read from the disk into the Cache the first time.
      *  New Nodes are created which are then indexed.
      */
-    void setNewNodes() {
+    public void setNewNodes(PersistentStore store) {
 
-        int index = tTable.getIndexCount();
+        int index = store.getAccessorKeys().length;
 
-        nPrimaryNode = new NodeAVLMemoryPointer(this);
+        nPrimaryNode = new NodeAVL(this);
 
         NodeAVL n = nPrimaryNode;
 
         for (int i = 1; i < index; i++) {
-            n.nNext = new NodeAVLMemoryPointer(this);
+            n.nNext = new NodeAVL(this);
             n       = n.nNext;
         }
     }
@@ -99,7 +136,7 @@ public class RowAVLDiskData extends RowAVLDisk {
     public NodeAVL insertNode(int index) {
 
         NodeAVL backnode = getNode(index - 1);
-        NodeAVL newnode  = new NodeAVLMemoryPointer(this);
+        NodeAVL newnode  = new NodeAVL(this);
 
         newnode.nNext  = backnode.nNext;
         backnode.nNext = newnode;
@@ -107,17 +144,8 @@ public class RowAVLDiskData extends RowAVLDisk {
         return newnode;
     }
 
-    /**
-     *  Used when data is re-read from the disk into the Cache. The Row is
-     *  already indexed so it is linked with the Node in the primary index.
-     *  the Nodes is made separetly.
-     */
-    void setPrimaryNode(NodeAVL primary) {
-        nPrimaryNode = primary;
-    }
-
     public int getRealSize(RowOutputInterface out) {
-        return out.getSize((RowAVLDisk) this);
+        return out.getSize(this);
     }
 
     /**
@@ -128,14 +156,38 @@ public class RowAVLDiskData extends RowAVLDisk {
     public void write(RowOutputInterface out) {
 
         out.writeSize(storageSize);
-        out.writeData(rowData, tTable.colTypes);
+        out.writeData(this, table.colTypes);
         out.writeEnd();
 
         hasDataChanged = false;
     }
 
+    public synchronized void setChanged(boolean changed) {
+        hasDataChanged = changed;
+    }
+
+    public boolean isNew() {
+        return false;
+    }
+
     public boolean hasChanged() {
         return hasDataChanged;
+    }
+
+    public void updateAccessCount(int count) {
+        accessCount = count;
+    }
+
+    public int getAccessCount() {
+        return accessCount;
+    }
+
+    public int getStorageSize() {
+        return storageSize;
+    }
+
+    public void setStorageSize(int size) {
+        storageSize = size;
     }
 
     /**
@@ -144,38 +196,32 @@ public class RowAVLDiskData extends RowAVLDisk {
      *
      * @param pos position in data file
      */
-    public void setPos(int pos) {
-
+    public void setPos(long pos) {
         position = pos;
-
-        NodeAVL n = nPrimaryNode;
-
-        while (n != null) {
-            ((NodeAVLMemoryPointer) n).iData = position;
-            n                                = n.nNext;
-        }
     }
 
-    /**
-     * With the current implementation of TEXT table updates and inserts,
-     * the lifetime scope of this method extends until redefinition of table
-     * data source or shutdown.
-     *
-     * @param obj the reference object with which to compare.
-     * @return <code>true</code> if this object is the same as the obj argument;
-     *   <code>false</code> otherwise.
-     */
-    public boolean equals(Object obj) {
+    public boolean isMemory() {
+        return true;
+    }
 
-        if (obj == this) {
-            return true;
-        }
+    /** used by Index, nodes are always in memory */
+    public boolean isInMemory() {
+        return rowData != null;
+    }
 
-        if (obj instanceof RowAVLDiskData) {
-            return ((RowAVLDiskData) obj).position == position
-                   && ((RowAVLDiskData) obj).tTable == tTable;
-        }
-
+    public boolean isKeepInMemory() {
         return false;
+    }
+
+    public boolean keepInMemory(boolean keep) {
+        return true;
+    }
+
+    /** required to purge cache */
+    public void setInMemory(boolean in) {
+
+        if (!in) {
+            rowData = null;
+        }
     }
 }

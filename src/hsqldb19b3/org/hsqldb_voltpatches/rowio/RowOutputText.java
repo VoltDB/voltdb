@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,11 +34,11 @@ package org.hsqldb_voltpatches.rowio;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.Row;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.StringConverter;
-import org.hsqldb_voltpatches.persist.TextCache;
+import org.hsqldb_voltpatches.persist.TextFileSettings;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BlobData;
 import org.hsqldb_voltpatches.types.ClobData;
@@ -48,13 +48,13 @@ import org.hsqldb_voltpatches.types.JavaObjectData;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.Row;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  *  Class for writing the data for a database row in text table format.
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.7.0
  */
 public class RowOutputText extends RowOutputBase {
@@ -114,7 +114,7 @@ public class RowOutputText extends RowOutputBase {
             writeBytes(nextSep);
         }
 
-        writeBytes(TextCache.NL);
+        writeBytes(TextFileSettings.NL);
     }
 
     public void writeSize(int size) {
@@ -227,11 +227,11 @@ public class RowOutputText extends RowOutputBase {
     }
 
     public void writeIntData(int i, int position) {
-        throw Error.runtimeError(ErrorCode.U_S0500, "RowInputText");
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowOutputText");
     }
 
     public void writeLong(long i) {
-        throw Error.runtimeError(ErrorCode.U_S0500, "RowInputText");
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowOutputText");
     }
 
 // fredt@users - comment - methods used for writing each SQL type
@@ -242,7 +242,6 @@ public class RowOutputText extends RowOutputBase {
         switch (type.typeCode) {
 
             case Types.SQL_VARCHAR :
-            case Types.VARCHAR_IGNORECASE :
                 nextSep    = varSep;
                 nextSepEnd = varSepEnd;
                 break;
@@ -268,7 +267,6 @@ public class RowOutputText extends RowOutputBase {
                 return;
 
             case Types.SQL_VARCHAR :
-            case Types.VARCHAR_IGNORECASE :
                 writeVarString(s);
 
                 return;
@@ -351,13 +349,17 @@ public class RowOutputText extends RowOutputBase {
         writeString(Long.toString(o.getId()));
     }
 
-    public int getSize(Row r) {
+    protected void writeArray(Object[] o, Type type) {
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowOutputText");
+    }
+
+    public int getSize(Row row) {
 
         reset();
 
         try {
             writeSize(0);
-            writeData(r.getData(), r.getTable().getColumnTypes());
+            writeData(row, row.getTable().getColumnTypes());
             writeEnd();
         } catch (Exception e) {
             reset();
@@ -376,4 +378,7 @@ public class RowOutputText extends RowOutputBase {
         return size;
     }
 
+    public RowOutputInterface duplicate() {
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowOutputText");
+    }
 }

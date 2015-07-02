@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,12 +35,12 @@ import org.hsqldb_voltpatches.lib.HsqlArrayList;
 
 /**
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class LobStoreMem implements LobStore {
 
-    int           lobBlockSize;
+    final int     lobBlockSize;
     int           blocksInLargeBlock = 128;
     int           largeBlockSize;
     HsqlArrayList byteStoreList;
@@ -86,12 +86,6 @@ public class LobStoreMem implements LobStore {
 
         while (blockCount > 0) {
             int largeBlockIndex = blockAddress / blocksInLargeBlock;
-            int largeBlockLimit = (blockAddress + blockCount)
-                                  / blocksInLargeBlock;
-
-            if ((blockAddress + blockCount) % blocksInLargeBlock != 0) {
-                largeBlockLimit++;
-            }
 
             if (largeBlockIndex >= byteStoreList.size()) {
                 byteStoreList.add(new byte[largeBlockSize]);
@@ -115,7 +109,51 @@ public class LobStoreMem implements LobStore {
         }
     }
 
+    public void setBlockBytes(byte[] dataBytes, long position, int offset,
+                              int length) {
+
+        while (length > 0) {
+            int largeBlockIndex = (int) (position / largeBlockSize);
+
+            if (largeBlockIndex >= byteStoreList.size()) {
+                byteStoreList.add(new byte[largeBlockSize]);
+            }
+
+            byte[] largeBlock = (byte[]) byteStoreList.get(largeBlockIndex);
+            int    offsetInLargeBlock = (int) (position % largeBlockSize);
+            int    currentLength      = length;
+
+            if ((offsetInLargeBlock + currentLength) > largeBlockSize) {
+                currentLength = largeBlockSize - offsetInLargeBlock;
+            }
+
+            System.arraycopy(dataBytes, offset, largeBlock,
+                             offsetInLargeBlock, currentLength);
+
+            position += currentLength;
+            offset   += currentLength;
+            length   -= currentLength;
+        }
+    }
+
+    public int getBlockSize() {
+        return lobBlockSize;
+    }
+
+    public long getLength() {
+        return (long) byteStoreList.size() * largeBlockSize;
+    }
+
+    public void setLength(long length) {
+
+        int largeBlockIndex = (int) (length / largeBlockSize);
+
+        byteStoreList.setSize(largeBlockIndex + 1);
+    }
+
     public void close() {
         byteStoreList.clear();
     }
+
+    public void synch() {}
 }

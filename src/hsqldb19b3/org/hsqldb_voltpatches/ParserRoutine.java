@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,17 +32,24 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
-import org.hsqldb_voltpatches.lib.HsqlList;
+import org.hsqldb_voltpatches.lib.LongDeque;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
+import org.hsqldb_voltpatches.result.ResultProperties;
+import org.hsqldb_voltpatches.types.ArrayType;
+import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Parser for SQL stored procedures and functions - PSM
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.1
  * @since 1.9.0
  */
 public class ParserRoutine extends ParserDML {
@@ -62,6 +69,12 @@ public class ParserRoutine extends ParserDML {
         Expression e     = null;
         boolean    minus = false;
 
+        if (token.tokenType == Tokens.NULL) {
+            read();
+
+            return new ExpressionValue(null, dataType);
+        }
+
         if (dataType.isDateTimeType() || dataType.isIntervalType()) {
             switch (token.tokenType) {
 
@@ -69,7 +82,7 @@ public class ParserRoutine extends ParserDML {
                 case Tokens.TIME :
                 case Tokens.TIMESTAMP :
                 case Tokens.INTERVAL : {
-                    e = readDateTimeIntervalLiteral();
+                    e = readDateTimeIntervalLiteral(session);
 
                     if (e.dataType.typeCode != dataType.typeCode) {
 
@@ -86,6 +99,12 @@ public class ParserRoutine extends ParserDML {
 
                 default :
                     e = XreadDateTimeValueFunctionOrNull();
+
+                    if (e == null) {
+                        break;
+                    }
+
+                    e = XreadModifier(e);
                     break;
             }
         } else if (dataType.isNumberType()) {
@@ -93,6 +112,11 @@ public class ParserRoutine extends ParserDML {
                 read();
 
                 minus = true;
+            } else {
+                if (database.sqlSyntaxPgs
+                        && token.tokenType == Tokens.NEXTVAL) {
+                    return readNextvalFunction();
+                }
             }
         } else if (dataType.isCharacterType()) {
             switch (token.tokenType) {
@@ -108,10 +132,6 @@ public class ParserRoutine extends ParserDML {
                     FunctionSQL function =
                         FunctionSQL.newSQLFunction(token.tokenString,
                                                    compileContext);
-
-                    if (function == null) {
-                        throw unexpectedToken();
-                    }
 
                     e = readSQLFunction(function);
                     break;
@@ -131,127 +151,478 @@ public class ParserRoutine extends ParserDML {
 
                     return Expression.EXPR_FALSE;
             }
-        }
+        } else if (dataType.isBitType()) {
+            switch (token.tokenType) {
 
-        if (e == null) {
-            if (token.tokenType == Tokens.NULL) {
-                read();
+                case Tokens.TRUE :
+                    read();
 
-                return new ExpressionValue(null, dataType);
+                    return new ExpressionValue(BinaryData.singleBitOne,
+                                               dataType);
+
+                case Tokens.FALSE :
+                    read();
+
+                    return new ExpressionValue(BinaryData.singleBitZero,
+                                               dataType);
+            }
+        } else if (dataType.isArrayType()) {
+            e = readCollection(OpTypes.ARRAY);
+
+            if (e.nodes.length > 0) {
+                throw Error.parseError(ErrorCode.X_42562, null,
+                                       scanner.getLineNumber());
             }
 
-            if (token.tokenType == Tokens.X_VALUE) {
-                e = new ExpressionValue(token.tokenValue, token.dataType);
+            e.dataType = dataType;
 
-                if (minus) {
-                    e = new ExpressionArithmetic(OpTypes.NEGATE, e);
+            return e;
+        }
 
-                    e.resolveTypes(session, null);
+        if (e != null) {
+            e.resolveTypes(session, null);
+
+            if (dataType.typeComparisonGroup
+                    != e.getDataType().typeComparisonGroup) {
+                throw Error.parseError(ErrorCode.X_42562, null,
+                                       scanner.getLineNumber());
+            }
+
+            return e;
+        }
+
+        boolean inParens = false;
+
+        if (database.sqlSyntaxMss && token.tokenType == Tokens.OPENBRACKET) {
+            read();
+
+            inParens = true;
+        }
+
+        if (token.tokenType == Tokens.X_VALUE) {
+            Object value       = token.tokenValue;
+            Type   valueType   = token.dataType;
+            Type   convertType = dataType;
+
+            if (dataType.typeCode == Types.SQL_CLOB) {
+                convertType = Type.getType(Types.SQL_VARCHAR, null,
+                                           database.collation,
+                                           dataType.precision, 0);
+            } else if (dataType.typeCode == Types.SQL_BLOB) {
+                convertType = Type.getType(Types.SQL_VARBINARY, null, null,
+                                           dataType.precision, 0);
+            }
+
+            value = convertType.convertToType(session, value, valueType);
+
+            read();
+
+            if (minus) {
+                value = dataType.negate(value);
+            }
+
+            if (inParens) {
+                readThis(Tokens.CLOSEBRACKET);
+            }
+
+            return new ExpressionValue(value, convertType);
+        } else {
+            if (database.sqlSyntaxDb2) {
+                Object value = null;
+
+                switch (dataType.typeComparisonGroup) {
+
+                    case Types.SQL_VARCHAR :
+                        value = "";
+                        break;
+
+                    case Types.SQL_VARBINARY :
+                        value = BinaryData.zeroLengthBinary;
+                        break;
+
+                    case Types.SQL_NUMERIC :
+                        value = Integer.valueOf(0);
+                        break;
+
+                    case Types.SQL_BOOLEAN :
+                        value = Boolean.FALSE;
+                        break;
+
+                    case Types.SQL_CLOB :
+                        value = "";
+
+                        return new ExpressionValue(value,
+                                                   Type.SQL_VARCHAR_DEFAULT);
+
+                    case Types.SQL_BLOB :
+                        value = BinaryData.zeroLengthBinary;
+
+                        return new ExpressionValue(value,
+                                                   Type.SQL_VARBINARY_DEFAULT);
+
+                    case Types.TIME : {
+                        FunctionSQL function =
+                            FunctionSQL.newSQLFunction(Tokens.T_CURRENT_TIME,
+                                                       compileContext);
+
+                        function.resolveTypes(session, null);
+
+                        return function;
+                    }
+                    case Types.DATE : {
+                        FunctionSQL function =
+                            FunctionSQL.newSQLFunction(Tokens.T_CURRENT_DATE,
+                                                       compileContext);
+
+                        function.resolveTypes(session, null);
+
+                        return function;
+                    }
+                    case Types.TIMESTAMP : {
+                        FunctionSQL function = FunctionSQL.newSQLFunction(
+                            Tokens.T_CURRENT_TIMESTAMP, compileContext);
+
+                        function.resolveTypes(session, null);
+
+                        return function;
+                    }
                 }
 
-                read();
+                value = dataType.convertToDefaultType(session, value);
 
-                Object defaultValue = e.getValue(session, dataType);
-
-                return new ExpressionValue(defaultValue, dataType);
-            } else {
-                throw unexpectedToken();
+                return new ExpressionValue(value, dataType);
             }
+
+            throw unexpectedToken();
         }
-
-        e.resolveTypes(session, null);
-
-        // check type and length compatibility of datetime and character functions
-        return e;
     }
 
-    /**
-     * Creates SET Statement for PSM from this parse context.
-     */
-    StatementSimple compileSetStatement(RangeVariable rangeVars[]) {
+    Statement compileOpenCursorStatement(StatementCompound context) {
+
+        readThis(Tokens.OPEN);
+        checkIsSimpleName();
+
+        String tokenString = token.tokenString;
 
         read();
 
-        OrderedHashSet colNames = new OrderedHashSet();
-        HsqlArrayList  exprList = new HsqlArrayList();
+        for (int i = 0; i < context.cursors.length; i++) {
+            if (context.cursors[i].getCursorName().name.equals(tokenString)) {
+                return context.cursors[i];
+            }
+        }
 
-        readSetClauseList(rangeVars, colNames, exprList);
+        throw Error.parseError(ErrorCode.X_34000, null,
+                               scanner.getLineNumber());
+    }
+
+    Statement compileSelectSingleRowStatement(RangeGroup[] rangeGroups) {
+
+        OrderedHashSet     variableNames = new OrderedHashSet();
+        Type[]             targetTypes;
+        LongDeque          colIndexList = new LongDeque();
+        QuerySpecification select;
+
+        compileContext.setOuterRanges(rangeGroups);
+
+        select = XreadSelect();
+
+        readThis(Tokens.INTO);
+
+        RangeVariable[] ranges = rangeGroups[0].getRangeVariables();
+
+        readTargetSpecificationList(variableNames, ranges, colIndexList);
+        XreadTableExpression(select);
+        select.setReturningResult();
+
+        int[] columnMap = new int[colIndexList.size()];
+
+        colIndexList.toArray(columnMap);
+
+        Expression[] variables = new Expression[variableNames.size()];
+
+        variableNames.toArray(variables);
+
+        targetTypes = new Type[variables.length];
+
+        for (int i = 0; i < variables.length; i++) {
+            if (variables[i].getColumn().getParameterMode()
+                    == SchemaObject.ParameterModes.PARAM_IN) {
+
+                // todo - use more specific error message
+                throw Error.parseError(ErrorCode.X_0U000, null,
+                                       scanner.getLineNumber());
+            }
+
+            targetTypes[i] = variables[i].getDataType();
+        }
+
+        select.setReturningResult();
+        select.resolve(session, rangeGroups, targetTypes);
+
+        if (select.getColumnCount() != variables.length) {
+            throw Error.error(ErrorCode.X_42564, Tokens.T_INTO);
+        }
+
+        Statement statement = new StatementSet(session, variables, select,
+                                               columnMap, compileContext);
+
+        return statement;
+    }
+
+    /**
+     * Creates GET DIAGNOSTICS.
+     */
+    Statement compileGetStatement(RangeGroup[] rangeGroups) {
+
+        read();
+        readThis(Tokens.DIAGNOSTICS);
+
+        OrderedHashSet  targetSet    = new OrderedHashSet();
+        HsqlArrayList   exprList     = new HsqlArrayList();
+        LongDeque       colIndexList = new LongDeque();
+        RangeVariable[] rangeVars    = rangeGroups[0].getRangeVariables();
+
+        readGetClauseList(rangeVars, targetSet, colIndexList, exprList);
 
         if (exprList.size() > 1) {
-            throw Error.error(ErrorCode.X_42602);
+            throw Error.parseError(ErrorCode.X_42602, null,
+                                   scanner.getLineNumber());
         }
 
         Expression expression = (Expression) exprList.get(0);
 
-        if (expression.getDegree() != colNames.size()) {
-
-//            throw Error.error(ErrorCode.X_42546);
+        if (expression.getDegree() != targetSet.size()) {
+            throw Error.error(ErrorCode.X_42546, Tokens.T_SET);
         }
 
-        int[]          indexes   = new int[colNames.size()];
-        ColumnSchema[] variables = new ColumnSchema[colNames.size()];
+        int[] columnMap = new int[colIndexList.size()];
 
-        setVariables(rangeVars, colNames, indexes, variables);
+        colIndexList.toArray(columnMap);
 
-        HsqlList unresolved = expression.resolveColumnReferences(rangeVars,
-            rangeVars.length, null, false);
+        Expression[] targets = new Expression[targetSet.size()];
 
-        unresolved = Expression.resolveColumnSet(rangeVars, unresolved, null);
+        targetSet.toArray(targets);
 
-        ExpressionColumn.checkColumnsResolved(unresolved);
-        expression.resolveTypes(session, null);
+        for (int i = 0; i < targets.length; i++) {
+            resolveOuterReferencesAndTypes(rangeGroups, targets[i]);
+        }
 
-        StatementSimple cs = new StatementSimple(StatementTypes.ASSIGNMENT,
-            variables, expression, indexes);
+        resolveOuterReferencesAndTypes(rangeGroups, expression);
+
+        for (int i = 0; i < targets.length; i++) {
+            if (targets[i].getColumn().getParameterMode()
+                    == SchemaObject.ParameterModes.PARAM_IN) {
+
+                // todo - use more specific error message
+                throw Error.parseError(ErrorCode.X_0U000, null,
+                                       scanner.getLineNumber());
+            }
+
+            if (!targets[i].getDataType().canBeAssignedFrom(
+                    expression.getNodeDataType(i))) {
+                throw Error.parseError(ErrorCode.X_42561, null,
+                                       scanner.getLineNumber());
+            }
+        }
+
+        StatementSet cs = new StatementSet(session, targets, expression,
+                                           columnMap, compileContext);
 
         return cs;
     }
 
-    private static void setVariables(RangeVariable[] rangeVars,
-                                     OrderedHashSet colNames, int[] indexes,
-                                     ColumnSchema[] variables)
-                                     throws IndexOutOfBoundsException {
+    /**
+     * Creates SET Statement for PSM or session variables from this parse context.
+     */
+    StatementSet compileSetStatement(RangeGroup[] rangeGroups,
+                                     RangeVariable[] rangeVars) {
 
-        int index = -1;
+        read();
 
-        for (int i = 0; i < variables.length; i++) {
-            String colName = (String) colNames.get(i);
+        OrderedHashSet targetSet    = new OrderedHashSet();
+        HsqlArrayList  exprList     = new HsqlArrayList();
+        LongDeque      colIndexList = new LongDeque();
 
-            for (int j = 0; j < rangeVars.length; j++) {
-                index = rangeVars[j].variables.getIndex(colName);
+        readSetClauseList(rangeVars, targetSet, colIndexList, exprList);
 
-                if (index > -1) {
-                    indexes[i]   = index;
-                    variables[i] = rangeVars[j].getColumn(index);
+        if (exprList.size() > 1) {
+            throw Error.parseError(ErrorCode.X_42602, null,
+                                   scanner.getLineNumber());
+        }
 
-                    break;
-                }
+        Expression expression = (Expression) exprList.get(0);
+
+        if (expression.getDegree() != targetSet.size()) {
+            throw Error.error(ErrorCode.X_42546, Tokens.T_SET);
+        }
+
+        int[] columnMap = new int[colIndexList.size()];
+
+        colIndexList.toArray(columnMap);
+
+        Expression[] targets = new Expression[targetSet.size()];
+
+        targetSet.toArray(targets);
+
+        for (int i = 0; i < targets.length; i++) {
+            this.resolveOuterReferencesAndTypes(rangeGroups, targets[i]);
+        }
+
+        resolveOuterReferencesAndTypes(rangeGroups, expression);
+
+        for (int i = 0; i < targets.length; i++) {
+            ColumnSchema col = targets[i].getColumn();
+
+            if (col.getParameterMode()
+                    == SchemaObject.ParameterModes.PARAM_IN) {
+
+                // todo - use more specific error message
+                throw Error.error(ErrorCode.X_0U000,
+                                  col.getName().statementName);
+            }
+
+            if (!targets[i].getDataType().canBeAssignedFrom(
+                    expression.getNodeDataType(i))) {
+                throw Error.parseError(ErrorCode.X_42561, null,
+                                       scanner.getLineNumber());
             }
         }
+
+        StatementSet cs = new StatementSet(session, targets, expression,
+                                           columnMap, compileContext);
+
+        return cs;
+    }
+
+    /**
+     * Creates SET Statement for a trigger row from this parse context.
+     */
+    StatementDMQL compileTriggerSetStatement(Table table,
+            RangeGroup[] rangeGroups) {
+
+        read();
+
+        Expression[]   updateExpressions;
+        int[]          columnMap;
+        OrderedHashSet targetSet = new OrderedHashSet();
+        HsqlArrayList  exprList  = new HsqlArrayList();
+        RangeVariable[] targetRangeVars = new RangeVariable[]{
+            rangeGroups[0].getRangeVariables()[TriggerDef.NEW_ROW] };
+        LongDeque colIndexList = new LongDeque();
+
+        readSetClauseList(targetRangeVars, targetSet, colIndexList, exprList);
+
+        columnMap = new int[colIndexList.size()];
+
+        colIndexList.toArray(columnMap);
+
+        Expression[] targets = new Expression[targetSet.size()];
+
+        targetSet.toArray(targets);
+
+        for (int i = 0; i < targets.length; i++) {
+            resolveOuterReferencesAndTypes(RangeGroup.emptyArray, targets[i]);
+        }
+
+        updateExpressions = new Expression[exprList.size()];
+
+        exprList.toArray(updateExpressions);
+        resolveUpdateExpressions(table, RangeGroup.emptyGroup, columnMap,
+                                 updateExpressions, rangeGroups);
+
+        StatementDMQL cs = new StatementSet(session, targets, table,
+                                            rangeGroups[0].getRangeVariables(),
+                                            columnMap, updateExpressions,
+                                            compileContext);
+
+        return cs;
+    }
+
+    StatementSchema compileAlterSpecificRoutine() {
+
+        boolean restrict = false;
+
+        readThis(Tokens.SPECIFIC);
+        readThis(Tokens.ROUTINE);
+
+        Routine routine =
+            (Routine) readSchemaObjectName(SchemaObject.SPECIFIC_ROUTINE);
+
+        routine = routine.duplicate();
+
+        readRoutineCharacteristics(routine);
+
+        restrict = readIfThis(Tokens.RESTRICT);
+
+        if (restrict) {
+            OrderedHashSet set = database.schemaManager.getReferencesTo(
+                routine.getSpecificName());
+
+            if (!set.isEmpty()) {
+                throw Error.parseError(ErrorCode.X_42502, null,
+                                       scanner.getLineNumber());
+            }
+        }
+
+        if (token.tokenType == Tokens.BODY) {
+            read();
+        } else if (token.tokenType == Tokens.NAME) {
+            read();
+        }
+
+        readRoutineBody(routine);
+        routine.resetAlteredRoutineSettings();
+        routine.resolve(session);
+
+        Object[] args = new Object[]{ routine };
+        String   sql  = getLastPart();
+        StatementSchema cs = new StatementSchema(sql,
+            StatementTypes.ALTER_ROUTINE, args, null,
+            database.schemaManager.getCatalogNameArray());
+
+        return cs;
     }
 
     // SQL-invoked routine
-    StatementSchema compileCreateProcedureOrFunction() {
+    StatementSchema compileCreateProcedureOrFunction(boolean orReplace) {
 
-        int routineType = token.tokenType == Tokens.PROCEDURE
-                          ? SchemaObject.PROCEDURE
-                          : SchemaObject.FUNCTION;
+        int     routineType;
+        boolean isAggregate = false;
+
+        if (token.tokenType == Tokens.AGGREGATE) {
+            isAggregate = true;
+
+            read();
+
+            if (token.tokenType == Tokens.PROCEDURE) {
+                throw unexpectedToken();
+            }
+        }
+
+        routineType = token.tokenType == Tokens.PROCEDURE
+                      ? SchemaObject.PROCEDURE
+                      : SchemaObject.FUNCTION;
+
         HsqlName name;
 
         read();
 
-        name = readNewSchemaObjectNameNoCheck(routineType);
+        name = readNewSchemaObjectName(routineType, true);
+
+        name.setSchemaIfNull(session.getCurrentSchemaHsqlName());
 
         Routine routine = new Routine(routineType);
 
         routine.setName(name);
+        routine.setAggregate(isAggregate);
         readThis(Tokens.OPENBRACKET);
 
         if (token.tokenType == Tokens.CLOSEBRACKET) {
             read();
         } else {
             while (true) {
-                ColumnSchema newcolumn = readRoutineParameter(routine);
+                ColumnSchema newcolumn = readRoutineParameter(routine, true);
 
                 routine.addParameter(newcolumn);
 
@@ -272,72 +643,123 @@ public class ParserRoutine extends ParserDML {
                 read();
 
                 TableDerived table =
-                    new TableDerived(database, name, TableBase.FUNCTION_TABLE);
+                    new TableDerived(database, SqlInvariants.MODULE_HSQLNAME,
+                                     TableBase.FUNCTION_TABLE);
 
-                readThis(Tokens.OPENBRACKET);
-
-                if (token.tokenType == Tokens.CLOSEBRACKET) {
-                    read();
-                } else {
-                    while (true) {
-                        ColumnSchema newcolumn = readRoutineParameter(routine);
-
-                        table.addColumn(newcolumn);
-
-                        if (token.tokenType == Tokens.COMMA) {
-                            read();
-                        } else {
-                            readThis(Tokens.CLOSEBRACKET);
-
-                            break;
-                        }
-                    }
-                }
-
+                readTableDefinition(routine, table);
                 routine.setReturnTable(table);
             } else {
-                Type type = readTypeDefinition(true);
+                Type type = readTypeDefinition(false, true);
 
                 routine.setReturnType(type);
             }
         }
 
         readRoutineCharacteristics(routine);
-
-        if (token.tokenType == Tokens.EXTERNAL) {
-            if (routine.getLanguage() != Routine.LANGUAGE_JAVA) {
-                throw unexpectedToken();
-            }
-
-            read();
-            readThis(Tokens.NAME);
-            checkIsValue(Types.SQL_CHAR);
-            routine.setMethodURL((String) token.tokenValue);
-            read();
-
-            if (token.tokenType == Tokens.PARAMETER) {
-                read();
-                readThis(Tokens.STYLE);
-                readThis(Tokens.JAVA);
-            }
-        } else {
-            startRecording();
-
-            Statement statement = readSQLProcedureStatementOrNull(routine,
-                null);
-            Token[] tokenList = getRecordedStatement();
-            String  sql       = Token.getSQL(tokenList);
-
-            statement.setSQL(sql);
-            routine.setProcedure(statement);
-        }
+        readRoutineBody(routine);
 
         Object[] args = new Object[]{ routine };
         String   sql  = getLastPart();
         StatementSchema cs = new StatementSchema(sql,
-            StatementTypes.CREATE_ROUTINE, args, null, null);
+            StatementTypes.CREATE_ROUTINE, args, null,
+            database.schemaManager.getCatalogNameArray());
 
         return cs;
+    }
+
+    Routine readCreatePasswordCheckFunction() {
+
+        Routine routine = new Routine(SchemaObject.FUNCTION);
+
+        if (token.tokenType == Tokens.NONE) {
+            read();
+
+            return null;
+        } else if (token.tokenType == Tokens.EXTERNAL) {
+            routine.setLanguage(Routine.LANGUAGE_JAVA);
+            routine.setDataImpact(Routine.NO_SQL);
+        } else {
+            routine.setLanguage(Routine.LANGUAGE_SQL);
+            routine.setDataImpact(Routine.CONTAINS_SQL);
+        }
+
+        HsqlName hsqlName = database.nameManager.newHsqlName(Tokens.T_PASSWORD,
+            false, SchemaObject.FUNCTION);
+
+        hsqlName.setSchemaIfNull(SqlInvariants.SYSTEM_SCHEMA_HSQLNAME);
+        routine.setName(hsqlName);
+
+        hsqlName = database.nameManager.newHsqlName(Tokens.T_PASSWORD, false,
+                SchemaObject.PARAMETER);
+
+        ColumnSchema column = new ColumnSchema(hsqlName, Type.SQL_VARCHAR,
+                                               false, false, null);
+
+        routine.addParameter(column);
+        routine.setReturnType(Type.SQL_BOOLEAN);
+        readRoutineBody(routine);
+        routine.resolve(session);
+
+        return routine;
+    }
+
+    Routine readCreateDatabaseAuthenticationFunction() {
+
+        Routine routine = new Routine(SchemaObject.FUNCTION);
+
+        if (token.tokenType == Tokens.NONE) {
+            read();
+
+            return null;
+        }
+
+        checkIsThis(Tokens.EXTERNAL);
+        routine.setLanguage(Routine.LANGUAGE_JAVA);
+        routine.setDataImpact(Routine.NO_SQL);
+        routine.setName(
+            database.nameManager.newHsqlName(
+                Tokens.T_AUTHENTICATION, false, SchemaObject.FUNCTION));
+
+        for (int i = 0; i < 3; i++) {
+            ColumnSchema column = new ColumnSchema(null, Type.SQL_VARCHAR,
+                                                   false, false, null);
+
+            routine.addParameter(column);
+        }
+
+        routine.setReturnType(
+            new ArrayType(
+                Type.SQL_VARCHAR_DEFAULT, ArrayType.defaultArrayCardinality));
+        readRoutineBody(routine);
+        routine.resolve(session);
+
+        return routine;
+    }
+
+    private void readTableDefinition(Routine routine,
+                                     Table table) throws HsqlException {
+
+        readThis(Tokens.OPENBRACKET);
+
+        for (int i = 0; ; i++) {
+            ColumnSchema newcolumn = readRoutineParameter(routine, false);
+
+            if (newcolumn.getName() == null) {
+                throw unexpectedToken();
+            }
+
+            table.addColumn(newcolumn);
+
+            if (token.tokenType == Tokens.COMMA) {
+                read();
+            } else {
+                readThis(Tokens.CLOSEBRACKET);
+
+                break;
+            }
+        }
+
+        table.createPrimaryKey();
     }
 
     private void readRoutineCharacteristics(Routine routine) {
@@ -393,7 +815,8 @@ public class ParserRoutine extends ParserDML {
                     read();
 
                     HsqlName name =
-                        readNewSchemaObjectNameNoCheck(routine.getType());
+                        readNewSchemaObjectName(SchemaObject.SPECIFIC_ROUTINE,
+                                                false);
 
                     routine.setSpecificName(name);
 
@@ -475,6 +898,11 @@ public class ParserRoutine extends ParserDML {
                         throw unexpectedToken();
                     }
 
+                    if (routine.isAggregate()) {
+                        throw Error.error(ErrorCode.X_42604,
+                                          token.tokenString);
+                    }
+
                     read();
                     readThis(Tokens.NULL);
                     readThis(Tokens.ON);
@@ -505,7 +933,15 @@ public class ParserRoutine extends ParserDML {
                     read();
                     readThis(Tokens.RESULT);
                     readThis(Tokens.SETS);
-                    readBigint();
+
+                    int results = readInteger();
+
+                    if (results < 0 || results > 16) {
+                        throw Error.error(ErrorCode.X_42604,
+                                          String.valueOf(results));
+                    }
+
+                    routine.setMaxDynamicResults(results);
 
                     break;
                 }
@@ -544,37 +980,110 @@ public class ParserRoutine extends ParserDML {
         }
     }
 
-/*
-    <SQL control statement> ::=
-    <call statement>
-    | <return statement>
+    void readRoutineBody(Routine routine) {
 
-    <compound statement>
-    <case statement>
-    <if statement>
-    <iterate statement>
-    <leave statement>
-    <loop statement>
-    <while statement>
-    <repeat statement>
-   <for statement>
-   <assignment statement> SET (,,,) = (,,,) or SET a = b
+        if (token.tokenType == Tokens.EXTERNAL) {
+            if (routine.getLanguage() != Routine.LANGUAGE_JAVA) {
+                throw unexpectedToken();
+            }
+
+            read();
+            readThis(Tokens.NAME);
+            checkIsValue(Types.SQL_CHAR);
+            routine.setMethodURL((String) token.tokenValue);
+            read();
+
+            if (token.tokenType == Tokens.PARAMETER) {
+                read();
+                readThis(Tokens.STYLE);
+                readThis(Tokens.JAVA);
+            }
+        } else {
+            startRecording();
+
+            Statement statement = compileSQLProcedureStatementOrNull(routine,
+                null);
+
+            if (statement == null) {
+                throw unexpectedToken();
+            }
+
+            Token[] tokenisedStatement = getRecordedStatement();
+            String  sql                = Token.getSQL(tokenisedStatement);
+
+            statement.setSQL(sql);
+            routine.setProcedure(statement);
+        }
+    }
+
+    /*
+        <SQL control statement> ::=
+        <call statement>
+        | <return statement>
+
+        <compound statement>
+        <case statement>
+        <if statement>
+        <iterate statement>
+        <leave statement>
+        <loop statement>
+        <while statement>
+        <repeat statement>
+       <for statement>
+       <assignment statement> SET (,,,) = (,,,) or SET a = b
 
 
-*/
+     */
     private Object[] readLocalDeclarationList(Routine routine,
             StatementCompound context) {
 
-        HsqlArrayList list = new HsqlArrayList();
+        HsqlArrayList list                = new HsqlArrayList();
+        final int     table               = 0;
+        final int     variableOrCondition = 1;
+        final int     cursor              = 2;
+        final int     handler             = 3;
+        int           objectType          = table;
+        RangeGroup[]  rangeGroups         = new RangeGroup[1];
+
+        rangeGroups[0] = context == null ? routine
+                                         : context;
+
+        compileContext.setOuterRanges(rangeGroups);
 
         while (token.tokenType == Tokens.DECLARE) {
-            Object var = readLocalVariableDeclarationOrNull();
+            Object var = null;
 
-            if (var == null) {
-                var = readLocalHandlerDeclaration(routine, context);
+            if (objectType == table) {
+                var = readLocalTableVariableDeclarationOrNull(routine);
+
+                if (var == null) {
+                    objectType = variableOrCondition;
+                } else {
+                    list.add(var);
+                    readThis(Tokens.SEMICOLON);
+                }
+            } else if (objectType == variableOrCondition) {
+                var = readLocalVariableDeclarationOrNull();
+
+                if (var == null) {
+                    objectType = cursor;
+                } else {
+                    list.addAll((Object[]) var);
+                }
+            } else if (objectType == cursor) {
+                var = compileDeclareCursor(rangeGroups, true);
+
+                if (var == null) {
+                    objectType = handler;
+                } else {
+                    list.add(var);
+                    readThis(Tokens.SEMICOLON);
+                }
+            } else if (objectType == handler) {
+                var = compileLocalHandlerDeclaration(routine, context);
+
+                list.add(var);
             }
-
-            list.add(var);
         }
 
         Object[] declarations = new Object[list.size()];
@@ -584,22 +1093,73 @@ public class ParserRoutine extends ParserDML {
         return declarations;
     }
 
-    ColumnSchema readLocalVariableDeclarationOrNull() {
+    Table readLocalTableVariableDeclarationOrNull(Routine routine) {
 
         int position = super.getPosition();
 
         readThis(Tokens.DECLARE);
 
-        if (isReservedKey()) {
+        if (token.tokenType == Tokens.TABLE) {
+            read();
+
+            HsqlName name = super.readNewSchemaObjectName(SchemaObject.TABLE,
+                false);
+
+            name.schema = SqlInvariants.MODULE_HSQLNAME;
+
+            Table table = new Table(database, name, TableBase.TEMP_TABLE);
+
+            table.persistenceScope = TableBase.SCOPE_ROUTINE;
+
+            readTableDefinition(routine, table);
+
+            return table;
+        } else {
+            rewind(position);
+
+            return null;
+        }
+    }
+
+    ColumnSchema[] readLocalVariableDeclarationOrNull() {
+
+        int        position = super.getPosition();
+        Type       type;
+        HsqlName[] names = HsqlName.emptyArray;
+
+        try {
+            readThis(Tokens.DECLARE);
+
+            if (isReservedKey()) {
+                rewind(position);
+
+                return null;
+            }
+
+            while (true) {
+                names = (HsqlName[]) ArrayUtil.resizeArray(names,
+                        names.length + 1);
+                names[names.length - 1] =
+                    super.readNewSchemaObjectName(SchemaObject.VARIABLE,
+                                                  false);
+
+                if (token.tokenType == Tokens.COMMA) {
+                    read();
+                } else {
+                    break;
+                }
+            }
+
+            type = readTypeDefinition(false, true);
+        } catch (HsqlException e) {
+
+            // may be cursor
             rewind(position);
 
             return null;
         }
 
-        HsqlName name =
-            super.readNewSchemaObjectNameNoCheck(SchemaObject.VARIABLE);
-        Type       type = readTypeDefinition(true);
-        Expression def  = null;
+        Expression def = null;
 
         if (token.tokenType == Tokens.DEFAULT) {
             read();
@@ -607,15 +1167,21 @@ public class ParserRoutine extends ParserDML {
             def = readDefaultClause(type);
         }
 
-        ColumnSchema variable = new ColumnSchema(name, type, true, false, def);
+        ColumnSchema[] variable = new ColumnSchema[names.length];
 
-        variable.setParameterMode(SchemaObject.ParameterModes.PARAM_INOUT);
+        for (int i = 0; i < names.length; i++) {
+            variable[i] = new ColumnSchema(names[i], type, true, false, def);
+
+            variable[i].setParameterMode(
+                SchemaObject.ParameterModes.PARAM_INOUT);
+        }
+
         readThis(Tokens.SEMICOLON);
 
         return variable;
     }
 
-    private StatementHandler readLocalHandlerDeclaration(Routine routine,
+    private StatementHandler compileLocalHandlerDeclaration(Routine routine,
             StatementCompound context) {
 
         int handlerType;
@@ -671,19 +1237,19 @@ public class ParserRoutine extends ParserDML {
                 case Tokens.SQLSTATE :
                     conditionType = StatementHandler.SQL_STATE;
 
-                // $FALL-THROUGH$
+                // fall through
                 case Tokens.SQLEXCEPTION :
                     if (conditionType == StatementHandler.NONE) {
                         conditionType = StatementHandler.SQL_EXCEPTION;
                     }
 
-                // $FALL-THROUGH$
+                // fall through
                 case Tokens.SQLWARNING :
                     if (conditionType == StatementHandler.NONE) {
                         conditionType = StatementHandler.SQL_WARNING;
                     }
 
-                // $FALL-THROUGH$
+                // fall through
                 case Tokens.NOT :
                     if (conditionType == StatementHandler.NONE) {
                         conditionType = StatementHandler.SQL_NOT_FOUND;
@@ -723,7 +1289,7 @@ public class ParserRoutine extends ParserDML {
         if (token.tokenType == Tokens.SEMICOLON) {
             read();
         } else {
-            Statement e = readSQLProcedureStatementOrNull(routine, context);
+            Statement e = compileSQLProcedureStatementOrNull(routine, context);
 
             if (e == null) {
                 throw unexpectedToken();
@@ -744,7 +1310,8 @@ public class ParserRoutine extends ParserDML {
         String sqlState = token.tokenString;
 
         if (token.tokenString.length() != 5) {
-            throw Error.error(ErrorCode.X_07000);
+            throw Error.parseError(ErrorCode.X_42607, null,
+                                   scanner.getLineNumber());
         }
 
         read();
@@ -752,13 +1319,29 @@ public class ParserRoutine extends ParserDML {
         return sqlState;
     }
 
-    private Statement readCompoundStatement(Routine routine,
+    private Statement compileCompoundStatement(Routine routine,
             StatementCompound context, HsqlName label) {
 
         final boolean atomic = true;
 
         readThis(Tokens.BEGIN);
         readThis(Tokens.ATOMIC);
+
+        if (label == null) {
+            String            labelString;
+            StatementCompound parent = context;
+            int               level  = 0;
+
+            while (parent != null) {
+                level++;
+
+                parent = parent.parent;
+            }
+
+            labelString = "_" + level;
+            label = session.database.nameManager.newHsqlName(labelString,
+                    false, SchemaObject.LABEL);
+        }
 
         StatementCompound statement =
             new StatementCompound(StatementTypes.BEGIN_END, label);
@@ -770,11 +1353,17 @@ public class ParserRoutine extends ParserDML {
         Object[] declarations = readLocalDeclarationList(routine, context);
 
         statement.setLocalDeclarations(declarations);
+        session.sessionContext.pushRoutineTables(statement.scopeTables);
 
-        Statement[] statements = readSQLProcedureStatementList(routine,
-            statement);
+        try {
+            Statement[] statements = compileSQLProcedureStatementList(routine,
+                statement);
 
-        statement.setStatements(statements);
+            statement.setStatements(statements);
+        } finally {
+            session.sessionContext.popRoutineTables();
+        }
+
         readThis(Tokens.END);
 
         if (isSimpleName() && !isReservedKey()) {
@@ -792,23 +1381,14 @@ public class ParserRoutine extends ParserDML {
         return statement;
     }
 
-    private Statement[] readSQLProcedureStatementList(Routine routine,
+    private Statement[] compileSQLProcedureStatementList(Routine routine,
             StatementCompound context) {
 
-        Statement e = readSQLProcedureStatementOrNull(routine, context);
-
-        if (e == null) {
-            throw unexpectedToken();
-        }
-
-        readThis(Tokens.SEMICOLON);
-
+        Statement     e;
         HsqlArrayList list = new HsqlArrayList();
 
-        list.add(e);
-
         while (true) {
-            e = readSQLProcedureStatementOrNull(routine, context);
+            e = compileSQLProcedureStatementOrNull(routine, context);
 
             if (e == null) {
                 break;
@@ -818,6 +1398,10 @@ public class ParserRoutine extends ParserDML {
             list.add(e);
         }
 
+        if (list.size() == 0) {
+            throw unexpectedToken();
+        }
+
         Statement[] statements = new Statement[list.size()];
 
         list.toArray(statements);
@@ -825,231 +1409,334 @@ public class ParserRoutine extends ParserDML {
         return statements;
     }
 
-    private Statement readSQLProcedureStatementOrNull(Routine routine,
+    Statement compileSQLProcedureStatementOrNull(Routine routine,
             StatementCompound context) {
 
-        Statement cs    = null;
-        HsqlName  label = null;
-        RangeVariable[] rangeVariables = context == null
-                                         ? routine.getParameterRangeVariables()
-                                         : context.getRangeVariables();
+        Statement    cs          = null;
+        HsqlName     label       = null;
+        RangeGroup   rangeGroup  = context == null ? routine
+                                                   : context;
+        RangeGroup[] rangeGroups = new RangeGroup[]{ rangeGroup };
 
-        if (isSimpleName() && !isReservedKey()) {
-            label = readNewSchemaObjectNameNoCheck(SchemaObject.LABEL);
+        if (!routine.isTrigger() && isSimpleName() && !isReservedKey()) {
+            label = readNewSchemaObjectName(SchemaObject.LABEL, false);
+
+            // todo - improved error message
+            if (token.tokenType != Tokens.COLON) {
+                throw unexpectedToken(label.getNameString());
+            }
 
             readThis(Tokens.COLON);
         }
 
-        switch (token.tokenType) {
+        compileContext.reset();
 
-            // data
-            case Tokens.SELECT : {
-                cs = readSelectSingleRowStatement(rangeVariables);
+        HsqlName oldSchema = session.getCurrentSchemaHsqlName();
 
-                break;
-            }
+        session.setCurrentSchemaHsqlName(routine.getSchemaName());
 
-            // data change
-            case Tokens.INSERT :
-                cs = compileInsertStatement(rangeVariables);
-                break;
+        try {
+            switch (token.tokenType) {
 
-            case Tokens.UPDATE :
-                cs = compileUpdateStatement(rangeVariables);
-                break;
+                // data
+                case Tokens.OPEN : {
+                    if (routine.dataImpact == Routine.CONTAINS_SQL) {
+                        throw Error.error(ErrorCode.X_42602,
+                                          routine.getDataImpactString());
+                    }
 
-            case Tokens.DELETE :
-            case Tokens.TRUNCATE :
-                cs = compileDeleteStatement(rangeVariables);
-                break;
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
 
-            case Tokens.MERGE :
-                cs = compileMergeStatement(rangeVariables);
-                break;
+                    cs = compileOpenCursorStatement(context);
 
-            case Tokens.SET :
-                cs = compileSetStatement(rangeVariables);
-                break;
+                    break;
+                }
+                case Tokens.SELECT : {
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
 
-            // control
-            case Tokens.CALL : {
-                if (label != null) {
-                    throw unexpectedToken();
+                    cs = compileSelectSingleRowStatement(rangeGroups);
+
+                    break;
                 }
 
-                cs = compileCallStatement(rangeVariables, true);
+                // data change
+                case Tokens.INSERT :
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
 
-                break;
-            }
-            case Tokens.RETURN : {
-                if (label != null) {
-                    throw unexpectedToken();
+                    cs = compileInsertStatement(rangeGroups);
+                    break;
+
+                case Tokens.UPDATE :
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    cs = compileUpdateStatement(rangeGroups);
+                    break;
+
+                case Tokens.DELETE :
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    cs = compileDeleteStatement(rangeGroups);
+                    break;
+
+                case Tokens.TRUNCATE :
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    cs = compileTruncateStatement();
+                    break;
+
+                case Tokens.MERGE :
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    cs = compileMergeStatement(rangeGroups);
+                    break;
+
+                case Tokens.SET :
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    if (routine.isTrigger()) {
+                        if (routine.triggerType == TriggerDef.BEFORE
+                                && routine.triggerOperation
+                                   != StatementTypes.DELETE_WHERE) {
+                            int position = super.getPosition();
+
+                            try {
+                                cs = compileTriggerSetStatement(
+                                    routine.triggerTable, rangeGroups);
+
+                                break;
+                            } catch (HsqlException e) {
+                                rewind(position);
+
+                                cs = compileSetStatement(
+                                    rangeGroups,
+                                    rangeGroup.getRangeVariables());
+                            }
+                        } else {
+                            cs = compileSetStatement(
+                                rangeGroups, rangeGroup.getRangeVariables());
+                        }
+
+                        ((StatementSet) cs).checkIsNotColumnTarget();
+                    } else {
+                        cs = compileSetStatement(
+                            rangeGroups, rangeGroup.getRangeVariables());
+                    }
+                    break;
+
+                case Tokens.GET :
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    cs = this.compileGetStatement(rangeGroups);
+                    break;
+
+                // control
+                case Tokens.CALL : {
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    cs = compileCallStatement(rangeGroups, true);
+
+                    Routine proc = ((StatementProcedure) cs).procedure;
+
+                    if (proc != null) {
+                        switch (routine.dataImpact) {
+
+                            case Routine.CONTAINS_SQL : {
+                                if (proc.dataImpact == Routine.READS_SQL
+                                        || proc.dataImpact
+                                           == Routine.MODIFIES_SQL) {
+                                    throw Error.error(
+                                        ErrorCode.X_42602,
+                                        routine.getDataImpactString());
+                                }
+
+                                break;
+                            }
+                            case Routine.READS_SQL : {
+                                if (proc.dataImpact == Routine.MODIFIES_SQL) {
+                                    throw Error.error(
+                                        ErrorCode.X_42602,
+                                        routine.getDataImpactString());
+                                }
+
+                                break;
+                            }
+                        }
+                    }
+
+                    break;
                 }
+                case Tokens.RETURN : {
+                    if (routine.isTrigger() || label != null) {
+                        throw unexpectedToken();
+                    }
 
-                read();
+                    read();
 
-                cs = readReturnValue(routine, context);
+                    cs = compileReturnValue(routine, context);
 
-                break;
-            }
-            case Tokens.BEGIN : {
-                cs = readCompoundStatement(routine, context, label);
-
-                break;
-            }
-            case Tokens.WHILE : {
-                cs = readWhile(routine, context, label);
-
-                break;
-            }
-            case Tokens.REPEAT : {
-                cs = readRepeat(routine, context, label);
-
-                break;
-            }
-            case Tokens.LOOP : {
-                cs = readLoop(routine, context, label);
-
-                break;
-            }
-            case Tokens.FOR : {
-                cs = readFor(routine, context, label);
-
-                break;
-            }
-            case Tokens.ITERATE : {
-                if (label != null) {
-                    throw unexpectedToken();
+                    break;
                 }
+                case Tokens.BEGIN : {
+                    cs = compileCompoundStatement(routine, context, label);
 
-                cs = readIterate();
-
-                break;
-            }
-            case Tokens.LEAVE : {
-                if (label != null) {
-                    throw unexpectedToken();
+                    break;
                 }
+                case Tokens.WHILE : {
+                    if (routine.isTrigger()) {
+                        throw unexpectedToken();
+                    }
 
-                cs = readLeave(routine, context);
+                    cs = compileWhile(routine, context, label);
 
-                break;
-            }
-            case Tokens.IF : {
-                if (label != null) {
-                    throw unexpectedToken();
+                    break;
                 }
+                case Tokens.REPEAT : {
+                    cs = compileRepeat(routine, context, label);
 
-                cs = readIf(routine, context);
-
-                break;
-            }
-            case Tokens.CASE : {
-                if (label != null) {
-                    throw unexpectedToken();
+                    break;
                 }
+                case Tokens.LOOP : {
+                    cs = compileLoop(routine, context, label);
 
-                cs = readCase(routine, context);
+                    break;
+                }
+                case Tokens.FOR : {
+                    cs = compileFor(routine, context, label);
 
-                break;
+                    break;
+                }
+                case Tokens.ITERATE : {
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    cs = compileIterate();
+
+                    break;
+                }
+                case Tokens.LEAVE : {
+                    if (label != null) {
+                        throw unexpectedToken();
+                    }
+
+                    cs = compileLeave(routine, context);
+
+                    break;
+                }
+                case Tokens.IF : {
+                    cs = compileIf(routine, context);
+
+                    break;
+                }
+                case Tokens.CASE : {
+                    cs = compileCase(routine, context);
+
+                    break;
+                }
+                case Tokens.SIGNAL : {
+                    cs = compileSignal(routine, context, label);
+
+                    break;
+                }
+                case Tokens.RESIGNAL : {
+                    cs = compileResignal(routine, context, label);
+
+                    break;
+                }
+                default :
+                    return null;
             }
-            case Tokens.SIGNAL : {
-                cs = readSignal(routine, context, label);
 
-                break;
-            }
-            case Tokens.RESIGNAL : {
-                cs = readResignal(routine, context, label);
+            cs.setRoot(routine);
+            cs.setParent(context);
 
-                break;
-            }
-            default :
-                return null;
+            return cs;
+        } finally {
+            session.setCurrentSchemaHsqlName(oldSchema);
         }
-
-        cs.setRoot(routine);
-        cs.setParent(context);
-
-        return cs;
     }
 
-    private Statement readReturnValue(Routine routine,
-                                      StatementCompound context) {
+    private Statement compileReturnValue(Routine routine,
+                                         StatementCompound context) {
+
+        RangeGroup[] rangeGroups = new RangeGroup[1];
+
+        rangeGroups[0] = context == null ? routine
+                                         : context;
+
+        compileContext.setOuterRanges(rangeGroups);
 
         Expression e = XreadValueExpressionOrNull();
 
         if (e == null) {
-            checkIsValue();
-
-            if (token.tokenValue == null) {
-                e = new ExpressionValue(null, null);
-            }
+            throw unexpectedToken();
         }
 
-        RangeVariable[] rangeVars = routine.getParameterRangeVariables();
+        resolveOuterReferencesAndTypes(routine, context, e);
 
-        if (context != null) {
-            rangeVars = context.getRangeVariables();
+        if (routine.isProcedure()) {
+            throw Error.parseError(ErrorCode.X_42602, null,
+                                   scanner.getLineNumber());
         }
 
-        HsqlList list = e.resolveColumnReferences(rangeVars, rangeVars.length,
-            null, false);
-
-        ExpressionColumn.checkColumnsResolved(list);
-        e.resolveTypes(session, null);
-
-        return new StatementSimple(StatementTypes.RETURN, e);
+        return new StatementExpression(session, compileContext,
+                                       StatementTypes.RETURN, e);
     }
 
-    private Statement readSelectSingleRowStatement(RangeVariable[] rangeVars) {
-
-        OrderedHashSet     variableNames = new OrderedHashSet();
-        QuerySpecification select        = XreadSelect();
-
-        readThis(Tokens.INTO);
-        readColumnNamesForSelectInto(variableNames, rangeVars);
-        XreadTableExpression(select);
-        select.setAsTopLevel();
-        select.resolve(session);
-
-        int[]          indexes   = new int[variableNames.size()];
-        ColumnSchema[] variables = new ColumnSchema[variableNames.size()];
-        Statement statement = new StatementSimple(StatementTypes.ASSIGNMENT,
-            variables, null, indexes);
-
-        return statement;
-    }
-
-    private Statement readIterate() {
+    private Statement compileIterate() {
 
         readThis(Tokens.ITERATE);
 
-        HsqlName label = readNewSchemaObjectNameNoCheck(SchemaObject.LABEL);
+        HsqlName label = readNewSchemaObjectName(SchemaObject.LABEL, false);
 
         return new StatementSimple(StatementTypes.ITERATE, label);
     }
 
-    private Statement readLeave(Routine routine, StatementCompound context) {
+    private Statement compileLeave(Routine routine,
+                                   StatementCompound context) {
 
         readThis(Tokens.LEAVE);
 
-        HsqlName label = readNewSchemaObjectNameNoCheck(SchemaObject.LABEL);
+        HsqlName label = readNewSchemaObjectName(SchemaObject.LABEL, false);
 
         return new StatementSimple(StatementTypes.LEAVE, label);
     }
 
-    private Statement readWhile(Routine routine, StatementCompound context,
-                                HsqlName label) {
+    private Statement compileWhile(Routine routine, StatementCompound context,
+                                   HsqlName label) {
 
         readThis(Tokens.WHILE);
 
-        StatementSimple condition =
-            new StatementSimple(StatementTypes.CONDITION,
-                                XreadBooleanValueExpression());
+        Expression e = XreadBooleanValueExpression();
+
+        resolveOuterReferencesAndTypes(routine, context, e);
+
+        StatementExpression condition = new StatementExpression(session,
+            compileContext, StatementTypes.CONDITION, e);
 
         readThis(Tokens.DO);
 
-        Statement[] statements = readSQLProcedureStatementList(routine,
+        Statement[] statements = compileSQLProcedureStatementList(routine,
             context);
 
         readThis(Tokens.END);
@@ -1076,19 +1763,23 @@ public class ParserRoutine extends ParserDML {
         return statement;
     }
 
-    private Statement readRepeat(Routine routine, StatementCompound context,
-                                 HsqlName label) {
+    private Statement compileRepeat(Routine routine,
+                                    StatementCompound context,
+                                    HsqlName label) {
 
         readThis(Tokens.REPEAT);
 
-        Statement[] statements = readSQLProcedureStatementList(routine,
+        Statement[] statements = compileSQLProcedureStatementList(routine,
             context);
 
         readThis(Tokens.UNTIL);
 
-        StatementSimple condition =
-            new StatementSimple(StatementTypes.CONDITION,
-                                XreadBooleanValueExpression());
+        Expression e = XreadBooleanValueExpression();
+
+        resolveOuterReferencesAndTypes(routine, context, e);
+
+        StatementExpression condition = new StatementExpression(session,
+            compileContext, StatementTypes.CONDITION, e);
 
         readThis(Tokens.END);
         readThis(Tokens.REPEAT);
@@ -1114,12 +1805,12 @@ public class ParserRoutine extends ParserDML {
         return statement;
     }
 
-    private Statement readLoop(Routine routine, StatementCompound context,
-                               HsqlName label) {
+    private Statement compileLoop(Routine routine, StatementCompound context,
+                                  HsqlName label) {
 
         readThis(Tokens.LOOP);
 
-        Statement[] statements = readSQLProcedureStatementList(routine,
+        Statement[] statements = compileSQLProcedureStatementList(routine,
             context);
 
         readThis(Tokens.END);
@@ -1145,17 +1836,34 @@ public class ParserRoutine extends ParserDML {
         return result;
     }
 
-    private Statement readFor(Routine routine, StatementCompound context,
-                              HsqlName label) {
+    private Statement compileFor(Routine routine, StatementCompound context,
+                                 HsqlName label) {
 
+        RangeGroup[] rangeGroups = new RangeGroup[1];
+
+        rangeGroups[0] = context == null ? routine
+                                         : context;
+
+        compileContext.setOuterRanges(rangeGroups);
         readThis(Tokens.FOR);
 
-        Statement cursorStatement = compileCursorSpecification();
+        StatementQuery cursorStatement =
+            compileCursorSpecification(rangeGroups,
+                                       ResultProperties.defaultPropsValue,
+                                       false);
 
         readThis(Tokens.DO);
 
-        Statement[] statements = readSQLProcedureStatementList(routine,
-            context);
+        StatementCompound forStatement =
+            new StatementCompound(StatementTypes.FOR, label);
+
+        forStatement.setAtomic(true);
+        forStatement.setRoot(routine);
+        forStatement.setParent(context);
+        forStatement.setLoopStatement(cursorStatement);
+
+        Statement[] statements = compileSQLProcedureStatementList(routine,
+            forStatement);
 
         readThis(Tokens.END);
         readThis(Tokens.FOR);
@@ -1172,43 +1880,28 @@ public class ParserRoutine extends ParserDML {
             read();
         }
 
-        StatementCompound result = new StatementCompound(StatementTypes.FOR,
-            label);
+        forStatement.setStatements(statements);
 
-        result.setLoopStatement(cursorStatement);
-        result.setStatements(statements);
-
-        return result;
+        return forStatement;
     }
 
-    private Statement readIf(Routine routine, StatementCompound context) {
+    private Statement compileIf(Routine routine, StatementCompound context) {
 
         HsqlArrayList list = new HsqlArrayList();
-        RangeVariable[] rangeVariables = context == null
-                                         ? routine.getParameterRangeVariables()
-                                         : context.getRangeVariables();
-        HsqlList unresolved = null;
 
         readThis(Tokens.IF);
 
-        Expression condition = XreadBooleanValueExpression();
+        Expression e = XreadBooleanValueExpression();
 
-        unresolved = condition.resolveColumnReferences(rangeVariables,
-                rangeVariables.length, unresolved, false);
+        resolveOuterReferencesAndTypes(routine, context, e);
 
-        ExpressionColumn.checkColumnsResolved(unresolved);
-
-        unresolved = null;
-
-        condition.resolveTypes(session, null);
-
-        Statement statement = new StatementSimple(StatementTypes.CONDITION,
-            condition);
+        Statement statement = new StatementExpression(session, compileContext,
+            StatementTypes.CONDITION, e);
 
         list.add(statement);
         readThis(Tokens.THEN);
 
-        Statement[] statements = readSQLProcedureStatementList(routine,
+        Statement[] statements = compileSQLProcedureStatementList(routine,
             context);
 
         for (int i = 0; i < statements.length; i++) {
@@ -1218,23 +1911,17 @@ public class ParserRoutine extends ParserDML {
         while (token.tokenType == Tokens.ELSEIF) {
             read();
 
-            condition = XreadBooleanValueExpression();
-            unresolved = condition.resolveColumnReferences(rangeVariables,
-                    rangeVariables.length, unresolved, false);
+            e = XreadBooleanValueExpression();
 
-            ExpressionColumn.checkColumnsResolved(unresolved);
+            resolveOuterReferencesAndTypes(routine, context, e);
 
-            unresolved = null;
-
-            condition.resolveTypes(session, null);
-
-            statement = new StatementSimple(StatementTypes.CONDITION,
-                                            condition);
+            statement = new StatementExpression(session, compileContext,
+                                                StatementTypes.CONDITION, e);
 
             list.add(statement);
             readThis(Tokens.THEN);
 
-            statements = readSQLProcedureStatementList(routine, context);
+            statements = compileSQLProcedureStatementList(routine, context);
 
             for (int i = 0; i < statements.length; i++) {
                 list.add(statements[i]);
@@ -1244,13 +1931,13 @@ public class ParserRoutine extends ParserDML {
         if (token.tokenType == Tokens.ELSE) {
             read();
 
-            condition = Expression.EXPR_TRUE;
-            statement = new StatementSimple(StatementTypes.CONDITION,
-                                            condition);
+            e = Expression.EXPR_TRUE;
+            statement = new StatementExpression(session, compileContext,
+                                                StatementTypes.CONDITION, e);
 
             list.add(statement);
 
-            statements = readSQLProcedureStatementList(routine, context);
+            statements = compileSQLProcedureStatementList(routine, context);
 
             for (int i = 0; i < statements.length; i++) {
                 list.add(statements[i]);
@@ -1272,7 +1959,7 @@ public class ParserRoutine extends ParserDML {
         return result;
     }
 
-    private Statement readCase(Routine routine, StatementCompound context) {
+    private Statement compileCase(Routine routine, StatementCompound context) {
 
         HsqlArrayList list      = new HsqlArrayList();
         Expression    condition = null;
@@ -1291,12 +1978,13 @@ public class ParserRoutine extends ParserDML {
             read();
 
             condition = Expression.EXPR_TRUE;
-            statement = new StatementSimple(StatementTypes.CONDITION,
-                                            condition);
+            statement = new StatementExpression(session, compileContext,
+                                                StatementTypes.CONDITION,
+                                                condition);
 
             list.add(statement);
 
-            statements = readSQLProcedureStatementList(routine, context);
+            statements = compileSQLProcedureStatementList(routine, context);
 
             for (int i = 0; i < statements.length; i++) {
                 list.add(statements[i]);
@@ -1321,15 +2009,11 @@ public class ParserRoutine extends ParserDML {
     private HsqlArrayList readSimpleCaseWhen(Routine routine,
             StatementCompound context) {
 
-        HsqlArrayList list = new HsqlArrayList();
-        RangeVariable[] rangeVariables = context == null
-                                         ? routine.getParameterRangeVariables()
-                                         : context.getRangeVariables();
-        HsqlList    unresolved = null;
-        Expression  condition  = null;
-        Statement   statement;
-        Statement[] statements;
-        Expression  predicand = XreadRowValuePredicand();
+        HsqlArrayList list      = new HsqlArrayList();
+        Expression    condition = null;
+        Statement     statement;
+        Statement[]   statements;
+        Expression    predicand = XreadRowValuePredicand();
 
         do {
             readThis(Tokens.WHEN);
@@ -1343,15 +2027,7 @@ public class ParserRoutine extends ParserDML {
                                               XreadRowValuePredicand());
                 }
 
-                unresolved =
-                    newCondition.resolveColumnReferences(rangeVariables,
-                        rangeVariables.length, unresolved, false);
-
-                ExpressionColumn.checkColumnsResolved(unresolved);
-
-                unresolved = null;
-
-                newCondition.resolveTypes(session, null);
+                resolveOuterReferencesAndTypes(routine, context, newCondition);
 
                 if (condition == null) {
                     condition = newCondition;
@@ -1367,13 +2043,14 @@ public class ParserRoutine extends ParserDML {
                 }
             } while (true);
 
-            statement = new StatementSimple(StatementTypes.CONDITION,
-                                            condition);
+            statement = new StatementExpression(session, compileContext,
+                                                StatementTypes.CONDITION,
+                                                condition);
 
             list.add(statement);
             readThis(Tokens.THEN);
 
-            statements = readSQLProcedureStatementList(routine, context);
+            statements = compileSQLProcedureStatementList(routine, context);
 
             for (int i = 0; i < statements.length; i++) {
                 list.add(statements[i]);
@@ -1390,35 +2067,26 @@ public class ParserRoutine extends ParserDML {
     private HsqlArrayList readCaseWhen(Routine routine,
                                        StatementCompound context) {
 
-        HsqlArrayList list = new HsqlArrayList();
-        RangeVariable[] rangeVariables = context == null
-                                         ? routine.getParameterRangeVariables()
-                                         : context.getRangeVariables();
-        HsqlList    unresolved = null;
-        Expression  condition  = null;
-        Statement   statement;
-        Statement[] statements;
+        HsqlArrayList list      = new HsqlArrayList();
+        Expression    condition = null;
+        Statement     statement;
+        Statement[]   statements;
 
         do {
             readThis(Tokens.WHEN);
 
             condition = XreadBooleanValueExpression();
-            unresolved = condition.resolveColumnReferences(rangeVariables,
-                    rangeVariables.length, unresolved, false);
 
-            ExpressionColumn.checkColumnsResolved(unresolved);
+            resolveOuterReferencesAndTypes(routine, context, condition);
 
-            unresolved = null;
-
-            condition.resolveTypes(session, null);
-
-            statement = new StatementSimple(StatementTypes.CONDITION,
-                                            condition);
+            statement = new StatementExpression(session, compileContext,
+                                                StatementTypes.CONDITION,
+                                                condition);
 
             list.add(statement);
             readThis(Tokens.THEN);
 
-            statements = readSQLProcedureStatementList(routine, context);
+            statements = compileSQLProcedureStatementList(routine, context);
 
             for (int i = 0; i < statements.length; i++) {
                 list.add(statements[i]);
@@ -1432,68 +2100,106 @@ public class ParserRoutine extends ParserDML {
         return list;
     }
 
-    private Statement readSignal(Routine routine, StatementCompound context,
-                                 HsqlName label) {
+    private Statement compileSignal(Routine routine,
+                                    StatementCompound context,
+                                    HsqlName label) {
+
+        String     sqlState;
+        Expression message = null;
 
         readThis(Tokens.SIGNAL);
         readThis(Tokens.SQLSTATE);
 
-        String sqlState = parseSQLStateValue();
+        sqlState = parseSQLStateValue();
+
+        if (readIfThis(Tokens.SET)) {
+            readThis(Tokens.MESSAGE_TEXT);
+            readThis(Tokens.EQUALS);
+
+            message = XreadSimpleValueSpecificationOrNull();
+
+            if (message == null) {
+                throw unexpectedToken();
+            }
+
+            resolveOuterReferencesAndTypes(routine, context, message);
+        }
+
         StatementSimple cs = new StatementSimple(StatementTypes.SIGNAL,
-            sqlState);
+            sqlState, message);
 
         return cs;
     }
 
-    private Statement readResignal(Routine routine, StatementCompound context,
-                                   HsqlName label) {
+    private Statement compileResignal(Routine routine,
+                                      StatementCompound context,
+                                      HsqlName label) {
 
-        String sqlState = null;
+        String     sqlState = null;
+        Expression message  = null;
 
         readThis(Tokens.RESIGNAL);
 
         if (readIfThis(Tokens.SQLSTATE)) {
             sqlState = parseSQLStateValue();
+
+            if (readIfThis(Tokens.SET)) {
+                readThis(Tokens.MESSAGE_TEXT);
+                readThis(Tokens.EQUALS);
+
+                message = XreadSimpleValueSpecificationOrNull();
+
+                if (message == null) {
+                    throw unexpectedToken();
+                }
+
+                resolveOuterReferencesAndTypes(routine, context, message);
+            }
         }
 
         StatementSimple cs = new StatementSimple(StatementTypes.RESIGNAL,
-            sqlState);
+            sqlState, message);
 
         return cs;
     }
 
-    private ColumnSchema readRoutineParameter(Routine routine) {
+    private ColumnSchema readRoutineParameter(Routine routine,
+            boolean isParam) {
 
         HsqlName hsqlName      = null;
         byte     parameterMode = SchemaObject.ParameterModes.PARAM_IN;
 
-        switch (token.tokenType) {
+        if (isParam) {
+            switch (token.tokenType) {
 
-            case Tokens.IN :
-                read();
-                break;
+                case Tokens.IN :
+                    read();
+                    break;
 
-            case Tokens.OUT :
-                if (routine.getType() != SchemaObject.PROCEDURE) {
-                    throw unexpectedToken();
-                }
+                case Tokens.OUT :
+                    if (routine.getType() != SchemaObject.PROCEDURE) {
+                        throw unexpectedToken();
+                    }
 
-                read();
+                    read();
 
-                parameterMode = SchemaObject.ParameterModes.PARAM_OUT;
-                break;
+                    parameterMode = SchemaObject.ParameterModes.PARAM_OUT;
+                    break;
 
-            case Tokens.INOUT :
-                if (routine.getType() != SchemaObject.PROCEDURE) {
-                    throw unexpectedToken();
-                }
+                case Tokens.INOUT :
+                    if (routine.getType() != SchemaObject.PROCEDURE) {
+                        if (!routine.isAggregate()) {
+                            throw unexpectedToken();
+                        }
+                    }
 
-                read();
+                    read();
 
-                parameterMode = SchemaObject.ParameterModes.PARAM_INOUT;
-                break;
+                    parameterMode = SchemaObject.ParameterModes.PARAM_INOUT;
+                    break;
 
-            default :
+                default :
+            }
         }
 
         if (!isReservedKey()) {
@@ -1501,12 +2207,24 @@ public class ParserRoutine extends ParserDML {
                     SchemaObject.PARAMETER);
         }
 
-        Type typeObject = readTypeDefinition(true);
-        ColumnSchema column = new ColumnSchema(hsqlName, typeObject, false,
+        Type typeObject = readTypeDefinition(false, true);
+        ColumnSchema column = new ColumnSchema(hsqlName, typeObject, true,
                                                false, null);
 
-        column.setParameterMode(parameterMode);
+        if (isParam) {
+            column.setParameterMode(parameterMode);
+        }
 
         return column;
+    }
+
+    void resolveOuterReferencesAndTypes(Routine routine,
+                                        StatementCompound context,
+                                        Expression e) {
+
+        RangeGroup rangeGroup = context == null ? routine
+                                                : context;
+
+        resolveOuterReferencesAndTypes(new RangeGroup[]{ rangeGroup }, e);
     }
 }

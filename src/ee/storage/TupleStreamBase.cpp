@@ -98,8 +98,7 @@ void TupleStreamBase::cleanupManagedBuffers()
  */
 void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
 {
-    if (currentSpHandle < m_openSpHandle)
-    {
+    if (currentSpHandle < m_openSpHandle) {
         throwFatalException(
                 "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
                 (intmax_t)m_openSpHandle, (intmax_t)currentSpHandle
@@ -108,8 +107,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
 
     // more data for an ongoing transaction with no new committed data
     if ((currentSpHandle == m_openSpHandle) &&
-        (lastCommittedSpHandle == m_committedSpHandle))
-    {
+        (lastCommittedSpHandle == m_committedSpHandle)) {
         //std::cout << "Current spHandle(" << currentSpHandle << ") == m_openSpHandle(" << m_openSpHandle <<
         //") && lastCommittedSpHandle(" << lastCommittedSpHandle << ") m_committedSpHandle(" <<
         //m_committedSpHandle << ")" << std::endl;

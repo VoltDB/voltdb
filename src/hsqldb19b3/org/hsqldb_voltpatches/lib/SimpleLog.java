@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@ import org.hsqldb_voltpatches.HsqlDateTime;
  * and minor errors.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.8.0
  */
 public class SimpleLog {
@@ -54,36 +54,67 @@ public class SimpleLog {
     public static final int LOG_NONE   = 0;
     public static final int LOG_ERROR  = 1;
     public static final int LOG_NORMAL = 2;
-    private PrintWriter     writer;
-    private int             level;
-    private boolean         isSystem;
+    public static final int LOG_DETAIL = 3;
+    public static final int LOG_RESULT = 4;
 
-    public SimpleLog(String path, int level, boolean useFile) {
+    //
+    public static final String   logTypeNameEngine = "ENGINE";
+    public static final String[] appLogTypeNames   = {
+        "", "ERROR ", "NORMAL", "DETAIL"
+    };
+    public static final String[] sqlLogTypeNames   = {
+        "", "BASIC ", "NORMAL", "DETAIL", "RESULT"
+    };
 
-        this.level = level;
+    //
+    private PrintWriter  writer;
+    private int          level;
+    private boolean      isSystem;
+    private boolean      isSQL;
+    String[]             logTypeNames;
+    private String       filePath;
+    private StringBuffer sb;
 
-        if (level != LOG_NONE) {
-            if (useFile) {
-                File file = new File(path);
+    public SimpleLog(String path, int level, boolean isSQL) {
 
-                makeLog(file);
-            } else {
-                isSystem = true;
+        this.isSystem = path == null;
+        this.filePath = path;
+        this.isSQL    = isSQL;
+        logTypeNames  = isSQL ? sqlLogTypeNames
+                              : appLogTypeNames;
+        sb            = new StringBuffer(256);
+
+        setLevel(level);
+    }
+
+    private void setupWriter() {
+
+        if (level == LOG_NONE) {
+            close();
+
+            return;
+        }
+
+        if (writer == null) {
+            if (isSystem) {
                 writer = new PrintWriter(System.out);
+            } else {
+                File file = new File(filePath);
+
+                setupLog(file);
             }
         }
     }
 
-    private void makeLog(File file) {
+    private void setupLog(File file) {
 
         try {
-            FileUtil.getDefaultInstance().makeParentDirectories(file);
+            FileUtil.getFileUtil().makeParentDirectories(file);
 
-            writer = new PrintWriter(new FileWriter(file.getPath(), true),
-                                     true);
+            writer = new PrintWriter(new FileWriter(file, true), true);
         } catch (Exception e) {
             isSystem = true;
-            writer = new PrintWriter(System.out);
+            writer   = new PrintWriter(System.out);
         }
     }
 
@@ -92,18 +123,14 @@ public class SimpleLog {
     }
 
     public void setLevel(int level) {
+
         this.level = level;
+
+        setupWriter();
     }
 
     public PrintWriter getPrintWriter() {
         return writer;
-    }
-
-    public synchronized void sendLine(int atLevel, String message) {
-
-        if (level >= atLevel) {
-            writer.println(HsqlDateTime.getSytemTimeString() + " " + message);
-        }
     }
 
     public synchronized void logContext(int atLevel, String message) {
@@ -112,51 +139,88 @@ public class SimpleLog {
             return;
         }
 
-        String info = HsqlDateTime.getSytemTimeString();
-
-//#ifdef JAVA4
-        Throwable           temp     = new Throwable();
-        StackTraceElement[] elements = temp.getStackTrace();
-
-        if (elements.length > 1) {
-            info += " " + elements[1].getClassName() + "."
-                    + elements[1].getMethodName();
+        if (writer == null) {
+            return;
         }
 
-//#endif JAVA4
-        writer.println(info + " " + message);
+        sb.append(HsqlDateTime.getSystemTimeString()).append(' ');
+
+        if (!isSQL) {
+            sb.append(logTypeNames[atLevel]).append(' ');
+        }
+
+        sb.append(message);
+        writer.println(sb.toString());
+        sb.setLength(0);
+        writer.flush();
     }
 
-    public synchronized void logContext(Throwable t, String message) {
+    public synchronized void logContext(int atLevel, String prefix,
+                                        String message, String suffix) {
+
+        if (level < atLevel) {
+            return;
+        }
+
+        if (writer == null) {
+            return;
+        }
+
+        sb.append(HsqlDateTime.getSystemTimeString()).append(' ');
+
+        if (!isSQL) {
+            sb.append(logTypeNames[atLevel]).append(' ');
+        }
+
+        sb.append(prefix).append(' ');
+        sb.append(message).append(' ').append(suffix);
+        writer.println(sb.toString());
+        sb.setLength(0);
+        writer.flush();
+    }
+
+    public synchronized void logContext(Throwable t, String message,
+                                        int atLevel) {
 
         if (level == LOG_NONE) {
             return;
         }
 
-        String info = HsqlDateTime.getSytemTimeString();
+        if (writer == null) {
+            return;
+        }
+
+        sb.append(HsqlDateTime.getSystemTimeString()).append(' ');
+
+        if (!isSQL) {
+            sb.append(logTypeNames[atLevel]).append(' ');
+        }
+
+        sb.append(message);
 
 //#ifdef JAVA4
         Throwable           temp     = new Throwable();
         StackTraceElement[] elements = temp.getStackTrace();
 
         if (elements.length > 1) {
-            info += " " + elements[1].getClassName() + "."
-                    + elements[1].getMethodName();
+            sb.append(' ');
+            sb.append(elements[1].getClassName()).append('.');
+            sb.append(elements[1].getMethodName());
         }
 
         elements = t.getStackTrace();
 
         if (elements.length > 0) {
-            info += " " + elements[0].getClassName() + "."
-                    + elements[0].getMethodName();
+            sb.append(' ');
+            sb.append(elements[0].getClassName()).append('.');
+            sb.append(' ').append(elements[0].getMethodName());
         }
 
 //#endif JAVA4
-        if (message == null) {
-            message = "";
-        }
-
-        writer.println(info + " " + t.toString() + " " + message);
+        sb.append(' ').append(t.toString());
+        writer.println(sb.toString());
+        sb.setLength(0);
+        writer.flush();
     }
 
     public void flush() {
@@ -169,6 +233,7 @@ public class SimpleLog {
     public void close() {
 
         if (writer != null && !isSystem) {
+            writer.flush();
             writer.close();
         }
 

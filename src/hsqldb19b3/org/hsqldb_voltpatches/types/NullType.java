@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,17 @@
 
 package org.hsqldb_voltpatches.types;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 
 /**
  * Type subclass for untyped NULL values.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.1
  * @since 1.9.0
  */
 public final class NullType extends Type {
@@ -60,6 +60,10 @@ public final class NullType extends Type {
         return typeCode;
     }
 
+    public Class getJDBCClass() {
+        return java.lang.Void.class;
+    }
+
     public String getJDBCClassName() {
         return "java.lang.Void";
     }
@@ -76,11 +80,11 @@ public final class NullType extends Type {
         return other;
     }
 
-    public Type getCombinedType(Type other, int operation) {
+    public Type getCombinedType(Session session, Type other, int operation) {
         return other;
     }
 
-    public int compare(Object a, Object b) {
+    public int compare(Session session, Object a, Object b) {
         throw Error.runtimeError(ErrorCode.U_S0500, "NullType");
     }
 
@@ -98,11 +102,11 @@ public final class NullType extends Type {
     }
 
     public String convertToString(Object a) {
-        throw Error.runtimeError(ErrorCode.U_S0500, "NullType");
+        return Tokens.T_NULL;
     }
 
     public String convertToSQLString(Object a) {
-        throw Error.runtimeError(ErrorCode.U_S0500, "NullType");
+        return Tokens.T_NULL;
     }
 
     public boolean canConvertFrom(Type otherType) {

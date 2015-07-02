@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,8 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.result.Result;
 
@@ -39,7 +41,7 @@ import org.hsqldb_voltpatches.result.Result;
  * Implementation of Statement for CREATE SCHEMA statements.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.1.1
  * @since 1.9.0
  */
 public class StatementSchemaDefinition extends StatementSchema {
@@ -48,14 +50,21 @@ public class StatementSchemaDefinition extends StatementSchema {
 
     StatementSchemaDefinition(StatementSchema[] statements) {
 
-        super();
+        super(StatementTypes.CREATE_SCHEMA,
+              StatementTypes.X_SQL_SCHEMA_DEFINITION);
 
         this.statements = statements;
     }
 
     public Result execute(Session session) {
 
-        Result result = getResult(session);
+        Result result;
+
+        try {
+            result = getResult(session);
+        } catch (Throwable t) {
+            result = Result.newErrorResult(t, null);
+        }
 
         if (result.isError()) {
             result.getException().setStatementType(group, type);
@@ -66,7 +75,7 @@ public class StatementSchemaDefinition extends StatementSchema {
 
     Result getResult(Session session) {
 
-        schemaName = statements[0].getSchemalName();
+        HsqlName schemaDefinitionName = statements[0].getSchemaName();
 
         if (this.isExplain) {
             return Result.newSingleColumnStringResult("OPERATION",
@@ -76,6 +85,8 @@ public class StatementSchemaDefinition extends StatementSchema {
         StatementSchema cs;
         Result          result      = statements[0].execute(session);
         HsqlArrayList   constraints = new HsqlArrayList();
+        StatementSchema log = new StatementSchema(null,
+            StatementTypes.LOG_SCHEMA_STATEMENT);
 
         if (statements.length == 1 || result.isError()) {
             return result;
@@ -85,10 +96,10 @@ public class StatementSchemaDefinition extends StatementSchema {
 
         for (int i = 1; i < statements.length; i++) {
             try {
-                session.setSchema(schemaName.name);
+                session.setSchema(schemaDefinitionName.name);
             } catch (HsqlException e) {}
 
-            statements[i].setSchemaHsqlName(schemaName);
+            statements[i].setSchemaHsqlName(schemaDefinitionName);
             session.parser.reset(statements[i].getSQL());
 
             try {
@@ -105,17 +116,28 @@ public class StatementSchemaDefinition extends StatementSchema {
                         cs                    = session.parser.compileCreate();
                         cs.isSchemaDefinition = true;
 
-                        cs.setSchemaHsqlName(schemaName);
+                        cs.setSchemaHsqlName(schemaDefinitionName);
 
                         if (session.parser.token.tokenType
                                 != Tokens.X_ENDPARSE) {
                             throw session.parser.unexpectedToken();
                         }
 
-                        result = cs.execute(session);
+                        cs.isLogged = false;
+                        result      = cs.execute(session);
+
+                        HsqlName name = ((Table) cs.arguments[0]).getName();
+                        Table table =
+                            (Table) session.database.schemaManager
+                                .getSchemaObject(name);
 
                         constraints.addAll((HsqlArrayList) cs.arguments[1]);
                         ((HsqlArrayList) cs.arguments[1]).clear();
+
+                        //
+                        log.sql = table.getSQL();
+
+                        log.execute(session);
                         break;
 
                     case StatementTypes.CREATE_ROLE :
@@ -134,7 +156,7 @@ public class StatementSchemaDefinition extends StatementSchema {
                         cs                    = session.parser.compileCreate();
                         cs.isSchemaDefinition = true;
 
-                        cs.setSchemaHsqlName(schemaName);
+                        cs.setSchemaHsqlName(schemaDefinitionName);
 
                         if (session.parser.token.tokenType
                                 != Tokens.X_ENDPARSE) {
@@ -159,6 +181,8 @@ public class StatementSchemaDefinition extends StatementSchema {
                 }
             } catch (HsqlException e) {
                 result = Result.newErrorResult(e, statements[i].getSQL());
+
+                break;
             }
         }
 
@@ -171,6 +195,10 @@ public class StatementSchemaDefinition extends StatementSchema {
                             c.core.refTableName);
 
                     ParserDDL.addForeignKey(session, table, c, null);
+
+                    log.sql = c.getSQL();
+
+                    log.execute(session);
                 }
             } catch (HsqlException e) {
                 result = Result.newErrorResult(e, sql);
@@ -179,23 +207,14 @@ public class StatementSchemaDefinition extends StatementSchema {
 
         if (result.isError()) {
             try {
-                session.database.schemaManager.dropSchema(schemaName.name,
-                        true);
-                session.database.logger.writeToLog(
-                    session, getDropSchemaStatement(schemaName));
+                session.database.schemaManager.dropSchema(session,
+                        schemaDefinitionName.name, true);
+                session.database.logger.writeOtherStatement(session,
+                        getDropSchemaStatement(schemaDefinitionName));
             } catch (HsqlException e) {}
         }
 
-        try {
-            // A VoltDB extension to disable 
-            // Try not to explicitly throw an exception, just to catch and ignore it,
-            // but accidents can happen, so keep the try/catch anyway.
-            session.setSchemaNoThrow(oldSessionSchema.name);
-            /* disable 1 line ...
-            session.setSchema(oldSessionSchema.name);
-            ... disabled 1 line */
-            // End of VoltDB extension
-        } catch (Exception e) {}
+        session.setCurrentSchemaHsqlName(oldSessionSchema);
 
         return result;
     }
@@ -217,5 +236,9 @@ public class StatementSchemaDefinition extends StatementSchema {
 */
     String getDropSchemaStatement(HsqlName schema) {
         return "DROP SCHEMA " + schema.statementName + " " + Tokens.T_CASCADE;
+    }
+
+    public boolean isAutoCommitStatement() {
+        return true;
     }
 }

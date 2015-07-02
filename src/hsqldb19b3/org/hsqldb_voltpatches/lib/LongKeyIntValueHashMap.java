@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,11 +33,11 @@ package org.hsqldb_voltpatches.lib;
 
 import java.util.NoSuchElementException;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.7.2
+ * @version 1.9.0
  * @since 1.7.2
  */
 public class LongKeyIntValueHashMap extends BaseHashMap {
@@ -95,6 +95,10 @@ public class LongKeyIntValueHashMap extends BaseHashMap {
         }
 
         return false;
+    }
+
+    public int getLookup(long key) {
+        return super.getLookup(key);
     }
 
     public boolean put(long key, int value) {
