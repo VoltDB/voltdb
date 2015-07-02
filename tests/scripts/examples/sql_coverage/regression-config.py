@@ -62,7 +62,7 @@
     "basic": {"schema": "schema.py",
               "ddl": "DDL.sql",
               "template": "basic.sql",
-              "normalizer": "normalizer.py"},
+              "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-joins": {"schema": "schema.py",
                     "ddl": "DDL.sql",
@@ -85,12 +85,12 @@
     "basic-index": {"schema": "schema.py",
                     "ddl": "index-DDL.sql",
                     "template": "basic.sql",
-                    "normalizer": "normalizer.py"},
+                    "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-strings": {"schema": "strings-schema.py",
                       "ddl": "strings-DDL.sql",
                       "template": "basic-strings.sql",
-                      "normalizer": "normalizer.py"},
+                      "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "partial-covering": {"schema": "partial-covering-schema.py",
                          "ddl": "partial-covering-DDL.sql",
@@ -139,21 +139,21 @@
     "advanced": {"schema": "schema.py",
                  "ddl": "DDL.sql",
                  "template": "advanced.sql",
-                 "normalizer": "normalizer.py"},
+                 "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "advanced-index": {"schema": "schema.py",
                        "ddl": "index-DDL.sql",
                        "template": "advanced.sql",
-                       "normalizer": "normalizer.py"},
+                       "normalizer": "nulls-lowest-normalizer.py"},
     "advanced-compoundex": {"schema": "schema.py",
                        "ddl": "compoundex-DDL.sql",
                        "template": "advanced.sql",
-                       "normalizer": "normalizer.py"},
+                       "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "advanced-strings": {"schema": "strings-schema.py",
                          "ddl": "strings-DDL.sql",
                          "template": "advanced-strings.sql",
-                         "normalizer": "normalizer.py"},
+                         "normalizer": "nulls-lowest-normalizer.py"},
     "advanced-ints": {"schema": "int-schema.py",
                       "ddl": "int-DDL.sql",
                       "template": "advanced-ints.sql",
@@ -190,7 +190,7 @@
     "advanced-matview-join": {"schema": "matview-advanced-join-schema.py",
                               "ddl": "matview-DDL.sql",
                               "template": "advanced-matview-join.sql",
-                              "normalizer": "normalizer.py"},
+                              "normalizer": "nulls-lowest-normalizer.py"},
 
 # To test index count
     "index-count1": {"schema": "index-count1-schema.py",
