@@ -55,6 +55,7 @@ public class SQLLexer extends SQLPatternFactory
         new VerbToken("export", true),
         new VerbToken("partition", true),
         new VerbToken("dr", true),
+        new VerbToken("set", true),
         // Unsupported verbs
         new VerbToken("import", false)
     };
@@ -79,7 +80,7 @@ public class SQLLexer extends SQLPatternFactory
         // Non-rename-able objects
         new ObjectToken("view", false),
         new ObjectToken("procedure", false),
-        new ObjectToken("role", false)
+        new ObjectToken("role", false),
     };
 
     private final static String[] MODIFIER_TOKENS = {
@@ -463,7 +464,13 @@ public class SQLLexer extends SQLPatternFactory
 
         // Whitelists for acceptable statement preambles.
         WHITELISTS = new CheckedPattern[] {
-            new WhitelistSupportedPreamblePattern()
+            new WhitelistSupportedPreamblePattern(),
+            new CheckedPattern(SQLParser.SET_GLOBAL_PARAM_FOR_WHITELIST) {
+                @Override
+                String explainMatch(Matcher matcher) {
+                    return null;
+                }
+            }
         };
 
         BLACKLISTS = new CheckedPattern[] {

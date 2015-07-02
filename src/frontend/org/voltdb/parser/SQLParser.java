@@ -80,18 +80,13 @@ public class SQLParser extends SQLPatternFactory
             "\\s*=\\s*([\\w_]+)" +              // (2) PARAMETER VALUE
             "\\s*;\\z"                          // (end statement)
             );
-    /**
-     * Pattern: SHOW <PARAMETER NAME>
-     *
-     * Capture groups:
-     *  (1) parameter name
-     */
-    private static final Pattern SHOW_GLOBAL_PARAM = Pattern.compile(
+    static final Pattern SET_GLOBAL_PARAM_FOR_WHITELIST = Pattern.compile(
             "(?i)" +                            // (ignore case)
             "\\A" +                             // (start statement)
-            "SHOW" +                            // SHOW
+            "SET" +                             // SET
             "\\s+([\\w_]+)" +                   // (1) PARAMETER NAME
-            "\\s*;\\z"                          // (end statement)
+            "\\s*=\\s*([\\w_]+)" +              // (2) PARAMETER VALUE
+            "\\s*\\z"                          // (end statement)
             );
     /**
      * Pattern: PARTITION PROCEDURE|TABLE ...
@@ -545,15 +540,6 @@ public class SQLParser extends SQLPatternFactory
         return SET_GLOBAL_PARAM.matcher(statement);
     }
 
-    /**
-     * Match statement against show global parameter pattern
-     * @param statement statement to match against
-     * @return          pattern matcher object
-     */
-    public static Matcher matchShowGlobalParam(String statement)
-    {
-        return SHOW_GLOBAL_PARAM.matcher(statement);
-    }
     /**
      * Match statement against pattern for all VoltDB-specific statement preambles
      * TODO: Much more useful would be a String parseVoltDBSpecificDdlStatementPreamble
