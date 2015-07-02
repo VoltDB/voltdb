@@ -1362,13 +1362,12 @@ var loadPage = function (serverName, portid) {
 
                     replicaLatencyTrans = response[key][i].LASTQUEUEDDRID - response[key][i].LASTACKDRID;
                     replicaLatencyMs = (response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000;
-
                     htmlcontent = htmlcontent + "<tr>";
-                    htmlcontent = htmlcontent + "<td>" + key + "</td>" +
-                        "<td>" + VoltDbUI.drStatus + "</td>" +
-                        "<td>" + response[key][i].TOTALBYTES / 1024 / 1024 + "</td >" +
-                        "<td>" + replicaLatencyMs + "</td >" +
-                        "<td>" + replicaLatencyTrans + "</td >";
+                    htmlcontent = htmlcontent + "<td style='text-align: right;'>" + key + "</td>" +
+                        "<td >" + VoltDbUI.drStatus + "</td>" +
+                        "<td style='text-align: right;'>" + (response[key][i].TOTALBYTES / 1024 / 1024).toFixed(2) + "</td >" +
+                        "<td style='text-align: right;'>" + replicaLatencyMs + "</td >" +
+                        "<td style='text-align: right;'>" + replicaLatencyTrans + "</td >";
                     htmlcontent = htmlcontent + "</tr>";
                 }
 
@@ -1379,9 +1378,9 @@ var loadPage = function (serverName, portid) {
             }
 
             var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
-                "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
+                "<thead><tr role='row'><th id='Th1' width='20%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
                 "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
-                "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >MB on disk</th>" +
+                "<th id='Th4' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >MB on disk</th>" +
                 "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
                 "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
             $("#tblMAster_wrapper").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
