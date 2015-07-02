@@ -52,8 +52,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
         private DBBPool.BBContainer m_cont;
         private long m_id;
-        public InternalCallback(final DBBPool.BBContainer cont) {
+        private Callback m_chainedCallback;
+
+        public InternalCallback(final DBBPool.BBContainer cont, Callback chainedCallback) {
             m_cont = cont;
+            m_chainedCallback = chainedCallback;
         }
 
         public void setId(long id) {
@@ -70,6 +73,9 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         @Override
         public void handleResponse(ClientResponse response) {
             discard();
+            if (m_chainedCallback!=null) {
+                m_chainedCallback.handleResponse(response);
+            }
             m_pendingCallbacks.remove(m_id);
         }
 
@@ -81,13 +87,18 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     public boolean createTransaction(Procedure catProc, StoredProcedureInvocation task,
             DBBPool.BBContainer tcont, int partition, long nowNanos) {
-            InternalCallback cb = new InternalCallback(tcont);
+        return createTransaction(catProc, task, tcont, partition, nowNanos, null);
+    }
+
+    public boolean createTransaction(Procedure catProc, StoredProcedureInvocation task,
+            DBBPool.BBContainer tcont, int partition, long nowNanos, Callback inputCallback) {
+            InternalCallback cb = new InternalCallback(tcont, inputCallback);
             long cbhandle = registerCallback(cb);
             cb.setId(cbhandle);
             task.setClientHandle(cbhandle);
             m_pendingCallbacks.put(cbhandle, cb);
 
-            //Submmit the transaction.
+            //Submit the transaction.
             return VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
                     catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
                     task.getSerializedSize(), nowNanos);

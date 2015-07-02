@@ -36,15 +36,11 @@ public class ImportHandler {
 
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private final InternalConnectionHandler m_internalConnectionHandler;
     private boolean m_stopped = false;
 
     // The real handler gets created for each importer.
-    public ImportHandler(InternalConnectionHandler internalConnectionHandler,
-                         ImportContext importContext,
+    public ImportHandler(ImportContext importContext,
                          CatalogContext catContext) {
-        m_internalConnectionHandler = internalConnectionHandler;
-
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
         m_importContext = importContext;
@@ -94,12 +90,13 @@ public class ImportHandler {
      * Returns true if a table with the given name exists in the server catalog.
      */
     public boolean hasTable(String name) {
-        return m_internalConnectionHandler.hasTable(name);
+        return VoltDB.instance().getClientInterface().getInternalConnectionHandler().hasTable(name);
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
         if (!m_stopped) {
-            return m_internalConnectionHandler.callProcedure(ic.getBackpressureTimeout(), proc, fieldList);
+            return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
+                    .callProcedure(ic.getBackpressureTimeout(), proc, fieldList);
         } else {
             m_logger.warn("Importer is in stopped state. Cannot execute procedures");
             return false;

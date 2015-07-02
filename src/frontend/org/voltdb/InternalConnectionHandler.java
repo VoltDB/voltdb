@@ -42,8 +42,13 @@ public class InternalConnectionHandler {
     // Atomically allows the catalog reference to change between access
     private final AtomicLong m_failedCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
+    private final InternalClientResponseAdapter m_adapter;
 
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTIONS", 5000);
+
+    public InternalConnectionHandler(InternalClientResponseAdapter adapter) {
+        m_adapter = adapter;
+    }
 
     //Allocate and pool similar row sizes will reuse the buffers.
     private BBContainer getBuffer(int sz) {
@@ -58,9 +63,10 @@ public class InternalConnectionHandler {
         return (table!=null);
     }
 
+    // Use backPressureTimeout value <= 0  for no back pressure timeout
     public boolean callProcedure(long backPressureTimeout, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED) { // TODO: we need to allow resume when memory goes back lower
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             m_logger.warn("Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
@@ -92,8 +98,7 @@ public class InternalConnectionHandler {
         int counter = 1;
         int maxSleepNano = 100000;
         long start = System.nanoTime();
-        InternalClientResponseAdapter adapter = VoltDB.instance().getClientInterface().getInternalAdapter();
-        while (adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS) {
+        while ((backPressureTimeout > 0) && (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS)) {
             try {
                 int nanos = 500 * counter++;
                 Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
@@ -115,7 +120,7 @@ public class InternalConnectionHandler {
             taskbuf.put(ProcedureInvocationType.ORIGINAL.getValue());
             taskbuf.putInt(proc.length());
             taskbuf.put(proc.getBytes());
-            taskbuf.putLong(adapter.connectionId());
+            taskbuf.putLong(m_adapter.connectionId());
             pset.flattenToBuffer(taskbuf);
             taskbuf.flip();
             task.initFromBuffer(taskbuf);
@@ -143,7 +148,7 @@ public class InternalConnectionHandler {
         boolean success;
         //Synchronize this to create good handles across all ImportHandlers
         synchronized(InternalConnectionHandler.class) {
-            success = adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
+            success = m_adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
         }
         if (!success) {
             tcont.discard();

@@ -41,17 +41,17 @@ public class ResourceUsageMonitor implements Runnable
     @Override
     public void run()
     {
+        if (VoltDB.instance().getMode()!=OperationMode.RUNNING) {
+            return;
+        }
+
         Datum datum = SystemStatsCollector.getRecentSample();
         if (datum==null) { // this will be null if stats has not run yet
             return;
         }
 
-        // TODO: May be do something like the thermostat delay so that the server won't
-        // switch back and forth between Paused and Running?
         if (datum.rss>=m_rssLimit && VoltDB.instance().getMode()==OperationMode.RUNNING) {
-            // pause the server
-        } else if (datum.rss<m_rssLimit && VoltDB.instance().getMode()==OperationMode.PAUSED) {
-            // resume the server
+            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(0, "@Pause");
         }
     }
 }

@@ -171,7 +171,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
-    private final InternalClientResponseAdapter m_internalAdapter;
+    private final InternalConnectionHandler m_internalConnectionHandler;
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
@@ -1206,12 +1206,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_siteId = m_mailbox.getHSId();
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
 
-        m_internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
-        bindAdapter(m_internalAdapter, null);
+        InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
+        bindAdapter(internalAdapter, null);
+        m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter);
     }
 
-    public InternalClientResponseAdapter getInternalAdapter() {
-        return m_internalAdapter;
+    public InternalConnectionHandler getInternalConnectionHandler() {
+        return m_internalConnectionHandler;
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {
