@@ -21,6 +21,8 @@
 
 package org.voltdb.catalog;
 
+import java.util.List;
+
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.utils.Pair;
 import org.voltdb.common.Constants;
@@ -123,7 +125,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     }
 
     @Override
-    public String[] checkModifyIfTableIsEmptyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
+    public List<String[]> checkModifyIfTableIsEmptyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
         return null;
     }
 }

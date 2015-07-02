@@ -21,8 +21,15 @@
 
 package org.voltdb.catalog;
 
-import java.util.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.SortedMap;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
@@ -810,7 +817,21 @@ public class CatalogDiffEngine {
         List<String[]> retval = new ArrayList<>();
 
         if (prevType instanceof Database) {
-            // TODO: if dr mode is changed, return all DRed tables as a list of response entries
+            if(field.equalsIgnoreCase("isActiveActiveDRed")) {
+                for (Table t : ((Database) suspect).getTables()) {
+                    if (t.getIsdred()) {
+                        String[] entry = new String[2];
+                        entry[0] = t.getTypeName();
+                        entry[1] = String.format(
+                                "Unable to change DR mode of table %s because it is not empty.",
+                                entry[0]);
+                        retval.add(entry);
+                    }
+                }
+                return retval;
+            }
+
+            return null;
         }
 
         if (prevType instanceof Table) {
