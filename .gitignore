@@ -20,6 +20,7 @@
 host*+0000.txt
 voltdb_crash*
 buildstring.txt
+bundles/
 obj/
 groovyout/
 debugoutput/
@@ -63,3 +64,4 @@ doc/tutorials/auction/csvloader_*.csv
 /src/frontend/org/voltcore/utils/.flagfile
 /tests/sqlcmd/scripts/**/*.outdiffs
 out
+bundles

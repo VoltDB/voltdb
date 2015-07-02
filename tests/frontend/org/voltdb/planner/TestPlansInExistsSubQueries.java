@@ -79,19 +79,32 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             AbstractScanPlanNode nps = (AbstractScanPlanNode) pn;
             // Check param indexes
             AbstractExpression e = nps.getPredicate();
-            /* not yet hsql232: ENG-8350, left/right children swapped in expr trees
             AbstractExpression le = e.getLeft();
-            assertEquals(ExpressionType.COMPARE_GREATERTHAN, le.getExpressionType());
-            AbstractExpression pve = le.getRight();
-            assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
-            assertEquals(new Integer(0), ((ParameterValueExpression)pve).getParameterIndex());
-            AbstractExpression re = e.getRight();
-            assertEquals(ExpressionType.OPERATOR_EXISTS, re.getExpressionType());
-            AbstractSubqueryExpression se = (AbstractSubqueryExpression) re.getLeft();
-            assertEquals(1, se.getArgs().size());
-            assertEquals(1, se.getParameterIdxList().size());
-            assertEquals(Integer.valueOf(1), se.getParameterIdxList().get(0));
-            */
+            if (le.getExpressionType().equals(ExpressionType.COMPARE_GREATERTHAN))  {
+                assertEquals(ExpressionType.COMPARE_GREATERTHAN, le.getExpressionType());
+                AbstractExpression pve = le.getRight();
+                assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
+                assertEquals(new Integer(0), ((ParameterValueExpression)pve).getParameterIndex());
+                AbstractExpression re = e.getRight();
+                assertEquals(ExpressionType.OPERATOR_EXISTS, re.getExpressionType());
+                AbstractSubqueryExpression se = (AbstractSubqueryExpression) re.getLeft();
+                assertEquals(1, se.getArgs().size());
+                assertEquals(1, se.getParameterIdxList().size());
+                assertEquals(Integer.valueOf(1), se.getParameterIdxList().get(0));
+            }
+            else{
+                le = e.getRight();
+                assertEquals(ExpressionType.COMPARE_GREATERTHAN, le.getExpressionType());
+                AbstractExpression pve = le.getRight();
+                assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
+                assertEquals(new Integer(0), ((ParameterValueExpression)pve).getParameterIndex());
+                AbstractExpression re = e.getLeft();
+                assertEquals(ExpressionType.OPERATOR_EXISTS, re.getExpressionType());
+                AbstractSubqueryExpression se = (AbstractSubqueryExpression) re.getLeft();
+                assertEquals(1, se.getArgs().size());
+                assertEquals(1, se.getParameterIdxList().size());
+                assertEquals(Integer.valueOf(1), se.getParameterIdxList().get(0));
+            }
         }
         {
             // Subqueries  with  grand-parent TVE
@@ -299,12 +312,21 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             AbstractSubqueryExpression se = (AbstractSubqueryExpression) e.getLeft();
             List<AbstractExpression> args = se.getArgs();
             assertEquals(2, args.size());
+            // order of elements in TubleVauleExperssion is not consistent on Java 7 and Java 8
             TupleValueExpression tve = (TupleValueExpression)args.get(0);
-            assertEquals("R2", tve.getTableName());
-            assertEquals("A", tve.getColumnName());
-            tve = (TupleValueExpression)args.get(1);
-            assertEquals("R1", tve.getTableName());
-            assertEquals("D", tve.getColumnName());
+            if (tve.getTableName().equals("R2")) {
+                assertEquals("A", tve.getColumnName());
+                tve = (TupleValueExpression)args.get(1);
+                assertEquals("R1", tve.getTableName());
+                assertEquals("D", tve.getColumnName());
+            }
+            else {
+                assertEquals("R1", tve.getTableName());
+                assertEquals("D", tve.getColumnName());
+                tve = (TupleValueExpression)args.get(1);
+                assertEquals("R2", tve.getTableName());
+                assertEquals("A", tve.getColumnName());
+            }
             assertEquals(2, se.getParameterIdxList().size());
             // Child query
             pn = se.getSubqueryNode();
@@ -339,11 +361,19 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             List<AbstractExpression> args = se.getArgs();
             assertEquals(2, args.size());
             TupleValueExpression tve = (TupleValueExpression)args.get(0);
-            assertEquals("R2", tve.getTableName());
-            assertEquals("C", tve.getColumnName());
-            tve = (TupleValueExpression)args.get(1);
-            assertEquals("R1", tve.getTableName());
-            assertEquals("A", tve.getColumnName());
+            if (tve.getTableName().equals("R2")) {
+                assertEquals("C", tve.getColumnName());
+                tve = (TupleValueExpression)args.get(1);
+                assertEquals("R1", tve.getTableName());
+                assertEquals("A", tve.getColumnName());
+            }
+            else {
+                assertEquals("R1", tve.getTableName());
+                assertEquals("A", tve.getColumnName());
+                tve = (TupleValueExpression)args.get(1);
+                assertEquals("R2", tve.getTableName());
+                assertEquals("C", tve.getColumnName());
+            }
             assertEquals(2, se.getParameterIdxList().size());
             // Child query
             pn = se.getSubqueryNode();

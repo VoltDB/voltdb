@@ -39,6 +39,7 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.QuantifierType;
@@ -399,6 +400,127 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         }
     }
 
+    public void testUnion() {
+        {
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "    select * from R5)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            assertEquals(0, selSubq.getArgs().size()); // no correlation params
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            // Correlation parameter on the LHS of the union
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "    where outer_tbl.a = c "
+                            + "  union "
+                            + "    select * from R5)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            // Correlation parameter on the RHS of the union
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "    select * from R5"
+                            + "    where outer_tbl.a = c)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            // Correlation parameter in an intersect under a union
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "      (select * from R4 "
+                            + "    intersect"
+                            + "      select * from R5"
+                            + "      where outer_tbl.a = c))");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+
+        }
+    }
+
     public void testScalarGuard() {
         String errorMessage = PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE;
 
@@ -406,6 +528,26 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         failToCompile("select r2.c from r2 where r2.c = (select p1.a from p1 where p1.a = r2.c);", errorMessage);
         */
+        // partition table in the UNION clause
+        // 2 partition tables
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p1.a from p1 where p1.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // 1 partition table and 1 replicated table
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // 2 tables with the same table alias
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p2.a from r4 as p2 where p2.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // swap the UNION order for the previous case
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p2.a from p2 where p2.a = r2.a UNION select p2.a from r4 as p2 where p2.a = r2.a);", errorMessage);
+        // Join in the right clause of UNION
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION select p2.a from p2, r3 where p2.a = r2.a and p2.a = r3.a);", errorMessage);
+        // partition sub-query in the UNION
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION "
+                + "  select tb.c from (select a, c from p2 where a = 3 and d > 2) tb, r3 where tb.a = r2.a and tb.a = r3.a);", errorMessage);
     }
 
     @Override

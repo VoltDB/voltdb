@@ -44,6 +44,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
@@ -54,10 +55,12 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -320,6 +323,58 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             deleteDirectory(new File("/tmp/snapshotdir1"));
             deleteDirectory(new File("/tmp/snapshotdir2"));
         }
+    }
+
+    public void testPauseMode() throws Exception {
+        Client adminClient = getAdminClient();
+        ClientResponse resp = adminClient.callProcedure("@Pause");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        Client client = getClient();
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml");
+        try {
+            client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+            fail("Update catalog with procs from class should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocproc.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocproc.xml");
+        try {
+            client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+            fail("Update catalog with adhoc procs should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocschema.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocschema.xml");
+        try {
+            client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+            fail("Update catalog with adhoc schema change should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        InMemoryJarfile jarfile = new InMemoryJarfile();
+        VoltCompiler comp = new VoltCompiler();
+        comp.addClassToJar(jarfile, TestProc.class);
+
+        try {
+            resp = client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            fail("Update classes should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        // admin should pass
+        resp = adminClient.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        resp = adminClient.callProcedure("@Resume");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
     }
 
     public void testUpdate() throws Exception {
@@ -1111,6 +1166,24 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
+        config = new LocalCluster("catalogupdate-cluster-adhocproc.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addStmtProcedure("adhocproc1", "SELECT * from WAREHOUSE");
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocproc.xml"));
+
+        config = new LocalCluster("catalogupdate-cluster-adhocschema.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addLiteralSchema("CREATE TABLE CATALOG_MODE_DDL_TEST (fld1 INTEGER NOT NULL);");
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocschema.xml"));
+
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-conflict.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
@@ -1246,5 +1319,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     public void setUp() throws Exception {
         super.setUp();
         callbackSuccess = true;
+    }
+
+    public class TestProc extends VoltProcedure {
+
+        public long run()
+        {
+            // do nothing
+            return 0;
+        }
     }
 }
