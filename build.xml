@@ -649,7 +649,7 @@ DISTRIBUTION
         <isset property="os.mac"/>
     </condition>
 
-    <!-- copy the native library to a common location -->
+    <!-- Call shell script that handles copying native libs so they can be packaged together -->
     <exec dir='.' executable="/usr/bin/env" failonerror='true'>
         <arg value='bash' />
         <arg value='tools/copy-lib.sh'/>

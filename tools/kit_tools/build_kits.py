@@ -23,8 +23,8 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
     run("mkdir -p " + builddir)
     # change to it
     with cd(builddir):
-        # do the checkouts, collect checkout errors on
-        # all 3 repos so user gets all the bad news at once
+        # do the checkouts, collect checkout errors on both community &
+        # pro repos so user gets status on both checkouts
         message = ""
         run("git clone git@github.com:VoltDB/voltdb.git")
         result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
@@ -38,8 +38,9 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
 
         run("git clone git@github.com:VoltDB/export-rabbitmq.git")
         result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
+        # Probably ok to use master for export-rabbitmq.
         if result.failed:
-            message += "\nExport-rabbitmg checkout failed. Missing branch %s." % rbmqExportGit
+            print "\nExport-rabbitmg branch %s checkout failed. Defaulting to master." % rbmqExportGit
 
         if len(message) > 0:
             abort(message)
@@ -279,17 +280,11 @@ UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 try:
 # build kits on the mini
-    print "++++++++++++starting the Mac-side build"
     with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
         versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
         buildCommunity()
-        # copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-        # buildPro()
-        # buildRabbitMQExport(versionMac)
-        # copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
 except Exception as e:
-    print "Could not build MAC kit. Exception: " + str(e)
-    print "Type " + str(type(e))
+    print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
 # build kits on 5f
@@ -318,9 +313,7 @@ try:
         copyMavenJarsToReleaseDir(releaseDir, versionCentos)
 
 except Exception as e:
-    print "Could not build LINUX kit: " + str(e)
-    print "Could not build MAC kit. Exception: " + str(e)
-    print "Type " + str(type(e))
+    print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
 # build debian kit
@@ -343,9 +336,7 @@ try:
             run ("sudo python voltdb-install.py -D " + entbld)
             get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
 except Exception as e:
-    print "Could not build debian kit: " + str(e)
-    print "Could not build MAC kit. Exception: " + str(e)
-    print "Type " + str(type(e))
+    print "Could not build debian kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
 try:
@@ -369,9 +360,7 @@ try:
             get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
 except Exception as e:
-    print "Could not build rpm kit: " + str(e)
-    print "Could not build MAC kit. Exception: " + str(e)
-    print "Type " + str(type(e))
+    print "Could not build rpm kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
 computeChecksums(releaseDir)
