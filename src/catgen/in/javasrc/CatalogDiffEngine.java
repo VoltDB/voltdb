@@ -988,7 +988,7 @@ public class CatalogDiffEngine {
         assert(errorMessage != null);
 
         // if no tablename, then it's just not possible
-        if (responseList == null) {
+        if (responseList == null || responseList.isEmpty()) {
             m_supported = false;
             m_errors.append(errorMessage + "\n");
         }
@@ -1034,8 +1034,11 @@ public class CatalogDiffEngine {
         if (errorMessage != null) {
             String[] response = checkAddDropIfTableIsEmptyWhitelist(prevType, ChangeType.DELETION);
             // handle all the error messages and state from the modify check
-            List<String[]> responseList = new ArrayList<>();
-            responseList.add(response);
+            List<String[]> responseList = null;
+            if (response != null) {
+                responseList = new ArrayList<>();
+                responseList.add(response);
+            }
             processModifyResponses(errorMessage, responseList);
         }
 
@@ -1064,8 +1067,11 @@ public class CatalogDiffEngine {
         if (errorMessage != null) {
             String[] response = checkAddDropIfTableIsEmptyWhitelist(newType, ChangeType.ADDITION);
             // handle all the error messages and state from the modify check
-            List<String[]> responseList = new ArrayList<>();
-            responseList.add(response);
+            List<String[]> responseList = null;
+            if (response != null) {
+                responseList = new ArrayList<>();
+                responseList.add(response);
+            }
             processModifyResponses(errorMessage, responseList);
         }
 
