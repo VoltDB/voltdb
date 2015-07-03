@@ -116,10 +116,12 @@ $(document).ready(function () {
     });
 
     // Implements Scroll in Server List div
-    $('#tabScroller').slimscroll({
-        disableFadeOut: true,
-        height: '225px'
-    });
+    //$('#tabScroller').slimscroll({
+    //    disableFadeOut: true,
+    //    alwaysVisible: true,
+    //    railVisible: true,
+    //    height: '225px'
+    //});
 });
 
 (function (window) {
@@ -619,7 +621,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
     };
 
     var populateTablesAndViews = function () {
-        voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData,sysProcedureData) {
+        voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData) {
             var tables = tablesData['tables'];
             populateTableData(tables);
             var views = viewsData['views'];
@@ -627,7 +629,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
             var procedures = proceduresData['procedures'];
             var procedureColumns = procedureColumnsData['procedureColumns'];
             var sysProcedure = sysProcedureData['sysProcedures'];
-            populateStoredProcedure(procedures, procedureColumns,sysProcedure);
+            populateStoredProcedure(procedures, procedureColumns, sysProcedure);
         });
     };
     populateTablesAndViews();

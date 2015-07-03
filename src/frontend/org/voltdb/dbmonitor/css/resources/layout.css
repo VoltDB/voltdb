@@ -783,6 +783,7 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
     float: left;
     width: 100%;
     background: #fff;
+    overflow: auto;
 }
 
 .tab_content {
