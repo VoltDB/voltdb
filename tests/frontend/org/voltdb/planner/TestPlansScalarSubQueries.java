@@ -527,7 +527,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         failToCompile("select * from r5 where (a,c) > ALL (select a, c from p1);", errorMessage);
         /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         failToCompile("select r2.c from r2 where r2.c = (select p1.a from p1 where p1.a = r2.c);", errorMessage);
-        */
+
         // partition table in the UNION clause
         // 2 partition tables
         failToCompile("select * from r2 where r2.c > "
@@ -548,6 +548,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         failToCompile("select * from r2 where r2.c > "
                 + " (select r4.a from r4 where r4.a = r2.a UNION "
                 + "  select tb.c from (select a, c from p2 where a = 3 and d > 2) tb, r3 where tb.a = r2.a and tb.a = r3.a);", errorMessage);
+        */
     }
 
     @Override
