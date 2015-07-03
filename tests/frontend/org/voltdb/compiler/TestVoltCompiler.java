@@ -4024,7 +4024,7 @@ public class TestVoltCompiler extends TestCase {
         // Scalar subquery not allowed in indices.
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
                                     "create index bidx on books ( select title from books as child where child.cash = books.cash );");
-        /* not yet hsql232: ENG-8302, NPE when creating partial index with subquery
+        /* not yet hsql232: ENG-8589, NPE when creating index with subquery
         checkDDLAgainstScalarSubquerySchema("Index BIDX1 with subquery expression\\(s\\) is not supported.",
                                     "create index bidx1 on books ( ( select title from books as child where child.cash = books.cash ) ) ;");
         checkDDLAgainstScalarSubquerySchema("Index BIDX2 with subquery expression\\(s\\) is not supported.",
