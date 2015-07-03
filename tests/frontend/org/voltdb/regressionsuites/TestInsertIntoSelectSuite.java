@@ -221,7 +221,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         new ProcedureTemplate("join_noparam",
                               "select t1.bi, t1.vc, t2.ii, t2.ti " +
                               "from %s as t1 inner join %s as t2 on t1.bi = t2.bi and t1.ii = t2.ii"),
-        // repro now because NEED TICKET!/* hsql232 not yet subqueries
+        /* hsql232 ENG-8314 lack of subquery support
         new ProcedureTemplate("subquery",
                               "select * " +
                               "from (select bi, 'subq + ' || vc as vc, ii, ti from %s) as t1_subq " +
@@ -807,7 +807,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
 
         // Note however that this issue is not specific to
         // INSERT INTO ... SELECT.  This fails to plan as well:
-        // repro now because NEED TICKET! //* hsql232 not yet subqueries
+        /* hsql232 ENG-8134 subquery support
         verifyStmtFails(client,
                 "select count(*) " +
                 "from target_p " +

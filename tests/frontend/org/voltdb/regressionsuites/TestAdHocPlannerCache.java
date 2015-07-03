@@ -73,6 +73,12 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
         vt = client.callProcedure("@Statistics", "PLANNER", 0).getResults()[0];
 
+        System.out.println(vt);
+        System.out.println(cache1_level + " is CACHE1_LEVEL, " +
+                cache2_level + " is CACHE2_LEVEL, " +
+                cache1_hits  + " is CACHE1_HITS, " +
+                cache2_hits  + " is CACHE2_HITS, " +
+                cache_misses + " is CACHE_MISSES.");
         while(vt.advanceRow()) {
             // MPI's site id is -1 by design
             Integer siteID = (Integer) vt.get("SITE_ID", VoltType.INTEGER);
@@ -94,32 +100,31 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         assertTrue(checked);
     }
 
-    private void checkPlannerCache(Client client, int... cacheTypes) throws NoConnectionsException, IOException, ProcCallException {
-        for (int cacheType : cacheTypes) {
-            if (cacheType == CACHE_MISS1) {
-                ++m_cache1_level;
-                ++m_cache_misses;
-            } else if (cacheType == CACHE_MISS2) {
-                ++m_cache2_level;
-                ++m_cache_misses;
-            } else if (cacheType == CACHE_MISS2_ADD1) {
-                ++m_cache1_level;
-                ++m_cache2_level;
-                ++m_cache_misses;
-            } else if (cacheType == CACHE_HIT1) {
-                ++m_cache1_hits;
-            } else if (cacheType == CACHE_HIT2) {
-                ++m_cache2_hits;
-            } else if (cacheType == CACHE_HIT2_ADD1) {
-                ++m_cache1_level;
-                ++m_cache2_hits;
-            } else if (cacheType == CACHE_PARAMS_EXCEPTION) {
-                ++m_cache_misses;
-            } else if (cacheType == CACHE_SKIPPED) {
-                // Has not gone through the planner cache code
-            } else {
-                fail("Wrong input cache type");
-            }
+    private void checkPlannerCache(Client client, int cacheType)
+            throws NoConnectionsException, IOException, ProcCallException {
+        if (cacheType == CACHE_MISS1) {
+            ++m_cache1_level;
+            ++m_cache_misses;
+        } else if (cacheType == CACHE_MISS2) {
+            ++m_cache2_level;
+            ++m_cache_misses;
+        } else if (cacheType == CACHE_MISS2_ADD1) {
+            ++m_cache1_level;
+            ++m_cache2_level;
+            ++m_cache_misses;
+        } else if (cacheType == CACHE_HIT1) {
+            ++m_cache1_hits;
+        } else if (cacheType == CACHE_HIT2) {
+            ++m_cache2_hits;
+        } else if (cacheType == CACHE_HIT2_ADD1) {
+            ++m_cache1_level;
+            ++m_cache2_hits;
+        } else if (cacheType == CACHE_PARAMS_EXCEPTION) {
+            ++m_cache_misses;
+        } else if (cacheType == CACHE_SKIPPED) {
+            // Has not gone through the planner cache code
+        } else {
+            fail("Wrong input cache type");
         }
 
         // check statistics
@@ -258,7 +263,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
-        checkPlannerCache(client, CACHE_SKIPPED, CACHE_SKIPPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
 
         // fewer parameters
         try {
@@ -267,7 +272,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
-        checkPlannerCache(client, CACHE_SKIPPED, CACHE_SKIPPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
 
         try {
             client.callProcedure("@AdHoc", "select * from r1 sub2;" + sql, 0, 0);
@@ -275,7 +280,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
-        checkPlannerCache(client, CACHE_SKIPPED, CACHE_SKIPPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
 
 
         // by pass the pre-planner check
@@ -289,7 +294,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         VoltTable[] vts = client.callProcedure("@AdHoc", sql + sql).getResults();
         validateTableOfScalarLongs(vts[0], new long[]{1, 2, 3});
         validateTableOfScalarLongs(vts[1], new long[]{1, 2, 3});
-        checkPlannerCache(client, CACHE_SKIPPED, CACHE_SKIPPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
 
         //
         // Pass in incorrect number of parameters
