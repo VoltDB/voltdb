@@ -44,9 +44,9 @@ import org.voltcore.logging.VoltLogger;
  * </ul>
  */
 public class HSQLInterface {
-    static final private VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
-
     static public String XML_SCHEMA_NAME = "databaseschema";
+
+    static final private VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
     /**
      * Naming conventions for unnamed indexes and constraints
      */
@@ -313,6 +313,9 @@ public class HSQLInterface {
         sessionProxy.resetVoltNodeIds();
 
         String errorMessage = null;
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug("SQL: " + sql);
+        }
         try {
             cs = sessionProxy.compileStatement(sql);
         } catch(HsqlException hexc) {
@@ -337,6 +340,13 @@ public class HSQLInterface {
         if (cs == null) {
             throw new HSQLParseException(errorMessage);
         }
+        if (m_logger.isDebugEnabled()) {
+            try {
+                m_logger.debug("HSQLDB: " + cs.describe(sessionProxy));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
 
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
@@ -346,19 +356,12 @@ public class HSQLInterface {
 
         VoltXMLElement xml = cs.voltGetStatementXML(sessionProxy);
         if (m_logger.isDebugEnabled()) {
-           try {
-               /*
-                * Sometimes exceptions happen.
-                */
-               m_logger.debug(String.format("SQL: %s\n", sql));;
-               m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
-               m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
-           } catch (Exception ex) {
-               System.out.printf("Exception: %s\n", ex.getMessage());
-               ex.printStackTrace(System.out);
-           }
+            try {
+                m_logger.debug("VoltDB: " + xml.toString());
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
-
         // this releases some small memory hsql uses that builds up over time if not
         // cleared
         // if it's not called for every call of getXMLCompiledStatement, that's ok;

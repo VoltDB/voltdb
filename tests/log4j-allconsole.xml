@@ -41,7 +41,7 @@
     </logger -->
 
     <!--logger name="HSQLDB_COMPILER">
-        <level  value="DEBUG"/>
+        <level value="DEBUG"/>
     </logger -->
 
     <!-- logger name="ADHOC">
