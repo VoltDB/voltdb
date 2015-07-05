@@ -1574,42 +1574,9 @@ public class PlanAssembler {
             return root;
         }
 
-        // For MP queries, the coordinator's OrderBy node can be replaced with
-        // a specialized Receive node that merges individual partitions results
-        // into a final result set. The preconditions for that are:
-        //  - partition result set is sorted in the order matching the ORDER BY order
-        //  - no aggregation at the coordinator node
-        List<AbstractPlanNode> receives = root.findAllNodesOfType(PlanNodeType.RECEIVE);
-        boolean isMPPlan = !receives.isEmpty();
-        boolean isPartitionSorted = false;
-        boolean noCoordinatorAggregation = true;
-        if (isMPPlan) {
-            AbstractPlanNode receive = receives.get(0);
-            assert(receive.getChildCount() == 1);
-            assert(receive.getChild(0).getChildCount() == 1);
-            AbstractPlanNode partitionRoot = receive.getChild(0).getChild(0);
-            isPartitionSorted = !isOrderByNodeRequired(parsedStmt, partitionRoot);
-            if (isPartitionSorted) {
-                List<AbstractPlanNode> aggs = root.findAllNodesOfClass(AggregatePlanNode.class);
-                for(AbstractPlanNode agg : aggs) {
-                    if (((AggregatePlanNode)agg).m_isCoordinatingAggregator) {
-                        noCoordinatorAggregation = false;
-                        break;
-                    }
-                }
-            }
-        }
-
         OrderByPlanNode orderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
-        if (isMPPlan && isPartitionSorted && noCoordinatorAggregation) {
-            ReceivePlanNode receive = (ReceivePlanNode)receives.get(0);
-            receive.setNeedMerge(true);
-            receive.addInlinePlanNode(orderByNode);
-            return root;
-        } else {
-            orderByNode.addAndLinkChild(root);
-            return orderByNode;
-        }
+        orderByNode.addAndLinkChild(root);
+        return orderByNode;
     }
 
     /**
@@ -1734,11 +1701,6 @@ public class PlanAssembler {
         if (pn instanceof OrderByPlanNode ||
             pn.getPlanNodeType() == PlanNodeType.AGGREGATE) {
             return true;
-        } else if (pn instanceof ReceivePlanNode) {
-            ReceivePlanNode rpn = (ReceivePlanNode) pn;
-            if (rpn.getNeedMerge() == true) {
-                return true;
-            }
         }
         return false;
     }

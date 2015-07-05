@@ -270,6 +270,12 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         return m_sortDirection;
     }
 
+    @Override
+    public boolean isOutputOrdered() {
+        return getSortDirection() != SortDirectionType.INVALID &&
+                getInlinePlanNode(PlanNodeType.HASHAGGREGATE) == null;
+    }
+
     // TODO: need to extend the sort direction for join from one table to the other table if possible
     // right now, only consider the sort direction on the outer table
     public void resolveSortDirection() {

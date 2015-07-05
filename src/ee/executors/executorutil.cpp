@@ -98,7 +98,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_RECEIVE: {
         ReceivePlanNode* receive_plan_node = dynamic_cast<ReceivePlanNode*>(abstract_node);
         assert(receive_plan_node != NULL);
-        if (receive_plan_node->needMerge()) {
+        if (receive_plan_node->isMergeReceive()) {
             return new MergeReceiveExecutor(engine, abstract_node);
         } else {
             return new ReceiveExecutor(engine, abstract_node);
