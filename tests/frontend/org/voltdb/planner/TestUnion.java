@@ -39,6 +39,7 @@ public class TestUnion extends PlannerTestCase {
         AbstractPlanNode pn = compile("select A from T1 UNION select B from T2 UNION select C from T3");
         assertTrue(pn.getChild(0) instanceof UnionPlanNode);
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(!unionPN.isOutputOrdered());
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
         assertTrue(unionPN.getChildCount() == 3);
 
@@ -298,6 +299,7 @@ public class TestUnion extends PlannerTestCase {
     public void testUnionOrderby() {
         {
             AbstractPlanNode pn = compile("select B from T2 UNION select B from T2 order by B");
+            assertTrue(pn.isOutputOrdered());
             pn = pn.getChild(0);
             String[] columnNames = {"B"};
             checkOrderByNode(pn, columnNames);

@@ -49,7 +49,7 @@
 
 namespace voltdb {
 
-ReceivePlanNode::ReceivePlanNode() : m_needMerge(false) { }
+ReceivePlanNode::ReceivePlanNode() : m_mergeReceive(false) { }
 
 PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
@@ -70,8 +70,8 @@ std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
 
 void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-        if (obj.hasNonNullKey("NEED_MERGE")) {
-            m_needMerge = obj.valueForKey("NEED_MERGE").asBool();
+        if (obj.hasNonNullKey("MERGE_RECEIVE")) {
+            m_mergeReceive = obj.valueForKey("MERGE_RECEIVE").asBool();
         }
 }
 

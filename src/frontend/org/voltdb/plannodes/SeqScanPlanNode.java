@@ -66,6 +66,11 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         return false; // TODO: enhance to return true for any supportable cases of in-order storage
     }
 
+    @Override
+    public boolean isOutputOrdered() {
+        return false;
+    }
+
     private static final TableEstimates SUBQUERY_TABLE_ESTIMATES_HACK = new TableEstimates();
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {

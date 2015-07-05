@@ -56,15 +56,15 @@ public:
     ReceivePlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
-    bool needMerge() const {
-        return m_needMerge;
+    bool isMergeReceive() const {
+        return m_mergeReceive;
     }
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
 
 private:
-    bool m_needMerge;
+    bool m_mergeReceive;
 };
 
 } // namespace voltdb

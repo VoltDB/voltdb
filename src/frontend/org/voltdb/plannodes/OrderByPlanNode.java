@@ -209,4 +209,9 @@ public class OrderByPlanNode extends AbstractPlanNode {
         }
         return collected;
     }
+
+    @Override
+    public boolean isOutputOrdered() {
+        return true;
+    }
 }
