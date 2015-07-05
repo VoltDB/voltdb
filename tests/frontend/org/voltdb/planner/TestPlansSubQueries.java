@@ -1387,10 +1387,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         // inline limit with order by
-        assertTrue(pn instanceof OrderByPlanNode);
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
-        pn = pn.getChild(0);
         assertTrue(pn instanceof ReceivePlanNode);
+        assertTrue(((ReceivePlanNode)pn).isMergeReceive());
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
 
         pn = planNodes.get(1).getChild(0);
         // inline limit with order by

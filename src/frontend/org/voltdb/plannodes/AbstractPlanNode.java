@@ -307,6 +307,26 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * Does the output is ordered by an index sort direction or ORDER BY expressions.
+     * The default implementation delegates the question to its children. Any node
+     * with more than one children needs to provide its own implementation.
+     *
+     * @return TRUE if the node's output table is ordered. FALSE otherwise
+     */
+    public boolean isOutputOrdered () {
+        assert(m_children != null);
+        if (m_children.size() > 1) {
+            return false;
+        }
+        for (AbstractPlanNode child : m_children) {
+            if (! child.isOutputOrdered()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Accessor for description of plan non-determinism.
      * @return the field
      */

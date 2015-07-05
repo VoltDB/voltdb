@@ -562,4 +562,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return collected;
     }
 
+    @Override
+    public boolean isOutputOrdered() {
+        return (getPlanNodeType() == PlanNodeType.HASHAGGREGATE) ? false : true;
+    }
 }

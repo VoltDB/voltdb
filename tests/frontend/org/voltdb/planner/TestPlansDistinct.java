@@ -30,6 +30,7 @@ import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
 
@@ -344,6 +345,19 @@ public class TestPlansDistinct extends PlannerTestCase {
         apn1 = pns1.get(0).getChild(0);
         apn2 = pns2.get(0).getChild(0);
 
+        boolean orderbyOptimization1 = false;
+        boolean orderbyOptimization2 = false;
+        List<AbstractPlanNode> receives = apn1.findAllNodesOfType(PlanNodeType.RECEIVE);
+        assertEquals(1, receives.size());
+        if (((ReceivePlanNode)receives.get(0)).isMergeReceive()) {
+            orderbyOptimization1 = true;
+        }
+        receives = apn2.findAllNodesOfType(PlanNodeType.RECEIVE);
+        assertEquals(1, receives.size());
+        if (((ReceivePlanNode)receives.get(0)).isMergeReceive()) {
+            orderbyOptimization2 = true;
+        }
+
         boolean hasTopProjection1 = false;
         if (apn1 instanceof ProjectionPlanNode) {
             apn1 = apn1.getChild(0);
@@ -369,6 +383,12 @@ public class TestPlansDistinct extends PlannerTestCase {
         } else if (apn2 instanceof LimitPlanNode) {
             hasLimit = true;
             apn2 = apn2.getChild(0);
+        } else if (apn2 instanceof ReceivePlanNode) {
+            if (((ReceivePlanNode)apn2).isMergeReceive()) {
+                assertTrue(apn2.getInlinePlanNode(PlanNodeType.ORDERBY) != null);
+                hasOrderby = true;
+                hasLimit = apn2.getInlinePlanNode(PlanNodeType.LIMIT) != null;
+            }
         }
 
         // check the DISTINCT query plan
@@ -402,7 +422,9 @@ public class TestPlansDistinct extends PlannerTestCase {
         }
 
         // check the rest plan nodes
-        assertEquals(apn1.toExplainPlanString(), apn2.toExplainPlanString());
+        if (orderbyOptimization1 == orderbyOptimization2) {
+            assertEquals(apn1.toExplainPlanString(), apn2.toExplainPlanString());
+        }
 
         // Distributed DISTINCT GROUP BY
         if (pns1.size() > 1) {
