@@ -33,11 +33,11 @@ public class ReceivePlanNode extends AbstractPlanNode {
     final static String m_nondeterminismDetail = "multi-fragment plan results can arrive out of order";
 
     public enum Members {
-        NEED_MERGE;
+        MERGE_RECEIVE;
     }
 
     // Indicator to tell whether the Receive node needs to mergesort results from individual partitions
-    private boolean m_needMerge = false;
+    private boolean m_mergeReceive = false;
 
     public ReceivePlanNode() {
         super();
@@ -78,7 +78,7 @@ public class ReceivePlanNode extends AbstractPlanNode {
         }
         m_outputSchema.sortByTveIndex();
 
-        if (m_needMerge) {
+        if (m_mergeReceive) {
             AbstractPlanNode pn = getInlinePlanNode(PlanNodeType.ORDERBY);
             assert(pn != null && pn instanceof OrderByPlanNode);
             OrderByPlanNode opn = (OrderByPlanNode) pn;
@@ -89,22 +89,22 @@ public class ReceivePlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        if (m_needMerge == true) {
-            stringer.key(Members.NEED_MERGE.name()).value(m_needMerge);
+        if (m_mergeReceive == true) {
+            stringer.key(Members.MERGE_RECEIVE.name()).value(m_mergeReceive);
         }
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        if (jobj.has(Members.NEED_MERGE.name())) {
-            m_needMerge = jobj.getBoolean(Members.NEED_MERGE.name());
+        if (jobj.has(Members.MERGE_RECEIVE.name())) {
+            m_mergeReceive = jobj.getBoolean(Members.MERGE_RECEIVE.name());
         }
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return (m_needMerge == true) ? "MERGE RECEIVE FROM ALL PARTITIONS": "RECEIVE FROM ALL PARTITIONS";
+        return (m_mergeReceive == true) ? "MERGE RECEIVE FROM ALL PARTITIONS": "RECEIVE FROM ALL PARTITIONS";
     }
 
     @Override
@@ -137,12 +137,21 @@ public class ReceivePlanNode extends AbstractPlanNode {
         return true;
     }
 
-    public void setNeedMerge(boolean needMerge) {
-        m_needMerge = needMerge;
+    public void setMergeReceive(boolean needMerge) {
+        m_mergeReceive = needMerge;
     }
 
-    public boolean getNeedMerge() {
-        return m_needMerge;
+    public boolean isMergeReceive() {
+        return m_mergeReceive;
+    }
+
+    @Override
+    public boolean isOutputOrdered() {
+        if (isMergeReceive()) {
+            return true;
+        } else {
+            return super.isOutputOrdered();
+        }
     }
 
 }

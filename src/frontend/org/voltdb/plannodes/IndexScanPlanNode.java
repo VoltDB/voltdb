@@ -325,6 +325,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return m_sortDirection;
     }
 
+    @Override
+    public boolean isOutputOrdered() {
+        return getSortDirection() != SortDirectionType.INVALID &&
+                getInlinePlanNode(PlanNodeType.HASHAGGREGATE) == null;
+    }
+
     /**
      *
      * @param lookupType
