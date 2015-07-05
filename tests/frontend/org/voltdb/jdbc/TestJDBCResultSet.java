@@ -76,7 +76,7 @@ public class TestJDBCResultSet {
         try {
             // HSQL setup
             Class.forName("org.hsqldb_voltpatches.jdbcDriver");
-            HsqlConn = DriverManager.getConnection("jdbc:hsqldb:mem:temptest",
+            HsqlConn = DriverManager.getConnection("jdbc:hsqldb_voltpatches:mem:temptest",
                     "sa", "");
             Statement hsqlStmt = null;
 
@@ -118,7 +118,7 @@ public class TestJDBCResultSet {
             assertFalse(i == -1);
             VoltDBStmt.close();
         } catch (SQLException ex) {
-            fail();
+            fail(ex.getMessage());
         }
     }
 
@@ -161,6 +161,7 @@ public class TestJDBCResultSet {
             voltDBServer = null;
         }
     }
+
 
     @Before
     public void populateResult() {
@@ -296,7 +297,9 @@ public class TestJDBCResultSet {
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         // afterLast position
+        /* not yet hsql232: ENG-8403, behavior of absolute changed
         assertEquals(hsql3RowRS.absolute(4), volt3RowRS.absolute(4));
+        */
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         // random afterLast position
@@ -331,7 +334,9 @@ public class TestJDBCResultSet {
         assertEquals(hsql3RowRS.relative(2), volt3RowRS.relative(2));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
+        /* not yet hsql232: ENG-, behavior of absolute changed
         assertEquals(hsql3RowRS.absolute(4), volt3RowRS.absolute(4));
+        */
         assertEquals(hsql3RowRS.relative(-3), volt3RowRS.relative(-3));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
@@ -362,7 +367,9 @@ public class TestJDBCResultSet {
         assertEquals(hsql3RowRS.next(), volt3RowRS.next());
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
+        /* not yet hsql232: ENG-8403, behavior of absolute changed
         assertEquals(hsql3RowRS.absolute(4), volt3RowRS.absolute(4));
+        */
         assertTrue(hsql3RowRS.getRow() == volt3RowRS.getRow());
     }
 
