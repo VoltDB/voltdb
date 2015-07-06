@@ -44,9 +44,9 @@ import org.voltcore.logging.VoltLogger;
  * </ul>
  */
 public class HSQLInterface {
-    static final private VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
-
     static public String XML_SCHEMA_NAME = "databaseschema";
+
+    static final private VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
     /**
      * Naming conventions for unnamed indexes and constraints
      */
@@ -308,12 +308,14 @@ public class HSQLInterface {
      */
     public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
-        m_logger.debug(String.format("SQL: %s\n", sql));;
         Statement cs = null;
         // clear the expression node id set for determinism
         sessionProxy.resetVoltNodeIds();
 
         String errorMessage = null;
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug("SQL: " + sql);
+        }
         try {
             cs = sessionProxy.compileStatement(sql);
         } catch(HsqlException hexc) {
@@ -338,22 +340,18 @@ public class HSQLInterface {
         if (cs == null) {
             throw new HSQLParseException(errorMessage);
         }
+        if (m_logger.isDebugEnabled()) {
+            try {
+                m_logger.debug("HSQLDB: " + cs.describe(sessionProxy));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
 
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
         if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
-        }
-        if (m_logger.isDebugEnabled()) {
-           try {
-               /*
-                * Sometimes exceptions happen.
-                */
-               m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.voltDescribe(sessionProxy, 0)));
-           } catch (Exception ex) {
-               System.out.printf("Exception: %s\n", ex.getMessage());
-               ex.printStackTrace(System.out);
-           }
         }
 
         VoltXMLElement xml = cs.voltGetStatementXML(sessionProxy);
@@ -368,7 +366,6 @@ public class HSQLInterface {
                ex.printStackTrace(System.out);
            }
         }
-
         // this releases some small memory hsql uses that builds up over time if not
         // cleared
         // if it's not called for every call of getXMLCompiledStatement, that's ok;

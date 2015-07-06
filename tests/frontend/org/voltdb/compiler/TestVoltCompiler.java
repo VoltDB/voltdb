@@ -2226,6 +2226,7 @@ public class TestVoltCompiler extends TestCase {
         // 1) unique index, 2) primary key
         validateUniqueAndAssumeUnique(schema, msgP, msgP);
 
+        /* hsql232: ENG-8284, issues with alter table and constraints
         // unique/assumeunique constraint added via ALTER TABLE to replicated table
         schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
                 "ALTER TABLE t0 ADD %s(name);";
@@ -2252,6 +2253,7 @@ public class TestVoltCompiler extends TestCase {
                 "ALTER TABLE t0 ADD %s(abs(val2));\n" +
                 "ALTER TABLE t0 DROP COLUMN val;\n";
         validateUniqueAndAssumeUnique(schema, msgP, null);
+         */
     }
 
     private boolean compileDDL(String ddl, VoltCompiler compiler) {
@@ -4044,7 +4046,6 @@ public class TestVoltCompiler extends TestCase {
      * When ENG8291 is fixed, this test should be renamed without the ticket number.
      */
     public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
-
         checkDDLAgainstScalarSubquerySchema("SQL Aggregate with subquery expression is not allowed.",
                                             "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
         checkDDLAgainstScalarSubquerySchema("SQL Aggregate with subquery expression is not allowed.",
