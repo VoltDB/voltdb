@@ -75,7 +75,7 @@ public class ImportManager {
         m_myHostId = myHostId;
         m_messenger = messenger;
         m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId), m_queue);
-        m_channelNotifier = new ChannelChangeNotifier(m_queue);
+        m_channelNotifier = new ChannelChangeNotifier();
 
         //create properties for osgi
         m_frameworkProps = new HashMap<String, String>();

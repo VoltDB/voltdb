@@ -285,6 +285,10 @@ public class ChannelDistributer {
         new GetChannels(MASTER_DN).getChannels();
     }
 
+    public final BlockingDeque<ChannelAssignment> getChannelAssignmentQueue() {
+        return m_assignq;
+    }
+
     public String getHostId() {
         return m_hostId;
     }

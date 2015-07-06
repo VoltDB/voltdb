@@ -82,7 +82,7 @@ public class ChannelChangeNotifier implements Runnable {
     private final AtomicBoolean m_done = new AtomicBoolean(false);
     private final ExecutorService m_es;
 
-    public ChannelChangeNotifier(BlockingDeque<ChannelAssignment> deque) {
+    public ChannelChangeNotifier() {
         m_es = CoreUtils.getCachedSingleThreadExecutor("Import Channel Change Notification Dispatcher", 15000);
     }
 

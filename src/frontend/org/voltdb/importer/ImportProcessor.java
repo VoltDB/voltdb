@@ -171,6 +171,8 @@ public class ImportProcessor implements ImportDataProcessor {
                 m_logger.error("Failed to start the import handler: " + bw.m_handlerProxy.getName(), ex);
             }
         }
+        //Start polling for channel assignments.
+        m_channelNotifier.startPolling(m_distributer.getChannelAssignmentQueue());
     }
 
     @Override
