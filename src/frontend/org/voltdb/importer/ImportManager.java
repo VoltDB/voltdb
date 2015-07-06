@@ -17,7 +17,6 @@
 
 package org.voltdb.importer;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +61,6 @@ public class ImportManager {
     private final int m_myHostId;
     private BlockingDeque<ChannelAssignment> m_queue = new LinkedBlockingDeque<ChannelAssignment>();
     private final ChannelDistributer m_distributer;
-    private final ChannelChangeNotifier m_channelNotifier;
     /**
      * Get the global instance of the ImportManager.
      * @return The global single instance of the ImportManager.
@@ -75,7 +73,6 @@ public class ImportManager {
         m_myHostId = myHostId;
         m_messenger = messenger;
         m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId), m_queue);
-        m_channelNotifier = new ChannelChangeNotifier();
 
         //create properties for osgi
         m_frameworkProps = new HashMap<String, String>();
@@ -113,7 +110,7 @@ public class ImportManager {
                 importLog.info("No importers specified skipping Streaming Import initialization.");
                 return;
             }
-            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, distributer, m_channelNotifier, m_framework);
+            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, distributer, m_framework);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
@@ -125,8 +122,6 @@ public class ImportManager {
 
     public synchronized void shutdown() {
         close();
-        //Shutdown channel distributer as we are shutting down the node.
-        m_channelNotifier.shutdown();
         m_distributer.shutdown();
     }
 

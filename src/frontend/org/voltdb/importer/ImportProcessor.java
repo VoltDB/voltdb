@@ -46,10 +46,10 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ChannelDistributer m_distributer;
     private final ChannelChangeNotifier m_channelNotifier;
 
-    public ImportProcessor(int myHostId, ChannelDistributer distributer, ChannelChangeNotifier channelNotifier, Framework framework) throws BundleException {
+    public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework) throws BundleException {
         m_framework = framework;
-        m_channelNotifier = channelNotifier;
         m_distributer = distributer;
+        m_channelNotifier = new ChannelChangeNotifier();
     }
 
     //This abstracts OSGi based and class based importers.
@@ -178,6 +178,8 @@ public class ImportProcessor implements ImportDataProcessor {
     @Override
     public synchronized void shutdown() {
         try {
+            //Stop the notifier
+            m_channelNotifier.shutdown();
             //Stop all the bundle wrappers.
             for (BundleWrapper bw : m_bundles.values()) {
                 try {
