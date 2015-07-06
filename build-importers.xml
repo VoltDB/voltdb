@@ -5,7 +5,7 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="socketstream, log4jsocketimporter"/>
+    <target name="buildbundles" depends="socketstream, log4jsocketimporter, kafkastream"/>
 
     <target name="socketstream">
         <antcall target="osgibundle">
@@ -23,6 +23,30 @@
 	    <param name="bundle.displayname" value="Log4jSocketImporter"/>
             <param name="include.classpattern" value="Log4jSocket*.class"/>
         </antcall>
+    </target>
+
+    <target name="kafkastream">
+        <mkdir dir="${bundles.dir}" />
+        <copy file="${base.dir}/lib/kafka-clients-0.8.2.1.jar" todir="${build.prod.dir}" />
+        <jar destfile="${bundles.dir}/kafkastream.jar" basedir="${build.prod.dir}">
+            <include name="org/voltdb/importclient/KafkaStreamImporter.class"/>
+            <include name="org/voltdb/importclient/KafkaStreamImporter$ClientConnectionHandler.class"/>
+            <include name="org/voltdb/importclient/KafkaStreamImporter$KafkaBulkLoaderCallback.class"/>
+            <include name="org/voltdb/importclient/KafkaStreamImporter$KafkaConsumerConnector.class"/>
+            <include name="kafka-clients-0.8.2.1.jar"/>
+            <manifest>
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.KafkaStreamImporter" />
+                <attribute name="Bundle-ManifestVersion" value="2" />
+                <attribute name="Bundle-Name" value="KafkaStream OSGi Bundle" />
+                <attribute name="Bundle-SymbolicName" value="KafkaStreamImporter" />
+                <attribute name="Bundle-Version" value="1.0.0" />
+                <attribute name="DynamicImport-Package" value="*" />
+                <attribute name="Embed-Dependency" value="groupId=org.apache.kafka" />
+                <attribute name="Embedded-Artifacts" value='kafka-clients-0.8.2.1.jar;g="org.apache.kafka";a="kafka-clients";v="0.8.2.1"' />
+                <attribute name="Bundle-ClassPath" value=".,kafka-clients-0.8.2.1.jar" />
+                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.apache.log4j,org.voltdb.importer,org.voltcore.network" />
+            </manifest>
+        </jar>
     </target>
 
     <!-- regular build compile will compile the classes -->

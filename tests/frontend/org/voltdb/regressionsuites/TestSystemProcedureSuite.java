@@ -29,6 +29,7 @@ import java.util.Random;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -396,6 +397,87 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertTrue(true);
     }
 
+    public void testPause() throws Exception {
+        Client client = getClient();
+        VoltTable[] results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
+        for (VoltTable result : results) {
+            assertEquals(0, result.asScalarLong());
+        }
+
+        ClientResponse resp = client.callProcedure("pauseTestInsert");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (10);");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        // pause
+        Client admin = getAdminClient();
+        resp = admin.callProcedure("@Pause");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        try {
+            client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
+            fail("AdHoc insert did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        try {
+            client.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
+            fail("AdHoc create did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+        try {
+            client.callProcedure("@AdHoc", "DROP TABLE pause_test_tbl;");
+            fail("AdHoc drop did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+        try {
+            client.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+            fail("AdHoc create proc did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+
+        // admin should work fine
+        admin.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
+        admin.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
+        admin.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+        admin.callProcedure("@AdHoc", "DROP TABLE ddl_test1;");
+
+        try {
+            resp = client.callProcedure("@UpdateLogging", m_loggingConfig);
+            fail();
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        try {
+            resp = client.callProcedure("pauseTestInsert");
+            fail();
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        resp = client.callProcedure("@Ping");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        resp = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM pause_test_tbl");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
+        resp = client.callProcedure("pauseTestCount");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
+
+        // resume
+        resp = admin.callProcedure("@Resume");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
+        for (VoltTable result : results) {
+            assertEquals(0, result.asScalarLong());
+        }
+    }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
@@ -434,11 +516,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         ");\n" +
                         "CREATE TABLE NEW_ORDER (\n" +
                         "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
+                        ");\n" +
+                        "CREATE TABLE PAUSE_TEST_TBL (\n" +
+                        "  TEST_ID SMALLINT DEFAULT '0' NOT NULL\n" +
                         ");\n");
 
+        project.setUseDDLSchema(true);
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
+        project.addStmtProcedure("pauseTestCount", "SELECT COUNT(*) FROM pause_test_tbl");
+        project.addStmtProcedure("pauseTestInsert", "INSERT INTO pause_test_tbl VALUES (1)");
 
         /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
                                   BackendTarget.NATIVE_EE_JNI);
@@ -452,7 +540,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.SITES, TestSystemProcedureSuite.HOSTS, TestSystemProcedureSuite.KFACTOR,
                                   BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
-        boolean success = config.compile(project);
+        //boolean success = config.compile(project);
+        boolean success = config.compileWithAdminMode(project, VoltDB.DEFAULT_ADMIN_PORT, false);
         assertTrue(success);
         builder.addServerConfig(config);
 
