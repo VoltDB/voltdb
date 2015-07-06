@@ -1,7 +1,7 @@
-<!-- Simple build file to buil  export benchmark -->
-<project name="exportbenchmark" basedir="." default="all">
+<!-- Simple build file to build  export benchmark -->
+<project name="exportbenchmark2" basedir="." default="all">
 
-    <property name="voltlibext.dir"     value="../../lib/extension"/>
+    <property name="voltlibext.dir"     value="../../../lib/extension"/>
 
     <property name="src.dir"     value="${basedir}/db/exportbenchmark"/>
     <property name="clientsrc.dir"     value="${basedir}/client/exportbenchmark"/>
@@ -29,6 +29,12 @@
     <path id="build-classpath">
        <fileset dir="${basedir}/../../../voltdb">
          <include name="voltdb*.jar"/>
+       </fileset>
+       <fileset dir="${basedir}/../../../lib">
+         <include name="*.jar"/>
+       </fileset>
+       <fileset dir="${basedir}/../../../lib/extension">
+         <include name="*.jar"/>
        </fileset>
     </path>
 

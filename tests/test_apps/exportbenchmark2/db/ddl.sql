@@ -1,4 +1,4 @@
-LOAD CLASSES exportbenchmark.jar;
+LOAD CLASSES exportbenchmark2.jar;
 
 CREATE TABLE ALL_VALUES_EXPORT1 (
   txnid                     BIGINT        NOT NULL
@@ -112,8 +112,8 @@ CREATE TABLE ALL_VALUES2 (
 );
 PARTITION TABLE ALL_VALUES2 ON COLUMN rowid;
 
-CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport;
-CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.TruncateTables;
+CREATE PROCEDURE FROM CLASS   exportbenchmark2.db.exportbenchmark.procedures.InsertExport;
+CREATE PROCEDURE FROM CLASS exportbenchmark2.db.exportbenchmark.procedures.TruncateTables;
 -- CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport5;
 -- CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport0;
 -- CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport1;

@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package exportbenchmark;
+package exportbenchmark2.client.exportbenchmark;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
@@ -34,7 +34,7 @@ public class Connect2Server {
      * Connect to a single server with retry. Limited exponential backoff.
      * No timeout. This will run until the process is killed if it's not
      * able to connect.
-     *
+     *ß
      * @param server hostname:port or just hostname (hostname can be ip).
      * @return
      */

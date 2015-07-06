@@ -2,7 +2,7 @@
 <deployment>
    <cluster hostcount="1" />
    <commandlog enabled="false"/>
-   <export enabled="true" target="custom" exportconnectorclass="exportbenchmark.NoOpExporter">
+   <export enabled="true" target="custom" exportconnectorclass="exportbenchmark2.exporter.exportbenchmark.NoOpExporter">
      <configuration>
        <property name="socket.dest">localhost</property>
        <property name="socket.port">5001</property>

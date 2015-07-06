@@ -21,21 +21,25 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * Bogus comment, probably inherited from someplace -- replace!
+/*
+ * ExportBenchmark
  *
- * This samples uses multiple threads to post synchronous requests to the
- * VoltDB server, simulating multiple client application posting
- * synchronous requests to the database, using the native VoltDB client
- * library.
+ * Insert rows into DB and export tables using a single stored procedure.
+ * The number of rows for the DB tables and the number of rows for the
+ * export tables are separate parameters to the SP so the ratio of DB inserts
+ * to export table inserts can be varied.
  *
- * While synchronous processing can cause performance bottlenecks (each
- * caller waits for a transaction answer before calling another
- * transaction), the VoltDB cluster at large is still able to perform at
- * blazing speeds when many clients are connected to it.
+ * The test driver, this class, can iterate through a series of ratios, reporting
+ * TPS rates for each case, then truncating the tables and moving on to the next
+ * test variant.
+ *
+ * Currently the distinct test variations are set in main(). These can be externalized
+ * via options or other control input as required.
  */
 
-package exportbenchmark;
+package exportbenchmark2.client.exportbenchmark;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Selector;
@@ -47,6 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -89,7 +94,7 @@ public class ExportBenchmark {
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
 
-    // collectors for min/max/start/stop statistics
+    // collectors for min/max/start/stop statistics -- all TPS
     double min = -1;
     double max = 0;
     double start = 0;
@@ -231,13 +236,11 @@ public class ExportBenchmark {
      * @throws NoConnectionsException
      */
     public void doInserts(Client client, int ratio) {
-
         // Make sure DB tables are empty
         System.out.println("Truncating DB tables");
         try {
             client.callProcedure("TruncateTables");
         } catch (IOException | ProcCallException e1) {
-            // TODO Auto-generated catch block
             e1.printStackTrace();
         }
 
@@ -271,7 +274,6 @@ public class ExportBenchmark {
 
         // Insert objects until we've run for long enough
         System.out.println("Running benchmark...");
-        System.out.println("Calling SP " + "InsertExport");
         now = System.currentTimeMillis();
         while (benchmarkEndTS > now) {
             try {
@@ -308,6 +310,69 @@ public class ExportBenchmark {
     }
 
     /**
+     * Checks the export table to make sure that everything has been successfully
+     * processed.
+     * @throws ProcCallException
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public boolean waitForStreamedAllocatedMemoryZero() throws ProcCallException,IOException,InterruptedException {
+        boolean passed = false;
+
+        VoltTable stats = null;
+        long ftime = 0;
+        long st = System.currentTimeMillis();
+        //Wait 10 mins only
+        long end = st + (10 * 60 * 1000);
+        while (true) {
+            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            boolean passedThisTime = true;
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                System.out.println(stats);
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                System.out.println(stats);
+                st = System.currentTimeMillis();
+            }
+            long ts = 0;
+            while (stats.advanceRow()) {
+                String ttype = stats.getString("TABLE_TYPE");
+                Long tts = stats.getLong("TIMESTAMP");
+                //Get highest timestamp and watch it change
+                if (tts > ts) {
+                    ts = tts;
+                }
+                if ("StreamedTable".equals(ttype)) {
+                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                        passedThisTime = false;
+                        System.out.println("Partition Not Zero.");
+                        break;
+                    }
+                }
+            }
+            if (passedThisTime) {
+                if (ftime == 0) {
+                    ftime = ts;
+                    continue;
+                }
+                //we got 0 stats 2 times in row with diff highest timestamp.
+                if (ftime != ts) {
+                    passed = true;
+                    break;
+                }
+                System.out.println("Passed but not ready to declare victory.");
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        System.out.println(stats);
+        return passed;
+    }
+
+    /**
      * Runs the export benchmark test
      * @throws InterruptedException
      * @throws NoConnectionsException
@@ -336,20 +401,20 @@ public class ExportBenchmark {
         periodicStatsTimer.cancel();
         System.out.println("Client flushed; waiting for export to finish");
 
-        boolean success = false;
-        /***
-         * Wait until export is done
 
+        // Wait until export is done
+        boolean success = false;
         try {
-            success = Stats.waitForStreamedAllocatedMemoryZero();
+            success = waitForStreamedAllocatedMemoryZero();
         } catch (IOException e) {
             System.err.println("Error while waiting for export: ");
             e.getLocalizedMessage();
         } catch (ProcCallException e) {
-            System.err.println("Error while calling procedures: ");S
+            System.err.println("Error while calling procedures: ");
             e.getLocalizedMessage();
         }
-        ***/
+        finalStats();
+
         // Print results & close
         System.out.println("Finished benchmark");
         System.out.println("Throughput");
@@ -359,10 +424,23 @@ public class ExportBenchmark {
         try {
             client.drain();
         } catch (NoConnectionsException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
+
+	void finalStats() {
+		// Write stats to file if requested
+		try {
+			if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+				FileWriter fw = new FileWriter(config.statsfile);
+				fw.append(String.format("%d,%f,%f,%f,%f\n",	benchmarkStartTS, min, max, (end-start)/start*100.0, (max-min)/min*100.0));
+				fw.close();
+			}
+		} catch (IOException e) {
+			System.err.println("Error writing stats file");
+			e.printStackTrace();
+		}
+	}
 
     static void connectToOneServerWithRetry(String server) {
         int sleep = 1000;
@@ -433,7 +511,7 @@ public class ExportBenchmark {
         final int EXPORTINSERTS = 1;
         int[][] tests = {{5,5}};
 
-     // Connect to servers
+        // Connect to servers
         try {
             System.out.println("Test initialization. Servers: " + config.servers);
             connect(config.servers);
@@ -445,7 +523,7 @@ public class ExportBenchmark {
 
         for (int test = 0; test < tests.length; test++) {
             try {
-                 ExportBenchmark bench = new ExportBenchmark(config,tests[test][DBINSERTS], tests[test][EXPORTINSERTS]);
+                 ExportBenchmark bench = new ExportBenchmark(config, tests[test][DBINSERTS], tests[test][EXPORTINSERTS]);
                  System.out.println("Running trial " + test + " -- DB Inserts: " + tests[test][DBINSERTS] + ", Export Inserts: " + tests[test][EXPORTINSERTS]);
                  bench.runTest();
             } catch (InterruptedException e) {

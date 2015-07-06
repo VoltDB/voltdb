@@ -29,7 +29,7 @@ else
 fi
 
 APPCLASSPATH=$CLASSPATH:$({ \
-\echo $APPNAME-client.jar; \
+\echo ${APPNAME}2-client.jar; \
 \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
 \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
@@ -133,9 +133,9 @@ function run_benchmark_help() {
 function run_benchmark() {
     # srccompile
     java -classpath :$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        exportbenchmark.ExportBenchmark \
+        exportbenchmark2.client.exportbenchmark.ExportBenchmark \
         --duration=30 \
-        --servers=volt3f \
+        --servers=localhost \
 	--statsfile=exportbench.csv
 }
 

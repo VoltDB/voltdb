@@ -32,16 +32,13 @@
  * blazing speeds when many clients are connected to it.
  */
 
-package exportbenchmark;
+package exportbenchmark2.exporter.exportbenchmark;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;

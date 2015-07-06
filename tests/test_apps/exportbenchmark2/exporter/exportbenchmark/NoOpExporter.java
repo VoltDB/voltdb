@@ -33,7 +33,7 @@
  * blazing speeds when many clients are connected to it.
  */
 
-package exportbenchmark;
+package exportbenchmark2.exporter.exportbenchmark;
 
 import java.util.Properties;
 

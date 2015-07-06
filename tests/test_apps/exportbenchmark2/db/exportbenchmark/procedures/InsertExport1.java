@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package exportbenchmark.procedures;
+package exportbenchmark2.db.exportbenchmark.procedures;
 
 import java.util.Random;
 

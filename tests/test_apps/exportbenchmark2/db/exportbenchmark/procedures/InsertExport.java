@@ -20,7 +20,21 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package exportbenchmark.procedures;
+
+/*
+ * Stored procedure for ExportBenchmark
+ *
+ * 2 tables -- all datatypes with nullable and not nullable variants
+ *
+ * Call the SP with DB tables insert count and export tables insert count.
+ * This allows mixing DB insert to export insert ratio, following the recent
+ * Flipkart customer case where export rows could exceed DB inserts as much as 10:1.
+ *
+ * Since DB inserts and export inserts are parameterized, it's possible to try many
+ * variations in the test driver.
+ */
+
+package exportbenchmark2.db.exportbenchmark.procedures;
 
 import java.util.Random;
 
@@ -47,9 +61,6 @@ public class InsertExport extends VoltProcedure {
     {
         @SuppressWarnings("deprecation")
         long txid = getVoltPrivateRealTransactionIdDontUseMe();
-        //int[] iterations = {1, 5};
-        //int dbInserts = 5;
-        //int exportInserts = 5;
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = new Random(txid);
@@ -95,10 +106,8 @@ public class InsertExport extends VoltProcedure {
                 record.type_null_float, record.type_not_null_float,
                 record.type_null_decimal, record.type_not_null_decimal,
                 record.type_null_varchar25, record.type_not_null_varchar25,
-                record.type_null_varchar128,
-                record.type_not_null_varchar128,
-                record.type_null_varchar1024,
-                record.type_not_null_varchar1024);
+                record.type_null_varchar128, record.type_not_null_varchar128,
+                record.type_null_varchar1024, record.type_not_null_varchar1024);
 
             record = new SampleRecord(rowid, rand);
             voltQueueSQL(exportInsert2, txid, rowid, record.rowid_group,
@@ -110,10 +119,8 @@ public class InsertExport extends VoltProcedure {
                 record.type_null_float, record.type_not_null_float,
                 record.type_null_decimal, record.type_not_null_decimal,
                 record.type_null_varchar25, record.type_not_null_varchar25,
-                record.type_null_varchar128,
-                record.type_not_null_varchar128,
-                record.type_null_varchar1024,
-                record.type_not_null_varchar1024);
+                record.type_null_varchar128, record.type_not_null_varchar128,
+                record.type_null_varchar1024, record.type_not_null_varchar1024);
         }
 
         // Execute queued statements
