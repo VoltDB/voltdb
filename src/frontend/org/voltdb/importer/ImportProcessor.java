@@ -159,9 +159,9 @@ public class ImportProcessor implements ImportDataProcessor {
                     m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
 
                     bw.setChannelDistributer(m_distributer);
-                    m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
                     //Register callback
                     m_channelNotifier.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
+                    m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
                 }
                 importHandler.readyForData();
                 m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
