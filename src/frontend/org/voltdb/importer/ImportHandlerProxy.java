@@ -24,13 +24,12 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.voltdb.client.ProcedureCallback;
 
-
 /**
  * This is the proxy for real ImportHandler. This is used as real handler
  * has lot of server code dependencies and not really helpful for the import bundle builder.
  * @author akhanzode
  */
-public abstract class ImportHandlerProxy implements ImportContext {
+public abstract class ImportHandlerProxy implements ImportContext, ChannelChangeCallback {
 
     private Object m_handler = null;
     private Method m_callProcMethod;
@@ -135,8 +134,7 @@ public abstract class ImportHandlerProxy implements ImportContext {
     }
 
     @Override
-    public void setAllocatedResources(Set<URI> allocated) {
+    public void onChange(Set<URI> added, Set<URI> removed, Set<URI> assigned, int version) {
         throw new UnsupportedOperationException("For Distributed Importer this must be implemented.");
     }
-
 }

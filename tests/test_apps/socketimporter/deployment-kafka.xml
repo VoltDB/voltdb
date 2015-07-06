@@ -6,8 +6,8 @@
     </httpd>
     <import>
         <configuration module="kafkastream.jar" type="custom" enabled="true">
-            <property name="zookeeper">kafka2:2181</property>
-            <property name="brokers">kafka2:9092</property>
+		<!-- <property name="brokers">volt15a:9092,volt15b:9092,volt15d:9092</property> -->
+            <property name="brokers">kafka2</property>
             <property name="topics">bar2</property>
             <property name="procedure">importTable.insert</property>
         </configuration>

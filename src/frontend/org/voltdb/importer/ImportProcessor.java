@@ -33,6 +33,7 @@ import org.voltdb.VoltDB;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import java.net.URI;
+import java.util.HashSet;
 import java.util.Set;
 import org.osgi.framework.BundleException;
 
@@ -43,9 +44,11 @@ public class ImportProcessor implements ImportDataProcessor {
     private final Map<String, BundleWrapper> m_bundlesByName = new HashMap<String, BundleWrapper>();
     private final Framework m_framework;
     private final ChannelDistributer m_distributer;
+    private final ChannelChangeNotifier m_channelNotifier;
 
-    public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework) throws BundleException {
+    public ImportProcessor(int myHostId, ChannelDistributer distributer, ChannelChangeNotifier channelNotifier, Framework framework) throws BundleException {
         m_framework = framework;
+        m_channelNotifier = channelNotifier;
         m_distributer = distributer;
     }
 
@@ -84,7 +87,7 @@ public class ImportProcessor implements ImportDataProcessor {
                     m_bundle.stop();
                 }
                 if (m_channelDistributer != null) {
-                    m_channelDistributer.registerChannels(m_handlerProxy.getName(), null);
+                    m_channelDistributer.registerChannels(m_handlerProxy.getName(), new HashSet<URI>());
                 }
             } catch (Exception ex) {
                 m_logger.error("Failed to stop the import bundles.", ex);
@@ -153,13 +156,12 @@ public class ImportProcessor implements ImportDataProcessor {
                 if (!bw.m_handlerProxy.isRunEveryWhere()) {
                     //This is a distributed and fault tolerant importer so get the resources.
                     Set<URI> allResources = bw.m_handlerProxy.getAllResponsibleResources();
+                    m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
 
                     bw.setChannelDistributer(m_distributer);
                     m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
-
-                    m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
-                    //Here set the callback handler for the importer to get notified of resources.
-                    bw.m_handlerProxy.setAllocatedResources(allResources);
+                    //Register callback
+                    m_channelNotifier.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
                 }
                 importHandler.readyForData();
                 m_logger.info("Importer started: " + bw.m_handlerProxy.getName());

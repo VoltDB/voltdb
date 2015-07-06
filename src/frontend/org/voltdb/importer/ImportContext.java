@@ -110,14 +110,6 @@ public interface ImportContext {
     public Set<URI> getAllResponsibleResources();
 
     /**
-     * This is called after importer system has allocated part of the responsible resources to the importer running on this node.
-     * This may get invoked during node failuers which may distribute additional resources this importer is now responsible for.
-     * @param allocated
-     * TODO make sure to get correct naming.
-     */
-    public void setAllocatedResources(Set<URI> allocated);
-
-    /**
      * log info message
      * @param message message to log to Volt server logging system.
      */

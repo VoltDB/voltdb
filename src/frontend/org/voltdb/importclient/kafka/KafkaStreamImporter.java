@@ -31,8 +31,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import kafka.api.FetchRequest;
 import kafka.api.PartitionOffsetRequestInfo;
@@ -54,7 +56,6 @@ import kafka.message.MessageAndOffset;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.CSVInvocation;
@@ -68,23 +69,34 @@ import org.voltdb.importer.ImportHandlerProxy;
  */
 public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
 
+    //Properties for the importer
     private Properties m_properties;
+    //Procedure to be invoked with params.
     private String m_procedure;
-    private String m_topics;
-    private String m_brokers;
-    private int m_fetchSize;
-    private int m_consumerSocketTimeout;
+    //List of topics form comma seperated list.
     private List<String> m_topicList;
+    //List of brokers.
     private final List<HostAndPort> m_brokerList = new ArrayList<HostAndPort>();
+    //kafka properties which has defaults
+    private int m_fetchSize = 65536;
+    private int m_consumerSocketTimeout = 30000; //In milliseconds
+
     private static final String GROUP_ID = "voltdb";
     private static final String CLIENT_ID = "voltdb-importer";
+    private static final int KAFKA_DEFAULT_BROKER_PORT = 9092;
+    //readyForData is waiting for this released by shutdown
+    private final Semaphore m_done = new Semaphore(0);
 
+    //topic partition metadata
     private final Map<String, List<TopicMetadata>> m_topicPartitionMetaData = new HashMap<String, List<TopicMetadata>>();
+    //Topic partitions
     private final Map<String, List<Integer>> m_topicPartitions = new HashMap<String, List<Integer>>();
+    //topic partition leader
     private final Map<String, String> m_topicPartitionLeader = new HashMap<String, String>();
     private final Map<String, Integer> m_topicPartitionLeaderPort = new HashMap<String, Integer>();
-    private final Map<TopicPartitionFetcher, ExecutorService> m_fetchers = new HashMap<TopicPartitionFetcher, ExecutorService>();
-    private Set<URI> m_availableChannels = new TreeSet<URI>();
+    private final Map<String, TopicPartitionFetcher> m_fetchers = new HashMap<String, TopicPartitionFetcher>();
+
+    private ExecutorService m_es = null;
 
     //Simple Host and Port abstraction....dont want to use our big stuff here orgi bundle import nastiness.
     public static class HostAndPort {
@@ -99,7 +111,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
         public static HostAndPort fromString(String hap) {
             String s[] = hap.split(":");
-            int p = Integer.parseInt(s[1]);
+            int p = KAFKA_DEFAULT_BROKER_PORT;
+            if (s.length > 1 && s[1] != null && s[1].length() > 0) {
+                p = Integer.parseInt(s[1]);
+            }
             return new HostAndPort(s[0], p);
         }
     }
@@ -117,9 +132,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     @Override
     public boolean isRunEveryWhere() {
+        //This is not a run everywhere importer only allocated resources are polled and consumed.
         return false;
     }
 
+    //This is called to get all available resources.
     private Set<URI> buildTopicLeaderMetadata(SimpleConsumer simpleConsumer) throws URISyntaxException {
 
         //For all topics connect and get metadata.
@@ -151,6 +168,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
 
         info("Available Channels are: " + availableResources);
+        //Create an executor serice with Queue.
+        m_es = Executors.newFixedThreadPool(availableResources.size() + 1);
         return availableResources;
     }
 
@@ -159,11 +178,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         SimpleConsumer simpleConsumer = null;
         Set<URI> availableResources = new TreeSet<URI>();
         try {
-            simpleConsumer = new SimpleConsumer(m_brokerList.get(0).host, m_brokerList.get(0).port, 0, 4096, CLIENT_ID);
+            simpleConsumer = new SimpleConsumer(m_brokerList.get(0).host, m_brokerList.get(0).port, m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
             //Build all available topic URIs
             availableResources = buildTopicLeaderMetadata(simpleConsumer);
         } catch (Exception ex) {
             //Handle
+            error("Failed to get available resources for kafka importer" + ex.toString());
         } finally {
             if (simpleConsumer != null) {
                 simpleConsumer.close();
@@ -173,16 +193,25 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     }
 
     @Override
-    public void setAllocatedResources(Set<URI> allocated) {
-        m_availableChannels = allocated;
-    }
-
-
-    @Override
     public void stop() {
         //Stop all the fetchers.
-        for (TopicPartitionFetcher fetcher : m_fetchers.keySet()) {
+        for (TopicPartitionFetcher fetcher : m_fetchers.values()) {
             fetcher.shutdown();
+        }
+        if (m_es != null) {
+            m_es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    m_done.release();
+                }
+            });
+            //Now wait for fetchers to break out.
+            m_es.shutdown();
+            try {
+                m_es.awaitTermination(365, TimeUnit.DAYS);
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
         }
     }
 
@@ -209,19 +238,19 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             throw new RuntimeException("Missing procedure.");
         }
         //pipe seperated list of topics.
-        m_topics = (String) m_properties.getProperty("topics");
-        if (m_topics == null || m_topics.trim().length() == 0) {
+        String topics = (String) m_properties.getProperty("topics");
+        if (topics == null || topics.trim().length() == 0) {
             throw new RuntimeException("Missing topic(s).");
         }
-        m_topicList = Arrays.asList(m_topics.split("\\s*,\\s*"));
+        m_topicList = Arrays.asList(topics.split("\\s*,\\s*"));
         if (m_topicList == null || m_topicList.isEmpty()) {
             throw new RuntimeException("Missing topic(s).");
         }
-        m_brokers = (String) m_properties.getProperty("brokers");
-        if (m_brokers == null || m_brokers.trim().length() == 0) {
+       String brokers = (String) m_properties.getProperty("brokers");
+        if (brokers == null || brokers.trim().length() == 0) {
             throw new RuntimeException("Missing kafka broker");
         }
-        List<String> brokerList = Arrays.asList(m_brokers.split("\\s*,\\s*"));
+        List<String> brokerList = Arrays.asList(brokers.split("\\s*,\\s*"));
         if (brokerList == null || brokerList.isEmpty()) {
             throw new RuntimeException("Missing kafka broker");
         }
@@ -237,6 +266,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //Per topic per partition that we are responsible for.
     private class TopicPartitionFetcher implements Runnable {
 
+        private final URI m_url;
         private final String m_topic;
         private final int m_partition;
         private final String m_leader;
@@ -245,12 +275,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final int m_fetchSize;
         private final List<HostAndPort> m_brokers;
         private final int m_consumerSocketTimeout;
-        private CountDownLatch m_latch;
         private final AtomicLong m_currentOffset = new AtomicLong(0);
         private final Map<Long, TopicPartitionInvocationCallback> m_pendingCallbacksByOffset = new HashMap<Long, TopicPartitionInvocationCallback>();
         private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 500);
 
-        public TopicPartitionFetcher(List<HostAndPort> brokers, String topic, int partition, String leader, int port, int fetchSize, int consumerSocketTimeout) {
+        public TopicPartitionFetcher(List<HostAndPort> brokers, URI url, String topic, int partition, String leader, int port, int fetchSize, int consumerSocketTimeout) {
+            m_url = url;
             m_brokers = brokers;
             m_topic = topic;
             m_partition = partition;
@@ -260,8 +290,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             m_consumerSocketTimeout = consumerSocketTimeout;
         }
 
-        public void setLatch(CountDownLatch latch) {
-            m_latch = latch;
+        public final URI getUrl() {
+            return m_url;
         }
 
         //Find leader for the topic+partition.
@@ -331,7 +361,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //Just set shutdown flag fetcher timeout will then exit the thread.
         public void shutdown() {
             m_shutdown = true;
-            m_latch.countDown();
         }
 
         //Return offset last committed if -1 means error.
@@ -502,6 +531,54 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     }
 
+    //On getting this event kick off ready
+    @Override
+    public void onChange(Set<URI> added, Set<URI> removed, Set<URI> assigned, int version) {
+        if (m_es == null) {
+            //Create executor with sufficient threads.
+            throw new RuntimeException("Failed to get configured executor service.");
+        }
+        //For addeed create fetchers...make sure existing fetchers are not there.
+        try {
+            for (URI nuri : added) {
+                Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
+                for (String topic : m_topicList) {
+                    topicMap.put(topic, Collections.singletonList(0));
+                }
+                for (String topic : m_topicList) {
+                    List<Integer> topicPartitions = m_topicPartitions.get(topic);
+                    for (int partition : topicPartitions) {
+                        String leaderKey = topic + "-" + partition;
+                        URI assignedKey = new URI("kafka:/" + topic + "/partition/" + partition);
+                        //The fetcher must not have existed.
+                        if (!m_fetchers.containsKey(nuri)) {
+                            info("Channel " + assignedKey + " mastership is assigned to this node.");
+                            TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, assignedKey, topic, partition,
+                                    m_topicPartitionLeader.get(leaderKey),
+                                    m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize, m_consumerSocketTimeout);
+                            m_fetchers.put(assignedKey.toString(), fetcher);
+                            m_es.submit(fetcher);
+                        } else {
+                            info("Channel is not already fetching for resource: " + nuri);
+                        }
+                    }
+                }
+            }
+        } catch (URISyntaxException ex) {
+            //This should never happen.
+            ex.printStackTrace();
+        }
+        //For removed shutdown the fetchers if all are removed the importer will be closed/shutdown?
+        for (URI r : removed) {
+            TopicPartitionFetcher fetcher = m_fetchers.get(r.toString());
+            if (fetcher != null) {
+                fetcher.shutdown();
+                m_fetchers.remove(r.toString());
+            }
+        }
+    }
+
+
     /**
      * This is called when server is ready to accept any transactions.
      */
@@ -509,39 +586,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     public void readyForData() {
         try {
             info("Configured and ready with properties: " + m_properties);
-
-            Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
-            for (String topic : m_topicList) {
-                topicMap.put(topic, Collections.singletonList(0));
-            }
-            long ts = System.currentTimeMillis();
-            for (String topic : m_topicList) {
-                List<Integer> topicPartitions = m_topicPartitions.get(topic);
-                for (int partition : topicPartitions) {
-                    String leaderKey = topic + "-" + partition;
-                    URI assignedKey = new URI("kafka:/" + topic + "/partition/" + partition);
-                    if (m_availableChannels.contains(assignedKey)) {
-                        info("Channel " + assignedKey + " mastership is assigned to this node.");
-                        TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, topic, partition,
-                                m_topicPartitionLeader.get(leaderKey),
-                                m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize, m_consumerSocketTimeout);
-                        ExecutorService es = CoreUtils.getListeningExecutorService("KafkaImporter Topic " + leaderKey + " - " + ts, 1);
-                        m_fetchers.put(fetcher, es);
-                    } else {
-                        info("Channel " + assignedKey + " is not available on this node.");
-                    }
-                }
-            }
-            //Submit all tasks and wait.
-            CountDownLatch cdl = new CountDownLatch(m_fetchers.size());
-            for (TopicPartitionFetcher fetcher : m_fetchers.keySet()) {
-                fetcher.setLatch(cdl);
-                m_fetchers.get(fetcher).submit(fetcher);
-            }
-            cdl.await();
-            for (TopicPartitionFetcher fetcher : m_fetchers.keySet()) {
-                m_fetchers.get(fetcher).shutdownNow();
-            }
+            //We wait for shutdown task to release.
+            m_done.acquire();
         } catch (Exception ex) {
             ex.printStackTrace();
         }
