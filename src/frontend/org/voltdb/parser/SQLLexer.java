@@ -259,7 +259,6 @@ public class SQLLexer extends SQLPatternFactory
      */
     public static String checkPermitted(String sql)
     {
-        System.out.println("HAHA: " + sql);
         /*
          *  IMPORTANT: Black-lists are checked first because they know more about
          * what they don't like about a statement and can provide a better message.

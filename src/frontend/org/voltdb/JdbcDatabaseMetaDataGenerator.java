@@ -30,11 +30,11 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -445,7 +445,7 @@ public class JdbcDatabaseMetaDataGenerator
     private Integer getCharOctetLength(Column column)
     {
         Integer length = null;
-        VoltType type = VoltType.get((byte) column.getType());
+        VoltType type = VoltType.get((byte)column.getType());
         if (type == VoltType.STRING || type == VoltType.VARBINARY)
         {
             length = column.getSize();

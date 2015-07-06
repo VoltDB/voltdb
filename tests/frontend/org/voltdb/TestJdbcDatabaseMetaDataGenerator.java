@@ -469,7 +469,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(params, "PROCEDURE_NAME", "proc2"));
         assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
         assertEquals(VoltType.INTEGER.getLengthInBytesForFixedTypes() * 8 - 1,
-                params.get("PRECISION", VoltType.INTEGER));
+                     params.get("PRECISION", VoltType.INTEGER));
         assertEquals(VoltType.INTEGER.getLengthInBytesForFixedTypes(),
                      params.get("LENGTH", VoltType.INTEGER));
         assertWithNullCheck(null, params.get("CHAR_OCTET_LENGTH", VoltType.INTEGER), params);
