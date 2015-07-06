@@ -2832,7 +2832,7 @@ public class Expression implements Cloneable {
             //
             case OpTypes.ROW_SUBQUERY :
             case OpTypes.TABLE_SUBQUERY :
-                sb.append("QUERY ");
+                sb.append(String.format("QUERY(opType=%d)", getType()));
                 sb.append(table.queryExpression.voltDescribe(session, blanks + 2));
                 return sb.toString();
             case OpTypes.ROW :
@@ -2874,10 +2874,6 @@ public class Expression implements Cloneable {
             sb.append("\n");
         }
         return sb.toString();
-    }
-
-    protected static String indentStr(int blanks) {
-        return indentStr(blanks, false, false);
     }
 
     // End of VoltDB extension

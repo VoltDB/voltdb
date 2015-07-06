@@ -342,7 +342,7 @@ public class HSQLInterface {
         }
         if (m_logger.isDebugEnabled()) {
             try {
-                m_logger.debug("HSQLDB: " + cs.describe(sessionProxy));
+                m_logger.debug("HSQLDB: " + cs.voltDescribe(sessionProxy, 0));
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
