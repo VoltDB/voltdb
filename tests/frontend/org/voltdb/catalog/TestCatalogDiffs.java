@@ -1215,7 +1215,7 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testSetDRActiveActiveOnEmptyTable() throws IOException {
-        if (!MiscUtils.isPro()) { return; }
+        if (!MiscUtils.isPro()) { return; } // not supported in community
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();

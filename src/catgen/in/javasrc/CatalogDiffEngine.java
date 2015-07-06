@@ -626,8 +626,6 @@ public class CatalogDiffEngine {
         // Support modification of these specific fields
         if (suspect instanceof Database && field.equals("schema"))
             return null;
-        if (suspect instanceof Database && field.equals("isActiveActiveDRed"))
-            return null;
         if (suspect instanceof Database && "securityprovider".equals(field))
             return null;
         if (suspect instanceof Cluster && field.equals("securityEnabled"))
@@ -990,7 +988,7 @@ public class CatalogDiffEngine {
         assert(errorMessage != null);
 
         // if no tablename, then it's just not possible
-        if (responseList == null || responseList.isEmpty()) {
+        if (responseList == null) {
             m_supported = false;
             m_errors.append(errorMessage + "\n");
         }
