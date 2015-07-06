@@ -200,15 +200,19 @@ function QueryUI(queryString, userName) {
         connectionQueue.Start();
 
         for (var i = 0; i < statements.length; i++) {
+
             var isExplainQuery = false;
             var id = 'r' + i;
             if (statements[i].toLowerCase().indexOf('@explain') >= 0) {
                 isExplainQuery = true;
             }
             var callback = new executeCallback(format, target, id, isExplainQuery);
-            if (/^execute /i.test(statements[i]))
+            if (/^execute /i.test(statements[i])) {
                 statements[i] = 'exec ' + statements[i].substr(8);
+            }
             if (/^exec /i.test(statements[i])) {
+                statements[i] = statements[i].replace(/\n/g, '');
+                statements[i] = statements[i].trim();
                 var params = CommandParser.parseProcedureCallParameters(statements[i].substr(5));
                 var procedure = params.splice(0, 1)[0];
                 connectionQueue.BeginExecute(procedure, params, callback.Callback, null, true);

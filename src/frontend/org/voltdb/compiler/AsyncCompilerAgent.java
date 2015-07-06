@@ -35,6 +35,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
@@ -258,12 +259,27 @@ public class AsyncCompilerAgent {
                 w.completionHandler.onCompletion(errResult);
                 return;
             }
+
+            if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Server is paused and is available in read-only mode - please try again later.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
             final CatalogChangeWork ccw = new CatalogChangeWork(w);
             dispatchCatalogChangeWork(ccw);
         }
     }
 
     void handleCatalogChangeWork(final CatalogChangeWork w) {
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+            AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Server is paused and is available in read-only mode - please try again later.");
+            w.completionHandler.onCompletion(errResult);
+            return;
+        }
         // We have an @UAC.  Is it okay to run it?
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen

@@ -27,7 +27,7 @@
         var latencyChart;
         var transactionChart;
         var partitionChart;
-        var drReplicationChart;        var cmdLogChart;        var physicalMemory = -1;
+        var drReplicationChart;        var cmdLogChart;        var cmdLogOverlay = [];        var physicalMemory = -1;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
@@ -442,7 +442,7 @@
                 .tickFormat(d3.format(',.2f'));
 
             MonitorGraphUI.ChartCommandlog.yAxis
-                .axisLabel('(Transactions/s)')
+                .axisLabel('(Pending Transactions)')
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartCommandlog.margin({ left: 80 });
@@ -450,7 +450,7 @@
 
             MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Command Log Statistic </h3>'
-                    + '<p>' + e + ' tps at ' + y + '</p>';
+                    + '<p>' + e + ' Pending at ' + y + '</p>';
             });
 
             d3.select('#visualisationCommandLog')
@@ -1167,6 +1167,42 @@
                     .transition().duration(500)
                     .call(MonitorGraphUI.ChartCommandlog);
             }
+            
+            var isDuplicate = false;
+            $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
+                var x1 = partitionValue.x;
+                if (x1 == cmdLogDetail[currentServer].START_TIME)
+                    isDuplicate = true;
+            });
+            if (!isDuplicate)
+                cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].START_TIME, "y": cmdLogDetail[currentServer].END_TIME });
+
+            d3.select('#visualisationCommandLog .nv-y')
+                .append('rect')
+                .attr('x', 2)
+                .attr('width', 475)
+                .style('fill', 'white')
+                .style('opacity', 1)
+                .attr('y', 0)
+                .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+
+            $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
+                var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
+                var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
+                var opacity = 1;
+                if (x1 > 3 && x1 < 475 && (x2 - x1 > 0)) {
+                    opacity = ((x2 - x1) > 4) ? 0.2 : 1;
+                    d3.select('#visualisationCommandLog .nv-y')
+                        .append('rect')
+                        .attr('x', x1)
+                        .attr('width', (x2 - x1))
+                        .style('fill', 'red')
+                        .style('opacity', opacity)
+                        .attr('y', 0)
+                        .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                }
+            });
+
             cmdLogSecCount++;
             cmdLogMinCount++;
         };

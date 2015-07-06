@@ -667,7 +667,7 @@ bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
     if (m_groupByColumnCount == 0) {
         TableIterator iterator = m_target->iteratorDeletingAsWeGo();
         iterator.next(m_existingTuple);
-        return true;
+        return ! m_existingTuple.isNullTuple();
     }
 
     // find the key for this tuple (which is the group by columns)

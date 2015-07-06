@@ -65,6 +65,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "harness.h"
+#include "common/SerializableEEException.h"
 
 using std::string;
 
@@ -158,11 +159,19 @@ int TestSuite::runAll() {
         fflush(stdout);
 
         // run the test and check the result
-        test->run();
-        if (test->testSuccess()) {
-            printf("PASSED.\n");
-        } else {
-            printf("FAILED.\n");
+        try {
+            test->run();
+            if (test->testSuccess()) {
+                printf("PASSED.\n");
+            } else {
+                printf("FAILED.\n");
+                test->printErrors();
+                printf("\n");
+                failed_tests++;
+            }
+        }
+        catch (voltdb::SerializableEEException& eeExc) {
+            printf("Uncaught SerializableEEException: %s\n", eeExc.message().c_str());
             test->printErrors();
             printf("\n");
             failed_tests++;

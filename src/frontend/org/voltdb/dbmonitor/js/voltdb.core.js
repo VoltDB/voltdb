@@ -141,7 +141,6 @@
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 }
-                
                 if (typeof (params) == 'string') {
                     var headerLength = params.replace(/'/g, "%27").length;
                     if (headerLength > 5632) {
@@ -247,8 +246,8 @@
                     return this;
                 };
 
-                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails,isLongTimeOut) {
-                    stack.push([procedure, parameters, callback, shortApiCallDetails, isLongTimeOut]);
+                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery) {
+                    stack.push([procedure, parameters, callback, shortApiCallDetails, isSqlQuery]);
                     return this;
                 };
                 this.EndExecute = function () {
@@ -281,11 +280,11 @@
                                 };
                             })(this, item), isHighTimeout)).Callback;
 
-                        if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration)
+                        if ((shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration) || item[4] === true) {
                             Connection.CallExecuteUpdate(item[0], item[1], callback, item[3]);
-                        else
+                        } else {
                             Connection.CallExecute(item[0], item[1], callback, item[3]);
-
+                        }
                     } else {
                         executing = false;
                         if (onCompleteHandler != null) {

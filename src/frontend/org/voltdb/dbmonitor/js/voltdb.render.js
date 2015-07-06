@@ -359,6 +359,18 @@ function alertNodeClicked(obj) {
             }
         };
 
+
+        this.GetExportProperties = function (onInformationLoaded) {
+
+            VoltDBService.GetExportProperties(function (connection) {
+                var rawData;
+                if (connection != null)
+                    rawData = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+
+                onInformationLoaded(loadExportProperties(connection), rawData);
+            });
+        };
+
         this.GetProceduresInfo = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
@@ -758,6 +770,16 @@ function alertNodeClicked(obj) {
             }
 
             return adminConfigValues;
+        };
+
+        var loadExportProperties = function (connection) {
+            var exportProperties = {};
+            if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'] != null) {
+                var data = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+                exportProperties['type'] = data.types;
+            }
+
+            return exportProperties;
         };
 
 
@@ -2158,6 +2180,7 @@ function alertNodeClicked(obj) {
                 repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 repData["HOST_ID"] = info[colIndex["HOST_ID"]];
+                repData["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 repData["STATE"] = info[colIndex["STATE"]];
                 repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
                 repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
@@ -2478,7 +2501,7 @@ function alertNodeClicked(obj) {
             });
         };
 
-        var getSnapshotStatus = function(connection, snapshotDetails) {
+        var getSnapshotStatus = function (connection, snapshotDetails) {
             var colIndex = {};
             var counter = 0;
 
