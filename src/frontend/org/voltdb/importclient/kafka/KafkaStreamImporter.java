@@ -86,6 +86,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private static final int KAFKA_DEFAULT_BROKER_PORT = 9092;
     //readyForData is waiting for this released by shutdown
     private final Semaphore m_done = new Semaphore(0);
+    private boolean m_stopping = false;
 
     //topic partition metadata
     private final Map<String, List<TopicMetadata>> m_topicPartitionMetaData = new HashMap<String, List<TopicMetadata>>();
@@ -194,6 +195,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     @Override
     public void stop() {
+        m_stopping = true;
         //Stop all the fetchers.
         for (TopicPartitionFetcher fetcher : m_fetchers.values()) {
             fetcher.shutdown();
@@ -535,6 +537,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //On getting this event kick off ready
     @Override
     public void onChange(Set<URI> added, Set<URI> removed, Set<URI> assigned, int version) {
+        if (m_stopping) {
+            info("Importer is stopping ignoring the change notification.");
+        }
         if (m_es == null) {
             //Create executor with sufficient threads.
             throw new RuntimeException("Failed to get configured executor service.");
