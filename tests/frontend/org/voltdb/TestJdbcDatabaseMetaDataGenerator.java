@@ -31,6 +31,7 @@ import junit.framework.TestCase;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
@@ -468,7 +469,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(params, "PROCEDURE_NAME", "proc2"));
         assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
         assertEquals(VoltType.INTEGER.getLengthInBytesForFixedTypes() * 8 - 1,
-                     params.get("PRECISION", VoltType.INTEGER));
+                params.get("PRECISION", VoltType.INTEGER));
         assertEquals(VoltType.INTEGER.getLengthInBytesForFixedTypes(),
                      params.get("LENGTH", VoltType.INTEGER));
         assertWithNullCheck(null, params.get("CHAR_OCTET_LENGTH", VoltType.INTEGER), params);
@@ -533,5 +534,29 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.NoMeaningClass"));
         assertEquals(0, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
         assertEquals(0, classes.get("ACTIVE_PROC", VoltType.INTEGER));
+    }
+
+    public void testGetConfig() throws Exception
+    {
+        String schema =
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
+        VoltCompiler c = compileForDDLTest2(schema);
+        JdbcDatabaseMetaDataGenerator dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
+        VoltTable config = dut.getMetaData("config");
+        System.out.println(config);
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(config, "CONFIG_NAME", DatabaseConfiguration.DR_MODE_NAME));
+        assertEquals(DatabaseConfiguration.ACTIVE_PASSIVE, config.get("CONFIG_VALUE", VoltType.STRING));
+
+       schema =
+            "set " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";" +
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
+        c = compileForDDLTest2(schema);
+        dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
+        config = dut.getMetaData("config");
+        System.out.println(config);
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(config, "CONFIG_NAME", DatabaseConfiguration.DR_MODE_NAME));
+        assertEquals(DatabaseConfiguration.ACTIVE_ACTIVE, config.get("CONFIG_VALUE", VoltType.STRING));
     }
 }

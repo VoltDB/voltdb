@@ -84,9 +84,7 @@ public class SQLParser extends SQLPatternFactory
             "(?i)" +                            // (ignore case)
             "\\A" +                             // (start statement)
             "SET" +                             // SET
-            "\\s+([\\w_]+)" +                   // (1) PARAMETER NAME
-            "\\s*=\\s*([\\w_]+)" +              // (2) PARAMETER VALUE
-            "\\s*\\z"                          // (end statement)
+            "\\s+.*\\z"                         // (end statement)
             );
     /**
      * Pattern: PARTITION PROCEDURE|TABLE ...
@@ -331,8 +329,7 @@ public class SQLParser extends SQLPatternFactory
             "\\AEXPORT|" +
             "\\AIMPORT|" +
             "\\ADR|" +
-            "\\ASET|" +
-            "\\ASHOW" +
+            "\\ASET" +
             ")" +                                  // end (group 1)
             "\\s" +                                // one required whitespace to terminate keyword
             "");
@@ -1730,7 +1727,7 @@ public class SQLParser extends SQLPatternFactory
      *
      * @param batch  A SQL string containing multiple statements separated by semicolons
      * @return true if the first keyword of the first statement is a DDL verb
-     *     like CREATE, ALTER, DROP, PARTITION, DR, or EXPORT,
+     *     like CREATE, ALTER, DROP, PARTITION, DR, SET or EXPORT,
      *     or if the batch is empty.
      *     See the official list of DDL verbs in the "// Supported verbs" section of
      *     the static initializer for SQLLexer.VERB_TOKENS)

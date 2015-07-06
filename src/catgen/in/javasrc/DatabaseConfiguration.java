@@ -29,16 +29,19 @@ import java.util.List;
 public class DatabaseConfiguration {
 
     // DR_MODE
-    public static final String DR_MODE_NAME = "DR_MODE";
-    public static final String ACTIVE_ACTIVE = "ACTIVE_ACTIVE";
-    public static final String ACTIVE_PASSIVE = "ACTIVE_PASSIVE";
-    public static final DatabaseConfiguration DR_MODE
-            = new DatabaseConfiguration(DR_MODE_NAME, "Data replication mode: either ACTIVE_ACTIVE or ACTIVE_PASSIVE", new ConfigurationValueFiller() {
-        @Override
-        public String getValue(Database db) {
-            return (db.getIsactiveactivedred() ? ACTIVE_ACTIVE : ACTIVE_PASSIVE);
+    public static final String DR_MODE_NAME = "DR";
+    public static final String ACTIVE_ACTIVE = "ACTIVE";
+    public static final String ACTIVE_PASSIVE = "PASSIVE";
+    public static final DatabaseConfiguration DR_MODE = new DatabaseConfiguration(
+        DR_MODE_NAME,
+        "Data replication mode: either " + ACTIVE_ACTIVE + " or " + ACTIVE_PASSIVE,
+        new ConfigurationValueFiller() {
+            @Override
+            public String getValue(Database db) {
+                return (db.getIsactiveactivedred() ? ACTIVE_ACTIVE : ACTIVE_PASSIVE);
+            }
         }
-    });
+    );
 
     // add more configurations above, don't forget to add them and their names below after that
     static {

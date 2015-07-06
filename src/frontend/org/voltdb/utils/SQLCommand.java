@@ -467,13 +467,13 @@ public class SQLCommand
 
     private static void printConfig(VoltTable configData) {
         System.out.println();
-        System.out.println(String.format("%-20s%-20s%-50s", "NAME", "VALUE", "DESCRIPTION"));
-        for (int i=0; i<90; i++) {
+        System.out.println(String.format("%-20s%-20s%-60s", "NAME", "VALUE", "DESCRIPTION"));
+        for (int i=0; i<100; i++) {
             System.out.print('-');
         }
         System.out.println();
         while (configData.advanceRow()) {
-            System.out.println(String.format("%-20s%-20s%-50s",
+            System.out.println(String.format("%-20s%-20s%-60s",
                     configData.getString(0), configData.getString(1), configData.getString(2)));
         }
     }
