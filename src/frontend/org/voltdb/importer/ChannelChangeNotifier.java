@@ -28,6 +28,7 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicStampedReference;
 
 import org.voltcore.logging.VoltLogger;
@@ -77,14 +78,21 @@ public class ChannelChangeNotifier implements Runnable {
     }
 
     private final CallbacksRef m_callbacks = new CallbacksRef();
-    private final BlockingDeque<ChannelAssignment> m_deque;
+    private final AtomicReference<BlockingDeque<ChannelAssignment>> m_qref = new AtomicReference<>();
     private final AtomicBoolean m_done = new AtomicBoolean(false);
     private final ExecutorService m_es;
 
     public ChannelChangeNotifier(BlockingDeque<ChannelAssignment> deque) {
-        m_deque = Preconditions.checkNotNull(deque, "deque is null");
         m_es = CoreUtils.getCachedSingleThreadExecutor("Import Channel Change Notification Dispatcher", 15000);
-        m_es.submit(this);
+    }
+
+    public void startPolling(BlockingDeque<ChannelAssignment> deque) {
+        deque = Preconditions.checkNotNull(deque, "deque is null");
+        if (m_qref.compareAndSet(null, deque)) {
+            m_es.submit(this);
+        } else {
+            throw new IllegalStateException("this notifier has already an assigned blocking deque");
+        }
     }
 
     public void registerCallback(String importer, ChannelChangeCallback callback) {
@@ -107,7 +115,7 @@ public class ChannelChangeNotifier implements Runnable {
     }
 
     public void shutdown() {
-        if (m_done.compareAndSet(false, true)) {
+        if (m_qref.get() != null && m_done.compareAndSet(false, true)) {
             m_es.shutdown();
             try {
                 m_es.awaitTermination(365, TimeUnit.DAYS);
@@ -122,7 +130,7 @@ public class ChannelChangeNotifier implements Runnable {
         if (m_done.get()) return;
         ChannelAssignment assignment = null;
         try {
-            assignment = m_deque.poll(200, TimeUnit.MILLISECONDS);
+            assignment = m_qref.get().poll(200, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             throw loggedDistributerException(e, "interrupted while polling for channel assignmanets");
         }
