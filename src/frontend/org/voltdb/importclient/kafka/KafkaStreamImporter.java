@@ -215,6 +215,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 ex.printStackTrace();
             }
         }
+        m_fetchers.clear();
     }
 
     /**
@@ -564,8 +565,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                     m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize, m_consumerSocketTimeout);
                             m_fetchers.put(assignedKey.toString(), fetcher);
                             m_es.submit(fetcher);
-                        } else {
-                            info("Channel is not already fetching for resource: " + nuri);
+                            info("KafkaImporter is fetching for resource: " + nuri);
                         }
                     }
                 }
