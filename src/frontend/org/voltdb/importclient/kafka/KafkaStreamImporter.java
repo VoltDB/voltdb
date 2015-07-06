@@ -579,6 +579,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             TopicPartitionFetcher fetcher = m_fetchers.get(r.toString());
             if (fetcher != null) {
                 fetcher.shutdown();
+                info("KafkaImporter is NOT fetching for resource: " + r);
                 m_fetchers.remove(r.toString());
             }
         }
