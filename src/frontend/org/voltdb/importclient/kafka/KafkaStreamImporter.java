@@ -519,6 +519,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         }
                     }
                 }
+                info("Partition fecher stopped for topic " + this.m_topic + " And partition " + m_partition);
             } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
@@ -551,7 +552,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         String leaderKey = topic + "-" + partition;
                         URI assignedKey = new URI("kafka:/" + topic + "/partition/" + partition);
                         //The fetcher must not have existed.
-                        if (!m_fetchers.containsKey(nuri)) {
+                        if (!m_fetchers.containsKey(nuri) && nuri.equals(assignedKey)) {
                             info("Channel " + assignedKey + " mastership is assigned to this node.");
                             TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, assignedKey, topic, partition,
                                     m_topicPartitionLeader.get(leaderKey),

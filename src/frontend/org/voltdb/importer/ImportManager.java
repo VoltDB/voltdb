@@ -17,6 +17,7 @@
 
 package org.voltdb.importer;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
+import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
@@ -80,12 +82,14 @@ public class ImportManager {
         //Need this so that ImportContext is available.
         m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
                 + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0");
-        // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
+        // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-framework/apache-felix-framework-configuration-properties.html
         m_frameworkProps.put("org.osgi.framework.storage.clean", "onFirstInit");
+        String tmpFilePath = System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"));
+        m_frameworkProps.put("felix.cache.rootdir", tmpFilePath);
         m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
+        importLog.info("Framework properties are: " + m_frameworkProps);
         m_framework = m_frameworkFactory.newFramework(m_frameworkProps);
         m_framework.start();
-
     }
 
     /**
