@@ -185,7 +185,7 @@
     "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
                                  "ddl": "matview-DDL.sql",
                                  "template": "advanced-matview-nonjoin.sql",
-                                 "normalizer": "normalizer.py"},
+                                 "normalizer": "nulls-lowest-normalizer.py"},
 
     "advanced-matview-join": {"schema": "matview-advanced-join-schema.py",
                               "ddl": "matview-DDL.sql",
