@@ -169,6 +169,19 @@
 
 </patternset>
 
+<patternset id='junit.all.path'>
+    <!-- Standard junit fileset -->
+    <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+    <include name='org/voltcore/**/Test*.class' />
+    <include name='org/voltdb/**/Test*.class'/>
+    <!-- Exclude tests -->
+    <patternset refid="junit.exclusions"/>
+</patternset>
+
+<patternset id='junit.exclude.regression.path'>
+    <exclude name="org/voltdb/regressionsuites/*.class"/>
+</patternset>
+
 <!-- 2 old patternsets which will be deprecated after Docker deployed in testing -->
 <patternset id='junit.regression.h1.path'>
     <!-- Standard junit fileset -->
@@ -536,19 +549,6 @@
 
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
-</patternset>
-
-<patternset id='junit.all.path'>
-    <!-- Standard junit fileset -->
-    <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-    <include name='org/voltcore/**/Test*.class' />
-    <include name='org/voltdb/**/Test*.class'/>
-    <!-- Exclude tests -->
-    <patternset refid="junit.exclusions"/>
-</patternset>
-
-<patternset id='junit.exclude.regression.path'>
-    <exclude name="org/voltdb/regressionsuites/*.class"/>
 </patternset>
 
 <!-- Workload Tracer Properties -->
