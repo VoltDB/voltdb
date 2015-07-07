@@ -169,8 +169,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
-    private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
-    private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
+    private final SnapshotDaemon m_snapshotDaemon;
+    private final SnapshotDaemonAdapter m_snapshotDaemonAdapter;
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
@@ -1151,6 +1151,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
             Cartographer cartographer, int[] allPartitions) throws Exception {
         m_catalogContext.set(context);
+        m_snapshotDaemon = new SnapshotDaemon(context);
+        m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
         m_cartographer = cartographer;
 
         // pre-allocate single partition array

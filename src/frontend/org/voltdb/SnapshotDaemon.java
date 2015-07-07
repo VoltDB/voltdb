@@ -193,7 +193,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private State m_state = State.STARTUP;
 
-    SnapshotDaemon() {
+    SnapshotDaemon(CatalogContext catalogContext) {
         m_esBase.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         m_esBase.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 
@@ -208,8 +208,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         // Register the snapshot status to the StatsAgent
         SnapshotStatus snapshotStatus = new SnapshotStatus();
         snapshotStatus.setSnapshotPath(
-                VoltDB.instance().getCatalogContext().cluster.getLogconfig().get("log").getInternalsnapshotpath(),
-                VoltDB.instance().getCatalogContext().database.getSnapshotschedule().get("default").getPath());
+                catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath(),
+                catalogContext.database.getSnapshotschedule().get("default").getPath());
         VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUS,
                                                               0,
                                                               snapshotStatus);

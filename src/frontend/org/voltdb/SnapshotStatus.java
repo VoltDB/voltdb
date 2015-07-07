@@ -32,9 +32,9 @@ import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
 public class SnapshotStatus extends StatsSource {
 
     enum SNAPSHOT_TYPE {
-        AUTO_SNAPSHOT,
-        MANUAL_SNAPSHOT,
-        TRUNCATION_SNAPSHOT
+        AUTO,
+        MANUAL,
+        TRUNCATION
     };
 
     private File m_truncationSnapshotPath = null;
@@ -48,12 +48,12 @@ public class SnapshotStatus extends StatsSource {
     private String getSnapshotType(String path) {
         File thisSnapshotPath = new File(path);
         if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
-            return SNAPSHOT_TYPE.TRUNCATION_SNAPSHOT.name();
+            return SNAPSHOT_TYPE.TRUNCATION.name();
         }
         else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
-            return SNAPSHOT_TYPE.AUTO_SNAPSHOT.name();
+            return SNAPSHOT_TYPE.AUTO.name();
         }
-        return SNAPSHOT_TYPE.MANUAL_SNAPSHOT.name();
+        return SNAPSHOT_TYPE.MANUAL.name();
     }
 
     /**
