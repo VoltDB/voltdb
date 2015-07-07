@@ -24,6 +24,7 @@
 #include "common/tabletuple.h"
 #include "indexes/tableindex.h"
 #include "catalog/materializedviewinfo.h"
+#include "catalog/indexref.h"
 
 namespace voltdb {
 
@@ -58,25 +59,26 @@ public:
     void initializeTupleHavingNoGroupBy();
 
     PersistentTable * targetTable() const { return m_target; }
-    std::string indexForMinMax() const { return m_indexForMinMax == NULL ? "" : m_indexForMinMax->getName(); }
+    const std::vector<TableIndex *> & indexForMinMax() const { return m_indexForMinMax; }
 
     void setTargetTable(PersistentTable * target);
-    void setIndexForMinMax(std::string index);
+    void setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax);
 
     catalog::MaterializedViewInfo* getMaterializedViewInfo() {
         return m_mvInfo;
     }
 
     // See if the index is just built on group by columns or it also includes min/max agg (ENG-6511)
-    bool minMaxIndexIncludesAggCol()
+    bool minMaxIndexIncludesAggCol(TableIndex * index)
     {
-        if ( ! m_indexForMinMax) { return false; }
-        return m_indexForMinMax->getColumnIndices().size() == m_groupByColumnCount + 1;
+        if ( ! index ) { return false; }
+        return index->getColumnIndices().size() == m_groupByColumnCount + 1;
     }
 private:
 
     void freeBackedTuples();
     void allocateBackedTuples();
+    void allocateMinMaxSearchKeyTuple();
 
     /** load a predicate from the catalog structure if it's there */
     static AbstractExpression* parsePredicate(catalog::MaterializedViewInfo *mvInfo);
@@ -96,7 +98,8 @@ private:
                                           const NValue &existingValue,
                                           const NValue &initialNull,
                                           int negate_for_min,
-                                          int aggIndex);
+                                          int aggIndex,
+                                          int minMaxAggIdx);
 
     NValue findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
                                              const NValue &existingValue,
@@ -116,7 +119,7 @@ private:
     TableIndex *m_index;
 
     // the index on srcTable which can be used to maintain min/max
-    TableIndex *m_indexForMinMax;
+    std::vector<TableIndex *> m_indexForMinMax;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
@@ -141,9 +144,9 @@ private:
     // storage to hold the value for the search key
     char *m_searchKeyBackingStore;
 
-    std::vector<NValue> m_minMaxSearchKeyValue;
     TableTuple m_minMaxSearchKeyTuple;
     char *m_minMaxSearchKeyBackingStore;
+    size_t m_minMaxSearchKeyBackingStoreSize;
 
     // which columns in the source table
 
