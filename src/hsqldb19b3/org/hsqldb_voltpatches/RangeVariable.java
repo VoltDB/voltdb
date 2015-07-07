@@ -911,7 +911,7 @@ public class RangeVariable {
     }
 
     /**
-     * Retreives a String representation of this obejct. <p>
+     * Retrieves a String representation of this obejct. <p>
      *
      * The returned String describes this object's table, alias
      * access mode, index, join mode, Start, End and And conditions.
@@ -2033,6 +2033,42 @@ public class RangeVariable {
             return cond;
         }
 
+        String voltDescribe(Session session, int blanks) {
+
+            StringBuffer sb = new StringBuffer();
+            sb.append("index=").append(rangeIndex.getName().name);
+            if (hasIndexCondition()) {
+                if (indexedColumnCount > 0) {
+                    sb.append(Expression.indentStr(blanks, true, false)).append("start conditions = [");
+
+                    for (int j = 0; j < indexedColumnCount; j++) {
+                        if (indexCond != null && indexCond[j] != null) {
+                            sb.append(Expression.indentStr(blanks, true, false))
+                              .append(indexCond[j].voltDescribe(session, blanks + 2));
+                        }
+                    }
+                    sb.append(Expression.indentStr(blanks, true, false))
+                      .append("]");
+                }
+
+                if (indexEndCondition != null) {
+                    String temp = indexEndCondition.voltDescribe(session, blanks + 2);
+
+                    sb.append(Expression.indentStr(blanks, true, false))
+                      .append("end condition=[")
+                      .append(temp)
+                      .append("]");
+                }
+            }
+
+            if (nonIndexCondition != null) {
+                String temp = nonIndexCondition.voltDescribe(session, blanks + 2);
+
+                sb.append(Expression.indentStr(blanks, true, false)).append("other condition=[").append(temp).append("]");
+            }
+
+            return sb.toString();
+        }
         // End of VoltDB extension
     }
     // A VoltDB extension to export abstract parse trees
@@ -2167,5 +2203,102 @@ public class RangeVariable {
 
         return Expression.voltCombineWithAnd(joinCond, whereCond);
     }
-    // End of VoltDB extension
+
+    /**
+     * Retrieves a String representation of this object. <p>
+     *
+     * The returned String describes this object's table, alias
+     * access mode, index, join mode, Start, End and And conditions.
+     *
+     * @return a String representation of this object
+     */
+    public String voltDescribe(Session session, int blanks) {
+
+        StringBuffer sb;
+        sb = new StringBuffer();
+
+        String temp = "INNER";
+
+        if (isLeftJoin) {
+            temp = "LEFT OUTER";
+
+            if (isRightJoin) {
+                temp = "FULL";
+            }
+        } else if (isRightJoin) {
+            temp = "RIGHT OUTER";
+        }
+
+        sb.append(Expression.indentStr(blanks, true, false))
+          .append("join type=")
+          .append(temp);
+        sb.append(Expression.indentStr(blanks, true, false))
+          .append("table=")
+          .append(rangeTable.getName().name);
+
+        if (tableAlias != null) {
+            sb.append(Expression.indentStr(blanks, true, false))
+              .append("alias=")
+              .append(tableAlias.name);
+        }
+
+        RangeVariableConditions[] conditions = joinConditions;
+
+        if (whereConditions[0].hasIndexCondition()) {
+            conditions = whereConditions;
+        }
+
+        sb.append(Expression.indentStr(blanks, true, false))
+          .append("cardinality=");
+        sb.append(conditions[0].rangeIndex.size(session, rangeTable.getRowStore(session)));
+
+        boolean fullScan = !conditions[0].hasIndexCondition();
+
+        if (conditions == whereConditions) {
+            if (joinConditions[0].nonIndexCondition != null) {
+                sb.append(Expression.indentStr(blanks, true, false))
+                  .append("join condition = [")
+                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append(joinConditions[0].nonIndexCondition.voltDescribe(session, blanks))
+                  .append(Expression.indentStr(blanks, true, false))
+                  .append("]");
+            }
+        }
+
+        sb.append(Expression.indentStr(blanks, true, false))
+          .append("access=")
+          .append(fullScan ? "FULL SCAN" : "INDEX PRED");
+
+        for (int i = 0; i < conditions.length; i++) {
+            if (i > 0) {
+                sb.append(Expression.indentStr(blanks, true, false))
+                  .append("OR condition = [");
+            } else {
+                sb.append(Expression.indentStr(blanks, true, false));
+                if (conditions == whereConditions) {
+                    sb.append("where condition = [");
+                } else {
+                    sb.append("join condition = [");
+                }
+            }
+            sb.append(Expression.indentStr(blanks + 2, true, false))
+              .append(conditions[i].voltDescribe(session, blanks + 2));
+        }
+
+        if (conditions == joinConditions) {
+            if (whereConditions[0].nonIndexCondition != null) {
+                sb.append(Expression.indentStr(blanks, true, false))
+                  .append("where condition = [")
+                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append(
+                    whereConditions[0].nonIndexCondition.voltDescribe(session, blanks + 2))
+                  .append(Expression.indentStr(blanks, true, false))
+                  .append("]");
+            }
+        }
+
+        return sb.toString();
+    }
+
+   // End of VoltDB extension
 }
