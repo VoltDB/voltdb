@@ -254,19 +254,6 @@
 
 <patternset id='junit.regression.p2.path'>
     <!-- Standard junit fileset -->
-    <invert>
-        <patternset refid="junit.exclude.regression.path" />
-    </invert>
-	
-    <!-- Exclude tests -->
-    <invert>
-        <patternset refid="junit.regression.p1.path"/>
-        <patternset refid="junit.regression.p3.path"/>
-    </invert>
-</patternset>
-	
-<patternset id='junit.regression.p3.path'>
-    <!-- Standard junit fileset -->
 	<include name='org/voltdb/regressionsuites/TestAdHocPlannerCache.class' />
 	<include name='org/voltdb/regressionsuites/TestAdminMode.class' />
 	<include name='org/voltdb/regressionsuites/TestAdminPort.class' />
@@ -304,6 +291,19 @@
 
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
+</patternset>
+
+<patternset id='junit.regression.p3.path'>
+    <!-- Standard junit fileset -->
+    <invert>
+        <patternset refid="junit.exclude.regression.path" />
+    </invert>
+	
+    <!-- Exclude tests -->
+    <invert>
+        <patternset refid="junit.regression.p1.path"/>
+        <patternset refid="junit.regression.p2.path"/>
+    </invert>
 </patternset>
 
 <patternset id='junit.other.p1.path'>
@@ -461,18 +461,6 @@
 	
 <patternset id='junit.other.p2.path'>
     <!-- Standard junit fileset -->
-    <patternset refid="junit.all.path" />
-
-    <!-- Exclude tests -->
-    <patternset refid="junit.exclude.regression.path"/>
-    <invert>
-	    <patternset refid="junit.other.p1.path"/>
-	    <patternset refid="junit.other.p3.path"/>
-	</invert>
-</patternset>
-
-<patternset id='junit.other.p3.path'>
-    <!-- Standard junit fileset -->
 	<include name='org/voltcore/agreement/TestAgreementSeeker.class' />
 	<include name='org/voltcore/agreement/TestFuzzMeshArbiter.class' />
 	<include name='org/voltdb/TestCLReplayLiveDDLSwitch.class' />
@@ -549,6 +537,18 @@
 
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
+</patternset>
+
+<patternset id='junit.other.p3.path'>
+    <!-- Standard junit fileset -->
+    <patternset refid="junit.all.path" />
+
+    <!-- Exclude tests -->
+    <patternset refid="junit.exclude.regression.path"/>
+    <invert>
+	    <patternset refid="junit.other.p1.path"/>
+	    <patternset refid="junit.other.p2.path"/>
+	</invert>
 </patternset>
 
 <!-- Workload Tracer Properties -->
