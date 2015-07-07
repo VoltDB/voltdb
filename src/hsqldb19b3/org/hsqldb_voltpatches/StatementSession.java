@@ -719,6 +719,10 @@ public class StatementSession extends Statement {
         return false;
     }
 
+    public String voltDescribe(Session session, int blanks) {
+        return sql;
+    }
+
     public String describe(Session session) {
         return sql;
     }

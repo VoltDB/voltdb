@@ -1386,4 +1386,9 @@ public class StatementCommand extends Statement {
     public String describe(Session session) {
         return sql;
     }
+    // A VoltDB extension to print HSQLDB ASTs.
+    public String voltDescribe(Session session, int blanks) {
+        return sql;
+    }
+    // End of VoltDB extension
 }

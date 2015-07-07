@@ -444,4 +444,48 @@ class Like implements Cloneable {
             throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
         }
     }
+
+    // A VoltDB extension to print HSQLDB ASTs
+    public String voltDescribe(Session session, int blanks) {
+
+        StringBuffer sb = new StringBuffer();
+        StringBuffer ind = new StringBuffer();
+        ind.append(Expression.indentStr(blanks, true, false));
+        sb.append(super.toString())
+          .append("[")
+          .append(ind)
+          .append("escapeChar=")
+          .append(escapeChar);
+        sb.append(ind)
+          .append("isNull=")
+          .append(isNull);
+
+//        sb.append("optimised=").append(optimised).append('\n');
+        sb.append(ind)
+          .append("isIgnoreCase=")
+          .append(isIgnoreCase);
+        sb.append(ind)
+          .append("iLen=")
+          .append(iLen);
+        sb.append(ind)
+          .append("iFirstWildCard=")
+          .append(iFirstWildCard);
+        sb.append(ind)
+          .append("cLike=");
+        if (cLike != null) {
+            sb.append(StringUtil.arrayToString(cLike));
+        }
+
+        sb.append(ind)
+          .append("wildCardType=");
+        if (wildCardType != null) {
+            sb.append(StringUtil.arrayToString(wildCardType));
+        }
+        sb.append(ind)
+          .append(']');
+
+        return sb.toString();
+    }
+    // End of VoltDB extension
+
 }

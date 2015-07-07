@@ -2365,7 +2365,7 @@ public class Expression implements Cloneable {
             exp.attributes.put("alias", getAlias());
         }
 
-        // Add expresion sub type
+        // Add expression sub type
         if (exprSubType == OpTypes.ANY_QUANTIFIED) {
             exp.attributes.put("opsubtype", "any");
         } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
@@ -2712,6 +2712,8 @@ public class Expression implements Cloneable {
      */
     @Override
     public String toString() {
+        return voltDescribe(null, 0);
+        /*
         String type = null;
 
         // iterate through all optypes, looking for
@@ -2744,6 +2746,7 @@ public class Expression implements Cloneable {
             str += "\n  " + this.nodes[LEFT].toString();
         }
         return str;
+        */
     }
 
     static protected Expression voltCombineWithAnd(Expression... conditions)
@@ -2785,7 +2788,7 @@ public class Expression implements Cloneable {
         }
         return result;
     }
-    
+
     public boolean voltHasSubqueries() {
         if (table != null) {
             return true;
@@ -2797,6 +2800,99 @@ public class Expression implements Cloneable {
             }
         }
         return false;
+    }
+
+    protected String voltDescribe(Session session, int blanks) {
+
+        StringBuffer sb = new StringBuffer(64);
+        switch (opType) {
+
+            case OpTypes.VALUE :
+                sb.append("VALUE = ")
+                  .append(dataType.convertToSQLString(valueData))
+                  .append(Expression.indentStr(blanks, true, false))
+                  .append("TYPE = ")
+                  .append(dataType.getNameString());
+                return sb.toString();
+
+            case OpTypes.ARRAY :
+                sb.append("ARRAY ");
+                return sb.toString();
+
+            case OpTypes.ARRAY_SUBQUERY :
+                sb.append("ARRAY SUBQUERY");
+                return sb.toString();
+
+            //
+            case OpTypes.ROW_SUBQUERY :
+            case OpTypes.TABLE_SUBQUERY :
+                sb.append(String.format("QUERY(opType=%d)", getType()));
+                sb.append(table.queryExpression.voltDescribe(session, blanks + 2));
+                return sb.toString();
+            case OpTypes.ROW :
+                sb.append("ROW = [");
+                for (int i = 0; i < nodes.length; i++) {
+                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                      .append(nodes[i].voltDescribe(session, blanks + 1));
+                }
+                sb.append(Expression.indentStr(blanks + 2, true, false))
+                  .append("]");
+                break;
+
+            case OpTypes.VALUELIST :
+                sb.append("VALUELIST [");
+                for (int i = 0; i < nodes.length; i++) {
+                    sb.append(nodes[i].describe(session, blanks + 2));
+                    sb.append(' ');
+                }
+                sb.append("]");
+                break;
+        }
+
+        return sb.toString();
+    }
+
+    protected void voltDescribeArgs(Session session, int blanks, StringBuffer sb) {
+        voltDescribeArgs(session, blanks, sb, "arg_left", "arg_right");
+    }
+
+    protected void voltDescribeArgs(Session session, int blanks, StringBuffer sb, String leftName, String rightName) {
+        if (getLeftNode() != null) {
+            sb.append(leftName)
+              .append(" = [")
+              .append(Expression.indentStr(blanks + 2, true, false))
+              .append(nodes[LEFT].voltDescribe(session, blanks + 2))
+              .append(Expression.indentStr(blanks+2, true, false))
+              .append(']');
+        }
+
+        if (getRightNode() != null) {
+            sb.append(Expression.indentStr(blanks+2, true, false))
+              .append(rightName)
+              .append(" = [")
+              .append(Expression.indentStr(blanks + 2, true, false))
+              .append(nodes[RIGHT].voltDescribe(session, blanks + 2))
+              .append(Expression.indentStr(blanks+2, true, false))
+              .append(']');
+        }
+    }
+
+    public static String indentStr(int blanks, boolean startNL, boolean endNL) {
+        StringBuffer sb = new StringBuffer();
+        if (startNL) {
+            sb.append("\n");
+        }
+        for (int cidx = 0; cidx < blanks; cidx += 1) {
+            if (cidx % 5 == 4) {
+                sb.append("|");
+            } else {
+                sb.append(".");
+            }
+        }
+        if (endNL) {
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 
     // End of VoltDB extension

@@ -911,4 +911,48 @@ public class ExpressionOp extends Expression {
                 throw Error.runtimeError(ErrorCode.U_S0500, "ExpressionOp");
         }
     }
+
+    // A VoltDB extension to print HSQLDB ASTs
+    protected String voltDescribe(Session session, int blanks) {
+        StringBuffer sb = new StringBuffer(64);
+        switch (opType) {
+            case OpTypes.VALUE :
+                sb.append("VALUE = ")
+                  .append(dataType.convertToSQLString(valueData))
+                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append("TYPE = ")
+                  .append(dataType.getNameString());
+                return sb.toString();
+
+            case OpTypes.LIKE_ARG :
+                sb.append(Tokens.T_LIKE).append(' ').append("ARG ");
+                sb.append(dataType.getTypeDefinition());
+                break;
+
+            case OpTypes.VALUELIST :
+                sb.append(Tokens.T_VALUE).append(' ').append("LIST [");
+                for (int i = 0; i < nodes.length; i++) {
+                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                      .append(nodes[i].voltDescribe(session, blanks + 2));
+                }
+                return sb.toString();
+
+            case OpTypes.CAST :
+                sb.append(Tokens.T_CAST).append(' ');
+                sb.append(dataType.getTypeDefinition());
+                break;
+
+            case OpTypes.CASEWHEN :
+                sb.append(Tokens.T_CASEWHEN);
+                break;
+
+            case OpTypes.CONCAT_WS :
+                sb.append(Tokens.T_CONCAT_WS);
+                break;
+        }
+        voltDescribeArgs(session, blanks, sb);
+        return sb.toString();
+    }
+    // End of VoltDB extension
+
 }

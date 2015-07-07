@@ -2777,4 +2777,30 @@ public class FunctionSQL extends Expression {
     }
 
     // End of VoltDB extension
+    // A VoltDB extension to print HSQLDB ASTs
+    public String voltDescribe(Session session, int blanks) {
+        StringBuffer sb = new StringBuffer();
+        sb.append("FUNCTION ")
+          .append(name)
+          .append("(");
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] == null) {
+                continue;
+            }
+            sb.append(Expression.indentStr(blanks + 2, true, false))
+              .append("[")
+              .append(Expression.indentStr(blanks + 4, true, false))
+              .append(nodes[i].voltDescribe(session, blanks + 4))
+              .append(Expression.indentStr(blanks + 2, true, false))
+              .append("]");
+        }
+        sb.append(Expression.indentStr(blanks + 2, true, false))
+          .append(") returns ")
+          .append(dataType.getNameString())
+          .append(Expression.indentStr(blanks + 2, true, false))
+          .append("]\n");
+        return sb.toString();
+    }
+    // End of VoltDB extension
+
 }

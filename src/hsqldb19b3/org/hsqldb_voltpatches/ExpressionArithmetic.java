@@ -676,5 +676,67 @@ public class ExpressionArithmetic extends Expression {
             ExpressionValue.voltMutateToBigintType(e, this, i);
         }
     }
+
+    protected String voltDescribe(Session session, int blanks) {
+        StringBuffer sb = new StringBuffer();
+        sb.append("ARITHMETIC EXPRESSION: [")
+          .append(Expression.indentStr(blanks + 2, true, false));
+        switch (opType) {
+            case OpTypes.VALUE :
+                sb.append(Expression.indentStr(blanks + 2, true, false))
+                  .append("VALUE = ")
+                  .append(dataType.convertToSQLString(valueData))
+                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append("TYPE = ").append(dataType.getNameString());
+                return sb.toString();
+
+            case OpTypes.ROW :
+
+            //
+            case OpTypes.VALUELIST :
+                sb.append(Expression.indentStr(blanks + 2, true, false))
+                  .append("VALUELIST(Type = ")
+                  .append(dataType.getNameString())
+                  .append(") [ ");
+
+                for (int i = 0; i < nodes.length; i++) {
+                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                      .append(nodes[i].voltDescribe(session, blanks + 2));
+                }
+                sb.append("]");
+                break;
+            case OpTypes.NEGATE :
+                sb.append("NEGATE ");
+                break;
+
+            case OpTypes.ADD :
+                sb.append("ADD ");
+                break;
+
+            case OpTypes.SUBTRACT :
+                sb.append("SUBTRACT ");
+                break;
+
+            case OpTypes.MULTIPLY :
+                sb.append("MULTIPLY ");
+                break;
+
+            case OpTypes.DIVIDE :
+                sb.append("DIVIDE ");
+                break;
+
+            case OpTypes.CONCAT :
+                sb.append("CONCAT ");
+                break;
+
+            case OpTypes.CAST :
+                sb.append("CAST ");
+                sb.append(dataType.getTypeDefinition());
+                sb.append(' ');
+                break;
+        }
+        voltDescribeArgs(session, blanks + 2, sb);
+        return sb.toString();
+    }
     // End of VoltDB extension
 }
