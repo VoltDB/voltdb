@@ -40,6 +40,7 @@ import com.google_voltpatches.common.collect.ImmutableSetMultimap;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.SetMultimap;
+import com.google_voltpatches.common.collect.Sets;
 
 public class ChannelChangeNotifier implements Runnable {
 
@@ -166,6 +167,12 @@ public class ChannelChangeNotifier implements Runnable {
                         }
                     }
                 });
+            }
+            for (String noCallbackFor: Sets.difference(assigned.keySet(), callbacks.keySet())) {
+                LOG.warn("Missing channel notification callbacks for importer \"" + noCallbackFor
+                        + "\", which leave these channels \"" + assigned.get(noCallbackFor)
+                        + "\" without any assigned handler"
+                        );
             }
         }
         if (!m_done.get()) {
