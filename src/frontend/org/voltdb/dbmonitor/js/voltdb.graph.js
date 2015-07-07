@@ -1173,14 +1173,19 @@
             }
             
             var isDuplicate = false;
-            $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
-                var x1 = partitionValue.x;
-                if (x1 == cmdLogDetail[currentServer].START_TIME)
-                    isDuplicate = true;
-            });
-            if (!isDuplicate)
-                cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].START_TIME, "y": cmdLogDetail[currentServer].END_TIME });
-
+            if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
+                for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                    $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
+                        var x1 = partitionValue.x;
+                        if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                            isDuplicate = true;
+                        else
+                            isDuplicate = false;
+                    });
+                    if (!isDuplicate)
+                        cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "y": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                }
+            }
             d3.select('#visualisationCommandLog .nv-y')
                 .append('rect')
                 .attr('x', 2)

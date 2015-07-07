@@ -2522,12 +2522,15 @@ function alertNodeClicked(obj) {
             connection.Metadata['@Statistics_SNAPSHOTSTATUS'].data.forEach(function (info) {
                 var hostName = info[colIndex["HOSTNAME"]];
                 if (!snapshotDetails.hasOwnProperty(hostName)) {
-                    snapshotDetails[hostName] = {};
+                    snapshotDetails[hostName] = [];
                 }
-                snapshotDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                snapshotDetails[hostName]["PATH"] = info[colIndex["PATH"]];
-                snapshotDetails[hostName]["START_TIME"] = info[colIndex["START_TIME"]];
-                snapshotDetails[hostName]["END_TIME"] = info[colIndex["END_TIME"]];
+                var snapshot = {                    
+                    "TIMESTAMP": info[colIndex["TIMESTAMP"]],
+                    "PATH": info[colIndex["PATH"]],
+                    "START_TIME": info[colIndex["START_TIME"]],
+                    "END_TIME": info[colIndex["END_TIME"]]
+                };
+                snapshotDetails[hostName].push(snapshot);
             });
         };
 
