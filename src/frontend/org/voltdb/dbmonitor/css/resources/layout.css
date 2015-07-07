@@ -2235,7 +2235,7 @@ ul.adminClusterList li a.stop {
 
 ul.adminClusterList li a.shutdown {
     display: inline-block;
-    background-position: -786px -56px;
+    background-position: -965px -56px;
     width: 40px;
     height: 36px;
 }
@@ -2675,7 +2675,7 @@ input.exitableFilePrefix {
 
         .tblshutdown tr td a.shutdown {
             display: inline-block;
-            background-position: -786px -105px;
+            background-position: -166px -105px;
             width: 40px;
             height: 36px;
             line-height: 39px;
@@ -2683,7 +2683,7 @@ input.exitableFilePrefix {
 
         .tblshutdown tr td a.disableServer {
             display: inline-block;
-            background-position: -978px -150px;
+            background-position: -359px -150px;
             width: 40px;
             height: 36px;
             line-height: 39px;
