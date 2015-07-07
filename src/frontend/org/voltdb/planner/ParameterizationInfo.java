@@ -28,6 +28,7 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
+import org.voltdb.utils.VoltTypeUtil;
 
 /**
  * Given a SQL statements plan from HSQLDB, as our fake XML tree,
@@ -190,14 +191,11 @@ class ParameterizationInfo {
                 }
                 paramValues.add(value);
 
+                // If the type is NUMERIC from hsqldb, VoltDB has to decide its real type.
+                // It's either INTEGER or DECIMAL according to the SQL Standard.
+                // Thanks for Hsqldb 1.9, FLOAT literal values have been handled well with E sign.
                 if (vt == VoltType.NUMERIC) {
-                    vt = VoltType.BIGINT;
-                    try {
-                        Long.parseLong(value);
-                    } catch (NumberFormatException e) {
-                        // DECIMAL probably is not bigger/smaller enough than our decimal range.
-                        vt = VoltType.DECIMAL;
-                    }
+                    vt = VoltTypeUtil.getNumericLiteralType(VoltType.BIGINT, value);
                 }
 
                 node.attributes.put("valuetype", vt.getName());

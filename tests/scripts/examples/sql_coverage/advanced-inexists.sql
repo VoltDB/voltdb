@@ -2,7 +2,9 @@
 
 --- DML: purge and regenerate random data first
 DELETE FROM @dmltable
-INSERT INTO @dmltable VALUES (@insertvals)
+{@insertvals_not_null = "_id, _value[string], _value[int16], _value[float]"}
+
+INSERT INTO @dmltable VALUES (@insertvals_not_null)
 
 -- TEMP, for debugging, just so I can quickly see what data was generated:
 --SELECT * FROM @fromtables ORDER BY @idcol

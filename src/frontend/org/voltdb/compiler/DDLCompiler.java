@@ -51,6 +51,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
@@ -2118,21 +2119,6 @@ public class DDLCompiler {
                     minMaxAggs.add(aggExpr);
                 }
             }
-            AbstractExpression singleUniqueMinMaxAggExpr = null;
-            /*
-             * ENG-6511: If we only have one distinct min/max aggCol/aggExpr, we can try to
-             * find an index that was built on both the group-by columns and the min/max
-             * aggCol/aggExpr to achieve better performance.
-             */
-            if (hasMinOrMaxAgg) {
-                singleUniqueMinMaxAggExpr = minMaxAggs.get(0);
-                for (int i=1; i<minMaxAggs.size(); ++i) {
-                    if ( ! minMaxAggs.get(i).equals(singleUniqueMinMaxAggExpr)) {
-                        singleUniqueMinMaxAggExpr = null;
-                        break;
-                    }
-                }
-            }
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {
@@ -2147,19 +2133,23 @@ public class DDLCompiler {
             }
 
             if (hasMinOrMaxAgg) {
-                // ENG-6511: If we have only one distinct min/max aggCol/aggExpr, we will pass it into
-                // findBestMatchIndexForMatviewMinOrMax() to see if a better index can be found.
-                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, singleUniqueMinMaxAggExpr);
-                if (found != null) {
-                    matviewinfo.setIndexforminmax(found.getTypeName());
-                } else {
-                    matviewinfo.setIndexforminmax("");
-                    m_compiler.addWarn("No index found to support min() / max() UPDATE and DELETE on Materialized View " +
+                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+                boolean needsWarning = false;
+                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                    IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                    if (found != null) {
+                        refFound.setName(found.getTypeName());
+                    } else {
+                        refFound.setName("");
+                        needsWarning = true;
+                    }
+                }
+                if (needsWarning) {
+                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
                             matviewinfo.getTypeName() +
                             ", and a sequential scan might be issued when current min / max value is updated / deleted.");
                 }
-            } else {
-                matviewinfo.setIndexforminmax("");
             }
 
             // parse out the aggregation columns into the dest table
@@ -2196,7 +2186,7 @@ public class DDLCompiler {
     //   -- (ENG-6511) indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
     // This function is mostly re-written for the fix of ENG-6511. --yzhang
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
-            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression singleUniqueMinMaxAggExpr)
+            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression minMaxAggExpr)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
         StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
@@ -2208,9 +2198,9 @@ public class DDLCompiler {
         for (Index index : allIndexes) {
             // indexOptimalForMinMax == true if the index covered both the group-by columns and the min/max aggExpr.
             boolean indexOptimalForMinMax = false;
-            // If singleUniqueMinMaxAggExpr is not null, the diff can be zero or one.
+            // If minMaxAggExpr is not null, the diff can be zero or one.
             // Otherwise, for a usable index, its number of columns must agree with that of the group-by columns.
-            final int diffAllowance = singleUniqueMinMaxAggExpr == null ? 0 : 1;
+            final int diffAllowance = minMaxAggExpr == null ? 0 : 1;
 
             // Get all indexed exprs if there is any.
             String expressionjson = index.getExpressionsjson();
@@ -2240,7 +2230,7 @@ public class DDLCompiler {
                     List<ColumnRef> indexedColRefs =
                         CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
                     // The number of columns in index can never be less than that in the group-by column list.
-                    // If singleUniqueMinMaxAggExpr == null, they must be equal (diffAllowance == 0)
+                    // If minMaxAggExpr == null, they must be equal (diffAllowance == 0)
                     // Otherwise they may be equal (sub-optimal) or
                     // indexedColRefs.size() == groupbyColRefs.size() + 1 (optimal, diffAllowance == 1)
                     if (isInvalidIndexCandidate(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
@@ -2251,7 +2241,7 @@ public class DDLCompiler {
                         continue;
                     }
                     if (isValidIndexCandidateForMinMax(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
-                        if(! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
                             continue;
                         }
                         indexOptimalForMinMax = true;
@@ -2273,7 +2263,7 @@ public class DDLCompiler {
                         continue;
                     }
                     if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
-                        if(! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, null, indexedExprs, null)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                             continue;
                         }
                         indexOptimalForMinMax = true;
@@ -2297,7 +2287,7 @@ public class DDLCompiler {
                 }
 
                 if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
-                    if (! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, null, indexedExprs, null)) {
+                    if (! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                         continue;
                     }
                     indexOptimalForMinMax = true;
@@ -2398,18 +2388,18 @@ public class DDLCompiler {
     }
 
     private static boolean isIndexOptimalForMinMax(
-            MatViewIndexMatchingGroupby matchingCase, AbstractExpression singleUniqueMinMaxAggExpr,
+            MatViewIndexMatchingGroupby matchingCase, AbstractExpression minMaxAggExpr,
             List<ColumnRef> indexedColRefs, List<AbstractExpression> indexedExprs,
             List<Column> srcColumnArray) {
-        // We have singleUniqueMinMaxAggExpr and the index also has one extra column
+        // We have minMaxAggExpr and the index also has one extra column
         switch(matchingCase) {
         case GB_COL_IDX_COL:
-            if ( ! (singleUniqueMinMaxAggExpr instanceof TupleValueExpression) ) {
+            if ( ! (minMaxAggExpr instanceof TupleValueExpression) ) {
                 // Here because the index columns are all simple columns (indexedExprs == null)
-                // so the singleUniqueMinMaxAggExpr must be TupleValueExpression.
+                // so the minMaxAggExpr must be TupleValueExpression.
                 return false;
             }
-            int aggSrcColIdx = ((TupleValueExpression)singleUniqueMinMaxAggExpr).getColumnIndex();
+            int aggSrcColIdx = ((TupleValueExpression)minMaxAggExpr).getColumnIndex();
             Column aggSrcCol = srcColumnArray.get(aggSrcColIdx);
             Column lastIndexCol = indexedColRefs.get(indexedColRefs.size() - 1).getColumn();
             // Compare the two columns, if they are equal as well, then this is the optimal index! Congrats!
@@ -2419,7 +2409,7 @@ public class DDLCompiler {
             break;
         case GB_COL_IDX_EXP:
         case GB_EXP_IDX_EXP:
-            if (indexedExprs.get(indexedExprs.size()-1).equals(singleUniqueMinMaxAggExpr)) {
+            if (indexedExprs.get(indexedExprs.size()-1).equals(minMaxAggExpr)) {
                 return true;
             }
             break;
