@@ -17,6 +17,7 @@
 
 package org.voltdb.importer;
 
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.not;
 
@@ -88,8 +89,7 @@ public class ChannelChangeNotifier implements Runnable {
     }
 
     public void startPolling(BlockingDeque<ChannelAssignment> deque) {
-        deque = Preconditions.checkNotNull(deque, "deque is null");
-        if (m_qref.compareAndSet(null, deque)) {
+        if (m_qref.compareAndSet(null, checkNotNull(deque, "deque is null"))) {
             m_es.submit(this);
         } else {
             throw new IllegalStateException("this notifier has already an assigned blocking deque");
@@ -101,7 +101,7 @@ public class ChannelChangeNotifier implements Runnable {
                 importer != null && !importer.trim().isEmpty(),
                 "importer is null or empty"
                 );
-        callback = Preconditions.checkNotNull(callback, "callback is null");
+        callback = checkNotNull(callback, "callback is null");
 
         int [] stamp = new int[]{0};
         NavigableMap<String, ChannelChangeCallback> prev = null;
@@ -116,7 +116,7 @@ public class ChannelChangeNotifier implements Runnable {
     }
 
     public void shutdown() {
-        if (m_qref.get() != null && m_done.compareAndSet(false, true)) {
+        if (m_done.compareAndSet(false, true)) {
             m_es.shutdown();
             try {
                 m_es.awaitTermination(365, TimeUnit.DAYS);
