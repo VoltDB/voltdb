@@ -139,7 +139,7 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
-    <exclude name='classes-java1.6.jar' />
+        <exclude name='classes-java1.6.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -295,7 +295,7 @@
 
 <patternset id='junit.regression.p3.path'>
     <!-- Standard junit fileset -->
-    <include name="org/voltdb/regressionsuites/*.class"/>
+    <include name="org/voltdb/regressionsuites/Test*.class"/>
     
     <!-- Exclude tests -->
     <invert>
@@ -975,7 +975,7 @@ DISTRIBUTION
 
     <!-- copy to dir where jar picks it up as well -->
     <condition property="jar.nativelib.dir"
-    value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
+        value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
         else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
         <isset property="os.mac"/>
     </condition>
@@ -1169,7 +1169,7 @@ JAR BUILDING
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/cliffc_voltpatches/**" />
             <include name="groovy_voltpatches/**"/>
-        <include name="org/supercsv_voltpatches/tokenizer/*" />
+            <include name="org/supercsv_voltpatches/tokenizer/*" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/HdrHistogram_voltpatches/**" />
@@ -1413,7 +1413,7 @@ JAVA COMPILATION
                   com/google_voltpatches/**/*.java
                   org/cliffc_voltpatches/**
                   groovy_voltpatches/**
-          org/supercsv_voltpatches/tokenizer/*.java"/>
+                  org/supercsv_voltpatches/tokenizer/*.java"/>
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
@@ -2394,7 +2394,7 @@ TEST CASES
       <fileset dir="${lib.dir}" includes ="*.jar" />
       <fileset dir='${vendor.lib.dir}'>
           <include name='*.jar' />
-      <exclude name='classes-java1.6.jar' />
+          <exclude name='classes-java1.6.jar' />
       </fileset>
       <pathelement location="${build.test.dir}" />
       <fileset refid="voltpro.classpath"/>
