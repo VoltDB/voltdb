@@ -228,10 +228,9 @@ public class PlanAssembler {
 
     private boolean canPushDownDistinctAggregation(AggregateExpression aggExpr) {
         assert(m_parsedSelect != null);
+        assert(aggExpr != null);
+        assert(aggExpr.isDistinct());
 
-        if ( aggExpr == null || aggExpr.isDistinct() == false ) {
-            return false;
-        }
         if ( aggExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ) {
             return true;
         }
