@@ -2008,8 +2008,8 @@ public class RangeVariable {
                     terminalCondition.replaceColumnReferences(range, list);
             }
         }
-        // A VoltDB extension to export predicates as a VoltXMLElement
 
+        // A VoltDB extension to export predicates as a VoltXMLElement
         private Expression voltCombineConditions() {
             Expression indexConds = Expression.voltCombineWithAnd(indexCond);
             Expression indexEndConds = Expression.voltCombineWithAnd(indexEndCond);
