@@ -303,8 +303,7 @@ public class SnapshotConverter {
     }
 
     private static void printHelpAndQuit( int code) {
-        System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --help");
-        System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --dir dir1 --dir dir2 --dir dir3" +
+        System.out.println("Usage\nsnapshotconverter --dir dir1 --dir dir2 --dir dir3 " +
                 "--table table1 --table table2 --table table3 --type CSV|TSV --outdir dir snapshot_name --timezone GMT+0");
         System.exit(code);
     }
