@@ -101,7 +101,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
         assertFalse(explained.substring(start).contains("LIMIT"));
     }
 
-    public void notestPureColumnIndex() throws Exception {
+    public void testPureColumnIndex() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TU1.insert", 1, 1);

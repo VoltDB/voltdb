@@ -139,7 +139,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         // TODO: For that reason, it might make sense to break them out into
         // their own suite to make their specific issues easier to isolate.
 
-        /* not yet hsql232 -- getting GC and hang? NEEDS TICKET?
         cr = client.callProcedure("@AdHoc",
                 "select ID from P1 " +
                 "where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 " +
@@ -147,7 +146,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(5, result.getRowCount());
-        ... not yet hsql232 -- getting GC and hang? */
 
         VoltTable r;
         long resultA;
@@ -441,26 +439,26 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "select * from P1, R2 where P1.ID = R2.ID AND ABS(P1.NUM) > 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println(r);
+        //* enable to debug */ System.out.println(r);
         assertEquals(8, r.getRowCount());
 
         cr = client.callProcedure("@AdHoc", "select * from P1, R2 where P1.ID = R2.ID AND ABS(P1.NUM+0) > 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println(r);
+        //* enable to debug */ System.out.println(r);
         assertEquals(8, r.getRowCount());
 
         // These next queries fail in 3.5 with a runtime type exception about unrecognized type related?/similar? to ENG-5004?
         cr = client.callProcedure("@AdHoc", "select count(*) from P1, R2 where P1.ID = R2.ID AND ABS(R2.NUM+0) > 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println(r);
+        //* enable to debug */ System.out.println(r);
         assertEquals(8, r.asScalarLong());
 
         cr = client.callProcedure("@AdHoc", "select count(*) from P1, R2 where P1.ID = R2.ID AND ABS(R2.NUM) > 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println(r);
+        //* enable to debug */ System.out.println(r);
         assertEquals(8, r.asScalarLong());
         // */
 
@@ -731,7 +729,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( DESC FROM 2) > 9");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            /* hsql232 NEED TICKET! -- missing parser type check -- and getting runtime type check error!
+            /* hsql232 ENG-8584 -- missing parser type check -- and getting runtime type check error!
             //TODO: isolate this as a planner/TestFunctions test case.
             String msg = e.getMessage();
             assertTrue(msg.indexOf("incompatible data type") != -1);
@@ -1387,7 +1385,8 @@ public class TestFunctionsSuite extends RegressionSuite {
             }
             else if (jj == FLOATCOLINDEX) {
                 cr = client.callProcedure(proc, filter);
-            } else {
+            }
+            else {
                 cr = client.callProcedure(proc, BigDecimal.valueOf(filter));
             }
         }
@@ -1485,6 +1484,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 result = cr.getResults()[0];
                 int rowCount = result.getRowCount();
                 assertEquals(rowCount, 1);
+                //* enable to debug */ System.out.println(proc + " got: " + result.toString());
                 resultSet[kk++] = new FunctionTestCase(proc, filter, result.asScalarLong());
             }
             ++jj;
@@ -1532,7 +1532,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 count = 0;
             }
             valueBag.put(asExpected, count + 1);
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("UPDATING " + result.m_case + " found count of " + asExpected + " to " + (count+1) );
+            //* enable to debug:*/ System.out.println("UPDATING " + result.m_case + " found count for " + asExpected + " to " + (count+1) );
         }
 
         if (monotonic) {
@@ -1576,7 +1576,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // If filters represents all the values in resultValues,
         // the filtered counts should total to resultValues.length.
         int coveringCount = resultValues.length;
-        //*VERBOSIFY TO DEBUG:*/ System.out.println("EXPECTING total count" + coveringCount);
+        //* enable to debug:*/ System.out.println("EXPECTING total count: " + coveringCount);
         for (FunctionTestCase result : results) {
             if (result.m_result == 0.0) {
                 // complain("NONMATCHING filter " + result.m_case + " " + result.m_filter);
@@ -1587,14 +1587,14 @@ public class TestFunctionsSuite extends RegressionSuite {
                 complain("Function " + fname + " got unexpected result " + result.m_filter + ".");
             }
             assertNotNull(count);
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
+            //* enable to debug:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
             if (count < result.m_result) {
                 complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
             }
             assertTrue(count >= result.m_result);
             valueBag.put(String.format(formatForFuzziness, result.m_filter), count-(int)result.m_result);
             coveringCount -= (int)result.m_result;
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
+            //* enable to debug:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
         }
         for (Entry<String, Integer> entry : valueBag.entrySet()) {
             int count = entry.getValue();
@@ -1613,7 +1613,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestFromVarCharCasts();
         subtestToVarCharCasts();
         subtestNumericCasts();
-        // hsql232 problem? NEED TICKET! subtestCeiling();
+        subtestCeiling();
         subtestExp();
         subtestFloor();
         subtestPowerx7();
@@ -1636,6 +1636,9 @@ public class TestFunctionsSuite extends RegressionSuite {
         final boolean monotonic = true;
         final boolean ascending = true;
         final String expectedFormat = null; // column/parameter values are variously typed.
+        if (isHSQL()) {
+            return; // HSQLBackend wrong answer issue with floating point 0 values. 
+        }
         functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
@@ -1782,7 +1785,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             for (String numTypeName : numTypeNames) {
                 String tooSimple = result.getString(jj);
                 String value = Double.valueOf(tooSimple).toString();
-                //*VERBOSIFY TO DEBUG:*/ System.out.println("DEBUG " + proc + " " + numTypeName + " GOT " + tooSimple + " into " + value);
+                //* enable to debug:*/ System.out.println("DEBUG " + proc + " " + numTypeName + " GOT " + tooSimple + " into " + value);
                 resultSet[ii++] = new FunctionVarCharTestCase(proc + " " + numTypeName, value);
                 ++jj;
             }
@@ -1857,7 +1860,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 int rowCount = result.getRowCount();
                 assertEquals(rowCount, 1);
                 long tupleCount = result.asScalarLong();
-                //*VERBOSIFY TO DEBUG:*/ System.out.println("DEBUG " + proc + " " + numTypeName + " GOT count " + tupleCount);
+                //* enable to debug:*/ System.out.println("DEBUG " + proc + " " + numTypeName + " GOT count " + tupleCount);
                 resultSet[kk++] = new FunctionVarCharTestCase(proc, filter, tupleCount);
             }
             ++jj;
@@ -1916,7 +1919,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                     count = 0;
                 }
                 valueBag.put(asExpected, count + 1);
-                //*VERBOSIFY TO DEBUG:*/ System.out.println("UPDATING " + result.m_case + " found count of " + asExpected + " to " + (count+1) );
+                //* enable to debug:*/ System.out.println("UPDATING " + result.m_case + " found count of " + asExpected + " to " + (count+1) );
             }
 
             // Validate that sorting on the function value does not alter the ordering of its input values.
@@ -1943,7 +1946,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             // If filters represents all the values in resultValues,
             // the filtered counts should total to resultValues.length.
             int coveringCount = resultValues.length;
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("EXPECTING total count" + coveringCount);
+            //* enable to debug:*/ System.out.println("EXPECTING total count" + coveringCount);
             for (FunctionTestCase result : results) {
                 if (result.m_result == 0.0) {
                     // complain("NONMATCHING filter " + result.m_case + " " + result.m_filter);
@@ -1954,14 +1957,14 @@ public class TestFunctionsSuite extends RegressionSuite {
                     complain("CAST got unexpected result " + result.m_filter + ".");
                 }
                 assertNotNull(count);
-                //*VERBOSIFY TO DEBUG:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
+                //* enable to debug:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
                 if (count < result.m_result) {
                     complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
                 }
                 assertTrue(count >= result.m_result);
                 valueBag.put(String.format(formatForFuzziness, result.m_filter), count-(int)result.m_result);
                 coveringCount -= (int)result.m_result;
-                //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
+                //* enable to debug:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
             }
             for (Entry<String, Integer> entry : valueBag.entrySet()) {
                 int count = entry.getValue();
@@ -2058,7 +2061,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 count = 0;
             }
             valueBag.put(expected, count + 1);
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("UPDATING " + result.m_case + " found count of " + expected + " to " + (count+1) );
+            //* enable to debug:*/ System.out.println("UPDATING " + result.m_case + " found count of " + expected + " to " + (count+1) );
         }
 
         results = whereVarCharCastRun(client, filters);
@@ -2067,21 +2070,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         // If filters represents all the values in resultValues,
         // the filtered counts should total to resultValues.length.
         int coveringCount = resultValues.length;
-        //*VERBOSIFY TO DEBUG:*/ System.out.println("EXPECTING total count" + coveringCount);
+        //* enable to debug:*/ System.out.println("EXPECTING total count" + coveringCount);
         for (FunctionVarCharTestCase result : results) {
             Integer count = valueBag.get(result.m_filter);
             if (count == null) {
                 complain("CAST got unexpected result " + result.m_filter + ".");
             }
             assertNotNull(count);
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("VARCHAR REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
+            //* enable to debug:*/ System.out.println("VARCHAR REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
             if (count < result.m_result) {
                 complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
             }
             assertTrue(count >= result.m_result);
             valueBag.put(result.m_filter, count-(int)result.m_result);
             coveringCount -= (int)result.m_result;
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
+            //* enable to debug:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
         }
         for (Entry<String, Integer> entry : valueBag.entrySet()) {
             int count = entry.getValue();
@@ -2845,7 +2848,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
                     "WHEN num >=5 THEN 'I am null'  ELSE num END FROM R1 ORDER BY 1;";
             vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
-            // hsql232 NEED TICKET! having no incompatibility problem with this: fail();
+            // hsql232 ENG-8586 CASE WHEN having no incompatibility problem with this: fail();
         } catch (Exception ex) {
             assertNotNull(ex);
             assertTrue(ex.getMessage().contains("incompatible data types in combination"));
@@ -3194,7 +3197,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // TODO: Is the exception throwed by coalesce? Or by decode?
         try {
             doTestThreeColCoalesce(cl, "S1", "I2", "V3", "100");
-            // hsql232 NEED TICKET! having no incompatibility problem with this: fail();
+            // hsql232 ENG-8587 Coalesce having no incompatibility problem with this: fail();
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("incompatible data types"));
         }
