@@ -59,7 +59,7 @@ public class ImportManager {
     private final Map<String, String> m_frameworkProps;
     private final Framework m_framework;
     private final int m_myHostId;
-    private BlockingDeque<ChannelAssignment> m_queue = new LinkedBlockingDeque<ChannelAssignment>();
+    private BlockingDeque<ChannelAssignment> m_queue = new LinkedBlockingDeque<ChannelAssignment>(Integer.getInteger("voltdb.import.maxchannels", 2048));
     private final ChannelDistributer m_distributer;
     /**
      * Get the global instance of the ImportManager.
