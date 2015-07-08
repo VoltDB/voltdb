@@ -8,7 +8,7 @@
         <configuration module="kafkastream.jar" type="custom" enabled="true">
             <property name="brokers">volt15a:9092,volt15b:9092,volt15d:9092</property>
             <property name="topics">replicated-import</property>
-            <property name="procedure">importTable.insert</property>
+            <property name="procedure">InsertExport</property>
         </configuration>
     </import>
 </deployment>

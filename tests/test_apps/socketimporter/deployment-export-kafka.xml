@@ -5,7 +5,7 @@
         <jsonapi enabled="true" />
     </httpd>
     <import>
-        <configuration module="kafkastream.jar" type="custom" enabled="true">
+        <configuration module="kafkastream.jar" type="custom" enabled="false">
             <property name="brokers">kafka2:9092</property>
             <property name="topics">T1_KAFKAEXPORTTABLE1</property>
             <property name="procedure">T1_KAFKAEXPORTTABLE1.insert</property>

@@ -34,9 +34,7 @@
  * the database has time to complete all socket importer input transactions.
  */
 
-package socketimporter;
-
-import com.google_voltpatches.common.net.HostAndPort;
+package socketimporter.client.socketimporter;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -55,6 +53,8 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class AsyncBenchmark {
 
