@@ -23,11 +23,11 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
+import org.voltcore.utils.Pair;
 
 public class SnapshotStatus extends StatsSource {
 
