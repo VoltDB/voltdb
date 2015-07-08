@@ -40,6 +40,9 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.types.BinaryData;
+import org.hsqldb_voltpatches.types.NumberType;
+import org.hsqldb_voltpatches.types.TimestampData;
 // End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
@@ -59,12 +62,9 @@ import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.types.ArrayType;
-import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Collation;
 import org.hsqldb_voltpatches.types.NullType;
-import org.hsqldb_voltpatches.types.NumberType;
-import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.Types;
 
