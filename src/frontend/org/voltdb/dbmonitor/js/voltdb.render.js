@@ -353,7 +353,6 @@ function alertNodeClicked(obj) {
                     var rawData;
                     if (connection != null)
                         rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
-
                     onInformationLoaded(loadAdminDeploymentInformation(connection), rawData);
                 });
             }
@@ -375,7 +374,6 @@ function alertNodeClicked(obj) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-
                 setKFactor(connection);
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
@@ -766,6 +764,12 @@ function alertNodeClicked(obj) {
                     adminConfigValues['drId'] = data.dr.id;
                     adminConfigValues['drListen'] = data.dr.listen;
                     adminConfigValues['drPort'] = data.dr.port;
+                }
+
+                //import
+
+                if (data.import != null) {
+                    adminConfigValues['importConfiguration'] = data.import.configuration;
                 }
             }
 
@@ -2518,12 +2522,15 @@ function alertNodeClicked(obj) {
             connection.Metadata['@Statistics_SNAPSHOTSTATUS'].data.forEach(function (info) {
                 var hostName = info[colIndex["HOSTNAME"]];
                 if (!snapshotDetails.hasOwnProperty(hostName)) {
-                    snapshotDetails[hostName] = {};
+                    snapshotDetails[hostName] = [];
                 }
-                snapshotDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                snapshotDetails[hostName]["PATH"] = info[colIndex["PATH"]];
-                snapshotDetails[hostName]["START_TIME"] = info[colIndex["START_TIME"]];
-                snapshotDetails[hostName]["END_TIME"] = info[colIndex["END_TIME"]];
+                var snapshot = {                    
+                    "TIMESTAMP": info[colIndex["TIMESTAMP"]],
+                    "PATH": info[colIndex["PATH"]],
+                    "START_TIME": info[colIndex["START_TIME"]],
+                    "END_TIME": info[colIndex["END_TIME"]]
+                };
+                snapshotDetails[hostName].push(snapshot);
             });
         };
 

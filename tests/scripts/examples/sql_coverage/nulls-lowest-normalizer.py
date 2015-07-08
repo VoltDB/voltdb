@@ -22,8 +22,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from NotANormalizer import NotANormalizer
+from SortNulls import SortNulls
 from SQLCoverageReport import generate_html_reports
+from StandardNormalizer import StandardNormalizer
+
+def normalize(table, sql):
+    """Normalizes the result tuples of ORDER BY statements, sorting SQL NULL
+       (Python None) values as if they were the lowest values, i.e., first
+       when using ORDER BY col1 ASC, but last when using ORDER BY col1 DESC.
+    """
+    return StandardNormalizer.normalize(table, sql, SortNulls.lowest)
 
 def safecmp(x, y):
     """Calls the 'standard' safecmp function, which performs a comparison
@@ -31,15 +39,10 @@ def safecmp(x, y):
        are considered equal, and a TypeError is avoided when a None value
        and a datetime are corresponding members of a list.
     """
-    return NotANormalizer.safecmp(x,y)
-
-def normalize(table, sql):
-    """Do nothing other than returning the table.
-    """
-    return NotANormalizer.normalize(table, sql)
+    return StandardNormalizer.safecmp(x,y)
 
 def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all, extra_stats):
     """Just calls SQLCoverageReport.generate_html_reports(...).
     """
     return generate_html_reports(suite, seed, statements_path, hsql_path,
-                                 jni_path, output_dir, report_all, extra_stats, True)
+                                 jni_path, output_dir, report_all, extra_stats)
