@@ -130,6 +130,12 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import java.net.URISyntaxException;
+import java.util.HashMap;
+import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.importer.ImportDataProcessor;
 
 /**
  *
@@ -1013,7 +1019,7 @@ public abstract class CatalogUtil {
         switch(exportConfiguration.getType()) {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
-            case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+            case KAFKA: exportClientClassName = "org.voltdb.exportclient.kafka.KafkaExportClient"; break;
             case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
             //Validate that we can load the class.
@@ -1122,11 +1128,18 @@ public abstract class CatalogUtil {
         }
         if (is == null) {
             try {
-                String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-                hostLog.info("Module base is: " + rpath);
-                String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
-                is = new FileInputStream(new File(bpath));
-                importBundleUrl = "file:" + bpath;
+                String bundlelocation = System.getProperty("voltdbbundlelocation");
+                if (bundlelocation == null || bundlelocation.trim().length() == 0) {
+                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                    hostLog.info("Module base is: " + rpath + "/../bundles/");
+                    String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    importBundleUrl = "file:" + bpath;
+                } else {
+                    String bpath = bundlelocation + "/" + importBundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    importBundleUrl = "file:" + bpath;
+                }
             } catch (URISyntaxException | FileNotFoundException ex) {
                 is = null;
             }

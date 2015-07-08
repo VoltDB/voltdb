@@ -134,6 +134,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.text.SimpleDateFormat;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -168,9 +169,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.4EA1";
+    static final String m_defaultVersionString = "5.4";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.4EA1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.4\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -325,6 +326,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
+    String m_licenseInformation = "";
     private LatencyStats m_latencyStats;
 
     private LatencyHistogramStats m_latencyHistogramStats;
@@ -332,6 +334,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Override
     public LicenseApi getLicenseApi() {
         return m_licenseApi;
+    }
+
+    @Override
+    public String getLicenseInformation() {
+        return m_licenseInformation;
     }
 
     /**
@@ -502,6 +509,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 hostLog.fatal("Please contact sales@voltdb.com to request a license.");
                 VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
                         "See previous log message for details.", false, null);
+            }
+
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
+                JSONObject jo = new JSONObject();
+                jo.put("trial",m_licenseApi.isTrial());
+                jo.put("hostcount",m_licenseApi.maxHostcount());
+                jo.put("commandlogging", m_licenseApi.isCommandLoggingAllowed());
+                jo.put("wanreplication", m_licenseApi.isDrReplicationAllowed());
+                jo.put("expiration", sdf.format(m_licenseApi.expires().getTime()));
+                m_licenseInformation = jo.toString();
+            } catch (JSONException ex) {
+                //Ignore
             }
 
             // Create the GlobalServiceElector.  Do this here so we can register the MPI with it

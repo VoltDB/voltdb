@@ -192,7 +192,7 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.help.isDisplayed() }
+        page.header.checkShowHelp()
     }
 
     // HEADER TAB TESTS
@@ -314,16 +314,8 @@ class DbMonitorTest extends TestBase {
     def "help popup existance" () {
         when:
         at DbMonitorPage
-        waitFor(30) { header.help.isDisplayed() }
-        header.help.click()
         then:
-        waitFor(30) {
-            header.popupTitle.isDisplayed()
-            header.popupClose.isDisplayed()
-            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
-        }
-
-        header.popupClose.click()
+        page.header.checkIfHelpIsOpen()
     }
 
     // FOOTER TESTS
@@ -2171,6 +2163,8 @@ class DbMonitorTest extends TestBase {
         // This loop is used to gain time. 
         while(count<numberOfTrials) {
             count++
+            page.chooseGraphView("Seconds")
+            page.chooseGraphView("Seconds")
             page.chooseGraphView("Days")
             if(graphView.text().equals("")) {
                 break
@@ -2192,6 +2186,11 @@ class DbMonitorTest extends TestBase {
 		        
 		        println(stringMax)
 		        println(stringMin)
+		        
+		        if(stringMax.length()<10 || stringMax.length()<10) {
+		            println("Not fixed")
+		            continue
+		        }
 		        
 		        break
 		    } catch(geb.waiting.WaitTimeoutException e) {
@@ -2227,16 +2226,10 @@ class DbMonitorTest extends TestBase {
 
     def "check max value in cluster transaction days"(){
         int count = 0
-        
+        int smallCount = 0
         when:
         // This loop is used to gain time. 
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Days")
-            if(graphView.text().equals("")) {
-                break
-            }
-		}
+        
 		count = 0
 		then:
 		String stringMax = ""
@@ -2244,6 +2237,16 @@ class DbMonitorTest extends TestBase {
 		
 		while(count<numberOfTrials) {
 		    count++
+		    while(smallCount<numberOfTrials) {
+                smallCount++
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Days")
+                if(graphView.text().equals("")) {
+                    break
+                }
+		    }
+		    
 		    try {
 		        waitFor(waitTime) {
 		            page.clustertransactionmax.isDisplayed()
@@ -2253,6 +2256,11 @@ class DbMonitorTest extends TestBase {
 		        
 		        println(stringMax)
 		        println(stringMin)
+		        
+		        if(stringMax.length()<10 || stringMax.length()<10) {
+		            println("Not fixed")
+		            continue
+		        }
 		        
 		        break
 		    } catch(geb.waiting.WaitTimeoutException e) {
@@ -2291,41 +2299,60 @@ class DbMonitorTest extends TestBase {
         
         when:
         // This loop is used to gain time. 
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Minutes")
-            if(graphView.text().equals("")) {
-                break
-            }
-		}
-		count = 0
-		then:
-		String stringMax
+        String stringMax
 		String stringMin
+        int bigCount = 0
 		
-		while(count<numberOfTrials) {
-		    count++
+		then:
+		while(bigCount<numberOfTrials) {
+		    bigCount++
+            while(count<numberOfTrials) {
+                count++
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Minutes")
+                if(graphView.text().equals("")) {
+                    break
+                }
+		    }
+		    count = 0
+		    while(count<numberOfTrials) {
+		        count++
+		        try {
+		            waitFor(waitTime) {
+		                page.clustertransactionmax.isDisplayed()
+		            }
+		            stringMax = page.clustertransactionmax.text()
+		            stringMin = page.clustertransactionmin.text()
+		            break
+		        } catch(geb.waiting.WaitTimeoutException e) {
+		            println("WaitTimeoutException")
+		        }
+		    }
+		
+		    String result = page.compareTime(stringMax, stringMin)
+		    println(result + " " + stringMax + " " + stringMin)
 		    try {
 		        waitFor(waitTime) {
-		            page.clustertransactionmax.isDisplayed()
+		            result.equals("minutes")
 		        }
-		        stringMax = page.clustertransactionmax.text()
-		        stringMin = page.clustertransactionmin.text()
+		        println("The minimum value is " + stringMin + " and the time is in " + result )
 		        break
 		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
+		        println("AJA BHAKOXAINA")
 		    }
-		}
-		
-		String result = page.compareTime(stringMax, stringMin)
-		
-		if(result.equals("minutes")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
+		    /*if(result.equals("minutes")) {
+		        println("The minimum value is " + stringMin + " and the time is in " + result )
+		        assert true
+		        break
+		    }
+		    else {
+		        println("FAIL: It is not in minutes")
+		        if(bigCount == 5) {
+		            println("TRULY FALSE")
+		            assert false
+		        }
+		    }*/
 		}
     }
 
@@ -2334,41 +2361,61 @@ class DbMonitorTest extends TestBase {
         
         when:
         // This loop is used to gain time. 
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Minutes")
-            if(graphView.text().equals("")) {
-                break
-            }
-		}
-		count = 0
-		then:
-		String stringMax
+        String stringMax
 		String stringMin
+		int bigCount = 0
 		
-		while(count<numberOfTrials) {
-		    count++
+		then:
+		while(bigCount<numberOfTrials) {
+            while(count<numberOfTrials) {
+                count++
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Minutes")
+                if(graphView.text().equals("")) {
+                    break
+                }
+		    }
+		    count = 0
+		    bigCount++
+		    while(count<numberOfTrials) {
+		        count++
+		        try {
+		            waitFor(waitTime) {
+		                page.clustertransactionmax.isDisplayed()
+		            }
+		            stringMax = page.clustertransactionmax.text()
+		            stringMin = page.clustertransactionmin.text()
+		            break
+		        } catch(geb.waiting.WaitTimeoutException e) {
+		            println("WaitTimeoutException")
+		        }
+		    }
+		
+		    String result = page.compareTime(stringMax, stringMin)
+		    println(result + " " + stringMax + " " + stringMin)
+		    
 		    try {
 		        waitFor(waitTime) {
-		            page.clustertransactionmax.isDisplayed()
+		            result.equals("minutes")
 		        }
-		        stringMax = page.clustertransactionmax.text()
-		        stringMin = page.clustertransactionmin.text()
+		        println("The maximum value is " + stringMax + " and the time is in " + result )
 		        break
 		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
+		        println("AJA BHAKOXAINA")
 		    }
-		}
-		
-		String result = page.compareTime(stringMax, stringMin)
-		
-		if(result.equals("minutes")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
+		    /*if(result.equals("minutes")) {
+		        println("The maximum value is " + stringMax + " and the time is in " + result )
+		        assert true
+		        break
+		    }
+		    else {
+		        println("FAIL: It is not in minutes")
+		        if(bigCount == 5) {
+		            println("TRULY FALSE")
+		            assert false
+		        }
+		    }*/
 		}
     }
 
@@ -2379,6 +2426,8 @@ class DbMonitorTest extends TestBase {
         // This loop is used to gain time. 
         while(count<numberOfTrials) {
             count++
+            page.chooseGraphView("Minutes")
+            page.chooseGraphView("Minutes")
             page.chooseGraphView("Seconds")
             if(graphView.text().equals("")) {
                 break
@@ -2422,6 +2471,8 @@ class DbMonitorTest extends TestBase {
         // This loop is used to gain time. 
         while(count<numberOfTrials) {
             count++
+            page.chooseGraphView("Minutes")
+            page.chooseGraphView("Minutes")
             page.chooseGraphView("Seconds")
             if(graphView.text().equals("")) {
                 break
