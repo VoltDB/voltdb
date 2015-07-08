@@ -1166,7 +1166,7 @@
             }
 
 
-            if (cmdLogMinCount == -1 && currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
                 d3.select('#visualisationCommandLog')
                     .datum(dataCommandLog)
                     .transition().duration(500)
