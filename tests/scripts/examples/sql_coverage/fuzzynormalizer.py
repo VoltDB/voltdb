@@ -181,6 +181,6 @@ def normalize(table, sql):
 
     return table
 
-def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all):
+def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all, extra_stats):
     return generate_html_reports(suite, seed, statements_path, hsql_path,
-            jni_path, output_dir, report_all)
+            jni_path, output_dir, report_all, extra_stats)

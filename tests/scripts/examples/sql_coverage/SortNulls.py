@@ -22,24 +22,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from NotANormalizer import NotANormalizer
-from SQLCoverageReport import generate_html_reports
-
-def safecmp(x, y):
-    """Calls the 'standard' safecmp function, which performs a comparison
-       similar to cmp, including iterating over lists, but two None values
-       are considered equal, and a TypeError is avoided when a None value
-       and a datetime are corresponding members of a list.
+class SortNulls:
+    """Simple class to enumerate the options for when and how to sort SQL NULL
+       (Python None) values, found in the ORDER BY columns: never, first, last,
+       lowest or highest.
     """
-    return NotANormalizer.safecmp(x,y)
-
-def normalize(table, sql):
-    """Do nothing other than returning the table.
-    """
-    return NotANormalizer.normalize(table, sql)
-
-def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all, extra_stats):
-    """Just calls SQLCoverageReport.generate_html_reports(...).
-    """
-    return generate_html_reports(suite, seed, statements_path, hsql_path,
-                                 jni_path, output_dir, report_all, extra_stats, True)
+    never = 0  # do not re-sort SQL NULL (Python None) values
+    first = 1  # always sort SQL NULL (Python None) values first
+    last  = 2  # always sort SQL NULL (Python None) values last
+    lowest  = 3  # sort SQL NULL (Python None) values first with ORDER BY ASC, last with ORDER BY DESC
+    highest = 4  # sort SQL NULL (Python None) values last with ORDER BY ASC, first with ORDER BY DESC
