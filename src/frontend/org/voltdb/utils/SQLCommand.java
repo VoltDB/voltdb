@@ -252,7 +252,14 @@ public class SQLCommand
                 }
 
                 // If the line is a FILE command - execute the content of the file
-                FileInfo fileInfo = SQLParser.parseFileStatement(line);
+                FileInfo fileInfo = null;
+                try {
+                    fileInfo = SQLParser.parseFileStatement(line);
+                }
+                catch (SQLParser.Exception e) {
+                    stopOrContinue(e);
+                    continue;
+                }
                 if (fileInfo != null) {
                     executeScriptFile(fileInfo, interactiveReader);
                     if (m_returningToPromptAfterError) {
