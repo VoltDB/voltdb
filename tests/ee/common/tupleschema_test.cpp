@@ -25,6 +25,7 @@
 
 #include "harness.h"
 #include "common/TupleSchema.h"
+#include "common/TupleSchemaBuilder.h"
 
 using voltdb::TupleSchema;
 using voltdb::ValueType;
@@ -33,30 +34,19 @@ using voltdb::VALUE_TYPE_VARCHAR;
 
 class TupleSchemaTest : public Test
 {
-
 };
 
 TEST_F(TupleSchemaTest, Basic)
 {
-    std::vector<ValueType> types;
-    std::vector<int32_t> sizes;
-    std::vector<bool> allowNullFlags;
-    std::vector<bool> inBytesFlags;
+    voltdb::TupleSchemaBuilder builder(2);
 
-    types.push_back(voltdb::VALUE_TYPE_INTEGER);
-    sizes.push_back(4);
-    allowNullFlags.push_back(true);
-    inBytesFlags.push_back(false);
+    builder.setColumnAtIndex(0, VALUE_TYPE_INTEGER);
+    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
+                             256, // column size
+                             false, // do not allow nulls
+                             true); // size is in bytes
 
-    types.push_back(VALUE_TYPE_VARCHAR);
-    sizes.push_back(256);
-    allowNullFlags.push_back(false);
-    inBytesFlags.push_back(true);
-
-    TupleSchema* schema = TupleSchema::createTupleSchema(types,
-                                                         sizes,
-                                                         allowNullFlags,
-                                                         inBytesFlags);
+    TupleSchema* schema = builder.build();
 
     ASSERT_NE(NULL, schema);
     ASSERT_EQ(2, schema->columnCount());
