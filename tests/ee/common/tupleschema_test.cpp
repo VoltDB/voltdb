@@ -29,11 +29,39 @@
 
 using voltdb::TupleSchema;
 using voltdb::ValueType;
+using voltdb::VALUE_TYPE_BIGINT;
 using voltdb::VALUE_TYPE_INTEGER;
 using voltdb::VALUE_TYPE_VARCHAR;
 
 class TupleSchemaTest : public Test
 {
+};
+
+class ScopedSchema {
+public:
+    ScopedSchema(TupleSchema* schema)
+        : m_schema(schema)
+    {
+    }
+
+    TupleSchema* get() {
+        return m_schema;
+    }
+
+    TupleSchema& operator*() {
+        return *m_schema;
+    }
+
+    TupleSchema* operator->() {
+        return m_schema;
+    }
+
+    ~ScopedSchema() {
+        TupleSchema::freeTupleSchema(m_schema);
+    }
+
+private:
+    TupleSchema* m_schema;
 };
 
 TEST_F(TupleSchemaTest, Basic)
@@ -46,9 +74,9 @@ TEST_F(TupleSchemaTest, Basic)
                              false, // do not allow nulls
                              true); // size is in bytes
 
-    TupleSchema* schema = builder.build();
+    ScopedSchema schema(builder.build());
 
-    ASSERT_NE(NULL, schema);
+    ASSERT_NE(NULL, schema.get());
     ASSERT_EQ(2, schema->columnCount());
 
     // 4 bytes for the integer
@@ -74,9 +102,25 @@ TEST_F(TupleSchemaTest, Basic)
     EXPECT_EQ(false, colInfo->allowNull);
     EXPECT_EQ(false, colInfo->inlined);
     EXPECT_EQ(true, colInfo->inBytes);
+}
 
-    TupleSchema::freeTupleSchema(schema);
-    schema = NULL;
+TEST_F(TupleSchemaTest, HiddenColumn)
+{
+    voltdb::TupleSchemaBuilder builder(2,  // 2 visible columns
+                                       1); // 1 hidden column
+    builder.setColumnAtIndex(0, VALUE_TYPE_INTEGER);
+    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
+                             256,   // column size
+                             false, // do not allow nulls
+                             true); // size is in bytes
+
+    builder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
+
+    ScopedSchema schema(builder.build());
+
+    ASSERT_NE(NULL, schema.get());
+    ASSERT_EQ(2, schema->columnCount());
+    ASSERT_EQ(1, schema->hiddenColumnCount());
 }
 
 int main() {

@@ -102,8 +102,12 @@ public:
     /** Static factory method to destroy a TupleSchema object. Set to null after this call */
     static void freeTupleSchema(TupleSchema *schema);
 
-    /** Return the number of columns in the schema for the tuple. */
+    /** Return the number of (visible) columns in the schema for the tuple. */
     inline uint16_t columnCount() const;
+
+    /** Return the number of hidden columns in the schema for the tuple. */
+    inline uint16_t hiddenColumnCount() const;
+
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
 
@@ -191,6 +195,10 @@ inline uint32_t TupleSchema::columnLengthPrivate(const int index) const {
 
 inline uint16_t TupleSchema::columnCount() const {
     return m_columnCount;
+}
+
+inline uint16_t TupleSchema::hiddenColumnCount() const {
+    return 0;
 }
 
 inline uint32_t TupleSchema::tupleLength() const {
