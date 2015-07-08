@@ -2425,6 +2425,13 @@ Eric Meyer's Reset CSS v2.0
 Site: http://meyerweb.com/eric/tools/css/reset/
 License: None http://www.cssreset.com/terms/
 ===============================================================================
+bignumber.js
+License Name: MIT License
+License url: https://github.com/MikeMcl/bignumber.js/blob/master/LICENCE
+===============================================================================
+jsonParse.js
+License: Public Domain
+===============================================================================
 bootstrap.js
 /* ===================================================
  * bootstrap-transition.js v2.3.1
