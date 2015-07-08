@@ -1230,6 +1230,20 @@ public final class NumberType extends Type {
 
             case Types.SQL_REAL :
             case Types.SQL_DOUBLE :
+                // A VoltDB extension to allow "describe" to handle BigDecimal
+                // or Integer initializers for FLOAT values.
+                // This is apparently acceptable elsewhere?
+                if (a instanceof BigDecimal) {
+                    // To minimize code change, taking the winding path:
+                    // BigDecimal -> double -> Double -> double -> String.
+                    a = ((BigDecimal) a).doubleValue();
+                }
+                else if (a instanceof Integer) {
+                    // To minimize code change, taking the winding path:
+                    // Integer -> double -> Double -> double -> String.
+                    a = ((Integer) a).doubleValue();
+                }
+                // End of VoltDB extension
                 double value = ((Double) a).doubleValue();
 
                 /** @todo - java 5 format change */
