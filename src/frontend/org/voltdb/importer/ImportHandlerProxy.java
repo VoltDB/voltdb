@@ -37,6 +37,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     private Method m_hasTableMethod;
     private Method m_info_log;
     private Method m_error_log;
+    private Method m_error_log_withT;
 
     @Override
     public boolean canContinue() {
@@ -97,6 +98,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         m_hasTableMethod = m_handler.getClass().getMethod("hasTable", String.class);
         m_info_log = m_handler.getClass().getMethod("info", String.class);
         m_error_log = m_handler.getClass().getMethod("error", String.class);
+        m_error_log_withT = m_handler.getClass().getMethod("error", String.class, Throwable.class);
     }
 
     @Override
@@ -108,6 +110,17 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         } catch (Exception ex) {
         }
     }
+
+    @Override
+    public void error(String message, Throwable t) {
+        try {
+            if (m_error_log != null) {
+                m_error_log_withT.invoke(m_handler, message, t);
+            }
+        } catch (Exception ex) {
+        }
+    }
+
     @Override
     public void error(String message) {
         try {

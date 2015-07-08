@@ -210,7 +210,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             availableResources = buildTopicLeaderMetadata(simpleConsumer);
         } catch (Exception ex) {
             //Handle
-            error("Failed to get available resources for kafka importer" + ex.toString());
+            error("Failed to get available resources for kafka importer", ex);
         } finally {
             if (simpleConsumer != null) {
                 simpleConsumer.close();
@@ -349,7 +349,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         }
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    error("Error in finding leader for " + m_topicAndPartition, e);
                 } finally {
                     if (consumer != null) {
                         consumer.close();
@@ -357,7 +357,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
             }
             if (returnMetaData == null) {
-                error("Failed to find Leader for topic " + m_topic + " and partition " + m_partition);
+                error("Failed to find Leader for " + m_topicAndPartition);
             }
             return returnMetaData;
         }
@@ -398,7 +398,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         public void getOffsetCoordinator() {
             BlockingChannel channel = null;
             try {
-                channel = new BlockingChannel(m_coordinator.getHost(), m_coordinator.getPort(),
+                //This can go to any broker
+                channel = new BlockingChannel(m_leader.getHost(), m_leader.getPort(),
                         BlockingChannel.UseDefaultBufferSize(),
                         BlockingChannel.UseDefaultBufferSize(),
                         5000 /* read timeout in millis */);
@@ -417,8 +418,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                 }
             } catch (Exception e) {
-                // retry the query (after backoff)
-                e.printStackTrace();
+                // retry the query (after backoff)??
+                error("Failed to get Offset Coordinator for " + m_topicAndPartition, e);
             } finally {
                 if (channel != null) {
                     channel.disconnect();
@@ -455,7 +456,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 long[] offsets = response.offsets(topic, partition);
                 return offsets[0];
             } catch (Exception ex) {
-                ex.printStackTrace();
+                error("Failed to get last Offset for " + m_topicAndPartition, ex);
             }
             return -1;
         }
@@ -492,11 +493,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     if (consumer != null) {
                         offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
                     } else {
-                        error("Failed to get offset coordinator thus failed to update commit offset.");
+                        error("Failed to get offset coordinator for " + m_topicAndPartition);
                         return false;
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    error("Failed to commit Offset for " + m_topicAndPartition, e);
                     return false;
                 }
                 final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
@@ -547,10 +548,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 Thread.sleep(1000);
                             } catch (InterruptedException ie) {
                             }
-                            error("Failed to fetch messages for topic " + m_topic + " and partition " + m_partition + " Code " + code);
+                            error("Failed to fetch messages for " + m_topicAndPartition + " Code " + code);
                             if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                                 // We asked for an invalid offset. For simple case ask for the last element to reset
-                                error("Invalid offset requested for " + m_topic + " and partition " + m_partition);
+                                error("Invalid offset requested for " + m_topicAndPartition);
                                 getOffsetCoordinator();
                                 m_currentOffset.set(getLastOffset(m_offsetManager.get(), m_topic, m_partition, kafka.api.OffsetRequest.LatestTime(), CLIENT_ID));
                                 continue;
@@ -596,7 +597,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
                 info("Partition fecher stopped for topic " + this.m_topic + " And partition " + m_partition);
             } catch (Exception ex) {
-                ex.printStackTrace();
+                error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
                 if (consumer != null) {
                     consumer.close();
@@ -617,35 +618,32 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             //Create executor with sufficient threads.
             throw new RuntimeException("Failed to get configured executor service.");
         }
+
         //For addeed create fetchers...make sure existing fetchers are not there.
-        try {
-            for (URI nuri : added) {
-                Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
-                for (String topic : m_topicList) {
-                    topicMap.put(topic, Collections.singletonList(0));
-                }
-                for (String topic : m_topicList) {
-                    List<Integer> topicPartitions = m_topicPartitions.get(topic);
-                    for (int partition : topicPartitions) {
-                        String leaderKey = topic + "-" + partition;
-                        URI assignedKey = new URI("kafka:/" + topic + "/partition/" + partition);
-                        //The fetcher must not have existed.
-                        if (!m_fetchers.containsKey(nuri) && nuri.equals(assignedKey)) {
-                            info("Channel " + assignedKey + " mastership is assigned to this node.");
-                            HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
-                            TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, assignedKey, topic, partition,
-                                    hap, m_fetchSize, m_consumerSocketTimeout);
-                            m_fetchers.put(assignedKey.toString(), fetcher);
-                            m_es.submit(fetcher);
-                            info("KafkaImporter is fetching for resource: " + nuri);
-                        }
+        for (URI nuri : added) {
+            Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
+            for (String topic : m_topicList) {
+                topicMap.put(topic, Collections.singletonList(0));
+            }
+            for (String topic : m_topicList) {
+                List<Integer> topicPartitions = m_topicPartitions.get(topic);
+                for (int partition : topicPartitions) {
+                    String leaderKey = topic + "-" + partition;
+                    URI assignedKey = URI.create("kafka:/" + topic + "/partition/" + partition);
+                    //The fetcher must not have existed.
+                    if (!m_fetchers.containsKey(nuri) && nuri.equals(assignedKey)) {
+                        info("Channel " + assignedKey + " mastership is assigned to this node.");
+                        HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
+                        TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, assignedKey, topic, partition,
+                                hap, m_fetchSize, m_consumerSocketTimeout);
+                        m_fetchers.put(assignedKey.toString(), fetcher);
+                        m_es.submit(fetcher);
+                        info("KafkaImporter is fetching for resource: " + nuri);
                     }
                 }
             }
-        } catch (URISyntaxException ex) {
-            //This should never happen.
-            ex.printStackTrace();
         }
+
         //For removed shutdown the fetchers if all are removed the importer will be closed/shutdown?
         for (URI r : removed) {
             TopicPartitionFetcher fetcher = m_fetchers.get(r.toString());
@@ -668,7 +666,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             //We wait for shutdown task to release.
             m_done.acquire();
         } catch (Exception ex) {
-            ex.printStackTrace();
+            error("Kafka Importer finished with exeception ", ex);
         }
     }
 

@@ -9,7 +9,7 @@
         <configuration module="kafkastream.jar" type="custom" enabled="true">
 	    <property name="brokers">volt15a.voltdb.lan:9092,volt15b.voltdb.lan:9092,volt15d.voltdb.lan:9092</property>
 	    <property name="topics">replicated-import</property>
-	    <property name="groupid">cluster15</property>
+	    <property name="groupid">replicatedimport</property>
             <property name="procedure">importTable.insert</property>
         </configuration>
     </import>

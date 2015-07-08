@@ -246,4 +246,13 @@ public class ImportHandler {
     public void error(String message) {
         m_logger.error(message);
     }
+
+    /**
+     * Log error message
+     * @param message
+     */
+    public void error(String message, Throwable t) {
+        m_logger.error(message, t);
+    }
+
 }
