@@ -79,6 +79,16 @@ public interface CommandLog {
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
+    interface CompletionChecks {
+        public CompletionChecks startNewCheckList(int startSize);
+
+        public void addTask(TransactionTask task);
+
+        public int getTaskListSize();
+
+        public void processChecks();
+    }
+
     public interface DurabilityListener {
         /**
          * Assign the listener that we will send SP and MP UniqueId durability notifications to
@@ -96,22 +106,20 @@ public interface CommandLog {
         public boolean completionCheckInitialized();
 
         /**
-         * Called from CommandLog to notify a Scheduler of the tasks/uniqueIds that have been made durable
-         */
-        public void onDurability();
-        /**
          * Called from CommandLog to assign a new task to be tracked by the DurabilityListener
          */
         public void addTransaction(TransactionTask pendingTask);
+
         /**
          * Used by CommandLog to calculate the next task list size
          */
         public int getNumberOfTasks();
+
         /**
          * Used by CommandLog to crate a new CompletionCheck so the last CompletionCheck can be
          * triggered when the sync completes
          */
-        public void startNewTaskList(int nextMaxRowCnt);
+        public CompletionChecks startNewTaskList(int nextMaxRowCnt);
     }
 
     /**

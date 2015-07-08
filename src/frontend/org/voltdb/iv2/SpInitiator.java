@@ -198,7 +198,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             ExportManager.instance().acceptMastership(m_partitionId);
             // If we are a DR replica, inform that subsystem of any remote data we've seen
             if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
-                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId);
+                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, Long.MIN_VALUE);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
