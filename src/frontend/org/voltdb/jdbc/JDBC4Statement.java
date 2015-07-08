@@ -426,21 +426,24 @@ public class JDBC4Statement implements java.sql.Statement
         int runningUpdateCount = 0;
 
         int i = 0;
-        try
-        {
-        for(; i < batch.size(); i++)
-        {
+        try {
+            for (; i < batch.size(); i++) {
 
-                setCurrentResult(null, (int) batch.get(i).execute(sourceConnection.NativeConnection,
-                        this.m_timeout,sourceConnection.queryTimeOutUnit)[0].fetchRow(0).getLong(0));
+                setCurrentResult(
+                        null,
+                        (int) batch.get(i).execute(
+                                sourceConnection.NativeConnection,
+                                this.m_timeout,
+                                sourceConnection.queryTimeOutUnit)[0].fetchRow(
+                                0).getLong(0));
                 updateCounts[i] = this.lastUpdateCount;
                 runningUpdateCount += this.lastUpdateCount;
-        }
-        }catch(SQLException x)
-        {
+            }
+        } catch (SQLException x) {
             updateCounts[i] = EXECUTE_FAILED;
-            throw new BatchUpdateException(Arrays.copyOf(updateCounts, i+1), x);
-        }finally {
+            throw new BatchUpdateException(Arrays.copyOf(updateCounts, i + 1),
+                    x);
+        } finally {
             clearBatch();
         }
         // replace the update count from the last statement with the update count
