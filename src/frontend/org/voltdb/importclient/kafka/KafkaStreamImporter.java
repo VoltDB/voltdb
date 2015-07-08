@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import kafka.javaapi.consumer.SimpleConsumer;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -96,8 +97,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //Topic partitions
     private final Map<String, List<Integer>> m_topicPartitions = new HashMap<String, List<Integer>>();
     //topic partition leader
-    private final Map<String, String> m_topicPartitionLeader = new HashMap<String, String>();
-    private final Map<String, Integer> m_topicPartitionLeaderPort = new HashMap<String, Integer>();
+    private final Map<String, HostAndPort> m_topicPartitionLeader = new HashMap<String, HostAndPort>();
     private final Map<String, TopicPartitionFetcher> m_fetchers = new HashMap<String, TopicPartitionFetcher>();
 
     private ExecutorService m_es = null;
@@ -105,21 +105,42 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //Simple Host and Port abstraction....dont want to use our big stuff here orgi bundle import nastiness.
     public static class HostAndPort {
 
-        public final String host;
-        public final int port;
+        private String m_host;
+        private int m_port;
 
         public HostAndPort(String h, int p) {
-            host = h;
-            port = p;
+            m_host = h;
+            m_port = p;
         }
 
         public static HostAndPort fromString(String hap) {
             String s[] = hap.split(":");
             int p = KAFKA_DEFAULT_BROKER_PORT;
             if (s.length > 1 && s[1] != null && s[1].length() > 0) {
-                p = Integer.parseInt(s[1]);
+                p = Integer.parseInt(s[1].trim());
             }
-            return new HostAndPort(s[0], p);
+            return new HostAndPort(s[0].trim(), p);
+        }
+
+        public String getHost() {
+            return m_host;
+        }
+
+        public void setHost(String host) {
+            m_host = host;
+        }
+
+        public int getPort() {
+            return m_port;
+        }
+
+        public void setPort(int port) {
+            m_port = port;
+        }
+
+        @Override
+        public String toString() {
+            return m_host + ":" + m_port;
         }
     }
 
@@ -141,7 +162,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     }
 
     //This is called to get all available resources.
-    private Set<URI> buildTopicLeaderMetadata(SimpleConsumer simpleConsumer) throws URISyntaxException {
+    private Set<URI> buildTopicLeaderMetadata(SimpleConsumer simpleConsumer) {
 
         //For all topics connect and get metadata.
         Set<URI> availableResources = new TreeSet<URI>();
@@ -151,6 +172,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             kafka.javaapi.TopicMetadataResponse resp = simpleConsumer.send(req);
 
             List<TopicMetadata> metaData = resp.topicsMetadata();
+            if (metaData == null) {
+                return availableResources;
+            }
             m_topicPartitionMetaData.put(topic, metaData);
             List<Integer> partitions = m_topicPartitions.get(topic);
             if (partitions == null) {
@@ -162,9 +186,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     partitions.add(part.partitionId());
                     for (kafka.cluster.Broker replica : part.replicas()) {
                         String leaderKey = topic + "-" + part.partitionId();
-                        m_topicPartitionLeader.put(leaderKey, replica.host());
-                        m_topicPartitionLeaderPort.put(leaderKey, replica.port());
-                        URI uri = new URI("kafka:/" + topic + "/partition/" + part.partitionId());
+                        m_topicPartitionLeader.put(leaderKey, new HostAndPort(replica.host(), replica.port()));
+                        URI uri = URI.create("kafka:/" + topic + "/partition/" + part.partitionId());
                         availableResources.add(uri);
                     }
                 }
@@ -182,7 +205,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         SimpleConsumer simpleConsumer = null;
         Set<URI> availableResources = new TreeSet<URI>();
         try {
-            simpleConsumer = new SimpleConsumer(m_brokerList.get(0).host, m_brokerList.get(0).port, m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
+            simpleConsumer = new SimpleConsumer(m_brokerList.get(0).getHost(), m_brokerList.get(0).getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
             //Build all available topic URIs
             availableResources = buildTopicLeaderMetadata(simpleConsumer);
         } catch (Exception ex) {
@@ -203,13 +226,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         for (TopicPartitionFetcher fetcher : m_fetchers.values()) {
             fetcher.shutdown();
         }
+        m_done.release();
         if (m_es != null) {
-            m_es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    m_done.release();
-                }
-            });
             //Now wait for fetchers to break out.
             m_es.shutdown();
             try {
@@ -228,7 +246,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
      */
     @Override
     public String getName() {
-        return "KafkaImporter";
+        return "KafkaImporter82";
     }
 
     /**
@@ -239,21 +257,21 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     @Override
     public void configure(Properties p) {
         m_properties = (Properties) p.clone();
-        m_procedure = (String) m_properties.get("procedure");
-        if (m_procedure == null || m_procedure.trim().length() == 0) {
+        m_procedure = m_properties.getProperty("procedure", "").trim();
+        if (m_procedure.isEmpty()) {
             throw new RuntimeException("Missing procedure.");
         }
         //pipe seperated list of topics.
-        String topics = (String) m_properties.getProperty("topics");
-        if (topics == null || topics.trim().length() == 0) {
+        String topics = m_properties.getProperty("topics", "").trim();
+        if (topics.isEmpty()) {
             throw new RuntimeException("Missing topic(s).");
         }
         m_topicList = Arrays.asList(topics.split("\\s*,\\s*"));
         if (m_topicList == null || m_topicList.isEmpty()) {
             throw new RuntimeException("Missing topic(s).");
         }
-       String brokers = (String) m_properties.getProperty("brokers");
-        if (brokers == null || brokers.trim().length() == 0) {
+       String brokers = m_properties.getProperty("brokers", "").trim();
+        if (brokers.isEmpty()) {
             throw new RuntimeException("Missing kafka broker");
         }
         List<String> brokerList = Arrays.asList(brokers.split("\\s*,\\s*"));
@@ -264,10 +282,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             HostAndPort hap = HostAndPort.fromString(broker);
             m_brokerList.add(hap);
         }
-        m_groupId = m_properties.getProperty("groupid");
-        if (m_groupId == null || m_groupId.trim().length() <= 0) {
-            m_groupId = GROUP_ID;
+        if (m_brokerList.isEmpty()) {
+            throw new RuntimeException("Missing or misconfigured kafka broker list. See brokers property");
         }
+        m_groupId = m_properties.getProperty("groupid", GROUP_ID).trim();
         //These are defaults picked up from kafka we save them so that they are passed around.
         m_fetchSize = Integer.parseInt(m_properties.getProperty("fetch.message.max.bytes", "65536"));
         m_consumerSocketTimeout = Integer.parseInt(m_properties.getProperty("socket.timeout.ms", "30000"));
@@ -279,31 +297,29 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final URI m_url;
         private final String m_topic;
         private final int m_partition;
-        private final String m_leader;
-        private String m_coordinator;
-        private int m_coordinator_port;
-        private final int m_port;
+        private final HostAndPort m_leader;
+        private HostAndPort m_coordinator;
         private boolean m_shutdown = false;
         private final int m_fetchSize;
         private final List<HostAndPort> m_brokers;
         private final int m_consumerSocketTimeout;
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
-        private final Map<Long, TopicPartitionInvocationCallback> m_pendingCallbacksByOffset = new HashMap<Long, TopicPartitionInvocationCallback>();
+        private final Map<Long, TopicPartitionInvocationCallback> m_pendingCallbacksByOffset = new LinkedHashMap<Long, TopicPartitionInvocationCallback>();
         private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 500);
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
+        private final TopicAndPartition m_topicAndPartition;
 
-        public TopicPartitionFetcher(List<HostAndPort> brokers, URI url, String topic, int partition, String leader, int port, int fetchSize, int consumerSocketTimeout) {
-            m_url = url;
+        public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String topic, int partition, HostAndPort leader, int fetchSize, int consumerSocketTimeout) {
+            m_url = uri;
             m_brokers = brokers;
             m_topic = topic;
             m_partition = partition;
             m_leader = leader;
             m_coordinator = leader;
-            m_port = port;
-            m_coordinator_port = m_port;
             m_fetchSize = fetchSize;
             m_consumerSocketTimeout = consumerSocketTimeout;
+            m_topicAndPartition = new TopicAndPartition(m_topic, m_partition);
         }
 
         public final URI getUrl() {
@@ -317,14 +333,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             for (HostAndPort broker : m_brokers) {
                 SimpleConsumer consumer = null;
                 try {
-                    consumer = new SimpleConsumer(broker.host, broker.port, m_consumerSocketTimeout, m_fetchSize, "findLeader");
+                    consumer = new SimpleConsumer(broker.getHost(), broker.getPort(), m_consumerSocketTimeout, m_fetchSize, "findLeader");
 
                     List<String> topics = Collections.singletonList(m_topic);
                     TopicMetadataRequest req = new TopicMetadataRequest(topics);
                     kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
 
                     List<TopicMetadata> metaData = resp.topicsMetadata();
-
                     for (TopicMetadata item : metaData) {
                         for (PartitionMetadata part : item.partitionsMetadata()) {
                             if (part.partitionId() == m_partition) {
@@ -348,7 +363,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
 
         //Find leader for this topic partition.
-        private String findNewLeader() {
+        private HostAndPort findNewLeader() {
             for (int i = 0; i < 3; i++) {
                 boolean shouldSleep = false;
                 PartitionMetadata metadata = findLeader();
@@ -356,12 +371,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     shouldSleep = true;
                 } else if (metadata.leader() == null) {
                     shouldSleep = true;
-                } else if (m_leader.equalsIgnoreCase(metadata.leader().host()) && i == 0) {
+                } else if (m_leader.getHost().equalsIgnoreCase(metadata.leader().host()) && i == 0) {
                     // first time through if the leader hasn't changed give ZooKeeper a second to recover
                     // second time, assume the broker did recover before failover, or it was a non-Broker issue
                     shouldSleep = true;
                 } else {
-                    return metadata.leader().host();
+                    return new HostAndPort(metadata.leader().host(), metadata.leader().port());
                 }
                 if (shouldSleep) {
                     try {
@@ -371,6 +386,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
             }
             //Unable to find return null for recheck.
+            info("Failed to find new leader for " + m_topicAndPartition);
             return null;
         }
 
@@ -382,7 +398,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         public void getOffsetCoordinator() {
             BlockingChannel channel = null;
             try {
-                channel = new BlockingChannel(m_coordinator, m_coordinator_port,
+                channel = new BlockingChannel(m_coordinator.getHost(), m_coordinator.getPort(),
                         BlockingChannel.UseDefaultBufferSize(),
                         BlockingChannel.UseDefaultBufferSize(),
                         5000 /* read timeout in millis */);
@@ -393,9 +409,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                 if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
                     Broker offsetManager = metadataResponse.coordinator();
-                    m_coordinator = offsetManager.host();
-                    m_coordinator_port = offsetManager.port();
-                    SimpleConsumer consumer = m_offsetManager.getAndSet(new SimpleConsumer(m_coordinator, m_coordinator_port, m_consumerSocketTimeout, m_fetchSize, CLIENT_ID) );
+                    m_coordinator.setHost(offsetManager.host());
+                    m_coordinator.setPort(offsetManager.port());
+                    SimpleConsumer consumer = m_offsetManager.getAndSet(new SimpleConsumer(m_coordinator.getHost(), m_coordinator.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID) );
                     if (consumer != null) {
                         consumer.close();
                     }
@@ -415,18 +431,33 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             if (consumer == null) {
                 return -1;
             }
-            TopicAndPartition topicAndPartition = new TopicAndPartition(topic, partition);
-            Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
-            requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(whichTime, 1));
-            kafka.javaapi.OffsetRequest request = new kafka.javaapi.OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(),clientName);
-            OffsetResponse response = consumer.getOffsetsBefore(request);
+            try {
+                Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
+                requestInfo.put(m_topicAndPartition, new PartitionOffsetRequestInfo(whichTime, 1));
+                kafka.javaapi.OffsetRequest request = new kafka.javaapi.OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(),clientName);
+                OffsetResponse response = consumer.getOffsetsBefore(request);
 
-            if (response.hasError()) {
-                info("Error fetching data Offset Data the Broker. Reason: " + response.errorCode(topic, partition) );
-                return -1;
+                if (response.hasError()) {
+                    if (response.errorCode(topic, partition) == ErrorMapping.NotLeaderForPartitionCode()) {
+                        HostAndPort leaderBroker = findNewLeader();
+                        if (leaderBroker != null) {
+                            info("Found new leader for " + m_topicAndPartition + " Coordinator will be updated.");
+                            SimpleConsumer oconsumer = m_offsetManager.getAndSet(new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID) );
+                            if (oconsumer != null) {
+                                oconsumer.close();
+                            }
+                            m_coordinator = leaderBroker;
+                        }
+                    }
+                    info("Error fetching Offset Data from Broker " + m_topicAndPartition.toString() + " Reason: " + response.errorCode(topic, partition) );
+                    return -1;
+                }
+                long[] offsets = response.offsets(topic, partition);
+                return offsets[0];
+            } catch (Exception ex) {
+                ex.printStackTrace();
             }
-            long[] offsets = response.offsets(topic, partition);
-            return offsets[0];
+            return -1;
         }
 
         //Callback for each invocation we have submitted.
@@ -436,10 +467,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             private final long m_nextOffset;
             private final TopicAndPartition m_topicAndPartition;
 
-            public TopicPartitionInvocationCallback(long offset, long noffset) {
+            public TopicPartitionInvocationCallback(long offset, long noffset, TopicAndPartition tAndP) {
                 m_offset = offset;
                 m_nextOffset = noffset;
-                m_topicAndPartition = new TopicAndPartition(m_topic, m_partition);
+                m_topicAndPartition = tAndP;
             }
 
             public boolean commitOffset(long offset) {
@@ -494,12 +525,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             info("Starting partition fetcher for topic " + m_topic + " And partition " + m_partition);
             try {
                 //Startwith the starting leader.
-                String leaderBroker = m_leader;
-                getOffsetCoordinator();
-                m_currentOffset.set(getLastOffset(m_offsetManager.get(), m_topic, m_partition, kafka.api.OffsetRequest.LatestTime(), CLIENT_ID));
+                HostAndPort leaderBroker = m_leader;
                 while (!m_shutdown) {
                     if (consumer == null) {
-                        consumer = new SimpleConsumer(leaderBroker, m_port, m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
+                        consumer = new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
+                        getOffsetCoordinator();
+                        m_currentOffset.set(getLastOffset(m_offsetManager.get(), m_topic, m_partition, kafka.api.OffsetRequest.LatestTime(), CLIENT_ID));
                     }
                     long currentFetchCount = 0;
                     //Build fetch request of we have a valid offset and not too many are pending.
@@ -529,10 +560,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             leaderBroker = findNewLeader();
                             if (leaderBroker == null) {
                                 //point to original leader which will fail and we fall back again here.
-                                error("Failed to find leader for " + m_topic + " and partition " + m_partition);
                                 leaderBroker = m_leader;
                             }
-                            info("Found new leader for topic " + m_topic + " and partition " + m_partition + " New Leader: " + leaderBroker);
+                            info("Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
                             continue;
                         }
                         for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topic, m_partition)) {
@@ -547,7 +577,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             payload.get(bytes);
                             String line = new String(bytes);
                             CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset());
+                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition);
                             m_pendingCallbacksByOffset.put(currentOffset, cb);
                             if (!callProcedure(cb, invocation)) {
                                 m_currentOffset.set(messageAndOffset.nextOffset());
@@ -602,9 +632,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         //The fetcher must not have existed.
                         if (!m_fetchers.containsKey(nuri) && nuri.equals(assignedKey)) {
                             info("Channel " + assignedKey + " mastership is assigned to this node.");
+                            HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
                             TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, assignedKey, topic, partition,
-                                    m_topicPartitionLeader.get(leaderKey),
-                                    m_topicPartitionLeaderPort.get(leaderKey), m_fetchSize, m_consumerSocketTimeout);
+                                    hap, m_fetchSize, m_consumerSocketTimeout);
                             m_fetchers.put(assignedKey.toString(), fetcher);
                             m_es.submit(fetcher);
                             info("KafkaImporter is fetching for resource: " + nuri);
