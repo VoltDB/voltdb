@@ -1071,21 +1071,22 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[14];
+        ColumnInfo[] expectedSchema = new ColumnInfo[15];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         expectedSchema[3] = new ColumnInfo("TABLE", VoltType.STRING);
         expectedSchema[4] = new ColumnInfo("PATH", VoltType.STRING);
         expectedSchema[5] = new ColumnInfo("FILENAME", VoltType.STRING);
-        expectedSchema[6] = new ColumnInfo("NONCE", VoltType.STRING);
-        expectedSchema[7] = new ColumnInfo("TXNID", VoltType.BIGINT);
-        expectedSchema[8] = new ColumnInfo("START_TIME", VoltType.BIGINT);
-        expectedSchema[9] = new ColumnInfo("END_TIME", VoltType.BIGINT);
-        expectedSchema[10] = new ColumnInfo("SIZE", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("DURATION", VoltType.BIGINT);
-        expectedSchema[12] = new ColumnInfo("THROUGHPUT", VoltType.FLOAT);
-        expectedSchema[13] = new ColumnInfo("RESULT", VoltType.STRING);
+        expectedSchema[6] = new ColumnInfo("TYPE", VoltType.STRING);
+        expectedSchema[7] = new ColumnInfo("NONCE", VoltType.STRING);
+        expectedSchema[8] = new ColumnInfo("TXNID", VoltType.BIGINT);
+        expectedSchema[9] = new ColumnInfo("START_TIME", VoltType.BIGINT);
+        expectedSchema[10] = new ColumnInfo("END_TIME", VoltType.BIGINT);
+        expectedSchema[11] = new ColumnInfo("SIZE", VoltType.BIGINT);
+        expectedSchema[12] = new ColumnInfo("DURATION", VoltType.BIGINT);
+        expectedSchema[13] = new ColumnInfo("THROUGHPUT", VoltType.FLOAT);
+        expectedSchema[14] = new ColumnInfo("RESULT", VoltType.STRING);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         // Finagle a snapshot
