@@ -754,8 +754,10 @@ var loadPage = function (serverName, portid) {
             $("#liCommandLogTables").show();
             var userPreference = getUserPreferences();
             if (userPreference["CommandLogStat"]) {
+                
                 $("#chartCommandLogging").show();
-
+                MonitorGraphUI.refreshGraphCmdLog();
+                
             }
             if (userPreference["CommandLogTables"]) {
                 $("#divCommandLog").show();
@@ -1236,8 +1238,10 @@ var loadPage = function (serverName, portid) {
         voltDbRenderer.GetCommandLogInformation(function (cmdLogDetails) {
             var response = cmdLogDetails;
             var htmlcontent = "";
+
             voltDbRenderer.GetSnapshotStatus(function (snapshotDetails) {
-                cmdLogDetails[getCurrentServer()].SNAPSHOTS = snapshotDetails[getCurrentServer()];
+                cmdLogDetails[getCurrentServer()].START_TIME = snapshotDetails[getCurrentServer()].START_TIME;
+                cmdLogDetails[getCurrentServer()].END_TIME = snapshotDetails[getCurrentServer()].END_TIME;
                 MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
             });
 
