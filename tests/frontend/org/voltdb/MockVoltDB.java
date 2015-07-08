@@ -202,6 +202,10 @@ public class MockVoltDB implements VoltDBInterface
         getCluster().setDrclusterid(clusterId);
     }
 
+    public void setDRConsumerConnectionEnabled(boolean enabled) {
+        getCluster().setDrconsumerenabled(enabled);
+    }
+
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
         org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");
