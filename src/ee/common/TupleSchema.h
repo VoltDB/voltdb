@@ -65,8 +65,9 @@ public:
             const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull);
 
     static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
-            const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull,
-            const std::vector<bool> columnInBytes);
+                                          const std::vector<int32_t>   columnSizes,
+                                          const std::vector<bool>      allowNull,
+                                          const std::vector<bool>      columnInBytes);
     /** Static factory method fakes a copy constructor */
     static TupleSchema* createTupleSchema(const TupleSchema *schema);
 
@@ -109,8 +110,12 @@ public:
     /** Get a string representation of this schema for debugging */
     std::string debug() const;
 
+    /** Returns the number of variable-length columns that are too long
+     * to be inlined into tuple storage. */
     uint16_t getUninlinedObjectColumnCount() const ;
 
+    /** Returns the index of the n-th uninlined column in the
+     * column info array. */
     uint16_t getUninlinedObjectColumnInfoIndex(const int objectColumnIndex) const;
 
     bool equals(const TupleSchema *other) const;
@@ -164,7 +169,10 @@ private:
     uint16_t m_uninlinedObjectColumnCount;
 
     /*
-     * Data storage for column info and for indices of string columns
+     * Data storage for:
+     *   - An array of int16_t, containing the 0-based ordinal position
+     *       of each non-inlined column
+     *   - An array of ColumnInfo objects, one for each column
      */
     char m_data[0];
 };
