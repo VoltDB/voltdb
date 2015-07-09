@@ -40,9 +40,13 @@ public class CurrentTimestampProcedure extends VoltProcedure {
             "INSERT INTO P_TIME (ID, C1) VALUES (?, ?);");
 
     public final SQLStmt selectStmt = new SQLStmt(
+            // Possible workaround if NOW is a problem in this context and not just for default values as described in ENG-8351
+            // "SELECT ID, C1, T_NOW, T_CURRENT_TIME, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM P_TIME ORDER BY 1;");
             "SELECT ID, C1, T_NOW, T_CURRENT_TIME, NOW, CURRENT_TIMESTAMP FROM P_TIME ORDER BY 1;");
 
     public final SQLStmt updateStmt = new SQLStmt(
+            // Possible workaround if NOW is a problem in this context and not just for default values as described in ENG-8351
+            // "UPDATE P_TIME SET C1 = ?, T1 = CURRENT_TIMESTAMP, T2 = CURRENT_TIMESTAMP WHERE C1 = ?;");
             "UPDATE P_TIME SET C1 = ?, T1 = NOW, T2 = CURRENT_TIMESTAMP WHERE C1 = ?;");
 
     public final SQLStmt groupbyStmt = new SQLStmt(
@@ -89,7 +93,9 @@ public class CurrentTimestampProcedure extends VoltProcedure {
             }
             if (vt.getTimestampAsLong(2) != timeValue || vt.getTimestampAsLong(3) != timeValue ||
                     vt.getTimestampAsLong(4) != timeValue || vt.getTimestampAsLong(5) != timeValue) {
-                throw new VoltAbortException("bad inconsistent current_timestamp value from different partitions");
+                throw new VoltAbortException("bad inconsistent current_timestamp value from different partitions: : " +
+                    vt.getTimestampAsLong(2) + " vs " + vt.getTimestampAsLong(3) + " vs " +
+                    vt.getTimestampAsLong(4) + " vs " + vt.getTimestampAsLong(5) + " vs " + timeValue);
             }
         }
 
@@ -116,7 +122,7 @@ public class CurrentTimestampProcedure extends VoltProcedure {
             throw new VoltAbortException("bad row count");
         }
         if (vt.getTimestampAsLong(0) != timeValue || vt.getTimestampAsLong(1) != timeValue) {
-            throw new VoltAbortException("bad inconsistent current_timestamp value from different partitions");
+            throw new VoltAbortException("bad inconsistent current_timestamp value from different partitions: : " + vt.getTimestampAsLong(0) + " vs " + vt.getTimestampAsLong(1) + " vs " +  timeValue);
         }
         if (vt.getLong(2) != 4) {
             throw new VoltAbortException("bad group by row count");
