@@ -1047,18 +1047,19 @@ public class QuerySpecification extends QueryExpression {
             }
         }
 
-        for (int i = 0; i < rangeVariables.length; i++) {
-            Expression e = rangeVariables[i].getJoinCondition();
+        if (rangeVariables != null) {
+            for (int i = 0; i < rangeVariables.length; i++) {
+                Expression e = rangeVariables[i].getJoinCondition();
 
-            if (e != null) {
-                e.resolveTypes(session, null);
+                if (e != null) {
+                    e.resolveTypes(session, null);
 
-                if (e.getDataType() != Type.SQL_BOOLEAN) {
-                    throw Error.error(ErrorCode.X_42568);
+                    if (e.getDataType() != Type.SQL_BOOLEAN) {
+                        throw Error.error(ErrorCode.X_42568);
+                    }
                 }
             }
         }
-
         if (queryCondition != null) {
             queryCondition.resolveTypes(session, null);
 

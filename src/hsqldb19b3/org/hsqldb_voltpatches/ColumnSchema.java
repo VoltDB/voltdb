@@ -460,7 +460,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
                 // add default value to body of column element
                 VoltXMLElement defaultElem = new VoltXMLElement("default");
                 column.children.add(defaultElem);
-                defaultElem.children.add(exp.voltGetXML(session));
+                defaultElem.children.add(exp.voltGetXML(session, null, null, -1, null, null));
             }
         }
 

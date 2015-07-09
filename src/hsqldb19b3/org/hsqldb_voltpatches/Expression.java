@@ -2278,14 +2278,14 @@ public class Expression implements Cloneable {
     VoltXMLElement voltGetXML(Session session)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        return voltGetXML(session, null, null, -1);
+        return voltGetXML(session, null, null, -1, null, new ExpressionColumn[0]);
     }
 
     VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
             java.util.Set<Integer> ignoredDisplayColIndexes, int startKey)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        return voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, null);
+        return voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, null, new ExpressionColumn[0]);
     }
 
     /**
@@ -2297,7 +2297,8 @@ public class Expression implements Cloneable {
      * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
-            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias)
+            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias,
+            ExpressionColumn parameters[])
         throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
@@ -2339,11 +2340,16 @@ public class Expression implements Cloneable {
                         // serialize the column this simple column stands-in for.
                         // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
                         // quit seeking simple_column's replacement.
-                        return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
+                        return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias(), parameters);
                     }
                 }
                 assert(false);
             }
+        } else if (exprOp == OpTypes.ROW_SUBQUERY) {
+            VoltXMLElement subquery = new VoltXMLElement("tablesubquery");
+            VoltXMLElement subqueryselect = StatementDMQL.voltGetXMLExpression(table.queryExpression, parameters, session);
+            subquery.children.add(subqueryselect);
+            return subquery;
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct
@@ -2389,7 +2395,7 @@ public class Expression implements Cloneable {
         for (Expression expr : exportedNodes) {
             if (expr != null) {
                 VoltXMLElement vxmle = expr.voltGetXML(session,
-                        displayCols, ignoredDisplayColIndexes, startKey, null);
+                        displayCols, ignoredDisplayColIndexes, startKey, null, parameters);
                 exp.children.add(vxmle);
                 assert(vxmle != null);
             }
@@ -2504,8 +2510,8 @@ public class Expression implements Cloneable {
             if (table == null || table.queryExpression == null) {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
             }
-            ExpressionColumn parameters[] = new ExpressionColumn[0];
-            exp.children.add(StatementQuery.voltGetXMLExpression(table.queryExpression, parameters, session));
+            ExpressionColumn params[] = new ExpressionColumn[0];
+            exp.children.add(StatementQuery.voltGetXMLExpression(table.queryExpression, params, session));
             return exp;
 
         case OpTypes.ALTERNATIVE:
@@ -2727,40 +2733,6 @@ public class Expression implements Cloneable {
     @Override
     public String toString() {
         return voltDescribe(null, 0);
-        /*
-        String type = null;
-
-        // iterate through all optypes, looking for
-        // a match...
-        // sadly do this with reflection
-        Field[] fields = OpTypes.class.getFields();
-        for (Field f : fields) {
-            if (f.getType() != int.class) continue;
-            int value = 0;
-            try {
-                value = f.getInt(null);
-            } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-
-            // found a match
-            if (value == opType) {
-                type = f.getName();
-                break;
-            }
-        }
-        assert(type != null);
-
-        // return the original default impl + the type
-        String str = super.toString() + " with opType " + type +
-                ", isAggregate: " + isAggregate +
-                ", columnIndex: " + columnIndex;
-        if (this instanceof ExpressionOrderBy) {
-            str += "\n  " + this.nodes[LEFT].toString();
-        }
-        return str;
-        */
     }
 
     static protected Expression voltCombineWithAnd(Expression... conditions)

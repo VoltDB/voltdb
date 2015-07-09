@@ -963,7 +963,7 @@ public abstract class StatementDMQL extends Statement {
                     assert(index < displayCols.size());
                     Expression column = displayCols.get(index);
                     e.setLeftNode(column);
-                    VoltXMLElement xml = e.voltGetXML(session, displayCols, ignoredColsIndexes, i);
+                    VoltXMLElement xml = e.voltGetXML(session, displayCols, ignoredColsIndexes, i, null, parameters);
                     orderCols.children.add(xml);
                 }
             }
@@ -1201,7 +1201,7 @@ public abstract class StatementDMQL extends Statement {
         if (havingCondition != null) {
             VoltXMLElement having = new VoltXMLElement("having");
             query.children.add(having);
-            VoltXMLElement havingExpr = havingCondition.voltGetXML(session, select.displayCols, ignoredColsIndexes, 0);
+            VoltXMLElement havingExpr = havingCondition.voltGetXML(session, select.displayCols, ignoredColsIndexes, 0, null, parameters);
             having.children.add(havingExpr);
         }
 
@@ -1210,7 +1210,7 @@ public abstract class StatementDMQL extends Statement {
             if (ignoredColsIndexes.contains(jj)) {
                 continue;
             }
-            VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
+            VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj, null, parameters);
             cols.children.add(xml);
             assert(xml != null);
         }
@@ -1234,7 +1234,7 @@ public abstract class StatementDMQL extends Statement {
 
             for (int jj=0; jj < groupByCols.size(); ++jj) {
                 Expression expr = groupByCols.get(jj);
-                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
+                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj, null, parameters);
                 groupCols.children.add(xml);
             }
         }
@@ -1245,7 +1245,7 @@ public abstract class StatementDMQL extends Statement {
             query.children.add(orderCols);
             for (int jj=0; jj < orderByCols.size(); ++jj) {
                 Expression expr = orderByCols.get(jj);
-                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj);
+                VoltXMLElement xml = expr.voltGetXML(session, select.displayCols, ignoredColsIndexes, jj, null, parameters);
                 orderCols.children.add(xml);
             }
         }

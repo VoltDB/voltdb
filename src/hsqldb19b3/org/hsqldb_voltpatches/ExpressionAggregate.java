@@ -375,18 +375,7 @@ public class ExpressionAggregate extends Expression {
                 break;
         }
 
-        if (getLeftNode() != null) {
-            sb.append(Expression.voltIndentStr(blanks + 4, true, false))
-              .append("arg = [")
-              .append(Expression.voltIndentStr(blanks + 6, true, false))
-              .append(nodes[LEFT].voltDescribe(session, blanks + 6))
-              .append(Expression.voltIndentStr(blanks + 4, true, false))
-              .append(']');
-        } else {
-            sb.append(Expression.voltIndentStr(blanks + 4, true, false))
-              .append("arg = []");
-        }
-
+        voltDescribeArgs(session, blanks + 2, sb);
         return sb.toString();
     }
 
