@@ -331,6 +331,7 @@
       <xs:enumeration value="kafka"/>
       <xs:enumeration value="http"/>
       <xs:enumeration value="rabbitmq"/>
+      <xs:enumeration value="elasticsearch"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
@@ -384,6 +385,7 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="enabled" type="xs:boolean" default="true" />
   </xs:complexType>
 
   <!-- restriction on id -->
