@@ -499,8 +499,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     return false;
                 }
                 final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-
-                return code == ErrorMapping.NoError();
+                if (code != ErrorMapping.NoError()) {
+                    error("Failed to get offset coordinator for " + m_topicAndPartition);
+                    return false;
+                }
+                return true;
             }
 
             @Override
@@ -521,8 +524,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     commit = n2;
                     m_seenOffset.remove(commit);
                 }
+                //Highest commit we have seen after me will be committed.
                 if (commitOffset(commit)) {
-                    //Now find any seen offsets greater than this and commit any
                     m_currentOffset.set(commit);
                 }
             }
