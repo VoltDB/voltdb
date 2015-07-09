@@ -664,9 +664,9 @@ class Overview extends Module {
                 save.click()
 	            !save.isDisplayed()
             } catch(geb.error.RequiredPageContentNotPresent e) {
-                break
+            
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                break
+                
             }
 	    }
 	    

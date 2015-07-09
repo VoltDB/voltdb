@@ -356,4 +356,22 @@ public abstract class VoltTypeUtil {
             return value;
         }
     }
+
+    /**
+     * If the type is NUMERIC from hsqldb, VoltDB has to decide its real type.
+     * It's either INTEGER or DECIMAL according to the SQL Standard.
+     * Thanks for Hsqldb 1.9, FLOAT literal values have been handled well with E sign.
+     * @param vt
+     * @param value
+     * @return
+     */
+    public static VoltType getNumericLiteralType(VoltType vt, String value) {
+        try {
+            Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            // Our DECIMAL may not be bigger/smaller enough to store the constant value
+            return VoltType.DECIMAL;
+        }
+        return vt;
+    }
 }

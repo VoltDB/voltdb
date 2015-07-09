@@ -176,6 +176,10 @@ function loadAdminPage() {
         exportConfiguration: $("#exportConfiguration"),
         exportConfigurationLoading: $('#exportConfigurationLoading'),
 
+        //Import Settings
+        loadingImportConfig: $("#loadingImportConfig"),
+        importConfiguration: $("#importConfiguration"),
+
         //Dr Mode object
         labelDrmode: $("#drMode"),
         labelDrId: $("#drId"),
@@ -341,6 +345,18 @@ function loadAdminPage() {
                 } else {
                     adminEditObjects.exportConfiguration.show();
                     adminEditObjects.exportConfigurationLoading.show();
+                }
+            }
+
+            //Handle import configuration
+            if ($(this).text() == "Import") {
+                //If parent is closed, then hide export configuration
+                if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
+                    adminEditObjects.importConfiguration.hide();
+                    //If parent is open, then open the export configuration.
+                } else {
+                    adminEditObjects.importConfiguration.show();
+
                 }
             }
         });
@@ -1930,7 +1946,8 @@ function loadAdminPage() {
                 adminEditObjects.addNewConfigLink.hide();
                 adminEditObjects.exportConfiguration.html(loadingConfig);
                 adminEditObjects.loadingConfiguration.show();
-                adminEditObjects.exportConfiguration.data("status", "loading");
+
+
 
                 //Close the popup
                 popup.close();
@@ -2828,6 +2845,8 @@ function loadAdminPage() {
             getExportProperties(adminConfigValues.configuration);
             //dr setting
             getDrMode(adminConfigValues.drListen);
+
+            getImportProperties(adminConfigValues.importConfiguration);
             //adminConfigValues.drListen = false;
             if (VoltDbUI.isDRInfoRequired) {
                 adminEditObjects.labelDrId.text(adminConfigValues.drId);
@@ -2866,11 +2885,11 @@ function loadAdminPage() {
                 } else {
                     adminEditObjects.labelDrmode.text("Replica");
                 }
-                adminEditObjects.LinkDrMasterEdit.removeClass().addClass('edit');
+
             } else {
                 adminEditObjects.labelDrmode.text("Master");
-                adminEditObjects.LinkDrMasterEdit.removeClass().addClass('editDisabled');
             }
+            adminEditObjects.LinkDrMasterEdit.removeClass().addClass('edit');
         };
 
         var getExportProperties = function (data) {
@@ -2946,6 +2965,79 @@ function loadAdminPage() {
 
             $('#exportConfiguration').html(result);
 
+        };
+
+        var getImportProperties = function (data) {
+            var result = "";
+            if (data != undefined) {
+
+                //Do not update the data in loading condition
+                if (adminEditObjects.importConfiguration.data("status") == "loading") {
+                    return;
+                }
+
+                for (var i = 0; i < data.length; i++) {
+                    var module = VoltDbAdminConfig.escapeHtml(data[i].module);
+                    var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
+                    var enabled = data[i].enabled;
+                    var importProperty = data[i].property;
+                    var rowId = 'row-5' + i;
+                    var style = '';
+                    var additionalCss = (VoltDbAdminConfig.toggleStates[rowId] === true) ? 'labelExpanded' : '';
+
+                    if (!VoltDbAdminConfig.toggleStates.hasOwnProperty(rowId) || VoltDbAdminConfig.toggleStates[rowId] === false) {
+                        VoltDbAdminConfig.toggleStates[rowId] = false;
+                        style = 'style = "display:none;"';
+                    }
+
+                    result += '<tr class="child-row-5 subLabelRow parentprop" id="' + rowId + '">' +
+                            '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + module + type + '</a>' +
+                            '   </td>' +
+                            '   <td align="right">' +
+                            '       <div class="' + getOnOffClass(enabled) + '"></div>' +
+                            '   </td>' +
+                            '   <td>' + getOnOffText(enabled) + '</td>' +
+                            '   <td>' +
+                            //'       <div class="exportDelete" style="display:none;"></div>' +
+                            //'       <a href="javascript:void(0)" id="exportEdit' + i + '" class="edit" onclick="editStream(' + i + ')" title="Edit">&nbsp;</a>' +
+                            '   </td>' +
+                            '</tr>';
+
+                    if (importProperty && importProperty.length > 0) {
+
+                        for (var j = 0; j < importProperty.length; j++) {
+                            var name = importProperty[j].name;
+                            var value = importProperty[j].value;
+
+                            result += '' +
+                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                                '   <td class="configLabe2">' + name + '</td>' +
+                                '   <td align="right">' + value + '</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '</tr>';
+                        }
+
+
+                    } else {
+                        result += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
+                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
+                            '   <td width="33%">&nbsp</td>' +
+                            '</tr>';
+                    }
+                }
+            }
+
+            if (result == "") {
+                result += '<tr class="propertyLast subLabelRow">' +
+                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
+                        '<td width="33%">&nbsp</td>' +
+                        '</tr>';
+            }
+
+            $('#importConfiguration').html(result);
         };
 
 

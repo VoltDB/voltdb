@@ -27,7 +27,7 @@
 
     <target name="kafkastream">
         <mkdir dir="${bundles.dir}" />
-        <copy file="${base.dir}/third_party/java/jars/kafka-clients-0.8.2.1.jar" todir="${build.prod.dir}" />
+        <copy file="${base.dir}/lib/kafka-clients-0.8.2.1.jar" todir="${build.prod.dir}" />
         <jar destfile="${bundles.dir}/kafkastream.jar" basedir="${build.prod.dir}">
             <include name="org/voltdb/importclient/KafkaStreamImporter.class"/>
             <include name="org/voltdb/importclient/KafkaStreamImporter$ClientConnectionHandler.class"/>

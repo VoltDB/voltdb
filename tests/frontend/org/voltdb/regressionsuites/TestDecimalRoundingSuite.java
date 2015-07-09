@@ -25,7 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,16 +34,10 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.types.VoltDecimalHelper;
 
 public class TestDecimalRoundingSuite extends RegressionSuite {
-
-    private static int m_defaultScale = 12;
-    private static String m_roundingEnabledProperty = "BIGDECIMAL_ROUND";
-    private static String m_roundingModeProperty = "BIGDECIMAL_ROUND_POLICY";
-    private static String m_defaultRoundingEnablement = "true";
-    private static String m_defaultRoundingMode = "HALF_UP";
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -53,13 +46,6 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
         super(name);
     }
 
-
-    private static String getRoundingString(String label) {
-        return String.format("%sRounding %senabled, mode is %s",
-                             label == null ? (label + ": ") : "",
-                             VoltDecimalHelper.isRoundingEnabled() ? "is " : "is *NOT* ",
-                             VoltDecimalHelper.getRoundingMode().toString());
-    }
     private void validateInsertStmt(boolean expectSuccess, String insertStmt, BigDecimal... expectedValues) throws Exception {
         Client client = getClient();
 
@@ -98,36 +84,6 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
                               roundIsEnabled.toString(), roundMode.toString());
         }
         doTestDecimalScaleInsertion(roundIsEnabled, roundMode);
-    }
-
-    /*
-     * This little helper function converts a string to
-     * a decimal, and, maybe, rounds it to the Volt default scale
-     * using the given mode.  If roundingEnabled is false, no
-     * rounding is done.
-     */
-    private static final BigDecimal roundDecimalValue(String  decimalValueString,
-                                                      boolean roundingEnabled,
-                                                      RoundingMode mode) {
-        BigDecimal bd = new BigDecimal(decimalValueString);
-        if (!roundingEnabled) {
-            return bd;
-        }
-        int precision = bd.precision();
-        int scale = bd.scale();
-        int lostScale = scale - m_defaultScale ;
-        if (lostScale <= 0) {
-            return bd;
-        }
-        int newPrecision = precision - lostScale;
-        MathContext mc = new MathContext(newPrecision, mode);
-        BigDecimal nbd = bd.round(mc);
-        assertTrue(nbd.scale() <= m_defaultScale);
-        if (nbd.scale() != m_defaultScale) {
-            nbd = nbd.setScale(m_defaultScale);
-        }
-        assertEquals(getRoundingString("Decimal Scale setting failure"), m_defaultScale, nbd.scale());
-        return nbd;
     }
 
     private void doTestDecimalScaleInsertion(boolean roundingEnabled,
@@ -442,6 +398,159 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
         assertEquals(getRoundingString("Cleanup statement failure"), ClientResponse.SUCCESS, cr.getStatus());
     }
 
+    public void testEEDecimalScale() throws Exception {
+        Boolean roundIsEnabled = Boolean.valueOf(m_defaultRoundingEnablement);
+        RoundingMode roundMode = RoundingMode.valueOf(m_defaultRoundingMode);
+
+        assert(m_config instanceof LocalCluster);
+        LocalCluster localCluster = (LocalCluster)m_config;
+        Map<String, String> props = localCluster.getAdditionalProcessEnv();
+        if (props != null) {
+            roundIsEnabled = Boolean.valueOf(props.containsKey(m_roundingEnabledProperty) ? props.get(m_roundingEnabledProperty) : "true");
+            roundMode = RoundingMode.valueOf(props.containsKey(m_roundingModeProperty) ? props.get(m_roundingModeProperty) : "HALF_UP");
+        }
+        doTestEEDecimalScale(roundIsEnabled, roundMode);
+    }
+
+    private void doTestEEDecimalScale(boolean roundEnabled, RoundingMode roundMode) throws Exception {
+        // We currently only support one rounding mode in the EE, and
+        // we always round.
+        if (roundEnabled && roundMode == RoundingMode.HALF_UP) {
+            Client client = getClient();
+            ClientResponse cr;
+            String[] values = new String[] {
+                // Don't round.
+                "0.8999999999994",
+                // Do round.
+                "0.8999999999995",
+                // Do round to the left of the dot.
+                "0.9999999999995",
+                // Do round to the left of the dot with non-zero integer part.
+                "1.9999999999995",
+                // Do round to the left of the dot with more digits.
+                "99.9999999999995",
+                // Do round to the left of the dot with no more digits.
+                "98.9999999999995",
+                // Don't round, but the result is the largest
+                // representable decimal value.
+                "99999999999999999999999999.9999999999994999999",
+                // The following cases replicate the cases above,
+                // but with a sign.
+                "-0.8999999999994",
+                "-0.8999999999995",
+                "-0.9999999999995",
+                "-1.9999999999995",
+                "-99.9999999999995",
+                "-98.9999999999995",
+                "-99999999999999999999999999.9999999999994999999"
+            };
+            String[] badValues = new String[] {
+                // Too many integer digits.
+                "999999999999999999999999999999.0",
+                // Round to an unrepresentable value.
+                "99999999999999999999999999.9999999999995999999",
+                // Round to an unrepresentable value.
+                "-99999999999999999999999999.9999999999995999999"
+            };
+            // Insert some data.
+            for (String val : values) {
+                cr = client.callProcedure("EEDecimal.Insert", val);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            }
+            // Insert some bad data.
+            // We will find this is bad later on.
+            for (int idx = 0; idx < badValues.length; idx += 1) {
+                String val = badValues[idx];
+                cr = client.callProcedure("EEBadDecimal.Insert", idx, val);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            }
+            // Query the data.  Just get them all for now.
+            cr = client.callProcedure("EEDecimalFetch");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            VoltTable tbl = cr.getResults()[0];
+            while (tbl.advanceRow()) {
+                String expectedStr = tbl.getString(0);
+                BigDecimal rounded = tbl.getDecimalAsBigDecimal(1);
+                BigDecimal expected = roundDecimalValue(expectedStr, roundEnabled, roundMode);
+                assertEquals(expected, rounded);
+            }
+            // Query the data for bad values.  Get them one at a time,
+            // because they are all bad in their own way.
+            for (int idx = 0; idx < badValues.length; idx += 1) {
+                try {
+                    cr = client.callProcedure("EEBadDecimalFetch", idx);
+                    fail(String.format("Unexpected success, case %d, decimal string \"%s\"",
+                         idx, badValues[idx]));
+                } catch (ProcCallException ex) {
+                    assertTrue(true);
+                }
+            }
+        } else {
+            assertTrue(true);
+        }
+    }
+
+    /**
+     * Test rounding on columns with decimal default.  HSQLDB does not give us the
+     * right value for decimal strings, so until ENG-8557 is
+     * @param roundEnabled
+     * @param roundMode
+     * @throws Exception
+     */
+    public final void notestDecimalDefault(boolean roundEnabled, RoundingMode roundMode) throws Exception {
+                    validateDecimalDefault("pRoundDecimalDownNC", false, roundEnabled, roundMode,  "0.8999999999994");
+            validateDecimalDefault("pRoundDecimalUpNC",   false, roundEnabled, roundMode,  "0.8999999999995");
+            validateDecimalDefault("pRoundDecimalDownC",  false, roundEnabled, roundMode,  "0.9999999999994");
+            validateDecimalDefault("pRoundDecimalUpC",    false, roundEnabled, roundMode,  "0.9999999999995");
+            validateDecimalDefault("pRoundDecimalDownC2", false, roundEnabled, roundMode, "99.9999999999994");
+            validateDecimalDefault("pRoundDecimalUpC2",   false, roundEnabled, roundMode, "99.9999999999995");
+            validateDecimalDefault("pRoundDecimalMax",    false, roundEnabled, roundMode, "99999999999999999999999999.9999999999994");
+            validateDecimalDefault("pRoundDecimalNotRep", true,  roundEnabled, roundMode, "99999999999999999999999999.9999999999995");
+            validateDecimalDefault("nRoundDecimalDownNC", false, roundEnabled, roundMode,  "-0.8999999999994");
+            validateDecimalDefault("nRoundDecimalUpNC",   false, roundEnabled, roundMode,  "-0.8999999999995");
+            validateDecimalDefault("nRoundDecimalDownC",  false, roundEnabled, roundMode,  "-0.9999999999994");
+            validateDecimalDefault("nRoundDecimalUpC",    false, roundEnabled, roundMode,  "-0.9999999999995");
+            validateDecimalDefault("nRoundDecimalDownC2", false, roundEnabled, roundMode, "-99.9999999999994");
+            validateDecimalDefault("nRoundDecimalUpC2",   false, roundEnabled, roundMode, "-99.9999999999995");
+            validateDecimalDefault("nRoundDecimalMax",    false, roundEnabled, roundMode, "-99999999999999999999999999.9999999999994");
+            validateDecimalDefault("nRoundDecimalNotRep", true,  roundEnabled, roundMode, "-99999999999999999999999999.9999999999995");
+
+    }
+    private final void validateDecimalDefault(String tableName,
+                                              boolean shouldFail,
+                                              boolean roundEnabled,
+                                              RoundingMode roundMode,
+                                              String value) throws Exception {
+        Client client = getClient();
+        ClientResponse cr;
+        boolean sawFail = false;
+        VoltTable tbl = null;
+        BigDecimal found = null;
+        try {
+            cr = client.callProcedure("@AdHoc", String.format("insert into %s (id) values ?;", tableName), 100);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            sawFail = false;
+            cr = client.callProcedure("@AdHoc", String.format("select (dec) from %s;", tableName));
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            tbl = cr.getResults()[0];
+            assertTrue(tbl.advanceRow());
+            found = tbl.getDecimalAsBigDecimal(0);
+        } catch (ProcCallException ex) {
+            sawFail = true;
+        }
+        assertEquals(shouldFail ? "Expected a failure here" : "Unexpected failure here",
+                    shouldFail, sawFail);
+        if (shouldFail) {
+            return;
+        }
+        BigDecimal expected = roundDecimalValue(value, roundEnabled, roundMode);
+        assertEquals(String.format("Default decimal value failed: rounding is %s, mode is %s",
+                                  roundEnabled ? "enabled" : "not enabled",
+                                  roundMode),
+                    expected,
+                    found);
+
+    }
     private final static Map<String, String> makePropertiesMap(String... entries) {
         assert(entries.length % 2 == 0);
         Map<String, String> answer = new HashMap<String, String>();
@@ -467,7 +576,7 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
         final String literalSchema =
                 "CREATE TABLE P1 ( id integer );" +
                 "CREATE TABLE DECIMALTABLE ( " +
-                "dec decimal" +
+                    "dec decimal"     +
                 ");" +
                 "CREATE PROCEDURE INSERT_DECIMAL AS " +
                 "INSERT INTO DECIMALTABLE VALUES ?;" +
@@ -475,6 +584,33 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
                 "SELECT DEC FROM DECIMALTABLE;" +
                 "CREATE PROCEDURE TRUNCATE_DECIMAL AS " +
                 "TRUNCATE TABLE DECIMALTABLE;" +
+                "create table EEDecimal (" +
+                "  valueIn    varChar(128)" +
+                ");" +
+                "create procedure EEDecimalFetch as " +
+                "select valueIn, cast(valueIn as decimal) from EEDecimal;" +
+                "create table EEBadDecimal (" +
+                "  id integer primary key not null," +
+                "  valueIn    varChar(128)" +
+                ");" +
+                "create procedure EEBadDecimalFetch as " +
+                "select valueIn, cast(valueIn as decimal) from EEBadDecimal where id = ?;" +
+                "create table pRoundDecimalDownNC ( id integer, dec decimal default  '0.8999999999994' );" +
+                "create table pRoundDecimalUpNC   ( id integer, dec decimal default  '0.8999999999995' );" +
+                "create table pRoundDecimalDownC  ( id integer, dec decimal default  '0.9999999999994' );" +
+                "create table pRoundDecimalUpC    ( id integer, dec decimal default  '0.9999999999995' );" +
+                "create table pRoundDecimalDownC2 ( id integer, dec decimal default '99.9999999999994' );" +
+                "create table pRoundDecimalUpC2   ( id integer, dec decimal default '99.9999999999995' );" +
+                "create table pRoundDecimalMax    ( id integer, dec decimal default '99999999999999999999999999.9999999999994' );" +
+                "create table pRoundDecimalNotRep ( id integer, dec decimal default '99999999999999999999999999.9999999999995' );" +
+                "create table nRoundDecimalDownNC ( id integer, dec decimal default  '-0.8999999999994' );" +
+                "create table nRoundDecimalUpNC   ( id integer, dec decimal default  '-0.8999999999995' );" +
+                "create table nRoundDecimalDownC  ( id integer, dec decimal default  '-0.9999999999994' );" +
+                "create table nRoundDecimalUpC    ( id integer, dec decimal default  '-0.9999999999995' );" +
+                "create table nRoundDecimalDownC2 ( id integer, dec decimal default '-99.9999999999994' );" +
+                "create table nRoundDecimalUpC2   ( id integer, dec decimal default '-99.9999999999995' );" +
+                "create table nRoundDecimalMax    ( id integer, dec decimal default '-99999999999999999999999999.9999999999994' );" +
+                "create table nRoundDecimalNotRep ( id integer, dec decimal default '-99999999999999999999999999.9999999999995' );" +
                 ""
                 ;
         try {

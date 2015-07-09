@@ -51,6 +51,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
@@ -2118,21 +2119,6 @@ public class DDLCompiler {
                     minMaxAggs.add(aggExpr);
                 }
             }
-            AbstractExpression singleUniqueMinMaxAggExpr = null;
-            /*
-             * ENG-6511: If we only have one distinct min/max aggCol/aggExpr, we can try to
-             * find an index that was built on both the group-by columns and the min/max
-             * aggCol/aggExpr to achieve better performance.
-             */
-            if (hasMinOrMaxAgg) {
-                singleUniqueMinMaxAggExpr = minMaxAggs.get(0);
-                for (int i=1; i<minMaxAggs.size(); ++i) {
-                    if ( ! minMaxAggs.get(i).equals(singleUniqueMinMaxAggExpr)) {
-                        singleUniqueMinMaxAggExpr = null;
-                        break;
-                    }
-                }
-            }
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {
@@ -2147,19 +2133,23 @@ public class DDLCompiler {
             }
 
             if (hasMinOrMaxAgg) {
-                // ENG-6511: If we have only one distinct min/max aggCol/aggExpr, we will pass it into
-                // findBestMatchIndexForMatviewMinOrMax() to see if a better index can be found.
-                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, singleUniqueMinMaxAggExpr);
-                if (found != null) {
-                    matviewinfo.setIndexforminmax(found.getTypeName());
-                } else {
-                    matviewinfo.setIndexforminmax("");
-                    m_compiler.addWarn("No index found to support min() / max() UPDATE and DELETE on Materialized View " +
+                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+                boolean needsWarning = false;
+                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                    IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                    if (found != null) {
+                        refFound.setName(found.getTypeName());
+                    } else {
+                        refFound.setName("");
+                        needsWarning = true;
+                    }
+                }
+                if (needsWarning) {
+                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
                             matviewinfo.getTypeName() +
                             ", and a sequential scan might be issued when current min / max value is updated / deleted.");
                 }
-            } else {
-                matviewinfo.setIndexforminmax("");
             }
 
             // parse out the aggregation columns into the dest table
@@ -2182,6 +2172,8 @@ public class DDLCompiler {
         }
     }
 
+    private enum MatViewIndexMatchingGroupby {GB_COL_IDX_COL, GB_COL_IDX_EXP,  GB_EXP_IDX_EXP}
+
     // if the materialized view has MIN / MAX, try to find an index defined on the source table
     // covering all group by cols / exprs to avoid expensive tablescan.
     // For now, the only acceptable index is defined exactly on the group by columns IN ORDER.
@@ -2194,22 +2186,21 @@ public class DDLCompiler {
     //   -- (ENG-6511) indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
     // This function is mostly re-written for the fix of ENG-6511. --yzhang
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
-            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression singleUniqueMinMaxAggExpr)
+            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression minMaxAggExpr)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
         StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
 
         // Candidate index. If we can find an index covering both group-by columns and aggExpr (optimal) then we will
-        // return immediately. If the index found covers only group-by columns (sub-optimal), we will first cache it here.
+        // return immediately.
+        // If the index found covers only group-by columns (sub-optimal), we will first cache it here.
         Index candidate = null;
         for (Index index : allIndexes) {
-            // matchedAll == true if the index covered all group-by columns (sub-optimal candidate).
-            boolean matchedAll = true;
-            // optimal == true if the index covered both the group-by columns and the min/max aggExpr.
-            boolean optimal = false;
-            // If singleUniqueMinMaxAggExpr is not null, the diff can be zero or one.
+            // indexOptimalForMinMax == true if the index covered both the group-by columns and the min/max aggExpr.
+            boolean indexOptimalForMinMax = false;
+            // If minMaxAggExpr is not null, the diff can be zero or one.
             // Otherwise, for a usable index, its number of columns must agree with that of the group-by columns.
-            int diffAllowance = singleUniqueMinMaxAggExpr == null ? 0 : 1;
+            final int diffAllowance = minMaxAggExpr == null ? 0 : 1;
 
             // Get all indexed exprs if there is any.
             String expressionjson = index.getExpressionsjson();
@@ -2225,129 +2216,86 @@ public class DDLCompiler {
             }
             // Get source table columns.
             List<Column> srcColumnArray = CatalogUtil.getSortedCatalogItems(srcTable.getColumns(), "index");
+            MatViewIndexMatchingGroupby matchingCase = null;
 
             if (groupbyExprs == null) {
                 // This means group-by columns are all simple columns.
                 // It also means we can only access the group-by columns by colref.
                 List<ColumnRef> groupbyColRefs =
                     CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
-                if (indexedExprs == null) { // groupbyExprs == null && indexedExprs == null
+                if (indexedExprs == null) {
+                    matchingCase = MatViewIndexMatchingGroupby.GB_COL_IDX_COL;
+
                     // All the columns in the index are also simple columns, EASY! colref vs. colref
                     List<ColumnRef> indexedColRefs =
                         CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
                     // The number of columns in index can never be less than that in the group-by column list.
-                    // If singleUniqueMinMaxAggExpr == null, they must be equal (diffAllowance == 0)
+                    // If minMaxAggExpr == null, they must be equal (diffAllowance == 0)
                     // Otherwise they may be equal (sub-optimal) or
                     // indexedColRefs.size() == groupbyColRefs.size() + 1 (optimal, diffAllowance == 1)
-                    if ( indexedColRefs.size() < groupbyColRefs.size() ||
-                         indexedColRefs.size() > groupbyColRefs.size() + diffAllowance ) {
+                    if (isInvalidIndexCandidate(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
                         continue;
                     }
-                    // Compare group by columns.
-                    for (int i = 0; i < groupbyColRefs.size(); ++i) {
-                        int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
-                        int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
-                        if (groupbyColIndex != indexedColIndex) {
-                            matchedAll = false;
-                            break;
-                        }
-                    }
-                    if ( ! matchedAll ) {
+
+                    if (! isGroupbyMatchingIndex(matchingCase, groupbyColRefs, null, indexedColRefs, null, null)) {
                         continue;
                     }
-                    // Compare the min/max aggExpr if we got one.
-                    if ( singleUniqueMinMaxAggExpr != null &&
-                         indexedColRefs.size() == groupbyColRefs.size() + diffAllowance ) {
-                        // We have singleUniqueMinMaxAggExpr and the index also has one extra column
-                        if ( ! (singleUniqueMinMaxAggExpr instanceof TupleValueExpression) ) {
-                            // Here because the index columns are all simple columns (indexedExprs == null)
-                            // so the singleUniqueMinMaxAggExpr must be TupleValueExpression.
+                    if (isValidIndexCandidateForMinMax(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
                             continue;
                         }
-                        int aggSrcColIdx = ((TupleValueExpression)singleUniqueMinMaxAggExpr).getColumnIndex();
-                        Column aggSrcCol = srcColumnArray.get(aggSrcColIdx);
-                        Column lastIndexCol = indexedColRefs.get(indexedColRefs.size() - 1).getColumn();
-                        // Compare the two columns, if they are equal as well, then this is the optimal index! Congrats!
-                        if ( ! aggSrcCol.equals(lastIndexCol) ) {
-                            continue;
-                        }
-                        optimal = true;
+                        indexOptimalForMinMax = true;
                     }
                 }
-                else { // groupbyExprs == null && indexedExprs != null
-                // In this branch, group-by columns are simple columns, but the index contains complex columns.
-                // So it's only safe to access the index columns from indexedExprs.
-                // You can still get something from indexedColRefs, but they will be inaccurate.
-                // e.g.: ONE index column (a+b) will get you TWO separate entries {a, b} in indexedColRefs.
-                // In order to compare columns: for group-by columns: convert colref => col
-                //                              for    index columns: convert    tve => col
-                    if ( indexedExprs.size() < groupbyColRefs.size() ||
-                         indexedExprs.size() > groupbyColRefs.size() + diffAllowance ) {
+                else {
+                    matchingCase = MatViewIndexMatchingGroupby.GB_COL_IDX_EXP;
+                    // In this branch, group-by columns are simple columns, but the index contains complex columns.
+                    // So it's only safe to access the index columns from indexedExprs.
+                    // You can still get something from indexedColRefs, but they will be inaccurate.
+                    // e.g.: ONE index column (a+b) will get you TWO separate entries {a, b} in indexedColRefs.
+                    // In order to compare columns: for group-by columns: convert colref => col
+                    //                              for    index columns: convert    tve => col
+                    if (isInvalidIndexCandidate(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
                         continue;
                     }
-                    // Compare group by columns.
-                    for (int i = 0; i < groupbyColRefs.size(); ++i) {
-                        AbstractExpression indexedExpr = indexedExprs.get(i);
-                        if ( ! (indexedExpr instanceof TupleValueExpression) ) {
-                            // Group-by columns are all simple columns, so indexedExpr must be tve.
-                            matchedAll = false;
-                            break;
-                        }
-                        int indexedColIdx = ((TupleValueExpression)indexedExpr).getColumnIndex();
-                        Column indexedColumn = srcColumnArray.get(indexedColIdx);
-                        Column groupbyColumn = groupbyColRefs.get(i).getColumn();
-                        if ( ! indexedColumn.equals(groupbyColumn) ) {
-                            continue;
-                        }
-                    }
-                    if ( ! matchedAll ) {
+
+                    if (! isGroupbyMatchingIndex(matchingCase, groupbyColRefs, null, null, indexedExprs, srcColumnArray)) {
                         continue;
                     }
-                    // Compare the min/max agg expr if we got one.
-                    if ( singleUniqueMinMaxAggExpr != null &&
-                         indexedExprs.size() == groupbyColRefs.size() + diffAllowance ) {
-                        // We have singleUniqueMinMaxAggExpr and the index also has one extra column
-                        // expr v.s. expr!
-                        if ( ! indexedExprs.get( indexedExprs.size() - 1 ).equals( singleUniqueMinMaxAggExpr ) ) {
+                    if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                             continue;
                         }
-                        optimal = true;
+                        indexOptimalForMinMax = true;
                     }
-                } // end if (indexedExprs == null)
+                }
             }
-            else { // groupbyExprs != null
+            else {
+                matchingCase = MatViewIndexMatchingGroupby.GB_EXP_IDX_EXP;
                 // This means group-by columns have complex columns.
                 // It's only safe to access the group-by columns from groupbyExprs.
                 // AND, indexedExprs must not be null in this case. (yeah!)
                 if ( indexedExprs == null ) {
                     continue;
                 }
-                if ( indexedExprs.size() < groupbyExprs.size() ||
-                     indexedExprs.size() > groupbyExprs.size() + diffAllowance ) {
+                if (isInvalidIndexCandidate(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
                     continue;
                 }
-                // Compare group-by columns
-                for (int i = 0; i < groupbyExprs.size(); ++i) {
-                    if ( ! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
-                        matchedAll = false;
-                        break;
-                    }
-                }
-                if ( ! matchedAll ) {
+
+                if (! isGroupbyMatchingIndex(matchingCase, null, groupbyExprs, null, indexedExprs, null)) {
                     continue;
                 }
-                if ( singleUniqueMinMaxAggExpr != null &&
-                     indexedExprs.size() == groupbyExprs.size() + diffAllowance ) {
-                    if (indexedExprs.get(indexedExprs.size() - 1).equals(singleUniqueMinMaxAggExpr)) {
-                        optimal = true;
-                    }
-                    else {
+
+                if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
+                    if (! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                         continue;
                     }
+                    indexOptimalForMinMax = true;
                 }
-            } // end if (groupbyExprs == null)
+            }
 
-            if (matchedAll && !index.getPredicatejson().isEmpty()) {
+            // NOW index at least covered all group-by columns (sub-optimal candidate)
+            if (!index.getPredicatejson().isEmpty()) {
                 // Additional check for partial indexes to make sure matview WHERE clause
                 // covers the partial index predicate
                 List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
@@ -2364,23 +2312,115 @@ public class DDLCompiler {
                     assert(false);
                     return null;
                 }
-                matchedAll = SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs);
-            }
-            if (matchedAll) {
-                // if the index already covered group by columns and the aggCol/aggExpr,
-                // it is already the best index we can get, return immediately.
-                if ( optimal ) {
-                    return index;
-                }
-                // otherwise wait to see if we can find something better!
-                else {
-                    candidate = index;
+                if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
+                    // partial index does not match MatView where clause, give up this index
+                    continue;
                 }
             }
+            // if the index already covered group by columns and the aggCol/aggExpr,
+            // it is already the best index we can get, return immediately.
+            if (indexOptimalForMinMax) {
+                return index;
+            }
+            // otherwise wait to see if we can find something better!
+            candidate = index;
         }
         return candidate;
     }
 
+    private static boolean isInvalidIndexCandidate(int idxSize, int gbSize, int diffAllowance) {
+        if ( idxSize < gbSize || idxSize > gbSize + diffAllowance ) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isGroupbyMatchingIndex(
+            MatViewIndexMatchingGroupby matchingCase,
+            List<ColumnRef> groupbyColRefs, List<AbstractExpression> groupbyExprs,
+            List<ColumnRef> indexedColRefs, List<AbstractExpression> indexedExprs,
+            List<Column> srcColumnArray) {
+        // Compare group-by columns/expressions for different cases
+        switch(matchingCase) {
+        case GB_COL_IDX_COL:
+            for (int i = 0; i < groupbyColRefs.size(); ++i) {
+                int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
+                int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
+                if (groupbyColIndex != indexedColIndex) {
+                    return false;
+                }
+            }
+            break;
+        case GB_COL_IDX_EXP:
+            for (int i = 0; i < groupbyColRefs.size(); ++i) {
+                AbstractExpression indexedExpr = indexedExprs.get(i);
+                if (! (indexedExpr instanceof TupleValueExpression)) {
+                    // Group-by columns are all simple columns, so indexedExpr must be tve.
+                    return false;
+                }
+                int indexedColIdx = ((TupleValueExpression)indexedExpr).getColumnIndex();
+                Column indexedColumn = srcColumnArray.get(indexedColIdx);
+                Column groupbyColumn = groupbyColRefs.get(i).getColumn();
+                if ( ! indexedColumn.equals(groupbyColumn) ) {
+                    return false;
+                }
+            }
+            break;
+        case GB_EXP_IDX_EXP:
+            for (int i = 0; i < groupbyExprs.size(); ++i) {
+                if (! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
+                   return false;
+                }
+            }
+            break;
+        default:
+            assert(false);
+            // invalid option
+            return false;
+        }
+
+        // group-by columns/expressions are matched with the corresponding index
+        return true;
+    }
+
+    private static boolean isValidIndexCandidateForMinMax(int idxSize, int gbSize, int diffAllowance) {
+        return diffAllowance == 1 && idxSize == gbSize + 1;
+    }
+
+    private static boolean isIndexOptimalForMinMax(
+            MatViewIndexMatchingGroupby matchingCase, AbstractExpression minMaxAggExpr,
+            List<ColumnRef> indexedColRefs, List<AbstractExpression> indexedExprs,
+            List<Column> srcColumnArray) {
+        // We have minMaxAggExpr and the index also has one extra column
+        switch(matchingCase) {
+        case GB_COL_IDX_COL:
+            if ( ! (minMaxAggExpr instanceof TupleValueExpression) ) {
+                // Here because the index columns are all simple columns (indexedExprs == null)
+                // so the minMaxAggExpr must be TupleValueExpression.
+                return false;
+            }
+            int aggSrcColIdx = ((TupleValueExpression)minMaxAggExpr).getColumnIndex();
+            Column aggSrcCol = srcColumnArray.get(aggSrcColIdx);
+            Column lastIndexCol = indexedColRefs.get(indexedColRefs.size() - 1).getColumn();
+            // Compare the two columns, if they are equal as well, then this is the optimal index! Congrats!
+            if (aggSrcCol.equals(lastIndexCol)) {
+                return true;
+            }
+            break;
+        case GB_COL_IDX_EXP:
+        case GB_EXP_IDX_EXP:
+            if (indexedExprs.get(indexedExprs.size()-1).equals(minMaxAggExpr)) {
+                return true;
+            }
+            break;
+        default:
+            assert(false);
+        }
+
+        // If the last part of the index does not match the MIN/MAX expression
+        // this is not the optimal index candidate for now
+        return false;
+    }
     /**
      * Build the abstract expression representing the partial index predicate.
      * Verify it satisfies the rules. Throw error messages otherwise.
@@ -2489,7 +2529,7 @@ public class DDLCompiler {
 
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
-            msg += "is missing count(*) as the column after the group by columns, a materialized view requirement.";
+            msg += "must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).";
             throw m_compiler.new VoltCompilerException(msg);
         }
 

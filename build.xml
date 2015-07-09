@@ -139,6 +139,7 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
+	<exclude name='classes-java1.6.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -243,11 +244,11 @@ PRIMARY ENTRY POINTS
 <target name="check"
     depends="licensecheck, default, voltdbipc"
     description="Run Java and C++ JNI testcases." >
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="18000000">
         <arg value="eecheck" />
         <arg value="junit" />
         <arg value="sqlcmdtest" />
@@ -262,11 +263,11 @@ PRIMARY ENTRY POINTS
 <target name="check_noclustering"
     depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases that apply to a single node." >
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="18000000">
         <arg value="eecheck" />
         <arg value="junit_noclustering" />
         <arg value="distcheck" />
@@ -1993,7 +1994,10 @@ TEST CASES
     <class location="voltdb/voltdb-${dist.version}.jar" />
     <auxClasspath>
       <fileset dir="${lib.dir}" includes ="*.jar" />
-      <fileset dir="${vendor.lib.dir}" includes="*.jar" />
+      <fileset dir='${vendor.lib.dir}'>
+          <include name='*.jar' />
+	  <exclude name='classes-java1.6.jar' />
+      </fileset>
       <pathelement location="${build.test.dir}" />
       <fileset refid="voltpro.classpath"/>
     </auxClasspath>

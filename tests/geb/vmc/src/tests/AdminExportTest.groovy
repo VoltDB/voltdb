@@ -34,7 +34,7 @@ class AdminExportTest extends TestBase {
     }
     
     //String customConnectorClass = page.overview.getCustomConnectorClass()
-    /*
+    
 	def "Check export Click and check its value"() {	
 		when:
 		waitFor(waitTime) { page.exportbtn.isDisplayed() }
@@ -62,6 +62,7 @@ class AdminExportTest extends TestBase {
 	def "Verify Add Configuration opens/Verify Add Configuration for FILE"() {
 	    when: 'Open Add ConfigurationPopup'
 	    page.overview.openAddConfigurationPopup()
+	    page.overview.textType.value("FILE")
 	    then: 'Check elements'
 	    waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
 	    waitFor(waitTime) { page.overview.save.isDisplayed() }
@@ -151,6 +152,7 @@ class AdminExportTest extends TestBase {
     def "Verify Error messages of Add Configuration for FILE"() {
         when: 'Open Add ConfigurationPopup'
 	    page.overview.openAddConfigurationPopup()
+	    page.overview.textType.value("FILE")
 	    then: 'Check elements'
 	    waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
 	    waitFor(waitTime) { page.overview.save.isDisplayed() }
@@ -281,7 +283,7 @@ class AdminExportTest extends TestBase {
 	    waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
 	    waitFor(waitTime) { page.overview.errorExportConnectorClass.isDisplayed() }
     }
-     */
+    
     def "Verify Add Configuration for FILE created"() {
         String fileTestName     = page.overview.getFileTestName()
         String fileValueOne     = page.overview.getFileValueOne()
@@ -290,6 +292,7 @@ class AdminExportTest extends TestBase {
         
         when: 'Open Add ConfigurationPopup'
         page.overview.openAddConfigurationPopup()
+        page.overview.textType.value("FILE")
         then: 'Check elements'
         waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
 	    waitFor(waitTime) { page.overview.save.isDisplayed() }
