@@ -1218,7 +1218,13 @@
         };
 
         this.refreshGraphCmdLog = function () {
-             MonitorGraphUI.ChartCommandlog.update();
+            if ($.isFunction(MonitorGraphUI.ChartCommandlog.update))
+                MonitorGraphUI.ChartCommandlog.update();
+        };
+
+        this.refreshGraphDR = function () {
+            if ($.isFunction(MonitorGraphUI.ChartDrReplicationRate.update))
+                MonitorGraphUI.ChartDrReplicationRate.update();
         };
     });
 
