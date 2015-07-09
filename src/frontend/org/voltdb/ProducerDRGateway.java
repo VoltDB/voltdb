@@ -70,4 +70,9 @@ public interface ProducerDRGateway {
     public abstract int getDRClusterId();
 
     public void truncateDRLogsForRestore(Map<Integer, Long> sequenceNumbers);
+
+    /**
+     * Clear all queued DR buffers for a master, useful when the replica goes away
+     */
+    public void resetDR();
 }

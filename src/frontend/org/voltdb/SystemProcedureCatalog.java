@@ -159,6 +159,7 @@ public class SystemProcedureCatalog {
         builder.put("@GetHashinatorConfig",     new Config("org.voltdb.sysprocs.GetHashinatorConfig",      false, true,  false, 0, VoltType.INVALID,   true,  false, true,  true, false));
         builder.put("@ApplyBinaryLogSP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",         true,  false, false, 0, VoltType.VARBINARY, true,  false, false, true, true));
         builder.put("@ApplyBinaryLogMP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogMP",         false, false, false, 0, VoltType.INVALID,   true,  false, false, true, true));
+        builder.put("@ResetDatabaseReplication",new Config("org.voltdb.sysprocs.ResetDatabaseReplication", false, false, true,  0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@Ping",                    new Config(null,                                           true,  true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@GetPartitionKeys",        new Config(null,                                           false, true,  true,  0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@Subscribe",               new Config(null,                                           false, true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
