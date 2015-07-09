@@ -107,7 +107,8 @@ public class SnapshotVerifier {
     }
 
     private static void printHelpAndQuit( int code) {
-        System.out.println("Usage\nSpecific snapshot: snapshotverifier snapshot_name --dir dir1 --dir dir2 --dir dir3");
+        System.out.println("Usage: snapshotverifier --help");
+        System.out.println("Specific snapshot: snapshotverifier snapshot_name --dir dir1 --dir dir2 --dir dir3");
         System.out.println("All snapshots: snapshotverifier --dir dir1 --dir dir2 --dir dir3");
         System.exit(code);
     }

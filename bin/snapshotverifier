@@ -128,6 +128,6 @@ CLASSPATH=${CLASSPATH}
 
 # run it
 export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
-export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.utils.SnapshotVerifier"
+export CMDVAL="${CMDVAL}-classpath $CLASSPATH org.voltdb.utils.SnapshotVerifier"
 #echo $CMDVAL "$@"
 exec $CMDVAL "$@"
