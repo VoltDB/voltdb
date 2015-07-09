@@ -182,8 +182,8 @@ public class TestProcedureAPISuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalCluster("failures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
+        LocalCluster config = new LocalCluster("failures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        //* enable to debug in-process */ config.setHasLocalServer(true);
         // build the jarfile (note the reuse of the TPCC project)
         if (!config.compile(project)) fail();
 
