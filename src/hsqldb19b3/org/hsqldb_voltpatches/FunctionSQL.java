@@ -2787,17 +2787,17 @@ public class FunctionSQL extends Expression {
             if (nodes[i] == null) {
                 continue;
             }
-            sb.append(Expression.indentStr(blanks + 2, true, false))
+            sb.append(Expression.voltIndentStr(blanks + 2, true, false))
               .append("[")
-              .append(Expression.indentStr(blanks + 4, true, false))
+              .append(Expression.voltIndentStr(blanks + 4, true, false))
               .append(nodes[i].voltDescribe(session, blanks + 4))
-              .append(Expression.indentStr(blanks + 2, true, false))
+              .append(Expression.voltIndentStr(blanks + 2, true, false))
               .append("]");
         }
-        sb.append(Expression.indentStr(blanks + 2, true, false))
+        sb.append(Expression.voltIndentStr(blanks + 2, true, false))
           .append(") returns ")
           .append(dataType.getNameString())
-          .append(Expression.indentStr(blanks + 2, true, false))
+          .append(Expression.voltIndentStr(blanks + 2, true, false))
           .append("]\n");
         return sb.toString();
     }

@@ -680,13 +680,13 @@ public class ExpressionArithmetic extends Expression {
     protected String voltDescribe(Session session, int blanks) {
         StringBuffer sb = new StringBuffer();
         sb.append("ARITHMETIC EXPRESSION: [")
-          .append(Expression.indentStr(blanks + 2, true, false));
+          .append(Expression.voltIndentStr(blanks + 2, true, false));
         switch (opType) {
             case OpTypes.VALUE :
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("VALUE = ")
                   .append(dataType.convertToSQLString(valueData))
-                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("TYPE = ").append(dataType.getNameString());
                 return sb.toString();
 
@@ -694,13 +694,13 @@ public class ExpressionArithmetic extends Expression {
 
             //
             case OpTypes.VALUELIST :
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("VALUELIST(Type = ")
                   .append(dataType.getNameString())
                   .append(") [ ");
 
                 for (int i = 0; i < nodes.length; i++) {
-                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                    sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                       .append(nodes[i].voltDescribe(session, blanks + 2));
                 }
                 sb.append("]");

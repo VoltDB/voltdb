@@ -2810,7 +2810,7 @@ public class Expression implements Cloneable {
             case OpTypes.VALUE :
                 sb.append("VALUE = ")
                   .append(dataType.convertToSQLString(valueData))
-                  .append(Expression.indentStr(blanks, true, false))
+                  .append(Expression.voltIndentStr(blanks, true, false))
                   .append("TYPE = ")
                   .append(dataType.getNameString());
                 return sb.toString();
@@ -2832,10 +2832,10 @@ public class Expression implements Cloneable {
             case OpTypes.ROW :
                 sb.append("ROW = [");
                 for (int i = 0; i < nodes.length; i++) {
-                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                    sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                       .append(nodes[i].voltDescribe(session, blanks + 1));
                 }
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("]");
                 break;
 
@@ -2860,24 +2860,24 @@ public class Expression implements Cloneable {
         if (getLeftNode() != null) {
             sb.append(leftName)
               .append(" = [")
-              .append(Expression.indentStr(blanks + 2, true, false))
+              .append(Expression.voltIndentStr(blanks + 2, true, false))
               .append(nodes[LEFT].voltDescribe(session, blanks + 2))
-              .append(Expression.indentStr(blanks+2, true, false))
+              .append(Expression.voltIndentStr(blanks+2, true, false))
               .append(']');
         }
 
         if (getRightNode() != null) {
-            sb.append(Expression.indentStr(blanks+2, true, false))
+            sb.append(Expression.voltIndentStr(blanks+2, true, false))
               .append(rightName)
               .append(" = [")
-              .append(Expression.indentStr(blanks + 2, true, false))
+              .append(Expression.voltIndentStr(blanks + 2, true, false))
               .append(nodes[RIGHT].voltDescribe(session, blanks + 2))
-              .append(Expression.indentStr(blanks+2, true, false))
+              .append(Expression.voltIndentStr(blanks+2, true, false))
               .append(']');
         }
     }
 
-    public static String indentStr(int blanks, boolean startNL, boolean endNL) {
+    public static String voltIndentStr(int blanks, boolean startNL, boolean endNL) {
         StringBuffer sb = new StringBuffer();
         if (startNL) {
             sb.append("\n");

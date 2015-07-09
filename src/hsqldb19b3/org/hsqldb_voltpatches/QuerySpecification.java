@@ -2814,15 +2814,15 @@ public class QuerySpecification extends QueryExpression {
         sb.append(": JVM System ID = ")
           .append(System.identityHashCode(this));
         blanks += 2;
-        sb.append(Expression.indentStr(blanks, true, false))
+        sb.append(Expression.voltIndentStr(blanks, true, false))
           .append("isDistinctSelect = [")
           .append(isDistinctSelect)
           .append("]");
-        sb.append(Expression.indentStr(blanks, true, false))
+        sb.append(Expression.voltIndentStr(blanks, true, false))
           .append("isGrouped = [").append(isGrouped).append("]");
-        sb.append(Expression.indentStr(blanks, true, false))
+        sb.append(Expression.voltIndentStr(blanks, true, false))
           .append("isAggregated = [").append(isAggregated).append("]");
-        sb.append(Expression.indentStr(blanks, true, false))
+        sb.append(Expression.voltIndentStr(blanks, true, false))
           .append("columns = [");
         if (exprColumns == null) {
             sb.append("<NONE>");
@@ -2835,7 +2835,7 @@ public class QuerySpecification extends QueryExpression {
                     index = exprColumns[i].columnIndex;
                 }
 
-                sb.append(Expression.indentStr(blanks + 2, true, false));
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false));
                 Expression exprCol = exprColumns[i];
                 if (exprCol.getType() == OpTypes.SIMPLE_COLUMN) {
                     temp = String.format("SIMPLE_COLUMN(%d->%d)", i, index);
@@ -2860,28 +2860,28 @@ public class QuerySpecification extends QueryExpression {
                 }
             }
         }
-        sb.append(Expression.indentStr(blanks, true, false)).append("]");
-        sb.append(Expression.indentStr(blanks, true, false)).append("Range Variables: [");
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append("]");
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append("Range Variables: [");
         if (rangeVariables == null) {
             sb.append("<NONE>");
         } else {
             for (int i = 0; i < rangeVariables.length; i++) {
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("range variable ").append(i + 1).append(" [")
-                  .append(Expression.indentStr(blanks + 4, true, false))
+                  .append(Expression.voltIndentStr(blanks + 4, true, false))
                   .append(rangeVariables[i].voltDescribe(session, blanks + 4))
-                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("]");
             }
         }
-        sb.append(Expression.indentStr(blanks, true, false))
+        sb.append(Expression.voltIndentStr(blanks, true, false))
           .append("]");
 
         temp = queryCondition == null ? "null"
                                       : queryCondition.voltDescribe(session, blanks);
 
         if (isGrouped) {
-            sb.append(Expression.indentStr(blanks, true, false))
+            sb.append(Expression.voltIndentStr(blanks, true, false))
               .append("groupColumns = [");
             if (exprColumns == null) {
 
@@ -2894,53 +2894,53 @@ public class QuerySpecification extends QueryExpression {
                         index = exprColumns[i].columnIndex;
                     }
 
-                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                    sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                       .append(exprColumns[index].voltDescribe(session, blanks + 2));
                 }
             }
-            sb.append(Expression.indentStr(blanks + 2, true, false)).append("]");
+            sb.append(Expression.voltIndentStr(blanks + 2, true, false)).append("]");
         }
 
         if (havingCondition != null) {
             temp = havingCondition.voltDescribe(session, blanks + 2);
 
-            sb.append(Expression.indentStr(blanks + 2, true, false))
+            sb.append(Expression.voltIndentStr(blanks + 2, true, false))
               .append("havingCondition = [")
-              .append(Expression.indentStr(blanks + 2, true, false))
+              .append(Expression.voltIndentStr(blanks + 2, true, false))
               .append(temp)
-              .append(Expression.indentStr(blanks + 2, true, false))
+              .append(Expression.voltIndentStr(blanks + 2, true, false))
               .append("]");
         }
 
         if (sortAndSlice.hasOrder()) {
-            sb.append(Expression.indentStr(blanks + 2, true, false))
+            sb.append(Expression.voltIndentStr(blanks + 2, true, false))
               .append("order by = [");
             for (int i = 0; i < sortAndSlice.exprList.size(); i++) {
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("  ")
                   .append(((Expression) sortAndSlice.exprList.get(i)).voltDescribe(session, blanks + 2));
             }
             if (sortAndSlice.primaryTableIndex != null) {
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("uses index");
             }
 
-            sb.append(Expression.indentStr(blanks + 2, true, false)).append("]\n");
+            sb.append(Expression.voltIndentStr(blanks + 2, true, false)).append("]\n");
         }
 
         if (sortAndSlice.hasLimit()) {
             if (sortAndSlice.limitCondition.getLeftNode() != null) {
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("offset = [")
                   .append(sortAndSlice.limitCondition.getLeftNode().voltDescribe(session, blanks + 2))
-                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("]");
             }
             if (sortAndSlice.limitCondition.getRightNode() != null) {
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("limit = [")
                   .append(sortAndSlice.limitCondition.getRightNode().voltDescribe(session, blanks + 2))
-                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("]");
             }
         }

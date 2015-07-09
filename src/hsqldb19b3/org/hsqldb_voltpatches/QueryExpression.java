@@ -1225,13 +1225,13 @@ public class QueryExpression implements RangeGroup {
                 throw Error.runtimeError(ErrorCode.U_S0500, "QueryExpression");
         }
 
-        sb.append(Expression.indentStr(blanks, true, false)).append(temp);
-        sb.append(Expression.indentStr(blanks, true, false)).append("Left Query=[");
-        sb.append(Expression.indentStr(blanks, true, false)).append(leftQueryExpression.voltDescribe(session, blanks + 2));
-        sb.append(Expression.indentStr(blanks, true, false)).append("]");
-        sb.append(Expression.indentStr(blanks, true, false)).append("Right Query=[");
-        sb.append(Expression.indentStr(blanks, true, false)).append(rightQueryExpression.voltDescribe(session, blanks + 2));
-        sb.append(Expression.indentStr(blanks, true, false)).append("]");
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append(temp);
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append("Left Query=[");
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append(leftQueryExpression.voltDescribe(session, blanks + 2));
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append("]");
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append("Right Query=[");
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append(rightQueryExpression.voltDescribe(session, blanks + 2));
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append("]");
 
         return sb.toString();
     }

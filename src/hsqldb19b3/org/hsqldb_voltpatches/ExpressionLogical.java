@@ -2408,10 +2408,10 @@ public class ExpressionLogical extends Expression {
         sb.append("LOGICAL EXPRESSION: [");
         switch (opType) {
             case OpTypes.VALUE :
-                sb.append(Expression.indentStr(blanks+2, true, false))
+                sb.append(Expression.voltIndentStr(blanks+2, true, false))
                    .append("VALUE = ")
                    .append(dataType.convertToSQLString(valueData))
-                   .append(Expression.indentStr(blanks+2, true, false))
+                   .append(Expression.voltIndentStr(blanks+2, true, false))
                    .append("TYPE = ").append(dataType.getNameString());
                 return sb.toString();
 

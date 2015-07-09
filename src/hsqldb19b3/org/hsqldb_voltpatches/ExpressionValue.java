@@ -148,7 +148,7 @@ public class ExpressionValue extends Expression {
             case OpTypes.VALUE :
                 sb.append("VALUE = ")
                   .append(dataType.convertToSQLString(valueData))
-                  .append(Expression.indentStr(blanks, true, false))
+                  .append(Expression.voltIndentStr(blanks, true, false))
                   .append("TYPE = ")
                   .append(dataType.getNameString());
                 return sb.toString();

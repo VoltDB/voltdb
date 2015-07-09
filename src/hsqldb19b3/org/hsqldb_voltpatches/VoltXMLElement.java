@@ -82,16 +82,16 @@ public class VoltXMLElement {
     private void append(StringBuilder sb, int indent) {
         sb.append("ELEMENT: ").append(name);
         for (Entry<String, String> e : attributes.entrySet()) {
-            sb.append(Expression.indentStr(indent+2, true, false))
+            sb.append(Expression.voltIndentStr(indent+2, true, false))
               .append(e.getKey())
               .append(" = ")
               .append(e.getValue());
         }
         if ( ! children.isEmpty()) {
-            sb.append(Expression.indentStr(indent, true, false))
+            sb.append(Expression.voltIndentStr(indent, true, false))
               .append("[");
             for (VoltXMLElement e : children) {
-                sb.append(Expression.indentStr(indent + 2, true, false));
+                sb.append(Expression.voltIndentStr(indent + 2, true, false));
                 e.append(sb, indent + 2);
             }
         }

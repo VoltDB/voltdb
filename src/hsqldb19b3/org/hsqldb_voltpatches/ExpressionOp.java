@@ -919,7 +919,7 @@ public class ExpressionOp extends Expression {
             case OpTypes.VALUE :
                 sb.append("VALUE = ")
                   .append(dataType.convertToSQLString(valueData))
-                  .append(Expression.indentStr(blanks + 2, true, false))
+                  .append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("TYPE = ")
                   .append(dataType.getNameString());
                 return sb.toString();
@@ -932,7 +932,7 @@ public class ExpressionOp extends Expression {
             case OpTypes.VALUELIST :
                 sb.append(Tokens.T_VALUE).append(' ').append("LIST [");
                 for (int i = 0; i < nodes.length; i++) {
-                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                    sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                       .append(nodes[i].voltDescribe(session, blanks + 2));
                 }
                 return sb.toString();

@@ -450,7 +450,7 @@ class Like implements Cloneable {
 
         StringBuffer sb = new StringBuffer();
         StringBuffer ind = new StringBuffer();
-        ind.append(Expression.indentStr(blanks, true, false));
+        ind.append(Expression.voltIndentStr(blanks, true, false));
         sb.append(super.toString())
           .append("[")
           .append(ind)
