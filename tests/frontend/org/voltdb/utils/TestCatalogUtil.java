@@ -772,7 +772,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(catconn);
 
         assertTrue(builtin_elasticsearchnewdeployment.getExport().getConfiguration().get(0).isEnabled());
-        assertEquals(builtin_elasticsearchnewdeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.ELASTIC_SEARCH);
+        assertEquals(builtin_elasticsearchnewdeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.ELASTICSEARCH);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.ElasticSearchHttpExportClient");
 
@@ -789,7 +789,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(catconn);
 
         assertTrue(builtin_elasticsearcholddeployment.getExport().getConfiguration().get(0).isEnabled());
-        assertEquals(builtin_elasticsearcholddeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.ELASTIC_SEARCH);
+        assertEquals(builtin_elasticsearcholddeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.ELASTICSEARCH);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.ElasticSearchHttpExportClient");
     }
