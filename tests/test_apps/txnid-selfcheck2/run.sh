@@ -90,10 +90,10 @@ function benchmark() {
         --displayinterval=1 \
         --duration=120 \
         --servers=localhost \
-        --threads=20 \
+        --threads=50 \
         --threadoffset=0 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
+        --minvaluesize=1024000 \
+        --maxvaluesize=1024000 \
         --entropy=127 \
         --fillerrowsize=10240 \
         --replfillerrowmb=32 \

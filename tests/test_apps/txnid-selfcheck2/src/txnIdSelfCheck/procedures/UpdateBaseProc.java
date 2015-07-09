@@ -30,6 +30,8 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.utils.MiscUtils;
 
 public class UpdateBaseProc extends VoltProcedure {
+    public static int[] p_lastCount = new int[128];
+    public static int testint = 0;
 
     public final SQLStmt d_getCount = new SQLStmt(
             "SELECT count(*) FROM dimension where cid = ?;");
@@ -55,6 +57,10 @@ public class UpdateBaseProc extends VoltProcedure {
 
     public long run() {
         return 0; // never called in base procedure
+    }
+    
+    public static int[] getFinalCount() { // unnecessary
+        return p_lastCount;
     }
 
     protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt export, SQLStmt getAdHocData,
@@ -103,7 +109,7 @@ public class UpdateBaseProc extends VoltProcedure {
 
         voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
         voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
-        voltQueueSQL(cleanUp, cid, cnt - 10);
+        voltQueueSQL(cleanUp, cid, cnt - 10); 
         voltQueueSQL(getCIDData, cid);
         assert dim.getRowCount() == 1;
         VoltTable[] retval = voltExecuteSQL();
@@ -115,8 +121,21 @@ public class UpdateBaseProc extends VoltProcedure {
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
         }
-
+        
+        if (cid==0)
+            System.out.println("Last count reported to test client: "+cnt+" for cid: "+cid);
         return retval;
+    }
+    
+    private String getArrayString(int[] ary) {
+        String ret = "[";
+        if (ary.length > 0) 
+            ret += "cid0:"+ary[0];
+        for (int i=1;i<ary.length;i++) {
+            ret += ",cid"+i+":"+ary[i];
+        }
+        ret += "]";
+        return ret;
     }
 
     @SuppressWarnings("deprecation")
@@ -165,6 +184,7 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
         voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
         VoltTable[] retval = voltExecuteSQL();
+        
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occurring.
         data = retval[3];

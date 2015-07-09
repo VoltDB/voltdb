@@ -71,6 +71,8 @@ public class ClientThread extends BenchmarkThread {
     static Random rn = new Random(31); // deterministic sequence
     final Random m_random = new Random();
     final Semaphore m_permits;
+    public long m_cnt = -1;
+    public boolean m_connected = true;
 
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
             boolean allowInProcAdhoc, float mpRatio)
@@ -157,11 +159,15 @@ public class ClientThread extends BenchmarkThread {
                         shouldRollback);
             } catch (Exception e) {
                 if (shouldRollback == 0) {
-                    log.warn("ClientThread threw after " + m_txnsRun.get() +
+                    if (m_connected) {
+                        m_connected = false;
+                        log.warn("Last response from server for cid: "+m_cid+" was cnt: "+m_cnt);
+                        log.warn("ClientThread threw after " + m_txnsRun.get() +
                             " calls while calling procedure: " + procName +
                             " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
                             ", payload: " + payload +
                             ", shouldRollback: " + shouldRollback);
+                    }
                 }
                 throw e;
             }
@@ -172,7 +178,18 @@ public class ClientThread extends BenchmarkThread {
             }
 
             VoltTable[] results = response.getResults();
-
+            
+            VoltTable data = results[3];
+            long cnt = data.fetchRow(0).getLong("cnt");
+            
+            // check to see if the DB's last count matches with the last count reported by the server...
+            if (!m_connected) {
+                System.out.println("Reconnected to DB, cid:"+m_cid+" expected cnt val:"+(m_cnt+1)+" returned cnt val:"+cnt+" dif: "+(cnt-m_cnt-1));
+                m_connected = true;
+                //if (cnt-m_cnt > 1)
+                //    throw new VoltAbortException("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+(cnt-1));
+            }
+            m_cnt = cnt;
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
@@ -180,7 +197,6 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-            VoltTable data = results[3];
             try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }
@@ -237,7 +253,7 @@ public class ClientThread extends BenchmarkThread {
         while (m_shouldContinue.get()) {
             try {
                 m_permits.acquire();
-                System.out.println("Starting here. ");
+                //System.out.println("Starting here. "); // This message can become overwhealming
                 runOne();
             }
             catch (NoConnectionsException e) {

@@ -57,6 +57,7 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
+import txnIdSelfCheck.procedures.UpdateBaseProc;
 
 public class Benchmark {
 
@@ -572,12 +573,12 @@ public class Benchmark {
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
                          (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
-        partitionedLoader.start();
+        //partitionedLoader.start();
         BigTableLoader replicatedLoader = null;
         if (config.mpratio > 0.0) {
             replicatedLoader = new BigTableLoader(client, "bigr",
                              (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
-            replicatedLoader.start();
+            //replicatedLoader.start();
         }
 
         // wait for the filler tables to load up
@@ -604,41 +605,41 @@ public class Benchmark {
             System.out.println("Wait for hashinator..");
         }
 
-
+        
         TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
-        partitionedTruncater.start();
+        //partitionedTruncater.start();
         TruncateTableLoader replicatedTruncater = null;
         if (config.mpratio > 0.0) {
             replicatedTruncater = new TruncateTableLoader(client, "trur",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
-            replicatedTruncater.start();
+            //replicatedTruncater.start();
         }
 
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
-        plt.start();
+        //plt.start(); 
         LoadTableLoader rlt = null;
         if (config.mpratio > 0.0) {
         rlt = new LoadTableLoader(client, "loadmp",
                 (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
-        rlt.start();
+        //rlt.start(); 
         }
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
                 config.allowinprocadhoc, config.mpratio, permits);
-        readThread.start();
+        //readThread.start();
 
         AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio, permits);
         if (!config.disableadhoc) {
-            adHocMayhemThread.start();
+            //adHocMayhemThread.start();
         }
 
         InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
-        idpt.start();
+        // idpt.start();
         DdlThread ddlt = new DdlThread(client);
         // XXX/PSR ddlt.start();
-
+        
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
@@ -750,6 +751,24 @@ public class Benchmark {
         config.parse(Benchmark.class.getName(), args);
 
         Benchmark benchmark = new Benchmark(config);
+        
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println(getArrayString(UpdateBaseProc.getFinalCount()));
+            }
+            
+            private String getArrayString(int[] ary) {
+                String ret = "[";
+                if (ary.length > 0) 
+                    ret += "cid0:"+ary[0];
+                for (int i=1;i<ary.length;i++) {
+                    ret += ",cid"+i+":"+ary[i];
+                }
+                ret += "]";
+                return ret;
+            }
+        }));
         benchmark.runBenchmark();
     }
 }
