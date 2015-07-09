@@ -79,11 +79,12 @@ TEST_F(TupleSchemaTest, Basic)
     ASSERT_NE(NULL, schema.get());
     ASSERT_EQ(2, schema->columnCount());
 
+    EXPECT_EQ(1, schema->getUninlinedObjectColumnCount());
+    EXPECT_EQ(1, schema->getUninlinedObjectColumnInfoIndex(0));
+
     // 4 bytes for the integer
     // 8 bytes for the string pointer
     EXPECT_EQ(12, schema->tupleLength());
-    EXPECT_EQ(1, schema->getUninlinedObjectColumnCount());
-    EXPECT_EQ(1, schema->getUninlinedObjectColumnInfoIndex(0));
 
     const TupleSchema::ColumnInfo *colInfo = schema->getColumnInfo(0);
     ASSERT_NE(NULL, colInfo);
@@ -121,6 +122,33 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     ASSERT_NE(NULL, schema.get());
     ASSERT_EQ(2, schema->columnCount());
     ASSERT_EQ(1, schema->hiddenColumnCount());
+
+    EXPECT_EQ(1, schema->getUninlinedObjectColumnCount());
+    EXPECT_EQ(1, schema->getUninlinedObjectColumnInfoIndex(0));
+
+    // 8 bytes for the hidden bigint
+    // 4 bytes for the integer
+    // 8 bytes for the string pointer
+    EXPECT_EQ(20, schema->tupleLength());
+
+    // Verify that the visible columns are as expected
+    const TupleSchema::ColumnInfo *colInfo = schema->getColumnInfo(0);
+    ASSERT_NE(NULL, colInfo);
+    EXPECT_EQ(0, colInfo->offset);
+    EXPECT_EQ(4, colInfo->length);
+    EXPECT_EQ(VALUE_TYPE_INTEGER, colInfo->type);
+    EXPECT_EQ(1, colInfo->allowNull);
+    EXPECT_EQ(true, colInfo->inlined);
+    EXPECT_EQ(false, colInfo->inBytes);
+
+    colInfo = schema->getColumnInfo(1);
+    ASSERT_NE(NULL, colInfo);
+    EXPECT_EQ(4, colInfo->offset);
+    EXPECT_EQ(256, colInfo->length);
+    EXPECT_EQ(VALUE_TYPE_VARCHAR, colInfo->type);
+    EXPECT_EQ(false, colInfo->allowNull);
+    EXPECT_EQ(false, colInfo->inlined);
+    EXPECT_EQ(true, colInfo->inBytes);
 }
 
 int main() {

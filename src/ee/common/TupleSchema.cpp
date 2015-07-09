@@ -22,6 +22,21 @@
 
 namespace voltdb {
 
+static inline int memSizeForTupleSchema(uint16_t columnCount,
+                                        uint16_t uninlineableObjectColumnCount,
+                                        uint16_t hiddenColumnCount) {
+    // We must allocate enough memory for any data members plus
+    // enough for tupleCount + 1 "ColumnInfo" fields. We need CI+1
+    // because we get the length of a column by offset subtraction.
+    // Also allocate space for an int16_t for each uninlineable
+    // object column so that the indices of uninlineable columns can
+    // be stored at the front and aid in iteration.
+    return static_cast<int>(sizeof(TupleSchema) +
+                            (uninlineableObjectColumnCount * sizeof(int16_t)) +
+                            (sizeof(TupleSchema::ColumnInfo) * (hiddenColumnCount +
+                                                                 columnCount + 1)));
+}
+
 TupleSchema* TupleSchema::createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
                                             const std::vector<int32_t> columnSizes,
                                             const std::vector<bool> allowNull)
@@ -35,16 +50,36 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnT
                                             const std::vector<bool> allowNull,
                                             const std::vector<bool> columnInBytes)
 {
+    const std::vector<ValueType> hiddenTypes(0);
+    const std::vector<int32_t> hiddenSizes(0);
+    const std::vector<bool> hiddenAllowNull(0);
+    const std::vector<bool> hiddenColumnInBytes(0);
+    return TupleSchema::createTupleSchema(columnTypes,
+                                          columnSizes,
+                                          allowNull,
+                                          columnInBytes,
+                                          hiddenTypes,
+                                          hiddenSizes,
+                                          hiddenAllowNull,
+                                          hiddenColumnInBytes);
+}
+
+TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnTypes,
+                                            const std::vector<int32_t>   columnSizes,
+                                            const std::vector<bool>      allowNull,
+                                            const std::vector<bool>      columnInBytes,
+                                            const std::vector<ValueType> hiddenColumnTypes,
+                                            const std::vector<int32_t>   hiddenColumnSizes,
+                                            const std::vector<bool>      hiddenAllowNull,
+                                            const std::vector<bool>      hiddenColumnInBytes)
+{
     const uint16_t uninlineableObjectColumnCount =
       TupleSchema::countUninlineableObjectColumns(columnTypes, columnSizes, columnInBytes);
     const uint16_t columnCount = static_cast<uint16_t>(columnTypes.size());
-    // big enough for any data members plus big enough for tupleCount + 1 "ColumnInfo"
-    //  fields. We need CI+1 because we get the length of a column by offset subtraction
-    // Also allocate space for an int16_t for each uninlineable object column so that
-    // the indices of uninlineable columns can be stored at the front and aid in iteration
-    int memSize = (int)(sizeof(TupleSchema) +
-                        (sizeof(ColumnInfo) * (columnCount + 1)) +
-                        (uninlineableObjectColumnCount * sizeof(int16_t)));
+    const uint16_t hiddenColumnCount = static_cast<uint16_t>(hiddenColumnTypes.size());
+    int memSize = memSizeForTupleSchema(columnCount,
+                                        uninlineableObjectColumnCount,
+                                        hiddenColumnCount);
 
     // allocate the set amount of memory and cast it to a tuple pointer
     TupleSchema *retval = reinterpret_cast<TupleSchema*>(new char[memSize]);
@@ -53,6 +88,7 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnT
     memset(retval, 0, memSize);
     retval->m_columnCount = columnCount;
     retval->m_uninlinedObjectColumnCount = uninlineableObjectColumnCount;
+    retval->m_hiddenColumnCount = hiddenColumnCount;
 
     uint16_t uninlinedObjectColumnIndex = 0;
     for (uint16_t ii = 0; ii < columnCount; ii++) {
@@ -69,10 +105,9 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnT
 TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *schema) {
     // big enough for any data members plus big enough for tupleCount + 1 "ColumnInfo"
     //  fields. We need CI+1 because we get the length of a column by offset subtraction
-    int memSize =
-            (int)(sizeof(TupleSchema) +
-                    (sizeof(ColumnInfo) * (schema->m_columnCount + 1)) +
-                    (schema->m_uninlinedObjectColumnCount * sizeof(uint16_t)));
+    int memSize = memSizeForTupleSchema(schema->m_columnCount,
+                                        schema->m_uninlinedObjectColumnCount,
+                                        schema->m_hiddenColumnCount);
 
     // allocate the set amount of memory and cast it to a tuple pointer
     TupleSchema *retval = reinterpret_cast<TupleSchema*>(new char[memSize]);

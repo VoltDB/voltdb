@@ -159,7 +159,11 @@ public:
         return TupleSchema::createTupleSchema(m_types,
                                               m_sizes,
                                               m_allowNullFlags,
-                                              m_inBytesFlags);
+                                              m_inBytesFlags,
+                                              m_hiddenTypes,
+                                              m_hiddenSizes,
+                                              m_hiddenAllowNullFlags,
+                                              m_hiddenInBytesFlags);
     }
 
 private:

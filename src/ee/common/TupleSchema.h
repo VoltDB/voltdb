@@ -64,6 +64,16 @@ public:
     static TupleSchema* createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
             const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull);
 
+    /** Static factory method to create a TupleSchema that contains hidden columns */
+    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
+                                          const std::vector<int32_t>   columnSizes,
+                                          const std::vector<bool>      allowNull,
+                                          const std::vector<bool>      columnInBytes,
+                                          const std::vector<ValueType> hiddenColumnTypes,
+                                          const std::vector<int32_t>   hiddenColumnSizes,
+                                          const std::vector<bool>      hiddenAllowNull,
+                                          const std::vector<bool>      hiddenColumnInBytes);
+
     static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
                                           const std::vector<int32_t>   columnSizes,
                                           const std::vector<bool>      allowNull,
@@ -122,7 +132,11 @@ public:
      * column info array. */
     uint16_t getUninlinedObjectColumnInfoIndex(const int objectColumnIndex) const;
 
+    /* XXX: Should this take into account hidden columns? (probably) */
     bool equals(const TupleSchema *other) const;
+
+    /* Number of columns and their data types must be the same.
+    * Ignores hidden columns. */
     bool isCompatibleForCopy(const TupleSchema *other) const;
 
     const ColumnInfo* getColumnInfo(int columnIndex) const;
@@ -172,6 +186,10 @@ private:
     uint16_t m_columnCount;
     uint16_t m_uninlinedObjectColumnCount;
 
+    // number of hidden columns
+    // currently unlined values in hidden columns are not possible
+    uint16_t m_hiddenColumnCount;
+
     /*
      * Data storage for:
      *   - An array of int16_t, containing the 0-based ordinal position
@@ -198,7 +216,7 @@ inline uint16_t TupleSchema::columnCount() const {
 }
 
 inline uint16_t TupleSchema::hiddenColumnCount() const {
-    return 0;
+    return m_hiddenColumnCount;
 }
 
 inline uint32_t TupleSchema::tupleLength() const {
