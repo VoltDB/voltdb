@@ -168,7 +168,7 @@ public class TestPlansDML extends PlannerTestCase {
                 "WHERE sq.sqa = 10;");
         assertEquals(1, pns.size());
 
-        /* not yet hsql232: ENG-8314, getTableFromDB produces null
+        /* hsql232: ENG-8604, this produces the error: "mismatched columns ASQ in subquery"
         pns = compileToFragments(
                 "INSERT INTO P1 " +
                 "select P2_subq.Asq, P3_subq.Fsq  " +

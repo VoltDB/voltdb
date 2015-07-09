@@ -39,10 +39,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.TimestampData;
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
@@ -2378,7 +2378,21 @@ public class Expression implements Cloneable {
             exp.attributes.put("opsubtype", "all");
         }
 
-        for (Expression expr : nodes) {
+        Expression[] exportedNodes;
+        // Volt only handles the usual explicit argument to agg functions.
+        // HSQL injects another boolean argument representing some kind of
+        // filter? When? Why?
+        if (aggregateFunctionSet.contains(exprOp)) {
+            // TODO: we might want to throw if the ignored second argument is
+            // something other than a boolean true value, on the assumption
+            // that it has some meaning critical to VoltDB's implmentation.
+            exportedNodes = new Expression[] { nodes[0] };
+        }
+        else {
+            exportedNodes = nodes;
+        }
+
+        for (Expression expr : exportedNodes) {
             if (expr != null) {
                 VoltXMLElement vxmle = expr.voltGetXML(session,
                         displayCols, ignoredDisplayColIndexes, startKey, null, parameters);

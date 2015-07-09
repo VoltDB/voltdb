@@ -89,7 +89,6 @@ public class TestPlansCount extends PlannerTestCase {
 
     // Test subquery temp table count
     public void testCountStar003() {
-        /* not yet hsql232: ENG-8315, "VoltDB does not support this complex query currently."
         List<AbstractPlanNode> pn = compileToFragments("select count(*) from (SELECT count(*) from T1) Temp");
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
@@ -101,11 +100,9 @@ public class TestPlansCount extends PlannerTestCase {
         assertTrue(p instanceof TableCountPlanNode);
         p = p.getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
-        */
     }
 
     public void testCountStar004() {
-        /* not yet hsql232: ENG-8315, "VoltDB does not support this complex query currently."
         List<AbstractPlanNode> pn = compileToFragments("select count(*) from (SELECT count(*) from P1) Temp");
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
@@ -121,7 +118,6 @@ public class TestPlansCount extends PlannerTestCase {
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
-        */
     }
 
     // This is generated as an IndexScan which can't be converted into an index count,
