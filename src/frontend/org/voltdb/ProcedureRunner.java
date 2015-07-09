@@ -52,6 +52,7 @@ import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
@@ -129,7 +130,6 @@ public class ProcedureRunner {
     protected final boolean m_isSinglePartition;
     protected final boolean m_hasJava;
     protected final boolean m_isReadOnly;
-    protected final boolean m_isEverySite;
     protected final int m_partitionColumn;
     protected final VoltType m_partitionColumnType;
     protected final Language m_language;
@@ -143,6 +143,9 @@ public class ProcedureRunner {
     // running procedure info
     //  - track the current call to voltExecuteSQL for logging progress
     protected int m_batchIndex;
+
+    /** boolean flag to mark whether the previous batch execution has EE exception or not.*/
+    private boolean m_spBatchHadException = false;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -191,11 +194,6 @@ public class ProcedureRunner {
         m_hasJava = catProc.getHasjava();
         m_isReadOnly = catProc.getReadonly();
         m_isSinglePartition = m_catProc.getSinglepartition();
-        boolean isEverySite = false;
-        if (isSystemProcedure()) {
-            isEverySite = m_catProc.getEverysite();
-        }
-        m_isEverySite = isEverySite();
         if (m_isSinglePartition) {
             ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
             m_partitionColumn = ppi.index;
@@ -230,9 +228,6 @@ public class ProcedureRunner {
         return m_isSysProc;
     }
 
-    public boolean isEverySite() {
-        return m_isEverySite;
-    }
     /**
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
@@ -702,6 +697,13 @@ public class ProcedureRunner {
                                            "the final one");
             }
             m_seenFinalBatch = isFinalSQL;
+
+            // should check whether the batch is read only or not
+            // e.g. read only query may have timed out...
+            if (!m_isSinglePartition && m_txnState.needsRollback()) {
+                throw new RuntimeException("Multi-partition procedure " + m_procedureName +
+                        " attempted to execute new batch after hitting EE exception in a previous batch");
+            }
 
             // memo-ize the original batch size here
             int batchSize = m_batch.size();
@@ -1422,8 +1424,7 @@ public class ProcedureRunner {
        }
 
        // recursively call recursableRun and don't allow it to shutdown
-       Map<Integer,List<VoltTable>> mapResults =
-           m_site.recursableRun(m_txnState);
+       Map<Integer,List<VoltTable>> mapResults = m_site.recursableRun(m_txnState);
 
        assert(mapResults != null);
        assert(state.m_depsToResume != null);
@@ -1461,15 +1462,27 @@ public class ProcedureRunner {
            sqlTexts[i] = qs.stmt.getText();
            i++;
        }
-       return m_site.executePlanFragments(
-           batchSize,
-           fragmentIds,
-           null,
-           params,
-           sqlTexts,
-           m_txnState.txnId,
-           m_txnState.m_spHandle,
-           m_txnState.uniqueId,
-           m_isReadOnly);
+
+       VoltTable[] results = null;
+       try {
+           results = m_site.executePlanFragments(
+                   batchSize,
+                   fragmentIds,
+                   null,
+                   params,
+                   sqlTexts,
+                   m_txnState.txnId,
+                   m_txnState.m_spHandle,
+                   m_txnState.uniqueId,
+                   m_isReadOnly);
+       } catch (SQLException ex) {
+           m_spBatchHadException = true;
+           // roll back the current batch and re-throw the EE exception
+           m_site.truncateUndoLog(true, m_site.getLatestUndoToken(), m_txnState.m_spHandle, null);
+
+           throw ex;
+       }
+
+       return results;
     }
 }

@@ -142,9 +142,9 @@ public abstract class TransactionState extends OrderableTransaction  {
     }
 
     // Assume that rollback-ness is a latch.
-    public void setNeedsRollback()
+    public void setNeedsRollback(boolean rollback)
     {
-        m_needsRollback = true;
+        m_needsRollback = rollback;
     }
 
     public boolean needsRollback()
