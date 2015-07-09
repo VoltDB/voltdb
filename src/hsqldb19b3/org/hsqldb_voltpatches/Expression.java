@@ -2719,40 +2719,6 @@ public class Expression implements Cloneable {
     @Override
     public String toString() {
         return voltDescribe(null, 0);
-        /*
-        String type = null;
-
-        // iterate through all optypes, looking for
-        // a match...
-        // sadly do this with reflection
-        Field[] fields = OpTypes.class.getFields();
-        for (Field f : fields) {
-            if (f.getType() != int.class) continue;
-            int value = 0;
-            try {
-                value = f.getInt(null);
-            } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-
-            // found a match
-            if (value == opType) {
-                type = f.getName();
-                break;
-            }
-        }
-        assert(type != null);
-
-        // return the original default impl + the type
-        String str = super.toString() + " with opType " + type +
-                ", isAggregate: " + isAggregate +
-                ", columnIndex: " + columnIndex;
-        if (this instanceof ExpressionOrderBy) {
-            str += "\n  " + this.nodes[LEFT].toString();
-        }
-        return str;
-        */
     }
 
     static protected Expression voltCombineWithAnd(Expression... conditions)
@@ -2816,7 +2782,7 @@ public class Expression implements Cloneable {
             case OpTypes.VALUE :
                 sb.append("VALUE = ")
                   .append(dataType.convertToSQLString(valueData))
-                  .append(Expression.indentStr(blanks, true, false))
+                  .append(Expression.voltIndentStr(blanks, true, false))
                   .append("TYPE = ")
                   .append(dataType.getNameString());
                 return sb.toString();
@@ -2838,10 +2804,10 @@ public class Expression implements Cloneable {
             case OpTypes.ROW :
                 sb.append("ROW = [");
                 for (int i = 0; i < nodes.length; i++) {
-                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                    sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                       .append(nodes[i].voltDescribe(session, blanks + 1));
                 }
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("]");
                 break;
 
@@ -2858,7 +2824,32 @@ public class Expression implements Cloneable {
         return sb.toString();
     }
 
-    public static String indentStr(int blanks, boolean startNL, boolean endNL) {
+    protected void voltDescribeArgs(Session session, int blanks, StringBuffer sb) {
+        voltDescribeArgs(session, blanks, sb, "arg_left", "arg_right");
+    }
+
+    protected void voltDescribeArgs(Session session, int blanks, StringBuffer sb, String leftName, String rightName) {
+        if (getLeftNode() != null) {
+            sb.append(leftName)
+              .append(" = [")
+              .append(Expression.voltIndentStr(blanks + 2, true, false))
+              .append(nodes[LEFT].voltDescribe(session, blanks + 2))
+              .append(Expression.voltIndentStr(blanks+2, true, false))
+              .append(']');
+        }
+
+        if (getRightNode() != null) {
+            sb.append(Expression.voltIndentStr(blanks+2, true, false))
+              .append(rightName)
+              .append(" = [")
+              .append(Expression.voltIndentStr(blanks + 2, true, false))
+              .append(nodes[RIGHT].voltDescribe(session, blanks + 2))
+              .append(Expression.voltIndentStr(blanks+2, true, false))
+              .append(']');
+        }
+    }
+
+    public static String voltIndentStr(int blanks, boolean startNL, boolean endNL) {
         StringBuffer sb = new StringBuffer();
         if (startNL) {
             sb.append("\n");

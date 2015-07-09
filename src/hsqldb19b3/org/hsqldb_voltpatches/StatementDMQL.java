@@ -1376,81 +1376,84 @@ public abstract class StatementDMQL extends Statement {
         sb = new StringBuffer();
         switch (type) {
             case StatementTypes.SELECT_CURSOR : {
+                sb.append("SELECT STATEMENT: [")
+                  .append(Expression.voltIndentStr(blanks+2, true, false));
                 sb.append(queryExpression.voltDescribe(session, blanks+2))
-                  .append(Expression.indentStr(blanks, true, false));
+                  .append(Expression.voltIndentStr(blanks, true, false));
                 voltAppendParms(sb, blanks+2)
-                  .append(Expression.indentStr(blanks, true, false));
+                  .append(Expression.voltIndentStr(blanks, true, false));
                 voltAppendSubqueries(session, sb, blanks+2)
-                  .append(Expression.indentStr(blanks, true, false));
+                  .append(Expression.voltIndentStr(blanks, true, false))
+                  .append("]");
                 return sb.toString();
             }
             case StatementTypes.INSERT : {
                 if (queryExpression == null) {
                     sb.append("INSERT VALUES [");
-                    sb.append(Expression.indentStr(blanks + 2, true, false));
+                    sb.append(Expression.voltIndentStr(blanks + 2, true, false));
                     voltAppendMultiColumns(sb, insertColumnMap, blanks + 2)
-                        .append(Expression.indentStr(blanks + 2, true, false));
+                        .append(Expression.voltIndentStr(blanks + 2, true, false));
                     voltAppendTable(sb, blanks + 2)
-                        .append(Expression.indentStr(blanks + 2, true, false));
+                        .append(Expression.voltIndentStr(blanks + 2, true, false));
                     voltAppendParms(sb, blanks + 2)
-                        .append(Expression.indentStr(blanks + 2, true, false));
+                        .append(Expression.voltIndentStr(blanks + 2, true, false));
                     voltAppendSubqueries(session, sb, 2)
-                        .append(Expression.indentStr(blanks, true, false))
+                        .append(Expression.voltIndentStr(blanks, true, false))
                         .append(']');
                     return sb.toString();
                 } else {
                     sb.append("INSERT SELECT [")
-                      .append(Expression.indentStr(blanks + 2, true, false));
+                      .append(Expression.voltIndentStr(blanks + 2, true, false));
                     voltAppendColumns(sb, insertColumnMap, blanks)
-                      .append(Expression.indentStr(blanks + 2, true, false));
+                      .append(Expression.voltIndentStr(blanks + 2, true, false));
                     voltAppendTable(sb, blanks)
-                      .append(Expression.indentStr(blanks + 2, true, false));
+                      .append(Expression.voltIndentStr(blanks + 2, true, false));
                     sb.append(queryExpression.voltDescribe(session, blanks))
-                      .append(Expression.indentStr(blanks + 2, true, false));
+                      .append(Expression.voltIndentStr(blanks + 2, true, false));
                     voltAppendParms(sb, blanks)
-                      .append(Expression.indentStr(blanks + 2, true, false));
+                      .append(Expression.voltIndentStr(blanks + 2, true, false));
                     voltAppendSubqueries(session, sb, blanks+2)
-                      .append(Expression.indentStr(blanks, true, false))
+                      .append(Expression.voltIndentStr(blanks, true, false))
                       .append(']');
                     return sb.toString();
                 }
             }
             case StatementTypes.UPDATE_WHERE : {
                 sb.append("UPDATE [")
-                  .append(Expression.indentStr(blanks + 2, true, false));
+                  .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendColumns(sb, updateColumnMap, blanks)
-                      .append(Expression.indentStr(blanks + 2, true, false));
+                      .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendTable(sb, blanks)
-                     .append(Expression.indentStr(blanks + 2, true, false));
+                     .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendCondition(session, sb, blanks);
                 for (int i = 0; i < targetRangeVariables.length; i++) {
-                    sb.append(Expression.indentStr(blanks + 2, true, false))
+                    sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                       .append(targetRangeVariables[i].voltDescribe(session, blanks));
                 }
-                sb.append(Expression.indentStr(blanks + 2, true, false));
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendParms(sb, blanks)
-                    .append(Expression.indentStr(blanks + 2, true, false));
+                    .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendSubqueries(session, sb, blanks+2)
-                    .append(Expression.indentStr(blanks, true, false))
+                    .append(Expression.voltIndentStr(blanks, true, false))
                     .append(']');
                 return sb.toString();
             }
             case StatementTypes.DELETE_WHERE : {
                 sb.append("DELETE [")
-                    .append(Expression.indentStr(blanks + 2, true, false));
+                    .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendTable(sb, blanks + 2)
-                    .append(Expression.indentStr(blanks + 4, true, false));
+                    .append(Expression.voltIndentStr(blanks + 4, true, false));
                 voltAppendCondition(session, sb, blanks + 2);
 
                 for (int i = 0; i < targetRangeVariables.length; i++) {
-                    sb.append(Expression.indentStr(blanks + 6, true, false))
+                    sb.append(Expression.voltIndentStr(blanks + 6, true, false))
                       .append(targetRangeVariables[i].voltDescribe(session, blanks + 4));
                 }
-                sb.append(Expression.indentStr(blanks + 2, true, false));
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendParms(sb, blanks + 4)
-                   .append(Expression.indentStr(blanks + 2, true, false));
+                   .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendSubqueries(session, sb, blanks + 2)
-                   .append(Expression.indentStr(blanks + 2, true, false))
+                   .append(Expression.voltIndentStr(blanks, true, false))
                    .append(']');
                 return sb.toString();
             }
@@ -1460,24 +1463,24 @@ public abstract class StatementDMQL extends Statement {
             }
             case StatementTypes.MERGE : {
                 sb.append("MERGE [")
-                  .append(Expression.indentStr(blanks + 2, true, false));
+                  .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendMultiColumns(sb, insertColumnMap, blanks + 2)
-                  .append(Expression.indentStr(blanks + 2, true, false));
+                  .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendColumns(sb, updateColumnMap, blanks + 2)
-                  .append(Expression.indentStr(blanks + 2, true, false));
+                  .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendTable(sb, blanks + 2)
-                  .append(Expression.indentStr(blanks + 2, true, false));
+                  .append(Expression.voltIndentStr(blanks + 2, true, false));
                 voltAppendCondition(session, sb, blanks + 2);
 
                 for (int i = 0; i < targetRangeVariables.length; i++) {
-                    sb.append(Expression.indentStr(blanks + 4, true, false))
+                    sb.append(Expression.voltIndentStr(blanks + 4, true, false))
                       .append(targetRangeVariables[i].voltDescribe(session, blanks + 4));
                 }
-                sb.append(Expression.indentStr(blanks+2, true, false));
+                sb.append(Expression.voltIndentStr(blanks+2, true, false));
                 voltAppendParms(sb, blanks + 2)
-                  .append(Expression.indentStr(blanks+2, true, false));
+                  .append(Expression.voltIndentStr(blanks+2, true, false));
                 voltAppendSubqueries(session, sb, blanks+2)
-                  .append(Expression.indentStr(blanks+2, true, false))
+                  .append(Expression.voltIndentStr(blanks, true, false))
                   .append(']');
 
                 return sb.toString();
@@ -1491,22 +1494,22 @@ public abstract class StatementDMQL extends Statement {
     private StringBuffer voltAppendSubqueries(Session session,
                                               StringBuffer sb,
                                               int blanks) {
-        sb.append("SUBQUERIES[");
+        sb.append("SUBQUERIES [");
         for (int i = 0; i < subqueries.length; i++) {
-            sb.append(Expression.indentStr(blanks+2, true, false))
+            sb.append(Expression.voltIndentStr(blanks+2, true, false))
               .append("[level=")
               .append(subqueries[i].depth)
-              .append("]")
-              .append(Expression.indentStr(blanks+2, true, false));
+              .append("]");
             if (subqueries[i].queryExpression == null) {
-                sb.append("value expression");
+                sb.append(Expression.voltIndentStr(blanks+2, true, false))
+                  .append("value expression");
             } else {
-                sb.append(subqueries[i].queryExpression.voltDescribe(session, blanks));
+                sb.append(subqueries[i].queryExpression.voltDescribe(session, blanks + 2));
             }
-            sb.append(Expression.indentStr(blanks, true, false))
+            sb.append(Expression.voltIndentStr(blanks, true, false))
               .append("]");
         }
-        sb.append(Expression.indentStr(blanks, true, false))
+        sb.append(Expression.voltIndentStr(blanks, true, false))
           .append(']');
         return sb;
     }
@@ -1534,18 +1537,18 @@ public abstract class StatementDMQL extends Statement {
 
         sb.append("COLUMNS = [");
         for (int i = 0; i < columnMap.length; i++) {
-            sb.append(Expression.indentStr(blanks, true, false))
+            sb.append(Expression.voltIndentStr(blanks, true, false))
               .append(columnMap[i])
               .append(": ")
               .append(targetTable.getColumn(columnMap[i]).getNameString());
         }
 
         for (int i = 0; i < updateExpressions.length; i++) {
-            sb.append(Expression.indentStr(blanks, true, false))
+            sb.append(Expression.voltIndentStr(blanks, true, false))
               .append('[')
               .append(updateExpressions[i]).append(']');
         }
-        sb.append(Expression.indentStr(blanks, true, false)).append(']');
+        sb.append(Expression.voltIndentStr(blanks, true, false)).append(']');
         return sb;
     }
 
@@ -1559,7 +1562,7 @@ public abstract class StatementDMQL extends Statement {
         sb.append("COLUMNS = [");
         for (int j = 0; j < multiColumnValues.length; j++) {
             for (int i = 0; i < columnMap.length; i++) {
-                sb.append(Expression.indentStr(blanks + 2, true, false))
+                sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append(columnMap[i])
                   .append(": ")
                   .append(targetTable.getColumn(columnMap[i]).getName().name)
@@ -1568,7 +1571,7 @@ public abstract class StatementDMQL extends Statement {
                   .append(']');
             }
         }
-        sb.append(Expression.indentStr(blanks, true, false))
+        sb.append(Expression.voltIndentStr(blanks, true, false))
           .append(']');
         return sb;
     }
@@ -1576,7 +1579,7 @@ public abstract class StatementDMQL extends Statement {
     private StringBuffer voltAppendParms(StringBuffer sb, int blanks) {
         sb.append("PARAMETERS = [");
         for (int i = 0; i < parameters.length; i++) {
-            sb.append(Expression.indentStr(blanks + 2, true, false))
+            sb.append(Expression.voltIndentStr(blanks + 2, true, false))
               .append('@')
               .append(i)
               .append('[')
@@ -1584,7 +1587,7 @@ public abstract class StatementDMQL extends Statement {
               .append(']');
         }
 
-        sb.append(Expression.indentStr(blanks, true, false))
+        sb.append(Expression.voltIndentStr(blanks, true, false))
           .append(']');
         return sb;
     }
@@ -1592,9 +1595,9 @@ public abstract class StatementDMQL extends Statement {
     private StringBuffer voltAppendCondition(Session session, StringBuffer sb, int blanks) {
         return condition == null ? sb.append("CONDITION []\n")
                                  : sb.append("CONDITION [")
-                                     .append(Expression.indentStr(blanks + 2, true, false))
+                                     .append(Expression.voltIndentStr(blanks + 2, true, false))
                                      .append(condition.voltDescribe(session, blanks + 2))
-                                     .append(Expression.indentStr(blanks + 2, true, false))
+                                     .append(Expression.voltIndentStr(blanks + 2, true, false))
                                      .append("]");
     }
     // End of VoltDB extension

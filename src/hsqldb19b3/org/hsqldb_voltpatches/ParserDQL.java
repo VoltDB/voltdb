@@ -59,6 +59,7 @@ import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.Types;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Parser for DQL statements

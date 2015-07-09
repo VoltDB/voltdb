@@ -141,4 +141,22 @@ public class ExpressionValue extends Expression {
         return false;
     }
     // End of VoltDB extension
+    // A VoltDB extension to print HSQLDB ASTs
+    protected String voltDescribe(Session session, int blanks) {
+        StringBuffer sb = new StringBuffer(64);
+        switch (opType) {
+            case OpTypes.VALUE :
+                sb.append("VALUE = ")
+                  .append(dataType.convertToSQLString(valueData))
+                  .append(Expression.voltIndentStr(blanks, true, false))
+                  .append("TYPE = ")
+                  .append(dataType.getNameString());
+                return sb.toString();
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "ExpressionValue");
+        }
+    }
+    // End of VoltDB extension
+
 }

@@ -290,5 +290,8 @@ public abstract class Statement {
 
     public abstract String voltDescribe(Session session, int blanks);
 
+    public String toString() {
+        return voltDescribe(null, 0);
+    }
     // End of VoltDB extension
 }

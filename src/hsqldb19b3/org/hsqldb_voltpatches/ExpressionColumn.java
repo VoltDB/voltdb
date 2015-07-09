@@ -1332,9 +1332,11 @@ public class ExpressionColumn extends Expression {
                 break;
 
             case OpTypes.COLUMN :
-                    sb.append(Tokens.T_COLUMN).append(": ");
+                sb.append(Tokens.T_COLUMN).append(": ");
                 if (column != null) {
                     sb.append(column.getName().getSchemaQualifiedStatementName());
+                } else if (columnName != null) {
+                    sb.append(columnName);
                 } else {
                     sb.append(" <NO COLUMN NAME>");
                 }
@@ -1363,7 +1365,9 @@ public class ExpressionColumn extends Expression {
 
             case OpTypes.MULTICOLUMN :
                 // shouldn't get here
-                sb.append("OpTypes.MULTICOLUMN (How did you get here?)");
+                sb.append(String.format("OpTypes.MULTICOLUMN, table \"%s\", schema \"%s\"",
+                                        (tableName == null ? "<<No Table Name>>" : tableName),
+                                        (schema == null ? "<<No Schema>>" : schema)));
         }
         return sb.toString();
     }

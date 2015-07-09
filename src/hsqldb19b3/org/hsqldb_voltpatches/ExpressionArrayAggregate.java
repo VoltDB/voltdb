@@ -409,4 +409,24 @@ public class ExpressionArrayAggregate extends Expression {
 
         return e;
     }
+    // A VoltDB Extension to print HSQLDB ASTs
+    protected String voltDescribe(Session session, int blanks) {
+        StringBuffer sb = new StringBuffer(64);
+        switch (opType) {
+            case OpTypes.ARRAY_AGG :
+                sb.append(Tokens.T_ARRAY_AGG);
+                break;
+
+            case OpTypes.GROUP_CONCAT :
+                sb.append(Tokens.T_GROUP_CONCAT);
+                break;
+
+            case OpTypes.MEDIAN :
+                sb.append(Tokens.T_MEDIAN);
+                break;
+        }
+        voltDescribeArgs(session, blanks, sb);
+        return sb.toString();
+    }
+    // End of VoltDB Extensions
 }

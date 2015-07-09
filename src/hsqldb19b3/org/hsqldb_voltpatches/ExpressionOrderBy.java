@@ -144,4 +144,17 @@ public class ExpressionOrderBy extends Expression {
 
         return sb.toString();
     }
+    // A VoltDB extension to print HSQLDB ASTs
+    protected String voltDescribe(Session session, int blanks) {
+        StringBuffer sb = new StringBuffer();
+        sb.append("ORDER BY EXPRESSION: [ ")
+          .append(getLeftNode().voltDescribe(session, blanks + 2));
+        if (isDescending) {
+            sb.append(' ').append(Tokens.T_DESC);
+        }
+        sb.append(" ]");
+        return sb.toString();
+    }
+    // End of VoltDB extension
+
 }

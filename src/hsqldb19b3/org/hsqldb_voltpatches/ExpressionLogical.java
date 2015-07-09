@@ -2402,4 +2402,81 @@ public class ExpressionLogical extends Expression {
         return ExpressionValue.voltMutateToBigintType(nonIntegralExpr, this, whichChild);
     }
     // End of VoltDB extension
+    // A VoltDB extension to print HSQLDB ASTs
+    protected String voltDescribe(Session session, int blanks) {
+        StringBuffer sb = new StringBuffer(64);
+        sb.append("LOGICAL EXPRESSION: [");
+        switch (opType) {
+            case OpTypes.VALUE :
+                sb.append(Expression.voltIndentStr(blanks+2, true, false))
+                   .append("VALUE = ")
+                   .append(dataType.convertToSQLString(valueData))
+                   .append(Expression.voltIndentStr(blanks+2, true, false))
+                   .append("TYPE = ").append(dataType.getNameString());
+                return sb.toString();
+
+            case OpTypes.NOT :
+                if (nodes[LEFT].opType == OpTypes.NOT_DISTINCT) {
+                    sb.append(Tokens.T_DISTINCT);
+                    return sb.toString();
+                }
+                sb.append(Tokens.T_NOT);
+                break;
+            case OpTypes.NOT_DISTINCT :
+                sb.append(Tokens.T_NOT).append(' ').append(Tokens.T_DISTINCT);
+                break;
+            case OpTypes.EQUAL :
+                sb.append("EQUAL");
+                break;
+            case OpTypes.GREATER_EQUAL :
+            case OpTypes.GREATER_EQUAL_PRE :
+                sb.append("GREATER_EQUAL");
+                break;
+            case OpTypes.GREATER :
+                sb.append("GREATER");
+                break;
+            case OpTypes.SMALLER :
+                sb.append("SMALLER");
+                break;
+            case OpTypes.SMALLER_EQUAL :
+                sb.append("SMALLER_EQUAL");
+                break;
+            case OpTypes.NOT_EQUAL :
+                sb.append("NOT_EQUAL");
+                break;
+            case OpTypes.AND :
+                sb.append(Tokens.T_AND);
+                break;
+            case OpTypes.OR :
+                sb.append(Tokens.T_OR);
+                break;
+            case OpTypes.MATCH_SIMPLE :
+            case OpTypes.MATCH_PARTIAL :
+            case OpTypes.MATCH_FULL :
+            case OpTypes.MATCH_UNIQUE_SIMPLE :
+            case OpTypes.MATCH_UNIQUE_PARTIAL :
+            case OpTypes.MATCH_UNIQUE_FULL :
+                sb.append(Tokens.T_MATCH);
+                break;
+            case OpTypes.IS_NULL :
+                sb.append(Tokens.T_IS).append(' ').append(Tokens.T_NULL);
+                break;
+            case OpTypes.UNIQUE :
+                sb.append(Tokens.T_UNIQUE);
+                break;
+            case OpTypes.EXISTS :
+                sb.append(Tokens.T_EXISTS);
+                break;
+            case OpTypes.OVERLAPS :
+                sb.append(Tokens.T_OVERLAPS);
+                break;
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "ExpressionLogical");
+        }
+        voltDescribeArgs(session, blanks + 2, sb, "arg_left", "arg_right");
+        return sb.toString();
+    }
+    // End of VoltDB extension
+
 }
