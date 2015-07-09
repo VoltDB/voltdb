@@ -147,6 +147,27 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
     public long run(SystemProcedureExecutionContext ctx,
             String tableName, VoltTable table)
             throws VoltAbortException {
+        return run(ctx,tableName,table,(byte) 0);
+    }
+
+    /**
+     * These parameters, with the exception of ctx, map to user provided values.
+     *
+     * @param ctx
+     *            Internal. Not a user-supplied parameter.
+     * @param tableName
+     *            Name of persistent table receiving data.
+     * @param table
+     *            A VoltTable with schema matching tableName containing data to
+     *            load.
+     * @param upsertMode
+     *            True if using upsert instead of insert
+     * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}
+     * @throws VoltAbortException
+     */
+    public long run(SystemProcedureExecutionContext ctx,
+            String tableName, VoltTable table, byte upsertMode)
+            throws VoltAbortException {
 
         // if tableName is replicated, just send table everywhere.
         // otherwise, create a VoltTable for each partition and
@@ -163,13 +184,16 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         // check that the schema of the input matches
         int columnCount = table.getColumnCount();
 
+        // action should be either "insert" or "upsert"
+        final String action = (upsertMode != 0 ? "upsert" :"insert");
+
         // find the insert statement for this table
-        String insertProcName = String.format("%s.insert", tableName.toUpperCase());
+        String insertProcName = String.format("%s.%s", tableName.toUpperCase(),action);
         Procedure proc = ctx.ensureDefaultProcLoaded(insertProcName);
         if (proc == null) {
             throw new VoltAbortException(
-                    String.format("Unable to locate auto-generated CRUD insert statement for table %s",
-                            tableName));
+                    String.format("Unable to locate auto-generated CRUD %s statement for table %s",
+                            action, tableName));
         }
         // ensure MP fragment tasks load the plan for the table loading procedure
         m_runner.setProcNameToLoadForFragmentTasks(insertProcName);

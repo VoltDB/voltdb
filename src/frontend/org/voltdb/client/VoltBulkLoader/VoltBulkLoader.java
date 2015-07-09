@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -63,6 +62,8 @@ public class VoltBulkLoader {
     final ClientImpl m_clientImpl;
     // Batch size requested for this instance of VoltBulkLoader
     final int m_maxBatchSize;
+    // Flag to indicate to use upsert instead of insert
+    final boolean m_upsertMode;
     // Callback used to notify users of failed row inserts
     final BulkLoaderFailureCallBack m_notificationCallBack;
     //Array of PerPartitionTables from which this VoltBulkLoader chooses to put a row in
@@ -107,10 +108,15 @@ public class VoltBulkLoader {
 
     // Constructor allocated through the Client to ensure consistency of VoltBulkLoaderGlobals
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize,
+            BulkLoaderFailureCallBack blfcb) throws Exception {
+        this(vblGlobals,tableName,maxBatchSize,false,blfcb);
+    }
+    public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
                 BulkLoaderFailureCallBack blfcb) throws Exception {
         this.m_clientImpl = vblGlobals.m_clientImpl;
         this.m_maxBatchSize = maxBatchSize;
         this.m_notificationCallBack = blfcb;
+        this.m_upsertMode = upsertMode;
 
         m_vblGlobals = vblGlobals;
 
@@ -414,7 +420,7 @@ public class VoltBulkLoader {
     }
 
     public VoltType[] getColumnTypes() {
-        return (VoltType[])m_mappedColumnTypes.values().toArray(new VoltType[m_mappedColumnTypes.size()]);
+        return m_mappedColumnTypes.values().toArray(new VoltType[m_mappedColumnTypes.size()]);
     }
 
 }

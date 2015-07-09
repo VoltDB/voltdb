@@ -104,10 +104,14 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      * Size limit for each column.
      */
     public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
-
+    /**
+     * Using upsert instead of insert
+     */
+    public static final boolean DEFAULT_UPSERT_MODE = false;
     /**
      * Used for testing only.
      */
+
     public static boolean testMode = false;
 
     private class ErrorInfoItem {
@@ -301,6 +305,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         // This is set to true when -p option us used.
         boolean useSuppliedProcedure = false;
 
+        @Option(desc = "use upsert instead of insert", hasArg = false)
+        boolean upsertMode = DEFAULT_UPSERT_MODE;
         /**
          * Validate command line options.
          */
@@ -434,7 +440,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             if (config.useSuppliedProcedure) {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, errHandler);
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.upsertMode, errHandler);
             }
 
             CSVFileReader.initializeReader(cfg, csvClient, listReader);

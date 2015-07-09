@@ -74,7 +74,29 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
                     byte[] partitionParam,
             String tableName, VoltTable table)
             throws VoltAbortException {
+        return run(ctx,partitionParam,tableName,table,(byte) 0);
+    }
 
+    /**
+     * These parameters, with the exception of ctx, map to user provided values.
+     *
+     * @param ctx
+     *            Internal. Not a user-supplied parameter.
+     * @param partitionParam Partitioning parameter
+     * @param tableName
+     *            Name of persistent table receiving data.
+     * @param table
+     *            A VoltTable with schema matching tableName containing data to
+     *            load.
+     * @param upsertMode
+     *            True if using upsert instead of insert
+     * @return The number of rows modified.
+     * @throws VoltAbortException
+     */
+    public long run(SystemProcedureExecutionContext ctx,
+                    byte[] partitionParam,
+            String tableName, VoltTable table, byte upsertMode)
+            throws VoltAbortException {
         // if tableName is replicated, fail.
         // otherwise, create a VoltTable for each partition and
         // split up the incoming table .. then send those partial
@@ -89,19 +111,23 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
                     String.format("LoadSinglepartitionTable incompatible with replicated table %s.",
                             tableName));
         }
+
+        // action should be either "insert" or "upsert"
+        final String action = (upsertMode != 0 ? "upsert" :"insert");
+
         // fix any case problems
         tableName = catTable.getTypeName();
 
         // check that the schema of the input matches
         int columnCount = table.getColumnCount();
 
-        // find the insert statement for this table
-        String insertProcName = String.format("%s.insert", tableName);
+        // find the insert/upsert statement for this table
+        String insertProcName = String.format("%s.%s", tableName,action);
         Procedure p = ctx.ensureDefaultProcLoaded(insertProcName);
         if (p == null) {
             throw new VoltAbortException(
-                    String.format("Unable to locate auto-generated CRUD insert statement for table %s",
-                            tableName));
+                    String.format("Unable to locate auto-generated CRUD % statement for table %s",
+                            action,tableName));
         }
 
         // statements of all single-statement procs are named "sql"
