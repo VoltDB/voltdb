@@ -365,32 +365,30 @@ public class TestJoinOrder extends PlannerTestCase {
 
 
         // Sub-queries is an interesting question to test
-        // not yet hsql232: ENG-8314, issue with HSQL and subqueries
-        //        AbstractPlanNode pn;
-        //        sql = "select * FROM T1, T2, (select T4.D from T3 right outer join T4 on T4.D = T3.C) TM1 LEFT OUTER JOIN T5 on T5.E = TM1.D, T6, T7";
-        //        pn = compile(sql);
-        //        validJoinOrder(pn.toExplainPlanString(), "T1", "T2",  "T4", "T3", "T5", "T6", "T7");
-        //        /*
-        //        NEST LOOP INNER JOIN
-        //         NEST LOOP INNER JOIN
-        //          NEST LOOP LEFT JOIN
-        //           filter by (T5.E = TM1.D)
-        //           NEST LOOP INNER JOIN
-        //            NEST LOOP INNER JOIN
-        //             SEQUENTIAL SCAN of "T1"
-        //             SEQUENTIAL SCAN of "T2"
-        //            SEQUENTIAL SCAN of "TM1"
-        //             NEST LOOP LEFT JOIN
-        //              filter by (T4.D = T3.C)
-        //              SEQUENTIAL SCAN of "T4"
-        //              SEQUENTIAL SCAN of "T3"
-        //           SEQUENTIAL SCAN of "T5"
-        //          SEQUENTIAL SCAN of "T6"
-        //         SEQUENTIAL SCAN of "T7"
-        //       */
-        //        pn = compileSPWithJoinOrder(sql, "T1,T2,TM1,T5,T6,T7");
-        //        validJoinOrder(pn.toExplainPlanString(), "T1", "T2",  "T4", "T3", "T5", "T6", "T7");
-        // end not yet hsql232
+        AbstractPlanNode pn;
+        sql = "select * FROM T1, T2, (select T4.D from T3 right outer join T4 on T4.D = T3.C) TM1 LEFT OUTER JOIN T5 on T5.E = TM1.D, T6, T7";
+        pn = compile(sql);
+        validJoinOrder(pn.toExplainPlanString(), "T1", "T2",  "T4", "T3", "T5", "T6", "T7");
+        /*
+                NEST LOOP INNER JOIN
+                 NEST LOOP INNER JOIN
+                  NEST LOOP LEFT JOIN
+                   filter by (T5.E = TM1.D)
+                   NEST LOOP INNER JOIN
+                    NEST LOOP INNER JOIN
+                     SEQUENTIAL SCAN of "T1"
+                     SEQUENTIAL SCAN of "T2"
+                    SEQUENTIAL SCAN of "TM1"
+                     NEST LOOP LEFT JOIN
+                      filter by (T4.D = T3.C)
+                      SEQUENTIAL SCAN of "T4"
+                      SEQUENTIAL SCAN of "T3"
+                   SEQUENTIAL SCAN of "T5"
+                  SEQUENTIAL SCAN of "T6"
+                 SEQUENTIAL SCAN of "T7"
+         */
+        pn = compileSPWithJoinOrder(sql, "T1,T2,TM1,T5,T6,T7");
+        validJoinOrder(pn.toExplainPlanString(), "T1", "T2",  "T4", "T3", "T5", "T6", "T7");
         // Join order not the input table order
         //
 

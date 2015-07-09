@@ -291,13 +291,11 @@ public class TestPushDownAggregates extends PlannerTestCase {
                 "group by A3, B4 order by tag+1 desc limit 10");
         checkLimitPushedDown(pns, true);
 
-        /* not yet hsql232: ENG-8307, "VoltDB does not support this complex query currently."
         // One of the partition table is from sub-query
         pns = compileToFragments("select A3, B4, count(CT) as tag " +
                 " from (select A3, count(*) CT from T3 GROUP BY A3) TEMP, T4 WHERE A3 = A4 " +
                 "group by A3, B4 order by tag desc limit 10");
         checkLimitPushedDown(pns, true);
-         */
     }
 
     private void checkLimitPushedDown(List<AbstractPlanNode> pn, boolean pushdown) {

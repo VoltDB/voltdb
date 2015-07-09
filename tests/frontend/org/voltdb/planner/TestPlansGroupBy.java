@@ -211,7 +211,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
     public void testDistinctA1_Subquery() {
         AbstractPlanNode p;
         // Distinct rewrote with group by
-        /* not yet hsql232: ENG-8314, getTableFromDB produces nul
         pns = compileToFragments("select * from (SELECT DISTINCT A1 FROM T1) temp");
 
         p = pns.get(0).getChild(0);
@@ -222,7 +221,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AbstractScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-        */
     }
 
     public void testGroupByA1() {
