@@ -1,30 +1,8 @@
-/* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
- */
 
 package txnIdSelfCheck;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
+import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
@@ -32,16 +10,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
-public class TruncateTableLoader extends BenchmarkThread {
-
-
+public class CappedTableLoader extends BenchmarkThread {
+    
     final Client client;
     final long targetCount;
     final String tableName;
@@ -56,8 +32,8 @@ public class TruncateTableLoader extends BenchmarkThread {
     long rowsLoaded = 0;
     long nTruncates = 0;
     float mpRatio;
-
-    TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
+    
+    CappedTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
         setName("TruncateTableLoader");
         this.client = client;
         this.tableName = tableName;
@@ -131,6 +107,7 @@ public class TruncateTableLoader extends BenchmarkThread {
                         long p = Math.abs(r.nextLong());
                         m_permits.acquire();
                         insertsTried++;
+                        System.out.println(tableName.toUpperCase() + "TableInsert");
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                     }
                     latch.await(10, TimeUnit.SECONDS);
@@ -146,7 +123,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                     }
                     currentRowCount = nextRowCount;
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
                 log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
@@ -257,5 +235,5 @@ public class TruncateTableLoader extends BenchmarkThread {
         }
         log.info("TruncateTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded + " truncates: " + nTruncates);
     }
-
+    
 }

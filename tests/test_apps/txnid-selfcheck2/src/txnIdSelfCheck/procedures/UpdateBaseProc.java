@@ -122,8 +122,8 @@ public class UpdateBaseProc extends VoltProcedure {
             throw new VoltAbortException("EXPECTED ROLLBACK");
         }
         
-        if (cid==0)
-            System.out.println("Last count reported to test client: "+cnt+" for cid: "+cid);
+        //if (cid==0)
+        //    System.out.println("Last count reported to test client: "+cnt+" for cid: "+cid);
         return retval;
     }
     

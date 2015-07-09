@@ -608,12 +608,23 @@ public class Benchmark {
         
         TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
-        //partitionedTruncater.start();
+        partitionedTruncater.start();
         TruncateTableLoader replicatedTruncater = null;
         if (config.mpratio > 0.0) {
             replicatedTruncater = new TruncateTableLoader(client, "trur",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
-            //replicatedTruncater.start();
+            replicatedTruncater.start();
+        }
+        
+        // Make this clone the capped table loader thread. 
+        CappedTableLoader partitionedCapper = new CappedTableLoader(client, "capp",
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
+        partitionedTruncater.start();
+        CappedTableLoader replicatedCapper = null;
+        if (config.mpratio > 0.0) {
+            replicatedCapper = new CappedTableLoader(client, "capr",
+                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
+            replicatedCapper.start();
         }
 
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
@@ -751,25 +762,6 @@ public class Benchmark {
         config.parse(Benchmark.class.getName(), args);
 
         Benchmark benchmark = new Benchmark(config);
-        
-        
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-            @Override
-            public void run() {
-                System.out.println(getArrayString(UpdateBaseProc.getFinalCount()));
-            }
-            
-            private String getArrayString(int[] ary) {
-                String ret = "[";
-                if (ary.length > 0) 
-                    ret += "cid0:"+ary[0];
-                for (int i=1;i<ary.length;i++) {
-                    ret += ",cid"+i+":"+ary[i];
-                }
-                ret += "]";
-                return ret;
-            }
-        }));
         benchmark.runBenchmark();
     }
 }
