@@ -315,4 +315,80 @@ public class ExpressionAggregate extends Expression {
     public void setCondition(Expression e) {
         nodes[RIGHT] = e;
     }
+
+    // A VoltDB Extension to print HSQLDB ASTs.
+    protected String voltDescribe(Session session, int blanks) {
+
+        StringBuffer sb = new StringBuffer(64);
+        switch (opType) {
+
+            case OpTypes.COUNT :
+                sb.append(Tokens.T_COUNT);
+                break;
+
+            case OpTypes.SUM :
+                sb.append(Tokens.T_SUM);
+                break;
+
+            case OpTypes.MIN :
+                sb.append(Tokens.T_MIN);
+                break;
+
+            case OpTypes.MAX :
+                sb.append(Tokens.T_MAX);
+                break;
+
+            case OpTypes.AVG :
+                sb.append(Tokens.T_AVG);
+                break;
+
+            case OpTypes.EVERY :
+                sb.append(Tokens.T_EVERY);
+                break;
+
+            case OpTypes.SOME :
+                sb.append(Tokens.T_SOME);
+                break;
+
+            case OpTypes.STDDEV_POP :
+                sb.append(Tokens.T_STDDEV_POP);
+                break;
+
+            case OpTypes.STDDEV_SAMP :
+                sb.append(Tokens.T_STDDEV_SAMP);
+                break;
+
+            case OpTypes.VAR_POP :
+                sb.append(Tokens.T_VAR_POP);
+                break;
+
+            case OpTypes.VAR_SAMP :
+                sb.append(Tokens.T_VAR_SAMP);
+                break;
+
+            case OpTypes.SIMPLE_COLUMN:
+                sb.append("SIMPLE_COLUMN (Not an aggregate, eh?)");
+                break;
+
+            default:
+                sb.append(String.format("Unknown operator: %d", opType));
+                break;
+        }
+
+        if (getLeftNode() != null) {
+            sb.append(Expression.voltIndentStr(blanks + 4, true, false))
+              .append("arg = [")
+              .append(Expression.voltIndentStr(blanks + 6, true, false))
+              .append(nodes[LEFT].voltDescribe(session, blanks + 6))
+              .append(Expression.voltIndentStr(blanks + 4, true, false))
+              .append(']');
+        } else {
+            sb.append(Expression.voltIndentStr(blanks + 4, true, false))
+              .append("arg = []");
+        }
+
+        return sb.toString();
+    }
+
+    // End of VoltDB Extension
 }

@@ -342,7 +342,7 @@ public class HSQLInterface {
         }
         if (m_logger.isDebugEnabled()) {
             try {
-                m_logger.debug("HSQLDB: " + cs.describe(sessionProxy));
+                m_logger.debug("HSQLDB: " + cs.voltDescribe(sessionProxy, 0));
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -356,11 +356,15 @@ public class HSQLInterface {
 
         VoltXMLElement xml = cs.voltGetStatementXML(sessionProxy);
         if (m_logger.isDebugEnabled()) {
-            try {
-                m_logger.debug("VoltDB: " + xml.toString());
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
+           try {
+               /*
+                * Sometimes exceptions happen.
+                */
+               m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
+           } catch (Exception ex) {
+               System.out.printf("Exception: %s\n", ex.getMessage());
+               ex.printStackTrace(System.out);
+           }
         }
         // this releases some small memory hsql uses that builds up over time if not
         // cleared

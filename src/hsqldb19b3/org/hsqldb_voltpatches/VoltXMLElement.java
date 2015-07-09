@@ -79,29 +79,20 @@ public class VoltXMLElement {
         return sb.toString();
     }
 
-    private String indentStr(int indent) {
-        StringBuffer sb = new StringBuffer();
-        while (5 <= indent) {
-            sb.append("....|");
-            indent -= 5;
-        }
-        while (0 <= indent) {
-            sb.append(".");
-            indent -= 1;
-        }
-        return sb.toString();
-    }
-
     private void append(StringBuilder sb, int indent) {
-        sb.append(indentStr(indent)).append("ELEMENT: ").append(name).append("\n");
+        sb.append("ELEMENT: ").append(name);
         for (Entry<String, String> e : attributes.entrySet()) {
-            sb.append(indentStr(indent+2)).append(e.getKey());
-            sb.append(" = ").append(e.getValue()).append("\n");
+            sb.append(Expression.voltIndentStr(indent+2, true, false))
+              .append(e.getKey())
+              .append(" = ")
+              .append(e.getValue());
         }
         if ( ! children.isEmpty()) {
-            sb.append(indentStr(indent)).append("[").append("\n");
+            sb.append(Expression.voltIndentStr(indent, true, false))
+              .append("[");
             for (VoltXMLElement e : children) {
-                e.append(sb, indent+4);
+                sb.append(Expression.voltIndentStr(indent + 2, true, false));
+                e.append(sb, indent + 2);
             }
         }
     }

@@ -1266,7 +1266,7 @@ public class ExpressionColumn extends Expression {
                 rangeVariable.tableAlias != null &&
                 rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
             exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
-        } 
+        }
         else if (tableName != null) {
             exp.attributes.put("table", tableName.toUpperCase());
         }
@@ -1287,6 +1287,89 @@ public class ExpressionColumn extends Expression {
             exp.attributes.put("tablealias",  rangeVariable.tableAlias.name.toUpperCase());
         }
         return exp;
+    }
+    protected String voltDescribe(Session session, int blanks) {
+
+        StringBuffer sb = new StringBuffer(64);
+        switch (opType) {
+            case OpTypes.DEFAULT :
+                sb.append(Tokens.T_DEFAULT);
+                break;
+
+            case OpTypes.ASTERISK :
+                sb.append("OpTypes.ASTERISK ");
+                break;
+
+            case OpTypes.VARIABLE :
+                sb.append("VARIABLE: ");
+                if (column != null) {
+                    sb.append(column.getName().name);
+                } else {
+                    sb.append("<NO COLUMN>");
+                }
+                break;
+
+            case OpTypes.PARAMETER :
+                sb.append(Tokens.T_PARAMETER).append(": ");
+                if (column != null) {
+                    sb.append(column.getName().name);
+                } else {
+                    sb.append("<NO COLUMN>");
+                }
+                break;
+
+            case OpTypes.COALESCE :
+                sb.append(Tokens.T_COLUMN).append(": ");
+                if (columnName != null) {
+                    sb.append(columnName);
+                } else {
+                    sb.append("<NO COLUMN NAME>");
+                }
+
+                if (alias != null) {
+                    sb.append(" AS ").append(alias.name);
+                }
+                break;
+
+            case OpTypes.COLUMN :
+                sb.append(Tokens.T_COLUMN).append(": ");
+                if (column != null) {
+                    sb.append(column.getName().getSchemaQualifiedStatementName());
+                } else if (columnName != null) {
+                    sb.append(columnName);
+                } else {
+                    sb.append(" <NO COLUMN NAME>");
+                }
+                if (alias != null) {
+                    sb.append(" AS ").append(alias.name);
+                }
+                break;
+
+            case OpTypes.DYNAMIC_PARAM :
+                sb.append("DYNAMIC PARAM: ");
+                if (dataType != null) {
+                    sb.append(", TYPE = ").append(dataType.getNameString());
+                } else {
+                    sb.append("<NO DATA TYPE>");
+                }
+                break;
+
+            case OpTypes.SEQUENCE :
+                sb.append(Tokens.T_SEQUENCE).append(": ");
+                if (sequence != null) {
+                    sb.append(sequence.getName().name);
+                } else {
+                    sb.append("<NO SEQENCE>");
+                }
+                break;
+
+            case OpTypes.MULTICOLUMN :
+                // shouldn't get here
+                sb.append(String.format("OpTypes.MULTICOLUMN, table \"%s\", schema \"%s\"",
+                                        (tableName == null ? "<<No Table Name>>" : tableName),
+                                        (schema == null ? "<<No Schema>>" : schema)));
+        }
+        return sb.toString();
     }
     // End of VoltDB extension
 }

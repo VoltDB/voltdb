@@ -376,4 +376,16 @@ public final class ExpressionLike extends ExpressionLogical {
 
         return e;
     }
+    // A VoltDB extension to print HSQLDB ASTs
+    protected String voltDescribe(Session session, int blanks) {
+        if (likeObject == null) {
+            return super.describe(session, blanks);
+        }
+        StringBuffer sb = new StringBuffer(64);
+        sb.append("LIKE ");
+        sb.append(likeObject.voltDescribe(session, blanks + 2));
+        return sb.toString();
+    }
+    // End of VoltDB extension
+
 }

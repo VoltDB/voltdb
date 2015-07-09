@@ -198,4 +198,13 @@ public class ExpressionAccessor extends Expression {
 
         return sb.toString();
     }
+    // A VoltDB extension to print HSQLDB ASTs
+    protected String voltDescribe(Session session, int blanks) {
+
+        StringBuffer sb = new StringBuffer(64);
+        sb.append("ARRAY ACCESS");
+        voltDescribeArgs(session, blanks, sb);
+        return sb.toString();
+    }
+    // End of VoltDB extension
 }

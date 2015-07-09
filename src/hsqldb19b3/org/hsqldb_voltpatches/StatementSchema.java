@@ -1602,4 +1602,10 @@ public class StatementSchema extends Statement {
     public Object[] getArguments() {
         return arguments;
     }
+
+    // A VoltDB extension to print HSQLDB ASTs
+    public String voltDescribe(Session session, int blanks) {
+        return sql;
+    }
+    // end of VoltDB extension
 }
