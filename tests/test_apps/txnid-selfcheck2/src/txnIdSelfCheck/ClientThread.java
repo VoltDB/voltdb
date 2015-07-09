@@ -147,6 +147,7 @@ public class ClientThread extends BenchmarkThread {
                 expectedTables = 5;
                 break;
             }
+            
 
             byte[] payload = m_processor.generateForStore().getStoreValue();
 

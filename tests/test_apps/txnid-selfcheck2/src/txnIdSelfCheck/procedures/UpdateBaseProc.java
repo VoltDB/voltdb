@@ -214,6 +214,7 @@ public class UpdateBaseProc extends VoltProcedure {
                         " desc value " + desc +
                         " not equal to cid value " + cid);
             }
+            
             // make sure all cnt values are consecutive
             long cntValue = data.getLong("cnt");
             if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
