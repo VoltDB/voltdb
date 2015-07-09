@@ -25,16 +25,19 @@ namespace voltdb {
 static inline int memSizeForTupleSchema(uint16_t columnCount,
                                         uint16_t uninlineableObjectColumnCount,
                                         uint16_t hiddenColumnCount) {
-    // We must allocate enough memory for any data members plus
-    // enough for tupleCount + 1 "ColumnInfo" fields. We need CI+1
-    // because we get the length of a column by offset subtraction.
-    // Also allocate space for an int16_t for each uninlineable
-    // object column so that the indices of uninlineable columns can
-    // be stored at the front and aid in iteration.
+    // We must allocate enough memory for any data members plus enough
+    // for columnCount + hiddenColumnCount + 1 "ColumnInfo" fields.
+    // We use the last ColumnInfo object as a placeholder to store the
+    // offset of the end of a tuple (that is, the offset of the first
+    // byte after the tuple).
+    //
+    // Also allocate space for an int16_t for each uninlineable object
+    // column so that the indices of uninlineable columns can be
+    // stored at the front and aid in iteration.
     return static_cast<int>(sizeof(TupleSchema) +
                             (uninlineableObjectColumnCount * sizeof(int16_t)) +
                             (sizeof(TupleSchema::ColumnInfo) * (hiddenColumnCount +
-                                                                 columnCount + 1)));
+                                                                columnCount + 1)));
 }
 
 TupleSchema* TupleSchema::createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
@@ -99,12 +102,23 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnT
         retval->setColumnMetaData(ii, type, length, columnAllowNull, uninlinedObjectColumnIndex, inBytes);
     }
 
+    for (uint16_t ii = 0; ii < hiddenColumnCount; ++ii) {
+        const ValueType type = hiddenColumnTypes[ii];
+        const uint32_t length = hiddenColumnSizes[ii];
+        const bool columnAllowNull = hiddenAllowNull[ii];
+        const bool inBytes = hiddenColumnInBytes[ii];
+        retval->setColumnMetaData(static_cast<uint16_t>(columnCount + ii),
+                                  type,
+                                  length,
+                                  columnAllowNull,
+                                  uninlinedObjectColumnIndex,
+                                  inBytes);
+    }
+
     return retval;
 }
 
 TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *schema) {
-    // big enough for any data members plus big enough for tupleCount + 1 "ColumnInfo"
-    //  fields. We need CI+1 because we get the length of a column by offset subtraction
     int memSize = memSizeForTupleSchema(schema->m_columnCount,
                                         schema->m_uninlinedObjectColumnCount,
                                         schema->m_hiddenColumnCount);
@@ -112,7 +126,6 @@ TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *schema) {
     // allocate the set amount of memory and cast it to a tuple pointer
     TupleSchema *retval = reinterpret_cast<TupleSchema*>(new char[memSize]);
 
-    // clear all the offset values
     memcpy(retval, schema, memSize);
 
     return retval;
@@ -200,7 +213,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     uint32_t offset = 0;
 
     // set the type
-    ColumnInfo *columnInfo = getColumnInfo(index);
+    ColumnInfo *columnInfo = getColumnInfoInternal(index);
     columnInfo->type = static_cast<char>(type);
     columnInfo->allowNull = (char)(allowNull ? 1 : 0);
     columnInfo->length = length;
@@ -253,26 +266,44 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     // make the column offsets right for all columns past this one
     int oldsize = columnLengthPrivate(index);
     ColumnInfo *nextColumnInfo = NULL;
-    for (int i = index + 1; i <= m_columnCount; i++) {
-        nextColumnInfo = getColumnInfo(i);
+    for (int i = index + 1; i <= m_columnCount + m_hiddenColumnCount; i++) {
+        nextColumnInfo = getColumnInfoInternal(i);
         nextColumnInfo->offset = static_cast<uint32_t>(nextColumnInfo->offset + offset - oldsize);
     }
     assert(index == 0 ? columnInfo->offset == 0 : true);
 }
 
+std::string TupleSchema::ColumnInfo::debug() const {
+    std::ostringstream buffer;
+    buffer << "type = " << getTypeName(getVoltType()) << ", "
+           << "offset = " << offset << ", "
+           << "length = " << length << ", "
+           << "nullable = " << (allowNull ? "true" : "false") << ", "
+           << "isInlined = " << inlined;
+    return buffer.str();
+}
+
 std::string TupleSchema::debug() const {
     std::ostringstream buffer;
 
-    buffer << "Schema has " << columnCount() << " columns, length = " << tupleLength()
-           <<  ", uninlinedObjectColumns "  << m_uninlinedObjectColumnCount << std::endl;
+    buffer << "Schema has "
+           << columnCount() << " columns, "
+           << hiddenColumnCount() << " hidden columns, "
+           << "length = " << tupleLength() << ", "
+           <<  "uninlinedObjectColumns "  << m_uninlinedObjectColumnCount << std::endl;
 
     for (uint16_t i = 0; i < columnCount(); i++) {
         const TupleSchema::ColumnInfo *columnInfo = getColumnInfo(i);
-
-        buffer << " column " << i << ": type = " << getTypeName(columnInfo->getVoltType());
-        buffer << ", length = " << columnInfo->length << ", nullable = ";
-        buffer << (columnInfo->allowNull ? "true" : "false") << ", isInlined = " << columnInfo->inlined <<  std::endl;
+        buffer << " column " << i << ": " << columnInfo->debug() << std::endl;
     }
+
+    for (uint16_t i = 0; i < hiddenColumnCount(); i++) {
+        const TupleSchema::ColumnInfo *columnInfo = getHiddenColumnInfo(i);
+        buffer << " hidden column " << i << ": " << columnInfo->debug() << std::endl;
+    }
+
+    buffer << " terminator column info: "
+           << getColumnInfoInternal(m_columnCount + m_hiddenColumnCount)->debug() << std::endl;
 
     std::string ret(buffer.str());
     return ret;
