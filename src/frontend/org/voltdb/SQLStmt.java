@@ -49,11 +49,11 @@ public class SQLStmt {
         }
     }
 
-    // Used for uncompiled SQL.
+    // Used for non-compiled SQL.
     byte[] sqlText;
     String sqlTextStr;
     String joinOrder;
-    // hash of the sql string for determinism checks
+    // hash of the SQL string for determinism checks
     byte[] sqlCRC;
 
     byte statementParamJavaTypes[];
