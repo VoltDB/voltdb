@@ -248,6 +248,14 @@ public class ImportHandler {
     }
 
     /**
+     * Log debug message
+     * @param message
+     */
+    public void debug(String message) {
+        m_logger.debug(message);
+    }
+
+    /**
      * Log error message
      * @param message
      */

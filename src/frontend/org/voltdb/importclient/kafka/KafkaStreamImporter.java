@@ -17,7 +17,6 @@
 package org.voltdb.importclient.kafka;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import kafka.api.FetchRequestBuilder;
@@ -27,7 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import kafka.javaapi.consumer.SimpleConsumer;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -162,17 +161,25 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     }
 
     //This is called to get all available resources.
-    private Set<URI> buildTopicLeaderMetadata(SimpleConsumer simpleConsumer) {
+    private Set<URI> buildTopicLeaderMetadata(SimpleConsumer consumer) {
 
         //For all topics connect and get metadata.
         Set<URI> availableResources = new TreeSet<URI>();
         for (String topic : m_topicList) {
             List<String> topics = Collections.singletonList(topic);
             TopicMetadataRequest req = new TopicMetadataRequest(topics);
-            kafka.javaapi.TopicMetadataResponse resp = simpleConsumer.send(req);
+            kafka.javaapi.TopicMetadataResponse resp = null;
+            try {
+                resp = consumer.send(req);
+            } catch (Exception ex) {
+                m_es = Executors.newFixedThreadPool(availableResources.size() + 1);
+                error("Failed to send topic metada request for topics " + topics);
+                return availableResources;
+            }
 
             List<TopicMetadata> metaData = resp.topicsMetadata();
             if (metaData == null) {
+                m_es = Executors.newFixedThreadPool(availableResources.size() + 1);
                 return availableResources;
             }
             m_topicPartitionMetaData.put(topic, metaData);
@@ -301,7 +308,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final int m_consumerSocketTimeout;
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
-        private final Map<Long, TopicPartitionInvocationCallback> m_pendingCallbacksByOffset = new LinkedHashMap<Long, TopicPartitionInvocationCallback>();
+        private final TreeSet<Long> m_pendingOffsets = new TreeSet<Long>();
+        private final Map<Long, Long> m_seenOffset = new HashMap<Long, Long>();
         private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 500);
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private final TopicAndPartition m_topicAndPartition;
@@ -497,17 +505,37 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                m_pendingCallbacksByOffset.remove(m_offset);
-                //This message offset is already committed we just remove from pending and move on.
-                if (m_nextOffset < m_currentOffset.get()) {
+                if (m_pendingOffsets.first() != m_offset) {
+                    m_seenOffset.put(m_offset, m_nextOffset);
+                    m_pendingOffsets.remove(m_offset);
                     return;
                 }
-                if (commitOffset(m_nextOffset)) {
-                    //Update the offset to read to next offset.
-                    m_currentOffset.set(m_nextOffset);
+                m_pendingOffsets.remove(m_offset);
+                //If I am lowest in pending commit anything I have seen after me in sequence.
+                long commit = m_nextOffset;
+                while (true) {
+                    Long n2 = m_seenOffset.get(commit);
+                    if (n2 == null) {
+                        break;
+                    }
+                    commit = n2;
+                    m_seenOffset.remove(commit);
+                }
+                if (commitOffset(commit)) {
+                    //Now find any seen offsets greater than this and commit any
+                    m_currentOffset.set(commit);
                 }
             }
 
+        }
+
+        private int backoffSleep(int fetchFailedCount) {
+            try {
+                Thread.sleep(1000 * fetchFailedCount++);
+                if (fetchFailedCount > 10) fetchFailedCount = 1;
+            } catch (InterruptedException ie) {
+            }
+            return fetchFailedCount;
         }
 
         @Override
@@ -517,6 +545,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             try {
                 //Startwith the starting leader.
                 HostAndPort leaderBroker = m_leader;
+                int fetchFailedCount = 1;
                 while (!m_shutdown) {
                     if (consumer == null) {
                         consumer = new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
@@ -525,20 +554,23 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                     long currentFetchCount = 0;
                     //Build fetch request of we have a valid offset and not too many are pending.
-                    if (m_currentOffset.get() >= 0 && m_pendingCallbacksByOffset.size() < m_perTopicPendingLimit) {
+                    if (m_currentOffset.get() >= 0 && m_pendingOffsets.size() < m_perTopicPendingLimit) {
                         FetchRequest req = new FetchRequestBuilder().clientId(CLIENT_ID)
                                 .addFetch(m_topicAndPartition.topic(),
                                         m_topicAndPartition.partition(), m_currentOffset.get(), m_fetchSize)
                                 .build();
-                        FetchResponse fetchResponse = consumer.fetch(req);
+                        FetchResponse fetchResponse = null;
+                        try {
+                            fetchResponse = consumer.fetch(req);
+                        } catch (Exception ex) {
+                            error("Failed to fetch from " + m_topicAndPartition);
+                            fetchFailedCount = backoffSleep(fetchFailedCount);
+                        }
 
                         if (fetchResponse.hasError()) {
                             // Something went wrong!
                             short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
-                            try {
-                                Thread.sleep(1000);
-                            } catch (InterruptedException ie) {
-                            }
+                            fetchFailedCount = backoffSleep(fetchFailedCount);
                             error("Failed to fetch messages for " + m_topicAndPartition + " Code " + code);
                             if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                                 // We asked for an invalid offset. For simple case ask for the last element to reset
@@ -556,23 +588,26 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             info("Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
                             continue;
                         }
+                        fetchFailedCount = 1;
                         for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
                             long currentOffset = messageAndOffset.offset();
-                            if (currentOffset < m_currentOffset.get() || m_pendingCallbacksByOffset.containsKey(currentOffset)) {
-                                //info("Found an old offset: " + currentOffset + " Expecting: " + m_currentOffset.get());
+                            //if currentOffset is less means we have already pushed it and also check pending queue.
+                            if (currentOffset < m_currentOffset.get() || m_pendingOffsets.contains(currentOffset)) {
                                 continue;
                             }
                             ByteBuffer payload = messageAndOffset.message().payload();
 
                             byte[] bytes = new byte[payload.limit()];
                             payload.get(bytes);
-                            String line = new String(bytes);
+                            String line = new String(bytes, "UTF-8");
                             CSVInvocation invocation = new CSVInvocation(m_procedure, line);
                             TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition);
-                            m_pendingCallbacksByOffset.put(currentOffset, cb);
+                            m_pendingOffsets.add(currentOffset);
                             if (!callProcedure(cb, invocation)) {
+                                debug("Failed to process Invocation possibly bad data: " + line);
                                 m_currentOffset.set(messageAndOffset.nextOffset());
-                                m_pendingCallbacksByOffset.remove(currentOffset);
+                                m_pendingOffsets.remove(currentOffset);
+                                continue;
                             }
                             currentFetchCount++;
                         }
