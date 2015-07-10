@@ -162,12 +162,12 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     EXPECT_EQ(false, colInfo->inBytes);
 }
 
-TEST_F(TupleSchemaTest, EqualsAndCompatibleForCopy)
+TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
 {
     voltdb::TupleSchemaBuilder builder(3); // 3 visible columns
     builder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
     builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
-                             15,     // length
+                             64,     // length
                              true,   // allow nulls
                              false); // length not in bytes
     builder.setColumnAtIndex(2, VALUE_TYPE_TIMESTAMP);
@@ -176,7 +176,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForCopy)
     voltdb::TupleSchemaBuilder hiddenBuilder(3, 2); // 3 visible columns
     hiddenBuilder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
     hiddenBuilder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
-                             15,     // length
+                             64,     // length
                              true,   // allow nulls
                              false); // length not in bytes
     hiddenBuilder.setColumnAtIndex(2, VALUE_TYPE_TIMESTAMP);
@@ -194,7 +194,37 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForCopy)
     // different.
     EXPECT_FALSE(schema1->isCompatibleForMemcpy(schema2.get()));
     EXPECT_FALSE(schema2->isCompatibleForMemcpy(schema1.get()));
+    EXPECT_FALSE(schema1->equals(schema2.get()));
+    EXPECT_FALSE(schema2->equals(schema1.get()));
 
+    // Create another schema where the varchar column is longer (but
+    // still uninlined)
+    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 128);
+    ScopedSchema schema3(builder.build());
+
+    // Structural layout is the same
+    EXPECT_TRUE(schema1->isCompatibleForMemcpy(schema3.get()));
+    EXPECT_TRUE(schema3->isCompatibleForMemcpy(schema1.get()));
+
+    // But schemas are not equal due to length difference
+    EXPECT_FALSE(schema1->equals(schema3.get()));
+    EXPECT_FALSE(schema3->equals(schema1.get()));
+
+    // Now do a similar test comparing two schemas with hidden columns.
+    hiddenBuilder.setHiddenColumnAtIndex(0,
+                                         VALUE_TYPE_BIGINT,
+                                         8,
+                                         false); // nulls not allowed
+    ScopedSchema schema4(hiddenBuilder.build());
+
+    // Structural layout is the same
+    EXPECT_TRUE(schema2->isCompatibleForMemcpy(schema4.get()));
+    EXPECT_TRUE(schema4->isCompatibleForMemcpy(schema2.get()));
+
+    // But schemas are not equal due to difference in nullability in
+    // first hidden column.
+    EXPECT_FALSE(schema2->equals(schema4.get()));
+    EXPECT_FALSE(schema4->equals(schema2.get()));
 }
 
 int main() {

@@ -335,6 +335,7 @@ bool TupleSchema::isCompatibleForMemcpy(const TupleSchema *other) const
         return true;
     }
     if (other->m_columnCount != m_columnCount ||
+        other->m_hiddenColumnCount != m_hiddenColumnCount ||
         other->m_uninlinedObjectColumnCount != m_uninlinedObjectColumnCount ||
         other->tupleLength() != tupleLength()) {
         return false;
@@ -361,9 +362,9 @@ bool TupleSchema::equals(const TupleSchema *other) const
     }
 
     // Finally, rule out behavior differences.
-    for (int ii = 0; ii < m_columnCount; ii++) {
-        const ColumnInfo *columnInfo = getColumnInfo(ii);
-        const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
+    for (int ii = 0; ii < totalColumnCount(); ii++) {
+        const ColumnInfo *columnInfo = getColumnInfoPrivate(ii);
+        const ColumnInfo *ocolumnInfo = other->getColumnInfoPrivate(ii);
         if (columnInfo->allowNull != ocolumnInfo->allowNull) {
             return false;
         }
