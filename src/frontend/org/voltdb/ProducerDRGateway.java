@@ -74,5 +74,5 @@ public interface ProducerDRGateway {
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
      */
-    public void resetDR();
+    public void resetDRProducer();
 }

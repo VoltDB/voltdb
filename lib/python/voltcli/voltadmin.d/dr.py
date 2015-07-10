@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 def reset(runner):
-	status = runner.call_proc('@ResetDatabaseReplication', [], []).table(0).tuple(0).column_integer(0)
+	status = runner.call_proc('@ResetDR', [], []).table(0).tuple(0).column_integer(0)
 	if status == 0:
 		runner.info('Conversation log is reset.')
 	else:
