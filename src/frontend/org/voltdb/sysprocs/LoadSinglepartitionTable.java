@@ -67,27 +67,6 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      * @param table
      *            A VoltTable with schema matching tableName containing data to
      *            load.
-     * @return The number of rows modified.
-     * @throws VoltAbortException
-     */
-    public long run(SystemProcedureExecutionContext ctx,
-                    byte[] partitionParam,
-            String tableName, VoltTable table)
-            throws VoltAbortException {
-        return run(ctx,partitionParam,tableName,table,(byte) 0);
-    }
-
-    /**
-     * These parameters, with the exception of ctx, map to user provided values.
-     *
-     * @param ctx
-     *            Internal. Not a user-supplied parameter.
-     * @param partitionParam Partitioning parameter
-     * @param tableName
-     *            Name of persistent table receiving data.
-     * @param table
-     *            A VoltTable with schema matching tableName containing data to
-     *            load.
      * @param upsertMode
      *            True if using upsert instead of insert
      * @return The number of rows modified.

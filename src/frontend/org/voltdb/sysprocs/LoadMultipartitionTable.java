@@ -141,25 +141,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
      * @param table
      *            A VoltTable with schema matching tableName containing data to
      *            load.
-     * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}
-     * @throws VoltAbortException
-     */
-    public long run(SystemProcedureExecutionContext ctx,
-            String tableName, VoltTable table)
-            throws VoltAbortException {
-        return run(ctx,tableName,table,(byte) 0);
-    }
-
-    /**
-     * These parameters, with the exception of ctx, map to user provided values.
-     *
-     * @param ctx
-     *            Internal. Not a user-supplied parameter.
-     * @param tableName
-     *            Name of persistent table receiving data.
-     * @param table
-     *            A VoltTable with schema matching tableName containing data to
-     *            load.
      * @param upsertMode
      *            True if using upsert instead of insert
      * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}

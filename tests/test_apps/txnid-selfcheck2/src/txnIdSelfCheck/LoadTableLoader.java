@@ -263,7 +263,8 @@ public class LoadTableLoader extends BenchmarkThread {
 
     @Override
     public void run() {
-
+        // using insert for @Load*Table
+        byte upsertMode = (byte) 0;
         CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
         cdtask.start();
         try {
@@ -284,9 +285,9 @@ public class LoadTableLoader extends BenchmarkThread {
                         Object rpartitionParam
                                 = TheHashinator.valueToBytes(m_table.fetchRow(0).get(
                                                 m_partitionedColumnIndex, VoltType.BIGINT));
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, m_table);
+                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, m_table, upsertMode);
                     } else {
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, m_table);
+                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, m_table, upsertMode);
                     }
                     //Ad if successfully queued but remove if proc fails.
                     if (success) {

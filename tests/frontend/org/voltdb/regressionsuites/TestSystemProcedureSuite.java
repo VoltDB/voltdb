@@ -165,6 +165,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     }
 
     public void testLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
+        // using insert for @Load*Table
+        byte upsertMode = (byte) 0;
         Client client = getClient();
 
         /*
@@ -178,7 +180,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         // try the failure case first
         try {
-            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, 1);
+            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, 1, upsertMode);
             fail();
         } catch (ProcCallException ex) {}
 
@@ -229,11 +231,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         try {
             try {
                 client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
-                                 partitioned_table);
+                                 partitioned_table, upsertMode);
                 fail();
             } catch (ProcCallException e) {}
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
-                                 replicated_table);
+                                 replicated_table, upsertMode);
 
             // 20 rows per site for the replicated table.  Wait for it...
             int rowcount = 0;
