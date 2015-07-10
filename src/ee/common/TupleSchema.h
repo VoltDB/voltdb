@@ -38,6 +38,9 @@ namespace voltdb {
  * Represents the schema of a tuple or table row. Used to define table rows, as
  * well as index keys. Note: due to arbitrary size embedded array data, this class
  * cannot be created on the stack; all constructors are private.
+ *
+ * Consider using the helper class TupleSchemaBuilder to create
+ * TupleSchema objects.
  */
 class TupleSchema {
 public:
@@ -61,10 +64,12 @@ public:
     // This needs to keep in synch with the VoltType.MAX_VALUE_LENGTH defined in java.
     enum class_constants { COLUMN_MAX_VALUE_LENGTH = 1048576 };
 
-    /** Static factory method to create a TupleSchema object with a fixed number of columns */
-
-    static TupleSchema* createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
-            const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull);
+    /** Static factory method to create a TupleSchema a fixed number
+     *  of all visible columns */
+    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
+                                          const std::vector<int32_t>   columnSizes,
+                                          const std::vector<bool>      allowNull,
+                                          const std::vector<bool>      columnInBytes);
 
     /** Static factory method to create a TupleSchema that contains hidden columns */
     static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
@@ -76,16 +81,19 @@ public:
                                           const std::vector<bool>      hiddenAllowNull,
                                           const std::vector<bool>      hiddenColumnInBytes);
 
-    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
-                                          const std::vector<int32_t>   columnSizes,
-                                          const std::vector<bool>      allowNull,
-                                          const std::vector<bool>      columnInBytes);
-    /** Static factory method fakes a copy constructor */
+    /** A simplified factory method for ease of testing */
+    static TupleSchema* createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
+                                                 const std::vector<int32_t> columnSizes,
+                                                 const std::vector<bool> allowNull);
+
+    /** Static factory method fakes a copy constructor (will also
+     *  duplicate hidden columns) */
     static TupleSchema* createTupleSchema(const TupleSchema *schema);
 
     /**
      * Static factory method to create a TupleSchema object by copying the
      * specified columns of the given schema.
+     * (Hidden column will be omitted.)
      */
     static TupleSchema* createTupleSchema(const TupleSchema *schema,
                                           const std::vector<uint16_t> set);
@@ -97,6 +105,8 @@ public:
      *
      * This method has the same limitation that the number of columns of a
      * schema has to be less than or equal to 64.
+     *
+     * Hidden column will be omitted from the created schema.
      */
     static TupleSchema* createTupleSchema(const TupleSchema *first,
                                           const TupleSchema *second);
@@ -105,6 +115,8 @@ public:
      * Static factory method to create a TupleSchema object by including the
      * specified columns of the two given TupleSchema objects. The result
      * contains only those columns specified in the bitmasks.
+     *
+     * Hidden columns will be omitted from the created schema.
      */
     static TupleSchema* createTupleSchema(const TupleSchema *first,
                                           const std::vector<uint16_t> firstSet,
@@ -134,26 +146,32 @@ public:
      * column info array. */
     uint16_t getUninlinedObjectColumnInfoIndex(const int objectColumnIndex) const;
 
-    /* XXX: Should this take into account hidden columns? (probably) */
+    /** Returns true if other TupleSchema is equal to this one.  Both
+     *  visible and hidden columns must match for schemas to be
+     *  equal. */
     bool equals(const TupleSchema *other) const;
 
-    /* Number of columns and their data types must be the same.
-    * Ignores hidden columns. */
+    /* Returns true if number of columns and their data types are the
+     * same.  Ignores hidden columns. */
     bool isCompatibleForCopy(const TupleSchema *other) const;
 
+    /** Returns column info object for columnIndex-th (visible) column.  */
     const ColumnInfo* getColumnInfo(int columnIndex) const;
     ColumnInfo* getColumnInfo(int columnIndex);
 
+    /** Returns the value type for idx-th (visible) column.  */
     ValueType columnType(int idx) const {
         const TupleSchema::ColumnInfo *columnInfo = getColumnInfo(idx);
         return columnInfo->getVoltType();
     }
 
+    /** Returns the inlined-ness for idx-th (visible) column.  */
     bool columnIsInlined(int idx) const {
         const TupleSchema::ColumnInfo *columnInfo = getColumnInfo(idx);
         return columnInfo->inlined;
     }
 
+    /** Returns column info object for columnIndex-th hidden column.  */
     const ColumnInfo* getHiddenColumnInfo(int columnIndex) const;
     ColumnInfo* getHiddenColumnInfo(int columnIndex);
 
@@ -204,8 +222,11 @@ private:
      * Data storage for:
      *   - An array of int16_t, containing the 0-based ordinal position
      *       of each non-inlined column
-     *   - An array of ColumnInfo objects, one for each column
-     *       (both hidden and visible.  Hidden columns are last.)
+     *   - An array of ColumnInfo objects, in this order:
+     *       - normal, visible columns
+     *       - hidden columns (must be accessed via getHiddenColumnInfo)
+     *       - A terminating ColumnInfo containing the offset of the first byte
+     *         after the tuple (i.e., the tuple length)
      */
     char m_data[0];
 };
@@ -231,7 +252,7 @@ inline uint16_t TupleSchema::hiddenColumnCount() const {
 }
 
 inline uint16_t TupleSchema::totalColumnCount() const {
-    return m_columnCount + m_hiddenColumnCount;
+    return static_cast<uint16_t>(m_columnCount + m_hiddenColumnCount);
 }
 
 inline uint32_t TupleSchema::tupleLength() const {
