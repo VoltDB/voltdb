@@ -34,7 +34,7 @@ public class SnapshotStatus extends StatsSource {
     enum SNAPSHOT_TYPE {
         AUTO,
         MANUAL,
-        TRUNCATION
+        COMMANDLOG
     };
 
     private File m_truncationSnapshotPath = null;
@@ -48,7 +48,7 @@ public class SnapshotStatus extends StatsSource {
     private String getSnapshotType(String path) {
         File thisSnapshotPath = new File(path);
         if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
-            return SNAPSHOT_TYPE.TRUNCATION.name();
+            return SNAPSHOT_TYPE.COMMANDLOG.name();
         }
         else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
             return SNAPSHOT_TYPE.AUTO.name();
@@ -107,7 +107,6 @@ public class SnapshotStatus extends StatsSource {
         columns.add(new ColumnInfo("TABLE", VoltType.STRING));
         columns.add(new ColumnInfo("PATH", VoltType.STRING));
         columns.add(new ColumnInfo("FILENAME", VoltType.STRING));
-        columns.add(new ColumnInfo("TYPE", VoltType.STRING));
         columns.add(new ColumnInfo("NONCE", VoltType.STRING));
         columns.add(new ColumnInfo("TXNID", VoltType.BIGINT));
         columns.add(new ColumnInfo("START_TIME", VoltType.BIGINT));
@@ -116,6 +115,7 @@ public class SnapshotStatus extends StatsSource {
         columns.add(new ColumnInfo("DURATION", VoltType.BIGINT));
         columns.add(new ColumnInfo("THROUGHPUT", VoltType.FLOAT));
         columns.add(new ColumnInfo("RESULT", VoltType.STRING));
+        columns.add(new ColumnInfo("TYPE", VoltType.STRING));
     }
 
     @SuppressWarnings("unchecked")
@@ -136,7 +136,6 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("TABLE")] = t.name;
         rowValues[columnNameToIndex.get("PATH")] = s.path;
         rowValues[columnNameToIndex.get("FILENAME")] = t.filename;
-        rowValues[columnNameToIndex.get("TYPE")] = getSnapshotType(s.path);
         rowValues[columnNameToIndex.get("NONCE")] = s.nonce;
         rowValues[columnNameToIndex.get("TXNID")] = s.txnId;
         rowValues[columnNameToIndex.get("START_TIME")] = timeStarted;
@@ -145,6 +144,7 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("DURATION")] = duration;
         rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;
         rowValues[columnNameToIndex.get("RESULT")] = t.error == null ? "SUCCESS" : "FAILURE";
+        rowValues[columnNameToIndex.get("TYPE")] = getSnapshotType(s.path);
         super.updateStatsRow(rowKey, rowValues);
     }
 
