@@ -168,11 +168,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     @Override
-    public void setLock(Object o) {
-        super.setLock(o);
-    }
-
-    @Override
     public void setLeaderState(boolean isLeader)
     {
         super.setLeaderState(isLeader);
