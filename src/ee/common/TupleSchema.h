@@ -152,8 +152,8 @@ public:
     bool equals(const TupleSchema *other) const;
 
     /* Returns true if number of columns and their data types are the
-     * same.  Ignores hidden columns. */
-    bool isCompatibleForCopy(const TupleSchema *other) const;
+     * same.  Includes hidden columns. */
+    bool isCompatibleForMemcpy(const TupleSchema *other) const;
 
     /** Returns column info object for columnIndex-th (visible) column.  */
     const ColumnInfo* getColumnInfo(int columnIndex) const;
@@ -179,8 +179,11 @@ private:
 
     uint16_t totalColumnCount() const;
 
-    ColumnInfo* getColumnInfoInternal(int columnIndex);
-    const ColumnInfo* getColumnInfoInternal(int columnIndex) const;
+    /** These methods are like their public counterparts, but accepts
+     *  indexes >= m_columnCount, in order to access hidden columns or
+     *  the terminating ColumnInfo object. */
+    ColumnInfo* getColumnInfoPrivate(int columnIndex);
+    const ColumnInfo* getColumnInfoPrivate(int columnIndex) const;
 
     /*
      * Report the actual length in bytes of a column. For inlined strings this will include the two byte length prefix and null terminator.
@@ -237,8 +240,8 @@ private:
 
 inline uint32_t TupleSchema::columnLengthPrivate(const int index) const {
     assert(index < totalColumnCount());
-    const ColumnInfo *columnInfo = getColumnInfoInternal(index);
-    const ColumnInfo *columnInfoPlusOne = getColumnInfoInternal(index + 1);
+    const ColumnInfo *columnInfo = getColumnInfoPrivate(index);
+    const ColumnInfo *columnInfoPlusOne = getColumnInfoPrivate(index + 1);
     // calculate the real column length in raw bytes
     return static_cast<uint32_t>(columnInfoPlusOne->offset - columnInfo->offset);
 }
@@ -259,35 +262,35 @@ inline uint32_t TupleSchema::tupleLength() const {
     // index "m_columnCount + m_hiddenColumnCount" has the offset for the end of the tuple
     // index "m_columnCount + m_hiddenColumnCount - 1" has the offset for the last hidden column
     // index "m_columnCount - 1" has the offset for the last visible column
-    return getColumnInfoInternal(totalColumnCount())->offset;
+    return getColumnInfoPrivate(totalColumnCount())->offset;
 }
 
-inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfoInternal(int columnIndex) const {
+inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnIndex) const {
     return &reinterpret_cast<const ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];
 }
 
-inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfoInternal(int columnIndex) {
+inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnIndex) {
     return &reinterpret_cast<ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {
     assert(columnIndex < m_columnCount);
-    return getColumnInfoInternal(columnIndex);
+    return getColumnInfoPrivate(columnIndex);
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) {
     assert(columnIndex < m_columnCount);
-    return getColumnInfoInternal(columnIndex);
+    return getColumnInfoPrivate(columnIndex);
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) const {
     assert(hiddenColumnIndex < m_hiddenColumnCount);
-    return getColumnInfoInternal(m_columnCount + hiddenColumnIndex);
+    return getColumnInfoPrivate(m_columnCount + hiddenColumnIndex);
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) {
     assert(hiddenColumnIndex < m_hiddenColumnCount);
-    return getColumnInfoInternal(m_columnCount + hiddenColumnIndex);
+    return getColumnInfoPrivate(m_columnCount + hiddenColumnIndex);
 }
 
 inline uint16_t TupleSchema::getUninlinedObjectColumnCount() const { return m_uninlinedObjectColumnCount; }

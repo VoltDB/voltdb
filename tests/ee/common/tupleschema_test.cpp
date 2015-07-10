@@ -30,7 +30,9 @@
 using voltdb::TupleSchema;
 using voltdb::ValueType;
 using voltdb::VALUE_TYPE_BIGINT;
+using voltdb::VALUE_TYPE_DECIMAL;
 using voltdb::VALUE_TYPE_INTEGER;
+using voltdb::VALUE_TYPE_TIMESTAMP;
 using voltdb::VALUE_TYPE_VARCHAR;
 
 class TupleSchemaTest : public Test
@@ -158,6 +160,41 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     EXPECT_EQ(true, colInfo->allowNull);
     EXPECT_EQ(true, colInfo->inlined);
     EXPECT_EQ(false, colInfo->inBytes);
+}
+
+TEST_F(TupleSchemaTest, EqualsAndCompatibleForCopy)
+{
+    voltdb::TupleSchemaBuilder builder(3); // 3 visible columns
+    builder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
+    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
+                             15,     // length
+                             true,   // allow nulls
+                             false); // length not in bytes
+    builder.setColumnAtIndex(2, VALUE_TYPE_TIMESTAMP);
+    ScopedSchema schema1(builder.build());
+
+    voltdb::TupleSchemaBuilder hiddenBuilder(3, 2); // 3 visible columns
+    hiddenBuilder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
+    hiddenBuilder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
+                             15,     // length
+                             true,   // allow nulls
+                             false); // length not in bytes
+    hiddenBuilder.setColumnAtIndex(2, VALUE_TYPE_TIMESTAMP);
+
+    hiddenBuilder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
+    hiddenBuilder.setHiddenColumnAtIndex(1, VALUE_TYPE_VARCHAR, 10);
+
+    ScopedSchema schema2(hiddenBuilder.build());
+
+    ASSERT_NE(NULL, schema1.get());
+    ASSERT_NE(NULL, schema2.get());
+
+    // Table tuples whose schemas that differ only in hidden columns
+    // are not suitable for memcpy.  The tuple lengths will be
+    // different.
+    EXPECT_FALSE(schema1->isCompatibleForMemcpy(schema2.get()));
+    EXPECT_FALSE(schema2->isCompatibleForMemcpy(schema1.get()));
+
 }
 
 int main() {

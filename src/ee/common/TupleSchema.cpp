@@ -40,6 +40,20 @@ static inline int memSizeForTupleSchema(uint16_t columnCount,
                                                                 columnCount + 1)));
 }
 
+static inline bool isInlineable(ValueType vt, int32_t length, bool inBytes) {
+    if (vt == VALUE_TYPE_VARCHAR || vt == VALUE_TYPE_VARBINARY) {
+
+        if (vt == VALUE_TYPE_VARBINARY || inBytes) {
+            return length < UNINLINEABLE_OBJECT_LENGTH;
+        }
+
+        // must be a VARCHAR field without inBytes flag set
+        return length < UNINLINEABLE_CHARACTER_LENGTH;
+    }
+
+    return true;
+}
+
 TupleSchema* TupleSchema::createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
                                             const std::vector<int32_t> columnSizes,
                                             const std::vector<bool> allowNull)
@@ -107,6 +121,12 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnT
         const uint32_t length = hiddenColumnSizes[ii];
         const bool columnAllowNull = hiddenAllowNull[ii];
         const bool inBytes = hiddenColumnInBytes[ii];
+
+        // We can't allow uninlineable data in hidden columns yet
+        if (! isInlineable(type, length, inBytes)) {
+            throwFatalLogicErrorStreamed("Attempt to create uninlineable hidden column");
+        }
+
         retval->setColumnMetaData(static_cast<uint16_t>(columnCount + ii),
                                   type,
                                   length,
@@ -213,7 +233,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     uint32_t offset = 0;
 
     // set the type
-    ColumnInfo *columnInfo = getColumnInfoInternal(index);
+    ColumnInfo *columnInfo = getColumnInfoPrivate(index);
     columnInfo->type = static_cast<char>(type);
     columnInfo->allowNull = (char)(allowNull ? 1 : 0);
     columnInfo->length = length;
@@ -267,7 +287,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     int oldsize = columnLengthPrivate(index);
     ColumnInfo *nextColumnInfo = NULL;
     for (int i = index + 1; i <= totalColumnCount(); i++) {
-        nextColumnInfo = getColumnInfoInternal(i);
+        nextColumnInfo = getColumnInfoPrivate(i);
         nextColumnInfo->offset = static_cast<uint32_t>(nextColumnInfo->offset + offset - oldsize);
     }
     assert(index == 0 ? columnInfo->offset == 0 : true);
@@ -303,13 +323,13 @@ std::string TupleSchema::debug() const {
     }
 
     buffer << " terminator column info: "
-           << getColumnInfoInternal(totalColumnCount())->debug() << std::endl;
+           << getColumnInfoPrivate(totalColumnCount())->debug() << std::endl;
 
     std::string ret(buffer.str());
     return ret;
 }
 
-bool TupleSchema::isCompatibleForCopy(const TupleSchema *other) const
+bool TupleSchema::isCompatibleForMemcpy(const TupleSchema *other) const
 {
     if (this == other) {
         return true;
@@ -320,9 +340,9 @@ bool TupleSchema::isCompatibleForCopy(const TupleSchema *other) const
         return false;
     }
 
-    for (int ii = 0; ii < m_columnCount; ii++) {
-        const ColumnInfo *columnInfo = getColumnInfo(ii);
-        const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
+    for (int ii = 0; ii < totalColumnCount(); ii++) {
+        const ColumnInfo *columnInfo = getColumnInfoPrivate(ii);
+        const ColumnInfo *ocolumnInfo = other->getColumnInfoPrivate(ii);
         if (columnInfo->offset != ocolumnInfo->offset ||
                 columnInfo->type != ocolumnInfo->type ||
                 columnInfo->inlined != ocolumnInfo->inlined) {
@@ -336,9 +356,10 @@ bool TupleSchema::isCompatibleForCopy(const TupleSchema *other) const
 bool TupleSchema::equals(const TupleSchema *other) const
 {
     // First check for structural equality.
-    if ( ! isCompatibleForCopy(other)) {
+    if ( ! isCompatibleForMemcpy(other)) {
         return false;
     }
+
     // Finally, rule out behavior differences.
     for (int ii = 0; ii < m_columnCount; ii++) {
         const ColumnInfo *columnInfo = getColumnInfo(ii);
