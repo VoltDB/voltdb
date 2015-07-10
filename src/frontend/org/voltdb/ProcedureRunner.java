@@ -1476,9 +1476,11 @@ public class ProcedureRunner {
                    m_txnState.uniqueId,
                    m_isReadOnly);
        } catch (SQLException ex) {
-           m_spBatchHadException = true;
-           // roll back the current batch and re-throw the EE exception
-           m_site.truncateUndoLog(true, m_site.getLatestUndoToken(), m_txnState.m_spHandle, null);
+           if (! m_isReadOnly) {
+               m_spBatchHadException = true;
+               // roll back the current batch and re-throw the EE exception
+               m_site.truncateUndoLog(true, m_site.getLatestUndoToken(), m_txnState.m_spHandle, null);
+           }
 
            throw ex;
        }
