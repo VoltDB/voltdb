@@ -28,6 +28,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.rejoin.TaskLog;
 
@@ -152,6 +153,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     public void setLock(Object o) {
         m_lock = o;
+    }
+
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
+        // Durability Listeners should never be assigned to the MP Scheduler
+        assert false;
     }
 
     /**

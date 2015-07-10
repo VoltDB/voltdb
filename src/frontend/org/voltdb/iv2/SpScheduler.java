@@ -46,7 +46,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
-import org.voltdb.iv2.SpDurabilityListener.CompletionChecks;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -169,11 +168,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     @Override
-    public void setLock(Object o) {
-        super.setLock(o);
-    }
-
-    @Override
     public void setLeaderState(boolean isLeader)
     {
         super.setLeaderState(isLeader);
@@ -187,13 +181,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
+    @Override
     public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
         m_durabilityListener.setUniqueIdListener(listener);
-        // If command logging is disabled, we need to notify the listener right
-        // away that all uniqueIds are considered durable
-        if (m_cl != null && !m_cl.isEnabled()) {
-            listener.lastUniqueIdsMadeDurable(Long.MAX_VALUE, Long.MAX_VALUE);
-        }
     }
 
     public void setDRGateway(PartitionDRGateway gateway)
@@ -1046,7 +1036,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         return new CountDownLatch(0);
     }
 
-    public void processDurabilityChecks(final CompletionChecks currentChecks) {
+    public void processDurabilityChecks(final CommandLog.CompletionChecks currentChecks) {
         final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
             @Override
             void run() {

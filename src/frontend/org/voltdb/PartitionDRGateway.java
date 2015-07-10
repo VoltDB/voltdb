@@ -28,7 +28,6 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
@@ -231,6 +230,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                 }
 
             }
+            buf.order(ByteOrder.BIG_ENDIAN);
         }
 
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
