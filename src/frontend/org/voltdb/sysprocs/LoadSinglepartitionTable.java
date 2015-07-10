@@ -28,9 +28,11 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.types.ConstraintType;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,
@@ -91,8 +93,25 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
                             tableName));
         }
 
+        boolean isUpsert = (upsertMode != 0);
+
+        if (isUpsert) {
+            boolean hasPkey = false;
+            for (Constraint c : catTable.getConstraints()) {
+                if (c.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
+                    hasPkey = true;
+                    break;
+                }
+            }
+            if (!hasPkey) {
+                throw new VoltAbortException(
+                        String.format("LoadSinglepartitionTable in upsert mode is incompatible with table %s. with no primary key",
+                                tableName));
+            }
+        }
+
         // action should be either "insert" or "upsert"
-        final String action = (upsertMode != 0 ? "upsert" :"insert");
+        final String action = (isUpsert ? "upsert" :"insert");
 
         // fix any case problems
         tableName = catTable.getTypeName();

@@ -29,10 +29,12 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.types.ConstraintType;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,
@@ -159,14 +161,32 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         if (catTable == null) {
             throw new VoltAbortException("Table not present in catalog.");
         }
+
+        boolean isUpsert = (upsertMode != 0);
+
+        if (isUpsert) {
+            boolean hasPkey = false;
+            for (Constraint c : catTable.getConstraints()) {
+                if (c.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
+                    hasPkey = true;
+                    break;
+                }
+            }
+            if (!hasPkey) {
+                throw new VoltAbortException(
+                        String.format("LoadSinglepartitionTable in upsert mode is incompatible with table %s. with no primary key",
+                                tableName));
+            }
+        }
+
+        // action should be either "insert" or "upsert"
+        final String action = (isUpsert ? "upsert" :"insert");
+
         // fix any case problems
         tableName = catTable.getTypeName();
 
         // check that the schema of the input matches
         int columnCount = table.getColumnCount();
-
-        // action should be either "insert" or "upsert"
-        final String action = (upsertMode != 0 ? "upsert" :"insert");
 
         // find the insert statement for this table
         String insertProcName = String.format("%s.%s", tableName.toUpperCase(),action);
