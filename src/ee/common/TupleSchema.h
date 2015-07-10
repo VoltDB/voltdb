@@ -159,6 +159,8 @@ public:
 
 private:
 
+    uint16_t totalColumnCount() const;
+
     ColumnInfo* getColumnInfoInternal(int columnIndex);
     const ColumnInfo* getColumnInfoInternal(int columnIndex) const;
 
@@ -213,7 +215,7 @@ private:
 ///////////////////////////////////
 
 inline uint32_t TupleSchema::columnLengthPrivate(const int index) const {
-    assert(index < m_columnCount + m_hiddenColumnCount);
+    assert(index < totalColumnCount());
     const ColumnInfo *columnInfo = getColumnInfoInternal(index);
     const ColumnInfo *columnInfoPlusOne = getColumnInfoInternal(index + 1);
     // calculate the real column length in raw bytes
@@ -228,11 +230,15 @@ inline uint16_t TupleSchema::hiddenColumnCount() const {
     return m_hiddenColumnCount;
 }
 
+inline uint16_t TupleSchema::totalColumnCount() const {
+    return m_columnCount + m_hiddenColumnCount;
+}
+
 inline uint32_t TupleSchema::tupleLength() const {
     // index "m_columnCount + m_hiddenColumnCount" has the offset for the end of the tuple
     // index "m_columnCount + m_hiddenColumnCount - 1" has the offset for the last hidden column
     // index "m_columnCount - 1" has the offset for the last visible column
-    return getColumnInfoInternal(m_columnCount + m_hiddenColumnCount)->offset;
+    return getColumnInfoInternal(totalColumnCount())->offset;
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfoInternal(int columnIndex) const {

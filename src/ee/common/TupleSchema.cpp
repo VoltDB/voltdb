@@ -266,7 +266,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     // make the column offsets right for all columns past this one
     int oldsize = columnLengthPrivate(index);
     ColumnInfo *nextColumnInfo = NULL;
-    for (int i = index + 1; i <= m_columnCount + m_hiddenColumnCount; i++) {
+    for (int i = index + 1; i <= totalColumnCount(); i++) {
         nextColumnInfo = getColumnInfoInternal(i);
         nextColumnInfo->offset = static_cast<uint32_t>(nextColumnInfo->offset + offset - oldsize);
     }
@@ -303,7 +303,7 @@ std::string TupleSchema::debug() const {
     }
 
     buffer << " terminator column info: "
-           << getColumnInfoInternal(m_columnCount + m_hiddenColumnCount)->debug() << std::endl;
+           << getColumnInfoInternal(totalColumnCount())->debug() << std::endl;
 
     std::string ret(buffer.str());
     return ret;
