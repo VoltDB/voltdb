@@ -39,6 +39,9 @@ class TupleSchemaTest : public Test
 {
 };
 
+// A class to automatically free TupleSchema instances, which cannot
+// be allocated on the stack due to variable-length data that follows
+// each instance.  Modeled after boost::scoped_ptr.
 class ScopedSchema {
 public:
     ScopedSchema(TupleSchema* schema)

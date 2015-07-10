@@ -26,9 +26,20 @@
 
 namespace voltdb {
 
+/** A helper class to create TupleSchema objects.
+ * Example:
+ *
+ *   TupleSchemaBuilder builder(3); // 3 columns
+ *   builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
+ *   builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 32);
+ *   builder.setColumnAtIndex(2, VALUE_TYPE_INTEGER);
+ *   TupleSchema *schema = builder.build();
+ */
 class TupleSchemaBuilder {
 public:
 
+    /** Create a builder that will build a schema with the given
+     * number of columns. */
     explicit TupleSchemaBuilder(size_t numCols)
         : m_types(numCols)
         , m_sizes(numCols)
@@ -41,6 +52,8 @@ public:
     {
     }
 
+    /** Create a builder that will build a schema with the given
+     * number of columns and hidden columns. */
     TupleSchemaBuilder(size_t numCols, size_t numHiddenCols)
         : m_types(numCols)
         , m_sizes(numCols)
@@ -53,6 +66,8 @@ public:
     {
     }
 
+    /** Set the attributes of the index-th column for the schema to be
+     *  built. */
     void setColumnAtIndex(size_t index,
                           ValueType valueType,
                           int32_t colSize,
@@ -65,6 +80,41 @@ public:
         m_allowNullFlags[index] = allowNull;
         m_inBytesFlags[index] = inBytes;
     }
+
+    /** Set the attributes of the index-th hidden column for the
+     *  schema to be built. */
+    void setHiddenColumnAtIndex(size_t index,
+                                ValueType valueType,
+                                int32_t colSize,
+                                bool allowNull,
+                                bool inBytes)
+    {
+        assert(index < m_hiddenTypes.size());
+        m_hiddenTypes[index] = valueType;
+        m_hiddenSizes[index] = colSize;
+        m_hiddenAllowNullFlags[index] = allowNull;
+        m_hiddenInBytesFlags[index] = inBytes;
+    }
+
+    /** Finally, build the schema with the attributes specified. */
+    TupleSchema* build() const
+    {
+        return TupleSchema::createTupleSchema(m_types,
+                                              m_sizes,
+                                              m_allowNullFlags,
+                                              m_inBytesFlags,
+                                              m_hiddenTypes,
+                                              m_hiddenSizes,
+                                              m_hiddenAllowNullFlags,
+                                              m_hiddenInBytesFlags);
+    }
+
+    /* Below are convenience methods for setting column attributes,
+     * with reasonable defaults:
+     *   - Size attribute is implied for non-variable-length types
+     *   - nullability is true by default
+     *   - inBytes flag is false by default
+     */
 
     void setColumnAtIndex(size_t index,
                           ValueType valueType,
@@ -106,19 +156,6 @@ public:
     void setHiddenColumnAtIndex(size_t index,
                                 ValueType valueType,
                                 int32_t colSize,
-                                bool allowNull,
-                                bool inBytes)
-    {
-        assert(index < m_hiddenTypes.size());
-        m_hiddenTypes[index] = valueType;
-        m_hiddenSizes[index] = colSize;
-        m_hiddenAllowNullFlags[index] = allowNull;
-        m_hiddenInBytesFlags[index] = inBytes;
-    }
-
-    void setHiddenColumnAtIndex(size_t index,
-                                ValueType valueType,
-                                int32_t colSize,
                                 bool allowNull)
     {
         setHiddenColumnAtIndex(index,
@@ -152,18 +189,6 @@ public:
                                NValue::getTupleStorageSize(valueType),
                                true,    // allow nulls
                                false);  // size not in bytes
-    }
-
-    TupleSchema* build() const
-    {
-        return TupleSchema::createTupleSchema(m_types,
-                                              m_sizes,
-                                              m_allowNullFlags,
-                                              m_inBytesFlags,
-                                              m_hiddenTypes,
-                                              m_hiddenSizes,
-                                              m_hiddenAllowNullFlags,
-                                              m_hiddenInBytesFlags);
     }
 
 private:
