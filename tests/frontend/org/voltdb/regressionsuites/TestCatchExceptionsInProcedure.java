@@ -144,6 +144,7 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
                 hasFollowingBatch, followingBatchHasException, expected);
     }
 
+    public static double prev = 0.1;
     public void testSPCatchException() throws IOException, ProcCallException {
         System.out.println("test testSPCatchException...");
         Client client = getClient();
@@ -157,11 +158,11 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
         spSingleTryCatchChecker(client, 0, 1, 1, 1, new double[]{});
 
         // has previous batch
-        spSingleTryCatchChecker(client, 1, 0, 0, 0, new double[]{0.1, 1.1});
-        spSingleTryCatchChecker(client, 1, 0, 1, 0, new double[]{0.1, 1.1, 3.1});
+        spSingleTryCatchChecker(client, 1, 0, 0, 0, new double[]{prev, 1.1});
+        spSingleTryCatchChecker(client, 1, 0, 1, 0, new double[]{prev, 1.1, 3.1});
         spSingleTryCatchChecker(client, 1, 0, 1, 1, new double[]{});
-        spSingleTryCatchChecker(client, 1, 1, 0, 0, new double[]{0.1});
-        spSingleTryCatchChecker(client, 1, 1, 1, 0, new double[]{0.1, 3.1});
+        spSingleTryCatchChecker(client, 1, 1, 0, 0, new double[]{prev});
+        spSingleTryCatchChecker(client, 1, 1, 1, 0, new double[]{prev, 3.1});
         spSingleTryCatchChecker(client, 1, 1, 1, 1, new double[]{});
     }
 
@@ -203,22 +204,83 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
 
 
         // has previous batch
-        double prv = 0.1;
-        spMultiTryCatchChecker(client, 1, 0, 0, 0, 0, new double[]{prv, 1.1, 2.1});
+        spMultiTryCatchChecker(client, 1, 0, 0, 0, 0, new double[]{prev, 1.1, 2.1});
         spMultiTryCatchChecker(client, 1, 1, 1, 1, 1, new double[]{});
 
-        spMultiTryCatchChecker(client, 1, 1, 0, 0, 0, new double[]{prv, 2.1});
-        spMultiTryCatchChecker(client, 1, 0, 1, 0, 0, new double[]{prv, 1.1});
-        spMultiTryCatchChecker(client, 1, 0, 0, 1, 0, new double[]{prv, 1.1, 2.1, 3.1});
+        spMultiTryCatchChecker(client, 1, 1, 0, 0, 0, new double[]{prev, 2.1});
+        spMultiTryCatchChecker(client, 1, 0, 1, 0, 0, new double[]{prev, 1.1});
+        spMultiTryCatchChecker(client, 1, 0, 0, 1, 0, new double[]{prev, 1.1, 2.1, 3.1});
 
-        spMultiTryCatchChecker(client, 1, 1, 1, 0, 0, new double[]{prv});
-        spMultiTryCatchChecker(client, 1, 1, 0, 1, 0, new double[]{prv, 2.1, 3.1});
-        spMultiTryCatchChecker(client, 1, 0, 1, 1, 0, new double[]{prv, 1.1, 3.1});
+        spMultiTryCatchChecker(client, 1, 1, 1, 0, 0, new double[]{prev});
+        spMultiTryCatchChecker(client, 1, 1, 0, 1, 0, new double[]{prev, 2.1, 3.1});
+        spMultiTryCatchChecker(client, 1, 0, 1, 1, 0, new double[]{prev, 1.1, 3.1});
         spMultiTryCatchChecker(client, 1, 0, 0, 1, 1, new double[]{});
 
-        spMultiTryCatchChecker(client, 1, 1, 1, 1, 0, new double[]{prv, 3.1});
+        spMultiTryCatchChecker(client, 1, 1, 1, 1, 0, new double[]{prev, 3.1});
         spMultiTryCatchChecker(client, 1, 1, 0, 1, 1, new double[]{});
         spMultiTryCatchChecker(client, 1, 0, 1, 1, 1, new double[]{});
+    }
+
+    private void bigBatchChecker(Client client, int hasPreviousBatch, int duplicatedID,
+            int hasFollowingBatch, int followingBatchHasException,
+            double[] expected, int tableCount)
+        throws NoConnectionsException, IOException, ProcCallException {
+
+        VoltTable vt;
+        String sql;
+        try {
+            // use the default value for partition column to route this procedure
+            vt = client.callProcedure("SPBigBatchOnPartitionTable", 0,
+                    hasPreviousBatch, duplicatedID,
+                    hasFollowingBatch, followingBatchHasException).getResults()[0];
+            if (isTrue(followingBatchHasException)) {
+                assertTrue(isTrue(hasFollowingBatch));
+                fail("Expected failure but succeeded.");
+            }
+            // validate returned value from the procedure calls
+            validateRowOfLongs(vt, new long[]{duplicatedID > BIGBATCHTESTSIZE ? 0: -1});
+        } catch(Exception e) {
+            assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(e.getMessage().contains("500.2")); // violated at row (3, 3.2)
+            assertTrue(isTrue(hasFollowingBatch) && isTrue(followingBatchHasException));
+        }
+
+        sql = "select distinct ratio from P1 order by 1; ";
+        validateTableColumnOfScalarFloat(client, sql, expected);
+
+        sql = "select count(*) from P1; ";
+        validateTableOfScalarLongs(client, sql, new long[]{tableCount});
+
+        client.callProcedure("@AdHoc", "truncate table P1");
+    }
+    private static final int BIGBATCHTESTSIZE = 300;
+
+    public void testBigBatchException() throws IOException, ProcCallException {
+        System.out.println("test testBigBatchException...");
+        Client client = getClient();
+
+        int[] duplicates = {123, 200, 201, 256, 300};
+        for (int dup: duplicates) {
+            // exception in the first 200 batch
+            bigBatchChecker(client, 0, dup, 0, 0, new double[]{}, 0);
+            bigBatchChecker(client, 0, dup, 1, 0, new double[]{500.1}, 1);
+            bigBatchChecker(client, 0, dup, 1, 1, new double[]{}, 0);
+            bigBatchChecker(client, 1, dup, 0, 0, new double[]{prev}, 1);
+            bigBatchChecker(client, 1, dup, 1, 0, new double[]{prev, 500.1}, 2);
+            bigBatchChecker(client, 1, dup, 1, 1, new double[]{}, 0);
+        }
+
+        // exception in the second 200 batch
+        int[] noDuplicates = {350, 400, 450};
+        for (int noDup: noDuplicates) {
+            // exception in the first 200 batch
+            bigBatchChecker(client, 0, noDup, 0, 0, new double[]{10.1}, BIGBATCHTESTSIZE);
+            bigBatchChecker(client, 0, noDup, 1, 0, new double[]{10.1, 500.1}, BIGBATCHTESTSIZE+1);
+            bigBatchChecker(client, 0, noDup, 1, 1, new double[]{}, 0);
+            bigBatchChecker(client, 1, noDup, 0, 0, new double[]{prev, 10.1}, BIGBATCHTESTSIZE+1);
+            bigBatchChecker(client, 1, noDup, 1, 0, new double[]{prev, 10.1, 500.1}, BIGBATCHTESTSIZE+2);
+            bigBatchChecker(client, 1, noDup, 1, 1, new double[]{}, 0);
+        }
     }
 
     public TestCatchExceptionsInProcedure(String name) {
@@ -229,7 +291,8 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
         org.voltdb_testprocs.regressionsuites.catchexceptions.MPInsertOnReplicatedTable.class,
         org.voltdb_testprocs.regressionsuites.catchexceptions.SPInsertOnPartitionTable.class,
         org.voltdb_testprocs.regressionsuites.catchexceptions.MPInsertOnPartitionTable.class,
-        org.voltdb_testprocs.regressionsuites.catchexceptions.SPMultipleTryCatchOnPartitionTable.class
+        org.voltdb_testprocs.regressionsuites.catchexceptions.SPMultipleTryCatchOnPartitionTable.class,
+        org.voltdb_testprocs.regressionsuites.catchexceptions.SPBigBatchOnPartitionTable.class
         };
 
     static public junit.framework.Test suite() {

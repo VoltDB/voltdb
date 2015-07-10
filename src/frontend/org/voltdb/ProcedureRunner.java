@@ -145,7 +145,7 @@ public class ProcedureRunner {
     protected int m_batchIndex;
 
     /** boolean flag to mark whether the previous batch execution has EE exception or not.*/
-    private boolean m_spBatchHadException = false;
+    private long m_spBigBatchBeginToken = -100L;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -717,6 +717,10 @@ public class ProcedureRunner {
             }
             // otherwise, break it into sub-batches
             else {
+                if (! m_isReadOnly) {
+                    // increase 1 here to mark the next executing undo token
+                    m_spBigBatchBeginToken = m_site.getLatestUndoToken() + 1;
+                }
                 List<VoltTable[]> results = new ArrayList<VoltTable[]>();
 
                 while (m_batch.size() > 0) {
@@ -1477,9 +1481,10 @@ public class ProcedureRunner {
                    m_isReadOnly);
        } catch (SQLException ex) {
            if (! m_isReadOnly) {
-               m_spBatchHadException = true;
                // roll back the current batch and re-throw the EE exception
-               m_site.truncateUndoLog(true, m_site.getLatestUndoToken(), m_txnState.m_spHandle, null);
+               m_site.truncateUndoLog(true,
+                       m_spBigBatchBeginToken >= 0 ? m_spBigBatchBeginToken: m_site.getLatestUndoToken(),
+                       m_txnState.m_spHandle, null);
            }
 
            throw ex;
