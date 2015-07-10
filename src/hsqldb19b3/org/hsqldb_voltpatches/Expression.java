@@ -2195,9 +2195,16 @@ public class Expression implements Cloneable {
         prototypes.put(OpTypes.DYNAMIC_PARAM, (new VoltXMLElement("value")).withValue("isparam", "true")); // param
         prototypes.put(OpTypes.ASTERISK,      new VoltXMLElement("asterisk"));
         prototypes.put(OpTypes.SEQUENCE,      null); // not yet supported sequence type
-        prototypes.put(OpTypes.SCALAR_SUBQUERY,null); // not yet supported subquery feature, query based row/table
-        prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
-        prototypes.put(OpTypes.TABLE_SUBQUERY,new VoltXMLElement("tablesubquery"));
+        /*
+         * A ROW_SUBQUERY is a subquery which is expected to return a single,
+         * multicolumn row.  A TABLE_SUBQUERY is an unrestricted subquery.  A
+         * single column, single row query is a SCALAR_SUBQUERY.  We treat them
+         * all roughly interchangeably here, but we will add an attribute which
+         * the planner could use if it wanted to.
+         */
+        prototypes.put(OpTypes.SCALAR_SUBQUERY,new VoltXMLElement("tablesubquery").withValue("subquerytype", "scalar"));
+        prototypes.put(OpTypes.ROW_SUBQUERY,  new VoltXMLElement("tablesubquery").withValue("subquerytype", "row"));
+        prototypes.put(OpTypes.TABLE_SUBQUERY,new VoltXMLElement("tablesubquery").withValue("subquerytype", "table"));
         prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
         prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table"));
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
@@ -2278,14 +2285,14 @@ public class Expression implements Cloneable {
     VoltXMLElement voltGetXML(Session session)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        return voltGetXML(session, null, null, -1, null, new ExpressionColumn[0]);
+        return voltGetXML(session, null, null, -1);
     }
 
     VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
             java.util.Set<Integer> ignoredDisplayColIndexes, int startKey)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        return voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, null, new ExpressionColumn[0]);
+        return voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, null);
     }
 
     /**
@@ -2297,8 +2304,7 @@ public class Expression implements Cloneable {
      * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
-            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias,
-            ExpressionColumn parameters[])
+            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias)
         throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
@@ -2340,16 +2346,11 @@ public class Expression implements Cloneable {
                         // serialize the column this simple column stands-in for.
                         // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
                         // quit seeking simple_column's replacement.
-                        return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias(), parameters);
+                        return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
                     }
                 }
                 assert(false);
             }
-        } else if (exprOp == OpTypes.ROW_SUBQUERY) {
-            VoltXMLElement subquery = new VoltXMLElement("tablesubquery");
-            VoltXMLElement subqueryselect = StatementDMQL.voltGetXMLExpression(table.queryExpression, parameters, session);
-            subquery.children.add(subqueryselect);
-            return subquery;
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct
@@ -2395,7 +2396,7 @@ public class Expression implements Cloneable {
         for (Expression expr : exportedNodes) {
             if (expr != null) {
                 VoltXMLElement vxmle = expr.voltGetXML(session,
-                        displayCols, ignoredDisplayColIndexes, startKey, null, parameters);
+                        displayCols, ignoredDisplayColIndexes, startKey, null);
                 exp.children.add(vxmle);
                 assert(vxmle != null);
             }
@@ -2506,12 +2507,14 @@ public class Expression implements Cloneable {
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
+        case OpTypes.SCALAR_SUBQUERY:
+        case OpTypes.ROW_SUBQUERY:
         case OpTypes.TABLE_SUBQUERY:
             if (table == null || table.queryExpression == null) {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
             }
-            ExpressionColumn params[] = new ExpressionColumn[0];
-            exp.children.add(StatementQuery.voltGetXMLExpression(table.queryExpression, params, session));
+            ExpressionColumn parameters[] = new ExpressionColumn[0];
+            exp.children.add(StatementQuery.voltGetXMLExpression(table.queryExpression, parameters, session));
             return exp;
 
         case OpTypes.ALTERNATIVE:
@@ -2819,7 +2822,7 @@ public class Expression implements Cloneable {
                 sb.append("ROW = [");
                 for (int i = 0; i < nodes.length; i++) {
                     sb.append(Expression.voltIndentStr(blanks + 2, true, false))
-                      .append(nodes[i].voltDescribe(session, blanks + 1));
+                      .append(nodes[i].voltDescribe(session, blanks + 2));
                 }
                 sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("]");
@@ -2828,10 +2831,11 @@ public class Expression implements Cloneable {
             case OpTypes.VALUELIST :
                 sb.append("VALUELIST [");
                 for (int i = 0; i < nodes.length; i++) {
-                    sb.append(nodes[i].describe(session, blanks + 2));
-                    sb.append(' ');
+                    sb.append(voltIndentStr(blanks + 2, true, false))
+                      .append(nodes[i].voltDescribe(session, blanks + 2));
                 }
-                sb.append("]");
+                sb.append(voltIndentStr(blanks, true, false))
+                  .append("]");
                 break;
         }
 
@@ -2853,7 +2857,7 @@ public class Expression implements Cloneable {
         }
 
         if (getRightNode() != null) {
-            sb.append(Expression.voltIndentStr(blanks+2, true, false))
+            sb.append(Expression.voltIndentStr(blanks, true, false))
               .append(rightName)
               .append(" = [")
               .append(Expression.voltIndentStr(blanks + 2, true, false))
