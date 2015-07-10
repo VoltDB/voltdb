@@ -155,6 +155,7 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     EXPECT_EQ(false, colInfo->inlined);
     EXPECT_EQ(true, colInfo->inBytes);
 
+    // Now check the hidden column
     colInfo = schema->getHiddenColumnInfo(0);
     ASSERT_NE(NULL, colInfo);
     EXPECT_EQ(12, colInfo->offset);
@@ -193,8 +194,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
     ASSERT_NE(NULL, schema2.get());
 
     // Table tuples whose schemas that differ only in hidden columns
-    // are not suitable for memcpy.  The tuple lengths will be
-    // different.
+    // are not suitable for memcpy.
     EXPECT_FALSE(schema1->isCompatibleForMemcpy(schema2.get()));
     EXPECT_FALSE(schema2->isCompatibleForMemcpy(schema1.get()));
     EXPECT_FALSE(schema1->equals(schema2.get()));
