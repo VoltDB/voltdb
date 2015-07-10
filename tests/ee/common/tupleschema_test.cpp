@@ -149,6 +149,15 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     EXPECT_EQ(false, colInfo->allowNull);
     EXPECT_EQ(false, colInfo->inlined);
     EXPECT_EQ(true, colInfo->inBytes);
+
+    colInfo = schema->getHiddenColumnInfo(0);
+    ASSERT_NE(NULL, colInfo);
+    EXPECT_EQ(12, colInfo->offset);
+    EXPECT_EQ(8, colInfo->length);
+    EXPECT_EQ(VALUE_TYPE_BIGINT, colInfo->type);
+    EXPECT_EQ(true, colInfo->allowNull);
+    EXPECT_EQ(true, colInfo->inlined);
+    EXPECT_EQ(false, colInfo->inBytes);
 }
 
 int main() {
