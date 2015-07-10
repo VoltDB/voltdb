@@ -104,12 +104,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //Simple Host and Port abstraction....dont want to use our big stuff here orgi bundle import nastiness.
     public static class HostAndPort {
 
-        private String m_host;
-        private int m_port;
+        private final String m_host;
+        private final int m_port;
+        private final String m_connectionString;
 
         public HostAndPort(String h, int p) {
             m_host = h;
             m_port = p;
+            m_connectionString = m_host + ":" + m_port;
         }
 
         public static HostAndPort fromString(String hap) {
@@ -125,21 +127,33 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             return m_host;
         }
 
-        public void setHost(String host) {
-            m_host = host;
-        }
-
         public int getPort() {
             return m_port;
-        }
-
-        public void setPort(int port) {
-            m_port = port;
         }
 
         @Override
         public String toString() {
             return m_host + ":" + m_port;
+        }
+
+        @Override
+        public int hashCode() {
+            return m_connectionString.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof HostAndPort)) {
+                return false;
+            }
+            HostAndPort hap = (HostAndPort )o;
+            if (hap == this) {
+                return true;
+            }
+            if (hap.getHost().equals(getHost()) && hap.getPort() == getPort()) {
+                return true;
+            }
+            return false;
         }
     }
 
@@ -379,10 +393,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     return new HostAndPort(metadata.leader().host(), metadata.leader().port());
                 }
                 if (shouldSleep) {
-                    try {
-                        Thread.sleep(5000);
-                    } catch (InterruptedException ie) {
-                    }
+                    backoffSleep(i+1);
                 }
             }
             //Unable to find return null for recheck.
@@ -397,30 +408,35 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
         public void getOffsetCoordinator() {
             BlockingChannel channel = null;
-            try {
-                //This can go to any broker
-                channel = new BlockingChannel(m_leader.getHost(), m_leader.getPort(),
-                        BlockingChannel.UseDefaultBufferSize(),
-                        BlockingChannel.UseDefaultBufferSize(),
-                        5000 /* read timeout in millis */);
-                channel.connect();
-                int correlationId = 0;
-                channel.send(new ConsumerMetadataRequest(m_groupId, ConsumerMetadataRequest.CurrentVersion(), correlationId++, CLIENT_ID));
-                ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
+            for (int i = 0; i < 3; i++) {
+                try {
+                    //This can go to any broker
+                    channel = new BlockingChannel(m_coordinator.getHost(), m_coordinator.getPort(),
+                            BlockingChannel.UseDefaultBufferSize(),
+                            BlockingChannel.UseDefaultBufferSize(),
+                            m_consumerSocketTimeout /* read timeout in millis */);
+                    channel.connect();
+                    int correlationId = 0;
+                    channel.send(new ConsumerMetadataRequest(m_groupId, ConsumerMetadataRequest.CurrentVersion(), correlationId++, CLIENT_ID));
+                    ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
 
-                if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
-                    Broker offsetManager = metadataResponse.coordinator();
-                    m_coordinator.setHost(offsetManager.host());
-                    m_coordinator.setPort(offsetManager.port());
-                    SimpleConsumer consumer = m_offsetManager.getAndSet(new SimpleConsumer(m_coordinator.getHost(), m_coordinator.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID) );
-                    closeConsumer(consumer);
-                }
-            } catch (Exception e) {
-                // retry the query (after backoff)??
-                error("Failed to get Offset Coordinator for " + m_topicAndPartition, e);
-            } finally {
-                if (channel != null) {
-                    channel.disconnect();
+                    if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
+                        Broker offsetManager = metadataResponse.coordinator();
+                        m_coordinator = new HostAndPort(offsetManager.host(), offsetManager.port());
+                        SimpleConsumer consumer = m_offsetManager.getAndSet(new SimpleConsumer(m_coordinator.getHost(), m_coordinator.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID) );
+                        closeConsumer(consumer);
+                        consumer = null;
+                        break;
+                    }
+                    error("Failed to get Offset Coordinator for " + m_topicAndPartition + " Code: " + metadataResponse.errorCode());
+                } catch (Exception e) {
+                    // retry the query (after backoff)??=
+                    error("Failed to get Offset Coordinator for " + m_topicAndPartition, e);
+                    backoffSleep(i+1);
+                } finally {
+                    if (channel != null) {
+                        channel.disconnect();
+                    }
                 }
             }
             info("Coordinator for consumer is: " + m_coordinator);
@@ -438,12 +454,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 OffsetResponse response = consumer.getOffsetsBefore(request);
 
                 if (response.hasError()) {
-                    if (response.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition()) == ErrorMapping.NotLeaderForPartitionCode()) {
+                    short code = response.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
+                    if (code == ErrorMapping.NotLeaderForPartitionCode() || code == ErrorMapping.UnknownTopicOrPartitionCode()) {
                         HostAndPort leaderBroker = findNewLeader();
                         if (leaderBroker != null) {
                             info("Found new leader for " + m_topicAndPartition + " Coordinator will be updated.");
                             SimpleConsumer oconsumer = m_offsetManager.getAndSet(new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID) );
                             closeConsumer(oconsumer);
+                            oconsumer = null;
                             m_coordinator = leaderBroker;
                         }
                     }
@@ -490,8 +508,15 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                     if (consumer != null) {
                         offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                        final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+                        if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
+                            info("Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
+                            getOffsetCoordinator();
+                            consumer = m_offsetManager.get();
+                            offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                        }
                     } else {
-                        error("Failed to get offset coordinator for " + m_topicAndPartition);
+                        error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                         return false;
                     }
                 } catch (Exception e) {
@@ -500,7 +525,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
                 final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
                 if (code != ErrorMapping.NoError()) {
-                    error("Failed to get offset coordinator for " + m_topicAndPartition);
+                    error("Commit Offset Failed to commit for " + m_topicAndPartition + " Code: " + code);
                     return false;
                 }
                 return true;
@@ -508,7 +533,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                if (m_pendingOffsets.first() != m_offset) {
+                if (m_pendingOffsets.pollFirst() != m_offset) {
                     m_seenOffset.put(m_offset, m_nextOffset);
                     m_pendingOffsets.remove(m_offset);
                     return;
@@ -526,6 +551,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
                 //Highest commit we have seen after me will be committed.
                 if (commitOffset(commit)) {
+                    debug("Committed offset " + commit + " for " + m_topicAndPartition);
                     m_currentOffset.set(commit);
                 }
             }
@@ -553,6 +579,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     if (consumer == null) {
                         consumer = new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
                         getOffsetCoordinator();
+                        m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
+                    }
+                    if (m_currentOffset.get() < 0) {
                         m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
                     }
                     long currentFetchCount = 0;
@@ -583,12 +612,17 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 continue;
                             }
                             closeConsumer(consumer);
+                            consumer = null;
                             leaderBroker = findNewLeader();
                             if (leaderBroker == null) {
                                 //point to original leader which will fail and we fall back again here.
+                                error("Failed to find leader continue with old leader: " + m_leader);
                                 leaderBroker = m_leader;
+                            } else {
+                                if (!leaderBroker.equals(m_leader)) {
+                                    info("Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
+                                }
                             }
-                            info("Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
                             continue;
                         }
                         fetchFailedCount = 1;
@@ -628,6 +662,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
                 closeConsumer(consumer);
+                consumer = null;
             }
         }
 
@@ -637,7 +672,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         try {
             if (consumer != null) {
                 consumer.close();
-                consumer = null;
             }
         } catch (Exception e) {
             error("Failed to close consumer connection.", e);
