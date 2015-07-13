@@ -57,6 +57,7 @@ import kafka.network.BlockingChannel;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.CSVInvocation;
@@ -180,21 +181,19 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //For all topics connect and get metadata.
         Set<URI> availableResources = new TreeSet<URI>();
         for (String topic : m_topicList) {
-            List<String> topics = Collections.singletonList(topic);
-            TopicMetadataRequest req = new TopicMetadataRequest(topics);
+            TopicMetadataRequest req = new TopicMetadataRequest(Collections.singletonList(topic));
             kafka.javaapi.TopicMetadataResponse resp = null;
             try {
                 resp = consumer.send(req);
             } catch (Exception ex) {
-                m_es = Executors.newFixedThreadPool(availableResources.size() + 1);
-                error("Failed to send topic metada request for topics " + topics, ex);
-                return availableResources;
+                error("Failed to send topic metada request for topic " + topic, ex);
+                continue;
             }
 
             List<TopicMetadata> metaData = resp.topicsMetadata();
             if (metaData == null) {
-                m_es = Executors.newFixedThreadPool(availableResources.size() + 1);
-                return availableResources;
+                error("Failed to get topic metadata for topic " + topic);
+                continue;
             }
             m_topicPartitionMetaData.put(topic, metaData);
             List<Integer> partitions = m_topicPartitions.get(topic);
@@ -230,8 +229,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             //Build all available topic URIs
             availableResources = buildTopicLeaderMetadata(simpleConsumer);
         } catch (Exception ex) {
-            //Handle
-            error("Failed to get available resources for kafka importer", ex);
+            VoltDB.crashLocalVoltDB("Failed to get available resources for kafka importer", true, ex);
         } finally {
             closeConsumer(simpleConsumer);
         }
@@ -252,6 +250,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             try {
                 m_es.awaitTermination(365, TimeUnit.DAYS);
             } catch (InterruptedException ex) {
+                //Should never come here.
                 ex.printStackTrace();
             }
         }
@@ -313,11 +312,15 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //Per topic per partition that we are responsible for.
     private class TopicPartitionFetcher implements Runnable {
 
+        //URL for this fetcher.
         private final URI m_url;
+        //Leafer for fetching data
         private final HostAndPort m_leader;
+        //coordinator for offset management.
         private HostAndPort m_coordinator;
         private boolean m_shutdown = false;
         private final int m_fetchSize;
+        //Available brokers.
         private final List<HostAndPort> m_brokers;
         private final int m_consumerSocketTimeout;
         //Start with invalid so consumer will fetch it.
@@ -535,7 +538,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                if (m_pendingOffsets.pollFirst() != m_offset) {
+                //We should never get here wiht no pending offsets.
+                assert(!m_pendingOffsets.isEmpty());
+
+                if (m_pendingOffsets.first() != m_offset) {
                     m_seenOffset.put(m_offset, m_nextOffset);
                     m_pendingOffsets.remove(m_offset);
                     return;
@@ -688,7 +694,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
         if (m_es == null) {
             //Create executor with sufficient threads.
-            throw new RuntimeException("Failed to get configured executor service.");
+            VoltDB.crashLocalVoltDB("buildTopicLeaderMetadata must be called before getting an onChange", false, null);
         }
 
         //For addeed create fetchers...make sure existing fetchers are not there.
@@ -701,7 +707,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 List<Integer> topicPartitions = m_topicPartitions.get(topic);
                 if (topicPartitions == null) {
                     //I got a change for added partition that I am not aware of die die.
-                    throw new RuntimeException("Unknown kafka topic for this node: " + topic);
+                    VoltDB.crashLocalVoltDB("Unknown kafka topic added for this node", false, null);
                 }
                 for (int partition : topicPartitions) {
                     String leaderKey = topic + "-" + partition;
