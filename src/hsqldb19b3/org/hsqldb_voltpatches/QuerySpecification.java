@@ -1047,7 +1047,9 @@ public class QuerySpecification extends QueryExpression {
             }
         }
 
+        // A VoltDB extension to avoid an NPE.
         if (rangeVariables != null) {
+        // End of VoltDB extension
             for (int i = 0; i < rangeVariables.length; i++) {
                 Expression e = rangeVariables[i].getJoinCondition();
 
@@ -1059,7 +1061,9 @@ public class QuerySpecification extends QueryExpression {
                     }
                 }
             }
+        // A VoltDB extension to avoid an NPE
         }
+        // End of VoltDB extension
         if (queryCondition != null) {
             queryCondition.resolveTypes(session, null);
 
