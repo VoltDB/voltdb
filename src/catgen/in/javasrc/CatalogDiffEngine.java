@@ -634,12 +634,14 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
             return null;
+        if (suspect instanceof Cluster && field.equals("drConsumerEnabled"))
+            return null;
         if (suspect instanceof Connector && "enabled".equals(field))
             return null;
         if (suspect instanceof Connector && "loaderclass".equals(field))
             return null;
         // ENG-6511 Allow materialized views to change the index they use dynamically.
-        if (suspect instanceof MaterializedViewInfo && field.equals("indexForMinMax"))
+        if (suspect instanceof IndexRef && field.equals("name"))
             return null;
 
         // Avoid over-generalization when describing limitations that are dependent on particular

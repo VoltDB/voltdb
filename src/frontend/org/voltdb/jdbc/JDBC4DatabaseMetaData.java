@@ -1209,17 +1209,30 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         /*
          * ALL types can be converted to VARCHAR /VoltType.String
          */
+        case java.sql.Types.VARCHAR:
+        case java.sql.Types.VARBINARY:
+        case java.sql.Types.TIMESTAMP:
+            switch (toType) {
+            case java.sql.Types.VARCHAR:
+                return true;
+
+            default:
+                return false;
+            }
         case java.sql.Types.TINYINT:
         case java.sql.Types.SMALLINT:
         case java.sql.Types.INTEGER:
         case java.sql.Types.BIGINT:
         case java.sql.Types.FLOAT:
         case java.sql.Types.DECIMAL:
-        case java.sql.Types.VARCHAR:
-        case java.sql.Types.VARBINARY:
-        case java.sql.Types.TIMESTAMP:
             switch (toType) {
             case java.sql.Types.VARCHAR:
+            case java.sql.Types.TINYINT:
+            case java.sql.Types.SMALLINT:
+            case java.sql.Types.INTEGER:
+            case java.sql.Types.BIGINT:
+            case java.sql.Types.FLOAT:
+            case java.sql.Types.DECIMAL:
                 return true;
 
             default:

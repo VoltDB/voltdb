@@ -1675,10 +1675,9 @@ function loadAdminPage() {
                 '    <td>' +
                 '       <select id="txtType" name="txtType"> ';
 
-            exporttypes.type.splice(2, 1);
+            exporttypes.type.splice(3, 1);
 
             exporttypes.type.push("CUSTOM");
-
 
             for (var i = 0; i <= exporttypes.type.length - 1; i++) {
                 contents = contents +
@@ -1816,15 +1815,20 @@ function loadAdminPage() {
                     $("#deleteFirstProperty").trigger("click");
                 }
                 var count = 1;
+                var multiPropertyCount = 0;
                 for (var i = 0; i < properties.length; i++) {
-                    if (VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name)) {
+                    if (VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name) || VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name + '_' + config.type)) {
                         if (properties[i].name == "broker.host" || properties[i].name == "amqp.uri") {
                             $("#selectRabbitMq").val(properties[i].name);
                         }
                         if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).length) {
                             $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).val(properties[i].value);
                             $(".newStreamMinProperty").addClass("orgProperty");
-                        } else {
+                        } else if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name + '_' + config.type]).length && multiPropertyCount==0) {
+                            $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name + '_' + config.type]).val(properties[i].value);
+                            $(".newStreamMinProperty").addClass("orgProperty");
+                            multiPropertyCount++;
+                        }else {
                             $("#lnkAddNewProperty").trigger("click");
                             $("#txtName" + count).val(properties[i].name);
                             $("#txtValue" + count).val(properties[i].value);
@@ -1928,7 +1932,6 @@ function loadAdminPage() {
                         adminConfigurations.export.configuration.push(newConfig);
                     } else {
                         var updatedConfig = adminConfigurations.export.configuration[editId * 1];
-
                         updatedConfig.stream = newConfig.stream;
                         updatedConfig.type = newConfig.type;
                         updatedConfig.enabled = newConfig.enabled;
@@ -2144,6 +2147,22 @@ function loadAdminPage() {
                     '</tr>';
             }
 
+        } else if (exportType.toUpperCase() == "ELASTICSEARCH") {
+            if (!$('#txtEndpointES').length) {
+                exportProperties = '<tr class="newStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtEndpointES" name="txtEndpointES" value="endpoint" disabled="disabled" class="newStreamPropertyName newStreamProperty  requiredProperty" type="text">' +
+                    '       <label id="errorEndpoint" for="txtEndpoint" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtEndpointESValue" name="txtEndpointESValue" class="newStreamPropertyValue newStreamProperty" type="text">' +
+                    '       <label id="errorEndpointESValue" for="txtEndpointESValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtEndpointES').attr("disabled", "disabled");
+            }
         }
         $('#tblAddNewProperty tr.headerProperty').after(exportProperties);
 
@@ -2176,6 +2195,7 @@ function loadAdminPage() {
     };
 
     var removeDuplicate = function (object, propertyName) {
+        var exportType = $('#txtType').val();
         if (!$(object).hasClass("requiredProperty")) {
             var val = $(':input:eq(' + ($(':input').index(object) + 1) + ')').val();
             if ($(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName]).length) {
@@ -2183,6 +2203,11 @@ function loadAdminPage() {
                 $(".newStreamMinProperty").addClass("addedProperty");
                 var $row = $(object).closest("tr");
                 $row.remove();
+            } else if ($(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName + '_' + exportType]).length) {
+                $(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName + '_' + exportType]).val(val);
+                $(".newStreamMinProperty").addClass("addedProperty");
+                var $row1 = $(object).closest("tr");
+                $row1.remove();
             }
             if (propertyName == "broker.host" || propertyName == "amqp.uri") {
                 $("#selectRabbitMq").val(propertyName);
@@ -2227,6 +2252,12 @@ function loadAdminPage() {
             setDefaultDisplay($("#selectRabbitMq"));
         } else {
             setNormalDisplay($("#selectRabbitMq"));
+        }
+        
+        if (exportType.toUpperCase() == "ELASTICSEARCH") {
+            setDefaultDisplay($("#txtEndpointES"));
+        } else {
+            setNormalDisplay($("#txtEndpointES"));
         }
 
     };
@@ -2726,12 +2757,13 @@ function loadAdminPage() {
             "outdir": "#txtOutdirValue",
             "nonce": "#txtnonceValue",
             "type": "#txtFileTypeValue",
-            "endpoint": "#txtEndpointValue",
+            "endpoint_HTTP": "#txtEndpointValue",
             "metadata.broker.list": "#txtMetadataBrokerListValue",
             "jdbcurl": "#txtJdbcUrlValue",
             "jdbcdriver": "#txtJdbcDriverValue",
             "broker.host": "#txtRabbitMqValue",
-            "amqp.uri": "#txtRabbitMqValue"
+            "amqp.uri": "#txtRabbitMqValue",
+            "endpoint_ELASTICSEARCH": "#txtEndpointESValue"
         };
 
         this.orgTypeValue = "";

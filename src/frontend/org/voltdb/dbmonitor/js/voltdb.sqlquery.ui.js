@@ -221,7 +221,7 @@ $(document).ready(function () {
             sysScr += '<div id="systemProcedure" class="listView">';
             for (var k in sysProcedure) {
                 for (var paramCount in sysProcedure[k]) {
-                    sysScr += '<h3>' + k + '(' + paramCount + ')</h3>';
+                    sysScr += '<h3>' + k + '</h3>';
                     sysScr += '<div class="listView">';
                     sysScr += '<ul>';
                     for (var i = 0; i < sysProcedure[k][paramCount].length - 1; i++) {
@@ -283,7 +283,15 @@ $(document).ready(function () {
             defSrcHeader += '<div id="defaultProcedure" class="listView">';
             var defSrcFooter = '</div>';
             defSrc = defSrcHeader + defSrc + defSrcFooter;
-            $('#accordionProcedures').html(sysScr + defSrc + src);
+            
+            var userProcHeader = "";
+            userProcHeader += '<h3 class="systemHeader">User Defined Stored Procedures</h3>';
+            userProcHeader += '<div id="userProcedure" class="listView">';
+            var userProcFooter = '</div>';
+            var userSrc = userProcHeader + src + userProcFooter;
+
+            $('#accordionProcedures').html(sysScr + defSrc + userSrc);
+            
             $('#accordionProcedures').accordion("refresh");
             $('#systemProcedure').accordion({
                 collapsible: true,
@@ -315,6 +323,35 @@ $(document).ready(function () {
                 }
             });
             $('#defaultProcedure').accordion({
+                collapsible: true,
+                active: false,
+                beforeActivate: function (event, ui) {
+                    // The accordion believes a panel is being opened
+                    if (ui.newHeader[0]) {
+                        var currHeader = ui.newHeader;
+                        var currContent = currHeader.next('.ui-accordion-content');
+                        // The accordion believes a panel is being closed
+                    } else {
+                        var currHeader = ui.oldHeader;
+                        var currContent = currHeader.next('.ui-accordion-content');
+                    }
+                    // Since we've changed the default behavior, this detects the actual status
+                    var isPanelSelected = currHeader.attr('aria-selected') == 'true';
+
+                    // Toggle the panel's header
+                    currHeader.toggleClass('ui-corner-all', isPanelSelected).toggleClass('accordion-header-active ui-state-active ui-corner-top', !isPanelSelected).attr('aria-selected', ((!isPanelSelected).toString()));
+
+                    // Toggle the panel's icon
+                    currHeader.children('.ui-icon').toggleClass('ui-icon-triangle-1-e', isPanelSelected).toggleClass('ui-icon-triangle-1-s', !isPanelSelected);
+
+                    // Toggle the panel's content
+                    currContent.toggleClass('accordion-content-active', !isPanelSelected)
+                    if (isPanelSelected) { currContent.slideUp(50); } else { currContent.slideDown(50); }
+
+                    return false; // Cancels the default action
+                }
+            });
+            $('#userProcedure').accordion({
                 collapsible: true,
                 active: false,
                 beforeActivate: function (event, ui) {
