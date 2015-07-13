@@ -24,6 +24,18 @@
 package org.voltdb.planner;
 
 public class TestWithClause extends PlannerTestCase {
+    private static final boolean allTests = false;
+    private static final boolean WITH_BASIC_DONE = false;
+    private static final boolean WITH_DOUBLE = false;
+    private static final boolean WITH_IN_FROM = false;
+    private static final boolean WITH_IN_IN = false;
+    private static final boolean WITH_IN_EXISTS = false;
+    private static final boolean WITH_IN_SUBQUERY1 = false;
+    private static final boolean WITH_IN_SUBQUERY2 = false;
+    private static final boolean doTest(boolean condition) {
+        return allTests || condition;
+    }
+
     @Override
     protected void setUp() throws Exception {
         final boolean planForSinglePartitionFalse = false;
@@ -36,85 +48,94 @@ public class TestWithClause extends PlannerTestCase {
         super.tearDown();
     }
 
-    public void notestSimpleWith() throws Exception {
-        compile("WITH dept_count AS (\n" +
+    public void testSimpleWith() throws Exception {
+        if (doTest(WITH_BASIC_DONE)) {
+            compile("WITH dept_count AS (\n" +
+                    "  SELECT deptno, COUNT(*) AS dept_count\n" +
+                    "  FROM   employee\n" +
+                    "  GROUP BY deptno)\n" +
+                    "SELECT e.name AS employee_name,\n" +
+                    "       dc.dept_count AS emp_dept_count\n" +
+                    "FROM   employee e,\n" +
+                    "       dept_count dc\n" +
+                    "WHERE  e.deptno = dc.deptno;" +
+                    "");
+        }
+    }
+
+    public void testDoubleWith() throws Exception {
+        if (doTest(WITH_DOUBLE)) {
+            compile(
+                "WITH dept_count AS (\n" +
                 "  SELECT deptno, COUNT(*) AS dept_count\n" +
                 "  FROM   employee\n" +
-                "  GROUP BY deptno)\n" +
+                "  GROUP BY deptno),\n" +
+                "  current_proj AS (\n" +
+                "  select e.empno as empno,\n" +
+                "         p.description as pdesc\n" +
+                "  from\n" +
+                "   employee as e,\n" +
+                "        project as p,\n" +
+                "   project_participation pd\n" +
+                "  where e.empno = pd.empno\n" +
+                "  and   p.projectno = pd.projectno\n" +
+                "  and   pd.end_date is null )\n" +
                 "SELECT e.name AS employee_name,\n" +
-                "       dc.dept_count AS emp_dept_count\n" +
+                "       dc.dept_count AS emp_dept_count,\n" +
+                "       cp.pdesc\n" +
                 "FROM   employee e,\n" +
-                "       dept_count dc\n" +
-                "WHERE  e.deptno = dc.deptno;" +
-                "");
-    }
-
-    public void notestDoubleWith() throws Exception {
-        compile(
-            "WITH dept_count AS (\n" +
-            "  SELECT deptno, COUNT(*) AS dept_count\n" +
-            "  FROM   employee\n" +
-            "  GROUP BY deptno),\n" +
-            "  current_proj AS (\n" +
-            "  select e.empno as empno,\n" +
-            "         p.description as pdesc\n" +
-            "  from\n" +
-            "   employee as e,\n" +
-            "        project as p,\n" +
-            "   project_participation pd\n" +
-            "  where e.empno = pd.empno\n" +
-            "  and   p.projectno = pd.projectno\n" +
-            "  and   pd.end_date is null )\n" +
-            "SELECT e.name AS employee_name,\n" +
-            "       dc.dept_count AS emp_dept_count,\n" +
-            "       cp.pdesc\n" +
-            "FROM   employee e,\n" +
-            "       dept_count dc,\n" +
-            "       current_proj cp\n" +
-            "WHERE  e.deptno = dc.deptno\n" +
-            "and    cp.empno = e.empno;\n" +
-            ""
-            );
-    }
-    public void notestWithInFrom() throws Exception {
-        compile(
-                "SELECT e.name AS employee_name, \n" +
-                "       dc.dept_count AS emp_dept_count \n" +
-                "FROM   employee e, \n" +
-                "       (WITH dept_count AS ( \n" +
-                "         SELECT deptno, COUNT(*) AS dept_count \n" +
-                "        FROM   employee \n" +
-                "        GROUP BY deptno) \n" +
-                "       select * from dept_count) as dc \n" +
-                "WHERE  e.deptno = dc.deptno; \n" +
+                "       dept_count dc,\n" +
+                "       current_proj cp\n" +
+                "WHERE  e.deptno = dc.deptno\n" +
+                "and    cp.empno = e.empno;\n" +
                 ""
                 );
+        }
     }
-    public void notestWithInIn() throws Exception {
-        compile("SELECT e.name AS employee_name\n " +
-                "FROM   employee e\n " +
-                "WHERE  e.deptno in ( WITH dept_count AS (\n " +
-                "                              SELECT deptno, COUNT(*) AS dept_count\n " +
-                "                        FROM   employee\n " +
-                "                        GROUP BY deptno\n " +
-                "                        HAVING count(*) > 5)\n " +
-                "                    select deptno from dept_count);\n " +
-                ""
-                );
-
+    public void testWithInFrom() throws Exception {
+        if (doTest(WITH_IN_FROM)) {
+            compile(
+                    "SELECT e.name AS employee_name, \n" +
+                    "       dc.dept_count AS emp_dept_count \n" +
+                    "FROM   employee e, \n" +
+                    "       (WITH dept_count AS ( \n" +
+                    "         SELECT deptno, COUNT(*) AS dept_count \n" +
+                    "        FROM   employee \n" +
+                    "        GROUP BY deptno) \n" +
+                    "       select * from dept_count) as dc \n" +
+                    "WHERE  e.deptno = dc.deptno; \n" +
+                    ""
+                    );
+        }
+    }
+    public void testWithInIn() throws Exception {
+        if (doTest(WITH_IN_IN)) {
+            compile("SELECT e.name AS employee_name\n " +
+                    "FROM   employee e\n " +
+                    "WHERE  e.deptno in ( WITH dept_count AS (\n " +
+                    "                              SELECT deptno, COUNT(*) AS dept_count\n " +
+                    "                        FROM   employee\n " +
+                    "                        GROUP BY deptno\n " +
+                    "                        HAVING count(*) > 5)\n " +
+                    "                    select deptno from dept_count);\n " +
+                    ""
+                    );
+        }
     }
 
-    public void notestWithInExists() throws Exception {
-        compile("SELECT e.name AS employee_name\n" +
-                "FROM   employee e\n" +
-                "WHERE  exists ( WITH dept_count AS (\n" +
-                "                       SELECT deptno, COUNT(*) AS dept_count\n" +
-                "               FROM   employee\n" +
-                "               GROUP BY deptno\n" +
-                "               HAVING count(*) > 5)\n" +
-                "               select deptno from dept_count);\n" +
-                ""
-                );
+    public void testWithInExists() throws Exception {
+        if (doTest(WITH_IN_EXISTS)) {
+            compile("SELECT e.name AS employee_name\n" +
+                    "FROM   employee e\n" +
+                    "WHERE  exists ( WITH dept_count AS (\n" +
+                    "                       SELECT deptno, COUNT(*) AS dept_count\n" +
+                    "               FROM   employee\n" +
+                    "               GROUP BY deptno\n" +
+                    "               HAVING count(*) > 5)\n" +
+                    "               select deptno from dept_count);\n" +
+                    ""
+                    );
+        }
     }
 
     /**
@@ -123,38 +144,42 @@ public class TestWithClause extends PlannerTestCase {
      *
      * @throws Exception
      */
-    public void notestSubquery1() throws Exception {
-        compile("SELECT e.name AS employee_name,\n" +
-                "       dc.dept_count AS emp_dept_count,\n" +
-                "       cp.pdesc as Project_Description\n" +
-                "FROM   employee e,\n" +
-                "       (SELECT deptno, COUNT(*) AS dept_count\n" +
-                "         FROM   employee\n" +
-                "             GROUP BY deptno) dc,\n" +
-                "       (select e.empno as empno,\n" +
-                "               p.description as pdesc\n" +
-                "       from\n" +
-                "              employee as e,\n" +
-                "               project as p,\n" +
-                "              project_participation pd\n" +
-                "        where e.empno = pd.empno\n" +
-                "        and   p.projectno = pd.projectno\n" +
-                "        and   pd.end_date is null) as cp\n" +
-                "WHERE  e.deptno = dc.deptno\n" +
-                "and    cp.empno = e.empno;\n" +
-                ""
-               );
+    public void testSubquery1() throws Exception {
+        if (doTest(WITH_IN_SUBQUERY1)) {
+            compile("SELECT e.name AS employee_name,\n" +
+                    "       dc.dept_count AS emp_dept_count,\n" +
+                    "       cp.pdesc as Project_Description\n" +
+                    "FROM   employee e,\n" +
+                    "       (SELECT deptno, COUNT(*) AS dept_count\n" +
+                    "         FROM   employee\n" +
+                    "             GROUP BY deptno) dc,\n" +
+                    "       (select e.empno as empno,\n" +
+                    "               p.description as pdesc\n" +
+                    "       from\n" +
+                    "              employee as e,\n" +
+                    "               project as p,\n" +
+                    "              project_participation pd\n" +
+                    "        where e.empno = pd.empno\n" +
+                    "        and   p.projectno = pd.projectno\n" +
+                    "        and   pd.end_date is null) as cp\n" +
+                    "WHERE  e.deptno = dc.deptno\n" +
+                    "and    cp.empno = e.empno;\n" +
+                    ""
+                   );
+        }
     }
 
-    public void notestSubquery2() throws Exception {
-        compile("SELECT e.name AS employee_name,\n" +
-                "       dc.deptno AS emp_dept_count\n" +
-                "FROM   employee e,\n" +
-                "       (SELECT *\n" +
-                "         FROM   employee) dc\n" +
-                "WHERE  e.deptno = dc.deptno;\n" +
-                ""
-               );
+    public void testSubquery2() throws Exception {
+        if (doTest(WITH_IN_SUBQUERY2)) {
+            compile("SELECT e.name AS employee_name,\n" +
+                    "       dc.deptno AS emp_dept_count\n" +
+                    "FROM   employee e,\n" +
+                    "       (SELECT *\n" +
+                    "         FROM   employee) dc\n" +
+                    "WHERE  e.deptno = dc.deptno;\n" +
+                    ""
+                   );
+        }
     }
     /**
      * All of the tests above are commented out.  They all fail.  We
