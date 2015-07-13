@@ -283,6 +283,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(shortOpt = "n", desc = "Custom null string, overrides all other Null pattern matching")
         String customNullString = "";
 
+        @Option(desc = "Disables the quote character. All characters between delimiters, including quote characters, are included in the input.",
+                hasArg = false)
+        boolean noquotechar = false;
+
         /**
          * Batch size for processing batched operations.
          */
@@ -376,6 +380,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         final CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
         config = cfg;
+        if (config.noquotechar) {
+            config.quotechar = '\u0000';
+        }
+
 
         configuration();
         final Tokenizer tokenizer;

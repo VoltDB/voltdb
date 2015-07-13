@@ -40,7 +40,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!--logger name="HSQLCOMPILER">
+    <!--logger name="HSQLDB_COMPILER">
         <level value="DEBUG"/>
     </logger -->
 

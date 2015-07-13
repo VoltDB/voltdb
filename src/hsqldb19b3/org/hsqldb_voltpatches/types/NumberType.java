@@ -1230,6 +1230,20 @@ public final class NumberType extends Type {
 
             case Types.SQL_REAL :
             case Types.SQL_DOUBLE :
+                // A VoltDB extension to allow "describe" to handle BigDecimal
+                // or Integer initializers for FLOAT values.
+                // This is apparently acceptable elsewhere?
+                if (a instanceof BigDecimal) {
+                    // To minimize code change, taking the winding path:
+                    // BigDecimal -> double -> Double -> double -> String.
+                    a = ((BigDecimal) a).doubleValue();
+                }
+                else if (a instanceof Integer) {
+                    // To minimize code change, taking the winding path:
+                    // Integer -> double -> Double -> double -> String.
+                    a = ((Integer) a).doubleValue();
+                }
+                // End of VoltDB extension
                 double value = ((Double) a).doubleValue();
 
                 /** @todo - java 5 format change */
@@ -2009,6 +2023,54 @@ public final class NumberType extends Type {
         }
     }
 
+    // A VoltDB extension
+    public Object mod(Object a, Object b) {
+
+         if (a == null || b == null) {
+             return null;
+         }
+
+         switch (typeCode) {
+
+             case Types.SQL_REAL :
+             case Types.SQL_FLOAT :
+             case Types.SQL_DOUBLE : {
+                 double ad = ((Number) a).doubleValue();
+                 double bd = ((Number) b).doubleValue();
+
+                 if (bd == 0) {
+                     throw Error.error(ErrorCode.X_22012);
+                 }
+
+                 return ValuePool.getDouble(Double.doubleToLongBits(ad % bd));
+             }
+             case Types.TINYINT :
+             case Types.SQL_SMALLINT :
+             case Types.SQL_INTEGER : {
+                 int ai = ((Number) a).intValue();
+                 int bi = ((Number) b).intValue();
+
+                 if (bi == 0) {
+                     throw Error.error(ErrorCode.X_22012);
+                 }
+
+                 return ValuePool.getInt(ai % bi);
+             }
+             case Types.SQL_BIGINT : {
+                 long al = ((Number) a).longValue();
+                 long bl = ((Number) b).longValue();
+
+                 if (bl == 0) {
+                     throw Error.error(ErrorCode.X_22012);
+                 }
+
+                 return ValuePool.getLong(al % bl);
+             }
+             default :
+                 throw Error.runtimeError(ErrorCode.U_S0500, "NumberType");
+         }
+     }
+    // End of VoltDB extension
     public Object floor(Object a) {
 
         if (a == null) {

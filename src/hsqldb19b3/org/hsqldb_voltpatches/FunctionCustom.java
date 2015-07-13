@@ -395,10 +395,12 @@ public class FunctionCustom extends FunctionSQL {
 
     static {
         customValueFuncMap.put(Tokens.TODAY, FUNC_CURRENT_DATE);
-        customValueFuncMap.put(Tokens.NOW, FUNC_LOCALTIMESTAMP);
         // A VoltDB extension to override NOW as an alias
         // for CURRENT TIMESTAMP vs. LOCAL TIMESTAMP.
         customValueFuncMap.put(Tokens.NOW, FUNC_CURRENT_TIMESTAMP);
+        /* disable 1 line.
+        customValueFuncMap.put(Tokens.NOW, FUNC_LOCALTIMESTAMP);
+        ... disabled 1 line. */
         // End of VoltDB extension
     }
 
@@ -3720,6 +3722,9 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_ASCII :
             case FUNC_ASIN :
             case FUNC_ATAN :
+            // A VoltDB extension: Hsqldb mistreats BITNOT as a 2-argument case
+            case FUNC_BITNOT : //
+            // End of VoltDB extension
             case FUNC_CHAR :
             case FUNC_COS :
             case FUNC_COT :
@@ -3744,15 +3749,10 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_BITAND :
             case FUNC_BITANDNOT :
             case FUNC_BITOR :
-            // A VoltDB extension: Hsqldb uses Integer type by default,
-                return new StringBuffer(name).append('(')         //
-                        .append(nodes[0].getSQL()).append(Tokens.T_COMMA)     //
-                        .append(nodes[1].getSQL()).append(')').toString();
-            // End of VoltDB extension
+            // A VoltDB extension: Hsqldb mistreats BITNOT as a 2-argument case
+            /* disable 1 line.
             case FUNC_BITNOT :
-            // A VoltDB extension: Hsqldb uses Integer type by default,
-                return new StringBuffer(name).append('(')         //
-                        .append(nodes[0].getSQL()).append(')').toString();
+            ... disabled 1 line. */
             // End of VoltDB extension
             case FUNC_BITXOR :
             case FUNC_DIFFERENCE :

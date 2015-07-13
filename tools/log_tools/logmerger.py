@@ -26,12 +26,14 @@ import tempfile
 # apprunner           04-18 07:14:35
 # dragent             2013-03-14 00:00:33
 # servers             2013-03-14 00:00:33,877
+# meshmon             2013-03-14 00:00:33.877
 # syslog              Aug  6 09:06:38
 
 def epochtimemillis_keyfunc(ts):
     """Return ms since epoch for timestamp of format yyyy-mm-dd hh:mm:ss[,xxx]
+       or format yyyy-mm-dd hh:mm:ss[.xxx]
     """
-    split_ts = ts.split(',')
+    split_ts = ts.replace('.',',').split(',')
     seconds = time.strptime(split_ts[0],"%Y-%m-%d %H:%M:%S")
     if len(split_ts) > 1:
         millis = int(split_ts[1])
@@ -50,7 +52,7 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
     ts_date = '\d{0,4}-?\d{2}-\d{2}'
     ts_mmm = '\w{3}'
     ts_day = '\d{1,2}'
-    ts_time = '\d{2}:\d{2}:\d{2},?\d{0,3}'
+    ts_time = '\d{2}:\d{2}:\d{2}[\.,]?\d{0,3}'
 
     ts_format = ts_date + '\s+' + ts_time
     ts_format_syslog = ts_mmm + '\s+' + ts_day + '\s+' + ts_time

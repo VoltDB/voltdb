@@ -40,6 +40,21 @@ public class PlannerTestCase extends TestCase {
     private boolean m_byDefaultPlanForSinglePartition;
 
     /**
+     * Default constructor
+     */
+    public PlannerTestCase() {
+    }
+
+    /**
+     * This constructor takes the method name so that subclasses can override the "suite"
+     * method to only run certain test methods.
+     * @param methodName  Name of which test method in the suite to run
+     */
+    public PlannerTestCase(String methodName) {
+        super(methodName);
+    }
+
+    /**
      * @param sql
      * @return
      */
@@ -199,7 +214,7 @@ public class PlannerTestCase extends TestCase {
         }
         catch (Exception ex) {
             ex.printStackTrace();
-            fail();
+            fail(ex.getMessage());
         }
         assertTrue(pns.get(0) != null);
         return pns.get(0);

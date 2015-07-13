@@ -979,4 +979,10 @@ public class StatementCompound extends Statement implements RangeGroup {
     public boolean isVariable() {
         return true;
     }
+
+    // A VoltDB extension to print HSQLDB ASTs
+    public String voltDescribe(Session session, int blanks) {
+        return "";
+    }
+    // End of VoltDB extension
 }

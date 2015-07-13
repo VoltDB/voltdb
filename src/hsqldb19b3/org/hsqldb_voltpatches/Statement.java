@@ -287,5 +287,11 @@ public abstract class Statement {
         throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                 "this type of sql statement is not supported or is not not allowed in this context");
     }
+
+    public abstract String voltDescribe(Session session, int blanks);
+
+    public String toString() {
+        return voltDescribe(null, 0);
+    }
     // End of VoltDB extension
 }

@@ -169,4 +169,9 @@ public class ExpressionColumnAccessor extends Expression {
     public Type getDataType() {
         return column.getDataType();
     }
+    // A VoltDB extension to print HSQLDB ASTs
+    protected String voltDescribe(Session session, int blanks) {
+        return column.getName().name;
+    }
+    // End of VoltDB extension
 }

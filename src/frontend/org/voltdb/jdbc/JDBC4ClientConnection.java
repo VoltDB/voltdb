@@ -270,13 +270,16 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws NoConnectionsException
      * @throws ProcCallException
      */
-    public ClientResponse execute(String procedure, long timeout, Object... parameters)
+   public ClientResponse execute(String procedure, long timeout, TimeUnit unit, Object... parameters)
             throws NoConnectionsException, IOException, ProcCallException {
         long start = System.currentTimeMillis();
         ClientImpl currentClient = this.getClient();
+        if (unit == null) {
+            unit = TimeUnit.SECONDS;
+        }
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, TimeUnit.SECONDS, parameters);
+            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, unit, parameters);
             return response;
         }
         catch (ProcCallException pce) {

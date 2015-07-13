@@ -50,20 +50,18 @@ public interface ImportContext {
 
     /**
      * Call this to get the ingested data passed to procedure.
-     * @param ic Import Context invoking the procedure.
      * @param procName procedure to invoke.
      * @param fieldList parameters to the procedure.
      * @return true if successfully accepted the work.
      */
-    public boolean callProcedure(ImportContext ic, String procName, Object... fieldList);
+    public boolean callProcedure(String procName, Object... fieldList);
 
     /**
      * Call this to get the ingested data passed to procedure.
-     * @param ic Import Context invoking the procedure.
      * @param invocation indicating what kind of data is passed in for this.
      * @return true if successfully accepted the work.
      */
-    public boolean callProcedure(ImportContext ic, Invocation invocation);
+    public boolean callProcedure(Invocation invocation);
 
     /**
      * Returns max time in nanoseconds a call to callProcedure waits in backpressure.

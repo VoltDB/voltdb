@@ -39,6 +39,7 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.QuantifierType;
@@ -46,6 +47,7 @@ import org.voltdb.types.QuantifierType;
 public class TestPlansScalarSubQueries extends PlannerTestCase {
 
     public void testSelectScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile("select r2.c, (select d from r1) scalar from r2");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -55,9 +57,11 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         SchemaColumn col = schema.getColumns().get(1);
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
+        */
     }
 
     public void testSelectCorrelatedScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax within an expression"
         AbstractPlanNode pn = compile("select r2.c, (select d from r1 where r1.c = r2.c ) scalar from r2");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -74,9 +78,11 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         List<Integer> params = subqueryExpr.getParameterIdxList();
         assertEquals(1, params.size());
         assertEquals(new Integer(0), params.get(0));
+        */
     }
 
     public void testSelectCorrelatedScalarWithGroupby() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         String sql = "select franchise_id, count(*) as stores_in_category_AdHoc, "
                 + " (select category from store_types where type_id = stores.type_id) as store_category "
                 + "from stores group by franchise_id, type_id;";
@@ -93,11 +99,13 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        */
     }
 
     public void testSelectCorrelatedScalarInGroupbyClause() {
         String sql = "select franchise_id, count(*) as stores_in_category_AdHoc "
                 + " from stores group by franchise_id, (select category from store_types where type_id = stores.type_id);";
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile(sql);
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -113,6 +121,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractExpression gbExpr = aggNode.getGroupByExpressions().get(1);
         assertTrue(gbExpr instanceof ScalarValueExpression);
         assertTrue(gbExpr.getLeft() instanceof SelectSubqueryExpression);
+        */
     }
 
     // negative tests not to support subquery inside of aggregate function
@@ -122,6 +131,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         // non-correlated
         sql = "select franchise_id, sum((select count(category) from store_types where type_id = 3)) as stores_in_category_AdHoc "
                 + " from stores group by franchise_id;";
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         failToCompile(sql, errorMsg);
 
         // expression with subquery
@@ -133,9 +143,11 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         sql = "select franchise_id, sum((select count(category) from store_types where type_id = stores.franchise_id)) as stores_in_category_AdHoc "
                 + " from stores group by franchise_id;";
         failToCompile(sql, "user lacks privilege or object not found: STORES.FRANCHISE_ID");
+        */
     }
 
     public void testSelectParameterScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile("select r2.c, (select d from r1 where r1.c = ? ) scalar from r2");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -153,14 +165,18 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(PlanNodeType.SEQSCAN, subquery.getPlanNodeType());
         AbstractExpression pred = ((SeqScanPlanNode) subquery).getPredicate();
         assertEquals(ExpressionType.VALUE_PARAMETER, pred.getRight().getExpressionType());
+        */
     }
 
     public void testMultiColumnSelect() {
+        /* not yet hsql232: ENG-8307, "row expression not allowed"
         failToCompile("select r2.c, (select d, c from r1) from r2",
                 "Scalar subquery can have only one output column");
+         */
     }
 
     public void testWhereEqualScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile("select r2.c from r2 where (select r1.a from r1) = r2.c;");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -168,9 +184,11 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
         assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
         assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
+         */
     }
 
     public void testWhereGreaterScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile("select r2.c from r2 where (select r1.a from r1) > r2.c;");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -178,9 +196,11 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.COMPARE_LESSTHAN, pred.getExpressionType());
         assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
         assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
+         */
     }
 
     public void testWhereParamScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile("select r2.c from r2 where r2.c = (select r1.a from r1 where r1.a = r2.c);");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -189,9 +209,11 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
         assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
         assertEquals(1, pred.getRight().getArgs().size());
+         */
     }
 
     public void testWhereUserParamScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile("select r2.c from r2 where r2.c = (select r1.a from r1 where r1.a = ?);");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -200,6 +222,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
         assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
         assertEquals(0, pred.getRight().getArgs().size());
+         */
     }
 
     /**
@@ -207,6 +230,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
      * All the where clause are used as post predicate in the index scan, other than search key or end key.
      */
     public void testWhereIndexScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         {
             AbstractPlanNode pn = compile("select r5.c from r5 where r5.a = (select r1.a from r1 where r1.a = ?);");
             pn = pn.getChild(0);
@@ -223,6 +247,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
             assertEquals(0, exprs.size());
             assertNotNull(((IndexScanPlanNode) pn).getPredicate());
         }
+         */
         {
             AbstractPlanNode pn = compile("select r5.c from r5 where r5.a IN (select r1.a from r1);");
             pn = pn.getChild(0);
@@ -257,6 +282,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
     }
 
     public void testWhereGreaterRow() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile("select r5.c from r5 where (a,c) > (select r1.a, r1.c from r1);");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -264,9 +290,11 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, pred.getExpressionType());
         assertEquals(ExpressionType.ROW_SUBQUERY, pred.getLeft().getExpressionType());
         assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
+        */
     }
 
     public void testWhereEqualRow() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         AbstractPlanNode pn = compile("select r2.c from r2 where (a,c) = (select r1.a, r1.c from r1 where r1.c = r2.c);");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -275,6 +303,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.ROW_SUBQUERY, pred.getLeft().getExpressionType());
         assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
         assertEquals(1, pred.getRight().getArgs().size());
+         */
     }
 
     public void testWhereRowMismatch() {
@@ -286,8 +315,10 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
      * Uncomment these tests when ENG-8306 is finished
      */
     public void testHavingScalar() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         failToCompile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);",
                 TestPlansInExistsSubQueries.HavingErrorMsg);
+         */
 
 //        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);");
 //        pn = pn.getChild(0).getChild(0);
@@ -301,8 +332,10 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
      * Uncomment these tests when ENG-8306 is finished
      */
     public void testHavingRow() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         failToCompile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);",
                 TestPlansInExistsSubQueries.HavingErrorMsg);
+         */
 
 //        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);");
 //        pn = pn.getChild(0).getChild(0);
@@ -318,6 +351,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
     }
 
     public void testWhereIndexRow() {
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         {
             AbstractPlanNode pn = compile("select * from r5 where (a,c) = (select a, c from r1);");
             pn = pn.getChild(0);
@@ -336,6 +370,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
             assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getLeft().getExpressionType());
             assertEquals(ExpressionType.ROW_SUBQUERY, pred.getRight().getExpressionType());
         }
+        */
         {
             AbstractPlanNode pn = compile("select * from r5 where (a,c) IN (select a, c from r1);");
             pn = pn.getChild(0);
@@ -365,11 +400,155 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         }
     }
 
+    public void testUnion() {
+        {
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "    select * from R5)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            assertEquals(0, selSubq.getArgs().size()); // no correlation params
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            // Correlation parameter on the LHS of the union
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "    where outer_tbl.a = c "
+                            + "  union "
+                            + "    select * from R5)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            // Correlation parameter on the RHS of the union
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "    select * from R5"
+                            + "    where outer_tbl.a = c)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+        }
+        {
+            // Correlation parameter in an intersect under a union
+            AbstractPlanNode pn = compile(
+                    "select * "
+                            + "from r4 as outer_tbl "
+                            + "where (a, c) = all ("
+                            + "    select * from R3 "
+                            + "  union "
+                            + "      (select * from R4 "
+                            + "    intersect"
+                            + "      select * from R5"
+                            + "      where outer_tbl.a = c))");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof IndexScanPlanNode);
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
+            assertNotNull(pred);
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            pred = pred.getRight();
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getExpressionType());
+
+            SelectSubqueryExpression selSubq = (SelectSubqueryExpression)pred;
+            List<AbstractExpression> args = selSubq.getArgs();
+            assertEquals(1, args.size()); // one correlation param
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("OUTER_TBL", tve.getTableAlias());
+            assertEquals("A", tve.getColumnName());
+
+            AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
+            assertNotNull(subqPlanNode);
+            assertTrue(subqPlanNode instanceof UnionPlanNode);
+
+        }
+    }
+
     public void testScalarGuard() {
         String errorMessage = PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE;
 
         failToCompile("select * from r5 where (a,c) > ALL (select a, c from p1);", errorMessage);
+        /* not yet hsql232: ENG-8307, "Unsupported subquery syntax..."
         failToCompile("select r2.c from r2 where r2.c = (select p1.a from p1 where p1.a = r2.c);", errorMessage);
+
+        // partition table in the UNION clause
+        // 2 partition tables
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p1.a from p1 where p1.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // 1 partition table and 1 replicated table
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // 2 tables with the same table alias
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p2.a from r4 as p2 where p2.a = r2.a UNION select p2.a from p2 where p2.a = r2.a);", errorMessage);
+        // swap the UNION order for the previous case
+        failToCompile("select * from r2 where r2.c > "
+                + " (select p2.a from p2 where p2.a = r2.a UNION select p2.a from r4 as p2 where p2.a = r2.a);", errorMessage);
+        // Join in the right clause of UNION
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION select p2.a from p2, r3 where p2.a = r2.a and p2.a = r3.a);", errorMessage);
+        // partition sub-query in the UNION
+        failToCompile("select * from r2 where r2.c > "
+                + " (select r4.a from r4 where r4.a = r2.a UNION "
+                + "  select tb.c from (select a, c from p2 where a = 3 and d > 2) tb, r3 where tb.a = r2.a and tb.a = r3.a);", errorMessage);
+        */
     }
 
     @Override

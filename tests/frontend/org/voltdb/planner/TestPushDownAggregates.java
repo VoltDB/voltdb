@@ -296,7 +296,6 @@ public class TestPushDownAggregates extends PlannerTestCase {
                 " from (select A3, count(*) CT from T3 GROUP BY A3) TEMP, T4 WHERE A3 = A4 " +
                 "group by A3, B4 order by tag desc limit 10");
         checkLimitPushedDown(pns, true);
-
     }
 
     private void checkLimitPushedDown(List<AbstractPlanNode> pn, boolean pushdown) {
