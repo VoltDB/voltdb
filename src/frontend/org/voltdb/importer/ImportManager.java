@@ -107,7 +107,6 @@ public class ImportManager {
     private synchronized void create(int myHostId, ChannelDistributer distributer, CatalogContext catalogContext, ZooKeeper zk) {
         try {
             if (catalogContext.getDeployment().getImport() == null) {
-                importLog.info("No importers specified skipping Streaming Import initialization.");
                 return;
             }
             ImportDataProcessor newProcessor = new ImportProcessor(myHostId, distributer, m_framework);
