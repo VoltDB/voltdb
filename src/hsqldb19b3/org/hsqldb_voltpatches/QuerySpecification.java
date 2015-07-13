@@ -1050,17 +1050,17 @@ public class QuerySpecification extends QueryExpression {
         // A VoltDB extension to avoid an NPE.
         if (rangeVariables != null) {
         // End of VoltDB extension
-            for (int i = 0; i < rangeVariables.length; i++) {
-                Expression e = rangeVariables[i].getJoinCondition();
+        for (int i = 0; i < rangeVariables.length; i++) {
+            Expression e = rangeVariables[i].getJoinCondition();
 
-                if (e != null) {
-                    e.resolveTypes(session, null);
+            if (e != null) {
+                e.resolveTypes(session, null);
 
-                    if (e.getDataType() != Type.SQL_BOOLEAN) {
-                        throw Error.error(ErrorCode.X_42568);
-                    }
+                if (e.getDataType() != Type.SQL_BOOLEAN) {
+                    throw Error.error(ErrorCode.X_42568);
                 }
             }
+        }
         // A VoltDB extension to avoid an NPE
         }
         // End of VoltDB extension
