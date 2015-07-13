@@ -174,7 +174,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         return false;
     }
 
-    //This is called to get all available resources.
+    //This is called to get all available resources. So called once during startup or catalog update.
     private Set<URI> buildTopicLeaderMetadata(SimpleConsumer consumer) {
 
         //For all topics connect and get metadata.
@@ -187,7 +187,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 resp = consumer.send(req);
             } catch (Exception ex) {
                 m_es = Executors.newFixedThreadPool(availableResources.size() + 1);
-                error("Failed to send topic metada request for topics " + topics);
+                error("Failed to send topic metada request for topics " + topics, ex);
                 return availableResources;
             }
 
@@ -597,7 +597,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         try {
                             fetchResponse = consumer.fetch(req);
                         } catch (Exception ex) {
-                            error("Failed to fetch from " + m_topicAndPartition);
+                            error("Failed to fetch from " + m_topicAndPartition, ex);
                             fetchFailedCount = backoffSleep(fetchFailedCount);
                         }
 
