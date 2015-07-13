@@ -262,7 +262,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     counter = 0
 
     statements_file = open(statements_path, "wb")
-    for i in generator.generate():
+    for i in generator.generate(submit_verbosely):
         cPickle.dump({"id": counter, "SQL": i}, statements_file)
         counter += 1
     statements_file.close()
