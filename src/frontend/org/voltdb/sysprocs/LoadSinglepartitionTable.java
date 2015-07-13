@@ -76,7 +76,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      */
     public long run(SystemProcedureExecutionContext ctx,
                     byte[] partitionParam,
-            String tableName, VoltTable table, byte upsertMode)
+            String tableName, byte upsertMode, VoltTable table)
             throws VoltAbortException {
         // if tableName is replicated, fail.
         // otherwise, create a VoltTable for each partition and
@@ -105,7 +105,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
             }
             if (!hasPkey) {
                 throw new VoltAbortException(
-                        String.format("LoadSinglepartitionTable in upsert mode is incompatible with table %s. with no primary key",
+                        String.format("LoadSinglepartitionTable in upsert mode incompatible with table %s. with no primary key",
                                 tableName));
             }
         }

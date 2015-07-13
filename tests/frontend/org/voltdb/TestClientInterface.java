@@ -542,7 +542,7 @@ public class TestClientInterface {
         table.addRow(1);
 
         byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
-        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", table);
+        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 0, table);
         readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true);
     }
 

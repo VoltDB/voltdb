@@ -258,11 +258,11 @@ public class PerPartitionTable {
 
         try {
             if (m_isMP) {
-                m_clientImpl.callProcedure(callback, m_procName, m_tableName, toSend, m_upsertMode);
+                m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsertMode, toSend);
             } else {
                 Object rpartitionParam = HashinatorLite.valueToBytes(toSend.fetchRow(0).get(
                         m_partitionedColumnIndex, m_partitionColumnType));
-                m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, toSend, m_upsertMode);
+                m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsertMode, toSend);
             }
         } catch (IOException e) {
             final ClientResponse r = new ClientResponseImpl(

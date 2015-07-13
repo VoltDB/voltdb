@@ -674,11 +674,11 @@ public class AsyncBenchmark {
                         switch (tc) {
                         case LOADSINGLEPARTITIONTABLEPTN:
                             client.callProcedure(new SequenceCallback(),
-                                    "@LoadSinglepartitionTable", "LIKE_COUNTERS_PTN", vt0, upsertMode);
+                                    "@LoadSinglepartitionTable", "LIKE_COUNTERS_PTN", upsertMode, vt0);
                             break;
                         case LOADMULTIPARTITIONTABLEREP:
                             client.callProcedure(new SequenceCallback(),
-                                    "@LoadMultipartitionTable", "LIKE_COUNTERS_REP", vt0, upsertMode);
+                                    "@LoadMultipartitionTable", "LIKE_COUNTERS_REP", upsertMode, vt0);
                             break;
                         }
                     }

@@ -74,7 +74,7 @@ public class TestLoadingSuite extends RegressionSuite {
         table.addRow(1, 1, 1, "1", 1.0);
         table.addRow(2, 1, 2, "2", 2.0);
         r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(1),
-                "PARTITIONED", table, upsertMode);
+                "PARTITIONED", upsertMode, table);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
         assertEquals(1, r.getResults().length);
         assertEquals(2, r.getResults()[0].asScalarLong());
@@ -83,7 +83,7 @@ public class TestLoadingSuite extends RegressionSuite {
         // test failure to load replicated table from SP proc
         try {
             r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(1),
-                    "REPLICATED", table, upsertMode);
+                    "REPLICATED", upsertMode, table);
             fail(); // prev stmt should throw exception
         } catch (ProcCallException e) {
             e.printStackTrace();
@@ -96,7 +96,7 @@ public class TestLoadingSuite extends RegressionSuite {
         table.addRow(3, 2, 3, "3", 3.0);
         try {
             r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(2),
-                    "PARTITIONED", table, upsertMode);
+                    "PARTITIONED", upsertMode, table);
             fail(); // prev stmt should throw exception
         } catch (ProcCallException e) {
             e.printStackTrace();
@@ -119,7 +119,7 @@ public class TestLoadingSuite extends RegressionSuite {
         table.addRow(2, 1, 2, "2", 2.0);
         table.addRow(3, 2, 3, "3", 3.0);
         table.addRow(4, 2, 4, "4", 4.0);
-        r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", table, upsertMode);
+        r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", upsertMode, table);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
         assertEquals(1, r.getResults().length);
         assertEquals(4, r.getResults()[0].asScalarLong());
@@ -133,7 +133,7 @@ public class TestLoadingSuite extends RegressionSuite {
             table.addRow(3, 2, 3, "3", 3.0);
             table.addRow(4, 2, 4, "4", 4.0);
             try {
-                r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", table, upsertMode);
+                r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", upsertMode, table);
                 fail();
             } catch (ProcCallException e) {}
 
@@ -142,7 +142,7 @@ public class TestLoadingSuite extends RegressionSuite {
             table.addRow(5, 1, 5, "5", 5.0);
             table.addRow(5, 1, 5, "5", 5.0);
             try {
-                r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", table, upsertMode);
+                r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", upsertMode, table);
                 fail(); // prev stmt should throw exception
             } catch (ProcCallException e) {}
             // 4 rows in the db from the previous test

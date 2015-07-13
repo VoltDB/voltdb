@@ -180,7 +180,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         // try the failure case first
         try {
-            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, 1, upsertMode);
+            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, upsertMode, 1);
             fail();
         } catch (ProcCallException ex) {}
 
@@ -231,11 +231,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         try {
             try {
                 client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
-                                 partitioned_table, upsertMode);
+                            upsertMode, partitioned_table);
                 fail();
             } catch (ProcCallException e) {}
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
-                                 replicated_table, upsertMode);
+                            upsertMode, replicated_table);
 
             // 20 rows per site for the replicated table.  Wait for it...
             int rowcount = 0;
