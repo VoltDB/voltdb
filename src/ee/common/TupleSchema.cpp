@@ -247,8 +247,11 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
         if (isInlineable(type, length, inBytes)) {
             columnInfo->inlined = true;
 
+            // If the length was specified in characters, convert to bytes.
+            int32_t factor = (type == VALUE_TYPE_VARCHAR && !inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
+
             // inlined variable length columns have a size prefix (1 byte)
-            offset = static_cast<uint32_t>(SHORT_OBJECT_LENGTHLENGTH + length);
+            offset = static_cast<uint32_t>(SHORT_OBJECT_LENGTHLENGTH + (length * factor));
         } else {
             columnInfo->inlined = false;
 
