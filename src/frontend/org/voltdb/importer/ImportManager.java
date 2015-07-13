@@ -134,12 +134,17 @@ public class ImportManager {
         m_processor.set(null);
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
+    //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
+    public synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
         //Shutdown and recreate.
         m_self.close();
         assert(m_processor.get() == null);
         m_self.create(m_myHostId, m_distributer, catalogContext, messenger.getZK());
         m_self.readyForData(catalogContext, messenger);
+    }
+
+    public void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
+        restart(catalogContext, messenger);
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {

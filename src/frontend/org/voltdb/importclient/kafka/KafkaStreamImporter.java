@@ -542,8 +542,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 assert(!m_pendingOffsets.isEmpty());
 
                 if (m_pendingOffsets.first() != m_offset) {
-                    m_seenOffset.put(m_offset, m_nextOffset);
                     m_pendingOffsets.remove(m_offset);
+                    //Add after we have removed from pending.
+                    m_seenOffset.put(m_offset, m_nextOffset);
                     return;
                 }
                 m_pendingOffsets.remove(m_offset);
