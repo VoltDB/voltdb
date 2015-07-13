@@ -16,10 +16,11 @@
  */
 package org.voltdb;
 
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -68,7 +69,7 @@ public interface CommandLog {
             long spHandle,
             int[] involvedPartitions,
             DurabilityListener listener,
-            Object durabilityHandle);
+            TransactionTask durabilityHandle);
 
     public abstract void shutdown() throws InterruptedException;
 
@@ -78,8 +79,47 @@ public interface CommandLog {
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
+    interface CompletionChecks {
+        public CompletionChecks startNewCheckList(int startSize);
+
+        public void addTask(TransactionTask task);
+
+        public int getTaskListSize();
+
+        public void processChecks();
+    }
+
     public interface DurabilityListener {
-        public void onDurability(ArrayList<Object> durableThings);
+        /**
+         * Assign the listener that we will send SP and MP UniqueId durability notifications to
+         */
+        public void setUniqueIdListener(DurableUniqueIdListener listener);
+
+        /**
+         * Called from Scheduler to set up how all future completion checks will be handled
+         */
+        public void createFirstCompletionCheck(boolean isSyncLogging, boolean commandLoggingEnabled);
+
+        /**
+         * Determines if a completionCheck has already been allocated.
+         */
+        public boolean completionCheckInitialized();
+
+        /**
+         * Called from CommandLog to assign a new task to be tracked by the DurabilityListener
+         */
+        public void addTransaction(TransactionTask pendingTask);
+
+        /**
+         * Used by CommandLog to calculate the next task list size
+         */
+        public int getNumberOfTasks();
+
+        /**
+         * Used by CommandLog to crate a new CompletionCheck so the last CompletionCheck can be
+         * triggered when the sync completes
+         */
+        public CompletionChecks startNewTaskList(int nextMaxRowCnt);
     }
 
     /**
@@ -98,4 +138,14 @@ public interface CommandLog {
      * Implementation should populate the stats based on column name to index mapping
      */
     public void populateCommandLogStats(Map<String, Integer> columnNameToIndex, Object[] rowValues);
+
+    /**
+     * Does this logger do synchronous logging
+     */
+    public abstract boolean isSynchronous();
+
+    /**
+     * Assign DurabilityListener from each SpScheduler to commmand log
+     */
+    public abstract void registerDurabilityListener(DurabilityListener durabilityListener);
 }
