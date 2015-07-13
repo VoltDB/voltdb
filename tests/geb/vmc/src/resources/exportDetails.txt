@@ -42,3 +42,7 @@ customTest
 #customConnectorClass
 customConnectorClass
 
+#elasticSearchTestName
+elasticSearchTest
+#endpointValue
+endpointValue
