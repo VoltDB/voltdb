@@ -203,6 +203,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // default iterator
     TableIterator m_iter;
 
+ protected:
+
+    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
+
   public:
     virtual ~PersistentTable();
 
@@ -393,6 +397,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     bool isDREnabled() const { return m_drEnabled; }
+
+    bool hasDRTimestampColumn() const { return m_drTimestampColumnIndex != -1; }
+
+    bool getDRTimestampColumnIndex() const { return m_drTimestampColumnIndex; }
+
+    void setDRTimestampForTuple(ExecutorContext* ec, TableTuple &tuple);
 
     // for test purpose
     void setDR(bool flag) { m_drEnabled = flag; }
@@ -641,6 +651,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     bool m_noAvailableUniqueIndex;
     TableIndex* m_smallestUniqueIndex;
     uint32_t m_smallestUniqueIndexCrc;
+    int m_drTimestampColumnIndex;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

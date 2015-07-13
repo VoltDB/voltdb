@@ -61,6 +61,7 @@
 #include "common/types.h"
 #include "common/RecoveryProtoMessage.h"
 #include "common/StreamPredicateList.h"
+#include "common/ValueFactory.hpp"
 #include "catalog/catalog.h"
 #include "catalog/database.h"
 #include "catalog/table.h"
@@ -104,7 +105,8 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_drEnabled(drEnabled),
     m_noAvailableUniqueIndex(false),
     m_smallestUniqueIndex(NULL),
-    m_smallestUniqueIndexCrc(0)
+    m_smallestUniqueIndexCrc(0),
+    m_drTimestampColumnIndex(-1)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
@@ -116,6 +118,26 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
 
     m_preTruncateTable = NULL;
     ::memcpy(&m_signature, signature, 20);
+}
+
+void PersistentTable::initializeWithColumns(TupleSchema *schema,
+                                            const std::vector<std::string> &columnNames,
+                                            bool ownsTupleSchema,
+                                            int32_t compactionThreshold)
+{
+    assert (schema != NULL);
+    uint16_t hiddenColumnCount = schema->hiddenColumnCount();
+    if (hiddenColumnCount == 1) {
+        m_drTimestampColumnIndex = 0; // The first hidden column
+
+        // At some point if we have more than one hidden column int a table,
+        // we'll need a system for keeping track of which are which.
+    }
+    else {
+        assert (hiddenColumnCount == 0);
+    }
+
+    Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
 }
 
 PersistentTable::~PersistentTable()
@@ -360,6 +382,13 @@ void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(1, source.getNValue(2));
 }
 
+void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple) {
+    assert(hasDRTimestampColumn());
+    const int64_t drTimestamp = ec->currentDRTimestamp();
+    tuple.setHiddenNValue(getDRTimestampColumnIndex(),
+                          ValueFactory::getBigIntValue(drTimestamp));
+}
+
 /*
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.
@@ -436,6 +465,9 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    if (hasDRTimestampColumn())
+        setDRTimestampForTuple(ec, target);
+
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
@@ -576,6 +608,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    if (hasDRTimestampColumn())
+        setDRTimestampForTuple(ec, sourceTupleWithNewValues);
+
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled) {
