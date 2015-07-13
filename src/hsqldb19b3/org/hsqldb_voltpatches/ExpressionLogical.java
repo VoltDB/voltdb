@@ -2405,16 +2405,18 @@ public class ExpressionLogical extends Expression {
     // A VoltDB extension to print HSQLDB ASTs
     protected String voltDescribe(Session session, int blanks) {
         StringBuffer sb = new StringBuffer(64);
-        sb.append("LOGICAL EXPRESSION: [");
+        sb.append("LOGICAL EXPRESSION: [")
+          .append(Expression.voltIndentStr(blanks+2, true, false));
         switch (opType) {
             case OpTypes.VALUE :
-                sb.append(Expression.voltIndentStr(blanks+2, true, false))
-                   .append("VALUE = ")
-                   .append(dataType.convertToSQLString(valueData))
-                   .append(Expression.voltIndentStr(blanks+2, true, false))
-                   .append("TYPE = ").append(dataType.getNameString());
-                return sb.toString();
-
+                sb.append("VALUE = ")
+                  .append(dataType.convertToSQLString(valueData))
+                  .append(Expression.voltIndentStr(blanks+2, true, false))
+                  .append("TYPE = ")
+                  .append(dataType.getNameString())
+                  .append(voltIndentStr(blanks, true, false))
+                  .append("]");
+                break;
             case OpTypes.NOT :
                 if (nodes[LEFT].opType == OpTypes.NOT_DISTINCT) {
                     sb.append(Tokens.T_DISTINCT);

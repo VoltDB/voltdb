@@ -2195,9 +2195,16 @@ public class Expression implements Cloneable {
         prototypes.put(OpTypes.DYNAMIC_PARAM, (new VoltXMLElement("value")).withValue("isparam", "true")); // param
         prototypes.put(OpTypes.ASTERISK,      new VoltXMLElement("asterisk"));
         prototypes.put(OpTypes.SEQUENCE,      null); // not yet supported sequence type
-        prototypes.put(OpTypes.SCALAR_SUBQUERY,null); // not yet supported subquery feature, query based row/table
-        prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
-        prototypes.put(OpTypes.TABLE_SUBQUERY,new VoltXMLElement("tablesubquery"));
+        /*
+         * A ROW_SUBQUERY is a subquery which is expected to return a single,
+         * multicolumn row.  A TABLE_SUBQUERY is an unrestricted subquery.  A
+         * single column, single row query is a SCALAR_SUBQUERY.  We treat them
+         * all roughly interchangeably here, but we will add an attribute which
+         * the planner could use if it wanted to.
+         */
+        prototypes.put(OpTypes.SCALAR_SUBQUERY,new VoltXMLElement("tablesubquery").withValue("subquerytype", "scalar"));
+        prototypes.put(OpTypes.ROW_SUBQUERY,  new VoltXMLElement("tablesubquery").withValue("subquerytype", "row"));
+        prototypes.put(OpTypes.TABLE_SUBQUERY,new VoltXMLElement("tablesubquery").withValue("subquerytype", "table"));
         prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
         prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table"));
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
@@ -2500,6 +2507,8 @@ public class Expression implements Cloneable {
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
+        case OpTypes.SCALAR_SUBQUERY:
+        case OpTypes.ROW_SUBQUERY:
         case OpTypes.TABLE_SUBQUERY:
             if (table == null || table.queryExpression == null) {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
@@ -2727,40 +2736,6 @@ public class Expression implements Cloneable {
     @Override
     public String toString() {
         return voltDescribe(null, 0);
-        /*
-        String type = null;
-
-        // iterate through all optypes, looking for
-        // a match...
-        // sadly do this with reflection
-        Field[] fields = OpTypes.class.getFields();
-        for (Field f : fields) {
-            if (f.getType() != int.class) continue;
-            int value = 0;
-            try {
-                value = f.getInt(null);
-            } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-
-            // found a match
-            if (value == opType) {
-                type = f.getName();
-                break;
-            }
-        }
-        assert(type != null);
-
-        // return the original default impl + the type
-        String str = super.toString() + " with opType " + type +
-                ", isAggregate: " + isAggregate +
-                ", columnIndex: " + columnIndex;
-        if (this instanceof ExpressionOrderBy) {
-            str += "\n  " + this.nodes[LEFT].toString();
-        }
-        return str;
-        */
     }
 
     static protected Expression voltCombineWithAnd(Expression... conditions)
@@ -2847,7 +2822,7 @@ public class Expression implements Cloneable {
                 sb.append("ROW = [");
                 for (int i = 0; i < nodes.length; i++) {
                     sb.append(Expression.voltIndentStr(blanks + 2, true, false))
-                      .append(nodes[i].voltDescribe(session, blanks + 1));
+                      .append(nodes[i].voltDescribe(session, blanks + 2));
                 }
                 sb.append(Expression.voltIndentStr(blanks + 2, true, false))
                   .append("]");
@@ -2856,10 +2831,11 @@ public class Expression implements Cloneable {
             case OpTypes.VALUELIST :
                 sb.append("VALUELIST [");
                 for (int i = 0; i < nodes.length; i++) {
-                    sb.append(nodes[i].describe(session, blanks + 2));
-                    sb.append(' ');
+                    sb.append(voltIndentStr(blanks + 2, true, false))
+                      .append(nodes[i].voltDescribe(session, blanks + 2));
                 }
-                sb.append("]");
+                sb.append(voltIndentStr(blanks, true, false))
+                  .append("]");
                 break;
         }
 
@@ -2881,7 +2857,7 @@ public class Expression implements Cloneable {
         }
 
         if (getRightNode() != null) {
-            sb.append(Expression.voltIndentStr(blanks+2, true, false))
+            sb.append(Expression.voltIndentStr(blanks, true, false))
               .append(rightName)
               .append(" = [")
               .append(Expression.voltIndentStr(blanks + 2, true, false))
