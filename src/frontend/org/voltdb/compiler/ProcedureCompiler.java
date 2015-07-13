@@ -744,10 +744,18 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
                 if (statementPartitionExpression != null) {
                     // The planner has uncovered an overlooked opportunity to run the statement SP.
-                    String msg = null;
+                    String msg = "This procedure would benefit from ";
+                    String tableName = "tableName", partitionColumnName = "partitionColumnName";
+                    try {
+                        assert(partitioning.getFullColumnName() != null);
+                        String array[] = partitioning.getFullColumnName().split("\\.");
+                        tableName = array[0];
+                        partitionColumnName = array[1];
+                    } catch(Exception ex) {
+                    }
+
                     if (statementPartitionExpression instanceof ParameterValueExpression) {
-                        msg = "This procedure would benefit from setting the attribute 'partitioninfo=" + partitioning.getFullColumnName() +
-                                ":" + ((ParameterValueExpression) statementPartitionExpression).getParameterIndex() + "'";
+                        paramCount = ((ParameterValueExpression) statementPartitionExpression).getParameterIndex();
                     } else {
                         String valueDescription = null;
                         Object partitionValue = partitioning.getInferredPartitioningValue();
@@ -757,10 +765,11 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                         } else {
                             valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
                         }
-                        msg = "This procedure would benefit from adding a parameter to be passed the value " + valueDescription +
-                                " and setting the attribute 'partitioninfo=" + partitioning.getFullColumnName() +
-                                ":" + paramCount  + "'";
+                        msg += "adding a parameter to be passed the value " + valueDescription + " and ";
                     }
+                    msg += "adding 'PARTITION PROCEDURE "+ shortName + " ON TABLE " + tableName + " COLUMN " +
+                            partitionColumnName + " PARAMETER " + paramCount + ";' to the DDL.";
+
                     compiler.addWarn(msg);
                 }
             }
