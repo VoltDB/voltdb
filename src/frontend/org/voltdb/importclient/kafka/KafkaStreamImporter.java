@@ -513,7 +513,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             info("Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
                             getOffsetCoordinator();
                             consumer = m_offsetManager.get();
-                            offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                            if (consumer != null) {
+                                offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                            }
                         }
                     } else {
                         error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
