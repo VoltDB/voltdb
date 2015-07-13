@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -325,8 +326,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final int m_consumerSocketTimeout;
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
-        private final TreeSet<Long> m_pendingOffsets = new TreeSet<Long>();
-        private final Map<Long, Long> m_seenOffset = new HashMap<Long, Long>();
+        private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
+        private final Map<Long, Long> m_seenOffset = Collections.synchronizedMap(new HashMap<Long, Long>());
         private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 500);
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private final TopicAndPartition m_topicAndPartition;
@@ -538,30 +539,34 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                //We should never get here wiht no pending offsets.
-                assert(!m_pendingOffsets.isEmpty());
+                try {
+                    //We should never get here wiht no pending offsets.
+                    assert(!m_pendingOffsets.isEmpty());
 
-                if (m_pendingOffsets.first() != m_offset) {
-                    m_pendingOffsets.remove(m_offset);
-                    //Add after we have removed from pending.
-                    m_seenOffset.put(m_offset, m_nextOffset);
-                    return;
-                }
-                m_pendingOffsets.remove(m_offset);
-                //If I am lowest in pending commit anything I have seen after me in sequence.
-                long commit = m_nextOffset;
-                while (true) {
-                    Long n2 = m_seenOffset.get(commit);
-                    if (n2 == null) {
-                        break;
+                    if (m_pendingOffsets.first() != m_offset) {
+                        m_pendingOffsets.remove(m_offset);
+                        //Add after we have removed from pending.
+                        m_seenOffset.put(m_offset, m_nextOffset);
+                        return;
                     }
-                    commit = n2;
-                    m_seenOffset.remove(commit);
-                }
-                //Highest commit we have seen after me will be committed.
-                if (commitOffset(commit)) {
-                    debug("Committed offset " + commit + " for " + m_topicAndPartition);
-                    m_currentOffset.set(commit);
+                    m_pendingOffsets.remove(m_offset);
+                    //If I am lowest in pending commit anything I have seen after me in sequence.
+                    long commit = m_nextOffset;
+                    while (true) {
+                        Long n2 = m_seenOffset.get(commit);
+                        if (n2 == null) {
+                            break;
+                        }
+                        commit = n2;
+                        m_seenOffset.remove(commit);
+                    }
+                    //Highest commit we have seen after me will be committed.
+                    if (commitOffset(commit)) {
+                        debug("Committed offset " + commit + " for " + m_topicAndPartition);
+                        m_currentOffset.set(commit);
+                    }
+                } catch (Throwable t) {
+                  t.printStackTrace();
                 }
             }
 
