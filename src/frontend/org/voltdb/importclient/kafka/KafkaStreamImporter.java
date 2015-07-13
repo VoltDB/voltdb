@@ -699,6 +699,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             }
             for (String topic : m_topicList) {
                 List<Integer> topicPartitions = m_topicPartitions.get(topic);
+                if (topicPartitions == null) {
+                    //I got a change for added partition that I am not aware of die die.
+                    throw new RuntimeException("Unknown kafka topic for this node: " + topic);
+                }
                 for (int partition : topicPartitions) {
                     String leaderKey = topic + "-" + partition;
                     URI assignedKey = URI.create("kafka:/" + topic + "/partition/" + partition);
