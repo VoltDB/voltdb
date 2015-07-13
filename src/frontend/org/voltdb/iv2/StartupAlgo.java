@@ -86,6 +86,8 @@ public class StartupAlgo implements RepairAlgo
                 new RepairResult(
                     TxnEgo.makeZero(m_partitionId).getTxnId(),
                     Long.MIN_VALUE,
+                    Long.MIN_VALUE,
+                    Long.MIN_VALUE,
                     Long.MIN_VALUE));
     }
 

@@ -144,6 +144,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             m_term.start();
             long binaryLogDRId = Long.MIN_VALUE;
             long binaryLogUniqueId = Long.MIN_VALUE;
+            long localSpUniqueId = Long.MIN_VALUE;
             while (!success) {
                 RepairAlgo repair =
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
@@ -167,6 +168,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     txnid = res.m_txnId;
                     binaryLogDRId = res.m_binaryLogDRId;
                     binaryLogUniqueId = res.m_binaryLogUniqueId;
+                    localSpUniqueId = res.m_localSpUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -198,7 +200,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             ExportManager.instance().acceptMastership(m_partitionId);
             // If we are a DR replica, inform that subsystem of any remote data we've seen
             if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
-                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, Long.MIN_VALUE);
+                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, localSpUniqueId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);

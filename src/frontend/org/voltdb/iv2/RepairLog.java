@@ -63,6 +63,8 @@ public class RepairLog
     private long m_maxSeenMpBinaryLogUniqueId = Long.MIN_VALUE;
     private long m_maxSeenSpBinaryLogDRId = Long.MIN_VALUE;
     private long m_maxSeenMpBinaryLogDRId = Long.MIN_VALUE;
+    private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -168,6 +170,8 @@ public class RepairLog
                     Object[] params = spi.getParams().toArray();
                     m_maxSeenSpBinaryLogDRId = Math.max(m_maxSeenSpBinaryLogDRId, ((Number)params[2]).longValue());
                     m_maxSeenSpBinaryLogUniqueId = Math.max(m_maxSeenSpBinaryLogUniqueId, ((Number)params[3]).longValue());
+                    assert UniqueIdGenerator.getPartitionIdFromUniqueId(m.getUniqueId()) !=  MpInitiator.MP_INIT_PID;
+                    m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, m.getUniqueId());
                 }
             }
         } else if (msg instanceof FragmentTaskMessage) {
@@ -188,6 +192,8 @@ public class RepairLog
                     Object[] params = spi.getParams().toArray();
                     m_maxSeenMpBinaryLogDRId = Math.max(m_maxSeenMpBinaryLogDRId, ((Number)params[2]).longValue());
                     m_maxSeenMpBinaryLogUniqueId = Math.max(m_maxSeenMpBinaryLogUniqueId, ((Number)params[3]).longValue());
+                    assert UniqueIdGenerator.getPartitionIdFromUniqueId(m.getUniqueId()) ==  MpInitiator.MP_INIT_PID;
+                    m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, m.getUniqueId());
                 }
             }
         }
@@ -270,6 +276,8 @@ public class RepairLog
         items.addAll(m_logMP);
         long maxSeenBinaryLogUniqueId = m_maxSeenMpBinaryLogUniqueId;
         long maxSeenBinaryLogDRId = m_maxSeenMpBinaryLogDRId;
+        long maxSeenLocalSpUniqueId = m_maxSeenLocalSpUniqueId;
+        long maxSeenLocalMpUniqueId = m_maxSeenLocalMpUniqueId;
         // SP repair requests also want the SP transactions
         if (!forMPI) {
             maxSeenBinaryLogUniqueId = m_maxSeenSpBinaryLogUniqueId;
@@ -294,6 +302,8 @@ public class RepairLog
                         m_lastSpHandle,
                         m_lastMpHandle,
                         TheHashinator.getCurrentVersionedConfigCooked(),
+                        maxSeenLocalSpUniqueId,
+                        maxSeenLocalMpUniqueId,
                         maxSeenBinaryLogDRId,
                         maxSeenBinaryLogUniqueId);
         responses.add(hheader);

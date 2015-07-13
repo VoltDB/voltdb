@@ -49,11 +49,15 @@ public interface RepairAlgo
     public static class RepairResult
     {
         public final long m_txnId;
+        public final long m_localSpUniqueId;
+        public final long m_localMpUniqueId;
         public final long m_binaryLogDRId;
         public final long m_binaryLogUniqueId;
 
-        RepairResult(long txnId, long binaryLogDRId, long binaryLogUniqueId) {
+        RepairResult(long txnId, long localSpUniqueId, long localMpUniqueId, long binaryLogDRId, long binaryLogUniqueId) {
             m_txnId = txnId;
+            m_localSpUniqueId = localSpUniqueId;
+            m_localMpUniqueId = localMpUniqueId;
             m_binaryLogDRId = binaryLogDRId;
             m_binaryLogUniqueId = binaryLogUniqueId;
         }
