@@ -283,6 +283,63 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
         }
     }
 
+
+    private void bigBatchAdvancedChecker(Client client, int partitionKey, int hasPreviousBatch,
+            int hasBigBatch, int bigBatchDuplicatedID, int hasFollowingBatch,
+            int hasFollowingTryCatchBatch, int hasDupsInTryCatch, int exitAbort,
+            double[] expected, int tableCount)
+        throws NoConnectionsException, IOException, ProcCallException {
+
+        VoltTable vt;
+        String sql;
+
+        // use the default value for partition column to route this procedure
+        vt = client.callProcedure("SPBigBatchAdvancedOnPartitionTable", 0,
+                hasPreviousBatch, hasBigBatch, bigBatchDuplicatedID,
+                hasFollowingBatch, hasFollowingTryCatchBatch,
+                hasDupsInTryCatch, exitAbort).getResults()[0];
+        // validate returned value from the procedure calls
+        int result = bigBatchDuplicatedID > BIGBATCHTESTSIZE ? 0: -1;
+        if (isTrue(hasDupsInTryCatch)) result = -2;
+        validateRowOfLongs(vt, new long[]{result});
+
+        sql = "select distinct ratio from P1 order by 1;";
+        validateTableColumnOfScalarFloat(client, sql, expected);
+
+        sql = "select count(*) from P1; ";
+        validateTableOfScalarLongs(client, sql, new long[]{tableCount});
+
+        client.callProcedure("@AdHoc", "truncate table P1");
+    }
+
+    public void testBigBatchAdvancedException() throws IOException, ProcCallException {
+        System.out.println("test testBigBatchAdvancedException...");
+        Client client = getClient();
+
+        // so many more permutations
+        bigBatchAdvancedChecker(client, 0, 1, 1, 150, 1, 1, 1, 0, new double[]{0.1, 500.1}, 2);
+        bigBatchAdvancedChecker(client, 0, 1, 1, 250, 1, 1, 1, 0, new double[]{0.1, 500.1}, 2);
+        bigBatchAdvancedChecker(client, 0, 0, 1, 150, 0, 0, 0, 0, new double[]{}, 0);
+
+        // Test multiple procedure call suggested from code review
+        String sql;
+
+        // big batch roll back
+        client.callProcedure("SPBigBatchAdvancedOnPartitionTable", 0, 1, 1, 150, 0, 0, 0, 0);
+        // how transaction roll back
+        try {
+            client.callProcedure("SPBigBatchAdvancedOnPartitionTable", 0, 0, 0, 0, 0, 0, 0, 1);
+            fail();
+        } catch(Exception e) {
+            assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(e.getMessage().contains("700.2")); // violated at row (700, 700.2)
+        }
+        sql = "select distinct ratio from P1 order by 1;";
+        validateTableColumnOfScalarFloat(client, sql, new double[]{0.1});
+    }
+
+
+
     public TestCatchExceptionsInProcedure(String name) {
         super(name);
     }
@@ -292,7 +349,8 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
         org.voltdb_testprocs.regressionsuites.catchexceptions.SPInsertOnPartitionTable.class,
         org.voltdb_testprocs.regressionsuites.catchexceptions.MPInsertOnPartitionTable.class,
         org.voltdb_testprocs.regressionsuites.catchexceptions.SPMultipleTryCatchOnPartitionTable.class,
-        org.voltdb_testprocs.regressionsuites.catchexceptions.SPBigBatchOnPartitionTable.class
+        org.voltdb_testprocs.regressionsuites.catchexceptions.SPBigBatchOnPartitionTable.class,
+        org.voltdb_testprocs.regressionsuites.catchexceptions.SPBigBatchAdvancedOnPartitionTable.class
         };
 
     static public junit.framework.Test suite() {

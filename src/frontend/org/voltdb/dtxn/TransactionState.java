@@ -141,7 +141,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_beginUndoToken;
     }
 
-    // Assume that rollback-ness is a latch.
     public void setNeedsRollback(boolean rollback)
     {
         m_needsRollback = rollback;

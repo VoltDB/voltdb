@@ -145,7 +145,7 @@ public class ProcedureRunner {
     protected int m_batchIndex;
 
     /** boolean flag to mark whether the previous batch execution has EE exception or not.*/
-    private long m_spBigBatchBeginToken = -100L;
+    private long m_spBigBatchBeginToken;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -263,6 +263,9 @@ public class ProcedureRunner {
 
         // reset batch context info
         m_batchIndex = -1;
+
+        // reset the beginning big batch undo token
+        m_spBigBatchBeginToken = -1;
 
         // set procedure name in the site/ee
         m_site.setProcedureName(m_procedureName);
@@ -701,7 +704,7 @@ public class ProcedureRunner {
             // should check whether the batch is read only or not
             // e.g. read only query may have timed out...
             if (!m_isSinglePartition && m_txnState.needsRollback()) {
-                throw new RuntimeException("Multi-partition procedure " + m_procedureName +
+                throw new VoltAbortException("Multi-partition procedure " + m_procedureName +
                         " attempted to execute new batch after hitting EE exception in a previous batch");
             }
 
@@ -713,6 +716,9 @@ public class ProcedureRunner {
 
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
+                // invalidate this big batch begin token
+                m_spBigBatchBeginToken = -1;
+
                 return executeQueriesInABatch(m_batch, isFinalSQL);
             }
             // otherwise, break it into sub-batches
