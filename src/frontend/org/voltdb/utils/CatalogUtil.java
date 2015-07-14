@@ -124,8 +124,10 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+
 import java.net.URISyntaxException;
 import java.util.HashMap;
+
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
@@ -1016,6 +1018,7 @@ public abstract class CatalogUtil {
             case KAFKA: exportClientClassName = "org.voltdb.exportclient.kafka.KafkaExportClient"; break;
             case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
+            case ELASTICSEARCH: exportClientClassName = "org.voltdb.exportclient.ElasticSearchHttpExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 exportClientClassName = exportConfiguration.getExportconnectorclass();
@@ -1702,6 +1705,7 @@ public abstract class CatalogUtil {
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
+                cluster.setDrconsumerenabled(drConnection.isEnabled());
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
         }

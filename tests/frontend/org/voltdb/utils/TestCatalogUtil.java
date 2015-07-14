@@ -669,6 +669,26 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
+        final String withBuiltinElasticSearchExportNew =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='true' type='elasticsearch'>"
+                + "            <property name=\"endpoint\">http://localhost:9200/index_%t/type_%p</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String withBuiltinElasticSearchExportOld =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='elasticsearch'>"
+                + "        <configuration>"
+                + "            <property name=\"endpoint\">http://localhost:9200/index_%t/type_%p</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
         final String ddl =
                 "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
                 + "EXPORT TABLE export_data;";
@@ -738,6 +758,40 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(builtin_kafkadeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.KAFKA);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.kafka.KafkaExportClient");
+
+        //Check elastic-search option.
+        final File tmpElasticSearchNewBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinElasticSearchExportNew);
+        DeploymentType builtin_elasticsearchnewdeployment = CatalogUtil.getDeployment(new FileInputStream(tmpElasticSearchNewBuiltin));
+
+        Catalog cat5 = compiler.compileCatalogFromDDL(x);
+        msg = CatalogUtil.compileDeployment(cat5, builtin_elasticsearchnewdeployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        db = cat5.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        assertNotNull(catconn);
+
+        assertTrue(builtin_elasticsearchnewdeployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(builtin_elasticsearchnewdeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.ELASTICSEARCH);
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.ElasticSearchHttpExportClient");
+
+        //Check elastic-search with legacy deployment XML
+        final File tmpElasticSearchOldBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinElasticSearchExportOld);
+        DeploymentType builtin_elasticsearcholddeployment = CatalogUtil.getDeployment(new FileInputStream(tmpElasticSearchOldBuiltin));
+
+        Catalog cat6 = compiler.compileCatalogFromDDL(x);
+        msg = CatalogUtil.compileDeployment(cat6, builtin_elasticsearcholddeployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        db = cat6.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        assertNotNull(catconn);
+
+        assertTrue(builtin_elasticsearcholddeployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(builtin_elasticsearcholddeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.ELASTICSEARCH);
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.ElasticSearchHttpExportClient");
     }
 
     public void testImportSettings() throws Exception {
@@ -1371,7 +1425,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
-        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
         assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpEnabled = VoltProjectBuilder.writeStringToTempFile(oneEnabledConnection);
@@ -1383,7 +1437,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
-        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
         assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(drDisabled);

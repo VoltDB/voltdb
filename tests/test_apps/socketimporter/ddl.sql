@@ -45,7 +45,6 @@ CREATE TABLE kafkaexporttable1
 EXPORT TABLE kafkaexporttable1;
 
 -- Stored procedures
-
 LOAD classes sp.jar;
 
 CREATE PROCEDURE FROM class socketimporter.db.procedures.InsertExport;

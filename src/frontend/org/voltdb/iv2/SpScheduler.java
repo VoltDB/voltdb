@@ -127,6 +127,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     };
 
+    public interface DurableUniqueIdListener {
+        /**
+         * Notify listener of last durable Single-Part and Multi-Part uniqueIds
+         */
+        public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId);
+    }
+
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
 
@@ -148,7 +155,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
 
-
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
@@ -157,31 +163,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         super(partitionId, taskQueue);
         m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
         m_snapMonitor = snapMonitor;
-        m_durabilityListener = new DurabilityListener() {
-            @Override
-            public void onDurability(final ArrayList<Object> durableThings) {
-                final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
-                    @Override
-                    void run() {
-                        synchronized (m_lock) {
-                            for (Object o : durableThings) {
-                                m_pendingTasks.offer((TransactionTask)o);
-
-                                // Make sure all queued tasks for this MP txn are released
-                                if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
-                                    offerPendingMPTasks(((TransactionTask) o).getTxnId());
-                                }
-                            }
-                        }
-                    }
-                };
-                if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
-                    m_tasks.offer(r);
-                } else {
-                    r.run();
-                }
-            }
-        };
+        m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
@@ -199,14 +181,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
+    @Override
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
+        m_durabilityListener.setUniqueIdListener(listener);
+    }
+
     public void setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
-    }
-
-    public void setMpDRGateway(final PartitionDRGateway mpGateway)
-    {
-        // intentionally blank placeholder
+        setDurableUniqueIdListener(gateway);
     }
 
     @Override
@@ -877,7 +860,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      *
      * @param txnId    The MP transaction ID.
      */
-    private void offerPendingMPTasks(long txnId)
+    public void offerPendingMPTasks(long txnId)
     {
         Queue<TransactionTask> pendingTasks = m_mpsPendingDurability.get(txnId);
         if (pendingTasks != null) {
@@ -1001,6 +984,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
+        m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), cl.isEnabled());
+        m_cl.registerDurabilityListener(m_durabilityListener);
     }
 
     @Override
@@ -1049,6 +1034,23 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         return new CountDownLatch(0);
+    }
+
+    public void processDurabilityChecks(final CommandLog.CompletionChecks currentChecks) {
+        final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
+            @Override
+            void run() {
+                assert(currentChecks != null);
+                synchronized (m_lock) {
+                    currentChecks.processChecks();
+                }
+            }
+        };
+        if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
+            m_tasks.offer(r);
+        } else {
+            r.run();
+        }
     }
 
     @Override

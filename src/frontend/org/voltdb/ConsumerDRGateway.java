@@ -38,9 +38,9 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void shutdown(boolean blocking) throws InterruptedException;
 
-    public abstract void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId);
+    public abstract void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId);
 
-    public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId);
+    public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId, long localUniqueId);
 
     /**
      * Should only be called before initialization. Populate all previously seen
@@ -74,10 +74,10 @@ public interface ConsumerDRGateway extends Promotable {
         public void shutdown(boolean blocking) {}
 
         @Override
-        public void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId) {}
+        public void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId) {}
 
         @Override
-        public void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId) {
+        public void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId, long localUniqueId) {
             int dataCenter = (int)(endDRId >> 55);
             if (!ids.containsKey(dataCenter)) {
                 ids.put(dataCenter, new HashMap<Integer, Pair<Long, Long>>());
