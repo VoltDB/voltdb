@@ -304,10 +304,10 @@ public class KafkaImportBenchmark {
         // TODO: make interval a command line argument
         System.out.println("starting data checker...");
         @SuppressWarnings("static-access")
-		Timer t = matchChecks.checkTimer(5000, client, config.duration);
+		Timer t = matchChecks.checkTimer(5000, client);
 
         runner.join(); // writers are done
-        t.wait();      // now let the checking timer run down
+        // t.wait();      // now let the checking timer run down
 
         client.drain();
         client.close();

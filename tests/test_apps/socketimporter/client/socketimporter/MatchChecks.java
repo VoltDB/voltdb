@@ -29,7 +29,6 @@ import java.util.TimerTask;
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
@@ -47,22 +46,18 @@ public class MatchChecks {
          }
     }
 
-	protected static Timer checkTimer(long interval, Client client, int duration) {
+	protected static Timer checkTimer(long interval, Client client) {
 		final Timer timer = new Timer();
         final Client innerClient = client;
-        final long innerDuration = duration;
-        final long innerInterval = interval;
 		timer.scheduleAtFixedRate(new TimerTask() {
-		    private long count = (3 * innerDuration * 1000) / innerInterval; // give some extra time after export ends for import to complete
 		    private long mirrorRowCount = 0;
 
 			@Override
 		    public void run() {
 				mirrorRowCount = getMirrorTableRowCount(innerClient);
-				System.out.println("Loop countdown: " + count);
 				System.out.println("\tDelete rows: " + findAndDeleteMatchingRows(innerClient));
 				System.out.println("\tMirror table row count: " + mirrorRowCount);
-		    	if (count-- == 0 || mirrorRowCount == 0) {
+		    	if (mirrorRowCount == 0) { // indicates everything matched and table empty
 		    		timer.cancel();
 		    		timer.purge();
 		    	}
@@ -79,7 +74,6 @@ public class MatchChecks {
 			VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
 			mirrorRowCount = countQueryResult[0].asScalarLong();
 		} catch (IOException | ProcCallException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		System.out.println("Mirror table row count: " + mirrorRowCount);
