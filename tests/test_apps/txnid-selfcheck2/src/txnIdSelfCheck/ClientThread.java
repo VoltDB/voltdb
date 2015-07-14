@@ -71,6 +71,7 @@ public class ClientThread extends BenchmarkThread {
     static Random rn = new Random(31); // deterministic sequence
     final Random m_random = new Random();
     final Semaphore m_permits;
+    public long m_cnt = 0;
 
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
             boolean allowInProcAdhoc, float mpRatio)
@@ -172,7 +173,13 @@ public class ClientThread extends BenchmarkThread {
             }
 
             VoltTable[] results = response.getResults();
-
+            VoltTable data = results[3];
+            long cnt = data.fetchRow(0).getLong("cnt");
+            
+            // check to see if the DB's last count matches with the last count reported by the server...
+            if (cnt-m_cnt < 0 )
+                hardStop("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+(cnt-1));
+            m_cnt = cnt+1;
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {

@@ -90,7 +90,7 @@ function benchmark() {
         --displayinterval=1 \
         --duration=120 \
         --servers=localhost \
-        --threads=20 \
+        --threads=49 \
         --threadoffset=0 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \

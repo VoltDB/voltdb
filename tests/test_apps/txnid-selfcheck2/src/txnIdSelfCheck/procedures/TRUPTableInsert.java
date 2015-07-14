@@ -24,14 +24,16 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.types.TimestampType;
 
 public class TRUPTableInsert extends VoltProcedure {
-    final SQLStmt insert = new SQLStmt("insert into trup values (?,?,?);");
+    final SQLStmt inserttrup = new SQLStmt("insert into trup values (?,?,?);");
 
     public VoltTable[] run(long p, byte[] data) {
-        voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);
+        voltQueueSQL(inserttrup, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);
         return voltExecuteSQL(true);
     }
 }

@@ -619,8 +619,6 @@ public class Benchmark {
             Thread.sleep(1000);
             System.out.println("Wait for hashinator..");
         }
-
-
         partitionedTruncater = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedTruncater.start();
@@ -654,7 +652,6 @@ public class Benchmark {
         idpt.start();
         ddlt = new DdlThread(client);
         // XXX/PSR ddlt.start();
-
         clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,

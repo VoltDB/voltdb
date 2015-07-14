@@ -185,6 +185,22 @@ CREATE TABLE trup
 );
 PARTITION TABLE trup ON COLUMN p;
 
+CREATE TABLE capr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_cr PRIMARY KEY (p,id)
+);
+
+CREATE TABLE capp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_cp PRIMARY KEY (p,id)
+);
+PARTITION TABLE trup ON COLUMN p;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;

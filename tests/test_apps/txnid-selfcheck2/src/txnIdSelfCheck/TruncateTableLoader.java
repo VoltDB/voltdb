@@ -32,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -40,7 +42,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 public class TruncateTableLoader extends BenchmarkThread {
-
 
     final Client client;
     final long targetCount;
@@ -56,6 +57,7 @@ public class TruncateTableLoader extends BenchmarkThread {
     long rowsLoaded = 0;
     long nTruncates = 0;
     float mpRatio;
+    boolean capped;
 
     TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
         setName("TruncateTableLoader");
@@ -132,6 +134,13 @@ public class TruncateTableLoader extends BenchmarkThread {
                         m_permits.acquire();
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
+                        try {
+                            String mcapName = "CAPR";
+                            if (tableName.equals("TRUP")) mcapName = "CAPP";
+                            client.callProcedure(new InsertCallback(latch), mcapName + "TableInsert", p, data); // here
+                        } catch (Exception e) {
+                            log.error("Catching general exception, catch a specific exception. Also probably check a table size or two. ");
+                        }
                     }
                     latch.await(10, TimeUnit.SECONDS);
                     long nextRowCount = -1;
@@ -160,6 +169,8 @@ public class TruncateTableLoader extends BenchmarkThread {
             } catch (Exception e) {
                 hardStop("getrowcount exception", e);
             }
+            
+            
 
             try {
                 log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);

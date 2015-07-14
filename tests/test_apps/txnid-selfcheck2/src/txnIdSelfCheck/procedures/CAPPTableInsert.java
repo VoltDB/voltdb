@@ -24,25 +24,16 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
-import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.types.TimestampType;
 
-public class TRUPScanAggTableSP extends VoltProcedure {
-    final SQLStmt max = new SQLStmt("select max(id) from (select * from trup) t;");
-    // add select for CAPP? 
+public class CAPPTableInsert extends VoltProcedure {
+    final SQLStmt insertcapp = new SQLStmt("insert into capp values (NOW,?,?,?);");
 
-
-    public VoltTable[] run(long p, byte shouldRollback) {
-        voltQueueSQL(max);
-        VoltTable[] results = voltExecuteSQL(true);
-        if (results[0].getRowCount() != 1) {
-            throw new VoltAbortException("rowcount for max is not one");
-        }
-        if (shouldRollback != 0) {
-            throw new VoltAbortException("EXPECTED ROLLBACK");
-        }
-        return results;
+    public VoltTable[] run(long p, byte[] data) {
+        voltQueueSQL(insertcapp, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);
+        return voltExecuteSQL(true);
     }
 }
