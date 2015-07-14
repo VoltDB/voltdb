@@ -43,7 +43,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -85,6 +84,7 @@ public class KafkaImportBenchmark {
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
     static InsertExport exportProc;
+    static ExportMonitor exportMon;
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -139,64 +139,6 @@ public class KafkaImportBenchmark {
             System.out.println("NOTICE: Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
         }
     }
-
-//    /**
-//     * Connect to a single server with retry. Limited exponential backoff.
-//     * No timeout. This will run until the process is killed if it's not
-//     * able to connect.
-//     *
-//     * @param server hostname:port or just hostname (hostname can be ip).
-//     */
-//    static OutputStream connectToOneServerWithRetry(String server, int port) {
-//        int sleep = 1000;
-//        while (true) {
-//            try {
-//                Socket pushSocket = new Socket(server, port);
-//                OutputStream out = pushSocket.getOutputStream();
-//                System.out.printf("Connected to VoltDB node at: %s.\n", server);
-//                return out;
-//            }
-//            catch (Exception e) {
-//                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-//                try { Thread.sleep(sleep); } catch (Exception interruted) {}
-//                if (sleep < 8000) sleep += sleep;
-//            }
-//        }
-//    }
-//
-//    /**
-//     * Connect to a set of servers in parallel. Each will retry until
-//     * connection. This call will block until all have connected.
-//     *
-//     * @param servers A comma separated list of servers using the hostname:port
-//     * syntax (where :port is optional).
-//     * @throws InterruptedException if anything bad happens with the threads.
-//     */
-//    static void connect(String servers) throws InterruptedException {
-//        System.out.println("Connecting to Socket Streaming Interface...");
-//
-//        String[] serverArray = servers.split(",");
-//        final CountDownLatch connections = new CountDownLatch(serverArray.length);
-//
-//        // use a new thread to connect to each server
-//        for (final String server : serverArray) {
-//            new Thread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    int port = 7001;
-//                    HostAndPort hap = HostAndPort.fromString(server);
-//                    if (hap.hasPort()) {
-//                        port = hap.getPort();
-//                    }
-//                    OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), port);
-//                    haplist.put(hap, writer);
-//                    connections.countDown();
-//                }
-//            }).start();
-//        }
-//        // block until all have connected
-//        connections.await();
-//    }
 
     /**
      * Connect to one or more VoltDB servers.
@@ -281,7 +223,6 @@ public class KafkaImportBenchmark {
             benchmarkStartTS = System.currentTimeMillis();
             schedulePeriodicStats();
 
-
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database
@@ -293,6 +234,8 @@ public class KafkaImportBenchmark {
                 exportProc.insertExport(key, value);
                 icnt++;
             }
+            // check for export completion
+            exportMon.waitForStreamedAllocatedMemoryZero();
         } finally {
             // cancel periodic stats printing
             timer.cancel();
@@ -304,23 +247,17 @@ public class KafkaImportBenchmark {
 
     public static class BenchmarkRunner extends Thread {
         private final KafkaImportBenchmark benchmark;
-        private final CountDownLatch cdl;
-        private final HostAndPort hap;
-        public BenchmarkRunner(KafkaImportBenchmark bm, CountDownLatch c, HostAndPort iidx) {
+
+        public BenchmarkRunner(KafkaImportBenchmark bm) {
             benchmark = bm;
-            cdl = c;
-            hap = iidx;
         }
 
         @Override
         public void run() {
             try {
                 benchmark.runBenchmark();
-                writers.incrementAndGet();
             } catch (Exception ex) {
                 ex.printStackTrace();
-            } finally {
-                cdl.countDown();
             }
         }
     }
@@ -343,47 +280,17 @@ public class KafkaImportBenchmark {
 
         // handle inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(client);  // TODO: put this in the constructor?
+        exportMon = new ExportMonitor(client);
 
         //CountDownLatch cdl = new CountDownLatch(haplist.size());
         //for (HostAndPort hap : haplist.keySet()) {
 
         System.out.println("starting KafkaImportBenchmark...");
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
-        benchmark.runBenchmark();
-            //BenchmarkRunner runner = new BenchmarkRunner(benchmark);
-            //runner.start();
-        //}
+        BenchmarkRunner runner = new BenchmarkRunner(benchmark);
 
-//        // start checking the table that's being populated by the socket injester(s)
-//
-//        System.out.println("Starting CheckData methods. Queue size: " + queue.size());
-//        CheckData checkDB = new CheckData(queue, client);
-//        while (queue.size() == 0) {
-//            try {
-//                Thread.sleep(1000);                 //1000 milliseconds is one second.
-//            } catch(InterruptedException ex) {
-//                Thread.currentThread().interrupt();
-//            }
-//        }
-//        System.out.println("Starting CheckData methods. Queue size: " + queue.size());
-//        checkDB.processQueue();
-//        cdl.await();
-//
-//        // close socket connections...
-//        for (HostAndPort hap : haplist.keySet()) {
-//             OutputStream writer = haplist.get(hap);
-//             writer.flush();
-//             writer.close();
-//         }
-//
-//        System.out.println("...starting timed check looping... " + queue.size());
-//        // final long queueEndTime = System.currentTimeMillis() + ((config.duration > WAIT_FOR_A_WHILE) ? WAIT_FOR_A_WHILE : config.duration);
-//        final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
-//        System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
-//
-//        while (queueEndTime > System.currentTimeMillis()) {
-//            checkDB.processQueue();
-//        }
+        // benchmark.runBenchmark();
+
         client.drain();
         client.close();
 
