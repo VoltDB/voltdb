@@ -407,8 +407,9 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
 
         String expectedWarning =
-                "This procedure would benefit from adding 'PARTITION PROCEDURE myTestProc "
-                + "ON TABLE PKEY_BIGINT COLUMN PKEY PARAMETER 0;' to the DDL";
+                "This procedure myTestProc would benefit from being partitioned, by adding a "
+                + "'PARTITION ON TABLE PKEY_BIGINT COLUMN ON PKEY PARAMETER 0' clause to the "
+                + "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
 
         boolean findMatched = false;
         for (Feedback fb : compiler.m_warnings) {

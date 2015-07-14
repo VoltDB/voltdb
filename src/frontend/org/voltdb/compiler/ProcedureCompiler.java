@@ -744,7 +744,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
                 if (statementPartitionExpression != null) {
                     // The planner has uncovered an overlooked opportunity to run the statement SP.
-                    String msg = "This procedure would benefit from ";
+                    String msg = "This procedure " + shortName + " would benefit from being partitioned, by ";
                     String tableName = "tableName", partitionColumnName = "partitionColumnName";
                     try {
                         assert(partitioning.getFullColumnName() != null);
@@ -767,9 +767,9 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                         }
                         msg += "adding a parameter to be passed the value " + valueDescription + " and ";
                     }
-                    msg += "adding 'PARTITION PROCEDURE "+ shortName + " ON TABLE " + tableName + " COLUMN " +
-                            partitionColumnName + " PARAMETER " + paramCount + ";' to the DDL.";
-
+                    msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN ON " +
+                            partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
+                            "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
                     compiler.addWarn(msg);
                 }
             }

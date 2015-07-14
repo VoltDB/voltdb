@@ -175,13 +175,12 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
 
         assertFalse(foundLineMatching(lines, ".*DeterministicRWProc.*non-deterministic.*"));
 
-
         // test SP improvement warnings
         String absPattern = "abs\\s*\\(\\s*1\\s*\\)\\s*\\+\\s*1"; // Pattern for abs(1) + 1, with whitespace between tokens
-        String pattern0 = "adding \\'PARTITION PROCEDURE StmtSPcandidate[\\d] ON TABLE BLAH COLUMN IVAL PARAMETER 0;\\' to the DDL.";
-        String pattern1 = "adding \\'PARTITION PROCEDURE StmtSPcandidate[\\d] ON TABLE BLAH COLUMN IVAL PARAMETER 1;\\' to the DDL.";
+        String pattern0 = "adding a \\'PARTITION ON TABLE BLAH COLUMN ON IVAL PARAMETER 0\\' .*";
+        String pattern1 = "adding a \\'PARTITION ON TABLE BLAH COLUMN ON IVAL PARAMETER 1\\' .*";
 
-        assertEquals(4, countLinesMatching(lines, ".*" + pattern0)); // StmtSPcandidates 1,2,3,4
+        assertEquals(4, countLinesMatching(lines, ".*" + pattern0 + ".*")); // StmtSPcandidates 1,2,3,4
         assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*" + pattern0)); // 2, 3
         assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*" + absPattern + ".*" + pattern0)); // just 4
         assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*" + pattern1)); // just 5
