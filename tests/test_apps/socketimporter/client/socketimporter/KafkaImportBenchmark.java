@@ -288,6 +288,8 @@ public class KafkaImportBenchmark {
         System.out.println("starting KafkaImportBenchmark...");
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
+        runner.start();
+        runner.join();
 
         // benchmark.runBenchmark();
 
