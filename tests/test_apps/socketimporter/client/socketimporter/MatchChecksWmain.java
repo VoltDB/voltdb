@@ -66,7 +66,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
-public class MatchChecks {
+public class MatchChecksWmain {
     static Client client;
 
     static void dbconnect(String servers) throws InterruptedException, Exception {
@@ -102,8 +102,6 @@ public class MatchChecks {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
-
 
 		final Timer timer = new Timer();
 		timer.scheduleAtFixedRate(new TimerTask() {
