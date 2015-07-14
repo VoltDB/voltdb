@@ -330,27 +330,16 @@ public class MaterializedViewBenchmark {
                 csvStr = "w min opt";
                 procStr = "idsWithMinMatViewOpt";
                 break;
-            case "2MinMatView":
-                systemStr = "2mins";
-                csvStr = "2mins";
-                procStr = "idsWith2MinMatView";
-                break;
-            case "2MinMatViewOpt":
-                systemStr = "2mins opt";
-                csvStr = "2mins opt";
-                procStr = "idsWith2MinMatViewOpt";
-                break;
             case "4MinMatView":
                 systemStr = "4mins";
                 csvStr = "4mins";
                 procStr = "idsWith4MinMatView";
                 break;
             default:
-                assertEquals(matView, "4MinMatViewOpt");
+                assert(matView.equals("4MinMatViewOpt"));
                 systemStr = "4mins opt";
                 csvStr = "4mins opt";
                 procStr = "idsWith4MinMatViewOpt";
-                break;
         }
 
         int grp = 1;
@@ -366,11 +355,20 @@ public class MaterializedViewBenchmark {
 
         if (config.group > 0) {
             for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
+                if (systemStr.startsWith("4")) {
+                    client.callProcedure(new NullCallback(),
                                      procStr + "_insert",
                                      i,
                                      grp,
-                                     i);
+                                     i, i, i, i);
+                }
+                else {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         grp,
+                                         i);
+                }
                 if (grp == config.group) {
                     grp = 1;
                 } else {
@@ -379,11 +377,20 @@ public class MaterializedViewBenchmark {
             }
         } else {
             for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     procStr + "_insert",
-                                     i,
-                                     i,
-                                     i);
+                if (systemStr.startsWith("4")) {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         i,
+                                         i, i, i, i);
+                }
+                else {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         i,
+                                         i);
+                }
             }
         }
         timer.cancel();
@@ -522,32 +529,22 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                      "idsWithMinMatView_insert",
                                      i,
-                                     i % 100,
+                                     i,
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWithMinMatViewOpt_insert",
                                      i,
-                                     i % 100,
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWith2MinMatView_insert",
                                      i,
-                                     i % 100,
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWith2MinMatViewOpt_insert",
-                                     i,
-                                     i % 100,
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWith4MinMatView_insert",
                                      i,
-                                     i % 100,
+                                     i,
                                      i, i, i, i);
                 client.callProcedure(new NullCallback(),
                                      "idsWith4MinMatViewOpt_insert",
                                      i,
-                                     i % 100,
+                                     i,
                                      i, i, i, i);
             }
             client.drain();
@@ -563,12 +560,6 @@ public class MaterializedViewBenchmark {
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWithMinMatViewOpt_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWith2MinMatView_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWith2MinMatViewOpt_delete",
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWith4MinMatView_delete",
@@ -599,16 +590,9 @@ public class MaterializedViewBenchmark {
         System.out.print(HORIZONTAL_RULE);
 
         insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
-        runHalf("2MinMatView", fw);
-        System.out.print(HORIZONTAL_RULE);
-        runHalf("2MinMatViewOpt", fw);
-        System.out.print(HORIZONTAL_RULE);
-
-        insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
         runHalf("4MinMatView", fw);
         System.out.print(HORIZONTAL_RULE);
         runHalf("4MinMatViewOpt", fw);
-        System.out.print(HORIZONTAL_RULE);
         benchmarkActive = false;
 
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
