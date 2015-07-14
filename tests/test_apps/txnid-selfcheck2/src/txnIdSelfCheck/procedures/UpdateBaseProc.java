@@ -101,8 +101,8 @@ public class UpdateBaseProc extends VoltProcedure {
                     " for cid " + cid);
         }
 
-        voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
-        voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
+        voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
+        voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
         assert dim.getRowCount() == 1;
@@ -111,6 +111,9 @@ public class UpdateBaseProc extends VoltProcedure {
         // not seen by the server, hopefully this will bisect where they're occuring.
         data = retval[3];
         validateCIDData(data, getClass().getName());
+        
+        VoltTableRow row = data.fetchRow(0);
+        assert(row.getVarbinary("value").length != 0);
 
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
@@ -160,8 +163,8 @@ public class UpdateBaseProc extends VoltProcedure {
                     " for cid " + cid);
         }
 
-        voltQueueSQLExperimental("INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
-        voltQueueSQLExperimental("INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
+        voltQueueSQLExperimental("INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
+        voltQueueSQLExperimental("INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
         voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
         VoltTable[] retval = voltExecuteSQL();
@@ -169,6 +172,9 @@ public class UpdateBaseProc extends VoltProcedure {
         // not seen by the server, hopefully this will bisect where they're occurring.
         data = retval[3];
         validateCIDData(data, getClass().getName());
+        
+        VoltTableRow row = data.fetchRow(0);
+        assert(row.getVarbinary("value").length != 0);
 
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
