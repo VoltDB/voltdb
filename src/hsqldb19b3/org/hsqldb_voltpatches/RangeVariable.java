@@ -2068,7 +2068,12 @@ public class RangeVariable {
             if (nonIndexCondition != null) {
                 String temp = nonIndexCondition.voltDescribe(session, blanks + 2);
 
-                sb.append(Expression.voltIndentStr(blanks, true, false)).append("other condition=[").append(temp).append("]");
+                sb.append(Expression.voltIndentStr(blanks, true, false))
+                  .append("other condition = [")
+                  .append(Expression.voltIndentStr(blanks + 2, true, false))
+                  .append(temp)
+                  .append(Expression.voltIndentStr(blanks, true, false))
+                  .append("]");
             }
 
             return sb.toString();

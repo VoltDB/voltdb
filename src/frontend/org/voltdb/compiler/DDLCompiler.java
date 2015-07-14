@@ -1981,9 +1981,10 @@ public class DDLCompiler {
             VoltXMLElement xmlquery = null;
             try {
                 xmlquery = m_hsql.getXMLCompiledStatement(query);
-            }
-            catch (HSQLParseException e) {
-                e.printStackTrace();
+            } catch (HSQLParseException ex) {
+                ex.printStackTrace();
+                m_compiler.addErr(ex.getMessage());
+                throw m_compiler.new VoltCompilerException(ex);
             }
             assert(xmlquery != null);
 
