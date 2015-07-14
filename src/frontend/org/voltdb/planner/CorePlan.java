@@ -68,8 +68,6 @@ public class CorePlan {
     private int partitioningParamIndex = -1;
     private Object partitioningParamValue = null;
 
-    private int m_questionMarkParameterCount = 0;
-
     /**
      * Constructor from QueryPlanner output.
      *
@@ -102,8 +100,7 @@ public class CorePlan {
         isReplicatedTableDML = plan.replicatedTableDML;
         this.catalogHash = catalogHash;
         parameterTypes = plan.parameterTypes();
-        readOnly = plan.getReadOnly();
-        m_questionMarkParameterCount = plan.getQuestionMarkParameterCount();
+        readOnly = plan.isReadOnly();
     }
 
     /***
@@ -304,9 +301,5 @@ public class CorePlan {
 
     public boolean wasPlannedAgainstHash(byte[] catalogHash) {
         return Arrays.equals(catalogHash, this.catalogHash);
-    }
-
-    public int getQuestionMarkParameterCount() {
-        return m_questionMarkParameterCount;
     }
 }

@@ -252,7 +252,14 @@ public class SQLCommand
                 }
 
                 // If the line is a FILE command - execute the content of the file
-                FileInfo fileInfo = SQLParser.parseFileStatement(line);
+                FileInfo fileInfo = null;
+                try {
+                    fileInfo = SQLParser.parseFileStatement(line);
+                }
+                catch (SQLParser.Exception e) {
+                    stopOrContinue(e);
+                    continue;
+                }
                 if (fileInfo != null) {
                     executeScriptFile(fileInfo, interactiveReader);
                     if (m_returningToPromptAfterError) {
@@ -410,7 +417,7 @@ public class SQLCommand
         // complete formatted String result rather than the multiple lists.
         // This would save churn on startup and on DDL update.
         Tables tables = getTables();
-        printTables("User     Tables", tables.tables);
+        printTables("User Tables", tables.tables);
         printTables("User Views", tables.views);
         printTables("User Export Streams", tables.exports);
         System.out.println();
@@ -910,10 +917,6 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@GC",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
-        Procedures.put("@ApplyBinaryLogSP",
-                ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("varbinary", "varbinary", "int", "int", "int")).build());
-        Procedures.put("@ApplyBinaryLogMP",
-                       ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("varbinary", "varbinary", "int", "int", "int")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
@@ -1136,7 +1139,6 @@ public class SQLCommand
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
             getInteractiveQueries(reader);
             return SQLParser.parseQuery(m_testFrontEndResult);
-
         } catch (Exception ioe) {}
         return null;
     }
@@ -1311,7 +1313,7 @@ public class SQLCommand
             // which would fail in the opposite direction, when a 0-length
             // file was piped in, showing an interactive greeting and prompt
             // before quitting.
-            if (System.console() == null) {
+            if (System.console() == null && m_interactive) {
                 m_interactive = false;
                 executeNoninteractive();
             }

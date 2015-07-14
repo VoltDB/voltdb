@@ -65,6 +65,7 @@
 #include "catalog/database.h"
 #include "catalog/table.h"
 #include "catalog/materializedviewinfo.h"
+#include "crc/crc32c.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
@@ -100,7 +101,10 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
     m_isMaterialized(isMaterialized),
-    m_drEnabled(drEnabled)
+    m_drEnabled(drEnabled),
+    m_noAvailableUniqueIndex(false),
+    m_smallestUniqueIndex(NULL),
+    m_smallestUniqueIndexCrc(0)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
@@ -580,7 +584,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE, uniqueIndex.first, uniqueIndex.second);
         drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
     }
 
@@ -737,7 +742,8 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE);
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex.first, uniqueIndex.second);
     }
 
     if (fallible) {
@@ -1034,9 +1040,7 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
         if (currTarget == target) {
             // The view is already up to date.
             // but still need to update the index used for min/max
-            if (currView->indexForMinMax().compare(targetMvInfo->indexForMinMax()) != 0) {
-                currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
-            }
+            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
             return;
         }
 
@@ -1561,6 +1565,35 @@ void PersistentTableSurgeon::activateSnapshot() {
     assert(m_table.m_blocksNotPendingSnapshot.empty());
     for (int ii = 0; ii < m_table.m_blocksNotPendingSnapshotLoad.size(); ii++) {
         assert(m_table.m_blocksNotPendingSnapshotLoad[ii]->empty());
+    }
+}
+
+void PersistentTable::computeSmallestUniqueIndex() {
+    uint32_t smallestIndexTupleLength = UINT32_MAX;
+    m_noAvailableUniqueIndex = true;
+    m_smallestUniqueIndex = NULL;
+    m_smallestUniqueIndexCrc = 0;
+    std::string smallestUniqueIndexName = ""; // use name for determinism
+    BOOST_FOREACH(TableIndex* index, m_indexes) {
+        if (index->isUniqueIndex() && !index->isPartialIndex()) {
+            uint32_t indexTupleLength = index->getKeySchema()->tupleLength();
+            if (!m_smallestUniqueIndex ||
+                (m_smallestUniqueIndex->keyUsesNonInlinedMemory() && !index->keyUsesNonInlinedMemory()) ||
+                indexTupleLength < smallestIndexTupleLength ||
+                (indexTupleLength == smallestIndexTupleLength && index->getName() < smallestUniqueIndexName)) {
+                m_smallestUniqueIndex = index;
+                m_noAvailableUniqueIndex = false;
+                smallestIndexTupleLength = indexTupleLength;
+                smallestUniqueIndexName = index->getName();
+            }
+        }
+    }
+    if (m_smallestUniqueIndex) {
+        m_smallestUniqueIndexCrc = vdbcrc::crc32cInit();
+        m_smallestUniqueIndexCrc = vdbcrc::crc32c(m_smallestUniqueIndexCrc,
+                &(m_smallestUniqueIndex->getColumnIndices()[0]),
+                m_smallestUniqueIndex->getColumnIndices().size() * sizeof(int));
+        m_smallestUniqueIndexCrc = vdbcrc::crc32cFinish(m_smallestUniqueIndexCrc);
     }
 }
 

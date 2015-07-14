@@ -72,6 +72,9 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -139,6 +142,14 @@ public class VoltProjectBuilder {
         public final String name;
         public String password;
         private final String roles[];
+        public boolean plaintext = true;
+
+        public UserInfo (final String name, final String password, final String roles[], final boolean plaintext){
+            this.name = name;
+            this.password = password;
+            this.roles = roles;
+            this.plaintext = plaintext;
+        }
 
         public UserInfo (final String name, final String password, final String roles[]){
             this.name = name;
@@ -264,6 +275,7 @@ public class VoltProjectBuilder {
 
     private List<String> m_diagnostics;
 
+    private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<HashMap<String, Object>>();
     private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<HashMap<String, Object>>();
 
     private Integer m_deadHostTimeout = null;
@@ -558,6 +570,22 @@ public class VoltProjectBuilder {
         m_ppdEnabled = true;
         m_snapshotPath = snapshotPath;
         m_ppdPrefix = ppdPrefix;
+    }
+
+    public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
+        HashMap<String, Object> importConnector = new HashMap<String, Object>();
+        importConnector.put("ilEnabled", enabled);
+        importConnector.put("ilModule", importBundle);
+
+        importConnector.put("ilConfig", config);
+
+        if ((importType != null) && !importType.trim().isEmpty()) {
+            importConnector.put("ilImportType", importType);
+        } else {
+            importConnector.put("ilImportType", "custom");
+        }
+
+        m_ilImportConnectors.add(importConnector);
     }
 
     public void addExport(boolean enabled, String exportTarget, Properties config) {
@@ -997,6 +1025,7 @@ public class VoltProjectBuilder {
                 users.getUser().add(user);
                 user.setName(info.name);
                 user.setPassword(info.password);
+                user.setPlaintext(info.plaintext);
 
                 // build up user/roles.
                 if (info.roles.length > 0) {
@@ -1053,6 +1082,34 @@ public class VoltProjectBuilder {
                 }
             }
             export.getConfiguration().add(exportConfig);
+        }
+
+        // <import>
+        ImportType importt = factory.createImportType();
+        deployment.setImport(importt);
+
+        for (HashMap<String,Object> importConnector : m_ilImportConnectors) {
+            ImportConfigurationType importConfig = factory.createImportConfigurationType();
+            importConfig.setEnabled((boolean)importConnector.get("ilEnabled"));
+            ServerImportEnum importType = ServerImportEnum.fromValue(((String)importConnector.get("ilImportType")).toLowerCase());
+            importConfig.setType(importType);
+            importConfig.setModule((String )importConnector.get("ilModule"));
+
+            Properties config = (Properties)importConnector.get("ilConfig");
+            if((config != null) && (config.size() > 0)) {
+                List<PropertyType> configProperties = importConfig.getProperty();
+
+                for( Object nameObj: config.keySet()) {
+                    String name = String.class.cast(nameObj);
+
+                    PropertyType prop = factory.createPropertyType();
+                    prop.setName(name);
+                    prop.setValue(config.getProperty(name));
+
+                    configProperties.add(prop);
+                }
+            }
+            importt.getConfiguration().add(importConfig);
         }
 
         if (m_drProducerClusterId != null || (m_drMasterHost != null && !m_drMasterHost.isEmpty())) {

@@ -233,6 +233,15 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
+     * Update the argument at specified index
+     * @param index   the index of the item to replace
+     * @param arg     the new argument to insert into the list
+     */
+    public void setArgAtIndex(int index, AbstractExpression arg) {
+        m_args.set(index, arg);
+    }
+
+    /**
      * @return The type of this expression's value.
      */
     public VoltType getValueType() {
@@ -272,7 +281,39 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     @Override
     public String toString() {
-        return "Expression: " + toJSONString();
+        StringBuilder sb = new StringBuilder();
+        toStringHelper("", sb);
+        return sb.toString();
+    }
+
+    private static final String INDENT = "  | ";
+
+    private void toStringHelper(String linePrefix, StringBuilder sb) {
+        String header = this.getClass().getSimpleName() + "[" + getExpressionType().toString() + "] : ";
+        if (m_valueType != null) {
+            header += m_valueType.toSQLString();
+        }
+        else {
+            header += "[null type]";
+        }
+        sb.append(linePrefix + header + "\n");
+
+        if (m_left != null) {
+            sb.append(linePrefix + "Left:\n");
+            m_left.toStringHelper(linePrefix + INDENT, sb);
+        }
+
+        if (m_right != null) {
+            sb.append(linePrefix + "Right:\n");
+            m_right.toStringHelper(linePrefix + INDENT, sb);
+        }
+
+        if (m_args != null) {
+            sb.append(linePrefix + "Args:\n");
+            for (AbstractExpression arg : m_args) {
+                arg.toStringHelper(linePrefix + INDENT, sb);
+            }
+        }
     }
 
     @Override
@@ -494,7 +535,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.key(Members.RIGHT.name()).value(m_right);
         }
 
-        if (m_args != null && m_args.size() > 0) {
+        if (m_args != null) {
             stringer.key(Members.ARGS.name()).array();
             for (AbstractExpression argument : m_args) {
                 assert (argument instanceof JSONString);
@@ -643,8 +684,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             ParsedColInfo col = indexToColumnMap.get(ii);
             TupleValueExpression tve = new TupleValueExpression(
                     col.tableName, col.tableAlias, col.columnName, col.alias, ii);
-            tve.setTypeSizeBytes(getValueType(), getValueSize(), getInBytes());
 
+            tve.setTypeSizeBytes(getValueType(), getValueSize(), getInBytes());
+            if (this instanceof TupleValueExpression) {
+                tve.setOrigStmtId(((TupleValueExpression)this).getOrigStmtId());
+            }
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
             if (hasAnySubexpressionOfClass(AggregateExpression.class))
                 tve.setHasAggregate(true);
@@ -1020,5 +1064,31 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     public abstract String explain(String impliedTableName);
+
+    public static boolean hasInlineVarType(AbstractExpression expr) {
+        VoltType type = expr.getValueType();
+        int size = expr.getValueSize();
+        boolean inBytes = expr.getInBytes();
+
+        switch(type) {
+        case STRING:
+            if (inBytes && size < 64) {
+                return true;
+            }
+            if (!inBytes && size < 16) {
+                return true;
+            }
+            break;
+        case VARBINARY:
+            if (size < 64) {
+                return true;
+            }
+            break;
+        default:
+            break;
+        }
+
+        return false;
+    }
 
 }

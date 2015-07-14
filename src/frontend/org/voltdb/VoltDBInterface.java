@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -138,6 +139,18 @@ public interface VoltDBInterface
     public long getClusterUptime();
 
     /**
+     * @return The time the cluster's Create start action
+     */
+    public long getClusterCreateTime();
+
+    /**
+     * Set the time at which the cluster was created. This method is used when
+     * in the Recover action and @SnapshotRestore paths to assign the cluster
+     * create time that was preserved in the snapshot.
+     */
+    public void setClusterCreateTime(long clusterCreateTime);
+
+    /**
      * Notify RealVoltDB that recovery is complete
      */
     void onExecutionSiteRejoinCompletion(long transferred);
@@ -163,9 +176,11 @@ public interface VoltDBInterface
 
     public boolean getReplicationActive();
 
-    public NodeDRGateway getNodeDRGateway();
+    public ProducerDRGateway getNodeDRGateway();
 
     public ConsumerDRGateway getConsumerDRGateway();
+
+    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener);
 
     public void onSyncSnapshotCompletion();
 
@@ -235,8 +250,12 @@ public interface VoltDBInterface
 
     /**
      * Return the license api. This may be null in community editions!
+     * @return License API based on edition.
      */
      public LicenseApi getLicenseApi();
+     //Return JSON string represenation of license information.
+     public String getLicenseInformation();
+
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
 }

@@ -30,8 +30,8 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
-import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StartAction;
@@ -40,6 +40,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -86,13 +87,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
     @Override
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway nodeDRGateway,
+                          ProducerDRGateway nodeDRGateway,
                           ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway,
                           String coreBindIds)
@@ -114,10 +116,10 @@ public class SpInitiator extends BaseInitiator implements Promotable
         PartitionDRGateway mpPDRG = null;
         if (createMpDRGateway) {
             mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
-            ((SpScheduler) m_scheduler).setMpDRGateway(mpPDRG);
+            setDurableUniqueIdListener(mpPDRG);
         }
 
-        super.configureCommon(backend, catalogContext,
+        super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway, mpPDRG);
 
         m_tickProducer.start();
@@ -125,7 +127,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
+                LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
     }
 
@@ -194,9 +196,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
-            // If we are a DR replica, inform that subsystem of its new responsibilities
-            if (m_consumerDRGateway != null) {
-                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId);
+            // If we are a DR replica, inform that subsystem of any remote data we've seen
+            if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
+                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, Long.MIN_VALUE);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
@@ -222,6 +224,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
     @Override
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
+    }
+
+    @Override
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
+    {
+        m_scheduler.setDurableUniqueIdListener(listener);
     }
 
     @Override

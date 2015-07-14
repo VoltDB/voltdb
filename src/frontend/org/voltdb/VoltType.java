@@ -213,7 +213,22 @@ public enum VoltType {
             null, // unsigned?
             null, // minimum scale
             null, // maximum scale
-            "java.lang.Byte[]"); // getObject return type
+            "java.lang.Byte[]"), // getObject return type
+
+    /**
+     * Boolean type. Not a valid value for actual user data.
+     */
+    BOOLEAN  ((byte)23, 1, "boolean", new Class[] {boolean.class, Boolean.class}, boolean[].class, 'o', //'b' is taken by BIGINT
+            java.sql.Types.BOOLEAN,  // java.sql.Types DATA_TYPE
+            null, // prefix to specify a literal
+            null, // suffix to specify a literal
+            null, // necessary params to create
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            0, // minimum scale
+            0, // maximum scale
+            "java.lang.Boolean"); // getObject return type
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
@@ -501,6 +516,10 @@ public enum VoltType {
      */
     @Override public String toString() {
         return "VoltType." + name();
+    }
+
+    public String getName() {
+        return name();
     }
 
     /**

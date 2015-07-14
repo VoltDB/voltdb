@@ -1,11 +1,14 @@
-
-(function(window) {
+﻿
+(function (window) {
 
     var IMonitorGraphUI = (function () {
 
         var currentView = "Seconds";
         var cpuSecCount = 0;
         var cpuMinCount = 0;
+        var cmdLogSecCount = 0;
+        var cmdLogMinCount = 0;
+
         var tpsSecCount = 0;
         var tpsMinCount = 0;
         var memSecCount = 0;
@@ -14,6 +17,8 @@
         var latMinCount = 0;
         var partitionSecCount = 0;
         var partitionMinCount = 0;
+        var drSecCount = 0;
+        var drMinCount = 0;
         var totalEmptyData = 121;
         var totalEmptyDataForMinutes = 121;
         var totalEmptyDataForDays = 360;
@@ -22,18 +27,18 @@
         var latencyChart;
         var transactionChart;
         var partitionChart;
-        var physicalMemory = -1;
+        var drReplicationChart;        var cmdLogChart;        var cmdLogOverlay = [];        var physicalMemory = -1;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
         this.ChartLatency = nv.models.lineChart();
         this.ChartTransactions = nv.models.lineChart();
         this.ChartPartitionIdleTime = nv.models.lineChart().useInteractiveGuideline(true);
-        var dataMapperSec = {};
+        this.ChartDrReplicationRate = nv.models.lineChart();        this.ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
 
-        this.GetPartitionDetailData = function(partitionDetails) {
+        this.GetPartitionDetailData = function (partitionDetails) {
             dataParitionDetails = partitionDetails;
         };
 
@@ -48,7 +53,7 @@
 
             return arr;
         }
-        
+
         function getEmptyDataForMinutes() {
             var arr = [];
             var theDate = new Date();
@@ -60,7 +65,7 @@
 
             return arr;
         }
-        
+
         function getEmptyDataForDays() {
             var arr = [];
             var theDate = new Date();
@@ -72,22 +77,22 @@
 
             return arr;
         }
-        
+
         function getEmptyDataForPartition() {
             var count = 0;
             var dataPartition = [];
-            
+
             if (dataParitionDetails != undefined) {
-                $.each(dataParitionDetails, function(key, value) {
-                    $.each(value, function(datatype, datatypeValue) {
-                        $.each(datatypeValue, function(partitionKey, partitionValue) {
+                $.each(dataParitionDetails, function (key, value) {
+                    $.each(value, function (datatype, datatypeValue) {
+                        $.each(datatypeValue, function (partitionKey, partitionValue) {
                             var arr = [];
                             arr.push(emptyData[0]);
                             arr.push(emptyData[emptyData.length - 1]);
                             if (datatype == "data") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#FF8C00" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
@@ -104,16 +109,16 @@
             var count = 0;
             var dataPartition = [];
             if (dataParitionDetails != undefined) {
-                $.each(dataParitionDetails, function(key, value) {
-                    $.each(value, function(datatype, datatypeValue) {
-                        $.each(datatypeValue, function(partitionKey, partitionValue) {
+                $.each(dataParitionDetails, function (key, value) {
+                    $.each(value, function (datatype, datatypeValue) {
+                        $.each(datatypeValue, function (partitionKey, partitionValue) {
                             var arr = [];
                             arr.push(emptyDataForMinutes[0]);
                             arr.push(emptyDataForMinutes[emptyDataForMinutes.length - 1]);
                             if (datatype == "data") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#FF8C00" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
@@ -130,16 +135,16 @@
             var count = 0;
             var dataPartition = [];
             if (dataParitionDetails != undefined) {
-                $.each(dataParitionDetails, function(key, value) {
-                    $.each(value, function(datatype, datatypeValue) {
-                        $.each(datatypeValue, function(partitionKey, partitionValue) {
+                $.each(dataParitionDetails, function (key, value) {
+                    $.each(value, function (datatype, datatypeValue) {
+                        $.each(datatypeValue, function (partitionKey, partitionValue) {
                             var arr = [];
                             arr.push(emptyDataForDays[0]);
                             arr.push(emptyDataForDays[emptyDataForDays.length - 1]);
                             if (datatype == "data") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#FF8C00" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
@@ -171,7 +176,7 @@
 
             return arr;
         }
-        
+
         function getEmptyDataForDaysOptimized() {
             var arr = [];
             arr.push(emptyDataForDays[0]);
@@ -179,7 +184,7 @@
 
             return arr;
         }
-        
+
         var dataCpu = [{
             "key": "CPU",
             "values": getEmptyDataOptimized(),
@@ -203,6 +208,19 @@
             "values": getEmptyDataOptimized(),
             "color": "rgb(27, 135, 200)"
         }];
+
+        var dataDrReplicationRate = [{
+            "key": "Replication Rate",
+            "values": getEmptyDataOptimized(),
+            "color": "rgb(27, 135, 200)"
+        }];
+
+        var dataCommandLog = [{
+            "key": "Command Log Statistics",
+            "values": getEmptyDataOptimized(),
+            "color": "rgb(27, 135, 200)"
+        }];
+
         var dataPartitionIdleTime = [];
 
         var dataParitionDetails = [];
@@ -248,7 +266,7 @@
                 .tickFormat(function (d) {
                     return d3.time.format('%X')(new Date(d));
                 });
-            
+
             MonitorGraphUI.ChartRam.xAxis.rotateLabels(-20);
 
             MonitorGraphUI.ChartRam.yAxis
@@ -257,15 +275,15 @@
             MonitorGraphUI.ChartRam.yAxis
                 .axisLabel('(GB)')
                 .axisLabelDistance(10);
-            
+
             MonitorGraphUI.ChartRam.margin({ left: 80 });
             MonitorGraphUI.ChartRam.lines.forceY([0, 0.1]);
-            
+
             MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
                 return '<h3> RAM </h3>'
                     + '<p>' + e + ' GB at ' + y + '</p>';
             });
-            
+
             d3.select('#visualisationRam')
                 .datum(dataRam)
                 .transition().duration(500)
@@ -284,7 +302,7 @@
                 });
 
             MonitorGraphUI.ChartLatency.xAxis.rotateLabels(-20);
-            
+
             MonitorGraphUI.ChartLatency.yAxis
                 .tickFormat(d3.format(',.2f'));
 
@@ -294,7 +312,7 @@
 
             MonitorGraphUI.ChartLatency.margin({ left: 80 });
             MonitorGraphUI.ChartLatency.lines.forceY([0, 1]);
-            
+
             MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Latency </h3>'
                     + '<p>' + e + ' ms at ' + y + '</p>';
@@ -316,9 +334,9 @@
                 .tickFormat(function (d) {
                     return d3.time.format('%X')(new Date(d));
                 });
-            
+
             MonitorGraphUI.ChartTransactions.xAxis.rotateLabels(-20);
-            
+
             MonitorGraphUI.ChartTransactions.yAxis
                 .tickFormat(d3.format(',.2f'));
 
@@ -338,7 +356,7 @@
                 .datum(dataTransactions)
                 .transition().duration(500)
                 .call(MonitorGraphUI.ChartTransactions);
-            
+
             nv.utils.windowResize(MonitorGraphUI.ChartTransactions.update);
 
             return MonitorGraphUI.ChartTransactions;
@@ -350,6 +368,7 @@
                     return d3.time.format('%X')(new Date(d));
                 });
 
+            MonitorGraphUI.ChartPartitionIdleTime.showLegend(false);
             MonitorGraphUI.ChartPartitionIdleTime.xAxis.rotateLabels(-20);
 
             MonitorGraphUI.ChartPartitionIdleTime.yAxis
@@ -360,7 +379,8 @@
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartPartitionIdleTime.margin({ left: 80 });
-            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 1]);
+            MonitorGraphUI.ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
+            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 100]);
 
             MonitorGraphUI.ChartPartitionIdleTime.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Partition Idle Time </h3>'
@@ -377,6 +397,73 @@
             return MonitorGraphUI.ChartPartitionIdleTime;
         });
 
+        nv.addGraph(function () {
+            MonitorGraphUI.ChartDrReplicationRate.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format('%X')(new Date(d));
+                });
+
+            MonitorGraphUI.ChartDrReplicationRate.xAxis.rotateLabels(-20);
+
+            MonitorGraphUI.ChartDrReplicationRate.yAxis
+                .tickFormat(d3.format(',.2f'));
+
+            MonitorGraphUI.ChartDrReplicationRate.yAxis
+                .axisLabel('(KBps)')
+                .axisLabelDistance(10);
+
+            MonitorGraphUI.ChartDrReplicationRate.margin({ left: 80 });
+            MonitorGraphUI.ChartDrReplicationRate.lines.forceY([0, 1]);
+
+            MonitorGraphUI.ChartDrReplicationRate.tooltipContent(function (key, y, e, graph) {
+                return '<h3> Replication Rate </h3>'
+                    + '<p>' + e + ' KBps at ' + y + '</p>';
+            });
+
+            d3.select('#visualizationDrReplicationRate')
+                .datum(dataDrReplicationRate)
+                .transition().duration(500)
+                .call(MonitorGraphUI.ChartDrReplicationRate);
+
+            nv.utils.windowResize(MonitorGraphUI.ChartDrReplicationRate.update);
+
+            return MonitorGraphUI.ChartDrReplicationRate;
+        });
+
+        nv.addGraph(function () {
+            MonitorGraphUI.ChartCommandlog.showLegend(false);
+            MonitorGraphUI.ChartCommandlog.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format('%X')(new Date(d));
+                });
+
+            MonitorGraphUI.ChartCommandlog.xAxis.rotateLabels(-20);
+
+            MonitorGraphUI.ChartCommandlog.yAxis
+                .tickFormat(d3.format(',.2f'));
+
+            MonitorGraphUI.ChartCommandlog.yAxis
+                .axisLabel('(Pending Transactions)')
+                .axisLabelDistance(10);
+
+            MonitorGraphUI.ChartCommandlog.margin({ left: 80 });
+            MonitorGraphUI.ChartCommandlog.lines.forceY([0, 0.1]);
+
+            MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
+                return '<h3> Command Log Statistic </h3>'
+                    + '<p>' + e + ' Pending at ' + y + '</p>';
+            });
+
+            d3.select('#visualisationCommandLog')
+                .datum(dataCommandLog)
+                .transition().duration(500)
+                .call(MonitorGraphUI.ChartCommandlog);
+
+            nv.utils.windowResize(MonitorGraphUI.ChartCommandlog.update);
+
+            return MonitorGraphUI.ChartCommandlog;
+        });
+
         function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
             this.lowestTrackableValue = lowestTrackableValue;
             this.highestTrackableValue = highestTrackableValue;
@@ -386,7 +473,7 @@
             this.init();
         }
 
-        Histogram.prototype.init = function() {
+        Histogram.prototype.init = function () {
             var largestValueWithSingleUnitResolution = 2 * Math.pow(10, this.nSVD);
             this.unitMagnitude = Math.floor(Math.log(this.lowestTrackableValue) / Math.log(2));
             var subBucketCountMagnitude = Math.ceil(Math.log(largestValueWithSingleUnitResolution) / Math.log(2));
@@ -405,7 +492,7 @@
             this.countsArrayLength = (this.bucketCount + 1) * (this.subBucketCount / 2);
         };
 
-        Histogram.prototype.diff = function(newer) {
+        Histogram.prototype.diff = function (newer) {
             var h = new Histogram(newer.lowestTrackableValue, newer.highestTrackableValue, newer.nSVD, newer.totalCount - this.totalCount);
             for (var i = 0; i < h.countsArrayLength; i++) {
                 h.count[i] = newer.count[i] - this.count[i];
@@ -413,18 +500,18 @@
             return h;
         };
 
-        Histogram.prototype.getCountAt = function(bucketIndex, subBucketIndex) {
+        Histogram.prototype.getCountAt = function (bucketIndex, subBucketIndex) {
             var bucketBaseIndex = (bucketIndex + 1) << this.subBucketHalfCountMagnitude;
             var offsetInBucket = subBucketIndex - this.subBucketHalfCount;
             var countIndex = bucketBaseIndex + offsetInBucket;
             return this.count[countIndex];
         };
 
-        Histogram.prototype.valueFromIndex = function(bucketIndex, subBucketIndex) {
+        Histogram.prototype.valueFromIndex = function (bucketIndex, subBucketIndex) {
             return subBucketIndex * Math.pow(2, bucketIndex + this.unitMagnitude);
         };
 
-        Histogram.prototype.getValueAtPercentile = function(percentile) {
+        Histogram.prototype.getValueAtPercentile = function (percentile) {
             var totalToCurrentIJ = 0;
             var countAtPercentile = Math.floor(((percentile / 100.0) * this.totalCount) + 0.5); // round to nearest
             for (var i = 0; i < this.bucketCount; i++) {
@@ -504,14 +591,15 @@
             return getEmptyDataForPartition();
         };
 
-        this.AddGraph = function (view, cpuChartObj, ramChartObj, clusterChartObj, transactinoChartObj, partitionChartObj) {
+        this.AddGraph = function (view, cpuChartObj, ramChartObj, clusterChartObj, transactinoChartObj, partitionChartObj, drReplicationCharObj, cmdLogChartObj) {
             cpuChart = cpuChartObj;
             ramChart = ramChartObj;
             latencyChart = clusterChartObj;
             transactionChart = transactinoChartObj;
             partitionChart = partitionChartObj;
-            currentView = view;
-            MonitorGraphUI.Monitors = {                
+            drReplicationChart = drReplicationCharObj;
+            cmdLogChart = cmdLogChartObj;            currentView = view;
+            MonitorGraphUI.Monitors = {
                 'latHistogram': {},
                 'latData': getEmptyDataOptimized(),
                 'latDataMin': getEmptyDataForMinutesOptimized(),
@@ -533,15 +621,21 @@
                 'partitionDataMin': getEmptyDataForPartitionForMinutes(),
                 'partitionDataDay': getEmptyDataForPartitionForDay(),
                 'partitionFirstData': true,
-                'lastTimedTransactionCount': -1,
+                'drReplicationData': getEmptyDataOptimized(),
+                'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
+                'drReplicationDataDay': getEmptyDataForDaysOptimized(),                //pm
+                'cmdLogData': getEmptyDataOptimized(),
+                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),                'cmdLogDataDay': getEmptyDataForDaysOptimized(),                'cmdLogFirstData': true,                'drFirstData': true,                'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
-            
+
             dataCpu[0]["values"] = getEmptyDataForView(view);
             dataRam[0]["values"] = getEmptyDataForView(view);
             dataLatency[0]["values"] = getEmptyDataForView(view);
             dataTransactions[0]["values"] = getEmptyDataForView(view);
             dataPartitionIdleTime = getEmptyDataForPartitionView(view);
+            dataDrReplicationRate[0]["values"] = getEmptyDataForView(view);
+            dataCommandLog[0]["values"] = getEmptyDataForView(view);
             changeAxisTimeFormat(view);
         };
 
@@ -553,25 +647,31 @@
                 dataRam[0]["values"] = MonitorGraphUI.Monitors.memDataDay;
                 dataLatency[0]["values"] = MonitorGraphUI.Monitors.latDataDay;
                 dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionDataDay;
+                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationDataDay;
+                dataCommandLog[0]["values"] = MonitorGraphUI.Monitors.cmdLogDataDay;
             } else if (view == 'Minutes') {
                 dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataMin;
                 dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataMin;
                 dataRam[0]["values"] = MonitorGraphUI.Monitors.memDataMin;
                 dataLatency[0]["values"] = MonitorGraphUI.Monitors.latDataMin;
                 dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionDataMin;
+                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationDataMin;
+                dataCommandLog[0]["values"] = MonitorGraphUI.Monitors.cmdLogDataMin;
             } else {
                 dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuData;
                 dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsData;
                 dataRam[0]["values"] = MonitorGraphUI.Monitors.memData;
                 dataLatency[0]["values"] = MonitorGraphUI.Monitors.latData;
                 dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionData;
+                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationData;
+                dataCommandLog[0]["values"] = MonitorGraphUI.Monitors.cmdLogData;
             }
 
             nv.utils.windowResize(MonitorGraphUI.ChartCpu.update);
             changeAxisTimeFormat(view);
         };
 
-        this.UpdateCharts = function() {
+        this.UpdateCharts = function () {
 
             if (ramChart.is(":visible"))
                 MonitorGraphUI.ChartRam.update();
@@ -584,9 +684,14 @@
 
             if (transactionChart.is(":visible"))
                 MonitorGraphUI.ChartTransactions.update();
-            
+
             if (partitionChart.is(":visible"))
                 MonitorGraphUI.ChartPartitionIdleTime.update();
+
+            if (drReplicationChart.is(":visible"))                MonitorGraphUI.ChartDrReplicationRate.update();
+
+            if (cmdLogChart.is(":visible"))
+                MonitorGraphUI.ChartCommandlog.update();
         };
 
         var changeAxisTimeFormat = function (view) {
@@ -614,6 +719,14 @@
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
+            MonitorGraphUI.ChartDrReplicationRate.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            MonitorGraphUI.ChartCommandlog.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
         };
 
         var dataView = {
@@ -621,12 +734,12 @@
             'Minutes': 1,
             'Days': 2
         };
-        
+
         function sliceFirstData(dataArray, view) {
 
             var total = totalEmptyData;
             var refEmptyData = emptyData;
-            
+
             if (view == dataView.Minutes) {
                 total = totalEmptyDataForMinutes;
                 refEmptyData = emptyDataForMinutes;
@@ -653,7 +766,7 @@
             var maxLatency = 0;
 
             // Compute latency statistics
-            jQuery.each(latency, function(id, val) {
+            jQuery.each(latency, function (id, val) {
                 var strLatStats = val["UNCOMPRESSED_HISTOGRAM"];
                 timeStamp = val["TIMESTAMP"];
                 var latStats = convert2Histogram(strLatStats);
@@ -711,7 +824,7 @@
             latSecCount++;
             latMinCount++;
         };
-        
+
         this.RefreshMemory = function (memoryDetails, currentServer, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
             var dataMem = monitor.memData;
@@ -720,10 +833,13 @@
             var memDetails = memoryDetails;
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
-            
+
+            if ($.isEmptyObject(memDetails) || memDetails[currentServer].PHYSICALMEMORY == null || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].RSS == null || memDetails[currentServer].TIMESTAMP == null || memDetails[currentServer].TIMESTAMP == undefined)
+                return;
+
             if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
                 physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
-                
+
                 MonitorGraphUI.ChartRam.yAxis.scale().domain([0, physicalMemory]);
                 MonitorGraphUI.ChartRam.lines.forceY([0, physicalMemory]);
             }
@@ -778,10 +894,13 @@
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
 
+            if ($.isEmptyObject(transacDetail) || transacDetail["CurrentTimedTransactionCount"] == null || transacDetail["TimeStamp"] == null || transacDetail["TimeStamp"] == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["currentTimerTick"] == null || transacDetail["currentTimerTick"] == undefined)
+                return;
+
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
                 var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
-                
+
                 if (calculatedValue < 0 || isNaN(calculatedValue) || (currentTimerTick - monitor.lastTimerTick == 0))
                     calculatedValue = 0;
 
@@ -819,7 +938,7 @@
                     .transition().duration(500)
                     .call(MonitorGraphUI.ChartTransactions);
             }
-            
+
             tpsSecCount++;
             tpsMinCount++;
         };
@@ -832,6 +951,9 @@
             var cpuDetail = cpuDetails;
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
+
+            if ($.isEmptyObject(cpuDetail) || cpuDetail[currentServer].PERCENT_USED == null || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == null || cpuDetail[currentServer].TIMESTAMP == undefined)
+                return;
 
             if (percentageUsage < 0)
                 percentageUsage = 0;
@@ -873,7 +995,7 @@
             cpuSecCount++;
             cpuMinCount++;
         };
-        
+
         function getPartitionData() {
             var monitor = MonitorGraphUI.Monitors;
             monitor.partitionData = getEmptyDataForPartition();
@@ -891,6 +1013,10 @@
             var partitionDataDay = monitor.partitionDataDay;
             var partitionDetail = partitionDetails;
             var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
+
+            if ($.isEmptyObject(partitionDetail) || partitionDetail["partitionDetail"]["timeStamp"] == null || partitionDetail["partitionDetail"]["timeStamp"] == undefined)
+                return;
+
             $.each(partitionDetail["partitionDetail"], function (datatype, datavalue) {
                 $.each(datavalue, function (partitionKey, partitionValue) {
                     var keyValue = partitionKey;
@@ -922,6 +1048,9 @@
                     MonitorGraphUI.Monitors.partitionData = partitionData;
                 });
             });
+            if (monitor.partitionFirstData) {
+                $(".legend").css("display", "block");
+            }
             monitor.partitionFirstData = false;
             if (partitionSecCount >= 6)
                 partitionSecCount = 0;
@@ -942,13 +1071,165 @@
                     .transition().duration(500)
                     .call(MonitorGraphUI.ChartPartitionIdleTime);
             }
-            
+
             partitionSecCount++;
             partitionMinCount++;
         };
 
+        this.RefreshDrReplicationGraph = function (drDetails, currentServer, graphView, currentTab) {
+            var monitor = MonitorGraphUI.Monitors;
+            var drData = monitor.drReplicationData;
+            var drDataMin = monitor.drReplicationDataMin;
+            var drDataDay = monitor.drReplicationDataDay;
+            var drDetail = drDetails;
+            var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
+            var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
+
+            if ($.isEmptyObject(drDetail) || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == null || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == null || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
+                return;
+
+            if (drSecCount >= 6 || monitor.drFirstData) {
+                drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
+                drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
+                drSecCount = 0;
+            }
+            if (drMinCount >= 60 || monitor.drFirstData) {
+                drDataDay = sliceFirstData(drDataDay, dataView.Days);
+                drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
+                drMinCount = 0;
+            }
+            drData = sliceFirstData(drData, dataView.Seconds);
+            drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
+            MonitorGraphUI.Monitors.drReplicationData = drData;
+            monitor.drFirstData = false;
+
+            if (graphView == 'Minutes')
+                dataDrReplicationRate[0]["values"] = drDataMin;
+            else if (graphView == 'Days')
+                dataDrReplicationRate[0]["values"] = drDataDay;
+            else {
+                dataDrReplicationRate[0]["values"] = drData;
+
+            }
+
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
+                d3.select('#visualizationDrReplicationRate')
+                    .datum(dataDrReplicationRate)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartDrReplicationRate);
+            }
+            drSecCount++;
+            drMinCount++;
+        };
+
+        this.RefreshCommandLog = function (cmdLogDetails, currentServer, graphView, currentTab) {
+            var monitor = MonitorGraphUI.Monitors;
+            var cmdLogData = monitor.cmdLogData;
+            var cmdLogDataMin = monitor.cmdLogDataMin;
+            var cmdLogDataDay = monitor.cmdLogDataDay;
+            var cmdLogDetail = cmdLogDetails;
+
+            if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail[currentServer].OUTSTANDING_TXNS == null || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == null || cmdLogDetail[currentServer].TIMESTAMP == undefined)
+                return;
+
+            var outStandingTxn = parseFloat(cmdLogDetail[currentServer].OUTSTANDING_TXNS).toFixed(1) * 1;
+            var timeStamp = cmdLogDetail[currentServer].TIMESTAMP;
+
+            if (cmdLogSecCount >= 6 || monitor.cmdLogFirstData) {
+                cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
+                cmdLogDataMin.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+                MonitorGraphUI.Monitors.cmdLogDataMin = cmdLogDataMin;
+                cmdLogSecCount = 0;
+            }
+            if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
+                cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
+                cmdLogDataDay.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+                MonitorGraphUI.Monitors.cmdLogDataDay = cmdLogDataDay;
+                cmdLogMinCount = 0;
+            }
+            cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
+            cmdLogData.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+            MonitorGraphUI.Monitors.cmdLogData = cmdLogData;
+            if (monitor.cmdLogFirstData) {
+                $(".cmdLogLegend").css("display", "block");
+            }
+            monitor.cmdLogFirstData = false;
+
+            if (graphView == 'Minutes')
+                dataCommandLog[0]["values"] = cmdLogDataMin;
+            else if (graphView == 'Days')
+                dataCommandLog[0]["values"] = cmdLogDataDay;
+            else {
+                dataCommandLog[0]["values"] = cmdLogData;
+            }
+
+
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
+                d3.select('#visualisationCommandLog')
+                    .datum(dataCommandLog)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartCommandlog);
+            }
+
+            var isDuplicate = false;
+            if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
+                for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                    $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
+                        var x1 = partitionValue.x;
+                        if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                            isDuplicate = true;
+                        else
+                            isDuplicate = false;
+                    });
+                    if (!isDuplicate)
+                        cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "y": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                }
+            }
+            d3.select('#visualisationCommandLog .nv-y')
+                .append('rect')
+                .attr('x', 2)
+                .attr('width', 475)
+                .style('fill', 'white')
+                .style('opacity', 1)
+                .attr('y', 0)
+                .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+
+            $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
+                var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
+                var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
+                var opacity = 1;
+                if (x1 > 3 && x1 < 475 && (x2 - x1 > 0)) {
+                    opacity = ((x2 - x1) > 4) ? 0.2 : 1;
+                    d3.select('#visualisationCommandLog .nv-y')
+                        .append('rect')
+                        .attr('x', x1)
+                        .attr('width', (x2 - x1))
+                        .style('fill', 'red')
+                        .style('opacity', opacity)
+                        .attr('y', 0)
+                        .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                }
+            });
+
+            cmdLogSecCount++;
+            cmdLogMinCount++;
+        };
+
+        this.refreshGraphCmdLog = function () {
+            if ($.isFunction(MonitorGraphUI.ChartCommandlog.update))
+                MonitorGraphUI.ChartCommandlog.update();
+        };
+
+        this.refreshGraphDR = function () {
+            if ($.isFunction(MonitorGraphUI.ChartDrReplicationRate.update))
+                MonitorGraphUI.ChartDrReplicationRate.update();
+        };
     });
-    
+
+
+
     window.MonitorGraphUI = MonitorGraphUI = new IMonitorGraphUI();
 })(window);
 

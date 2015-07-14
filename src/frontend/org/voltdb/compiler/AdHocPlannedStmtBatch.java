@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
@@ -112,6 +111,14 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             Object[] extractedValues, VoltType[] paramTypes,
             Object[] userParams, int partitionParamIndex, byte[] catalogHash)
     {
+        return mockStatementBatch(replySiteId, sql, extractedValues, paramTypes, userParams, partitionParamIndex, catalogHash, true, false);
+    }
+
+    public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId, String sql,
+            Object[] extractedValues, VoltType[] paramTypes,
+            Object[] userParams, int partitionParamIndex, byte[] catalogHash,
+            boolean readOnly, boolean isAdmin)
+    {
         // Mock up a dummy completion handler to satisfy the dummy work request.
         AsyncCompilerWorkCompletionHandler dummyHandler = new AsyncCompilerWorkCompletionHandler() {
 
@@ -125,14 +132,15 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                                                                                 sql,
                                                                                 userParams,
                                                                                 false, // mock inferred partitioning
-                                                                                null, dummyHandler);
+                                                                                null, dummyHandler,
+                                                                                isAdmin);
         // Mock up dummy results from the work request.
         CorePlan core = new CorePlan(new byte[0],
                 partitionParamIndex == -1 ? new byte[20] : null,
                 new byte[20],
                 partitionParamIndex == -1 ? new byte[20] : null,
                 false,
-                true,
+                readOnly,
                 paramTypes,
                 catalogHash);
         AdHocPlannedStatement s = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
@@ -358,17 +366,15 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         PlanNodeTree pnt = new PlanNodeTree();
         try {
             JSONObject jobj = new JSONObject( aggplan );
-            JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-            pnt.loadFromJSONArray(jarray, db);
+            pnt.loadFromJSONPlan(jobj, db);
 
             if( plannedStatement.core.collectorFragment != null ) {
                 //multi-partition query plan
                 String collplan = new String(plannedStatement.core.collectorFragment, Constants.UTF8ENCODING);
                 PlanNodeTree collpnt = new PlanNodeTree();
                 //reattach plan fragments
-                jobj = new JSONObject( collplan );
-                jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                collpnt.loadFromJSONArray(jarray, db);
+                JSONObject jobMP = new JSONObject( collplan );
+                collpnt.loadFromJSONPlan(jobMP, db);
                 assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
                 pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
             }

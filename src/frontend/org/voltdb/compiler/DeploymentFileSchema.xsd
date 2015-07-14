@@ -48,6 +48,7 @@
                   type="systemSettingsType" />
       <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
+      <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
     </xs:all>
   </xs:complexType>
 
@@ -291,6 +292,22 @@
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
   </xs:complexType>
 
+  <!-- <import> -->
+  <xs:complexType name="importType">
+    <xs:sequence>
+      <xs:element name="configuration" type="ImportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ImportConfigurationType">
+    <xs:sequence>
+      <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="module" type="xs:string" />
+    <xs:attribute name="type" type="ServerImportEnum" use="required" />
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
   <xs:complexType name="PropertyType">
     <xs:simpleContent>
       <xs:extension base="xs:string">
@@ -314,6 +331,13 @@
       <xs:enumeration value="kafka"/>
       <xs:enumeration value="http"/>
       <xs:enumeration value="rabbitmq"/>
+      <xs:enumeration value="elasticsearch"/>
+      <xs:enumeration value="custom"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ServerImportEnum">
+    <xs:restriction base="xs:token">
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
@@ -347,8 +371,8 @@
         <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="id" type="clusterIdType" use="required"/>
-    <xs:attribute name="listen" type="xs:boolean" default="false" />
-    <xs:attribute name="port" type="xs:int" default="0"/>
+    <xs:attribute name="listen" type="xs:boolean" default="true" />
+    <xs:attribute name="port" type="xs:int" default="5555"/>
   </xs:complexType>
 
   <xs:complexType name="connectionType">
@@ -361,6 +385,7 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="enabled" type="xs:boolean" default="true" />
   </xs:complexType>
 
   <!-- restriction on id -->

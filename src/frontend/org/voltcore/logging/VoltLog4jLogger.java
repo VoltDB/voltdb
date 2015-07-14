@@ -37,10 +37,10 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         try {
             rb = ResourceBundle.getBundle("org/voltdb/utils/voltdb_logstrings");
         } catch (MissingResourceException e) {
-            System.err.println("Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.");
+            System.err.println("Couldn't find voltdb_logstrings resource bundle. Should be in voltdb_logstrings.properties.");
             e.printStackTrace(System.err);
             org.voltdb.VoltDB.crashLocalVoltDB(
-                    "Couldn't find voltdb_logstrings resource bundle. Should be in voldb_logstrings.properties.",
+                    "Couldn't find voltdb_logstrings resource bundle. Should be in voltdb_logstrings.properties.",
                     true, e);
         }
         Logger.getRootLogger().setResourceBundle(rb);
@@ -161,6 +161,11 @@ public class VoltLog4jLogger implements CoreVoltLogger {
             }
         }
         return logLevels;
+    }
+
+    @Override
+    public void setLevel(Level level) {
+        m_logger.setLevel(getPriorityForLevel(level));
     }
 
     /**

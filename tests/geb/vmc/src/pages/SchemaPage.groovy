@@ -63,10 +63,18 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "Overview" tab is currently open.
      */
     def boolean isSchemaPageOverviewTabOpen() {
-        if (isSchemaPageOpen() && overviewTab.attr('class') == 'active') {
-            return true
-        } else {
-            return false
+        int count = 0
+        while (count<10) {
+            count++
+            try {
+                if (isSchemaPageOpen() && overviewTab.attr('class') == 'active') {
+                    return true
+                } else {
+                    return false
+                }
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                
+            }
         }
     }
 
@@ -77,10 +85,18 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "Schema" tab is currently open.
      */
     def boolean isSchemaPageSchemaTabOpen() {
-        if (isSchemaPageOpen() && schemaSubTab.attr('class') == 'active') {
-            return true
-        } else {
-            return false
+        int count = 0
+        while (count<10) {
+            count++
+            try {
+                if (isSchemaPageOpen() && schemaSubTab.attr('class') == 'active') {
+                    return true
+                } else {
+                    return false
+                }
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                
+            }
         }
     }
 
@@ -92,10 +108,18 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "Procedures & SQL" tab is currently open.
      */
     def boolean isSchemaPageProceduresAndSqlTabOpen() {
-        if (isSchemaPageOpen() && proceduresTab.attr('class') == 'active') {
-            return true
-        } else {
-            return false
+        int count = 0
+        while (count<10) {
+            count++
+            try {
+                if (isSchemaPageOpen() && proceduresTab.attr('class') == 'active') {
+                    return true
+                } else {
+                    return false
+                }
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                
+            }
         }
     }
 
@@ -107,10 +131,18 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "Size Worksheet" tab is currently open.
      */
     def boolean isSchemaPageSizeWorksheetTabOpen() {
-        if (isSchemaPageOpen() && sizeTab.attr('class') == 'active') {
-            return true
-        } else {
-            return false
+        int count = 0
+        while (count<10) {
+            count++
+            try {
+                if (isSchemaPageOpen() && sizeTab.attr('class') == 'active') {
+                    return true
+                } else {
+                    return false
+                }
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                
+            }
         }
     }
 
@@ -122,10 +154,18 @@ class SchemaPage extends VoltDBManagementCenterPage {
      * @return true if a SchemaPage's "DDL Source" tab is currently open.
      */
     def boolean isSchemaPageDdlSourceTabOpen() {
-        if (isSchemaPageOpen() && ddlTab.attr('class') == 'active') {
-            return true
-        } else {
-            return false
+        int count = 0
+        while (count<10) {
+            count++
+            try {
+                if (isSchemaPageOpen() && ddlTab.attr('class') == 'active') {
+                    return true
+                } else {
+                    return false
+                }
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                
+            }
         }
     }
 
@@ -225,6 +265,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * get tablename that is created and deleted
      */
+
     def String getTablename() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
         String line;
@@ -243,6 +284,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * click SQL query to go to SQL query
      */
+
     def boolean gotoSqlQuery() {
         header.tabSQLQuery.click()
     }
@@ -250,6 +292,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * click schema tab to go to Schema tab
      */
+
     def boolean gotoSchemaSubTab() {
         schemaSubLink.click()
     }

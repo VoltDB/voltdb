@@ -29,8 +29,8 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedColInfo;
+import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
@@ -60,9 +60,10 @@ public class StmtSubqueryScan extends StmtTableScan {
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
-    public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias) {
-        super(tableAlias);
+    public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias, int stmtId) {
+        super(tableAlias, stmtId);
         m_subqueryStmt = subqueryStmt;
+
         // A union or other set operator uses the output columns of its left-most leaf child statement.
         while (subqueryStmt instanceof ParsedUnionStmt) {
             assert( ! ((ParsedUnionStmt)subqueryStmt).m_children.isEmpty());
@@ -78,7 +79,10 @@ public class StmtSubqueryScan extends StmtTableScan {
             m_outputColumnIndexMap.put(colAlias, i);
             i++;
         }
+    }
 
+    public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias) {
+        this(subqueryStmt, tableAlias, 0);
     }
 
     public StatementPartitioning getPartitioningForStatement() {
@@ -310,12 +314,18 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         m_hasReceiveNode = true;
-        ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;
-        if (selectStmt == null) {
+        if (m_subqueryStmt instanceof ParsedUnionStmt) {
             // Union are just returned
             assert(m_subqueryStmt instanceof ParsedUnionStmt);
             return root;
         }
+
+        if (m_subqueryStmt instanceof ParsedSelectStmt == false) {
+            throw new PlanningErrorException("Unsupported subquery found in FROM clause:" + m_subqueryStmt.toString());
+        }
+
+        ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;
+        assert(selectStmt != null);
 
         // Now If query has LIMIT/OFFSET/DISTINCT on a replicated table column,
         // we should get rid of the receive node.
@@ -434,5 +444,9 @@ public class StmtSubqueryScan extends StmtTableScan {
             // We are about to branch and leave the coordinator
             return root;
         }
+    }
+
+    public List<SchemaColumn> getOutputSchema() {
+        return m_outputColumnList;
     }
 }

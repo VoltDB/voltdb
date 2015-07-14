@@ -128,41 +128,40 @@ class schemaTab extends Module{
         //for writing query
         clicksqlquery{$("#navSqlQuery > a")}
 
-
         //Procedure & SQL
-        clickproceduresqlbtn{$("#p-nav > a")}
-        proceduresqlTitle{$("#p > div > div.dataBlockHeading > h1")}
-        expandall_check{$("#p > div > div.dataBlockContent > div > div > label > input")}
-        procedurenamesort{$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(1) > div > div")}
-        parameterssort{$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(2) > div > div")}
-        partitionsort{$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(3) > div > div")}
-        rwsort{$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(4) > div > div")}
-        accesssort{$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(5) > div > div")}
-        attributessort{$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(6) > div > div")}
+        clickproceduresqlbtn    {$("#p-nav > a")}
+        proceduresqlTitle       {$("#p > div > div.dataBlockHeading > h1")}
+        expandall_check         {$("#p > div > div.dataBlockContent > div > div > label > input")}
+        procedurenamesort       {$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(1) > div > div")}
+        parameterssort          {$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(2) > div > div")}
+        partitionsort           {$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(3) > div > div")}
+        rwsort                  {$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(4) > div > div")}
+        accesssort              {$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(5) > div > div")}
+        attributessort          {$("#proctable > thead > tr.tablesorter-headerRow > th:nth-child(6) > div > div")}
 
         //Size worksheet
 
-        clicksizeworksheetbtn{$("#z-nav > a")}
-        memoryusedbyTitle{$("#z > div:nth-child(1) > div.dataBlockHeading > h1")}
-        checkparagraph{$("#zTbl > tbody > tr > td:nth-child(1)")}
-        sizewithoutunittxt{$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(1)")}
-        usefulresultstxt{$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(2)")}
-        calculatedfieldstxt{$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(3)")}
-        warningpagetxt{$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(4)")}
-        varcharcolumntxt{$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(5)")}
+        clicksizeworksheetbtn   {$("#z-nav > a")}
+        memoryusedbyTitle       {$("#z > div:nth-child(1) > div.dataBlockHeading > h1")}
+        checkparagraph          {$("#zTbl > tbody > tr > td:nth-child(1)")}
+        sizewithoutunittxt      {$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(1)")}
+        usefulresultstxt        {$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(2)")}
+        calculatedfieldstxt     {$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(3)")}
+        warningpagetxt          {$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(4)")}
+        varcharcolumntxt        {$("#zTbl > tbody > tr > td:nth-child(2) > small > ul > li:nth-child(5)")}
 
         //size analysis part of schema
         sizeanalysissummaryTitle{$("#z > div:nth-child(2) > div.dataBlockHeading > h3")}
-        tablestxt{$("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(1) > td:nth-child(2)")}
-        materializedtxt{$("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(2) > td:nth-child(2)")}
-        indexestxt{$("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(3) > td:nth-child(2)")}
-        totalusertxt{$("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(5) > td:nth-child(1) > b")}
-        tablestxtvalue1{$("#s-size-summary-table-min")}
-        tabletxtvalue2{$("#s-size-summary-table-max")}
-        materializedtxtvalue{$("#s-size-summary-view-min")}
-        indexestxtvalue{$("#s-size-summary-index-min")}
-        totalusertxtvalue1{$("#s-size-summary-total-min")}
-        totalusertxtvalue2{$("#s-size-summary-total-max")}
+        tablestxt               {$("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(1) > td:nth-child(2)")}
+        materializedtxt         {$("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(2) > td:nth-child(2)")}
+        indexestxt              {$("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(3) > td:nth-child(2)")}
+        totalusertxt            {$("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(5) > td:nth-child(1) > b")}
+        tablestxtvalue1         {$("#s-size-summary-table-min")}
+        tabletxtvalue2          {$("#s-size-summary-table-max")}
+        materializedtxtvalue    {$("#s-size-summary-view-min")}
+        indexestxtvalue         {$("#s-size-summary-index-min")}
+        totalusertxtvalue1      {$("#s-size-summary-total-min")}
+        totalusertxtvalue2      {$("#s-size-summary-total-max")}
 
         //sorting in sizw worksheet
         namesortinsizeworksheet{$("#sizetable > thead > tr.tablesorter-headerRow > th:nth-child(1) > div > div")}
@@ -174,7 +173,6 @@ class schemaTab extends Module{
         indexmaxsortinsizeworksheet{$("#sizetable > thead > tr.tablesorter-headerRow > th:nth-child(7) > div > div")}
         tableminsortinsizeworksheet{$("#sizetable > thead > tr.tablesorter-headerRow > th:nth-child(8) > div > div")}
         tablemaxsortinsizeworksheet{$("#sizetable > thead > tr.tablesorter-headerRow > th:nth-child(9) > div > div")}
-
 
 
     }

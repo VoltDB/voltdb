@@ -39,11 +39,14 @@ public class PlannerTestCase extends TestCase {
     private boolean m_byDefaultInferPartitioning = true;
     private boolean m_byDefaultPlanForSinglePartition;
 
-    protected void failToCompile(String sql, String... patterns)
-    {
+    /**
+     * @param sql
+     * @return
+     */
+    private int countQuestionMarks(String sql) {
         int paramCount = 0;
         int skip = 0;
-        while(true) {
+        while (true) {
             // Yes, we ARE assuming that test queries don't contain quoted question marks.
             skip = sql.indexOf('?', skip);
             if (skip == -1) {
@@ -52,16 +55,22 @@ public class PlannerTestCase extends TestCase {
             skip++;
             paramCount++;
         }
+        return paramCount;
+    }
+
+    protected void failToCompile(String sql, String... patterns)
+    {
+        int paramCount = countQuestionMarks(sql);
         try {
-            m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
-            fail();
+            m_aide.compile(sql, paramCount,
+                    m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
+            fail("Expected planner failure, but found success.");
         }
-        catch (PlanningErrorException ex) {
+        catch (Exception ex) {
             String result = ex.toString();
             for (String pattern : patterns) {
                 if ( ! result.contains(pattern)) {
-                    System.err.println("Did not find pattern '" + pattern + "' in error string '" + result + "'");
-                    fail();
+                    fail("Did not find pattern '" + pattern + "' in error string '" + result + "'");
                 }
             }
         }
@@ -190,7 +199,7 @@ public class PlannerTestCase extends TestCase {
         }
         catch (Exception ex) {
             ex.printStackTrace();
-            fail();
+            fail(ex.getMessage());
         }
         assertTrue(pns.get(0) != null);
         return pns.get(0);

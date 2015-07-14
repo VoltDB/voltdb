@@ -27,11 +27,11 @@ function alertNodeClicked(obj) {
 
         var data = {
             CurrentServer: clickedServer,
-            GraphView: $.cookie("graph-view"),
-            DisplayPreferences: $.cookie("user-preferences"),
-            AlertThreshold: $.cookie("alert-threshold"),
-            username: $.cookie("username"),
-            password: $.cookie("password")
+            GraphView: VoltDbUI.getCookie("graph-view"),
+            DisplayPreferences: VoltDbUI.getCookie("user-preferences"),
+            AlertThreshold: VoltDbUI.getCookie("alert-threshold"),
+            username: VoltDbUI.getCookie("username"),
+            password: VoltDbUI.getCookie("password")
         };
 
         var win = window.open(newUrl + '?data=' + JSON.stringify(data), '_parent');
@@ -119,6 +119,10 @@ function alertNodeClicked(obj) {
         var alertCount = 0;
         var serverSettings = false;
 
+        this.drTablesArray = [];
+
+        this.exportTablesArray = [];
+
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
         };
@@ -172,7 +176,7 @@ function alertNodeClicked(obj) {
                     $("#overlay").show();
                     $("#UnableToLoginMsg").hide();
                     var usernameVal = $("#username").val();
-                    var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
+                    var passwordVal = $("#password").val() != '' ? CryptoJS.SHA256($("#password").val()).toString(CryptoJS.enc.Hex) : $("#password").val();
                     responseObtained = false;
 
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result, response) {
@@ -197,7 +201,7 @@ function alertNodeClicked(obj) {
                                 $("#password").val("");
                             }, 300);
                             $("#logOut").css('display', 'block');
-                            $('#logOut').prop('title', $.cookie("username"));
+                            $('#logOut').prop('title', VoltDbUI.getCookie("username"));
                         } else {
 
                             //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
@@ -235,8 +239,8 @@ function alertNodeClicked(obj) {
                 return true;
             });
 
-            var username = ($.cookie("username") != undefined) ? $.cookie("username") : "";
-            var password = (username != "" && $.cookie("password") != undefined) ? $.cookie("password") : "";
+            var username = (VoltDbUI.getCookie("username") != undefined) ? VoltDbUI.getCookie("username") : "";
+            var password = (username != "" && VoltDbUI.getCookie("password") != undefined) ? VoltDbUI.getCookie("password") : "";
 
             $("#serUnavailablePopup").popup({
                 open: function (event, ui, ele) {
@@ -299,7 +303,7 @@ function alertNodeClicked(obj) {
                 $(".userN").attr("title", userName).html(userName);
                 $("#userLine").show();
             } else {
-                $(".userN").attr("title","").html("");
+                $(".userN").attr("title", "").html("");
                 $("#userLine").hide();
             }
         };
@@ -309,6 +313,7 @@ function alertNodeClicked(obj) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
+
 
                 if (VoltDbAdminConfig.isAdmin) {
                     onAdminPagePortAndOverviewDetailsLoaded(getPortAndOverviewDetails(), serverSettings);
@@ -348,17 +353,27 @@ function alertNodeClicked(obj) {
                     var rawData;
                     if (connection != null)
                         rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
-
                     onInformationLoaded(loadAdminDeploymentInformation(connection), rawData);
                 });
             }
+        };
+
+
+        this.GetExportProperties = function (onInformationLoaded) {
+
+            VoltDBService.GetExportProperties(function (connection) {
+                var rawData;
+                if (connection != null)
+                    rawData = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+
+                onInformationLoaded(loadExportProperties(connection), rawData);
+            });
         };
 
         this.GetProceduresInfo = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-
                 setKFactor(connection);
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
@@ -430,6 +445,51 @@ function alertNodeClicked(obj) {
 
         };
 
+        //Check if DR is enable or not
+        this.GetDrStatusInformation = function (onInformationLoaded) {
+            var drStatus = {};
+            VoltDBService.GetDrStatusInformation(function (connection) {
+                getDrStatus(connection, drStatus);
+                onInformationLoaded(drStatus);
+            });
+        };
+        //
+
+        //GET DR Details
+        this.GetDrDetails = function (onInformationLoaded) {
+            var drDetails = {};
+            VoltDBService.GetDrStatusInformation(function (connection) {
+
+                getDrDetails(connection, drDetails);
+                onInformationLoaded(drDetails);
+            });
+        };
+        //
+
+        //Check if cluster is replica or not
+        this.GetClusterReplicaInformation = function (onInformationLoaded) {
+            var replicationStatus = {};
+
+            VoltDBService.GetClusterReplicaInformation(function (connection) {
+                getReplicationDetails(connection, replicationStatus, "CLUSTER_REPLICA_INFORMATION");
+                onInformationLoaded(replicationStatus);
+            });
+        };
+        //
+
+        //Render DR Replication Graph
+        this.GetDrReplicationInformation = function (onInformationLoaded) {
+            var replicationData = {};
+
+            VoltDBService.GetDrReplicationInformation(function (connection) {
+                getDrReplicationData(connection, replicationData);
+                onInformationLoaded(replicationData);
+            });
+        };
+        //
+
+
+
         //Render Cluster Transaction Graph
         this.GetTransactionInformation = function (onInformationLoaded) {
             var transactionDetails = {};
@@ -437,6 +497,32 @@ function alertNodeClicked(obj) {
             VoltDBService.GetTransactionInformation(function (connection) {
                 getTransactionDetails(connection, transactionDetails);
                 onInformationLoaded(transactionDetails);
+            });
+        };
+        //
+
+        //Get host and site count
+        this.GetDeploymentInformation = function (onInformationLoaded) {
+            var deploymentDetails = {};
+            VoltDBService.GetSystemInformationDeployment(function (connection) {
+                getDeploymentDetails(connection, deploymentDetails);
+                onInformationLoaded(deploymentDetails);
+            });
+        };
+
+        this.GetCommandLogInformation = function (onInformationLoaded) {
+            var cmdLogDetails = {};
+            VoltDBService.GetCommandLogInformation(function (connection) {
+                getCommandLogDetails(connection, cmdLogDetails);
+                onInformationLoaded(cmdLogDetails);
+            });
+        };
+
+        this.GetSnapshotStatus = function (onInformationLoaded) {
+            var snapshotDetails = {};
+            VoltDBService.GetSnapshotStatus(function (connection) {
+                getSnapshotStatus(connection, snapshotDetails);
+                onInformationLoaded(snapshotDetails);
             });
         };
 
@@ -449,6 +535,17 @@ function alertNodeClicked(obj) {
                 var sysProceduresData = {};
                 getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION');
                 onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData);
+            });
+        };
+
+        this.GetTableInformationClientPort = function () {
+            VoltDBService.GetTableInformationClientPort(function (connection) {
+                var tablesData = {};
+                var viewsData = {};
+                var proceduresData = {};
+                var procedureColumnsData = {};
+                var sysProceduresData = {};
+                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION_CLIENTPORT');
             });
         };
 
@@ -516,8 +613,7 @@ function alertNodeClicked(obj) {
             var alertHtml = "";
 
             jQuery.each(systemMemory, function (id, val) {
-
-                var threshold = $.cookie("alert-threshold") != undefined ? $.cookie("alert-threshold") : 70;
+                var threshold = VoltDbUI.getCookie("alert-threshold") != undefined ? VoltDbUI.getCookie("alert-threshold") : 70;
                 if (val["MEMORYUSAGE"] * 1 >= threshold) {
                     alertHtml += '<li class="active"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick=\"alertNodeClicked(this);\" href=\"#\">' + val['HOSTNAME'] + '</a> <span class=\"memory-status alert\">' + val['MEMORYUSAGE'] + '%</span></li>';
                     alertCount++;
@@ -532,7 +628,6 @@ function alertNodeClicked(obj) {
         };
 
         var configureRequestedHost = function (hostName) {
-
             $.each(systemOverview, function (id, val) {
                 if (val["IPADDRESS"] == hostName) {
                     gCurrentServer = val["HOSTNAME"];
@@ -576,7 +671,6 @@ function alertNodeClicked(obj) {
         };
 
         var loadAdminDeploymentInformation = function (connection) {
-
             var adminConfigValues = {};
             if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT'] != null) {
                 var data = connection.Metadata['SHORTAPI_DEPLOYMENT'];
@@ -615,8 +709,10 @@ function alertNodeClicked(obj) {
                 //Command Logging
                 if (data.commandlog != null) {
                     adminConfigValues['commandLogEnabled'] = data.commandlog.enabled;
-                    adminConfigValues['commandLogFrequencyTime'] = data.commandlog.frequency.time;
-                    adminConfigValues['commandLogFrequencyTransactions'] = data.commandlog.frequency.transactions;
+                    if (data.commandlog.frequency != null) {
+                        adminConfigValues['commandLogFrequencyTime'] = data.commandlog.frequency.time;
+                        adminConfigValues['commandLogFrequencyTransactions'] = data.commandlog.frequency.transactions;
+                    }
                     adminConfigValues['logSegmentSize'] = data.commandlog.logsize;
                 }
 
@@ -637,8 +733,11 @@ function alertNodeClicked(obj) {
                 }
 
                 if (data.systemsettings != null) {
-                    adminConfigValues['tempTablesMaxSize'] = data.systemsettings.temptables.maxsize;
-                    adminConfigValues['snapshotPriority'] = data.systemsettings.snapshot.priority;
+                    if (data.systemsettings.temptables != null)
+                        adminConfigValues['tempTablesMaxSize'] = data.systemsettings.temptables.maxsize;
+
+                    if (data.systemsettings.snapshot != null)
+                        adminConfigValues['snapshotPriority'] = data.systemsettings.snapshot.priority;
                 }
 
                 //Directory
@@ -658,9 +757,33 @@ function alertNodeClicked(obj) {
                     if (data.paths.commandlogsnapshot != null)
                         adminConfigValues['commandLogSnapshotPath'] = data.paths.commandlogsnapshot.path;
                 }
+
+                //dr
+                if (data.dr != null) {
+                    adminConfigValues['drConnectionSource'] = data.dr.connection != null ? data.dr.connection.source : "";
+                    adminConfigValues['drId'] = data.dr.id;
+                    adminConfigValues['drListen'] = data.dr.listen;
+                    adminConfigValues['drPort'] = data.dr.port;
+                }
+
+                //import
+
+                if (data.import != null) {
+                    adminConfigValues['importConfiguration'] = data.import.configuration;
+                }
             }
 
             return adminConfigValues;
+        };
+
+        var loadExportProperties = function (connection) {
+            var exportProperties = {};
+            if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'] != null) {
+                var data = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+                exportProperties['type'] = data.types;
+            }
+
+            return exportProperties;
         };
 
 
@@ -670,24 +793,23 @@ function alertNodeClicked(obj) {
             var serverOverview = {};
             var iterator = 0;
             var ipAddress = "";
-            
+
             //Error: "Authentication rejected(-3)"
             if (connection.Metadata['@SystemInformation_OVERVIEW_status'] == -3) {
                 VoltDbUI.hasPermissionToView = false;
-                
+
                 if (!$("#loginWarningPopup").is(":visible")) {
-                    $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view this page.");
+                    $("#loginWarningPopupMsg").text("Security settings have been changed. You no longer have permission to view this page.");
                     $("#loginWarnPopup").click();
                 }
                 return;
             } else if (connection.Metadata['@SystemInformation_OVERVIEW'] == null) {
                 return;
             }
-            
+
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
-
                 if (singleData[1] == 'IPADDRESS') {
                     if (singleData[2] == VoltDBConfig.GetDefaultServerIP()) {
                         voltDbRenderer.isHost = true;
@@ -730,12 +852,16 @@ function alertNodeClicked(obj) {
             });
 
             systemOverview = {};
-            systemOverview[0] = currentServerOverview;
+            if (!$.isEmptyObject(currentServerOverview))
+                systemOverview[0] = currentServerOverview;
 
             //iterate through updatedSystemOverview to add remaining server to the list 'systemOverview'
             for (iterator = 0; iterator < updatedSystemOverview.length; iterator++) {
-                systemOverview[iterator + 1] = updatedSystemOverview[iterator];
-
+                if (!$.isEmptyObject(currentServerOverview))
+                    systemOverview[iterator + 1] = updatedSystemOverview[iterator];
+                else {
+                    systemOverview[iterator] = updatedSystemOverview[iterator];
+                }
             };
 
         };
@@ -1020,7 +1146,7 @@ function alertNodeClicked(obj) {
                             "MIN_ROWS": data["MIN_ROWS"],
                             "AVG_ROWS": data["AVG_ROWS"],
                             "TUPLE_COUNT": data["TUPLE_COUNT"],
-                            "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+                            "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS //getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
                         };
                         tableCount++;
                     });
@@ -1036,7 +1162,7 @@ function alertNodeClicked(obj) {
                             "MIN_ROWS": data["MIN_ROWS"],
                             "AVG_ROWS": data["AVG_ROWS"],
                             "TUPLE_COUNT": data["TUPLE_COUNT"],
-                            "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+                            "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS //getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
                         };
                         tableCount++;
                     });
@@ -1069,21 +1195,23 @@ function alertNodeClicked(obj) {
                 tableName = entry[tableNameIndex];
                 if (!schemaCatalogTableTypes.hasOwnProperty(tableName)) {
                     schemaCatalogTableTypes[tableName] = {};
-                    schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
-                    schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
-                    if (entry[remarksIndex] != null)
-                        schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
-                    else {
-                        schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
-                    }
                 }
+                schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
+
+                if (entry[remarksIndex] != null) {
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
+                    schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
+                } else {
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
+                }
+                schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
             });
 
         };
 
         this.mapNodeInformationByStatus = function (callback) {
             var counter = 0;
-            var memoryThreshold = $.cookie("alert-threshold") != '' ? $.cookie("alert-threshold") : -1;
+            var memoryThreshold = VoltDbUI.getCookie("alert-threshold") != '' ? VoltDbUI.getCookie("alert-threshold") : -1;
             var htmlMarkups = { "ServerInformation": [] };
             var htmlMarkup;
             var currentServerHtml = "";
@@ -1566,90 +1694,101 @@ function alertNodeClicked(obj) {
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
                 if (this.isTableSearch == false) voltDbRenderer.tableDataSize = Object.keys(tableData).length;
 
+                voltDbRenderer.drTablesArray = [];
+                voltDbRenderer.exportTablesArray = [];
 
                 $.each(lTableData, function (id, val) {
-                    if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTupleDataHtml(val, id);
-                            if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
+                    if (val['drEnabled'] == "true") {
+                        voltDbRenderer.drTablesArray.push(val['TABLE_NAME']);
+                    }
+
+                    if (val['TABLE_TYPE1'] == "EXPORT") {
+                        voltDbRenderer.exportTablesArray.push(val['TABLE_NAME']);
+                    }
+
+                    if (lTableData)
+                        if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
+                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                                setTableTupleDataHtml(val, id);
+                                if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
+                                    voltDbRenderer.tableIndex++;
+                                    return false;
+                                }
+
+                            } else if (counter == tablePageStartIndex * 2) {
                                 voltDbRenderer.tableIndex++;
                                 return false;
                             }
 
-                        } else if (counter == tablePageStartIndex * 2) {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
+                        } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
+                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows)) {
+                                setTableTupleDataHtml(val, id);
+                            }
+                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                                voltDbRenderer.tableIndex--;
+                            }
 
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows)) {
-                            setTableTupleDataHtml(val, id);
-                        }
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
+                        } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
+                            if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
+                                setTableTupleDataHtml(val, id);
+                            }
 
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
-                        if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
-                            setTableTupleDataHtml(val, id);
+                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                                voltDbRenderer.tableIndex--;
+                            }
+
+                        } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
+                            if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                                voltDbRenderer.tableIndex--;
+                            }
+
+                        } else if (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
+                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                        } else if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
+                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
+                                setTableTupleDataHtml(val, id);
+
+                            }
+
+                        } else if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.NONE) || (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.SEARCH) ||
+                        (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
+                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                        } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.SEARCH) || (currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                            if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
+                                voltDbRenderer.tableIndex++;
+                                return false;
+                            }
+
+                        } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
+                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
+                            if ((counter == (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
+                                voltDbRenderer.tableIndex++;
+                                return false;
+                            }
+
+                        } else {
+                            if (counter < voltDbRenderer.maxVisibleRows) {
+                                setTableTupleDataHtml(val, id);
+                            }
+
                         }
-
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
-
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
-                        if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
-
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                            setTableTupleDataHtml(val, id);
-
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.NONE) || (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.SEARCH) ||
-                    (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.SEARCH) || (currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                        if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                        if ((counter == (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
-
-                    } else {
-                        if (counter < voltDbRenderer.maxVisibleRows) {
-                            setTableTupleDataHtml(val, id);
-                        }
-
-                    }
                     counter++;
 
                 });
@@ -1694,6 +1833,22 @@ function alertNodeClicked(obj) {
 
             });
             return serverAddress;
+        };
+
+        this.getClusterDetail = function (serverName) {
+            var clusterInfo = [];
+            $.each(systemOverview, function (key, val) {
+                if (val["HOSTNAME"] == serverName) {
+                    clusterInfo["VERSION"] = val["VERSION"];
+                    clusterInfo["MODE"] = val["CLUSTERSTATE"];
+                    clusterInfo["BUILDSTRING"] = val["BUILDSTRING"];
+                    clusterInfo["STARTTIME"] = val["STARTTIME"];
+                    clusterInfo["UPTIME"] = val["UPTIME"];
+                    clusterInfo["LICENSE"] = val["LICENSE"];
+                    return false;
+                }
+            });
+            return clusterInfo;
         };
 
         this.sortTablesByColumns = function (isSearched) {
@@ -1885,6 +2040,176 @@ function alertNodeClicked(obj) {
             });
         };
 
+        //Get DR Status Information
+        var getDrStatus = function (connection, drDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (!drDetails.hasOwnProperty("Details")) {
+                drDetails["Details"] = {};
+            }
+            drDetails["Details"]["STATUS"] = connection.Metadata["@Statistics_DR_status"];
+
+            if (connection.Metadata['@Statistics_DR_completeData'] == null || $.isEmptyObject(connection.Metadata['@Statistics_DR_completeData'])) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_DR_completeData'][1].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "SYNCSNAPSHOTSTATE" || columnInfo["name"] == "STATE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_DR_completeData'][1].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!drDetails.hasOwnProperty(hostName)) {
+                    drDetails[hostName] = {};
+                }
+                var isEnable = false;
+                if (info[colIndex["STATE"]] != null && info[colIndex["STATE"]].toLowerCase() != "off")
+                    isEnable = true;
+                drDetails[hostName]["MASTERENABLED"] = isEnable;
+                drDetails[hostName]["STATE"] = info[colIndex["STATE"]];
+                drDetails[hostName]["SYNCSNAPSHOTSTATE"] = info[colIndex["SYNCSNAPSHOTSTATE"]];
+            });
+        };
+
+        //Get DR Details Information
+        var getDrDetails = function (connection, drDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_DR'] == null) {
+                return;
+            }
+
+
+
+            connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            counter = 0;
+
+            connection.Metadata['@Statistics_DR_completeData'][0].data.forEach(function (info) {
+                //Filter Master from Replica
+                if (info[colIndex["MODE"]] == "NORMAL") {
+                    var partitionId = info[colIndex["PARTITION_ID"]];
+                    if (!drDetails.hasOwnProperty(partitionId)) {
+                        drDetails[partitionId] = [];
+                    }
+
+                    var partitionDetails = {};
+                    partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
+                    partitionDetails["TOTALBYTES"] = info[colIndex["TOTALBYTES"]];
+                    partitionDetails["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    partitionDetails["LASTQUEUEDDRID"] = info[colIndex["LASTQUEUEDDRID"]];
+                    partitionDetails["LASTACKDRID"] = info[colIndex["LASTACKDRID"]];
+                    partitionDetails["LASTQUEUEDTIMESTAMP"] = info[colIndex["LASTQUEUEDTIMESTAMP"]];
+                    partitionDetails["LASTACKTIMESTAMP"] = info[colIndex["LASTACKTIMESTAMP"]];
+                    drDetails[partitionId].push(partitionDetails);
+                }
+            });
+        };
+
+
+        //Get Replication Information
+        var getReplicationDetails = function (connection, replicationDetails, processName) {
+            var colIndex = {};
+            var counter = 0;
+            var replicaStatus = false;
+            var hostName = "";
+            var suffix = "_" + processName;
+            if (connection.Metadata['@SystemInformation_Overview' + suffix] == null) {
+                return;
+            }
+
+            connection.Metadata['@SystemInformation_Overview' + suffix].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "KEY" || columnInfo["name"] == "VALUE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+
+            connection.Metadata['@SystemInformation_Overview' + suffix].data.forEach(function (info) {
+                if (info[colIndex["KEY"]] == "HOSTNAME") {
+                    hostName = info[colIndex["VALUE"]];
+                }
+                if (info[colIndex["KEY"]] == "REPLICATIONROLE") {
+                    replicaStatus = info[colIndex["VALUE"]];
+                    if (!replicationDetails.hasOwnProperty(hostName)) {
+                        replicationDetails[hostName] = {};
+                    }
+                    replicationDetails[hostName]["status"] = replicaStatus;
+                }
+
+            });
+        };
+        //
+
+        //Get DR Replication Data
+        var getDrReplicationData = function (connection, replicationDetails) {
+            var colIndex = {};
+            var colIndex2 = {};
+            var counter = 0;
+            var replicationRate1M = 0;
+            if (connection.Metadata['@Statistics_DRCONSUMER'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            counter = 0;
+            connection.Metadata['@Statistics_DRCONSUMER_completeData'][1].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == 'IS_COVERED')
+                    colIndex2[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
+                if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
+                    replicationDetails["DR_GRAPH"] = {};
+                    replicationDetails["DR_GRAPH"]["REPLICATION_DATA"] = [];
+                }
+
+                replicationRate1M += (info[colIndex["REPLICATION_RATE_1M"]] == null || info[colIndex["REPLICATION_RATE_1M"]] < 0) ? 0 : info[colIndex["REPLICATION_RATE_1M"]];
+
+                var repData = {};
+                repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                repData["HOST_ID"] = info[colIndex["HOST_ID"]];
+                repData["HOSTNAME"] = info[colIndex["HOSTNAME"]];
+                repData["STATE"] = info[colIndex["STATE"]];
+                repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
+                repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
+                replicationDetails["DR_GRAPH"]["REPLICATION_DATA"].push(repData);
+
+            });
+
+            replicationDetails["DR_GRAPH"]['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1], colIndex2['IS_COVERED']);
+            replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M / 1000;
+        };
+
+        var getReplicationNotCovered = function (replicationData, index) {
+            var count = 0;
+            if (index != undefined) {
+                replicationData.data.forEach(function (columnInfo) {
+                    columnInfo.forEach(function (col, i) {
+                        if (col == 'false' && i == index) {
+                            count++;
+                        }
+                    });
+                });
+            }
+            return count;
+        }
+
         var getPartitionIdleTimeDetails = function (connection, partitionDetail) {
             var colIndex = {};
             var counter = 0;
@@ -1933,10 +2258,10 @@ function alertNodeClicked(obj) {
             connection.Metadata['@Statistics_STARVATION'].data.forEach(function (info) {
                 if (currentServer == info[colIndex["HOSTNAME"]]) {
                     if (siteId == parseInt(info[colIndex["SITE_ID"]])) {
-                        var keyMpi = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                        var keyMpi = info[colIndex["HOSTNAME"]] + ': ' + info[colIndex["SITE_ID"]];
                         starvMpiData[keyMpi] = info[colIndex["PERCENT"]];
                     } else {
-                        var key = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                        var key = info[colIndex["HOSTNAME"]] + ': ' + info[colIndex["SITE_ID"]];
                         keys.push(key);
                         starvStats[key] = info[colIndex["PERCENT"]];
                     }
@@ -1964,7 +2289,7 @@ function alertNodeClicked(obj) {
                                 maxPer = parseFloat(info[colIndex["PERCENT"]]);
                             }
                             previousHost = info[colIndex["HOSTNAME"]];
-                            previousHostKey = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                            previousHostKey = info[colIndex["HOSTNAME"]] + ': ' + info[colIndex["SITE_ID"]];
                             previousSiteId = info[colIndex["SITE_ID"]];
                         }
                     }
@@ -2115,6 +2440,100 @@ function alertNodeClicked(obj) {
             return portConfigValues;
         };
 
+        var getDeploymentDetails = function (connection, countDetails) {
+            var colIndex = {};
+            var counter = 0;
+            var hostCount = 0;
+            var siteCount = 0;
+            var commandLogStatus = false;
+            if (connection.Metadata['@SystemInformation_DEPLOYMENT'] == null) {
+                return;
+            }
+
+            connection.Metadata['@SystemInformation_DEPLOYMENT'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "PROPERTY" || columnInfo["name"] == "VALUE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (info) {
+                if (info[colIndex["PROPERTY"]] == "hostcount") {
+                    hostCount = info[colIndex["VALUE"]];
+                }
+                if (info[colIndex["PROPERTY"]] == "sitesperhost") {
+                    siteCount = info[colIndex["VALUE"]];
+                }
+                if (info[colIndex["PROPERTY"]] == "commandlogenabled") {
+                    commandLogStatus = info[colIndex["VALUE"]];
+                }
+            });
+            if (!countDetails.hasOwnProperty("DETAILS")) {
+                countDetails["DETAILS"] = {};
+            }
+            countDetails["DETAILS"]["HOSTCOUNT"] = hostCount;
+            countDetails["DETAILS"]["SITECOUNT"] = siteCount;
+            countDetails["DETAILS"]["COMMANDLOGSTATUS"] = commandLogStatus;
+        };
+
+        var getCommandLogDetails = function (connection, cmdLogDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_COMMANDLOG'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_COMMANDLOG'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "OUTSTANDING_TXNS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "OUTSTANDING_BYTES" || columnInfo["name"] == "SEGMENT_COUNT" ||
+                    columnInfo["name"] == "FSYNC_INTERVAL" || columnInfo["name"] == "IN_USE_SEGMENT_COUNT")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+
+            connection.Metadata['@Statistics_COMMANDLOG'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!cmdLogDetails.hasOwnProperty(hostName)) {
+                    cmdLogDetails[hostName] = {};
+                }
+                cmdLogDetails[hostName]["OUTSTANDING_TXNS"] = info[colIndex["OUTSTANDING_TXNS"]];
+                cmdLogDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                cmdLogDetails[hostName]["OUTSTANDING_BYTES"] = info[colIndex["OUTSTANDING_BYTES"]];
+                cmdLogDetails[hostName]["SEGMENT_COUNT"] = info[colIndex["SEGMENT_COUNT"]];
+                cmdLogDetails[hostName]["FSYNC_INTERVAL"] = info[colIndex["FSYNC_INTERVAL"]];
+                cmdLogDetails[hostName]["IN_USE_SEGMENT_COUNT"] = info[colIndex["IN_USE_SEGMENT_COUNT"]];
+            });
+        };
+
+        var getSnapshotStatus = function (connection, snapshotDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_SNAPSHOTSTATUS'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_SNAPSHOTSTATUS'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PATH" || columnInfo["name"] == "START_TIME" || columnInfo["name"] == "END_TIME")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_SNAPSHOTSTATUS'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!snapshotDetails.hasOwnProperty(hostName)) {
+                    snapshotDetails[hostName] = [];
+                }
+                var snapshot = {                    
+                    "TIMESTAMP": info[colIndex["TIMESTAMP"]],
+                    "PATH": info[colIndex["PATH"]],
+                    "START_TIME": info[colIndex["START_TIME"]],
+                    "END_TIME": info[colIndex["END_TIME"]]
+                };
+                snapshotDetails[hostName].push(snapshot);
+            });
+        };
+
         var validateServerSpecificSettings = function (overviewValues) {
             if (overviewValues['ADMININTERFACE'] == "" && overviewValues['HTTPINTERFACE'] == "" &&
                 overviewValues['CLIENTINTERFACE'] == "" && overviewValues['INTERNALINTERFACE'] == "" &&
@@ -2144,7 +2563,7 @@ function alertNodeClicked(obj) {
             var currentServerColumnClass;
             var count = 0;
 
-            this.setServerDetails = function (hostId, serverInfo,iteratorCount) {
+            this.setServerDetails = function (hostId, serverInfo, iteratorCount) {
                 var count = 0;
                 var stopperServerCount = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
@@ -2155,8 +2574,8 @@ function alertNodeClicked(obj) {
                             if (value.serverName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.servers.length - 1) {
                                 serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
                                 VoltDbAdminConfig.servers[iteratorCount] = serverDetails;
-                               
-                                $.each(VoltDbAdminConfig.stoppedServers, function(key,val) {
+
+                                $.each(VoltDbAdminConfig.stoppedServers, function (key, val) {
                                     if (val.HOSTNAME == value.serverName) {
                                         //remove server from the stopped server list if server stopped while ago is already in running state
                                         VoltDbAdminConfig.stoppedServers.splice(stopperServerCount, 1);
@@ -2228,7 +2647,7 @@ function alertNodeClicked(obj) {
                         count++;
                     });
 
-                    $.each(VoltDbAdminConfig.stoppedServers, function(id, val) {
+                    $.each(VoltDbAdminConfig.stoppedServers, function (id, val) {
                         setServerDetails(val.HOSTID, val, count);
                     });
                 }
@@ -2237,7 +2656,7 @@ function alertNodeClicked(obj) {
 
             if (VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined) {
                 $.each(VoltDbAdminConfig.servers, function (id, val) {
-                    if ((val.serverName != null || val.serverName != "" || val.serverName!=undefined) && val.serverState == 'RUNNING') {
+                    if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == 'RUNNING') {
                         className = voltDbRenderer.currentHost == val.serverName ? "disableServer" : "shutdown";
                         currentServerRowClass = voltDbRenderer.currentHost == val.serverName ? "activeHostMonitoring" : "activeHost";
                         currentServerColumnClass = voltDbRenderer.currentHost == val.serverName ? "shutdownServer stopDisable" : "shutdownServer";
@@ -2276,7 +2695,7 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.stopServer = function (nodeId,hostNameValue, onServerStopped) {
+        this.stopServer = function (nodeId, hostNameValue, onServerStopped) {
             VoltDBService.stopServerNode(nodeId, function (connection, status, statusString) {
                 if (status == 1) {
                     VoltDbAdminConfig.stoppedServers[VoltDbAdminConfig.stoppedServers.length] = new VoltDbAdminConfig.stoppedServer(nodeId, hostNameValue);
@@ -2439,9 +2858,57 @@ function alertNodeClicked(obj) {
 
         this.getAdminconfiguration = function (onInformationLoaded) {
             VoltDBService.GetSystemInformationDeployment(function (connection) {
+                // this.getCommandLogStatus(connection, status);
+
                 onInformationLoaded(connection);
             });
         };
+
+
+        //var getCommandLogStatus = function (connection, status) {
+        //    var colIndex = {};
+        //    var colIndex2 = {};
+        //    var counter = 0;
+        //    var replicationRate1M = 0;
+        //    if (connection.Metadata['@SystemInformation_DEPLOYMENT'] == null) {
+        //        return;
+        //    }
+
+        //    connection.Metadata['@SystemInformation_DEPLOYMENT'].schema.forEach(function (columnInfo) {
+        //        //if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M")
+        //        //    colIndex[columnInfo["name"]] = counter;
+        //        //counter++;
+        //    });
+
+        //    counter = 0;
+        //    connection.Metadata['@SystemInformation_DEPLOYMENT_completeData'][1].schema.forEach(function (columnInfo) {
+        //        //if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == 'IS_COVERED')
+        //        //    colIndex2[columnInfo["name"]] = counter;
+        //        //counter++;
+        //    });
+
+        //    connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
+        //        //if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
+        //        //    replicationDetails["DR_GRAPH"] = {};
+        //        //    replicationDetails["DR_GRAPH"]["REPLICATION_DATA"] = [];
+        //        //}
+
+        //        //replicationRate1M += (info[colIndex["REPLICATION_RATE_1M"]] == null || info[colIndex["REPLICATION_RATE_1M"]] < 0) ? 0 : info[colIndex["REPLICATION_RATE_1M"]];
+
+        //        //var repData = {};
+        //        //repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+        //        //replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+        //        //repData["HOST_ID"] = info[colIndex["HOST_ID"]];
+        //        //repData["STATE"] = info[colIndex["STATE"]];
+        //        //repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
+        //        //repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
+        //        //replicationDetails["DR_GRAPH"]["REPLICATION_DATA"].push(repData);
+
+        //    });
+
+        //    //replicationDetails["DR_GRAPH"]['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1], colIndex2['IS_COVERED']);
+        //    //replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M / 1000;
+        //};
 
         this.updateAdminConfiguration = function (updatedData, onInformationLoaded) {
             VoltDBService.UpdateAdminConfiguration(updatedData, function (connection) {
@@ -2469,10 +2936,10 @@ function alertNodeClicked(obj) {
             }, userId, requestType);
         };
 
-        
+
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
-            if (processName == "TABLE_INFORMATION") {
+            if (processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT") {
                 suffix = "_" + processName;
             }
 
@@ -2488,7 +2955,7 @@ function alertNodeClicked(obj) {
 
             for (var k = 0; k < rawTables.length; k++) {
                 var tableName = rawTables[k][5];
-                if (rawTables[k][6] == 'StreamedTable') 
+                if (rawTables[k][6] == 'StreamedTable')
                     exports[tableName] = { name: tableName };
                 else {
                     var isView = false;
@@ -2665,7 +3132,9 @@ function alertNodeClicked(obj) {
                                 "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
                                 "AVG_ROWS": getAverage(tupleCountPartitions),
                                 "TUPLE_COUNT": schemaCatalogTableTypes[key].REMARKS == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
-                                "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS
+                                "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS,
+                                "drEnabled": schemaCatalogTableTypes[key].drEnabled,
+                                "TABLE_TYPE1": schemaCatalogTableTypes[key].TABLE_TYPE
                             };
 
                         });
@@ -3016,7 +3485,7 @@ function alertNodeClicked(obj) {
                                 "MIN_ROWS": tupleData["MIN_ROWS"],
                                 "AVG_ROWS": tupleData["AVG_ROWS"],
                                 "TUPLE_COUNT": tupleData["TUPLE_COUNT"],
-                                "TABLE_TYPE": getColumnTypes(nestKey) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[nestKey].TABLE_TYPE
+                                "TABLE_TYPE": schemaCatalogTableTypes[nestKey].REMARKS //getColumnTypes(nestKey) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[nestKey].TABLE_TYPE
                             };
                             searchTableCount++;
 
@@ -3070,3 +3539,4 @@ $(window).resize(function () {
     }
 
 });
+

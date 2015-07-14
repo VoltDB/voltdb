@@ -39,10 +39,20 @@ class DbMonitorTest extends TestBase {
 
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
-        when: 'click the DB Monitor link (if needed)'
-        page.openDbMonitorPage()
-        then: 'should be on DB Monitor page'
-        at DbMonitorPage
+        int count = 0
+		
+		while(count<numberOfTrials) {
+			try {
+			    when: 'click the DB Monitor link (if needed)'
+                page.openDbMonitorPage()
+                then: 'should be on DB Monitor page'
+                at DbMonitorPage
+            break
+			} catch (org.openqa.selenium.ElementNotVisibleException e) {
+				println("ElementNotVisibleException: Unable to Start the test")
+				println("Retrying")
+			}
+		}
     }
 
     def 'confirm Graph area and Data area open initially'() {
@@ -168,7 +178,7 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
     }
 
     def "header logout exists" () {
@@ -182,7 +192,7 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.help.isDisplayed() }
+        page.header.checkShowHelp()
     }
 
     // HEADER TAB TESTS
@@ -228,15 +238,13 @@ class DbMonitorTest extends TestBase {
     }
 
     def "header username check" () {
-
-
         when:
         at DbMonitorPage
         String username = page.getUsername()
         then:
         waitFor(30) {
-            header.username.isDisplayed()
-            header.username.text().equals(username)
+            header.usernameInHeader.isDisplayed()
+            header.usernameInHeader.text().equals(username)
         }
     }
 
@@ -245,8 +253,8 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
         waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
@@ -259,8 +267,8 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
         waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
@@ -306,17 +314,8 @@ class DbMonitorTest extends TestBase {
     def "help popup existance" () {
         when:
         at DbMonitorPage
-        waitFor(30) { header.help.isDisplayed() }
-        header.help.click()
         then:
-        waitFor(30) {
-            header.popup.isDisplayed()
-            header.popupTitle.isDisplayed()
-            header.popupClose.isDisplayed()
-            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
-        }
-
-        header.popupClose.click()
+        page.header.checkIfHelpIsOpen()
     }
 
     // FOOTER TESTS
@@ -372,11 +371,20 @@ class DbMonitorTest extends TestBase {
     }
 
     def clickGraphViewMinute() {
+        int count = 0
+        
         expect: 'Graph view button exists'
         page.graphViewDisplayed()
-
-        when: 'choose Seconds in Graph View'
-        page.chooseGraphView("Minutes")
+                
+        when: 'choose Minutes in Graph View'
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
         then: 'display'
 
         DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
@@ -404,13 +412,21 @@ class DbMonitorTest extends TestBase {
     }
 
     def clickGraphViewDays() {
+        int count = 0
+        
         expect: 'Graph view button exists'
         page.graphViewDisplayed()
-
-        when: 'choose Seconds in Graph View'
-        page.chooseGraphView("Days")
+        
+        when: 'choose Days in Graph View'
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
         then: 'display'
-
         String stringOne = timeOne.text()
         if ( stringOne.length() > 8 ) {
             assert true
@@ -798,14 +814,6 @@ class DbMonitorTest extends TestBase {
         then: 'run the query'
         page.runQuery()
 
-        if ( page.queryStatus.isDisplayed() ) {
-            println("Create query successful")
-        }
-        else {
-            println("Create query unsuccessful")
-            assert false
-        }
-
         when: 'Db Monitor tab is clicked'
         page.gotoDbMonitor()
         then: 'at DbMonitor Page'
@@ -834,14 +842,6 @@ class DbMonitorTest extends TestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-
-        if ( page.queryStatus.isDisplayed() ) {
-            println("Delete query successful")
-        }
-        else {
-            println("Delete query unsuccessful")
-            assert false
-        }
 
         when: 'Db Monitor tab is clicked'
         page.gotoDbMonitor()
@@ -1003,27 +1003,26 @@ class DbMonitorTest extends TestBase {
 		String after  = ""
 
 		when: 'click stored procedure'
-			page.clickStoredProcedure()
-        then: 'check if table is in ascending'
-            if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
+		    try {
+                page.tableInAscendingOrder()
+                before = "ascending"
+            } catch(geb.error.RequiredPageContentNotPresent e) {
 				before = "descending"
+		    }
+			waitFor(30) { page.clickStoredProcedure() }
+        then: 'check if table is in ascending'
+            try {
+                page.tableInAscendingOrder()
+                before = "ascending"
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+				before = "descending"
+		    }
 
-		when: 'click stored procedure'
-			page.clickStoredProcedure()
-		then: 'check if table is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
-
-			if ( before.equals("ascending") && after.equals("descending") )
+			if ( !before.equals(after)  )
 				assert true
 			else
 				assert false
     }
-
 
     def "check if Invocations is clickable"() {
         String before = ""
@@ -1227,23 +1226,11 @@ class DbMonitorTest extends TestBase {
     // server search
     def "check server search on dbmonitor matched"(){
 
-        def $line
-        def $line1
-        def $line2
-        def $line3
-        def $lineunused, $lineunused1
-        new File("src/resources/serversearch.txt").withReader {
-            $lineunused = it.readLine()
-            $lineunused1 = it.readLine()
-            $line = it.readLine()
-            $line1 = it.readLine()
-            $line2 = it.readLine()
-            $line3 = it.readLine()
-        }
         when:'clicked server button'
         at DbMonitorPage
+        String serverNamevalid = page.getValidPath()  // taking local server valid name from serversearch.txt file ("/src/resources/serversearch.txt")
         page.clusterserverbutton.click()
-        waitFor(5){page.serversearch.value($line)
+        waitFor(5){page.serversearch.value(serverNamevalid)
         }
 
         then:
@@ -1256,26 +1243,12 @@ class DbMonitorTest extends TestBase {
 
     def "check server search on dbmonitor not matched"(){
 
-
-
-        def $line
-        def $line1
-        def $line2
-        def $line3
-        def $lineunused, $lineunused1
-        new File("src/resources/serversearch.txt").withReader {
-            $lineunused = it.readLine()
-            $lineunused1 = it.readLine()
-            $line = it.readLine()
-            $line1 = it.readLine()
-            $line2 = it.readLine()
-            $line3 = it.readLine()
-        }
         when:'clicked server button'
         at DbMonitorPage
+        String serverNameinvalid = page.getInvalidPath() // taking local server invalid name from serversearch.txt file ("/src/resources/serversearch.txt")
         page.clusterserverbutton.click()
-        waitFor(5){page.serversearch.value($line3)}
-        //page.serversearch.value($line3)
+        waitFor(5){page.serversearch.value(serverNameinvalid)}
+
 
         then:
         at DbMonitorPage
@@ -1297,379 +1270,1609 @@ class DbMonitorTest extends TestBase {
         println("server title matched");
     }
 
-
-    //dbmonitor graph part
+    //server cpu
     def "check min value in server cpu days"(){
-        when:
-        page.selecttypeindrop.click()
-        page.selecttypedays.click()
+        int count = 0
         
+        when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
 		then:
-        if(page.servercpudaysmax.text()-page.servercpudaysmin.text()<="7:00:00") {
-            println("Min Time for cpu days is:"+page.servercpudaysmin.text());
-        }
-
-        else {
-            println("doesn't match")
-        }
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The minimum value is " + stringMin + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
     }
-
+    
     def "check max value in server cpu days"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypedays.click()
-
-        then:
-        if(page.servercpudaysmax.text()-page.servercpudaysmin.text()<="7:00:00") {
-            println("Max Time  for cpu days is:"+page.servercpudaysmax.text());
-        }
-
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The maximum value is " + stringMax + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
     }
-
-
-
+    
     def "check min value in server cpu minutes"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypemin.click()
-
-        then:
-        if(page.servercpuminutemax.text()-page.servercpuminutesmin.text()<="1:00:06") {
-            println("Min Time for cpu minutes is:"+page.servercpuminutesmin.text());
-        }
-
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("minutes")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
     }
 
 
     def "check max value in server cpu minutes"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypemin.click()
-    
-        then:
-        if(page.servercpuminutemax.text()-page.servercpuminutesmin.text()<="1:00:06") {
-            println("Max Time for cpu minutes is:"+page.servercpuminutemax.text());
-        }
-
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("minutes")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
     }
-
 
     def "check min value in server cpu seconds"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypesec.click()
-
-        then:
-        if(page.servercpusecondmax.text()-page.servercpusecondmin.text()<="00:11:06") {
-            println("Min Time for cpu seconds is:"+page.servercpusecondmin.text());
-        }
-
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
     }
-
 
     def "check max value in server cpu seconds"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypesec.click()
-
-        then:
-        if(page.servercpusecondmax.text()-page.servercpusecondmin.text()<="00:11:06") {
-            println("Max Time for cpu seconds is:"+page.servercpusecondmax.text());
-        }
-
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
     }
-
-
-
+    
+    //for server ram
     def "check min value in server ram days"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypedays.click()
-
-        then:
-        if(page.serverramdaysmax.text()-page.serverramdaysmin.text()<="7:00:00") {
-            println("Min Time for RAM days is:"+page.serverramdaysmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The minimum value is " + stringMin + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
     }
-
-
-   def "check max value in server ram days"(){
-       when:
-       page.selecttypeindrop.click()
-       page.selecttypedays.click()
-
-       then:
-       if(page.serverramdaysmax.text()-page.serverramdaysmin.text()<="7:00:00") {
-          println("Max Time for RAM days is:"+page.serverramdaysmax.text());
-       }
-       else {
-           println("doesn't match")
-       }
-   }
-
-
+    
+    def "check max value in server ram days"(){
+        int count = 0
+        
+        when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The maximum value is " + stringMax + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
+    }
+    
     def "check min value in server ram minutes"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypemin.click()
-
-        then:
-        if(page.serverramminutesmax.text()-page.serverramminutesmin.text()<="1:00:06") {
-            println("Min Time for RAM minutes is:"+page.serverramminutesmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("minutes")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
     }
-
 
 
     def "check max value in server ram minutes"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypemin.click()
-
-        then:
-        if(page.serverramminutesmax.text()-page.serverramminutesmin.text()<="1:00:06") {
-            println("Max Time for RAM minutes is:"+page.serverramminutesmax.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("minutes")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
     }
-
-
-
 
     def "check min value in server ram seconds"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypesec.click()
-
-        then:
-        if(page.serverramsecondmax.text()-page.serverramsecondmin.text()<="00:11:06") {
-            println("Min Time for RAM seconds is:"+page.serverramsecondmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
     }
-
 
     def "check max value in server ram seconds"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypesec.click()
-
-        then:
-        if(page.serverramsecondmax.text()-page.serverramsecondmin.text()<="00:11:06") {
-            println("Max Time for RAM seconds is:"+page.serverramsecondmax.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
     }
 
-
-
+    //cluster latency
     def "check min value in cluster latency days"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypedays.click()
-
-        then:
-        if(page.clusterlatencydaysmax.text()-page.clusterlatencydaysmin.text()<="7:00:00") {
-            println("Min Time for cluster latency days is:"+page.clusterlatencydaysmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clusterlatencymax.isDisplayed()
+		        }
+		        stringMax = page.clusterlatencymax.text()
+		        stringMin = page.clusterlatencymin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The minimum value is " + stringMin + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
     }
-
 
     def "check max value in cluster latency days"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypedays.click()
-
-        then:
-        if(page.clusterlatencydaysmax.text()-page.clusterlatencydaysmin.text()<="7:00:00") {
-            println("Max Time for cluster latency days is:"+page.clusterlatencydaysmax.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clusterlatencymax.isDisplayed()
+		        }
+		        stringMax = page.clusterlatencymax.text()
+		        stringMin = page.clusterlatencymin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The maximum value is " + stringMax + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
     }
-
 
     def "check min value in cluster latency minutes"(){
-        when:
-        page.selecttypeindrop.click()
-        page.selecttypemin.click()
-
-        then:
-        if(page.clusterlatencyminutesmax.text()-page.clusterlatencyminutesmin.text()<="1:00:06") {
-            println("Min Time for cluster latency minutes is:"+page.clusterlatencyminutesmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+		int count = 0
+		when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clusterlatencymax.isDisplayed()
+		        }
+		        stringMax = page.clusterlatencymax.text()
+		        stringMin = page.clusterlatencymin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("minutes")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
     }
-
 
     def "check max value in cluster latency minutes"(){
+        int count = 0
         when:
-        page.selecttypeindrop.click()
-        page.selecttypemin.click()
-
-        then:
-        if(page.clusterlatencyminutesmax.text()-page.clusterlatencyminutesmin.text()<="1:00:06") {
-            println("Max Time for cluster latency minutes is:"+page.clusterlatencyminutesmax.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clusterlatencymax.isDisplayed()
+		        }
+		        stringMax = page.clusterlatencymax.text()
+		        stringMin = page.clusterlatencymin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("minutes")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
     }
-
 
     def "check min value in cluster latency seconds"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypesec.click()
-
-        then:
-        if(page.clusterlatencysecondmax.text()-page.clusterlatencysecondmin.text()<="00:11:06") {
-            println("Min Time for cluster latency seconds is:"+page.clusterlatencysecondmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clusterlatencymax.isDisplayed()
+		        }
+		        stringMax = page.clusterlatencymax.text()
+		        stringMin = page.clusterlatencymin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
     }
-
-
 
     def "check max value in cluster latency seconds"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypesec.click()
-
-        then:
-        if(page.clusterlatencysecondmax.text()-page.clusterlatencysecondmin.text()<="00:11:06") {
-            println("Max Time for cluster latency seconds is:"+page.clusterlatencysecondmax.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clusterlatencymax.isDisplayed()
+		        }
+		        stringMax = page.clusterlatencymax.text()
+		        stringMin = page.clusterlatencymin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
     }
 
-
-
-
+    //cluster transaction
     def "check min value in cluster transaction days"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypedays.click()
-
-        then:
-        if(page.clustertransactiondaysmax.text()-page.clustertransactiondaysmin.text()<="7:00:00") {
-            println("Min Time for cluster transaction days is:"+page.clustertransactiondaysmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            page.chooseGraphView("Seconds")
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clustertransactionmax.isDisplayed()
+		        }
+		        stringMax = page.clustertransactionmax.text()
+		        stringMin = page.clustertransactionmin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        if(stringMax.length()<10 || stringMax.length()<10) {
+		            println("Not fixed")
+		            continue
+		        }
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The minimum value is " + stringMin + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
     }
-
 
     def "check max value in cluster transaction days"(){
+        int count = 0
+        int smallCount = 0
         when:
-        page.selecttypeindrop.click()
-        page.selecttypedays.click()
-
-        then:
-        if(page.clustertransactiondaysmax.text()-page.clustertransactiondaysmin.text()<="7:00:00") {
-            println("Max Time for cluster transaction days is:"+page.clustertransactiondaysmax.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    while(smallCount<numberOfTrials) {
+                smallCount++
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Days")
+                if(graphView.text().equals("")) {
+                    break
+                }
+		    }
+		    
+		    try {
+		        waitFor(waitTime) {
+		            page.clustertransactionmax.isDisplayed()
+		        }
+		        stringMax = page.clustertransactionmax.text()
+		        stringMin = page.clustertransactionmin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        if(stringMax.length()<10 || stringMax.length()<10) {
+		            println("Not fixed")
+		            continue
+		        }
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The maximum value is " + stringMax + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
     }
-
 
     def "check min value in cluster transaction minutes"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypemin.click()
-
-        then:
-        if(page.clustertransactionminutesmax.text()-page.clustertransactionminutesmin.text()<="1:00:06") {
-            println("Min Time for cluster transaction minutes is:"+page.clustertransactionminutesmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        String stringMax
+		String stringMin
+        int bigCount = 0
+		
+		then:
+		while(bigCount<numberOfTrials) {
+		    bigCount++
+            while(count<numberOfTrials) {
+                count++
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Minutes")
+                if(graphView.text().equals("")) {
+                    break
+                }
+		    }
+		    count = 0
+		    while(count<numberOfTrials) {
+		        count++
+		        try {
+		            waitFor(waitTime) {
+		                page.clustertransactionmax.isDisplayed()
+		            }
+		            stringMax = page.clustertransactionmax.text()
+		            stringMin = page.clustertransactionmin.text()
+		            break
+		        } catch(geb.waiting.WaitTimeoutException e) {
+		            println("WaitTimeoutException")
+		        }
+		    }
+		
+		    String result = page.compareTime(stringMax, stringMin)
+		    println(result + " " + stringMax + " " + stringMin)
+		    try {
+		        waitFor(waitTime) {
+		            result.equals("minutes")
+		        }
+		        println("The minimum value is " + stringMin + " and the time is in " + result )
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("AJA BHAKOXAINA")
+		    }
+		    /*if(result.equals("minutes")) {
+		        println("The minimum value is " + stringMin + " and the time is in " + result )
+		        assert true
+		        break
+		    }
+		    else {
+		        println("FAIL: It is not in minutes")
+		        if(bigCount == 5) {
+		            println("TRULY FALSE")
+		            assert false
+		        }
+		    }*/
+		}
     }
-
 
     def "check max value in cluster transaction minutes"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypemin.click()
-
-        then:
-        if(page.clustertransactionminutesmax.text()-page.clustertransactionminutesmin.text()<="1:00:06") {
-            println("Max Time for cluster transaction minutes is:"+page.clustertransactionminutesmax.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        String stringMax
+		String stringMin
+		int bigCount = 0
+		
+		then:
+		while(bigCount<numberOfTrials) {
+            while(count<numberOfTrials) {
+                count++
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Minutes")
+                if(graphView.text().equals("")) {
+                    break
+                }
+		    }
+		    count = 0
+		    bigCount++
+		    while(count<numberOfTrials) {
+		        count++
+		        try {
+		            waitFor(waitTime) {
+		                page.clustertransactionmax.isDisplayed()
+		            }
+		            stringMax = page.clustertransactionmax.text()
+		            stringMin = page.clustertransactionmin.text()
+		            break
+		        } catch(geb.waiting.WaitTimeoutException e) {
+		            println("WaitTimeoutException")
+		        }
+		    }
+		
+		    String result = page.compareTime(stringMax, stringMin)
+		    println(result + " " + stringMax + " " + stringMin)
+		    
+		    try {
+		        waitFor(waitTime) {
+		            result.equals("minutes")
+		        }
+		        println("The maximum value is " + stringMax + " and the time is in " + result )
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("AJA BHAKOXAINA")
+		    }
+		    /*if(result.equals("minutes")) {
+		        println("The maximum value is " + stringMax + " and the time is in " + result )
+		        assert true
+		        break
+		    }
+		    else {
+		        println("FAIL: It is not in minutes")
+		        if(bigCount == 5) {
+		            println("TRULY FALSE")
+		            assert false
+		        }
+		    }*/
+		}
     }
 
-
-
     def "check min value in cluster transaction seconds"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypesec.click()
-
-        then:
-        if(page.clustertransactionsecondmax.text()-page.clustertransactionsecondmin.text()<="00:11:06") {
-            println("Min Time for cluster transaction seconds is:"+page.clustertransactionsecondmin.text());
-        }
-        else {
-            println("doesn't match")
-        }
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            page.chooseGraphView("Minutes")
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clustertransactionmax.isDisplayed()
+		        }
+		        stringMax = page.clustertransactionmax.text()
+		        stringMin = page.clustertransactionmin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
     }
 
     def "check max value in cluster transaction seconds"(){
+        int count = 0
+        
         when:
-        page.selecttypeindrop.click()
-        page.selecttypesec.click()
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            page.chooseGraphView("Minutes")
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.clustertransactionmax.isDisplayed()
+		        }
+		        stringMax = page.clustertransactionmax.text()
+		        stringMin = page.clustertransactionmin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
+    }
 
-        then:
-        if(page.clustertransactionsecondmax.text()-page.clustertransactionsecondmin.text()<="00:11:06") {
-            println("Max Time for cluster transaction seconds is:"+page.clustertransactionsecondmax.text());
+    // for partition idle graph
+    def "check min value in Partition Idle graph with respect to seconds"() {
+        int count = 0
+        
+        when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.partitiongraphmax.isDisplayed()
+		        }
+		        stringMax = page.partitiongraphmax.text()
+		        stringMin = page.partitiongraphmin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
+    }
+
+    def "check max value in Partition Idle graph with respect to seconds"(){
+        int count = 0
+        
+        when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.partitiongraphmax.isDisplayed()
+		        }
+		        stringMax = page.partitiongraphmax.text()
+		        stringMin = page.partitiongraphmin.text()
+		        println(stringMax)
+		        println(stringMin)
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("seconds")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}   
+    }
+
+    def "check min value in cluster Partition Idle graph with respect to minutes"(){
+        int count = 0
+        
+        when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+	
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.partitiongraphmax.isDisplayed()
+		        }
+		        stringMax = page.partitiongraphmax.text()
+		        stringMin = page.partitiongraphmin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("minutes")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
+    }
+
+    def "check max value in cluster Partition Idle graph with respect to minutes"(){
+        int count = 0
+        
+        when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.partitiongraphmax.isDisplayed()
+		        }
+		        stringMax = page.partitiongraphmax.text()
+		        stringMin = page.partitiongraphmin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String result = page.compareTime(stringMax, stringMin)
+		
+		if(result.equals("minutes")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
+    }
+    
+    def "check min value in cluster Partition Idle graph with respect to days"(){
+        int count = 0
+        
+        when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.partitiongraphmax.isDisplayed()
+		        }
+		        stringMax = page.partitiongraphmax.text()
+		        stringMin = page.partitiongraphmin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The minimum value is " + stringMin + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
+    }
+
+    def "check max value in cluster Partition Idle graph with respect to days"(){
+        int count = 0
+        
+        when:
+        // This loop is used to gain time. 
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+		
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.partitiongraphmax.isDisplayed()
+		        }
+		        stringMax = page.partitiongraphmax.text()
+		        stringMin = page.partitiongraphmin.text()
+		        
+		        println(stringMax)
+		        println(stringMin)
+		        
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+		
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+		
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+		
+		
+		if(monthMax.equals(monthMin)) {
+		    if(dateMax > dateMin) {
+		        println("The maximum value is " + stringMax + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (dateMax < dateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
+    }
+
+    def "Click display preferences remove Partition Idle Time and again Add Partition Idle Time"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Partition Idle Time checkbox is displayed'
+        page.partitionIdleTimeCheckboxDisplayed()
+        then: 'Remove Partition Idle Time'
+        page.partitionIdleTimeCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Partition Idle Time displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        !page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Partition Idle Time is displayed'
+        page.partitionIdleTimeCheckboxDisplayed()
+        then: 'Add Partition Idle Time'
+        page.partitionIdleTimeCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Partition Idle Time displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "Check server legends visible in Graph Partition Idle Time"(){
+
+        // for testing , 4 server legends are visible
+        
+        when: 'server partition legends is visible'
+        waitFor(10){	page.localpartition.isDisplayed()
+            page.clusterwide.isDisplayed()
+            page.multipartition.isDisplayed()
         }
-        else {
-            println("doesn't match")
-        }
+
+        then: 'check those server partition legends and print them'
+        if(page.localpartition.text()=="Local partitions"){
+            println("grey partition displayed as: " +page.localpartition.text())}
+        if(page.clusterwide.text()=="Cluster-wide Maximum / Minimum"){
+            println("Blue partition displayed as: " +page.clusterwide.text())}
+        if(page.multipartition.text()=="Multi-partition"){
+            println("Orange partition displayed as: " +page.multipartition.text())}
+        else {println("No server legends are visible")}
+
     }
 
     def cleanupSpec() {

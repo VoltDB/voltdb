@@ -38,7 +38,7 @@ public class VoltXMLElement {
     public final Map<String, String> attributes = new TreeMap<String, String>();
     public final List<VoltXMLElement> children = new ArrayList<VoltXMLElement>();
 
-    public VoltXMLElement(String name) {
+    public VoltXMLElement(String  name) {
         this.name = name;
     }
 
@@ -75,20 +75,33 @@ public class VoltXMLElement {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        append(sb, "");
+        append(sb, 0);
         return sb.toString();
     }
 
-    private void append(StringBuilder sb, String indent) {
-        sb.append(indent).append("ELEMENT: ").append(name).append("\n");
+    private String indentStr(int indent) {
+        StringBuffer sb = new StringBuffer();
+        while (5 <= indent) {
+            sb.append("....|");
+            indent -= 5;
+        }
+        while (0 <= indent) {
+            sb.append(".");
+            indent -= 1;
+        }
+        return sb.toString();
+    }
+
+    private void append(StringBuilder sb, int indent) {
+        sb.append(indentStr(indent)).append("ELEMENT: ").append(name).append("\n");
         for (Entry<String, String> e : attributes.entrySet()) {
-            sb.append(indent).append(" ").append(e.getKey());
+            sb.append(indentStr(indent+2)).append(e.getKey());
             sb.append(" = ").append(e.getValue()).append("\n");
         }
         if ( ! children.isEmpty()) {
-            sb.append(indent).append("[").append("\n");
+            sb.append(indentStr(indent)).append("[").append("\n");
             for (VoltXMLElement e : children) {
-                e.append(sb, indent + "   ");
+                e.append(sb, indent+4);
             }
         }
     }
@@ -107,6 +120,21 @@ public class VoltXMLElement {
     /**
      * Given a name, recursively find all the children  with matching name, if any.
      */
+    public List<VoltXMLElement> findChildrenRecursively(String name)
+    {
+        List<VoltXMLElement> retval = new ArrayList<VoltXMLElement>();
+        for (VoltXMLElement vxe : children) {
+            if (name.equals(vxe.name)) {
+                retval.add(vxe);
+            }
+            retval.addAll(vxe.findChildrenRecursively(name));
+        }
+        return retval;
+    }
+
+    /**
+     * Given a name, find all the immediate children  with matching name, if any.
+     */
     public List<VoltXMLElement> findChildren(String name)
     {
         List<VoltXMLElement> retval = new ArrayList<VoltXMLElement>();
@@ -114,7 +142,6 @@ public class VoltXMLElement {
             if (name.equals(vxe.name)) {
                 retval.add(vxe);
             }
-            retval.addAll(vxe.findChildren(name));
         }
         return retval;
     }

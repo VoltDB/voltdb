@@ -174,6 +174,7 @@ CTX.INPUT['catalog'] = """
  constraintref.cpp
  database.cpp
  index.cpp
+ indexref.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp
@@ -220,17 +221,17 @@ CTX.INPUT['execution'] = """
 """
 
 CTX.INPUT['executors'] = """
+ OptimizedProjector.cpp
  abstractexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
  executorutil.cpp
- indexscanexecutor.cpp
  indexcountexecutor.cpp
- tablecountexecutor.cpp
+ indexscanexecutor.cpp
  insertexecutor.cpp
  limitexecutor.cpp
- materializeexecutor.cpp
  materializedscanexecutor.cpp
+ materializeexecutor.cpp
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
@@ -238,6 +239,8 @@ CTX.INPUT['executors'] = """
  receiveexecutor.cpp
  sendexecutor.cpp
  seqscanexecutor.cpp
+ tablecountexecutor.cpp
+ tuplescanexecutor.cpp
  unionexecutor.cpp
  updateexecutor.cpp
 """
@@ -248,7 +251,10 @@ CTX.INPUT['expressions'] = """
  vectorexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
+ operatorexpression.cpp
  parametervalueexpression.cpp
+ subqueryexpression.cpp
+ scalarvalueexpression.cpp
 """
 
 CTX.INPUT['plannodes'] = """
@@ -275,6 +281,7 @@ CTX.INPUT['plannodes'] = """
  SchemaColumn.cpp
  sendnode.cpp
  seqscannode.cpp
+ tuplescannode.cpp
  unionnode.cpp
  updatenode.cpp
 """
@@ -388,10 +395,16 @@ if whichtests in ("${eetestsuite}", "execution"):
      engine_test
      FragmentManagerTest
     """
+if whichtests in ("${eetestsuite}", "executors"):
+    CTX.TESTS['executors'] = """
+    OptimizedProjectorTest
+    """
+
 
 if whichtests in ("${eetestsuite}", "expressions"):
     CTX.TESTS['expressions'] = """
      expression_test
+     function_test
     """
 
 if whichtests in ("${eetestsuite}", "indexes"):

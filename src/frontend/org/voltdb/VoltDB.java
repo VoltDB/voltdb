@@ -151,7 +151,7 @@ public class VoltDB {
         public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
 
         /** port number to use for DR channel (override in the deployment file) */
-        public int m_drAgentPortStart = DEFAULT_DR_PORT;
+        public int m_drAgentPortStart = -1;
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
@@ -212,6 +212,7 @@ public class VoltDB {
          */
         public String m_versionStringOverrideForTest = null;
         public String m_versionCompatibilityRegexOverrideForTest = null;
+        public String m_buildStringOverrideForTest = null;
 
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
@@ -463,6 +464,8 @@ public class VoltDB {
                     m_versionStringOverrideForTest = args[++i].trim();
                     m_versionCompatibilityRegexOverrideForTest = args[++i].trim();
                 }
+                else if (arg.equalsIgnoreCase("buildstringoverride"))
+                    m_buildStringOverrideForTest = args[++i].trim();
                 else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -525,7 +528,7 @@ public class VoltDB {
                 isValid = false;
                 hostLog.fatal("VoltDB Community Edition only supports the \"create\" start action.");
                 String msg = m_startAction.featureNameForErrorString();
-                msg += " is an Enterprise Edition feature. An evaluation edition is availibale at http://voltdb.com.";
+                msg += " is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.";
                 hostLog.fatal(msg);
             }
 
@@ -536,15 +539,6 @@ public class VoltDB {
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
                     hostLog.fatal("The deployment file location is empty.");
-                }
-
-                if (m_replicationRole == ReplicationRole.REPLICA) {
-                    if (m_startAction.doesRecover()) {
-                        isValid = false;
-                        hostLog.fatal("Replica cluster only supports create database");
-                    } else {
-                        m_startAction = StartAction.CREATE;
-                    }
                 }
             }
 
@@ -934,6 +928,15 @@ public class VoltDB {
         }
         else {
             return m_config.m_drInterface;
+        }
+    }
+
+    public static int getReplicationPort(int deploymentFilePort) {
+        if (m_config.m_drAgentPortStart != -1) {
+            return m_config.m_drAgentPortStart;
+        }
+        else {
+            return deploymentFilePort;
         }
     }
 

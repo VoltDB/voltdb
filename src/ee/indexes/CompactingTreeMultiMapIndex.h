@@ -225,6 +225,19 @@ class CompactingTreeMultiMapIndex : public TableIndex
         movePrev(mapIter);
     }
 
+    void moveToPriorEntry(IndexCursor& cursor) const
+    {
+        assert(cursor.m_forward);
+        cursor.m_forward = false;
+        MapIterator &mapIter = castToIter(cursor);
+
+        if (mapIter.isEnd()) {
+            mapIter = m_entries.rbegin();
+        } else {
+            mapIter.movePrev();
+        }
+    }
+
     void moveToEnd(bool begin, IndexCursor& cursor) const
     {
         cursor.m_forward = begin;

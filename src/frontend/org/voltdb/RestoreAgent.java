@@ -507,10 +507,6 @@ SnapshotCompletionInterest, Promotable
      *         to restore.
      */
     public Pair<Integer, String> findRestoreCatalog() {
-        createZKDirectory(VoltZK.restore);
-        createZKDirectory(VoltZK.restore_barrier);
-        createZKDirectory(VoltZK.restore_barrier2);
-
         enterRestore();
 
         try {
@@ -534,6 +530,10 @@ SnapshotCompletionInterest, Promotable
      * Enters the restore process. Creates ZooKeeper barrier node for this host.
      */
     void enterRestore() {
+        createZKDirectory(VoltZK.restore);
+        createZKDirectory(VoltZK.restore_barrier);
+        createZKDirectory(VoltZK.restore_barrier2);
+
         try {
             m_generatedRestoreBarrier2 = m_zk.create(VoltZK.restore_barrier2 + "/counter", null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);

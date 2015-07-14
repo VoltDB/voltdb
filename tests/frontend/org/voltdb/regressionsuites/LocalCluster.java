@@ -31,6 +31,7 @@ import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
+import org.voltdb.EELibraryLoader;
 import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
@@ -112,18 +113,25 @@ public class LocalCluster implements VoltServerConfig {
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
     private Map<String, String> m_additionalProcessEnv = null;
+    protected final Map<String, String> getAdditionalProcessEnv() {
+        return m_additionalProcessEnv;
+    }
+
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
     private String m_voltdbroot = "";
 
     private String[] m_versionOverrides = null;
     private String[] m_versionCheckRegexOverrides = null;
+    private String[] m_buildStringOverrides = null;
 
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
+
+    private String m_prefix = null;
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -232,17 +240,27 @@ public class LocalCluster implements VoltServerConfig {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
 
-        String jzmq_dir = System.getenv("VOLTDB_JZMQ_DIR"); // via build.xml
-        if (jzmq_dir == null) {
-            jzmq_dir = System.getProperty("user.dir") + "/third_party/cpp/jnilib";
+        String classPath = System.getProperty("java.class.path") + ":" +
+            buildDir + File.separator + m_jarFileName;
+
+        String javaLibraryPath = null;
+        if (m_additionalProcessEnv != null && m_additionalProcessEnv.containsKey(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
+            if (Boolean.parseBoolean(m_additionalProcessEnv.get(EELibraryLoader.USE_JAVA_LIBRARY_PATH))) {
+                // set the java lib path to the one for this process - Add obj/release/nativelibs
+                javaLibraryPath = System.getProperty("java.library.path");
+                if (javaLibraryPath == null || javaLibraryPath.trim().length() == 0) {
+                    javaLibraryPath = buildDir + "/nativelibs";
+                } else {
+                    javaLibraryPath += ":" + buildDir + "/nativelibs";
+                }
+            }
         }
 
-        // set the java lib path to the one for this process - default to obj/release/nativelibs
-        String java_library_path = buildDir + "/nativelibs" + ":" + jzmq_dir;
-        java_library_path = System.getProperty("java.library.path", java_library_path);
-
-        String classPath = System.getProperty("java.class.path") + ":" + buildDir
-            + File.separator + m_jarFileName + ":" + buildDir + File.separator + "prod";
+        if (javaLibraryPath==null) {
+            // need this in classpath to find native library. Otherwise, don't add it to classpath to
+            // test override of loading EE lib from jar.
+            classPath = classPath + ":" + buildDir + File.separator + "prod";
+        }
 
         // Remove the stored procedures from the classpath.  Out-of-process nodes will
         // only be able to find procedures and dependent classes in the catalog, as intended
@@ -271,10 +289,12 @@ public class LocalCluster implements VoltServerConfig {
             startCommand("create").
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
-            javaLibraryPath(java_library_path).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
+        if (javaLibraryPath!=null) {
+            templateCmdLine.javaLibraryPath(javaLibraryPath);
+        }
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
         // "tag" this command line so it's clear which test started it
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
@@ -427,6 +447,10 @@ public class LocalCluster implements VoltServerConfig {
             assert(m_versionCheckRegexOverrides[hostId] != null);
             cmdln.m_versionStringOverrideForTest = m_versionOverrides[hostId];
             cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+            if ((m_buildStringOverrides != null) && (m_buildStringOverrides.length > hostId)) {
+                assert(m_buildStringOverrides[hostId] != null);
+                cmdln.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
+            }
         }
 
         // for debug, dump the command line to a unique file.
@@ -695,6 +719,10 @@ public class LocalCluster implements VoltServerConfig {
                 assert(m_versionCheckRegexOverrides[hostId] != null);
                 cmdln.m_versionStringOverrideForTest = m_versionOverrides[hostId];
                 cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+                if ((m_buildStringOverrides != null) && (m_buildStringOverrides.length > hostId)) {
+                    assert(m_buildStringOverrides[hostId] != null);
+                    cmdln.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
+                }
             }
 
             m_cmdLines.add(cmdln);
@@ -862,6 +890,10 @@ public class LocalCluster implements VoltServerConfig {
                 assert(m_versionCheckRegexOverrides[hostId] != null);
                 rejoinCmdLn.m_versionStringOverrideForTest = m_versionOverrides[hostId];
                 rejoinCmdLn.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+                if ((m_buildStringOverrides != null) && (m_buildStringOverrides.length > hostId)) {
+                    assert(m_buildStringOverrides[hostId] != null);
+                    rejoinCmdLn.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
+                }
             }
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
@@ -1086,6 +1118,15 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public String getListenerAddress(int hostId) {
+        return getListenerAddress(hostId, false);
+    }
+
+    @Override
+    public String getAdminAddress(int hostId) {
+        return getListenerAddress(hostId, true);
+    }
+
+    private String getListenerAddress(int hostId, boolean useAdmin) {
         if (!m_running) {
             return null;
         }
@@ -1097,11 +1138,16 @@ public class LocalCluster implements VoltServerConfig {
                 Process p = m_cluster.get(i);
                 // if the process is alive, or is the in-process server
                 if ((p != null) || (i == 0 && m_hasLocalServer)) {
-                    return "localhost:" + cl.m_port;
+                    return "localhost:" + (useAdmin ? cl.m_adminPort : cl.m_port);
                 }
             }
         }
         return null;
+    }
+
+    @Override
+    public int getListenerCount() {
+        return m_cmdLines.size();
     }
 
     @Override
@@ -1121,9 +1167,23 @@ public class LocalCluster implements VoltServerConfig {
         return listeners;
     }
 
+    /**
+     * This is used in generating the cluster name, to
+     * avoid name conflicts between LocalCluster instances
+     * that have the same site-host-Kfactor configuration,
+     * but have other configuration differences.  This could
+     * be used to differentiate between LocalCluster instances
+     * with different initial JVM properties through m_additionalProcessEnv,
+     * for example.
+     * @param prefix
+     */
+    public void setPrefix(String prefix) {
+        m_prefix  = prefix;
+    }
+
     @Override
     public String getName() {
-        String prefix = "localCluster";
+        String prefix = (m_prefix == null) ? "localCluster" : String.format("localCluster-%s", m_prefix);
         if (m_failureState == FailureState.ONE_FAILURE)
             prefix += "OneFail";
         if (m_failureState == FailureState.ONE_RECOVERING)
@@ -1231,6 +1291,13 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public boolean isHSQL() {
         return templateCmdLine.target() == BackendTarget.HSQLDB_BACKEND;
+    }
+
+    public void setOverridesForHotfix(String[] versions, String[] regexOverrides, String[] buildStrings) {
+        assert(buildStrings != null);
+
+        m_buildStringOverrides = buildStrings;
+        setOverridesForHotfix(versions, regexOverrides);
     }
 
     public void setOverridesForHotfix(String[] versions, String[] regexOverrides) {

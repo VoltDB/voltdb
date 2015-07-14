@@ -85,27 +85,13 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     // INLINE PROJECTION
     //
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) != NULL)
-    {
-        m_projectionNode =
-                static_cast<ProjectionPlanNode*>
-        (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) != NULL) {
+        m_projectionNode = static_cast<ProjectionPlanNode*>
+            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
 
-        m_numOfColumns = static_cast<int>(m_projectionNode->getOutputColumnExpressions().size());
-
-        assert(m_projectionNode->getOutputTable()->columnCount() == m_numOfColumns);
-
-        m_projectionExpressions = new AbstractExpression*[m_numOfColumns];
-        ::memset(m_projectionExpressions, 0, (sizeof(AbstractExpression*) * m_numOfColumns));
-
-        m_projectionAllTupleArrayPtr = ExpressionUtil::convertIfAllTupleValues(m_projectionNode->getOutputColumnExpressions());
-        m_projectionAllTupleArray = m_projectionAllTupleArrayPtr.get();
-
-        for (int ctr = 0; ctr < m_numOfColumns; ctr++) {
-            assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
-            m_projectionExpressions[ctr] =
-                    m_projectionNode->getOutputColumnExpressions()[ctr];
-        }
+        m_projector = OptimizedProjector(m_projectionNode->getOutputColumnExpressions());
+        m_projector.optimize(m_projectionNode->getOutputTable()->schema(),
+                             m_node->getTargetTable()->schema());
     }
 
     // Inline aggregation can be serial, partial or hash
@@ -126,7 +112,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         {
             VOLT_ERROR("The search key expression at position '%d' is NULL for"
                     " PlanNode '%s'", ctr, m_node->debug().c_str());
-            delete [] m_projectionExpressions;
             return false;
         }
         m_searchKeyArrayPtr[ctr] =
@@ -194,6 +179,15 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         temp_tuple = m_outputTable->tempTuple();
     }
 
+    // Short-circuit an empty scan
+    if (m_node->isEmptyScan()) {
+        VOLT_DEBUG ("Empty Index Scan :\n %s", m_outputTable->debug().c_str());
+        if (m_aggExec != NULL) {
+            m_aggExec->p_execute_finish();
+        }
+        return true;
+    }
+
     //
     // SEARCH KEY
     //
@@ -203,6 +197,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
+        if (candidateValue.isNull()) {
+            // when any part of the search key is NULL, the result is false when it compares to anything.
+            // do early return optimization, our index comparator may not handle null comparison correctly.
+            earlyReturnForSearchKeyOutOfRange = true;
+            break;
+        }
+
         try {
             searchKey.setNValue(ctr, candidateValue);
         }
@@ -419,18 +420,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             }
             tuple_ctr++;
 
-            if (m_projectionNode != NULL)
-            {
-                if (m_projectionAllTupleArray != NULL) {
-                    VOLT_TRACE("sweet, all tuples");
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                        temp_tuple.setNValue(ctr, tuple.getNValue(m_projectionAllTupleArray[ctr]));
-                    }
-                } else {
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                        temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
-                    }
-                }
+            if (m_projector.numSteps() > 0) {
+
+                m_projector.exec(temp_tuple, tuple);
 
                 if (m_aggExec != NULL) {
                     if (m_aggExec->p_execute_tuple(temp_tuple)) {
@@ -468,5 +460,4 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
 IndexScanExecutor::~IndexScanExecutor() {
     delete [] m_searchKeyBackingStore;
-    delete [] m_projectionExpressions;
 }

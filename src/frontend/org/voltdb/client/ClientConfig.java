@@ -17,11 +17,14 @@
 
 package org.voltdb.client;
 
+import java.math.RoundingMode;
 import java.util.concurrent.TimeUnit;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
+
+import org.voltdb.types.VoltDecimalHelper;
 
 /**
  * Container for configuration settings for a Client
@@ -43,7 +46,7 @@ public class ClientConfig {
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
-    long m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(DEFAULT_PROCEDURE_TIMOUT_NANOS);
+    long m_procedureCallTimeoutNanos = DEFAULT_PROCEDURE_TIMOUT_NANOS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
     boolean m_useClientAffinity = true;
     Subject m_subject = null;
@@ -352,5 +355,16 @@ public class ClientConfig {
        } catch (LoginException ex) {
            throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
        }
+    }
+
+    /**
+     * Enable or disable the rounding mode in the client.  This must match the
+     * rounding mode set in the server, which is set using system properties.
+     *
+     * @param isEnabled True iff rounding is enabled.
+     * @param mode The rounding mode, with values taken from java.math.RoundingMode.
+     */
+    public static void setRoundingConfig(boolean isEnabled, RoundingMode mode) {
+        VoltDecimalHelper.setRoundingConfig(isEnabled, mode);
     }
 }

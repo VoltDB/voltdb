@@ -20,9 +20,11 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.TransactionTask;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
     @Override
@@ -48,7 +50,7 @@ public class DummyCommandLog implements CommandLog {
             long spHandle,
             int[] involvedPartitions,
             DurabilityListener l,
-            Object handle) {
+            TransactionTask handle) {
         return Futures.immediateFuture(null);
     }
 
@@ -62,5 +64,30 @@ public class DummyCommandLog implements CommandLog {
     {
         // No real command log, obviously not enabled
         return false;
+    }
+
+    @Override
+    public void requestTruncationSnapshot(final boolean queueIfPending)
+    {
+        // Don't perform truncation snapshot if Command Logging is disabled
+        return;
+    }
+
+    @Override
+    public void populateCommandLogStats(Map<String, Integer> columnNameToIndex,
+            Object[] rowValues) {
+        rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_BYTES.name())] = 0;
+        rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_TXNS.name())] = 0;
+        rowValues[columnNameToIndex.get(CommandLogStats.StatName.IN_USE_SEGMENT_COUNT.name())] = 0;
+        rowValues[columnNameToIndex.get(CommandLogStats.StatName.SEGMENT_COUNT.name())] = 0;
+        rowValues[columnNameToIndex.get(CommandLogStats.StatName.FSYNC_INTERVAL.name())] = 0;
+    }
+
+    public boolean isSynchronous() {
+        return false;
+    }
+
+    @Override
+    public void registerDurabilityListener(DurabilityListener durabilityListener) {
     }
 }

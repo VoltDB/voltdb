@@ -25,6 +25,7 @@ package vmcTest.pages
 
 import java.util.List;
 import java.util.Map;
+import vmcTest.pages.VoltDBManagementCenterPage.ColumnHeaderCase;
 
 /**
  * This class represents the 'Schema' tab of the 'Schema' page (or tab) of
@@ -63,6 +64,7 @@ class SchemaPageSchemaTab extends SchemaPage {
         expandedlistbox { $(class:"invert")}
         expandedlist1   { $(class:"togglex",1)}
         expandedlist2   { $(class:"togglex",2)}
+        refreshtableschema      { $("#MenuCatalog > div > button", text:"Refresh")}
 
 
         header          	{ module Header }
@@ -75,6 +77,7 @@ class SchemaPageSchemaTab extends SchemaPage {
     }
 
 	String checkId = "#s-"+ getTablename()
+
     /**
      * Returns the contents of the "Schema" table, on the Schema tab of the
      * Schema page of the VMC, by column, as a Map<String,List<String>>.
@@ -82,6 +85,7 @@ class SchemaPageSchemaTab extends SchemaPage {
      * headers returned: converted to lower case, to upper case, or as-is.
      * @return the contents of the "Schema" table, listed by column.
      */
+
     Map<String,List<String>> getSchemaTableByColumn(ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.AS_IS) {
         return getTableByColumn(schemaTable, colHeaderFormat)
     }
@@ -93,6 +97,7 @@ class SchemaPageSchemaTab extends SchemaPage {
      * headers returned: converted to lower case, to upper case, or as-is.
      * @return the contents of the "Schema" table, listed by row.
      */
+
     List<List<String>> getSchemaTableByRow(ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.AS_IS) {
         return getTableByRow(schemaTable, colHeaderFormat)
     }

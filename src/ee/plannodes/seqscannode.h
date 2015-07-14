@@ -53,14 +53,15 @@ namespace voltdb {
 class AbstractExpression;
 
 /**
- *
+ * Seqential scan plan node
  */
 class SeqScanPlanNode : public AbstractScanPlanNode {
 public:
-    SeqScanPlanNode() { }
+    SeqScanPlanNode()  { }
     ~SeqScanPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
+
 };
 
 }

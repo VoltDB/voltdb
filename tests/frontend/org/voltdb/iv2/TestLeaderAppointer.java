@@ -63,7 +63,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
     private LeaderCache m_cache = null;
-    private AtomicBoolean m_newAppointee = new AtomicBoolean(false);
+    private final AtomicBoolean m_newAppointee = new AtomicBoolean(false);
 
     private LeaderAppointer m_dut = null;
 
@@ -133,13 +133,13 @@ public class TestLeaderAppointer extends ZKTestBase {
     void addReplica(int partitionId, long HSId) throws KeeperException, InterruptedException, Exception
     {
         LeaderElector.createParticipantNode(m_zk,
-                LeaderElector.electionDirForPartition(partitionId),
+                LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partitionId),
                 Long.toString(HSId), null);
     }
 
     void deleteReplica(int partitionId, long HSId) throws KeeperException, InterruptedException
     {
-        String dir = LeaderElector.electionDirForPartition(partitionId);
+        String dir = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partitionId);
         List<String> children = m_zk.getChildren(dir, false);
         for (String child : children) {
             if (LeaderElector.getPrefixFromChildName(child).equals(Long.toString(HSId))) {
@@ -494,7 +494,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         assertFalse(VoltDB.wasCrashCalled);
 
         // Create a partition dir
-        LeaderElector.createRootIfNotExist(m_zk, LeaderElector.electionDirForPartition(2));
+        LeaderElector.createRootIfNotExist(m_zk, LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, 2));
         Thread.sleep(500); // I'm evil
         assertFalse(VoltDB.wasCrashCalled);
 

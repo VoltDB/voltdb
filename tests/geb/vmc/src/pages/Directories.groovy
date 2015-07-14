@@ -18,11 +18,11 @@ class Directories extends Module {
     static content = {
         title 					{ $("h1", text:"Directories") }
 
-        rootTitle 				{ $("td", text:"Root (Destination)") }
-        snapshotTitle 			{ $("td", text:"Snapshot") }
-        exportOverflowTitle 	{ $("td", text:"Export Overflow") }
-        commandLogsTitle 		{ $("td", text:"Command Log") }
-        commandLogSnapshotTitle { $("td", text:"Command Log Snapshots") }
+        rootTitle 				{ $("#voltdbroot").previous() }
+        snapshotTitle 			{ $("#snapshotpath").previous() }
+        exportOverflowTitle 	{ $("#exportOverflow").previous() }
+        commandLogsTitle 		{ $("#commandlogpath").previous() }
+        commandLogSnapshotTitle { $("#commandlogsnapshotpath").previous() }
 
         rootValue 				{ $("#voltdbroot") }
         snapshotValue 			{ $("#snapshotpath") }

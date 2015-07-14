@@ -121,20 +121,6 @@ public class MaterializedViewBenchmark {
     }
 
     /**
-     * Class to use for returning values from the diffWriter method to the
-     * runBenchmark method.
-     */
-    public static class DiffRetVals {
-        double throughput;
-        double execute;
-
-        public DiffRetVals(double tp, double ex) {
-            throughput = tp;
-            execute = ex;
-        }
-    }
-
-    /**
      * The constructor method for the MaterializedViewBenchmark class.
      * @param config MatViewConfig object containing the configuration options.
      */
@@ -240,38 +226,6 @@ public class MaterializedViewBenchmark {
     }
 
     /**
-     * Writes the diff values to the csv file.
-     * @param savedThroughput Throughput class variable.
-     *        newThroughput   New throughput value.
-     *        savedExecute    Execute class variable.
-     *        newExecute      New Execute value.
-     *        name            Title to use for the row in the csv file.
-     *        stats           ClientStats class.
-     *        fw              FileWriter object with the csv file.
-     * @throws Exception if anything unexpected happens.
-     * @return Returns DiffRetVals class containing the throughput/execute values to update
-     *         the MaterializedViewBenchmark class variables with.
-     */
-    public DiffRetVals diffWriter(double savedThroughput, double newThroughput, double savedExecute,
-                                  double newExecute, String name, ClientStats stats, FileWriter fw) throws Exception {
-        if (savedThroughput > 0) {
-            savedThroughput = (((newThroughput - savedThroughput) /
-                                  newThroughput) * 100);
-            savedExecute = (((savedExecute - newExecute) /
-                               newExecute) * 100);
-            fw.append(String.format("%s,%d,-1,0,0,0,%.2f,%.2f,0,0,0,0,0,0\n",
-                                    name,
-                                    stats.getStartTimestamp(),
-                                    savedThroughput,
-                                    savedExecute));
-        } else {
-            savedThroughput = newThroughput;
-            savedExecute = newExecute;
-        }
-        return new DiffRetVals(savedThroughput, savedExecute);
-    }
-
-    /**
      * Prints the results and statistics about performance.
      * @param procedure The name of the stored procedure that was tested.
      * @throws Exception if anything unexpected happens.
@@ -338,30 +292,11 @@ public class MaterializedViewBenchmark {
                                 stats.getStartTimestamp(),
                                 stats.getTxnThroughput(),
                                 execTimeInMicroSec));
+    }
 
-        // Expecting the custom insert/delete procedure names ex. ids_insert
-        String[] procArray = procedure.split("_");
-        if (procArray[procArray.length-1].equals("insert")) {
-            DiffRetVals ret = diffWriter(insertThroughput, (double)stats.getTxnThroughput(), insertExecute,
-                                         execTimeInMicroSec, "Insert Diff", stats, fw);
-            insertThroughput = ret.throughput;
-            insertExecute = ret.execute;
-        } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("group")) {
-            DiffRetVals ret = diffWriter(updateGroupThroughput, (double)stats.getTxnThroughput(), updateGroupExecute,
-                                         execTimeInMicroSec, "Update Grp Diff", stats, fw);
-            updateGroupThroughput = ret.throughput;
-            updateGroupExecute = ret.execute;
-        } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("value")) {
-            DiffRetVals ret = diffWriter(updateValueThroughput, (double)stats.getTxnThroughput(), updateValueExecute,
-                                         execTimeInMicroSec, "Update Sum Diff", stats, fw);
-            updateValueThroughput = ret.throughput;
-            updateValueExecute = ret.execute;
-        } else {
-            DiffRetVals ret = diffWriter(deleteThroughput, (double)stats.getTxnThroughput(), deleteExecute,
-                                         execTimeInMicroSec, "Delete Diff", stats, fw);
-            deleteThroughput = ret.throughput;
-            deleteExecute = ret.execute;
-        }
+    private boolean isMinMatViewCase(String matView) {
+        return matView.toLowerCase().endsWith("minmatview") ||
+               matView.toLowerCase().endsWith("minmatviewopt");
     }
 
     /**
@@ -385,10 +320,26 @@ public class MaterializedViewBenchmark {
                 csvStr = "wo";
                 procStr = "ids";
                 break;
-            default:
+            case "minMatView":
                 systemStr = "w/ min";
                 csvStr = "w min";
                 procStr = "idsWithMinMatView";
+                break;
+            case "minMatViewOpt":
+                systemStr = "w/ min opt";
+                csvStr = "w min opt";
+                procStr = "idsWithMinMatViewOpt";
+                break;
+            case "4MinMatView":
+                systemStr = "4mins";
+                csvStr = "4mins";
+                procStr = "idsWith4MinMatView";
+                break;
+            default:
+                assert(matView.equals("4MinMatViewOpt"));
+                systemStr = "4mins opt";
+                csvStr = "4mins opt";
+                procStr = "idsWith4MinMatViewOpt";
         }
 
         int grp = 1;
@@ -404,11 +355,20 @@ public class MaterializedViewBenchmark {
 
         if (config.group > 0) {
             for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
+                if (systemStr.startsWith("4")) {
+                    client.callProcedure(new NullCallback(),
                                      procStr + "_insert",
                                      i,
                                      grp,
-                                     i);
+                                     i, i, i, i);
+                }
+                else {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         grp,
+                                         i);
+                }
                 if (grp == config.group) {
                     grp = 1;
                 } else {
@@ -417,11 +377,20 @@ public class MaterializedViewBenchmark {
             }
         } else {
             for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     procStr + "_insert",
-                                     i,
-                                     i,
-                                     i);
+                if (systemStr.startsWith("4")) {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         i,
+                                         i, i, i, i);
+                }
+                else {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         i,
+                                         i);
+                }
             }
         }
         timer.cancel();
@@ -434,7 +403,7 @@ public class MaterializedViewBenchmark {
         }
         System.out.print(HORIZONTAL_RULE);
 
-        if (!matView.equals("minMatView")) {
+        if ( ! isMinMatViewCase(matView) ) {
             // grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
             grp = 2;
 
@@ -562,6 +531,21 @@ public class MaterializedViewBenchmark {
                                      i,
                                      i,
                                      i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatViewOpt_insert",
+                                     i,
+                                     i,
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatView_insert",
+                                     i,
+                                     i,
+                                     i, i, i, i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatViewOpt_insert",
+                                     i,
+                                     i,
+                                     i, i, i, i);
             }
             client.drain();
             for (int i=0; i<config.warmup; i++){
@@ -573,6 +557,15 @@ public class MaterializedViewBenchmark {
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWithMinMatView_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatViewOpt_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatView_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatViewOpt_delete",
                                      i);
             }
             client.drain();
@@ -592,6 +585,14 @@ public class MaterializedViewBenchmark {
         // reset class variables so that diff is not written to the csv file
         insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
         runHalf("minMatView", fw);
+        System.out.print(HORIZONTAL_RULE);
+        runHalf("minMatViewOpt", fw);
+        System.out.print(HORIZONTAL_RULE);
+
+        insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
+        runHalf("4MinMatView", fw);
+        System.out.print(HORIZONTAL_RULE);
+        runHalf("4MinMatViewOpt", fw);
         benchmarkActive = false;
 
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {

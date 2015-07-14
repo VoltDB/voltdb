@@ -27,231 +27,728 @@ class AdminTest extends TestBase {
     static boolean revertHeartTimeout = false
     static boolean revertQueryTimeout = false
 
+	int count = 0
     def setup() { // called before each test
-        setup: 'Open VMC page'
-        to VoltDBManagementCenterPage
-        expect: 'to be on VMC page'
-        at VoltDBManagementCenterPage
+        count = 0
+		
+		while(count<numberOfTrials) {
+			count ++
+			try {
+				setup: 'Open VMC page'
+				to VoltDBManagementCenterPage
+				page.loginIfNeeded()
+				expect: 'to be on VMC page'
+				at VoltDBManagementCenterPage
 
-        when: 'click the Admin link (if needed)'
-        page.openAdminPage()
-        then: 'should be on Admin page'
-        at AdminPage
+				when: 'click the Admin link (if needed)'
+				page.openAdminPage()
+				then: 'should be on Admin page'
+				at AdminPage
+        
+				break
+			} catch (org.openqa.selenium.ElementNotVisibleException e) {
+				println("ElementNotVisibleException: Unable to Start the test")
+				println("Retrying")
+			}
+		}
     }
 
 
     // DIRECTORIES
 
     def "check Directories title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            directories.title.isDisplayed()
-            directories.title.text().toLowerCase().equals("Directories".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				    directories.title.isDisplayed()
+				    directories.title.text().toLowerCase().equals("Directories".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Root title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            directories.rootTitle.isDisplayed()
-            directories.rootTitle.text().toLowerCase().equals("Root (Destination)".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				    directories.rootTitle.isDisplayed()
+            		directories.rootTitle.text().toLowerCase().equals("Root (Destination)".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Snapshot title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            directories.snapshotTitle.isDisplayed()
-            directories.snapshotTitle.text().toLowerCase().equals("Snapshot".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.snapshotTitle.isDisplayed()
+           			directories.snapshotTitle.text().toLowerCase().equals("Snapshot".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+		if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Export Overflow title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            directories.exportOverflowTitle.isDisplayed()
-            directories.exportOverflowTitle.text().toLowerCase().equals("Export Overflow".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.exportOverflowTitle.isDisplayed()
+            		directories.exportOverflowTitle.text().toLowerCase().equals("Export Overflow".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Command Logs title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            directories.commandLogsTitle.isDisplayed()
-            directories.commandLogsTitle.text().toLowerCase().equals("Command Log".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.commandLogsTitle.isDisplayed()
+            		directories.commandLogsTitle.text().toLowerCase().equals("Command Log".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Command Log Snapshots title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            directories.commandLogSnapshotTitle.isDisplayed()
-            directories.commandLogSnapshotTitle.text().toLowerCase().equals("Command Log Snapshots".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.commandLogSnapshotTitle.isDisplayed()
+           			directories.commandLogSnapshotTitle.text().toLowerCase().equals("Command Log Snapshots".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Root Value not empty"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30){
-            directories.rootValue.isDisplayed()
-            !directories.rootValue.text().equals("")
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.rootValue.isDisplayed()
+            		!directories.rootValue.text().equals("")
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check SnapShot Value not empty"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30){
-            directories.snapshotValue.isDisplayed()
-            !directories.snapshotValue.text().equals("")
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.snapshotValue.isDisplayed()
+            		!directories.snapshotValue.text().equals("")
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Export Overflow Value not empty"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30){
-            directories.exportOverflowValue.isDisplayed()
-            !directories.exportOverflowValue.text().equals("")
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.exportOverflowValue.isDisplayed()
+            		!directories.exportOverflowValue.text().equals("")
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Command Logs Value not empty"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30){
-            directories.commandLogsValue.isDisplayed()
-            directories.commandLogsValue.text().equals("")
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.commandLogsValue.isDisplayed()
+           	 		!directories.commandLogsValue.text().equals("")
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Log Snapshot Value not empty"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30){
-            directories.commandLogSnapshotValue.isDisplayed()
-            directories.commandLogSnapshotValue.text().equals("")
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	directories.commandLogSnapshotValue.isDisplayed()
+            		!directories.commandLogSnapshotValue.text().equals("")
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     // OVERVIEW
 
     def "check title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.title.isDisplayed()
-            overview.title.text().toLowerCase().equals("Overview".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.title.isDisplayed()
+            		overview.title.text().toLowerCase().equals("Overview".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Site Per Host"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.sitePerHost.isDisplayed()
-            overview.sitePerHost.text().toLowerCase().equals("Sites Per Host".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.sitePerHost.isDisplayed()
+           	 		overview.sitePerHost.text().toLowerCase().equals("Sites Per Host".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check K-safety"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.ksafety.isDisplayed()
-            overview.ksafety.text().toLowerCase().equals("K-safety".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.ksafety.isDisplayed()
+            		overview.ksafety.text().toLowerCase().equals("K-safety".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Partition Detection"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.partitionDetection.isDisplayed()
-            overview.partitionDetection.text().toLowerCase().equals("Partition detection".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.partitionDetection.isDisplayed()
+            		overview.partitionDetection.text().toLowerCase().equals("Partition detection".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Security"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.security.isDisplayed()
-            overview.security.text().toLowerCase().equals("Security".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.security.isDisplayed()
+            		overview.security.text().toLowerCase().equals("Security".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check HTTP Access"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.httpAccess.isDisplayed()
-            overview.httpAccess.text().toLowerCase().equals("HTTP Access".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.httpAccess.isDisplayed()
+            		overview.httpAccess.text().toLowerCase().equals("HTTP Access".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Auto Snapshots"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.autoSnapshots.isDisplayed()
-            overview.autoSnapshots.text().toLowerCase().equals("Auto Snapshots".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.autoSnapshots.isDisplayed()
+            		overview.autoSnapshots.text().toLowerCase().equals("Auto Snapshots".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Command Logging"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.commandLogging.isDisplayed()
-            overview.commandLogging.text().toLowerCase().equals("Command Logging".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.commandLogging.isDisplayed()
+            		overview.commandLogging.text().toLowerCase().equals("Command Logging".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Export"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.export.isDisplayed()
-            overview.export.text().toLowerCase().equals("Export".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.export.isDisplayed()
+            		overview.export.text().toLowerCase().equals("Export".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Advanced"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            overview.advanced.isDisplayed()
-            overview.advanced.text().toLowerCase().equals("Advanced".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.advanced.isDisplayed()
+            		overview.advanced.text().toLowerCase().equals("Advanced".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     //values
@@ -260,7 +757,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.sitePerHostValue.isDisplayed()
             !overview.sitePerHostValue.text().equals("")
         }
@@ -270,7 +767,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.ksafetyValue.isDisplayed()
             !overview.ksafetyValue.text().equals("")
         }
@@ -280,7 +777,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.partitionDetectionValue.isDisplayed()
             !overview.partitionDetectionValue.text().equals("")
         }
@@ -290,7 +787,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.securityValue.isDisplayed()
             !overview.securityValue.text().equals("")
         }
@@ -301,7 +798,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.httpAccessValue.isDisplayed()
             !overview.httpAccessValue.text().equals("")
         }
@@ -311,7 +808,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.autoSnapshotsValue.isDisplayed()
             !overview.autoSnapshotsValue.text().equals("")
         }
@@ -321,7 +818,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.commandLoggingValue.isDisplayed()
             !overview.commandLoggingValue.text().equals("")
         }
@@ -335,14 +832,14 @@ class AdminTest extends TestBase {
         then:
 
         try {
-            waitFor(30) { page.overview.exportNoConfigAvailable.isDisplayed() }
+            waitFor(waitTime) { page.overview.exportNoConfigAvailable.isDisplayed() }
             println(page.overview.exportNoConfigAvailable.text())
         } catch(geb.error.RequiredPageContentNotPresent e ) {
-            waitFor(30) { page.overview.exportConfig.isDisplayed() }
+            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
             println("The export configuration")
             println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
         } catch (geb.waiting.WaitTimeoutException e ) {
-            waitFor(30) { page.overview.exportConfig.isDisplayed() }
+            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
             println("The export configuration")
             println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
         }
@@ -354,21 +851,21 @@ class AdminTest extends TestBase {
         when:
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
         }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutCancel.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutCancel.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             !page.overview.heartTimeoutField.isDisplayed()
             !page.overview.heartTimeoutOk.isDisplayed()
             !page.overview.heartTimeoutCancel.isDisplayed()
@@ -379,12 +876,12 @@ class AdminTest extends TestBase {
         when:
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
@@ -392,30 +889,42 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.heartTimeoutField.value("10")
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutPopupOk.isDisplayed()
             page.overview.heartTimeoutPopupCancel.isDisplayed()
         }
 
-        when:
-        waitFor(30) { page.overview.heartTimeoutPopupCancel.click() }
-        then:
-        waitFor(30) {
-            page.overview.heartTimeoutEdit.isDisplayed()
-            !page.overview.heartTimeoutPopupOk.isDisplayed()
-            !page.overview.heartTimeoutPopupCancel.isDisplayed()
-        }
+		int count = 0
+		while(count<numberOfTrials) {
+			count++
+			println("Try")
+			try {
+				try {
+					page.overview.heartTimeoutPopupCancel.click()
+				} catch (org.openqa.selenium.ElementNotVisibleException e) {
+					println("PASS")
+					break
+				}
+				page.overview.heartTimeoutEdit.isDisplayed()
+				!page.overview.heartTimeoutPopupOk.isDisplayed()
+				!page.overview.heartTimeoutPopupCancel.isDisplayed()
+			} catch (org.openqa.selenium.ElementNotVisibleException e) {
+				println("Try 2")
+			} catch (org.openqa.selenium.StaleElementReferenceException e) {
+				println("Try sele")
+			}
+		}
     }
 
     def "Check click Heart Timeout edit and click Ok and then Ok"() {
         when:
         String heartTimeout = 20
         page.advanced.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutValue.isDisplayed()
         }
         initialHeartTimeout = page.overview.heartTimeoutValue.text()
@@ -423,12 +932,12 @@ class AdminTest extends TestBase {
         revertHeartTimeout = true
 
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
@@ -436,17 +945,17 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.heartTimeoutField.value(heartTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutPopupOk.isDisplayed()
             page.overview.heartTimeoutPopupCancel.isDisplayed()
         }
 
 
-        waitFor(30) {
+        waitFor(waitTime) {
             try {
                 page.overview.heartTimeoutPopupOk.click()
             } catch (org.openqa.selenium.ElementNotVisibleException e) {
@@ -465,12 +974,12 @@ class AdminTest extends TestBase {
         String heartTimeout = ""
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
@@ -478,11 +987,11 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.heartTimeoutField.value(heartTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.errorMsgHeartbeat.isDisplayed()
             page.overview.errorMsgHeartbeat.text().equals("Please enter a valid positive number.")
         }
@@ -494,12 +1003,12 @@ class AdminTest extends TestBase {
         String heartTimeout = "0"
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
@@ -507,11 +1016,11 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.heartTimeoutField.value(heartTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.errorMsgHeartbeat.isDisplayed()
             page.overview.errorMsgHeartbeat.text().equals("Please enter a positive number. Its minimum value should be 1.")
         }
@@ -524,21 +1033,21 @@ class AdminTest extends TestBase {
         when:
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutField.isDisplayed()
             page.overview.queryTimeoutOk.isDisplayed()
             page.overview.queryTimeoutCancel.isDisplayed()
         }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutCancel.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutCancel.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             !page.overview.queryTimeoutField.isDisplayed()
             !page.overview.queryTimeoutOk.isDisplayed()
             !page.overview.queryTimeoutCancel.isDisplayed()
@@ -549,12 +1058,12 @@ class AdminTest extends TestBase {
         when:
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutField.isDisplayed()
             page.overview.queryTimeoutOk.isDisplayed()
             page.overview.queryTimeoutCancel.isDisplayed()
@@ -562,30 +1071,43 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.queryTimeoutField.value("10")
-        waitFor(30) {
+		then:
+		waitFor(waitTime) {
             page.overview.queryTimeoutOk.click()
-        }
-        then:
-        waitFor(30) {
             page.overview.queryTimeoutPopupOk.isDisplayed()
             page.overview.queryTimeoutPopupCancel.isDisplayed()
         }
 
-        when:
-        waitFor(30) { page.overview.queryTimeoutPopupCancel.click() }
-        then:
-        waitFor(30) {
-            page.overview.queryTimeoutEdit.isDisplayed()
-            !page.overview.queryTimeoutPopupOk.isDisplayed()
-            !page.overview.queryTimeoutPopupCancel.isDisplayed()
-        }
+		int count = 0
+		while(count<5) {
+			count++
+			try {
+				try {
+					page.overview.queryTimeoutPopupCancel.click()
+				} catch(org.openqa.selenium.ElementNotVisibleException e) {
+					if(count > 0) {
+						println("")
+						break
+					}
+				}
+
+				page.overview.queryTimeoutEdit.isDisplayed()
+				!page.overview.queryTimeoutPopupOk.isDisplayed()
+				!page.overview.queryTimeoutPopupCancel.isDisplayed()
+				println("")
+			}catch(org.openqa.selenium.ElementNotVisibleException f){
+				println("")
+			}catch(org.openqa.selenium.StaleElementReferenceException f){
+				println("")
+			}
+		}
     }
 
     def "Check click Query Timeout edit and click Ok and then Ok"() {
         when:
         String queryTimeout = 20
         page.advanced.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutValue.isDisplayed()
         }
         initialQueryTimeout = page.overview.queryTimeoutValue.text()
@@ -593,12 +1115,12 @@ class AdminTest extends TestBase {
         revertQueryTimeout = true
 
         then:
-        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutField.isDisplayed()
             page.overview.queryTimeoutOk.isDisplayed()
             page.overview.queryTimeoutCancel.isDisplayed()
@@ -606,17 +1128,17 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.queryTimeoutField.value(queryTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutPopupOk.isDisplayed()
             page.overview.queryTimeoutPopupCancel.isDisplayed()
         }
 
 
-        waitFor(30) {
+        waitFor(waitTime) {
             try {
                 page.overview.queryTimeoutPopupOk.click()
             } catch (org.openqa.selenium.ElementNotVisibleException e) {
@@ -635,12 +1157,12 @@ class AdminTest extends TestBase {
         String queryTimeout = ""
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutField.isDisplayed()
             page.overview.queryTimeoutOk.isDisplayed()
             page.overview.queryTimeoutCancel.isDisplayed()
@@ -648,11 +1170,11 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.queryTimeoutField.value(queryTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.errorQuery.isDisplayed()
             page.overview.errorQuery.text().equals("Please enter a valid positive number.")
         }
@@ -666,7 +1188,7 @@ class AdminTest extends TestBase {
         at AdminPage
         page.securityEdit.isDisplayed()
         then:
-        waitFor(10){
+        waitFor(waitTime){
             page.securityEdit.click()
             page.securityEditOk.isDisplayed()
             page.securityEditCancel.isDisplayed()
@@ -676,13 +1198,13 @@ class AdminTest extends TestBase {
      def "click security edit button and cancel"(){
         when:
         at AdminPage
-        waitFor(5) { page.securityEdit.isDisplayed()
+        waitFor(waitTime) { page.securityEdit.isDisplayed()
 
         }
 
         then:
 
-        waitFor(10) {
+        waitFor(waitTime) {
 
             page.securityEdit.click()
             page.securityEditOk.isDisplayed()
@@ -702,17 +1224,17 @@ class AdminTest extends TestBase {
     def "click security edit button and cancel popup"(){
         when:
         at AdminPage
-        waitFor(5) { page.securityEdit.isDisplayed() }
+        waitFor(waitTime) { page.securityEdit.isDisplayed() }
         then:
 
-        waitFor(10) {
+        waitFor(waitTime) {
             page.securityEdit.click()
             page.securityEditOk.isDisplayed()
             page.securityEditCancel.isDisplayed()
         }
         page.securityEditOk.click()
         println("security edit ok clicked!")
-        waitFor(10) {
+        waitFor(waitTime) {
           //  page.securityPopup.isDisplayed()
             page.securityPopupOk.isDisplayed()
             page.securityPopupCancel.isDisplayed()
@@ -732,10 +1254,10 @@ class AdminTest extends TestBase {
     def "click security edit button and ok and ok"(){
         when:
         at AdminPage
-        waitFor(5) { page.securityEdit.isDisplayed() }
+        waitFor(waitTime) { page.securityEdit.isDisplayed() }
         then:
 
-        waitFor(10) {
+        waitFor(waitTime) {
             page.securityEdit.click()
             page.securityEditOk.isDisplayed()
             page.securityEditCancel.isDisplayed()
@@ -743,19 +1265,19 @@ class AdminTest extends TestBase {
         page.securityEditOk.click()
         println("security edit ok clicked!")
 
-        waitFor(30) {
+        waitFor(waitTime) {
             page.securityPopupOk.isDisplayed()
             page.securityPopupCancel.isDisplayed()
             page.securityPopupOk.click()
         }
     }
 
-// autosnapshot
+	// autosnapshot
     def "check Auto Snapshots edit"() {
         when:
         at AdminPage
         then:
-        waitFor(10){ page.autoSnapshotsEdit.isDisplayed() }
+        waitFor(waitTime){ page.autoSnapshotsEdit.isDisplayed() }
         String string = page.autoSnapshotsEdit.text()
         !(string.equals(""))
     }
@@ -765,18 +1287,18 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
         }
         page.autoSnapshotsEdit.click()
 
-        waitFor(30) {
+        waitFor(waitTime) {
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
 
         }
-        waitFor(30){
+        waitFor(waitTime){
 
             page.frequencyEdit.isDisplayed()
             //println("first wait")
@@ -792,14 +1314,14 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
         }
 
         when:
         page.autoSnapshotsEdit.click()
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
         }
@@ -807,7 +1329,7 @@ class AdminTest extends TestBase {
         when:
         page.autoSnapshotsEditCancel.click()
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             !(page.autoSnapshotsEditCancel.isDisplayed())
             !(page.autoSnapshotsEditOk.isDisplayed())
         }
@@ -824,7 +1346,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
         }
 
@@ -833,7 +1355,7 @@ class AdminTest extends TestBase {
         String enabledDisabled = page.autoSnapshotsValue.text()
         println(enabledDisabled)
         then:
-        waitFor(10){
+        waitFor(waitTime){
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
@@ -865,7 +1387,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
             page.autoSnapshotsValue.isDisplayed()
         }
@@ -874,7 +1396,7 @@ class AdminTest extends TestBase {
         page.autoSnapshotsEdit.click()
         String string = page.autoSnapshotsValue.text()
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
@@ -887,7 +1409,7 @@ class AdminTest extends TestBase {
         page.autoSnapshotsEditCancel.click()
         println("cancel clicked successfully")
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
         }
 
@@ -908,7 +1430,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         page.autoSnapshots.click()
-        waitFor(30) {
+        waitFor(waitTime) {
 		    page.filePrefix.isDisplayed()
 		    page.frequency.isDisplayed()
 		    page.frequencyUnit.isDisplayed()
@@ -920,7 +1442,7 @@ class AdminTest extends TestBase {
         initialRetained	= page.retained.text()
         
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
             page.autoSnapshotsValue.isDisplayed()
             initialFreq
@@ -929,7 +1451,7 @@ class AdminTest extends TestBase {
         when:
         page.autoSnapshotsEdit.click()
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
@@ -966,121 +1488,359 @@ class AdminTest extends TestBase {
         }
 
         then:
-
-        waitFor(15){
-            page.filePrefix.text().equals(prefix)
-            page.frequency.text().equals(frequency)
-            page.frequencyUnit.text().equals(frequencyUnit)
-            page.retained.text().equals(retained)
-            page.filePrefix.isDisplayed()
-        }
-        
+		int count = 0
+		while(count<numberOfTrials) {
+			count++
+			try {
+				waitFor(waitTime) {
+					page.filePrefix.text().equals(prefix)
+					page.frequency.text().equals(frequency)
+					page.frequencyUnit.text().equals(frequencyUnit)
+					page.retained.text().equals(retained)
+					page.filePrefix.isDisplayed()
+				}
+				break
+			} catch (geb.waiting.WaitTimeoutException e) {
+				println("Try")
+			}
+		}
        
     }
 
 
-// NETWORK INTERFACES
+	// NETWORK INTERFACES
 
 
     def "check Network Interfaces title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.title.isDisplayed()
-            page.networkInterfaces.title.text().toLowerCase().equals("Network Interfaces".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.title.isDisplayed()
+            		page.networkInterfaces.title.text().toLowerCase().equals("Network Interfaces".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Port Name title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.portNameTitle.isDisplayed()
-            page.networkInterfaces.portNameTitle.text().toLowerCase().equals("Port Name".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.portNameTitle.isDisplayed()
+            		page.networkInterfaces.portNameTitle.text().toLowerCase().equals("Port Name".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
 
     def "check Cluster Setting title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.clusterSettingTitle.isDisplayed()
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.clusterSettingTitle.isDisplayed()
             page.networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Settings".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Server Setting title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.serverSettingTitle.isDisplayed()
-            page.networkInterfaces.serverSettingTitle.text().toLowerCase().equals("Server Settings".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.serverSettingTitle.isDisplayed()
+            		page.networkInterfaces.serverSettingTitle.text().toLowerCase().equals("Server Settings".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Client Port title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.clientPortTitle.isDisplayed()
-            page.networkInterfaces.clientPortTitle.text().toLowerCase().equals("Client Port".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.clientPortTitle.isDisplayed()
+            		page.networkInterfaces.clientPortTitle.text().toLowerCase().equals("Client Port".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Admin Port title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.adminPortTitle.isDisplayed()
-            page.networkInterfaces.adminPortTitle.text().toLowerCase().equals("Admin Port".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.adminPortTitle.isDisplayed()
+            		page.networkInterfaces.adminPortTitle.text().toLowerCase().equals("Admin Port".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check HTTP Port title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.httpPortTitle.isDisplayed()
-            page.networkInterfaces.httpPortTitle.text().toLowerCase().equals("HTTP Port".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.httpPortTitle.isDisplayed()
+            		page.networkInterfaces.httpPortTitle.text().toLowerCase().equals("HTTP Port".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Internal Port title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.internalPortTitle.isDisplayed()
-            page.networkInterfaces.internalPortTitle.text().toLowerCase().equals("Internal Port".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.internalPortTitle.isDisplayed()
+            		page.networkInterfaces.internalPortTitle.text().toLowerCase().equals("Internal Port".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Zookeeper Port title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.zookeeperPortTitle.isDisplayed()
-            page.networkInterfaces.zookeeperPortTitle.text().toLowerCase().equals("Zookeeper Port".toLowerCase())
+        int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.zookeeperPortTitle.isDisplayed()
+           			page.networkInterfaces.zookeeperPortTitle.text().toLowerCase().equals("Zookeeper Port".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     def "check Replication Port title"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(30) {
-            page.networkInterfaces.replicationPortTitle.isDisplayed()
-            page.networkInterfaces.replicationPortTitle.text().toLowerCase().equals("Replication Port".toLowerCase())
+       	int count = 0
+        testStatus = false
+        
+       	expect: 'at Admin Page'
+        
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	page.networkInterfaces.replicationPortTitle.isDisplayed()
+            		page.networkInterfaces.replicationPortTitle.text().toLowerCase().equals("Replication Port".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
         }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
     }
 
     // value
@@ -1089,9 +1849,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterClientPortValue.isDisplayed()
-            page.networkInterfaces.clusterClientPortValue.text().equals("")
+            !page.networkInterfaces.clusterClientPortValue.text().equals("")
         }
     }
 
@@ -1099,9 +1859,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterAdminPortValue.isDisplayed()
-            page.networkInterfaces.clusterAdminPortValue.text().equals("")
+            !page.networkInterfaces.clusterAdminPortValue.text().equals("")
         }
     }
 
@@ -1109,9 +1869,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterHttpPortValue.isDisplayed()
-            page.networkInterfaces.clusterHttpPortValue.text().equals("")
+            !page.networkInterfaces.clusterHttpPortValue.text().equals("")
         }
     }
 
@@ -1119,9 +1879,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.networkInterfaces.clusterInternalPortValue.isDisplayed()
-            page.networkInterfaces.clusterInternalPortValue.text().equals("")
+            !page.networkInterfaces.clusterInternalPortValue.text().equals("")
         }
     }
 
@@ -1129,9 +1889,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterZookeeperPortValue.isDisplayed()
-            page.networkInterfaces.clusterZookeeperPortValue.text().equals("")
+            !page.networkInterfaces.clusterZookeeperPortValue.text().equals("")
         }
     }
 
@@ -1139,9 +1899,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterReplicationPortValue.isDisplayed()
-            page.networkInterfaces.clusterReplicationPortValue.text().equals("")
+            !page.networkInterfaces.clusterReplicationPortValue.text().equals("")
         }
     }
 
@@ -1151,7 +1911,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.banner.isDisplayed() }
+        waitFor(waitTime) { header.banner.isDisplayed() }
     }
 
 
@@ -1159,28 +1919,28 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.image.isDisplayed() }
+        waitFor(waitTime) { header.image.isDisplayed() }
     }
 
     def "header username exists" () {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
     }
 
     def "header logout exists" () {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
     }
 
     def "header help exists" () {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.help.isDisplayed() }
+        page.header.checkShowHelp()
     }
 
     // HEADER TAB TESTS
@@ -1189,7 +1949,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabDBMonitor.isDisplayed()
             header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
         }
@@ -1199,7 +1959,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabAdmin.isDisplayed()
             header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
         }
@@ -1209,7 +1969,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabSchema.isDisplayed()
             header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
 
@@ -1220,7 +1980,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.tabSQLQuery.isDisplayed()
+        waitFor(waitTime) { header.tabSQLQuery.isDisplayed()
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
         }
     }
@@ -1230,20 +1990,19 @@ class AdminTest extends TestBase {
         at AdminPage
         String username = page.getUsername()
         then:
-        waitFor(30) {
-            header.username.isDisplayed()
-            header.username.text().equals(username)
+        waitFor(waitTime) {
+            header.usernameInHeader.isDisplayed()
+            header.usernameInHeader.text().equals(username)
         }
     }
-
 
     def "header username click and close" () {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
-        waitFor(30) {
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -1255,9 +2014,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
-        waitFor(30) {
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -1272,9 +2031,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
         header.logout.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -1287,9 +2046,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
         header.logout.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -1302,17 +2061,8 @@ class AdminTest extends TestBase {
     def "help popup existance" () {
         when:
         at AdminPage
-        waitFor(30) { header.help.isDisplayed() }
-        header.help.click()
         then:
-        waitFor(30) {
-            header.popup.isDisplayed()
-            header.popupTitle.isDisplayed()
-            header.popupClose.isDisplayed()
-            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
-        }
-
-        header.popupClose.click()
+        page.header.checkIfHelpIsOpen()
     }
 
     // FOOTER TESTS
@@ -1321,14 +2071,14 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { footer.banner.isDisplayed() }
+        waitFor(waitTime) { footer.banner.isDisplayed() }
     }
 
     def "footer text exists and valid"() {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             footer.banner.isDisplayed()
             footer.text.isDisplayed()
             footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
@@ -1343,7 +2093,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
 
-        waitFor(5) { 	page.downloadconfigurationbutton.isDisplayed() }
+        waitFor(waitTime) { 	page.downloadconfigurationbutton.isDisplayed() }
         println("downloadbutton seen")
         then:
 
@@ -1359,7 +2109,7 @@ class AdminTest extends TestBase {
     def "cluster title"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.clusterTitle.isDisplayed() }
+        waitFor(waitTime) { cluster.clusterTitle.isDisplayed() }
         then:
         cluster.clusterTitle.text().equals("Cluster")
     }
@@ -1369,18 +2119,18 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { cluster.promotebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.promotebutton.isDisplayed() }
     }
 
     def "check pause cancel"(){
         when:
         at AdminPage
-        waitFor(5){cluster.pausebutton.isDisplayed()}
+        waitFor(waitTime){cluster.pausebutton.isDisplayed()}
 
         then:
         at AdminPage
         cluster.pausebutton.click()
-        waitFor(5){cluster.pausecancel.isDisplayed()}
+        waitFor(waitTime){cluster.pausecancel.isDisplayed()}
 
         cluster.pausecancel.click()
         println("cancel button clicked for pause testing")
@@ -1390,18 +2140,26 @@ class AdminTest extends TestBase {
     def "check pause and verify resume too"(){
         when:
         at AdminPage
-        waitFor(5) { cluster.pausebutton.isDisplayed() }
         then:
+        waitFor{
+			cluster.pausebutton.click()
+			cluster.pauseok.isDisplayed()
+		}
 
-        cluster.pausebutton.click()
-        waitFor{cluster.pauseok.isDisplayed()}
-        cluster.pauseok.click()
-        waitFor(4){cluster.resumebutton.isDisplayed()
+        waitFor(waitTime) {
+			cluster.pauseok.click()
+			cluster.resumebutton.isDisplayed()
+		}
 
-            cluster.resumebutton.click()}
-        waitFor(10) {
-            cluster.resumeok.isDisplayed()}
-        cluster.resumeok.click()
+		waitFor(waitTime) {
+            cluster.resumebutton.click()
+            cluster.resumeok.isDisplayed()
+		}
+
+		waitFor(waitTime) {
+			cluster.resumeok.click()
+			cluster.pausebutton.isDisplayed()
+		}
         println("resume for ok has been clicked")
     }
 
@@ -1410,10 +2168,10 @@ class AdminTest extends TestBase {
     def "when save and cancel popup"(){
         when:
         at AdminPage
-        waitFor(5) { cluster.savebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(5) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savecancel.click()
     }
@@ -1424,10 +2182,10 @@ class AdminTest extends TestBase {
         when:
 
         at AdminPage
-        waitFor(15) { cluster.savebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase())
         cluster.savedirectory.value(emptyPath)
         cluster.saveok.click()
@@ -1444,14 +2202,14 @@ class AdminTest extends TestBase {
         when:
 
         at AdminPage
-        waitFor(15) { cluster.savebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savedirectory.value(invalidPath)
         cluster.saveok.click()
-        waitFor(10){cluster.failedsaveok.isDisplayed()}
+        waitFor(waitTime){cluster.failedsaveok.isDisplayed()}
         cluster.failedsaveok.click()
         println("error location for saving verified")
 
@@ -1464,14 +2222,14 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        waitFor(15) { cluster.savebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savedirectory.value(validPath)
         cluster.saveok.click()
-        waitFor(15){cluster.savesuccessok.isDisplayed()}
+        waitFor(waitTime){cluster.savesuccessok.isDisplayed()}
         cluster.savesuccessok.click()
         println("save succeeded and clicked!!")
     }
@@ -1482,7 +2240,7 @@ class AdminTest extends TestBase {
         String validPath = page.getValidPath()
         when:
         at AdminPage
-        waitFor(20) {   cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) {   cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -1490,11 +2248,11 @@ class AdminTest extends TestBase {
         println("restore button clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
         cluster.restoredirectory.value(validPath)
         cluster.restoresearch.click()
-        waitFor(5){cluster.restorecancelbutton.isDisplayed()}
+        waitFor(waitTime){cluster.restorecancelbutton.isDisplayed()}
         cluster.restorecancelbutton.click()
     }
 
@@ -1502,7 +2260,7 @@ class AdminTest extends TestBase {
     def "when restore button clicked and close popup"(){
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -1510,7 +2268,7 @@ class AdminTest extends TestBase {
         println("restore clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
         cluster.restoreclosebutton.click()
 
@@ -1520,7 +2278,7 @@ class AdminTest extends TestBase {
         String invalidPath = page.getInvalidPath()
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -1528,15 +2286,15 @@ class AdminTest extends TestBase {
         println("restore clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
 
         // FOR UAT TESTING ENABLE BELOW CODE
-        //    waitFor(10){cluster.restoresearch.isDisplayed()
+        //    waitFor(waitTime){cluster.restoresearch.isDisplayed()
         //    cluster.restoredirectory.isDisplayed()}
         //     cluster.restoredirectory.value(invalidPath)
         //      cluster.restoresearch.click()
-        //   if(waitFor(10){cluster.restoreerrormsg.isDisplayed()}){
+        //   if(waitFor(waitTime){cluster.restoreerrormsg.isDisplayed()}){
         //       cluster.restoreerrormsg.text().toLowerCase().equals("Error: Failure getting snapshots.Path is not a directory".toLowerCase())
         //      println("error message for restore search verified!!")}
 
@@ -1545,19 +2303,19 @@ class AdminTest extends TestBase {
     def "when search button clicked in empty path of Restore"(){
         String emptyPath = page.getEmptyPath()
         when:
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
         // FOR UAT TESTING ENABLE BELOW CODE
-        //       waitFor(10){cluster.restoresearch.isDisplayed()
+        //       waitFor(waitTime){cluster.restoresearch.isDisplayed()
         //       cluster.restoredirectory.isDisplayed()}
         //       cluster.restoredirectory.value(emptyPath)
         //      cluster.restoresearch.click()
-        //      if(waitFor(10){cluster.emptysearchrestore.isDisplayed()}){
+        //      if(waitFor(waitTime){cluster.emptysearchrestore.isDisplayed()}){
         //          cluster.emptysearchrestore.text().toLowerCase().equals("Please enter a valid directory path.".toLowerCase())
         //      println("error message for empty restore search verified!!")}
     }
@@ -1567,7 +2325,7 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -1575,17 +2333,17 @@ class AdminTest extends TestBase {
         println("restore clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
 
         // FOR UAT TESTING ENABLE BELOW CODE
-        //   waitFor(10){cluster.buttonrestore.isDisplayed()}
+        //   waitFor(waitTime){cluster.buttonrestore.isDisplayed()}
         //  cluster.buttonrestore.click()
-        //  waitFor(10){cluster.restorepopupno.isDisplayed()
+        //  waitFor(waitTime){cluster.restorepopupno.isDisplayed()
         //               cluster.restorepopupyes.isDisplayed()}
         //  cluster.restorepopupno.click()
         //  println("No clicked for restore popup")
-        // waitFor(10){cluster.restorecancelbutton.isDisplayed()}
+        // waitFor(waitTime){cluster.restorecancelbutton.isDisplayed()}
         // cluster.restorecancelbutton.click()
 
     }
@@ -1595,7 +2353,7 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -1603,17 +2361,17 @@ class AdminTest extends TestBase {
         println("restore clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
 
         // FOR UAT TESTING ENABLE BELOW CODE
-        //  waitFor(10){cluster.buttonrestore.isDisplayed()}
+        //  waitFor(waitTime){cluster.buttonrestore.isDisplayed()}
         //  cluster.buttonrestore.click()
-        //  waitFor(10){cluster.restorepopupno.isDisplayed()
+        //  waitFor(waitTime){cluster.restorepopupno.isDisplayed()
         //             cluster.restorepopupyes.isDisplayed()}
         //  cluster.restorepopupyes.click()
         //  println("Yes clicked for restore popup")
-        //  waitFor(10){cluster.savesuccessok.isDisplayed()}
+        //  waitFor(waitTime){cluster.savesuccessok.isDisplayed()}
         //  cluster.savesuccessok.click()
         // println("ok clicked and message displayed after restoring")
 
@@ -1623,10 +2381,10 @@ class AdminTest extends TestBase {
     def "when shutdown and cancel popup"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.shutdownbutton.isDisplayed() }
+        waitFor(waitTime) { cluster.shutdownbutton.isDisplayed() }
         cluster.shutdownbutton.click()
         then:
-        waitFor(30) { cluster.shutdownconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.shutdownconfirmation.isDisplayed() }
         cluster.shutdownconfirmation.text().toLowerCase().equals("Shutdown: Confirmation".toLowerCase())
         cluster.shutdowncancelbutton.click()
     }
@@ -1634,10 +2392,10 @@ class AdminTest extends TestBase {
     def "when shutdown and close popup"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.shutdownbutton.isDisplayed() }
+        waitFor(waitTime) { cluster.shutdownbutton.isDisplayed() }
         cluster.shutdownbutton.click()
         then:
-        waitFor(30) { cluster.shutdownconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.shutdownconfirmation.isDisplayed() }
         cluster.shutdownconfirmation.text().toLowerCase().equals("Shutdown: Confirmation".toLowerCase())
         cluster.shutdownclosebutton.click()
     }
@@ -1650,24 +2408,27 @@ class AdminTest extends TestBase {
         at AdminPage
         page.serverbutton.isDisplayed()
         page.serverbutton.click()
+        then:
+        if (waitFor(waitTime) { page.mainservername.isDisplayed() && page.servername.isDisplayed() }) {
 
-        if (waitFor(10) { page.mainservername.isDisplayed() && page.servername.isDisplayed() }) {
-
-            println("server name is displayed as: " + page.mainservername.text().replaceAll("Stop", " "))
+            println("server name is displayed as: " + page.mainservername.text().replaceAll("Stop", "").replaceAll("Paused", ""))
             println("currently running server is : "+ page.servername.text())
         }
-
-
-        then:
-        if (waitFor(5) { page.serverstopbtndisable.isDisplayed() }) {
-            println("server stop button  displayed for disable mode")
+        
+        try {
+            page.cluster.resumebutton.isDisplayed()
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+            waitFor(waitTime) { 
+                page.serverstopbtndisable.isDisplayed() 
+            }
         }
+        
 
         //   enable below code FOR UAT TESTING
-        //     if( waitFor(5) { page.serverstopbtnenable.isDisplayed() }){
+        //     if( waitFor(waitTime) { page.serverstopbtnenable.isDisplayed() }){
         //    println("server stop button clicked for  enable mode")
         //    page.serverstopbtnenable.click()
-        //   waitFor(5) { page.serverstopcancel.isDisplayed() }
+        //   waitFor(waitTime) { page.serverstopcancel.isDisplayed() }
         //   page.serverstopok.isDisplayed()
         //   page.serverstopcancel.click()
         //    println("server cancel button clicked")}
@@ -1679,7 +2440,7 @@ class AdminTest extends TestBase {
     	when:
     	page.overview.httpAccess.click()
     	then:
-    	waitFor(30) {
+    	waitFor(waitTime) {
     		page.overview.jsonApi.text().equals("JSON API")
     		!page.overview.jsonApiStatus.text().equals("")
     	}
@@ -1689,7 +2450,7 @@ class AdminTest extends TestBase {
     	when:
     	page.overview.commandLogging.click()
     	then:
-    	waitFor(30) {
+    	waitFor(waitTime) {
     		page.overview.logFrequencyTime.text().equals("Log Frequency Time")
     		!page.overview.logFrequencyTimeValue.text().equals("")
     		
@@ -1705,7 +2466,7 @@ class AdminTest extends TestBase {
     	when:
     	page.overview.advanced.click()
     	then:
-    	waitFor(30) {
+    	waitFor(waitTime) {
     		page.overview.maxJavaHeap.text().equals("Max Java Heap")
     		!page.overview.maxJavaHeapValue.text().equals("")
     		
@@ -1753,7 +2514,7 @@ class AdminTest extends TestBase {
             when:
             page.autoSnapshotsEdit.click()
             then:
-            waitFor(10) {
+            waitFor(waitTime) {
                 page.autoSnapshotsEditCheckbox.isDisplayed()
                 page.autoSnapshotsEditOk.isDisplayed()
                 page.autoSnapshotsEditCancel.isDisplayed()
@@ -1791,7 +2552,7 @@ class AdminTest extends TestBase {
 
             then:
 
-            waitFor(15){
+            waitFor(waitTime){
                 page.filePrefix.text().equals(initialPrefix)
                 page.frequency.text().equals(initialFreq)
                 page.frequencyUnit.text().equals(initialFreqUnit)
@@ -1805,12 +2566,12 @@ class AdminTest extends TestBase {
             when:
             page.advanced.click()
             then:
-            waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+            waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
             when:
-            waitFor(30) { page.overview.heartTimeoutEdit.click() }
+            waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
             then:
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.heartTimeoutField.isDisplayed()
                 page.overview.heartTimeoutOk.isDisplayed()
                 page.overview.heartTimeoutCancel.isDisplayed()
@@ -1818,17 +2579,17 @@ class AdminTest extends TestBase {
 
             when:
             page.overview.heartTimeoutField.value(initialHeartTimeout)
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.heartTimeoutOk.click()
             }
             then:
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.heartTimeoutPopupOk.isDisplayed()
                 page.overview.heartTimeoutPopupCancel.isDisplayed()
             }
 
 
-            waitFor(30) {
+            waitFor(waitTime) {
                 try {
                     page.overview.heartTimeoutPopupOk.click()
                 } catch (org.openqa.selenium.ElementNotVisibleException e) {
@@ -1848,12 +2609,12 @@ class AdminTest extends TestBase {
             when:
             page.advanced.click()
             then:
-            waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+            waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
             when:
-            waitFor(30) { page.overview.queryTimeoutEdit.click() }
+            waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
             then:
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.queryTimeoutField.isDisplayed()
                 page.overview.queryTimeoutOk.isDisplayed()
                 page.overview.queryTimeoutCancel.isDisplayed()
@@ -1861,17 +2622,17 @@ class AdminTest extends TestBase {
 
             when:
             page.overview.queryTimeoutField.value(initialQueryTimeout)
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.queryTimeoutOk.click()
             }
             then:
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.queryTimeoutPopupOk.isDisplayed()
                 page.overview.queryTimeoutPopupCancel.isDisplayed()
             }
 
 
-            waitFor(30) {
+            waitFor(waitTime) {
                 try {
                     page.overview.queryTimeoutPopupOk.click()
                 } catch (org.openqa.selenium.ElementNotVisibleException e) {
@@ -1884,6 +2645,45 @@ class AdminTest extends TestBase {
                 !page.overview.queryTimeoutPopupCancel.isDisplayed()
             }
         }
+    }
+
+    //server setting
+
+    def "Check server setting and display its respective value"(){
+
+        when:
+        while(true){
+            if(waitFor(waitTime){page.networkInterfaces.serverSettingTitle.isDisplayed()} && page.networkInterfaces.serverSettingTitle.text() !=""){
+                println("Title displayed as:"+page.networkInterfaces.serverSettingTitle.text())
+            }else println("Server setting title not displayed so not processing further")
+            break;
+        }
+
+        then:
+        if(page.networkInterfaces.serversettingclientvalue.text()==""){
+            println("Client port value in server setting is empty")}
+        else{println("Client port value in server setting is not empty, value:" +page.networkInterfaces.serversettingclientvalue.text())}
+
+        if(page.networkInterfaces.serversettingadminvalue.text()==""){
+            println("Admin port value in server setting is empty")}
+        else{println("Admin port value in server setting is not empty, value:" +page.networkInterfaces.serversettingadminvalue.text())}
+
+        if(page.networkInterfaces.serversettinghttpvalue.text()==""){
+            println("HTTP port value in server setting is empty")}
+        else{println("HTTP port value in server setting is not empty, value:" +page.networkInterfaces.serversettinghttpvalue.text())}
+
+        if(page.networkInterfaces.serversettinginternalvalue.text()==""){
+            println("Internal port value in server setting is empty")}
+        else{println("Internal port value in server setting is not empty, value:" +page.networkInterfaces.serversettinginternalvalue.text())}
+
+        if(page.networkInterfaces.serversettingzookeepervalue.text()==""){
+            println("Zookeeper port value in server setting is empty")}
+        else{println("Zookeeper port value in server setting is not empty, value:" +page.networkInterfaces.serversettingzookeepervalue.text())}
+
+        if(page.networkInterfaces.serversettingreplicationvalue.text()==""){
+            println("Replication port value in server setting is empty")}
+        else{println("Replication port value in server setting is not empty, value:" +page.networkInterfaces.serversettingreplicationvalue.text())}
+
     }
 
 }

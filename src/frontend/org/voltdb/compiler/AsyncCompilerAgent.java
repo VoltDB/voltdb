@@ -35,6 +35,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
@@ -258,12 +259,27 @@ public class AsyncCompilerAgent {
                 w.completionHandler.onCompletion(errResult);
                 return;
             }
+
+            if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Server is paused and is available in read-only mode - please try again later.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
             final CatalogChangeWork ccw = new CatalogChangeWork(w);
             dispatchCatalogChangeWork(ccw);
         }
     }
 
     void handleCatalogChangeWork(final CatalogChangeWork w) {
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+            AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Server is paused and is available in read-only mode - please try again later.");
+            w.completionHandler.onCompletion(errResult);
+            return;
+        }
         // We have an @UAC.  Is it okay to run it?
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
@@ -316,6 +332,11 @@ public class AsyncCompilerAgent {
         work.completionHandler.onCompletion(result);
     }
 
+    public static final String AdHocErrorResponseMessage =
+            "The @AdHoc stored procedure when called with more than one parameter "
+                    + "must be passed a single parameterized SQL statement as its first parameter. "
+                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
+
     AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
@@ -337,6 +358,13 @@ public class AsyncCompilerAgent {
         // when the batch has one statement.
         StatementPartitioning partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
+
+        if (work.userParamSet != null && work.userParamSet.length > 0) {
+            if (work.sqlStatements.length != 1) {
+                return AsyncCompilerResult.makeErrorResult(work, AdHocErrorResponseMessage);
+            }
+        }
+
         for (final String sqlStatement : work.sqlStatements) {
             if (inferSP) {
                 partitioning = StatementPartitioning.inferPartitioning();
@@ -347,7 +375,8 @@ public class AsyncCompilerAgent {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
+                        work.explainMode != ExplainMode.NONE, work.userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
@@ -359,32 +388,13 @@ public class AsyncCompilerAgent {
             }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
+            } catch (AssertionError ae) {
+                errorMsgs.add("Assertion Error in Ad Hoc Planning: " + ae);
             }
         }
         String errorSummary = null;
         if (!errorMsgs.isEmpty()) {
             errorSummary = StringUtils.join(errorMsgs, "\n");
-        }
-
-        // check the parameters count
-        if (work.explainMode == ExplainMode.NONE && work.userParamSet != null) {
-            int totalQuestionMarkParameters = 0;
-            for (AdHocPlannedStatement result: stmts) {
-                totalQuestionMarkParameters += result.getQuestionMarkParameterCount();
-            }
-            if (work.sqlStatements.length > 1 && totalQuestionMarkParameters > 0) {
-                return AsyncCompilerResult.makeErrorResult(work,
-                        String.format("The @AdHoc stored procedure when called with more than one parameter "
-                                + "must be passed a single parameterized SQL statement as its first parameter. "
-                                + "Pass each parameterized SQL statement to a separate callProcedure invocation."));
-            }
-
-            if (totalQuestionMarkParameters != work.userParamSet.length) {
-                return AsyncCompilerResult.makeErrorResult(work,
-                        String.format("Incorrect number of parameters passed: expected %d, passed %d",
-                                totalQuestionMarkParameters, work.userParamSet.length));
-            }
-
         }
 
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,

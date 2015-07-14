@@ -56,6 +56,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -77,6 +78,7 @@ public class MockVoltDB implements VoltDBInterface
     boolean m_noLoadLib = false;
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
+    long m_clusterCreateTime = 0;
     VoltDB.Configuration voltconfig = null;
     private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
     public int m_hostId = 0;
@@ -201,6 +203,10 @@ public class MockVoltDB implements VoltDBInterface
         getCluster().setDrclusterid(clusterId);
     }
 
+    public void setDRConsumerConnectionEnabled(boolean enabled) {
+        getCluster().setDrconsumerenabled(enabled);
+    }
+
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
         org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");
@@ -213,6 +219,14 @@ public class MockVoltDB implements VoltDBInterface
         logConfig.setMaxtxns(maxTxns);
         logConfig.setLogpath(logPath);
         logConfig.setInternalsnapshotpath(snapshotPath);
+    }
+
+    public void configureSnapshotSchedulePath(String autoSnapshotPath) {
+        org.voltdb.catalog.SnapshotSchedule scheduleConfig = getDatabase().getSnapshotschedule().get("default");
+        if (scheduleConfig == null) {
+            scheduleConfig = getDatabase().getSnapshotschedule().add("default");
+        }
+        scheduleConfig.setPath(autoSnapshotPath);
     }
 
     public void addColumnToTable(String tableName, String columnName,
@@ -553,7 +567,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public NodeDRGateway getNodeDRGateway()
+    public ProducerDRGateway getNodeDRGateway()
     {
         return null;
     }
@@ -616,6 +630,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getLicenseInformation() {
+        return "";
+    }
+
+    @Override
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work)
     {
         return null;
@@ -633,6 +652,16 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public long getClusterCreateTime() {
+        return m_clusterCreateTime;
+    }
+
+    @Override
+    public void setClusterCreateTime(long clusterCreateTime) {
+        m_clusterCreateTime = clusterCreateTime;
+    }
+
+    @Override
     public void halt() {
         assert (true);
     }
@@ -640,6 +669,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ConsumerDRGateway getConsumerDRGateway() {
         return null;
+    }
+
+    @Override
+    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
     }
 
     @Override

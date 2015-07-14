@@ -35,7 +35,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DBBPool.MBBContainer;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.EELibraryLoader;
+import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.xerial.snappy.Snappy;
 
 import com.google_voltpatches.common.base.Joiner;
@@ -161,7 +163,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             return false;
                         }
                         Long index = Long.valueOf(seqNum);
-                        PBDSegment qs = new PBDSegment( index, pathname );
+                        PBDSegment qs = newSegment( index, pathname );
                         try {
                             qs.open(false);
                             m_initializedFromExistingFiles = true;
@@ -173,6 +175,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                 }
                             }
                             m_numObjects += qs.getNumEntries();
+                            qs.close();
                             segments.put( index, qs);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
@@ -217,12 +220,33 @@ public class PersistentBinaryDeque implements BinaryDeque {
         } catch (NoSuchElementException e) {}
 
         PBDSegment writeSegment =
-            new PBDSegment(
+            newSegment(
                     writeSegmentIndex,
                     new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
         m_segments.offer(writeSegment);
         writeSegment.open(true);
         assertions();
+    }
+
+    private static final boolean USE_MMAP = Boolean.getBoolean("PBD_USE_MMAP");
+    private PBDSegment newSegment(long segmentId, File file) {
+        if (USE_MMAP) {
+            return new PBDMMapSegment(segmentId, file);
+        } else {
+            return new PBDRegularSegment(segmentId, file);
+        }
+    }
+
+    /**
+     * Close the tail segment if it's not being read from currently, then offer the new segment.
+     * @throws IOException
+     */
+    private void closeTailAndOffer(PBDSegment newSegment) throws IOException {
+        final PBDSegment last = m_segments.peekLast();
+        if (last != null && !last.isBeingPolled()) {
+            last.close();
+        }
+        m_segments.offer(newSegment);
     }
 
     @Override
@@ -238,19 +262,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         PBDSegment tail = m_segments.peekLast();
-        //If we are mostly empty, don't do compression, otherwise compress to reduce space and IO
-        final boolean compress = object.b().isDirect() && allowCompression &&
-                (m_segments.size() > 1 || tail.sizeInBytes() > 1024 * 512);
+        final boolean compress = object.b().isDirect() && allowCompression;
         if (!tail.offer(object, compress)) {
-            //Check to see if the tail is completely consumed so we can close and delete it
-            if (!tail.hasMoreEntries() && tail.m_discardCount == tail.getNumEntries()) {
-                m_segments.pollLast();
-                tail.closeAndDelete();
-            }
-            Long nextIndex = tail.m_index + 1;
-            tail = new PBDSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
-            tail.open(true);
-            m_segments.offer(tail);
+            tail = addSegment(tail);
             final boolean success = tail.offer(object, compress);
             if (!success) {
                 throw new IOException("Failed to offer object in PBD");
@@ -258,6 +272,40 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
         incrementNumObjects();
         assertions();
+    }
+
+    @Override
+    public synchronized int offer(DeferredSerialization ds) throws IOException {
+        assertions();
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
+
+        PBDSegment tail = m_segments.peekLast();
+        int written = tail.offer(ds);
+        if (written < 0) {
+            tail = addSegment(tail);
+            written = tail.offer(ds);
+            if (written < 0) {
+                throw new IOException("Failed to offer object in PBD");
+            }
+        }
+        incrementNumObjects();
+        assertions();
+        return written;
+    }
+
+    private PBDSegment addSegment(PBDSegment tail) throws IOException {
+        //Check to see if the tail is completely consumed so we can close and delete it
+        if (!tail.hasMoreEntries() && tail.isEmpty()) {
+            m_segments.pollLast();
+            tail.closeAndDelete();
+        }
+        Long nextIndex = tail.segmentId() + 1;
+        tail = newSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
+        tail.open(true);
+        closeTailAndOffer(tail);
+        return tail;
     }
 
     @Override
@@ -272,17 +320,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         //Take the objects that were provided and separate them into deques of objects
         //that will fit in a single write segment
-        int available = PBDSegment.m_chunkSize - 4;
+        int available = PBDSegment.CHUNK_SIZE - 4;
         for (BBContainer object : objects) {
-            int needed = PBDSegment.m_objectHeaderBytes + object.b().remaining();
+            int needed = PBDSegment.OBJECT_HEADER_BYTES + object.b().remaining();
 
             if (available - needed < 0) {
-                if (needed > PBDSegment.m_chunkSize - 4) {
-                    throw new IOException("Maximum object size is " + (PBDSegment.m_chunkSize - 4));
+                if (needed > PBDSegment.CHUNK_SIZE - 4) {
+                    throw new IOException("Maximum object size is " + (PBDSegment.CHUNK_SIZE - 4));
                 }
                 segments.offer( currentSegment );
                 currentSegment = new ArrayDeque<BBContainer>();
-                available = PBDSegment.m_chunkSize - 4;
+                available = PBDSegment.CHUNK_SIZE - 4;
             }
             available -= needed;
             currentSegment.add(object);
@@ -296,13 +344,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
         //before the write segment if there are no finished segments
         Long nextIndex = 0L;
         if (m_segments.size() > 0) {
-            nextIndex = m_segments.peek().m_index - 1;
+            nextIndex = m_segments.peek().segmentId() - 1;
         }
 
         while (segments.peek() != null) {
             ArrayDeque<BBContainer> currentSegmentContents = segments.poll();
             PBDSegment writeSegment =
-                new PBDSegment(
+                newSegment(
                         nextIndex,
                         new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
             writeSegment.open(true);
@@ -311,6 +359,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
             while (currentSegmentContents.peek() != null) {
                 writeSegment.offer(currentSegmentContents.pollFirst(), false);
                 incrementNumObjects();
+            }
+
+            // Don't close the last one, it'll be used for writes
+            if (!m_segments.isEmpty()) {
+                writeSegment.close();
             }
 
             m_segments.push(writeSegment);
@@ -326,18 +379,20 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         BBContainer retcont = null;
-        PBDSegment segment = m_segments.peek();
-        if (segment.hasMoreEntries()) {
-            retcont = segment.poll(ocf);
-        } else {
-            for (PBDSegment s : m_segments) {
-                if (s.hasMoreEntries()) {
-                    segment = s;
-                    retcont = segment.poll(ocf);
-                    break;
-                }
+        PBDSegment segment = null;
+
+        for (PBDSegment s : m_segments) {
+            if (s.isClosed()) {
+                s.open(false);
+            }
+
+            if (s.hasMoreEntries()) {
+                segment = s;
+                retcont = segment.poll(ocf);
+                break;
             }
         }
+
         if (retcont == null) {
             return null;
         }
@@ -350,17 +405,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
         return new BBContainer(retcont.b()) {
-            private boolean m_discarded = false;
             @Override
             public void discard() {
                 checkDoubleFree();
-                if (m_discarded) {
-                    LOG.error("PBD Container discarded more than once");
-                    return;
-                }
-                m_discarded = true;
                 retcont.discard();
-                segment.m_discardCount++;
                 assert(m_closed || m_segments.contains(segment));
 
                 //Don't do anything else if we are closed
@@ -370,7 +418,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                 //Segment is potentially ready for deletion
                 try {
-                    if (segment.m_discardCount == segment.getNumEntries()) {
+                    if (segment.isEmpty()) {
                         if (segment != m_segments.peekLast()) {
                             m_segments.remove(segment);
                             segment.closeAndDelete();
@@ -389,7 +437,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
             throw new IOException("Closed");
         }
         for (PBDSegment segment : m_segments) {
-            segment.sync();
+            if (!segment.isClosed()) {
+                segment.sync();
+            }
         }
     }
 
@@ -399,9 +449,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
             return;
         }
         m_closed = true;
-        if (m_segments.peekLast().isEmpty()) {
-            m_segments.pollLast().closeAndDelete();
-        }
         for (PBDSegment segment : m_segments) {
             segment.close();
         }
@@ -415,13 +462,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
             throw new IOException("Closed");
         }
 
-        PBDSegment segment = m_segments.peek();
-        if (segment == null) {
-            return true;
-        }
-        if (segment.hasMoreEntries()) return false;
         for (PBDSegment s : m_segments) {
-            if (segment.hasMoreEntries()) return false;
+            final boolean wasClosed = s.isClosed();
+            try {
+                if (wasClosed) s.open(false);
+                if (s.hasMoreEntries()) return false;
+            } finally {
+                if (wasClosed) {
+                    s.close();
+                }
+            }
         }
         return true;
     }
@@ -432,11 +482,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * although incredibly unlikely
      */
     @Override
-    public long sizeInBytes() {
+    public long sizeInBytes() throws IOException {
         assertions();
         long size = 0;
         for (PBDSegment segment : m_segments) {
-            size += segment.sizeInBytes();
+            final boolean wasClosed = segment.isClosed();
+            if (wasClosed) segment.open(false);
+            size += segment.uncompressedBytesToRead();
+            if (wasClosed) {
+                segment.close();
+            }
         }
         return size;
     }
@@ -450,6 +505,53 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
     }
 
+    public static class ByteBufferTruncatorResponse extends TruncatorResponse {
+        private final ByteBuffer m_retval;
+
+        public ByteBufferTruncatorResponse(ByteBuffer retval) {
+            super(Status.PARTIAL_TRUNCATE);
+            assert retval.remaining() > 0;
+            m_retval = retval;
+        }
+
+        @Override
+        public int writeTruncatedObject(ByteBuffer output) {
+            int objectSize = m_retval.remaining();
+            output.putInt(objectSize);
+            output.putInt(PBDSegment.NO_FLAGS);
+            output.put(m_retval);
+            return objectSize;
+        }
+    }
+
+    public static class DeferredSerializationTruncatorResponse extends TruncatorResponse {
+        public static interface Callback {
+            public void bytesWritten(int bytes);
+        }
+
+        private final DeferredSerialization m_ds;
+        private final Callback m_truncationCallback;
+
+        public DeferredSerializationTruncatorResponse(DeferredSerialization ds, Callback truncationCallback) {
+            super(Status.PARTIAL_TRUNCATE);
+            m_ds = ds;
+            m_truncationCallback = truncationCallback;
+        }
+
+        @Override
+        public int writeTruncatedObject(ByteBuffer output) throws IOException {
+            int bytesWritten = PBDUtils.writeDeferredSerialization(output, m_ds);
+            if (m_truncationCallback != null) {
+                m_truncationCallback.bytesWritten(bytesWritten);
+            }
+            return bytesWritten;
+        }
+    }
+
+    public static TruncatorResponse fullTruncateResponse() {
+        return new TruncatorResponse(Status.FULL_TRUNCATE);
+    }
+
     @Override
     public synchronized void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
         assertions();
@@ -458,124 +560,30 @@ public class PersistentBinaryDeque implements BinaryDeque {
             return;
         }
 
+        // Close the last write segment for now, will reopen after truncation
+        m_segments.getLast().close();
+
         /*
          * Iterator all the objects in all the segments and pass them to the truncator
          * When it finds the truncation point
          */
         Long lastSegmentIndex = null;
-        BBContainer decompressionBuffer = DBBPool.allocateDirect(1024 * 512);
-        try {
-            for (PBDSegment segment : m_segments) {
-                long segmentIndex = segment.m_index;
+        for (PBDSegment segment : m_segments) {
+            final long segmentIndex = segment.segmentId();
 
-                File segmentFile = segment.m_file;
-                RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
-                FileChannel fc = ras.getChannel();
-                MBBContainer readBufferC = DBBPool.wrapMBB(fc.map(MapMode.READ_WRITE, 0, fc.size()));
-                final ByteBuffer readBuffer = readBufferC.b();
-                final long buffAddr = readBufferC.address();
-                try {
-                    //Get the number of objects and then iterator over them
-                    int numObjects = readBuffer.getInt();
-                    int size = readBuffer.getInt();
-                    int objectsProcessed = 0;
-                    m_usageSpecificLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
-                    for (int ii = 0; ii < numObjects; ii++) {
-                        final int nextObjectLength = readBuffer.getInt();
-                        final int nextObjectFlags = readBuffer.getInt();
-                        final boolean compressed = nextObjectFlags == PBDSegment.FLAG_COMPRESSED;
-                        final int uncompressedLength = compressed ? (int)Snappy.uncompressedLength(buffAddr + readBuffer.position(), nextObjectLength) : nextObjectLength;
-                        objectsProcessed++;
-                        //Copy the next object into a separate heap byte buffer
-                        //do the old limit stashing trick to avoid buffer overflow
-                        BBContainer nextObject = null;
-                        if (compressed) {
-                            decompressionBuffer.b().clear();
-                            if (decompressionBuffer.b().remaining() < uncompressedLength ) {
-                                decompressionBuffer.discard();
-                                decompressionBuffer = DBBPool.allocateDirect(uncompressedLength);
-                            }
-                            nextObject = DBBPool.dummyWrapBB(decompressionBuffer.b());
-                            final long sourceAddr = (buffAddr + readBuffer.position());
-                            final long destAddr = nextObject.address();
-                            Snappy.rawUncompress(sourceAddr, nextObjectLength, destAddr);
-                            readBuffer.position(readBuffer.position() + nextObjectLength);
-                        } else {
-                            final int oldLimit = readBuffer.limit();
-                            readBuffer.limit(readBuffer.position() + nextObjectLength);
-                            nextObject = DBBPool.dummyWrapBB(readBuffer.slice());
-                            readBuffer.position(readBuffer.limit());
-                            readBuffer.limit(oldLimit);
-                        }
-                        try {
-                            //Handoff the object to the truncator and await a decision
-                            ByteBuffer retval = truncator.parse(nextObject);
-                            if (retval == null) {
-                                //Nothing to do, leave the object alone and move to the next
-                                continue;
-                            } else {
-                                //If the returned bytebuffer is empty, remove the object and truncate the file
-                                if (retval.remaining() == 0) {
-                                    if (ii == 0) {
-                                        /*
-                                         * If truncation is occuring at the first object
-                                         * Whammo! Delete the file. Do it by setting the lastSegmentIndex
-                                         * to 1 previous. We may end up with an empty finished segment
-                                         * set.
-                                         */
-                                        lastSegmentIndex = segmentIndex - 1;
-                                    } else {
-                                        addToNumObjects(-(numObjects - (objectsProcessed - 1)));
-                                        //Don't forget to update the number of entries in the file
-                                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
-                                        numObjectsBuffer.putInt(0, ii);
-                                        fc.position(0);
-                                        while (numObjectsBuffer.hasRemaining()) {
-                                            fc.write(numObjectsBuffer);
-                                        }
-                                        fc.truncate(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
-                                    }
+            final int truncatedEntries = segment.parseAndTruncate(truncator);
 
-                                } else {
-                                    addToNumObjects(-(numObjects - objectsProcessed));
-                                    //Partial object truncation
-                                    ByteBuffer copy = ByteBuffer.allocate(retval.remaining());
-                                    copy.put(retval);
-                                    copy.flip();
-                                    readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
-                                    readBuffer.putInt(copy.remaining());
-                                    readBuffer.putInt(0);
-                                    readBuffer.put(copy);
-
-                                    readBuffer.putInt(0, ii + 1);
-
-                                    /*
-                                     * SHOULD REALLY make a copy of the original and then swap them with renaming
-                                     */
-                                    fc.truncate(readBuffer.position());
-                                }
-                                //Set last segment and break the loop over this segment
-                                if (lastSegmentIndex == null) {
-                                    lastSegmentIndex = segmentIndex;
-                                }
-                                break;
-                            }
-                        } finally {
-                            nextObject.discard();
-                        }
-                    }
-
-                    //If this is set the just processed segment was the last one
-                    if (lastSegmentIndex != null) {
-                        break;
-                    }
-                } finally {
-                    fc.close();
-                    readBufferC.discard();
-                }
+            if (truncatedEntries == -1) {
+                lastSegmentIndex = segmentIndex - 1;
+                break;
+            } else if (truncatedEntries > 0) {
+                addToNumObjects(-truncatedEntries);
+                //Set last segment and break the loop over this segment
+                lastSegmentIndex = segmentIndex;
+                break;
             }
-        } finally {
-            decompressionBuffer.discard();
+            // truncatedEntries == 0 means nothing is truncated in this segment,
+            // should move on to the next segment.
         }
 
         /*
@@ -583,6 +591,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
          * Return and the parseAndTruncate is a noop.
          */
         if (lastSegmentIndex == null)  {
+            // Reopen the last segment for write
+            m_segments.getLast().open(true);
             return;
         }
         /*
@@ -591,7 +601,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         Iterator<PBDSegment> iterator = m_segments.descendingIterator();
         while (iterator.hasNext()) {
             PBDSegment segment = iterator.next();
-            if (segment.m_index <= lastSegmentIndex) {
+            if (segment.segmentId() <= lastSegmentIndex) {
                 break;
             }
             addToNumObjects(-segment.getNumEntries());
@@ -604,12 +614,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
          */
         //Find the first and last segment for polling and writing (after)
         Long newSegmentIndex = 0L;
-        if (m_segments.peekLast() != null) newSegmentIndex = m_segments.peekLast().m_index + 1;
+        if (m_segments.peekLast() != null) newSegmentIndex = m_segments.peekLast().segmentId() + 1;
 
-        PBDSegment newSegment =
-            new PBDSegment(
-                    newSegmentIndex,
-                    new VoltFile(m_path, m_nonce + "." + newSegmentIndex + ".pbd"));
+        PBDSegment newSegment = newSegment(newSegmentIndex, new VoltFile(m_path, m_nonce + "." + newSegmentIndex + ".pbd"));
         newSegment.open(true);
         m_segments.offer(newSegment);
         assertions();
@@ -647,15 +654,23 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private void assertions() {
-        if (!assertionsOn) return;
+        if (!assertionsOn || m_closed) return;
         int numObjects = 0;
         for (PBDSegment segment : m_segments) {
+            final boolean wasClosed = segment.isClosed();
             try {
-                numObjects += segment.getNumEntries() - segment.m_objectReadIndex;
+                numObjects += segment.getNumEntries() - segment.readIndex();
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
+            if (wasClosed) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
-        assert(numObjects == m_numObjects);
+        assert numObjects == m_numObjects : numObjects + " != " + m_numObjects;
     }
 }

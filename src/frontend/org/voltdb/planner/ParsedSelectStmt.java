@@ -35,10 +35,14 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.ScalarValueExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -66,7 +70,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private NodeSchema m_distinctProjectSchema = null;
 
     // It may has the consistent element order as the displayColumns
+    // This list contains the core information for aggregation.
+    // It collects aggregate expression, group by expression from display columns,
+    // group by columns, having, order by columns.
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
+    // It represents the group by expression and replace TVE if it's complex group by.
     public Map<String, AbstractExpression> m_groupByExpressions = null;
 
     private ArrayList<ParsedColInfo> m_avgPushdownDisplayColumns = null;
@@ -84,13 +92,55 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_isComplexOrderBy = false;
 
     // Limit plan node information.
-    private LimitPlanNode m_limitNodeTop = null;
-    private LimitPlanNode m_limitNodeDist = null;
-    public boolean m_limitCanPushdown;
-    private long m_limit = -1;
-    private long m_offset = 0;
-    private long m_limitParameterId = -1;
-    private long m_offsetParameterId = -1;
+    public static class LimitOffset {
+        private LimitPlanNode m_limitNodeTop = null;
+        private LimitPlanNode m_limitNodeDist = null;
+        private boolean m_limitCanPushdown = false;
+        private long m_limit = -1;
+        private long m_offset = 0;
+        private long m_limitParameterId = -1;
+        private long m_offsetParameterId = -1;
+
+        private boolean hasLimit() {
+            return m_limit != -1 || m_limitParameterId != -1;
+        }
+
+        public boolean hasOffset() {
+            return m_offset > 0 || m_offsetParameterId != -1;
+        }
+
+        public boolean hasLimitOrOffset() {
+            if (hasLimit() || hasOffset()) {
+                return true;
+            }
+            return false;
+        }
+
+        public boolean hasLimitOrOffsetParameters() {
+            return m_limitParameterId != -1 || m_offsetParameterId != -1;
+        }
+
+        public LimitPlanNode getLimitNodeTop() {
+            return m_limitNodeTop;
+        }
+
+        public void setLimit(long number) {
+            m_limit = number;
+        }
+
+        public long getLimit() {
+            return m_limit;
+        }
+
+        public long getOffset() {
+            return m_offset;
+        }
+
+        public long getLimitParameterId () {
+            return m_limitParameterId;
+        }
+    }
+    LimitOffset m_limitOffset = new LimitOffset();
 
     private boolean m_distinct = false;
     private boolean m_hasComplexAgg = false;
@@ -105,10 +155,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private final ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
 
     /**
-    * Class constructor
-    * @param paramValues
-    * @param db
-    */
+     * Class constructor
+     * @param paramValues
+     * @param db
+     */
     public ParsedSelectStmt(String[] paramValues, Database db) {
         super(paramValues, db);
     }
@@ -137,7 +187,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 havingElement = child;
             }
         }
-        parseLimitAndOffset(limitElement, offsetElement);
+        parseLimitAndOffset(limitElement, offsetElement, m_limitOffset);
 
         if (m_aggregationList == null) {
             m_aggregationList = new ArrayList<AbstractExpression>();
@@ -178,7 +228,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         placeTVEsinColumns();
 
         // prepare the limit plan node if it needs one.
-        prepareLimitPlanNode();
+        if (hasLimitOrOffset()) {
+            m_limitOffset.m_limitCanPushdown = canPushdownLimit();
+            prepareLimitPlanNode(this, m_limitOffset);
+        }
 
         // Prepare for the AVG push-down optimization only if it might be required.
         if (mayNeedAvgPushdown()) {
@@ -469,6 +522,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     private void insertAggExpressionsToAggResultColumns (List<AbstractExpression> aggColumns, ParsedColInfo cookedCol) {
         for (AbstractExpression expr: aggColumns) {
+            assert(expr instanceof AggregateExpression);
+            if (! expr.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+                throw new PlanningErrorException(
+                        "SQL Aggregate with subquery expression is not allowed.");
+            }
+
             ParsedColInfo col = new ParsedColInfo();
             col.expression = (AbstractExpression) expr.clone();
             assert(col.expression instanceof AggregateExpression);
@@ -580,47 +639,47 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_aggregationList.addAll(optimalAvgAggs);
     }
 
-    private void parseLimitAndOffset(VoltXMLElement limitNode, VoltXMLElement offsetNode) {
+    static void parseLimitAndOffset(VoltXMLElement limitNode, VoltXMLElement offsetNode, LimitOffset limitOffset) {
         String node;
         if (limitNode != null) {
             // Parse limit
             if ((node = limitNode.attributes.get("limit_paramid")) != null)
-                m_limitParameterId = Long.parseLong(node);
+                limitOffset.m_limitParameterId = Long.parseLong(node);
             else {
                 assert(limitNode.children.size() == 1);
                 VoltXMLElement valueNode = limitNode.children.get(0);
                 String isParam = valueNode.attributes.get("isparam");
                 if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
-                    m_limitParameterId = Long.parseLong(valueNode.attributes.get("id"));
+                    limitOffset.m_limitParameterId = Long.parseLong(valueNode.attributes.get("id"));
                 } else {
                     node = limitNode.attributes.get("limit");
                     assert(node != null);
-                    m_limit = Long.parseLong(node);
+                    limitOffset.m_limit = Long.parseLong(node);
                 }
             }
         }
         if (offsetNode != null) {
             // Parse offset
             if ((node = offsetNode.attributes.get("offset_paramid")) != null)
-                m_offsetParameterId = Long.parseLong(node);
+                limitOffset.m_offsetParameterId = Long.parseLong(node);
             else {
                 if (offsetNode.children.size() == 1) {
                     VoltXMLElement valueNode = offsetNode.children.get(0);
                     String isParam = valueNode.attributes.get("isparam");
                     if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
-                        m_offsetParameterId = Long.parseLong(valueNode.attributes.get("id"));
+                        limitOffset.m_offsetParameterId = Long.parseLong(valueNode.attributes.get("id"));
                     } else {
                         node = offsetNode.attributes.get("offset");
                         assert(node != null);
-                        m_offset = Long.parseLong(node);
+                        limitOffset.m_offset = Long.parseLong(node);
                     }
                 }
             }
         }
 
         // limit and offset can't have both value and parameter
-        if (m_limit != -1) assert m_limitParameterId == -1 : "Parsed value and param. limit.";
-        if (m_offset != 0) assert m_offsetParameterId == -1 : "Parsed value and param. offset.";
+        if (limitOffset.m_limit != -1) assert limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
+        if (limitOffset.m_offset != 0) assert limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
@@ -632,18 +691,37 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseDisplayColumn(VoltXMLElement child, boolean isDistributed) {
         ParsedColInfo col = new ParsedColInfo();
         m_aggregationList.clear();
-        col.expression = parseExpressionTree(child);
-        if (col.expression instanceof ConstantValueExpression) {
-            assert(col.expression.getValueType() != VoltType.NUMERIC);
+        AbstractExpression colExpr = parseExpressionTree(child);
+        if (colExpr instanceof ConstantValueExpression) {
+            assert(colExpr.getValueType() != VoltType.NUMERIC);
         }
-        assert(col.expression != null);
+        assert(colExpr != null);
+
         if (isDistributed) {
-            col.expression = col.expression.replaceAVG();
+            colExpr = colExpr.replaceAVG();
             updateAvgExpressions();
         }
-        ExpressionUtil.finalizeValueTypes(col.expression);
+        ExpressionUtil.finalizeValueTypes(colExpr);
+
+        // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
+        if(isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
+            AbstractExpression expr = new OperatorExpression();;
+            expr.setExpressionType(ExpressionType.OPERATOR_CAST);
+            VoltType voltType = colExpr.getValueType();
+            expr.setValueType(voltType);
+            expr.setInBytes(colExpr.getInBytes());
+
+            // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
+            // so assume max length for variable-length types (VARCHAR and VARBINARY).
+            expr.setValueSize(expr.getInBytes() ? voltType.getMaxLengthInBytes() : VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS);
+            expr.setLeft(colExpr);
+
+            // switch the new expression for CAST
+            colExpr = expr;
+        }
 
         if (child.name.equals("columnref")) {
+            col.expression = colExpr;
             col.columnName = child.attributes.get("column");
             col.tableName = child.attributes.get("table");
             col.tableAlias = child.attributes.get("tablealias");
@@ -651,8 +729,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.tableAlias = col.tableName;
             }
         }
+        else if (child.name.equals("tablesubquery")) {
+            // Scalar subquery like 'select c, (select count(*) from t1) from t2;'
+            ScalarValueExpression sve = (ScalarValueExpression)colExpr;
+
+            col.columnName = child.attributes.get("alias");
+            col.tableName = sve.getSubqueryScan().getTableName();
+            col.tableAlias = sve.getSubqueryScan().getTableAlias();
+            col.expression = colExpr;
+        }
         else
         {
+            col.expression = colExpr;
             // XXX hacky, assume all non-column refs come from a temp table
             col.tableName = "VOLT_TEMP_TABLE";
             col.tableAlias = "VOLT_TEMP_TABLE";
@@ -768,6 +856,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         AbstractExpression order_exp = order_col.expression;
         assert(order_exp != null);
+
+        // guards against subquery inside of order by clause
+        if (! order_exp.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+            throw new PlanningErrorException(
+                    "ORDER BY clause with subquery expression is not allowed.");
+        }
+
         // Mark the order by column if it is in displayColumns
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column
@@ -800,13 +895,23 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseHavingExpression(VoltXMLElement havingNode, boolean isDistributed) {
         m_aggregationList.clear();
         assert(havingNode.children.size() == 1);
-        m_having = parseExpressionTree(havingNode.children.get(0));
+        m_having = parseConditionTree(havingNode.children.get(0));
         assert(m_having != null);
+        if (! m_having.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+            throw new PlanningErrorException(
+                    "SQL HAVING with subquery expression is not allowed.");
+        }
         if (isDistributed) {
             m_having = m_having.replaceAVG();
             updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(m_having);
+        m_having = ExpressionUtil.evaluateExpression(m_having);
+        // If the condition is a trivial CVE(TRUE) (after the evaluation) simply drop it
+        if (ConstantValueExpression.isBooleanTrue(m_having)) {
+            m_having = null;
+        }
+
         if (m_aggregationList.size() >= 1) {
             m_hasAggregateExpression = true;
         }
@@ -876,75 +981,78 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return groupbyElement;
     }
 
-    private void prepareLimitPlanNode () {
-        if (!hasLimitOrOffset()) {
-            return;
-        }
-
-        int limitParamIndex = parameterCountIndexById(m_limitParameterId);
-        int offsetParamIndex = parameterCountIndexById(m_offsetParameterId);;
-
-        // The coordinator's top limit graph fragment for a MP plan.
-        // If planning "order by ... limit", getNextSelectPlan()
-        // will have already added an order by to the coordinator frag.
-        // This is the only limit node in a SP plan
-        m_limitNodeTop = new LimitPlanNode();
-        m_limitNodeTop.setLimit((int) m_limit);
-        m_limitNodeTop.setOffset((int) m_offset);
-        m_limitNodeTop.setLimitParameterIndex(limitParamIndex);
-        m_limitNodeTop.setOffsetParameterIndex(offsetParamIndex);
-
-        // Check if the LimitPlanNode can be pushed down.  The LimitPlanNode may have a LIMIT
-        // clause only, OFFSET clause only, or both.  Offset only cannot be pushed down.
-        m_limitCanPushdown = (hasLimit() && !m_distinct);
-        if (m_limitCanPushdown) {
+    /**
+     * Check if the LimitPlanNode can be pushed down.  The LimitPlanNode may have a LIMIT
+     * clause only, OFFSET clause only, or both.  Offset only cannot be pushed down.
+     * @return
+     */
+    private boolean canPushdownLimit() {
+        boolean limitCanPushdown = (m_limitOffset.hasLimit() && !m_distinct);
+        if (limitCanPushdown) {
             for (ParsedColInfo col : m_displayColumns) {
                 AbstractExpression rootExpr = col.expression;
                 if (rootExpr instanceof AggregateExpression) {
                     if (((AggregateExpression)rootExpr).isDistinct()) {
-                        m_limitCanPushdown = false;
+                        limitCanPushdown = false;
                         break;
                     }
                 }
             }
         }
+        return limitCanPushdown;
+    }
 
-        if (m_limitCanPushdown) {
-            m_limitNodeDist = new LimitPlanNode();
+    public static void prepareLimitPlanNode (AbstractParsedStmt stmt, LimitOffset limitOffset) {
+
+        int limitParamIndex = stmt.parameterCountIndexById(limitOffset.m_limitParameterId);
+        int offsetParamIndex = stmt.parameterCountIndexById(limitOffset.m_offsetParameterId);
+
+        // The coordinator's top limit graph fragment for a MP plan.
+        // If planning "order by ... limit", getNextSelectPlan()
+        // will have already added an order by to the coordinator frag.
+        // This is the only limit node in a SP plan
+        limitOffset.m_limitNodeTop = new LimitPlanNode();
+        limitOffset.m_limitNodeTop.setLimit((int) limitOffset.m_limit);
+        limitOffset.m_limitNodeTop.setOffset((int) limitOffset.m_offset);
+        limitOffset.m_limitNodeTop.setLimitParameterIndex(limitParamIndex);
+        limitOffset.m_limitNodeTop.setOffsetParameterIndex(offsetParamIndex);
+
+        if (limitOffset.m_limitCanPushdown) {
+            limitOffset.m_limitNodeDist = new LimitPlanNode();
             // Offset on a pushed-down limit node makes no sense, just defaults to 0
             // -- the original offset must be factored into the pushed-down limit as a pad on the limit.
-            if (m_limit != -1) {
-                m_limitNodeDist.setLimit((int) (m_limit + m_offset));
+            if (limitOffset.m_limit != -1) {
+                limitOffset.m_limitNodeDist.setLimit((int) (limitOffset.m_limit + limitOffset.m_offset));
             }
 
-            if (hasLimitOrOffsetParameters()) {
-                AbstractExpression left = getParameterOrConstantAsExpression(m_offsetParameterId, m_offset);
+            if (limitOffset.hasLimitOrOffsetParameters()) {
+                AbstractExpression left = stmt.getParameterOrConstantAsExpression(limitOffset.m_offsetParameterId, limitOffset.m_offset);
                 assert (left != null);
-                AbstractExpression right = getParameterOrConstantAsExpression(m_limitParameterId, m_limit);
+                AbstractExpression right = stmt.getParameterOrConstantAsExpression(limitOffset.m_limitParameterId, limitOffset.m_limit);
                 assert (right != null);
                 OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_PLUS, left, right);
                 expr.setValueType(VoltType.INTEGER);
                 expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
-                m_limitNodeDist.setLimitExpression(expr);
+                limitOffset.m_limitNodeDist.setLimitExpression(expr);
             }
             // else let the parameterized forms of offset/limit default to unused/invalid.
         }
     }
 
     public LimitPlanNode getLimitNodeTop() {
-        return new LimitPlanNode(m_limitNodeTop);
+        return new LimitPlanNode(m_limitOffset.m_limitNodeTop);
     }
 
     public LimitPlanNode getLimitNodeDist() {
-        return new LimitPlanNode(m_limitNodeDist);
+        return new LimitPlanNode(m_limitOffset.m_limitNodeDist);
     }
 
     @Override
     public String toString() {
         String retval = super.toString() + "\n";
 
-        retval += "LIMIT " + String.valueOf(m_limit) + "\n";
-        retval += "OFFSET " + String.valueOf(m_offset) + "\n";
+        retval += "LIMIT " + String.valueOf(m_limitOffset.m_limit) + "\n";
+        retval += "OFFSET " + String.valueOf(m_limitOffset.m_offset) + "\n";
 
         retval += "DISPLAY COLUMNS:\n";
         for (ParsedColInfo col : m_displayColumns) {
@@ -969,6 +1077,176 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return retval;
     }
 
+
+    /**
+     * Converts an IN expression into the equivalent EXISTS one
+     * IN (SELECT" forms e.g. "(A, B) IN (SELECT X, Y, FROM ...) ==
+     * EXISTS (SELECT 42 FROM ... AND|WHERE|HAVING A=X AND|WHERE|HAVING B=Y)
+     *
+     * @param selectStmt select subquery from the IN expression
+     * @param inListExpr TVE for the columns from the IN list
+     * @return modified subquery
+     */
+    protected static void rewriteInSubqueryAsExists(ParsedSelectStmt selectStmt, AbstractExpression inListExpr) {
+        List<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
+
+        // multi-column IN expression is a RowSubqueryExpression
+        // where each arg represents an individual column
+        List<AbstractExpression> inExprList = null;
+        if (inListExpr instanceof RowSubqueryExpression) {
+            inExprList = inListExpr.getArgs();
+        } else {
+            inExprList = new ArrayList<AbstractExpression>();
+            inExprList.add(inListExpr);
+        }
+        int idx = 0;
+        assert(inExprList.size() == selectStmt.m_displayColumns.size());
+        selectStmt.m_aggregationList = new ArrayList<AbstractExpression>();
+
+        // Iterate over the columns from the IN list and the subquery output schema
+        // For each pair create a new equality expression.
+        // If the output column is part of the aggregate expression, the new expression
+        // must be added to the subquery's HAVING expressions. If not, it should be added
+        // to the WHERE expressions
+        for (AbstractExpression expr : inExprList) {
+            ParsedColInfo colInfo = selectStmt.m_displayColumns.get(idx++);
+            assert(colInfo.expression != null);
+            // The TVE and the aggregated expressions from the IN clause will be
+            // parameters to the child select statement once the IN expression is
+            // replaced with the EXISTS one
+            expr = selectStmt.replaceExpressionsWithPve(expr);
+            // Finalize the expression. The subquery's own expressions are already finalized
+            // but not the expressions from the IN list
+            ExpressionUtil.finalizeValueTypes(expr);
+
+            // Create new compare equal expression
+            AbstractExpression equalityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                    expr, (AbstractExpression) colInfo.expression.clone());
+            // Check if this column contains aggregate expression
+            if (ExpressionUtil.containsAggregateExpression(colInfo.expression)) {
+                // we are not creating any new aggregate expressions so
+                // the aggregation list doen't need to be updated. Only HAVING expression itself
+                havingList.add(equalityExpr);
+            } else {
+                whereList.add(equalityExpr);
+            }
+        }
+        // Add new WHERE expressions
+        if (!whereList.isEmpty()) {
+            if (selectStmt.m_joinTree.getWhereExpression() != null) {
+                whereList.add(selectStmt.m_joinTree.getWhereExpression());
+            }
+            selectStmt.m_joinTree.setWhereExpression(ExpressionUtil.combine(whereList));
+        }
+        // Add new HAVING expressions
+        if (!havingList.isEmpty()) {
+            if (selectStmt.m_having != null) {
+                havingList.add(selectStmt.m_having);
+            }
+            selectStmt.m_having = ExpressionUtil.combine(havingList);
+            // reprocess HAVING expressions
+            ExpressionUtil.finalizeValueTypes(selectStmt.m_having);
+        }
+
+        selectStmt.m_aggregationList = null;
+
+        if (selectStmt.needComplexAggregation()) {
+            selectStmt.fillUpAggResultColumns();
+        } else {
+            selectStmt.m_aggResultColumns = selectStmt.m_displayColumns;
+        }
+        selectStmt.placeTVEsinColumns();
+    }
+
+    /**
+     * Simplify the EXISTS expression:
+     *  1. EXISTS ( table-agg-without-having-groupby) => TRUE
+     *  2. Replace the display columns with a single dummy column "1" and GROUP BY expressions
+     *  3. Drop DISTINCT expression
+     *  4. Add LIMIT 1
+     *  5. Remove ORDER BY expressions if HAVING expression is not present
+     *
+     * @param selectStmt
+     * @return existsExpr
+     */
+    protected AbstractExpression simplifyExistsSubqueryStmt(AbstractExpression originalExistExpr) {
+        // Verify the edge case of EXISTS ( table-agg-without-having-groupby) for which
+        // the correct handling is to optimize out the exists clause entirely as trivially true or
+        // false if limit = 0 or offset > 0
+        if (m_limitOffset.getLimit() == 0) {
+            return ConstantValueExpression.getFalse();
+        }
+        // Except for "limit 0 offset ?" which is already covered,
+        // can't optimize away the entire expression if there are limit and/or offset parameters
+        if (m_having == null &&
+                m_groupByColumns.isEmpty() &&
+                ! hasLimitOrOffsetParameters() &&
+                displaysAgg()) {
+            if (m_limitOffset.getOffset() == 0) {
+                return ConstantValueExpression.getTrue();
+            } else {
+                return ConstantValueExpression.getFalse();
+            }
+        }
+
+        // Remove ORDER BY columns
+        m_orderColumns.clear();
+
+        // Can drop GROUP BY expressions if there are no HAVING/OFFSET expressions
+        if (m_having == null && !hasOffset()) {
+            m_groupByColumns.clear();
+            m_groupByExpressions.clear();
+        }
+
+        // Remove all non-aggregate display columns if GROUP BY is empty
+        if (m_groupByColumns.isEmpty()) {
+            Iterator<ParsedColInfo >iter = m_displayColumns.iterator();
+            while(iter.hasNext()) {
+                ParsedColInfo col = iter.next();
+                if (!col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    iter.remove();
+                }
+            }
+        }
+
+        // If m_displayColumns is empty from the previous step
+        // add a single dummy column
+        if (m_displayColumns.isEmpty()) {
+            ParsedColInfo col = new ParsedColInfo();
+            col.expression = ConstantValueExpression.makeExpression(VoltType.NUMERIC, "1");
+            ExpressionUtil.finalizeValueTypes(col.expression);
+
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.columnName = "$$_EXISTS_$$";
+            col.alias = "$$_EXISTS_$$";
+            col.index = 0;
+            m_projectSchema = null;
+            m_displayColumns.add(col);
+        }
+
+        if (m_aggResultColumns.isEmpty()) {
+            m_hasAggregateExpression = false;
+            m_hasAverage = false;
+        }
+
+        placeTVEsinColumns();
+        needComplexAggregation();
+
+        // Drop DISTINCT expression
+        m_distinct = false;
+
+        // Set LIMIT 1
+        if (m_limitOffset.getLimitParameterId() == -1) {
+            m_limitOffset.setLimit(1);
+        }
+
+        prepareLimitPlanNode(this, m_limitOffset);
+
+        return originalExistExpr;
+    }
+
     public boolean hasJoinOrder() {
         return m_joinOrder != null || m_hasLargeNumberOfTableJoins;
     }
@@ -989,15 +1267,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // prepare the join order if needed
         if (m_joinOrder == null &&
-                m_tableAliasList.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
+                m_tableAliasListAsJoinOrder.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
             // When there are large number of table joins, give up the all permutations.
             // By default, try the join order with the SQL query table order first.
             m_hasLargeNumberOfTableJoins = true;
 
             StringBuilder sb = new StringBuilder();
             String separator = "";
-            for (int ii = 0; ii < m_tableAliasList.size(); ii++) {
-                String tableAlias = m_tableAliasList.get(ii);
+            for (int ii = 0; ii < m_tableAliasListAsJoinOrder.size(); ii++) {
+                String tableAlias = m_tableAliasListAsJoinOrder.get(ii);
                 sb.append(separator).append(tableAlias);
                 separator = ",";
             }
@@ -1162,7 +1440,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
                 joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
                 //Collect all the join/where conditions to reassign them later
-                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
+                AbstractExpression combinedWhereExpr = subTree.getAllFilters();
                 if (combinedWhereExpr != null) {
                     joinOrderSubTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
                 }
@@ -1177,7 +1455,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_joinOrderList.add(newNode);
         return true;
     }
-
 
     public boolean hasAggregateExpression() {
         return m_hasAggregateExpression;
@@ -1314,49 +1591,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return Collections.unmodifiableList(m_orderColumns);
     }
 
-    private boolean hasLimit() {
-        return m_limit != -1 || m_limitParameterId != -1;
-    }
-
-    private boolean hasOffset() {
-        return m_offset > 0 || m_offsetParameterId != -1;
+    public boolean hasOffset() {
+        return m_limitOffset.hasOffset();
     }
 
     @Override
     public boolean hasLimitOrOffset() {
-        if (hasLimit() || hasOffset()) {
-            return true;
-        }
-        return false;
+        return m_limitOffset.hasLimitOrOffset();
     }
 
     public boolean hasLimitOrOffsetParameters() {
-        return m_limitParameterId != -1 || m_offsetParameterId != -1;
+        return m_limitOffset.hasLimitOrOffsetParameters();
     }
 
-    public int getLimitParameterIndex() {
-        return parameterCountIndexById(m_limitParameterId);
+    public boolean getCanPushdownLimit() {
+        return m_limitOffset.m_limitCanPushdown;
     }
-
-    public int getOffsetParameterIndex() {
-        return parameterCountIndexById(m_offsetParameterId);
-    }
-
-    private AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
-        // The id was previously passed to parameterCountIndexById, so if not -1,
-        // it has already been asserted to be a valid id for a parameter, and the
-        // parameter's type has been refined to INTEGER.
-        if (id != -1) {
-            return m_paramsById.get(id);
-        }
-        // The limit/offset is a non-parameterized literal value that needs to be wrapped in a
-        // BIGINT constant so it can be used in the addition expression for the pushed-down limit.
-        ConstantValueExpression constant = new ConstantValueExpression();
-        constant.setValue(Long.toString(value));
-        constant.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        return constant;
-    }
-
 
     @Override
     public boolean isOrderDeterministic()
@@ -1423,11 +1673,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
+    private boolean orderByColumnsDetermineAllDisplayColumns(List<AbstractExpression> nonOrdered)
+    {
+        return orderByColumnsDetermineAllDisplayColumns(m_displayColumns, m_orderColumns, nonOrdered);
+    }
 
-    private boolean orderByColumnsDetermineAllDisplayColumns(ArrayList<AbstractExpression> nonOrdered)
+    private boolean orderByColumnsDetermineAllColumns(ArrayList<ParsedColInfo> candidateColumns,
+            ArrayList<AbstractExpression> outNonOrdered) {
+        return orderByColumnsDetermineAllColumns(m_orderColumns, candidateColumns, outNonOrdered);
+    }
+
+    static boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
+            List<ParsedColInfo> orderColumns,
+            List<AbstractExpression> nonOrdered)
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
-        for (ParsedColInfo displayCol : m_displayColumns) {
+        for (ParsedColInfo displayCol : displayColumns) {
             if (displayCol.orderBy) {
                 continue;
             }
@@ -1436,20 +1697,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 // Round up the usual suspects -- if there were uncooperative GROUP BY expressions,
                 // they will often also be uncooperative display column expressions.
                 for (AbstractExpression nonStarter : nonOrdered) {
-                     if (displayExpr.equals(nonStarter)) {
-                         return false;
-                     }
+                    if (displayExpr.equals(nonStarter)) {
+                        return false;
+                    }
                 }
                 // A GROUP BY expression that was not nonOrdered must be covered.
                 continue;
             }
             candidateColumns.add(displayCol);
         }
-        return orderByColumnsDetermineAllColumns(candidateColumns, null);
+        return orderByColumnsDetermineAllColumns(orderColumns, candidateColumns, null);
     }
 
-    private boolean orderByColumnsDetermineAllColumns(ArrayList<ParsedColInfo> candidateColumns,
-                                                      ArrayList<AbstractExpression> outNonOrdered) {
+    private static boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
+                                                      List<ParsedColInfo> candidateColumns,
+                                                      List<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
         ArrayList<AbstractExpression> candidateExprHardCases = null;
         // First try to get away with a brute force N by M search for exact equalities.
@@ -1461,7 +1723,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             AbstractExpression candidateExpr = candidateCol.expression;
             if (orderByExprs == null) {
                 orderByExprs = new HashSet<AbstractExpression>();
-                for (ParsedColInfo orderByCol : m_orderColumns) {
+                for (ParsedColInfo orderByCol : orderColumns) {
                     orderByExprs.add(orderByCol.expression);
                 }
             }
@@ -1647,5 +1909,61 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             throw new PlanningErrorException(
                     "Mismatched plan output cols to parsed display columns");
         }
+    }
+
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
+        List<AbstractExpression> exprs = super.findAllSubexpressionsOfType(exprType);
+        if (m_having != null) {
+            exprs.addAll(m_having.findAllSubexpressionsOfType(exprType));
+        }
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
+            }
+        }
+        for(ParsedColInfo col : m_displayColumns) {
+            if (col.expression != null) {
+                exprs.addAll(col.expression.findAllSubexpressionsOfType(exprType));
+            }
+        }
+        return exprs;
+    }
+
+    /**
+     * This functions tries to find all expression from the statement. For complex group by or complex aggregate,
+     * we have a special function ParsedSelectStmt::placeTVEsinColumns() to replace the expression with TVE for
+     * the convenience of projection node after group by node.
+     *
+     * So use the original expression from the XML of hsqldb, other than the processed information. See ENG-8263.
+     * m_having and m_projectSchema seem to have the same issue in ENG-8263.
+     */
+    @Override
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+        if (m_having != null) {
+            exprs.addAll(m_having.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+        if (m_projectSchema != null) {
+            for(SchemaColumn col : m_projectSchema.getColumns()) {
+                if (col.getExpression() != null) {
+                    exprs.addAll(col.getExpression().findAllSubexpressionsOfClass(aeClass));
+                }
+            }
+        }
+
+        // m_having, m_groupByExpressions, m_projectSchema may contain the aggregation or group by expression that have
+        // been replaced with TVEs already. So check out the repository of the original expression in m_aggResultColumns.
+        for (ParsedColInfo col: m_aggResultColumns) {
+            if (col.expression != null) {
+                exprs.addAll(col.expression.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+        return exprs;
     }
 }

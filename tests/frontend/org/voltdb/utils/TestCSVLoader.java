@@ -146,6 +146,65 @@ public class TestCSVLoader {
     }
 
     @Test
+    public void testNoQuotes() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--noquotechar",
+                "--escape=\\",
+                "--skip=1",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime,
+                "2,2,2,222222,second,3.30,NULL,"+currentTime,
+                //unclosed quote below should work
+                "1 ,1,1,11111111,fir\"st,1.10,1.11,"+currentTime,
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 2;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testNoQuotesSpecialSeparator() throws Exception
+    {
+        // Separator is Ctrl-A. Don't know how to make it visible in eclipse.
+        String[] myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=",
+                "--noquotechar",
+                "--escape=\\",
+                "--skip=1",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "1 1111111111first1.101.11"+currentTime,
+                "222222222second3.30NULL"+currentTime,
+                //unclosed quote below should work
+                "1 1111111111fir\"st1.101.11"+currentTime,
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 2;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
     public void testCommon() throws Exception
     {
         String []myOptions = {

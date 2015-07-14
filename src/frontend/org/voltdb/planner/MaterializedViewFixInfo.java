@@ -159,7 +159,6 @@ public class MaterializedViewFixInfo {
                 }
             }
         }
-        assert(numOfGroupByColumns > 0);
         m_mvTableScan = mvTableScan;
 
         Set<String> mvDDLGroupbyColumnNames = new HashSet<String>();
@@ -181,7 +180,9 @@ public class MaterializedViewFixInfo {
             String colName = mvCol.getName();
 
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, i);
+
             tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            tve.setOrigStmtId(mvTableScan.getStatementId());
 
             mvDDLGroupbyColumnNames.add(colName);
 
@@ -248,7 +249,9 @@ public class MaterializedViewFixInfo {
             String colName = mvCol.getName();
 
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName);
+
             tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            tve.setOrigStmtId(mvTableScan.getStatementId());
 
             needReAggTVEs.add(tve);
         }

@@ -34,6 +34,7 @@ import vmcTest.pages.*
  * This class contains tests of the 'SQL Query' tab of the VoltDB Management
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
+
 class SqlQueriesTest extends SqlQueriesTestBase {
 
     static final int DEFAULT_NUM_ROWS_TO_INSERT = 2
@@ -65,7 +66,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     @Shared def systemStoredProcsFile  = new File(SYSTEM_STORED_PROCS_FILE)
     @Shared def defaultStoredProcsFile = new File(DEFAULT_STORED_PROCS_FILE)
     @Shared def userStoredProcsFile    = new File(USER_STORED_PROCS_FILE)
-    
+
     @Shared def sqlQueryLines = []
     @Shared def tableLines = []
     @Shared def viewLines  = []
@@ -74,12 +75,12 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     @Shared def userStoredProcLines = []
 
     @Shared def fileLinesPairs = [
-        [sqlQueriesFile, sqlQueryLines],
-        [tablesFile, tableLines],
-        [viewsFile, viewLines],
-        [systemStoredProcsFile, systemStoredProcLines],
-        [defaultStoredProcsFile, defaultStoredProcLines],
-        [userStoredProcsFile, userStoredProcLines],
+            [sqlQueriesFile, sqlQueryLines],
+            [tablesFile, tableLines],
+            [viewsFile, viewLines],
+            [systemStoredProcsFile, systemStoredProcLines],
+            [defaultStoredProcsFile, defaultStoredProcLines],
+            [userStoredProcsFile, userStoredProcLines],
     ]
     @Shared def slurper = new JsonSlurper()
 
@@ -99,7 +100,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         for (int i=0; i < GENQA_TEST_TABLES.size(); i++) {
             if (!createdGenqaTestTable.get(i)) {
                 createdGenqaTestTable.set(i, createTableIfDoesNotExist(page, GENQA_TEST_TABLES.get(i),
-                                                                       GENQA_TEST_TABLE_PARTITION_COLUMN.get(i)))
+                        GENQA_TEST_TABLE_PARTITION_COLUMN.get(i)))
                 createdNewTable = createdNewTable || createdGenqaTestTable.get(i)
             }
         }
@@ -157,31 +158,31 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         if (getTables(sqp).contains(tableName)) {
             return false
         } else {
-            String ddl = 'Create table ' + tableName + ' (\n' + 
-                         '  rowid                     BIGINT        NOT NULL,\n' +
-                         '  rowid_group               TINYINT       NOT NULL,\n' +
-                         '  type_null_tinyint         TINYINT,\n' +
-                         '  type_not_null_tinyint     TINYINT       NOT NULL,\n' +
-                         '  type_null_smallint        SMALLINT,\n' +
-                         '  type_not_null_smallint    SMALLINT      NOT NULL,\n' +
-                         '  type_null_integer         INTEGER,\n' +
-                         '  type_not_null_integer     INTEGER       NOT NULL,\n' +
-                         '  type_null_bigint          BIGINT,\n' +
-                         '  type_not_null_bigint      BIGINT        NOT NULL,\n' +
-                         '  type_null_timestamp       TIMESTAMP,\n' +
-                         '  type_not_null_timestamp   TIMESTAMP     NOT NULL,\n' +
-                         '  type_null_float           FLOAT,\n' +
-                         '  type_not_null_float       FLOAT         NOT NULL,\n' +
-                         '  type_null_decimal         DECIMAL,\n' +
-                         '  type_not_null_decimal     DECIMAL       NOT NULL,\n' +
-                         '  type_null_varchar25       VARCHAR(32),\n' +
-                         '  type_not_null_varchar25   VARCHAR(32)   NOT NULL,\n' +
-                         '  type_null_varchar128      VARCHAR(128),\n' +
-                         '  type_not_null_varchar128  VARCHAR(128)  NOT NULL,\n' +
-                         '  type_null_varchar1024     VARCHAR(1024),\n' +
-                         '  type_not_null_varchar1024 VARCHAR(1024) NOT NULL,\n' +
-                         '  PRIMARY KEY (rowid)\n' +
-                         ');'
+            String ddl = 'Create table ' + tableName + ' (\n' +
+                    '  rowid                     BIGINT        NOT NULL,\n' +
+                    '  rowid_group               TINYINT       NOT NULL,\n' +
+                    '  type_null_tinyint         TINYINT,\n' +
+                    '  type_not_null_tinyint     TINYINT       NOT NULL,\n' +
+                    '  type_null_smallint        SMALLINT,\n' +
+                    '  type_not_null_smallint    SMALLINT      NOT NULL,\n' +
+                    '  type_null_integer         INTEGER,\n' +
+                    '  type_not_null_integer     INTEGER       NOT NULL,\n' +
+                    '  type_null_bigint          BIGINT,\n' +
+                    '  type_not_null_bigint      BIGINT        NOT NULL,\n' +
+                    '  type_null_timestamp       TIMESTAMP,\n' +
+                    '  type_not_null_timestamp   TIMESTAMP     NOT NULL,\n' +
+                    '  type_null_float           FLOAT,\n' +
+                    '  type_not_null_float       FLOAT         NOT NULL,\n' +
+                    '  type_null_decimal         DECIMAL,\n' +
+                    '  type_not_null_decimal     DECIMAL       NOT NULL,\n' +
+                    '  type_null_varchar25       VARCHAR(32),\n' +
+                    '  type_not_null_varchar25   VARCHAR(32)   NOT NULL,\n' +
+                    '  type_null_varchar128      VARCHAR(128),\n' +
+                    '  type_not_null_varchar128  VARCHAR(128)  NOT NULL,\n' +
+                    '  type_null_varchar1024     VARCHAR(1024),\n' +
+                    '  type_not_null_varchar1024 VARCHAR(1024) NOT NULL,\n' +
+                    '  PRIMARY KEY (rowid)\n' +
+                    ');'
             if (partitionColumn) {
                 ddl += '\nPartition table ' + tableName + ' on column ' + partitionColumn + ';'
             }
@@ -330,7 +331,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def upsertInto(SqlQueryPage sqp, List<String> tables, int numToInsert, int minIntValue) {
         insertOrUpsertInto(sqp, tables, numToInsert, minIntValue, 'upsert')
     }
-    
+
     /**
      * Tests the query result format options (which normally are "HTML", "CSV"
      * and "Monospace").
@@ -402,7 +403,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             views = Arrays.asList(testViews.split(','))
         }
         debugPrint "\nViews to test:  " + views
-        
+
         when: 'perform initial count queries on all Tables'
         def cqResults = queryCount(page, tables)
 
@@ -491,7 +492,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         expect: 'List of displayed Tables should match expected list'
         printAndCompare('Tables', TABLES_FILE, isRunningGenqa(page), tableLines, getTables(page))
     }
-    
+
     /**
      * Check that the list of Views displayed on the page matches the expected
      * list (for the 'genqa' test app).
@@ -508,7 +509,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def checkSystemStoredProcs() {
         expect: 'List of displayed System Stored Procedures should match expected list'
         printAndCompare('System Stored Procedures', SYSTEM_STORED_PROCS_FILE, true,
-                        systemStoredProcLines, page.getSystemStoredProcedures())
+                systemStoredProcLines, page.getSystemStoredProcedures())
     }
 
     /**
@@ -518,7 +519,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def checkDefaultStoredProcs() {
         expect: 'List of displayed Default Stored Procedures should match expected list'
         printAndCompare('Default Stored Procedures', DEFAULT_STORED_PROCS_FILE, isRunningGenqa(page),
-                        defaultStoredProcLines, page.getDefaultStoredProcedures())
+                defaultStoredProcLines, page.getDefaultStoredProcedures())
     }
 
     /**
@@ -528,7 +529,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def checkUserStoredProcs() {
         expect: 'List of displayed User Stored Procedures should match expected list'
         printAndCompare('User Stored Procedures', USER_STORED_PROCS_FILE, isRunningGenqa(page),
-                        userStoredProcLines, page.getUserStoredProcedures())
+                userStoredProcLines, page.getUserStoredProcedures())
     }
 
     /**
@@ -568,7 +569,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         then: 'check the error status, and query result'
         expectedResponse.result == qResult
         expectedResponse.status == status
-        
+
         cleanup: 'delete all rows from the tables'
         runQuery(page, 'delete from partitioned_table;\ndelete from replicated_table')
 
@@ -578,5 +579,213 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         sqlQueriesTestName = iter.testName
         query = iter.sqlCmd
         expectedResponse = iter.response
+    }
+
+    //sql queries test for admin-client port
+
+
+    def "Check sqlquery client to admin port switching for cancel popup"() {
+
+        when: 'click the SQL Query link (if needed)'
+        openSqlQueryPage()
+        then: 'should be on SQL Query page'
+        at SqlQueryPage
+
+        String checkQuery = page.getQueryToCreateTable()
+
+        when: 'set create query in the box'
+        page.setQueryText(checkQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        try {
+            waitFor(10) {
+                page.cancelpopupquery.isDisplayed()
+                page.cancelpopupquery.click()
+                page.queryDurHtml.isDisplayed()
+                println("result shown without popup, hence it is in admin port")
+                println("cancel button clicked")
+
+            }
+
+
+
+        } catch (geb.error.RequiredPageContentNotPresent e) {
+            println("pop up won't occurr due to already in running state")
+            println("it is already in admin port")
+
+        } catch (geb.waiting.WaitTimeoutException e) {
+
+
+            println("already in admin port state")
+
+        }
+
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        try {
+            waitFor(10) {
+                page.networkInterfaces.clusterClientPortValue.isDisplayed()
+                cluster.pausebutton.isDisplayed()
+            }
+            cluster.pausebutton.click()
+            waitFor(10) { cluster.pauseok.isDisplayed() }
+            cluster.pauseok.click()
+            println("Pause button displayed and clicked!!")
+
+        } catch (geb.error.RequiredPageContentNotPresent e) {
+            println("Already in pause state!! in admin page.")
+
+        } catch (geb.waiting.WaitTimeoutException e) {
+
+            page.networkInterfaces.clusterClientPortValue.isDisplayed()
+            println("rechecking due to geb waiting exception")
+
+        }
+
+        when: 'click the SQL Query link (if needed)'
+        openSqlQueryPage()
+        then: 'should be on SQL Query page'
+        at SqlQueryPage
+
+        String createQuery = page.getQueryToCreateTable()
+        String deleteQuery = page.getQueryToDeleteTable()
+        String tablename = page.getTablename()
+
+        when: 'set create query in the box'
+        page.setQueryText(createQuery)
+        then: 'run the query'
+        page.runQuery()
+        try {
+            waitFor(15) {
+                page.cancelpopupquery.isDisplayed()
+                page.okpopupquery.isDisplayed()
+                page.switchadminport.isDisplayed()
+                page.queryexecutionerror.isDisplayed()
+                page.queryerrortxt.isDisplayed()
+            }
+
+            page.cancelpopupquery.click()
+            println("all popup query verified for creating table!!")
+        }catch(geb.waiting.WaitTimeoutException e) {println("waiting time exceed here")}
+
+        when: 'set select query in the box'
+        page.setQueryText("SELECT * FROM " + tablename)
+        then: 'run the query'
+        page.runQuery()
+        try {
+            waitFor(5) {
+                page.cancelpopupquery.isDisplayed()
+                page.okpopupquery.isDisplayed()
+                page.switchadminport.isDisplayed()
+                page.queryexecutionerror.isDisplayed()
+                page.queryerrortxt.isDisplayed()
+            }
+            page.cancelpopupquery.click()
+            println("all popup query verified for selecting data from table!!")
+
+            when: 'set delete query in the box'
+            page.setQueryText(deleteQuery)
+            then: 'run the query'
+            page.runQuery()
+            waitFor(5) {
+                page.cancelpopupquery.isDisplayed()
+                page.okpopupquery.isDisplayed()
+                page.switchadminport.isDisplayed()
+                page.queryexecutionerror.isDisplayed()
+                page.queryerrortxt.isDisplayed()
+            }
+            page.cancelpopupquery.click()
+            println("all popup for query verified for deleting data from table!!")
+        }catch(geb.error.RequiredPageContentNotPresent e) {println("element not found")}
+
+        catch(geb.waiting.WaitTimeoutException e) {println("waiting time exceed here")}
+    }
+
+
+
+    def "Check sqlquery client to admin port switching for ok poup"() {
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        try {
+            waitFor(10) {
+
+                page.networkInterfaces.clusterClientPortValue.isDisplayed()
+                cluster.pausebutton.click()
+                cluster.pauseok.click()
+                println("Pause button displayed and clicked!!")}
+
+        } catch (geb.error.RequiredPageContentNotPresent e) {
+            println("Already in resume state!!")
+
+        } catch (geb.waiting.WaitTimeoutException e) {
+
+            page.networkInterfaces.clusterClientPortValue.isDisplayed()
+            println("rechecking due to geb waiting exception")
+
+        }
+
+        when: 'click the SQL Query link (if needed)'
+        openSqlQueryPage()
+        then: 'should be on SQL Query page'
+        at SqlQueryPage
+
+        String createQuery = page.getQueryToCreateTable()
+        String deleteQuery = page.getQueryToDeleteTable()
+        String tablename = page.getTablename()
+
+        when: 'set create query in the box'
+        page.setQueryText(createQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        try {
+            waitFor(10) {
+
+
+                page.cancelpopupquery.isDisplayed()
+                page.okpopupquery.isDisplayed()
+                page.switchadminport.isDisplayed()
+                page.queryexecutionerror.isDisplayed()
+                page.queryerrortxt.isDisplayed()
+            }
+
+            page.okpopupquery.click()
+            println("all popup query verified for creating table!!")
+        } catch(geb.waiting.WaitTimeoutException e) {println("waiting time exceed")}
+
+        try {
+            if(waitFor(5){page.htmlresultallcolumns.isDisplayed()}){
+                println("all columns displayed for creating table as: " +page.htmlresultallcolumns.text())}
+            if(waitFor(5){page.htmltableresult.isDisplayed()}){
+                println("table result shown for creating table HTML format i.e, "+page.htmltableresult.text())
+            }
+
+        }catch (geb.waiting.WaitTimeoutException e) {println("couldn't check due to server not online error or waiting time error")}
+
+
+        when: 'set select query in the box'
+        page.setQueryText("SELECT * FROM " + tablename)
+        then: 'run the query'
+        page.runQuery()
+
+        try {
+            if(waitFor(5){page.htmlresultselect.isDisplayed()}){
+                println("all columns displayed for selecting table as: " +page.htmlresultselect.text())}
+
+        }catch (geb.waiting.WaitTimeoutException e) {println("couldn't check due to server not online error or waiting time error")}
+
+
+        when: 'set delete query in the box'
+        page.setQueryText(deleteQuery)
+        then: 'run the query'
+        page.runQuery()
+
     }
 }

@@ -35,6 +35,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.rejoin.TaskLog;
 
 /**
@@ -117,6 +118,7 @@ public abstract class BaseInitiator implements Initiator
 
     protected void configureCommon(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
@@ -147,6 +149,7 @@ public abstract class BaseInitiator implements Initiator
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
+                                       serializedCatalog,
                                        m_partitionId,
                                        numberOfPartitions,
                                        startAction,
@@ -217,6 +220,13 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
+    }
+
+    @Override
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
+    {
+        // Durability Listeners should never be assigned to the MP Scheduler
+        assert false;
     }
 
     abstract protected void acceptPromotion() throws Exception;

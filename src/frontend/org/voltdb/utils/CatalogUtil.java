@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -32,6 +33,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -89,6 +91,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
@@ -103,6 +106,8 @@ import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -115,6 +120,7 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -124,7 +130,14 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+
+import java.net.URISyntaxException;
+import java.util.HashMap;
+
 import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.importer.ImportDataProcessor;
 
 /**
  *
@@ -567,6 +580,7 @@ public abstract class CatalogUtil {
 
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
+                setImportInfo(catalog, deployment.getImport());
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
@@ -1007,9 +1021,10 @@ public abstract class CatalogUtil {
         switch(exportConfiguration.getType()) {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
-            case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+            case KAFKA: exportClientClassName = "org.voltdb.exportclient.kafka.KafkaExportClient"; break;
             case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
+            case ELASTICSEARCH: exportClientClassName = "org.voltdb.exportclient.ElasticSearchHttpExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 exportClientClassName = exportConfiguration.getExportconnectorclass();
@@ -1092,6 +1107,87 @@ public abstract class CatalogUtil {
         return processorProperties;
     }
 
+    private static Properties checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
+        String importBundleUrl = importConfiguration.getModule();
+
+        if (!importConfiguration.isEnabled()) {
+            return null;
+        }
+        switch(importConfiguration.getType()) {
+            case CUSTOM:
+                break;
+            default:
+                throw new DeploymentCheckException("Import Configuration type must be specified.");
+        }
+
+        Properties processorProperties = new Properties();
+        String modulePrefix = "osgi|";
+        InputStream is;
+        try {
+            //Make sure we can load stream
+            is = (new URL(importBundleUrl)).openStream();
+        } catch (Exception ex) {
+            is = null;
+        }
+        if (is == null) {
+            try {
+                String bundlelocation = System.getProperty("voltdbbundlelocation");
+                if (bundlelocation == null || bundlelocation.trim().length() == 0) {
+                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                    hostLog.info("Module base is: " + rpath + "/../bundles/");
+                    String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    importBundleUrl = "file:" + bpath;
+                } else {
+                    String bpath = bundlelocation + "/" + importBundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    importBundleUrl = "file:" + bpath;
+                }
+            } catch (URISyntaxException | FileNotFoundException ex) {
+                is = null;
+            }
+        }
+        if (is != null) {
+            try {
+                is.close();
+            } catch (IOException ex) {
+            }
+        } else {
+            //Not a URL try as a class
+            try {
+                CatalogUtil.class.getClassLoader().loadClass(importBundleUrl);
+                modulePrefix = "class|";
+            }
+            catch (ClassNotFoundException ex2) {
+                String msg =
+                        "Import failed to configure, failed to load module by URL or classname provided" +
+                        " import module: " + importBundleUrl;
+                hostLog.error(msg);
+                throw new DeploymentCheckException(msg);
+            }
+        }
+        if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
+            processorProperties.setProperty(ImportDataProcessor.IMPORT_MODULE, modulePrefix + importBundleUrl);
+        }
+
+        List<PropertyType> configProperties = importConfiguration.getProperty();
+        if (configProperties != null && ! configProperties.isEmpty()) {
+
+            for( PropertyType configProp: configProperties) {
+                String key = configProp.getName();
+                String value = configProp.getValue();
+                if (!key.toLowerCase().contains("passw")) {
+                    processorProperties.setProperty(key, value.trim());
+                } else {
+                    //Dont trim passwords
+                    processorProperties.setProperty(key, value);
+                }
+            }
+        }
+
+        return processorProperties;
+    }
+
     /**
      * Set deployment time settings for export
      * @param catalog The catalog to be updated.
@@ -1109,7 +1205,7 @@ public abstract class CatalogUtil {
             // Get the stream name from the xml attribute "stream"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
             String streamName = exportConfiguration.getStream();
-            if (noEmptyTarget && (streamName == null || streamName.trim().isEmpty()) ) {
+            if (streamName == null || streamName.trim().isEmpty()) {
                     throw new RuntimeException("stream must be specified along with type in export configuration.");
             }
 
@@ -1187,6 +1283,56 @@ public abstract class CatalogUtil {
                 }
             }
         }
+    }
+
+    /**
+     * Set deployment time settings for export
+     * @param catalog The catalog to be updated.
+     * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     */
+    private static void setImportInfo(Catalog catalog, ImportType importType) {
+        if (importType == null) {
+            return;
+        }
+        List<String> streamList = new ArrayList<String>();
+
+        for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
+
+            boolean connectorEnabled = importConfiguration.isEnabled();
+            if (!connectorEnabled) continue;
+            if (streamList.contains(importConfiguration.getModule())) {
+                throw new RuntimeException("Multiple connectors can not be assigned to single import module: " +
+                        importConfiguration.getModule()+ ".");
+            } else {
+                streamList.add(importConfiguration.getModule());
+            }
+
+            checkImportProcessorConfiguration(importConfiguration);
+        }
+    }
+
+    public static Map<String, Properties> getImportProcessorConfig(ImportType importType) {
+        Map<String, Properties> processorConfig = new HashMap<String, Properties>();
+        if (importType == null) {
+            return processorConfig;
+        }
+        List<String> streamList = new ArrayList<String>();
+
+        for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
+
+            boolean connectorEnabled = importConfiguration.isEnabled();
+            if (!connectorEnabled) continue;
+            if (streamList.contains(importConfiguration.getModule())) {
+                throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
+                        importConfiguration.getModule()+ ".");
+            } else {
+                streamList.add(importConfiguration.getModule());
+            }
+
+            Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            processorConfig.put(importConfiguration.getModule(), processorProperties);
+        }
+        return processorConfig;
     }
 
     /**
@@ -1486,17 +1632,26 @@ public abstract class CatalogUtil {
             if (user.isPlaintext()) {
                 sha1hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA1);
                 sha256hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA256);
+            } else if (user.getPassword().length() == 104) {
+                int sha1len = ClientAuthHashScheme.getHexencodedDigestLength(ClientAuthHashScheme.HASH_SHA1);
+                sha1hex = sha1hex.substring(0, sha1len);
+                sha256hex = sha256hex.substring(sha1len);
+            } else {
+                hostLog.fatal("Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.");
+                System.exit(-1);
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
+            // generate salt only once for sha1 and sha256
+            String saltGen = BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr);
             String hashedPW =
                     BCrypt.hashpw(
                             sha1hex,
-                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+                            saltGen);
             String hashedPW256 =
                     BCrypt.hashpw(
                             sha256hex,
-                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+                            saltGen);
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
 
@@ -1556,6 +1711,7 @@ public abstract class CatalogUtil {
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
+                cluster.setDrconsumerenabled(drConnection.isEnabled());
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
         }

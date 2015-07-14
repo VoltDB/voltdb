@@ -24,7 +24,9 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -868,7 +870,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         try
         {
             sql = "SELECT * FROM R1_DECIMAL WHERE " +
-            "(R1_DECIMAL.CASH <= 0.0622493314185)" +
+            "(R1_DECIMAL.CASH <= 999999999999999999999999999999.0622493314185)" +
             " AND (R1_DECIMAL.ID > R1_DECIMAL.CASH)";
             client.callProcedure("@AdHoc", sql);
         }
@@ -1164,7 +1166,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("invalid format for a constant"));
+            assertTrue(e.getMessage().contains("Incorrect number of parameters passed: expected 3, passed 0"));
         }
         // test that missing parameters don't work (ENG-1000)
         try {
@@ -1172,7 +1174,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("Number of arguments provided was 0 where 4 was expected"));
+            assertTrue(e.getMessage().contains("Incorrect number of parameters passed: expected 4, passed 0"));
         }
         //VoltTable results = client.callProcedure("@AdHoc", "select * from P1;").getResults()[0];
         //System.out.println(results.toJSONString());
@@ -2143,11 +2145,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         //
         // operation between decimal and integer
         //
-        if (isHSQL()) {
-            // not compatible with Hsql
-            return;
-        }
-
         sql = "SELECT 0.1 + (1-0.1) + NUM FROM R1";
         runQueryGetDecimal(client, sql, 3.0);
 
@@ -2155,23 +2152,163 @@ public class TestFixedSQLSuite extends RegressionSuite {
         runQueryGetDecimal(client, sql, -1.0);
 
         sql = "SELECT 0.1 + (1-0.1) / NUM FROM R1";
-        runQueryGetDouble(client, sql, 0.55);
+        runQueryGetDecimal(client, sql, 0.55);
 
         sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
-        runQueryGetDouble(client, sql, 1.9);
+        runQueryGetDecimal(client, sql, 1.9);
 
         // reverse order
         sql = "SELECT 0.1 + NUM + (1-0.1) FROM R1";
-        runQueryGetDouble(client, sql, 3.0);
+        runQueryGetDecimal(client, sql, 3.0);
 
         sql = "SELECT 0.1 + NUM - (1-0.1) FROM R1";
-        runQueryGetDouble(client, sql, 1.2);
+        runQueryGetDecimal(client, sql, 1.2);
 
         sql = "SELECT 0.1 + NUM / (1-0.1) FROM R1";
-        runQueryGetDouble(client, sql, 2.322222222222);
+        runQueryGetDecimal(client, sql, 2.322222222222);
 
         sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
-        runQueryGetDouble(client, sql, 1.9);
+        runQueryGetDecimal(client, sql, 1.9);
+
+
+        //
+        // test Out of range decimal and float
+        //
+
+        // test overflow and any underflow decimal are rounded
+        sql = "SELECT NUM + 111111111111111111111111111111111111111.1111 FROM R1";
+        if (isHSQL()) {
+            verifyStmtFails(client, sql, "HSQL-BACKEND ERROR");
+            verifyStmtFails(client, sql, "to the left of the decimal point is 39 and the max is 26");
+        } else {
+            verifyStmtFails(client, sql, "Maximum precision exceeded. "
+                    + "Maximum of 26 digits to the left of the decimal point");
+        }
+
+        sql = "SELECT NUM + 111111.1111111111111111111111111111111111111 FROM R1";
+        runQueryGetDecimal(client, sql, 111113.1111111111111111111111111111111111111);
+
+        sql = "SELECT NUM + " + StringUtils.repeat("1", 256) + ".1111E1 FROM R1";
+        runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
+
+        sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
+        verifyStmtFails(client, sql, "java.lang.NumberFormatException");
+
+
+        // test stored procedure
+        VoltTable vt = null;
+        vt = client.callProcedure("R1_PROC1").getResults()[0];
+        validateTableColumnOfScalarDecimal(vt, 0, new BigDecimal[]{new BigDecimal(2.1)});
+
+        vt = client.callProcedure("R1_PROC2").getResults()[0];
+        validateTableColumnOfScalarFloat(vt, 0, new double[]{2.1});
+    }
+
+
+    private void nullIndexSearchKeyChecker(Client client, String sql) throws Exception {
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        String sql1 = sql.replace("SELECT ID", "SELECT COUNT(ID)");
+        assertTrue(sql1.contains("SELECT COUNT(ID) FROM"));
+        vt = client.callProcedure("@AdHoc", sql1, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+
+        String sql2 = sql.replace("SELECT ID", "SELECT COUNT(*)");
+        assertTrue(sql2.contains("SELECT COUNT(*) FROM"));
+        vt = client.callProcedure("@AdHoc", sql2, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+    }
+
+    public void testENG8120() throws Exception {
+        // hsqldb does not handle null
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+        VoltTable vt;
+        String sql;
+
+        String[] tables = {"R1", "R3", "R4"};
+        for (String tb : tables)
+        {
+            sql = "insert into " + tb + "  (id, num) Values(?, ?);";
+            client.callProcedure("@AdHoc", sql, 1, null);
+            client.callProcedure("@AdHoc", sql, 2, null);
+            client.callProcedure("@AdHoc", sql, 3, 3);
+            client.callProcedure("@AdHoc", sql, 4, 4);
+
+            sql = "select count(*) from " + tb;
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{4});
+
+            // activate # of searchkey is 1
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // activate # of searchkey is 2
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num > ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // post predicate
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // nest loop index join
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
+
+            if (tb != "R4") {
+                vt = client.callProcedure("@Explain", sql, null).getResults()[0];
+                assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
+                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4"));
+            }
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+        }
+
     }
 
     //

@@ -6,112 +6,22 @@ function QueryUI(queryString, userName) {
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
             MatchOneQuotedString = /'[^']*'/m,
-            MatchQuotedQuotes = /''/g,
-            QuotedQuoteLiteral = "''",
             MatchDoubleQuotes = /\"/g,
             EscapedDoubleQuoteLiteral = '\\"',
-            MatchDisguisedQuotedQuotes = /#COMMAND_PARSER_DISGUISED_QUOTED_QUOTE#/g,
-            DisguisedQuotedQuoteLiteral = "#COMMAND_PARSER_DISGUISED_QUOTED_QUOTE#",
             QuotedStringNonceLiteral = "#COMMAND_PARSER_REPLACED_STRING#",
             // Generate fixed-length 5-digit nonce values from 100000 - 999999.
             // That's 900000 strings per statement batch -- that should be enough.
             MatchOneQuotedStringNonce = /#COMMAND_PARSER_REPLACED_STRING#(\d\d\d\d\d\d)/,
             QuotedStringNonceBase = 100000,
 
-            // TODO: drop the remaining vars when semi-colon injection is no longer supported
-
-            // Normally, statement boundaries are guessed by the parser, which inserts semicolons as needed.
-            // The guessing is based on the assumption that the user is smart enough to not use SQL statement
-            // keywords as schema names.  To err on the safe side, avoid splitting (require a semicolon) before
-            // VoltDB proprietary non-SQL statement keywords, ("partition", "explain", "explainproc", "exec",
-            // and "execute") because they could theoretically occur mid-statement as (legacy?) names in user
-            // schema. Take a chance that they are not using SQL statement keywords like "select" and "delete"
-            // as unquoted names in queries.
-            // Similarly, do not enable statement splitting before "alter" or "drop" because it would be more
-            // trouble than it is worth to disable it when these keywords occur in the
-            // middle of an "alter table ... alter|drop column ..." statement.
-            // The intent is to avoid writing another full sql parser, here.
-            // Any statement keyword that does not get listed here simply requires an explicit semicolon before
-            // it to mark the end of the preceding statement.
-            // Note on            (?!\s+on) :
-            // This subpattern consumes no input itself but ensures that the next
-            // character is not 'on'.
-            MatchStatementStarts =
-                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition(?!\s+on)|exec|execute|explain|explainproc)\s/gim,
-            //     ($1--------------------------------------------------------------------------------------------------------------------)
-            GenerateSplitStatements = ';$1 ',
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
-            MatchParameterSeparators = /[\s,]+/g,
-
-            // There are some easily recognizable patterns that contain statement keywords mid-statement.
-            // As suggested above, cases like "alter" and "drop" that are not so easily recognized are
-            // always ignored by the statement splitter -- the user must separate them from the prior
-            // statement with a semicolon.
-            // For these other keywords, the usual statement splitting can be easily disabled in special
-            // cases:
-            // - Any "select" that occurs in "insert into ... select"
-            //   -- handled with its own more elaborate pattern: insert into <table-identifier> [(<column-list>)] select
-            // - Any SQL statement keyword after "explain ".
-            // - Any "select " that follows open parentheses (with optional whitespace)
-            //   -- these could either be subselects or the select statement arguments to a setop
-            //      (e.g. union).
-            // - Any "select " that follows a trailing setop keyword:
-            //   "union", "intersect", "except", or "all"
-            //   -- actually for ease of implementation (pattern simplicity) also disable command
-            //      splitting for the unlikely case of a setop followed by other statements:
-            //      "insert", "update", "delete", "truncate"
-            //
-            // The pattern grouping uses "(?:" anonymous pattern groups to preserve $1 as the prefix
-            // pattern and $2 as the suffix keyword. The intent is to temporarily disguise the suffix
-            // keyword to prevent a statement-splitting semicolon from getting inserted before it.
-            // If "explain" on ddl statements (?) (create|partition) is ever supported,
-            // add them as options to the $2 suffix keyword pattern.
-            MatchNonBreakingInsertIntoSelect =
-                /(\s*(?:insert|upsert)\s+into(?=\"|\s)\s*(?:[a-z][a-z0-9_]*|\"(?:[^\"]|\"\")+\")\s*(?:\((?:\"(?:[^\"]|\"\")+\"|[^\")])+\))?[(\s]*)(select)/gim,
-            //   ($1-----------------------------------------------------------------------------------------------------------------------------)($2----)
-            // Note on            (?=\"|\s) :
-            // This subpattern consumes no input itself but ensures that the next
-            // character is either whitespace or a double quote. This is handy
-            // when a keyword is followed by an identifier:
-            //   INSERT INTO"Foo"SELECT ...
-            // HSQL doesn't require whitespace between keywords and quoted
-            // identifiers.
-            // A more detailed explanation of the MatchNonBreakingInsertIntoSelect pattern
-            // can be found in the comments for the functionally identical InsertIntoSelect
-            // variable and related pattern variables in SQLCommand.java.
-            MatchNonBreakingCompoundKeywords =
-                /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
-            //   ($1------------------------------------------------)   ($2------------------------------------------------------)
-            // Note on           ([\s\S])
-            // It matches the any character including the new line character
-            MatchCreateView = /(\s*(?:create\s+view\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)(select)/gim,
-            //                 ($1-----------------------------------------------------------------------)($2----)
-            MatchCreateSingleQueryProcedure =
-                /(\s*(?:create\s+procedure\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
-            //   ($1----------------------------------------------------------------------------)($2------------------------------------------------------)
-
-            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
-            // There are three keywords that may start statements to escape:
-            //
-            //   partition, execute, and delete
-            //
-            // They require escaping when they are immediately preceded by
-            // "limit", "rows <n>", and "execute(", respectively.
-            MatchLimitPartition = /(\s*limit\s+)(partition)/gim,
-            MatchRowcountExecute = /(\s*rows\s+\d+\s+)(execute)/gim,
-            MatchExecuteDelete = /(\s*execute\s*\(\s*)(delete)/gim,
-
-            MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
-            GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
+            MatchParameterSeparators = /[\s,]+/g;
 
         // Avoid false positives for statement grammar inside quoted strings by
         // substituting a nonce for each string.
         function disguiseQuotedStrings(src, stringBankOut) {
             var nonceNum, nextString;
-            // Temporarily disguise quoted quotes as non-quotes to simplify the work of
-            // extracting quoted strings.
-            src = src.replace(MatchQuotedQuotes, DisguisedQuotedQuoteLiteral);
 
             // Extract quoted strings to keep their content from getting confused with interesting
             // statement syntax.
@@ -141,8 +51,6 @@ function QueryUI(queryString, userName) {
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
                                   stringBank[nonceNum - QuotedStringNonceBase]);
             }
-            // Clean up by restoring the replaced quoted quotes.
-            src = src.replace(MatchDisguisedQuotedQuotes, QuotedQuoteLiteral);
             return src;
         }
 
@@ -154,37 +62,11 @@ function QueryUI(queryString, userName) {
             // Eliminate line comments permanently.
             src = src.replace(MatchEndOfLineComments, '');
 
-            // Extract quoted strings to keep their content from getting confused with interesting
-            // statement syntax. This is required for statement splitting even if only at explicit
-            // semi-colon boundaries -- semi-colns might appear in quoted text.
+            // Extract quoted strings to keep their content from getting confused with
+            // interesting statement syntax. This is required for statement splitting at 
+            // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
 
-            // TODO: drop the following section when semi-colon injection is no longer supported
-
-            // Disguise compound keywords temporarily to avoid triggering statement splits.
-            //* Enable this to debug in the browser */ console.log("pre-processed queries:'" + src + "'");
-            src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchCreateView, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchCreateSingleQueryProcedure, GenerateDisguisedCompoundKeywords);
-
-            src = src.replace(MatchLimitPartition, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchRowcountExecute, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchExecuteDelete, GenerateDisguisedCompoundKeywords);
-
-            if (!src.match("^explain")) {
-                // Start a new statement before each remaining statement keyword.
-                src = src.replace(MatchStatementStarts, GenerateSplitStatements);
-                //* Enable this to debug in the browser */ console.log("mid-processed queries:'" + src + "'");
-            }
-
-            // Restore disguised compound keywords post-statement-split.
-            src = src.replace(MatchCompoundKeywordDisguise, '');
-            //* Enable this to debug in the browser */ console.log("post-processed queries:'" + src + "'");
-
-            // TODO: drop the preceding section when semi-colon injection is no longer supported
-
-            // Finally, get to work -- break the input into separate statements for processing.
             splitStmts = src.split(';');
 
             statementBank = [];
@@ -241,7 +123,7 @@ function QueryUI(queryString, userName) {
 
     //TODO: Apply reasonable coding standards to the code below...
 
-    function executeCallback(format, target, id) {
+    function executeCallback(format, target, id, isExplainQuery) {
         var Format = format;
         var targetHtml = target.find('#resultHtml');
         var targetCsv = target.find('#resultCsv');
@@ -253,14 +135,14 @@ function QueryUI(queryString, userName) {
 
         function callback(response) {
 
-            var processResponseForAllViews = function() {
-                processResponse('HTML', targetHtml, Id + '_html', response);
-                processResponse('CSV', targetCsv, Id + '_csv', response);
-                processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
+            var processResponseForAllViews = function () {
+                processResponse('HTML', targetHtml, Id + '_html', response, isExplainQuery);
+                processResponse('CSV', targetCsv, Id + '_csv', response, isExplainQuery);
+                processResponse('MONOSPACE', targetMonospace, Id + '_mono', response, isExplainQuery);
             };
-            
+
             var handlePortSwitchingOption = function (isPaused) {
-                
+
                 if (isPaused) {
                     //Show error message with an option to allow admin port switching
                     $("#queryDatabasePausedErrorPopupLink").click();
@@ -268,22 +150,22 @@ function QueryUI(queryString, userName) {
                     processResponseForAllViews();
                 }
             };
-            
+
             //Handle the case when Database is paused
             if (response.status == -5 && VoltDbAdminConfig.isAdmin && !SQLQueryRender.useAdminPortCancelled) {
 
                 if (!VoltDbAdminConfig.isDbPaused) {
 
                     //Refresh cluster state to display latest status.
-                    var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
+                    var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues) {
                         VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
                         handlePortSwitchingOption(VoltDbAdminConfig.isDbPaused);
                     };
-                    voltDbRenderer.GetSystemInformation(function() {}, loadAdminTabPortAndOverviewDetails, function(data) {});
+                    voltDbRenderer.GetSystemInformation(function () { }, loadAdminTabPortAndOverviewDetails, function (data) { });
                 } else {
                     handlePortSwitchingOption(true);
                 }
-                
+
             } else {
                 processResponseForAllViews();
             }
@@ -296,7 +178,7 @@ function QueryUI(queryString, userName) {
         var target = $('.queryResult');
         var format = $('#exportType').val();
 
-        var dataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        var dataSource = VoltDbUI.getCookie('connectionkey') == undefined ? '' : VoltDbUI.getCookie('connectionkey');
         if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');
             return;
@@ -316,28 +198,38 @@ function QueryUI(queryString, userName) {
         var start = (new Date()).getTime();
         var connectionQueue = connection.getQueue();
         connectionQueue.Start();
+
         for (var i = 0; i < statements.length; i++) {
+
+            var isExplainQuery = false;
             var id = 'r' + i;
-            var callback = new executeCallback(format, target, id);
-            if (/^execute /i.test(statements[i]))
+            if (statements[i].toLowerCase().indexOf('@explain') >= 0) {
+                isExplainQuery = true;
+            }
+            var callback = new executeCallback(format, target, id, isExplainQuery);
+            if (/^execute /i.test(statements[i])) {
                 statements[i] = 'exec ' + statements[i].substr(8);
+            }
             if (/^exec /i.test(statements[i])) {
+                statements[i] = statements[i].replace(/\n/g, '');
+                statements[i] = statements[i].trim();
                 var params = CommandParser.parseProcedureCallParameters(statements[i].substr(5));
                 var procedure = params.splice(0, 1)[0];
-                connectionQueue.BeginExecute(procedure, params, callback.Callback);
+                connectionQueue.BeginExecute(procedure, params, callback.Callback, null, true);
             }
             else
                 if (/^explain /i.test(statements[i])) {
-                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                 }
                 else
                     if (/^explainproc /i.test(statements[i])) {
-                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                     }
                     else {
-                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
+                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
                     }
         }
+
         function atEnd(state, success) {
             var totalDuration = (new Date()).getTime() - state;
             if (success) {
@@ -353,27 +245,35 @@ function QueryUI(queryString, userName) {
         connectionQueue.End(atEnd, start);
     }
 
-    function processResponse(format, target, id, response) {
+    function processResponse(format, target, id, response, isExplainQuery) {
         if (response.status == 1) {
             var tables = response.results;
             for (var j = 0; j < tables.length; j++)
-                printResult(format, target, id + '_' + j, tables[j]);
+                printResult(format, target, id + '_' + j, tables[j], isExplainQuery);
 
         } else {
-            target.append('<span class="errorValue">Error: ' + response.statusstring + '\r\n</span>');
+            // This inline encoder hack is intended to use html's &#nnnn; character encoding to
+            // properly escape characters that would otherwise mean something as html
+            // -- including angle brackets and such that are commonly used to suggest that the
+            // user correct their ddl grammar. Angle-bracketed place-holders were being
+            // rendered as invisible meaningless html tags.
+            // See http://stackoverflow.com/questions/18749591/encode-html-entities-in-javascript#18750001
+            var encodedStatus = response.statusstring.replace(/[\u00A0-\u9999<>\&]/gim,
+                function (i) { return '&#' + i.charCodeAt(0) + ';'; });
+            target.append('<span class="errorValue">Error: ' + encodedStatus + '\r\n</span>');
         }
     }
 
-    function printResult(format, target, id, table) {
+    function printResult(format, target, id, table, isExplainQuery) {
         switch (format.toUpperCase()) {
             case 'CSV'.toUpperCase():
-                printCSV(target, id, table);
+                printCSV(target, id, table, isExplainQuery);
                 break;
             case 'MONOSPACE':
-                printMonoSpace(target, id, table);
-                 break;
+                printMonoSpace(target, id, table, isExplainQuery);
+                break;
             default:
-                printGrid(target, id, table);
+                printGrid(target, id, table, isExplainQuery);
                 break;
         }
     }
@@ -387,7 +287,7 @@ function QueryUI(queryString, userName) {
         if (null != val && val.replace != null) {
             val = val.replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
             val = val.replace(/ /g, '&nbsp;');
-            val = val.replace(/\n/g, '<br>');
+            val = val.replace(/\n/g, '&lt;br&gt;');
         }
         return val;
     }
@@ -401,13 +301,14 @@ function QueryUI(queryString, userName) {
         return v;
     }
 
-    function printGrid(target, id, table) {
-        var src = '<table id="table_'+id+'" width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl sortable tablesorter" id="queryResultTbl"><thead class="ui-widget-header noborder"><tr>';
+
+    function printGrid(target, id, table, isExplainQuery) {
+        var src = '<table id="table_' + id + '" width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl sortable tablesorter" id="queryResultTbl"><thead class="ui-widget-header noborder"><tr>';
         if (isUpdateResult(table))
             src += '<th>modified_tuples</th>';
         else {
             for (var j = 0; j < table.schema.length; j++)
-                src += '<th width="' + 100/table.schema.length + '%">' + (table.schema[j].name == "" ? ("Column " + (j + 1)) : table.schema[j].name) + '</th>';
+                src += '<th width="' + 100 / table.schema.length + '%">' + (table.schema[j].name == "" ? ("Column " + (j + 1)) : table.schema[j].name) + '</th>';
         }
         src += '</tr></thead><tbody>';
         for (var j = 0; j < table.data.length; j++) {
@@ -427,14 +328,16 @@ function QueryUI(queryString, userName) {
                         + lPadZero((dt.getUTCMilliseconds()) * 1000 + us, 6);
                     typ = 9;  //code for varchar
                 }
-                val = applyFormat(val);
-                src += '<td align="left">' + val + '</td>';
+                if (isExplainQuery == true) {
+                    val = applyFormat(val);
+                }
+                src += '<td align="left">' + htmlEncode(val, isExplainQuery) + '</td>';
             }
             src += '</tr>';
         }
         src += '</tbody></table>';
         $(target).append(src);
-        sorttable.makeSortable(document.getElementById('table_'+id));
+        sorttable.makeSortable(document.getElementById('table_' + id));
     }
 
     function printMonoSpace(target, id, table) {
@@ -451,7 +354,7 @@ function QueryUI(queryString, userName) {
         for (var j = 0; j < table.data.length; j++) {
             for (var k = 0; k < table.data[j].length; k++) {
                 if (k > 0) src += '\t';
-                src += table.data[j][k];
+                src += htmlEncode(table.data[j][k]);
             }
             src += '</br>\r\n';
         }
@@ -474,12 +377,21 @@ function QueryUI(queryString, userName) {
         for (var j = 0; j < table.data.length; j++) {
             for (var k = 0; k < table.data[j].length; k++) {
                 if (k > 0) src += ', ';
-                src += table.data[j][k];
+                src += htmlEncode(table.data[j][k]);
             }
             src += '</br>\r\n';
         }
         src += '</br>\r\n(' + j + ' row(s) affected)\r\n\r\n</pr></br></br>';
         $(target).append(src);
+    }
+
+
+    function htmlEncode(value, isExplainQuery) {
+        if (isExplainQuery == true) {
+            return $('<div/>').html(value).text();
+        } else {
+            return $('<div/>').text(value).html();
+        }
     }
 
     this.execute = executeMethod;

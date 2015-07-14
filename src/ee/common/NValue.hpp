@@ -569,8 +569,19 @@ class NValue {
     // Precision and scale (inherent in the schema)
     static const uint16_t kMaxDecPrec = 38;
     static const uint16_t kMaxDecScale = 12;
-    static const int64_t kMaxScaleFactor = 1000000000000;
-
+    static const int64_t kMaxScaleFactor = 1000000000000;         // == 10**12
+  private:
+    // Our maximum scale is 12.  Our maximum precision is 38.  So,
+    // the maximum number of decimal digits is 38 - 12 = 26.  We can't
+    // represent 10**26 in a 64 bit integer, but we can represent 10**18.
+    // So, to test if a TTInt named m is too big we test if
+    // m/kMaxWholeDivisor < kMaxWholeFactor
+    static const uint64_t kMaxWholeDivisor = 100000000;             // == 10**8
+    static const uint64_t kMaxWholeFactor = 1000000000000000000;    // == 10**18
+    static bool inline oversizeWholeDecimal(TTInt ii) {
+        return (TTInt(kMaxWholeFactor) <= ii / kMaxWholeDivisor);
+    }
+  public:
     // setArrayElements is a const method since it doesn't actually mutate any NValue state, just
     // the state of the contained NValues which are referenced via the allocated object storage.
     // For example, it is not intended to ever "grow the array" which would require the NValue's
@@ -650,8 +661,20 @@ class NValue {
         return &valueChars[i];
     }
 
+    // Copy a value. If the value is inlined in a source tuple, then allocate
+    // memory from the temp string pool and copy data there
+    NValue copyNValue() const
+    {
+        NValue copy = *this;
+        if (m_sourceInlined) {
+            // The NValue storage is inlined (a pointer to the backing tuple storage) and needs
+            // to be copied to a local storage
+            copy.allocateObjectFromInlinedValue(getTempStringPool());
+        }
+        return copy;
+    }
 
-  private:
+private:
     /*
      * Private methods are private for a reason. Don't expose the raw
      * data so that it can be operated on directly.
@@ -2182,6 +2205,12 @@ class NValue {
         return retval;
     }
 
+    static NValue getBooleanValue(bool value) {
+        NValue retval(VALUE_TYPE_BOOLEAN);
+        retval.getBoolean() = value;
+        return retval;
+    }
+
     static NValue getDecimalValueFromString(const std::string &value) {
         NValue retval(VALUE_TYPE_DECIMAL);
         retval.createDecimalFromString(value);
@@ -2264,6 +2293,10 @@ class NValue {
         *reinterpret_cast<void**>(retval.m_data) = address;
         return retval;
     }
+
+    /// Common code to implement variants of the TRIM SQL function: LEADING, TRAILING, or BOTH
+    static NValue trimWithOptions(const std::vector<NValue>& arguments, bool leading, bool trailing);
+
 };
 
 /**
@@ -2382,6 +2415,8 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(char*);
       case VALUE_TYPE_DECIMAL:
         return sizeof(TTInt);
+      case VALUE_TYPE_BOOLEAN:
+        return sizeof(bool);
       default:
           char message[128];
           snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
