@@ -5,10 +5,10 @@
         <jsonapi enabled="true" />
     </httpd>
     <import>
-        <configuration module="kafkastream.jar" type="custom" enabled="false">
+        <configuration module="kafkastream.jar" type="custom" enabled="true">
             <property name="brokers">kafka2:9092</property>
-            <property name="topics">T1_KAFKAEXPORTTABLE1</property>
-            <property name="procedure">T1_KAFKAEXPORTTABLE1.insert</property>
+            <property name="topics">T3_KAFKAEXPORTTABLE1</property>
+            <property name="procedure">KAFKAIMPORTTABLE1.insert</property>
         </configuration>
     </import>
 
@@ -17,8 +17,8 @@
             <property name="metadata.broker.list">kafka2:9092</property>
             <property name="producer.type">async</property>
             <property name="request.required.acks">1</property>
-            <property name="skipinternals">false</property>
-            <property name="topic.prefix">T1_</property>
+            <property name="skipinternals">true</property>
+            <property name="topic.prefix">T3_</property>
         </configuration>
     </export>
 

@@ -52,5 +52,6 @@ export table kafkaExportTable1;
 -- Stored procedures
 load classes sp.jar;
 create procedure from class socketimporter.db.procedures.InsertExport;
+create procedure from class socketimporter.db.procedures.MatchRows;
 
 -- END_OF_BATCH
