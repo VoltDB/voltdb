@@ -87,7 +87,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         try {
             client.callProcedure("TruncateTable");
         } catch (ProcCallException ex) {
-            System.out.println(ex.getMessage());
+            //* enable to debug*/ System.out.println(ex.getMessage());
             e = ex;
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
         } finally {
@@ -245,7 +245,8 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // This mark two rows to be purged.
         client.callProcedure("@AdHoc",
-                        "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1 WHERE WAGE IN (20, 40)");
+                //hsql232 ENG-8325 IN LIST:  "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1 WHERE WAGE IN (20, 40)");
+                "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1 WHERE WAGE = 20 OR WAGE = 40"); // workaround hsql232 ENG-8325 IN LIST
         client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 50, 100);
         vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{0, 30, 60}, {0, 50, 100}});
@@ -445,8 +446,8 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // Now remove the constraint altogether
         cr = client.callProcedure("@AdHoc",
-                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX "
-                + "DROP LIMIT PARTITION ROWS");
+                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX " +
+                "DROP LIMIT PARTITION ROWS");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // no more constraint means insert can now succeed.
@@ -455,9 +456,10 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // Verify that we can add the constraint back again
         cr = client.callProcedure("@AdHoc",
-                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX "
-                + "ADD LIMIT PARTITION ROWS 3 "
-                + "EXECUTE (DELETE FROM CAPPED3_LIMIT_EXEC_COMPLEX WHERE DEPT IN (4, 7))");
+                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX " +
+                "ADD LIMIT PARTITION ROWS 3 " +
+                //hsql232 ENG-8325 IN LIST:  "EXECUTE (DELETE FROM CAPPED3_LIMIT_EXEC_COMPLEX WHERE DEPT IN (4, 7))"
+                "EXECUTE (DELETE FROM CAPPED3_LIMIT_EXEC_COMPLEX WHERE DEPT = 4 OR DEPT = 7)"); //workaround hsql232 ENG-8325 IN LIST
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 8, 0, "important", 17000).getResults()[0];
@@ -790,10 +792,11 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         //
         // Set the dept field to -32 as proof that we updated the row.
         validateTableOfScalarLongs(client,
-                "upsert into capped3_limit_rows_exec "
-                + "select case when wage in (80, 90) then 0 else 1 end, wage, -32 from nocapped "
-                + "where wage >= 80 "
-                + "order by id, wage, dept",
+                "upsert into capped3_limit_rows_exec " +
+                //hsql232 ENG-8325 IN LIST: "select case when wage in (80, 90) then 0 else 1 end, wage, -32 from nocapped "
+                "select case when (wage = 80 or wage = 90) then 0 else 1 end, wage, -32 from nocapped " + // workaround hsql232 ENG-8325 IN LIST
+                "where wage >= 80 " +
+                "order by id, wage, dept",
                 new long[] {8});
 
         validateTableOfLongs(client,
