@@ -84,7 +84,8 @@ public class KafkaImportBenchmark {
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
     static InsertExport exportProc;
-    static ExportMonitor exportMon;
+    static TableChangeMonitor exportMon;
+    static TableChangeMonitor importMon;
     static MatchChecks matchChecks;
 
     /**
@@ -240,6 +241,7 @@ public class KafkaImportBenchmark {
             }
             // check for export completion
             exportMon.waitForStreamedAllocatedMemoryZero();
+            importMon.waitForStreamedAllocatedMemoryZero();
         } finally {
             // cancel periodic stats printing
             statsTimer.cancel();
@@ -284,7 +286,8 @@ public class KafkaImportBenchmark {
 
         // handle inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(client);  // TODO: put this in the constructor?
-        exportMon = new ExportMonitor(client);
+        exportMon = new TableChangeMonitor(client, "StreamedTable", "KAFKAEXPORTTABLE1");
+        importMon = new TableChangeMonitor(client, "PersistentTable", "KAFKAIMPORTTABLE1");
         // matchChecks = new MatchChecks(client);
 
         //CountDownLatch cdl = new CountDownLatch(haplist.size());
@@ -300,7 +303,8 @@ public class KafkaImportBenchmark {
         // Arg is interval to wait between checks
         // TODO: make interval a command line argument
         System.out.println("starting data checker...");
-        Timer t = matchChecks.checkTimer(5000, client, config.duration);
+        @SuppressWarnings("static-access")
+		Timer t = matchChecks.checkTimer(5000, client, config.duration);
 
         runner.join(); // writers are done
         t.wait();      // now let the checking timer run down

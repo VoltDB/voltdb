@@ -6,10 +6,14 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 
-public class ExportMonitor {
+public class TableChangeMonitor {
 	Client client;
+	String table = "";
+	String type = "";
 
-    public ExportMonitor(Client client) {
+    public TableChangeMonitor(Client client, String type, String table) {
+    	this.type = type;
+    	this.table = table;
     	this.client = client;
     }
 
@@ -43,16 +47,17 @@ public class ExportMonitor {
             }
             long ts = 0;
             while (stats.advanceRow()) {
+                String ttable = stats.getString("TABLE_NAME");
                 String ttype = stats.getString("TABLE_TYPE");
                 Long tts = stats.getLong("TIMESTAMP");
                 //Get highest timestamp and watch it change
                 if (tts > ts) {
                     ts = tts;
                 }
-                if ("StreamedTable".equals(ttype)) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                if (type.equals(ttype) && table.equals(ttable)) {
+                    if (stats.getLong("TUPLE_ALLOCATED_MEMORY") != 0) {
                         passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
+                        System.out.println(ttable + ": Partition Not Zero.");
                         break;
                     }
                 }
@@ -67,11 +72,11 @@ public class ExportMonitor {
                     passed = true;
                     break;
                 }
-                System.out.println("Passed but not ready to declare victory.");
+                System.out.println(table + " quiescing but not ready to declare victory.");
             }
             Thread.sleep(5000);
         }
-        System.out.println("Passed is: " + passed);
+        System.out.println(table + " status is: " + passed);
         System.out.println(stats);
         return passed;
     }
