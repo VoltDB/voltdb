@@ -8,7 +8,7 @@
 -- DROP TABLE ROLE;
 
 CREATE TABLE EMPLOYEE(
-   empno      INTEGER NOT NULL,
+   empno      INTEGER DEFAULT 0 NOT NULL PRIMARY KEY,
    name       VARCHAR(10),
    job        VARCHAR(9),
    boss       INTEGER,
@@ -19,14 +19,14 @@ CREATE TABLE EMPLOYEE(
 );
  
 CREATE TABLE DEPARTMENT(
-   deptno     INTEGER NOT NULL,
+   deptno     INTEGER NOT NULL PRIMARY KEY,
    dept_count INTEGER NOT NULL,
    name       VARCHAR(14),
    location   VARCHAR(13)
 );
 
 CREATE TABLE SALARYGRADE(
-   grade      INTEGER NOT NULL,
+   grade      INTEGER NOT NULL PRIMARY KEY,
    losal      INTEGER NOT NULL,
    hisal      INTEGER NOT NULL
 );
@@ -35,11 +35,12 @@ CREATE TABLE BONUS (
    ename      VARCHAR(10) NOT NULL,
    job        VARCHAR(9) NOT NULL,
    sal        DECIMAL(7, 2),
-   comm       DECIMAL(7, 2)
+   comm       DECIMAL(7, 2),
+   PRIMARY KEY (ename, job)
 );
 
 CREATE TABLE PROJECT(
-   projectno    INTEGER NOT NULL,
+   projectno    INTEGER NOT NULL PRIMARY KEY,
    description  VARCHAR(100),
    start_date   VARCHAR(12),
    end_date     VARCHAR(12)
@@ -50,40 +51,13 @@ CREATE TABLE PROJECT_PARTICIPATION(
    empno        INTEGER NOT NULL,
    start_date   VARCHAR(12) NOT NULL,
    end_date     VARCHAR(12),
-   role_id      INTEGER
+   role_id      INTEGER,
+   PRIMARY KEY (projectno, empno, start_date)
 );
 
 CREATE TABLE ROLE(
-   role_id      INTEGER NOT NULL,
+   role_id      INTEGER NOT NULL PRIMARY KEY,
    description  VARCHAR(100)
 );
 
--- Primary Keys
-ALTER TABLE EMPLOYEE
-   ADD CONSTRAINT emp_pk
-   PRIMARY KEY (empno);
-
-ALTER TABLE DEPARTMENT
-   ADD CONSTRAINT dept_pk
-   PRIMARY KEY (deptno);
-
-ALTER TABLE SALARYGRADE
-   ADD CONSTRAINT salgrade_pk
-   PRIMARY KEY (grade);
-
-ALTER TABLE BONUS
-   ADD CONSTRAINT bonus_pk
-   PRIMARY KEY (ename, job);
-
-ALTER TABLE PROJECT
-   ADD CONSTRAINT project_pk
-   PRIMARY KEY (projectno);
- 
-ALTER TABLE PROJECT_PARTICIPATION
-   ADD CONSTRAINT participation_pk
-   PRIMARY KEY (projectno, empno, start_date);
-
-ALTER TABLE ROLE
-   ADD CONSTRAINT role_pk
-   PRIMARY KEY (role_id);
 
