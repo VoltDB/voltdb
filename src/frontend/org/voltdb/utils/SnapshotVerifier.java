@@ -98,7 +98,6 @@ public class SnapshotVerifier {
         if (snapshots.isEmpty()) {
             System.out.println("Snapshot corrupted");
             System.out.println("No files found");
-            printHelpAndQuit(-1);
         }
 
         for (Snapshot s : snapshots.values()) {
