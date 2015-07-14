@@ -13,6 +13,10 @@ fi
 
 OS=`uname`
 
+echo '$1 is ', $1
+echo '$2 is ', $2
+echo 'lib is ', obj/release/nativelibs/libvoltdb*.jnilib
+
 if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb*.jnilib ]
 then
     # the Mac case...
