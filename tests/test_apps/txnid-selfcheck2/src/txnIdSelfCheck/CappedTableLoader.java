@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.OperationMode;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -89,7 +90,7 @@ public class CappedTableLoader extends BenchmarkThread {
         public void clientCallback(ClientResponse clientResponse) throws Exception { // fix this
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
-                // logging this case makes the log massive. 
+                // This case is what happens when the table fails to delete enough rows to make room for the next insert. 
                 // log.info("CappedTableLoader acceptably failed to insert into " + tableName + ". ");
             } else if ( status == ClientResponse.USER_ABORT) {
                 log.error("User abort while attempting to insert into table "+ tableName );
@@ -146,12 +147,13 @@ public class CappedTableLoader extends BenchmarkThread {
                     }
                     currentRowCount = nextRowCount;
                     if (exceedsPartitionLimit()) 
-                        hardStop("Capped table  exceeds 10 rows, this shoudln't happen. Exiting. ");
+                        hardStop("Capped table exceeds 10 rows, this shoudln't happen and it shouldn't be tested here. Exiting. ");
                 }
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
+                log.error("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
+                hardStop("exceeds partition limit exception :: "+ e.getMessage(), e);
                 try { Thread.sleep(3000); } catch (Exception e2) { }
             }
             
@@ -161,7 +163,8 @@ public class CappedTableLoader extends BenchmarkThread {
                 if (exceedsPartitionLimit()) 
                     hardStop("Capped table  exceeds 10 rows, this shoudln't happen. Exiting. ");
             } catch (Exception e) {
-                hardStop("exceeds partition limit exception", e);
+                System.out.println("Exception number 2");
+                hardStop("exceeds partition limit exception :: "+ e.getMessage(), e);
             }
         }
         log.info("CappedTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
@@ -171,16 +174,33 @@ public class CappedTableLoader extends BenchmarkThread {
     
     private boolean exceedsPartitionLimit() throws NoConnectionsException, IOException, ProcCallException {
         VoltTable stats = TxnId2Utils.doStatistics(client, "table").getResults()[0];
+        boolean ret = false;
+        long replicated_cnt = -1;
         while (stats.advanceRow()) {
             long rowlim = stats.getLong(11);
+            long rowcnt = stats.getLong(7);
+            String tabname = stats.getString(5);
+            long partition = stats.getLong(4);
             if (rowlim > 0) {// only check rows with a limit
-                long rowcnt = stats.getLong(7);
+                if (tabname.equals("CAPR")) {
+                    if (replicated_cnt == -1)
+                        replicated_cnt = rowcnt+1000*partition;
+                    else {
+                        if (replicated_cnt%1000 != rowcnt) {
+                            log.error("CAPR on Partition:"+partition+" has TUPLE_COUNT:"+rowcnt+", which does not match Partition:"+(replicated_cnt/1000)+" with CAPR.TUPLE_COUNT:"+replicated_cnt%1000);
+                            //ret = true;
+                        }
+                    }
+                }
                 if (rowcnt > rowlim) {
-                    Benchmark.hardStop("tuple_count: "+rowcnt+" exceeds tuple_limit: "+rowlim+" for table " + stats.getString(5) + " on partition " + stats.getLong(4));
+                    log.error("Table "+tabname+" on partition "+partition+" has TUPLE_COUNT:"+rowcnt+" > TUPLE_LIMIT:"+rowlim);
+                    ret = true;
                 }
             }
         }
-        return false;
+        if (ret)
+            log.error("See tables CAPR and CAPP for each partition, as well as above errors ::\n"+stats.toFormattedString());
+        return ret;
     }
 
 }
