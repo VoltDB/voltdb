@@ -695,7 +695,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             m_pendingOffsets.add(currentOffset);
                             if (!callProcedure(cb, invocation)) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
-                                m_currentOffset.set(currentOffset);
+                                synchronized(m_seenOffset) {
+                                    m_seenOffset.add(messageAndOffset.nextOffset());
+                                }
                                 m_pendingOffsets.remove(messageAndOffset.nextOffset());
                                 continue;
                             }
