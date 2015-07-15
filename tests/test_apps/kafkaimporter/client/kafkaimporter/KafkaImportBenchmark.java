@@ -42,16 +42,15 @@ import java.io.OutputStream;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -62,9 +61,8 @@ public class KafkaImportBenchmark {
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
-    // queue structure to hold data as it's written, so we can check it all get's into the database
-    static Queue<Pair<Long,Long>> queue = new LinkedBlockingQueue<Pair<Long,Long>>();
-    static boolean importerDone = false;
+    // Statistics manager objects from the client
+    static ClientStatsContext periodicStatsContext;
 
     // validated command line configuration
     final Config config;
@@ -79,10 +77,6 @@ public class KafkaImportBenchmark {
     AtomicLong linesRead = new AtomicLong(0);
     AtomicLong rowsAdded = new AtomicLong(0);
     static final AtomicLong rowsChecked = new AtomicLong(0);
-    static final AtomicLong rowsMismatch = new AtomicLong(0);
-    static final AtomicLong writers = new AtomicLong(0);
-    static final AtomicLong socketWrites = new AtomicLong(0);
-    static final AtomicLong socketWriteExceptions = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
     static InsertExport exportProc;
@@ -179,6 +173,17 @@ public class KafkaImportBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
+    	ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+        long thrup;
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        thrup = stats.getTxnThroughput();
+        System.out.printf("Throughput %d/s, ", thrup);
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
     }
 
     /**
@@ -275,7 +280,6 @@ public class KafkaImportBenchmark {
      * @see {@link VoterConfig}
      */
     public static void main(String[] args) throws Exception {
-        // final long WAIT_FOR_A_WHILE = 100 * 1000; // 100 seconds
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(KafkaImportBenchmark.class.getName(), args);
@@ -313,7 +317,6 @@ public class KafkaImportBenchmark {
         client.drain();
         client.close();
 
-        System.out.println("Queued tuples remaining: " + queue.size());
         if (testResult == true) {
         	System.out.println("Test passed!");
         	System.exit(0);
