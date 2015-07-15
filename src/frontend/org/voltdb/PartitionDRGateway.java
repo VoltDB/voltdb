@@ -42,7 +42,7 @@ public class PartitionDRGateway {
     private static final VoltLogger log = new VoltLogger("DR");
 
     public enum DRRecordType {
-        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX;
+        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
 
         public static final ImmutableMap<Integer, DRRecordType> conversion;
         static {
