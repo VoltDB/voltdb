@@ -55,5 +55,3 @@ CREATE PROCEDURE FROM class kafkaimporter.db.procedures.DeleteRows;
 create procedure CountMirror as select count(*) from kafkamirrortable1;
 
 -- END_OF_BATCH
-           
-

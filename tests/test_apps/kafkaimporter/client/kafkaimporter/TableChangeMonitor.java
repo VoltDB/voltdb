@@ -7,17 +7,17 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 
 public class TableChangeMonitor {
-	Client client;
-	String table = "";
-	String type = "";
+    Client client;
+    String table = "";
+    String type = "";
 
     public TableChangeMonitor(Client client, String type, String table) {
-    	this.type = type;
-    	this.table = table;
-    	this.client = client;
+        this.type = type;
+        this.table = table;
+        this.client = client;
     }
 
-	/**
+    /**
      * Checks the export table to make sure that everything has been successfully
      * processed.
      * @throws ProcCallException

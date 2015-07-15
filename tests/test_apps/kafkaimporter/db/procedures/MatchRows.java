@@ -50,7 +50,7 @@ public class MatchRows extends VoltProcedure {
 
     public VoltTable[] run()
     {
-    	voltQueueSQL(matchSelect);
-    	return voltExecuteSQL(true);
+        voltQueueSQL(matchSelect);
+        return voltExecuteSQL(true);
     }
 }

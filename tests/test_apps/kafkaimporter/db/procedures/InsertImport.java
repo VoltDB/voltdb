@@ -50,7 +50,7 @@ public class InsertImport extends VoltProcedure {
 
     public long run(long key, long value)
     {
-    	voltQueueSQL(importInsert, key, value);
+        voltQueueSQL(importInsert, key, value);
 
         // Execute queued statements
         voltExecuteSQL(true);

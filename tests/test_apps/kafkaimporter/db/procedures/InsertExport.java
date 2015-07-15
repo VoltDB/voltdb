@@ -51,8 +51,8 @@ public class InsertExport extends VoltProcedure {
 
     public long run(long key, long value)
     {
-    	voltQueueSQL(exportInsert, key, value);
-    	voltQueueSQL(mirrorInsert, key, value);
+        voltQueueSQL(exportInsert, key, value);
+        voltQueueSQL(mirrorInsert, key, value);
 
         // Execute queued statements
         voltExecuteSQL(true);

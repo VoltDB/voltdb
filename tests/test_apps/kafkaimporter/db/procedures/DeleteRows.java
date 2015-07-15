@@ -50,9 +50,9 @@ public class DeleteRows extends VoltProcedure {
 
     public long run(long key)
     {
-    	voltQueueSQL(deleteRow1, key);
-    	voltQueueSQL(deleteRow2, key);
-    	voltExecuteSQL(true);
-    	return 0;
+        voltQueueSQL(deleteRow1, key);
+        voltQueueSQL(deleteRow2, key);
+        voltExecuteSQL(true);
+        return 0;
     }
 }

@@ -46,63 +46,63 @@ public class MatchChecks {
          }
     }
 
-	protected static Timer checkTimer(long interval, Client client) {
-		final Timer timer = new Timer();
+    protected static Timer checkTimer(long interval, Client client) {
+        final Timer timer = new Timer();
         final Client innerClient = client;
-		timer.scheduleAtFixedRate(new TimerTask() {
-		    private long mirrorRowCount = 0;
+        timer.scheduleAtFixedRate(new TimerTask() {
+            private long mirrorRowCount = 0;
 
-			@Override
-		    public void run() {
-				mirrorRowCount = getMirrorTableRowCount(innerClient);
-				System.out.println("\tDelete rows: " + findAndDeleteMatchingRows(innerClient));
-				System.out.println("\tMirror table row count: " + mirrorRowCount);
-		    	if (mirrorRowCount == 0) { // indicates everything matched and table empty
-		    		timer.cancel();
-		    		timer.purge();
-		    	}
-		    }
-		}, 0, interval);
+            @Override
+            public void run() {
+                mirrorRowCount = getMirrorTableRowCount(innerClient);
+                System.out.println("\tDelete rows: " + findAndDeleteMatchingRows(innerClient));
+                System.out.println("\tMirror table row count: " + mirrorRowCount);
+                if (mirrorRowCount == 0) { // indicates everything matched and table empty
+                    timer.cancel();
+                    timer.purge();
+                }
+            }
+        }, 0, interval);
         return timer;
-	}
+    }
 
-	protected static long getMirrorTableRowCount(Client client) {
-		// check row count in mirror table -- the "master" of what should come back
-		// eventually via import
-		long mirrorRowCount = 0;
-		try {
-			VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
-			mirrorRowCount = countQueryResult[0].asScalarLong();
-		} catch (IOException | ProcCallException e) {
-			e.printStackTrace();
-		}
-		System.out.println("Mirror table row count: " + mirrorRowCount);
-		return mirrorRowCount;
-	}
+    protected static long getMirrorTableRowCount(Client client) {
+        // check row count in mirror table -- the "master" of what should come back
+        // eventually via import
+        long mirrorRowCount = 0;
+        try {
+            VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
+            mirrorRowCount = countQueryResult[0].asScalarLong();
+        } catch (IOException | ProcCallException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Mirror table row count: " + mirrorRowCount);
+        return mirrorRowCount;
+    }
 
-	protected static long findAndDeleteMatchingRows(Client client) {
-		long rows = 0;
-		VoltTable results = null;
+    protected static long findAndDeleteMatchingRows(Client client) {
+        long rows = 0;
+        VoltTable results = null;
 
-		try {
-			results = client.callProcedure("MatchRows").getResults()[0];
-		} catch (Exception e) {
-		     e.printStackTrace();
-		     System.exit(-1);
-		}
+        try {
+            results = client.callProcedure("MatchRows").getResults()[0];
+        } catch (Exception e) {
+             e.printStackTrace();
+             System.exit(-1);
+        }
 
-		System.out.println("getRowCount(): " + results.getRowCount());
-		while (results.advanceRow()) {
-			long key = results.getLong(0);
-			// System.out.println("Key: " + key);
-			try {
-				client.callProcedure(new DeleteCallback(), "DeleteRows", key);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			rows++;
-		}
-		return rows;
-	}
+        System.out.println("getRowCount(): " + results.getRowCount());
+        while (results.advanceRow()) {
+            long key = results.getLong(0);
+            // System.out.println("Key: " + key);
+            try {
+                client.callProcedure(new DeleteCallback(), "DeleteRows", key);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            rows++;
+        }
+        return rows;
+    }
 }
 

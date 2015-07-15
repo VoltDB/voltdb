@@ -30,30 +30,30 @@ import org.voltdb.client.ProcedureCallback;
 
 
 public class InsertExport {
-	final Client m_client;
+    final Client m_client;
 
-	public InsertExport(Client client) {
-		m_client = client;
-	}
+    public InsertExport(Client client) {
+        m_client = client;
+    }
 
-	public void insertExport(long key, long value) {
-		try {
-			m_client.callProcedure(new InsertCallback(), "InsertExport", key, value);
-		} catch (IOException e) {
-			System.out.println("Exception calling stored procedure InsertExport");
-			e.printStackTrace();
-		}
-	}
+    public void insertExport(long key, long value) {
+        try {
+            m_client.callProcedure(new InsertCallback(), "InsertExport", key, value);
+        } catch (IOException e) {
+            System.out.println("Exception calling stored procedure InsertExport");
+            e.printStackTrace();
+        }
+    }
 
-	static class InsertCallback implements ProcedureCallback {
+    static class InsertCallback implements ProcedureCallback {
 
-		@Override
-		public void clientCallback(ClientResponse clientResponse)
-				throws Exception {
-			if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-				System.err.println(clientResponse.getStatusString());
-			}
-		}
+        @Override
+        public void clientCallback(ClientResponse clientResponse)
+                throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                System.err.println(clientResponse.getStatusString());
+            }
+        }
 
-	}
+    }
 }

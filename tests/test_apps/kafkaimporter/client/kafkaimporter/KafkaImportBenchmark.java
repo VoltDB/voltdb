@@ -21,17 +21,19 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * This program exercises the socket import capability by writing
- * <key, value> pairs to one or more VoltDB socket importers.
- *
- * The pairs accumulate in a Queue structure. The program removes pairs
- * from the Queue and uses asynchronous database queuries to verify that
- * all the pairs written to the socket interface are present and have
- * matching values.
- *
- * The checking proceeds in parallel as the socket writers write to the
- * socket importers, and continues on until all pairs have been checked and
- * the database has time to complete all socket importer input transactions.
+ * This program exercises the Kafka import capability by inserting
+ * <key, value> pairs into both a VoltDB table -- KAFKAMIRRORTABLE1, and
+ * a export table -- KAFKAEXPORTTABLE1. The export table links to a
+ * topic in a Kafka complex. The deployment file also add an import from
+ * that same complex. The checking proceeds in parallel, checking
+ * the rows in the KAFKAIMPORTTABLE1 with rows in the mirror table.
+ * Matching rows are deleted from both tables. Separate threads check
+ * statistics on both the export table and import table to determine when
+ * both import and export activity have quiesced. At the end of a
+ * successful run, both the import table and the mirror table are empty.
+ * If there are rows left in the mirror table, then not all exported
+ * rows have made the round trip back to the import table, or there might
+ * be data corruption causing the match process to fail.
  */
 
 package kafkaimporter.client.kafkaimporter;
@@ -98,7 +100,7 @@ public class KafkaImportBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 2000;
+        int duration = 300;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
@@ -106,10 +108,7 @@ public class KafkaImportBenchmark {
         @Option(desc = "Comma separated list of the form server[:port] to connect to for database queuries")
         String servers = "localhost";
 
-        @Option(desc = "Comma separated list of the form server[:port] to connect to for streaming import")
-        String sockservers = "localhost";
-
-        @Option(desc = "Report latency for async benchmark run.")
+        @Option(desc = "Report latency for kafka benchmark run.")
         boolean latencyreport = false;
 
         @Option(desc = "Filename to write raw summary statistics to.")
@@ -285,7 +284,7 @@ public class KafkaImportBenchmark {
         dbconnect(config.servers);
 
         // handle inserts to Kafka export table and its mirror DB table
-        exportProc = new InsertExport(client);  // TODO: put this in the constructor?
+        exportProc = new InsertExport(client);
         exportMon = new TableChangeMonitor(client, "StreamedTable", "KAFKAEXPORTTABLE1");
         importMon = new TableChangeMonitor(client, "PersistentTable", "KAFKAIMPORTTABLE1");
         // matchChecks = new MatchChecks(client);
@@ -304,7 +303,7 @@ public class KafkaImportBenchmark {
         // TODO: make interval a command line argument
         System.out.println("starting data checker...");
         @SuppressWarnings("static-access")
-		Timer t = matchChecks.checkTimer(5000, client);
+        Timer t = matchChecks.checkTimer(5000, client);
 
         runner.join(); // writers are done
         // t.wait();      // now let the checking timer run down
