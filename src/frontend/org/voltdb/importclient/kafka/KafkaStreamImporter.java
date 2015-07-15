@@ -328,7 +328,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
         private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
-        private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 500);
+        private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 50000);
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private final TopicAndPartition m_topicAndPartition;
 
@@ -539,32 +539,44 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
             private void commitAndSaveOffset(long currentNext) {
                 try {
-                    //Queue up commit offset points.
-                    m_seenOffset.add(m_nextOffset);
+                    //If we have too many commit last and clean up
                     if (m_seenOffset.size() >= m_perTopicPendingLimit) {
                         //Last possible commit point.
                         long commit = m_seenOffset.last();
-                        //Highest commit we have seen after me will be committed.
                         if (commitOffset(commit)) {
                             debug("Committed offset " + commit + " for " + m_topicAndPartition);
                             m_currentOffset.set(commit);
                         }
-                        m_seenOffset.clear();
+                        synchronized(m_seenOffset) {
+                            m_seenOffset.clear();
+                        }
                         return;
                     }
-                    //From first find the last continuous offset and commit that.
-                    long commit = m_seenOffset.first();
-                    while (m_seenOffset.contains(++commit)) {
-                        //
+                    long commit;
+                    synchronized(m_seenOffset) {
+                        if (!m_seenOffset.isEmpty()) {
+                            m_seenOffset.add(currentNext);
+                            //From first find the last continuous offset and commit that.
+                            commit = m_seenOffset.first();
+                            while (m_seenOffset.contains(++commit)) {
+                                //
+                            }
+                            Set<Long> removeSet = m_seenOffset.headSet(commit);
+                            if (removeSet != null) {
+                                debug("Remove set is: " + removeSet.size());
+                                m_seenOffset.removeAll(removeSet);
+                            }
+                        } else {
+                           commit =  currentNext;
+                        }
                     }
-                    Set<Long> removeSet = m_seenOffset.headSet(commit);
-                    m_seenOffset.removeAll(removeSet);
 
                     //Highest commit we have seen after me will be committed.
                     if (commitOffset(commit)) {
                         debug("Committed offset " + commit + " for " + m_topicAndPartition);
                         m_currentOffset.set(commit);
                     }
+                    //If this happens we will come back again on next callback.
                 } catch (Exception ex) {
                     error("Failed to commit and save offset " + currentNext, ex);
                 }
@@ -608,15 +620,20 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 while (!m_shutdown) {
                     if (consumer == null) {
                         consumer = new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
+                    }
+                    //If we dont know the offset get it backoff if we fail.
+                    if (m_currentOffset.get() < 0) {
                         getOffsetCoordinator();
                         m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
-                    }
-                    if (m_currentOffset.get() < 0) {
-                        m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
+                        if (m_currentOffset.get() < 0) {
+                            fetchFailedCount = backoffSleep(fetchFailedCount);
+                            continue;
+                        }
+                        info("Starting offset for " + m_topicAndPartition + " is set to: " + m_currentOffset.get());
                     }
                     long currentFetchCount = 0;
                     //Build fetch request of we have a valid offset and not too many are pending.
-                    if (m_currentOffset.get() >= 0 && m_pendingOffsets.size() < m_perTopicPendingLimit) {
+                    if (m_pendingOffsets.size() < m_perTopicPendingLimit) {
                         FetchRequest req = new FetchRequestBuilder().clientId(CLIENT_ID)
                                 .addFetch(m_topicAndPartition.topic(),
                                         m_topicAndPartition.partition(), m_currentOffset.get(), m_fetchSize)
@@ -641,7 +658,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             error("Failed to fetch messages for " + m_topicAndPartition + " Code " + code);
                             if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                                 // We asked for an invalid offset. For simple case ask for the last element to reset
-                                error("Invalid offset requested for " + m_topicAndPartition);
+                                info("Invalid offset requested for " + m_topicAndPartition);
                                 getOffsetCoordinator();
                                 m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
                                 continue;
@@ -697,7 +714,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 while (m_pendingOffsets.size() > 0) {
                     cnt = backoffSleep(cnt);
                 }
-                info("Partition fecher stopped for " + m_topicAndPartition);
+                info("Partition fecher stopped for " + m_topicAndPartition + " Last commit point is: " + m_currentOffset.get());
             } catch (Exception ex) {
                 error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
