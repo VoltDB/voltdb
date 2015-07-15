@@ -104,5 +104,18 @@ public class MatchChecks {
         }
         return rows;
     }
+
+	public static long getImportTableRowCount(Client client) {
+		// check row count in import table
+        long importRowCount = 0;
+        try {
+            VoltTable[] countQueryResult = client.callProcedure("CountImport").getResults();
+            importRowCount = countQueryResult[0].asScalarLong();
+        } catch (IOException | ProcCallException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Import table row count: " + importRowCount);
+        return importRowCount;
+	}
 }
 
