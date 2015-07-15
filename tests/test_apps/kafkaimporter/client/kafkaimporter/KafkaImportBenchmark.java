@@ -283,14 +283,12 @@ public class KafkaImportBenchmark {
         // connect to one or more servers, loop until success
         dbconnect(config.servers);
 
-        // handle inserts to Kafka export table and its mirror DB table
+        // instance handles inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(client);
+
+        // get instances to track track export completion using @Statistics
         exportMon = new TableChangeMonitor(client, "StreamedTable", "KAFKAEXPORTTABLE1");
         importMon = new TableChangeMonitor(client, "PersistentTable", "KAFKAIMPORTTABLE1");
-        // matchChecks = new MatchChecks(client);
-
-        //CountDownLatch cdl = new CountDownLatch(haplist.size());
-        //for (HostAndPort hap : haplist.keySet()) {
 
         System.out.println("starting KafkaImportBenchmark...");
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
@@ -306,18 +304,22 @@ public class KafkaImportBenchmark {
         Timer t = matchChecks.checkTimer(5000, client);
 
         runner.join(); // writers are done
-        // t.wait();      // now let the checking timer run down
+
+        // final check time since the import and export tables have quiesced.
+        // check that the mirror table is empty. If not, that indicates that
+        // not all the rows got to Kafka or not all the rows got imported back.
+        boolean testResult = FinalCheck.check(client);
 
         client.drain();
         client.close();
 
         System.out.println("Queued tuples remaining: " + queue.size());
-        System.out.println("Total rows added by Socket Injester: " + finalInsertCount.get());
-        System.out.println("Socket write count: " + socketWrites.get());
-        System.out.println("Socket write exception count: " + socketWriteExceptions.get());
-        System.out.println("Rows checked against database: " + rowsChecked.get());
-        System.out.println("Mismatch rows (value imported <> value in DB): " + rowsMismatch.get());
-
-        System.exit(0);
+        if (testResult == true) {
+        	System.out.println("Test passed!");
+        	System.exit(0);
+        } else {
+        	System.out.println("Test failed!");
+        	System.exit(1);
+        }
     }
 }
