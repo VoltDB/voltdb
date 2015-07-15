@@ -82,8 +82,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private List<String> m_topicList;
     //List of brokers.
     private final List<HostAndPort> m_brokerList = new ArrayList<HostAndPort>();
-    //kafka properties which has defaults
-    private int m_fetchSize = 65536;
+    //kafka properties which has defaults use 2m row limit.
+    private int m_fetchSize = (2*1024*1024);
     private int m_consumerSocketTimeout = 30000; //In milliseconds
 
     private static final String GROUP_ID = "voltdb";
@@ -485,10 +485,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private class TopicPartitionInvocationCallback implements ProcedureCallback {
 
             private final long m_offset;
+            private final long m_nextOffset;
             private final TopicAndPartition m_topicAndPartition;
 
-            public TopicPartitionInvocationCallback(long offset, TopicAndPartition tAndP) {
+            public TopicPartitionInvocationCallback(long offset, long noffset, TopicAndPartition tAndP) {
                 m_offset = offset;
+                m_nextOffset = noffset;
                 m_topicAndPartition = tAndP;
             }
 
@@ -587,7 +589,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     assert(!m_pendingOffsets.isEmpty());
 
                     m_pendingOffsets.remove(m_offset);
-                    commitAndSaveOffset(m_offset);
+                    commitAndSaveOffset(m_nextOffset);
 
                 } catch (Throwable t) {
                     // Should never get here
@@ -689,12 +691,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             payload.get(bytes);
                             String line = new String(bytes, "UTF-8");
                             CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, m_topicAndPartition);
+                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition);
                             m_pendingOffsets.add(currentOffset);
                             if (!callProcedure(cb, invocation)) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
                                 m_currentOffset.set(currentOffset);
-                                m_pendingOffsets.remove(currentOffset);
+                                m_pendingOffsets.remove(messageAndOffset.nextOffset());
                                 continue;
                             }
                         }

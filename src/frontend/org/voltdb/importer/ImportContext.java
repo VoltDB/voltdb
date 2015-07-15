@@ -129,7 +129,13 @@ public interface ImportContext {
     public void error(String message);
 
     /**
-     * log error message
+     * log warn message
+     * @param message message to log to Volt server logging system.
+     */
+    public void warn(String message);
+
+    /**
+     * log debug message
      * @param message message to log to Volt server logging system.
      */
     public void debug(String message);
