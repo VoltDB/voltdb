@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -237,6 +238,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         // This is set to true when -p option us used.
         boolean useSuppliedProcedure = false;
 
+        @Option(desc = "use upsert instead of insert", hasArg = false)
+        boolean upsertMode = false;
+
         /**
          * Validate command line options.
          */
@@ -338,7 +342,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             if (config.useSuppliedProcedure) {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, errHandler);
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.upsertMode, errHandler);
             }
 
             //Created Source reader

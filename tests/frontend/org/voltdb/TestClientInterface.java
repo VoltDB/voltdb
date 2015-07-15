@@ -537,13 +537,27 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testLoadSinglePartTable() throws Exception {
+    public void testLoadSinglePartTableInsert() throws Exception {
         VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
         table.addRow(1);
 
         byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
         ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 0, table);
-        readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true);
+        StoredProcedureInvocation invocation =
+                readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true).getStoredProcedureInvocation();
+        assertEquals((byte) 0, invocation.getParameterAtIndex(2));
+    }
+
+    @Test
+    public void testLoadSinglePartTableUpsert() throws Exception {
+        VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
+        table.addRow(1);
+
+        byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
+        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 1, table);
+        StoredProcedureInvocation invocation =
+                readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true).getStoredProcedureInvocation();
+        assertEquals((byte) 1, invocation.getParameterAtIndex(2));
     }
 
     @Test

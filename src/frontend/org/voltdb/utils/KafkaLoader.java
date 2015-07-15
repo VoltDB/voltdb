@@ -17,6 +17,7 @@
 package org.voltdb.utils;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
@@ -33,6 +35,7 @@ import kafka.message.MessageAndMetadata;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -98,7 +101,7 @@ public class KafkaLoader {
         if (m_config.useSuppliedProcedure) {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
         } else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, new KafkaBulkLoaderCallback());
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.upsertMode, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
         m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
@@ -163,6 +166,9 @@ public class KafkaLoader {
          */
         @AdditionalArgs(desc = "insert the data into this table.")
         public String table = "";
+
+        @Option(desc = "use upsert instead of insert", hasArg = false)
+        boolean upsertMode = false;
 
         /**
          * Validate command line options.

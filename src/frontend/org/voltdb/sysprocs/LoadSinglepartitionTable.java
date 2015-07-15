@@ -105,7 +105,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
             }
             if (!hasPkey) {
                 throw new VoltAbortException(
-                        String.format("LoadSinglepartitionTable in upsert mode incompatible with table %s. with no primary key",
+                        String.format("LoadSinglepartitionTable in upsert mode incompatible with table %s of no primary key.",
                                 tableName));
             }
         }
@@ -120,8 +120,8 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
         int columnCount = table.getColumnCount();
 
         // find the insert/upsert statement for this table
-        String insertProcName = String.format("%s.%s", tableName,action);
-        Procedure p = ctx.ensureDefaultProcLoaded(insertProcName);
+        String crudProcName = String.format("%s.%s", tableName,action);
+        Procedure p = ctx.ensureDefaultProcLoaded(crudProcName);
         if (p == null) {
             throw new VoltAbortException(
                     String.format("Unable to locate auto-generated CRUD % statement for table %s",

@@ -174,7 +174,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             }
             if (!hasPkey) {
                 throw new VoltAbortException(
-                        String.format("LoadMultipartitionTable in upsert mode incompatible with table %s. with no primary key",
+                        String.format("LoadMultipartitionTable in upsert mode incompatible with table %s of no primary key.",
                                 tableName));
             }
         }
@@ -189,15 +189,15 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         int columnCount = table.getColumnCount();
 
         // find the insert statement for this table
-        String insertProcName = String.format("%s.%s", tableName.toUpperCase(),action);
-        Procedure proc = ctx.ensureDefaultProcLoaded(insertProcName);
+        String crudProcName = String.format("%s.%s", tableName.toUpperCase(),action);
+        Procedure proc = ctx.ensureDefaultProcLoaded(crudProcName);
         if (proc == null) {
             throw new VoltAbortException(
                     String.format("Unable to locate auto-generated CRUD %s statement for table %s",
                             action, tableName));
         }
         // ensure MP fragment tasks load the plan for the table loading procedure
-        m_runner.setProcNameToLoadForFragmentTasks(insertProcName);
+        m_runner.setProcNameToLoadForFragmentTasks(crudProcName);
 
         Statement catStmt = proc.getStatements().get(VoltDB.ANON_STMT_NAME);
         if (catStmt == null) {
