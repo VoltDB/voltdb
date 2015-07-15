@@ -654,7 +654,7 @@ DISTRIBUTION
         <arg value='bash' />
         <arg value='tools/copy-lib.sh'/>
         <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
-        <arg value='${dest.version}' />
+        <arg value='${dist.version}' />
     </exec>
 
     <copy todir="${jar.nativelib.dir}">
