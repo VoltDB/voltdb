@@ -485,12 +485,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private class TopicPartitionInvocationCallback implements ProcedureCallback {
 
             private final long m_offset;
-            private final long m_nextOffset;
             private final TopicAndPartition m_topicAndPartition;
 
-            public TopicPartitionInvocationCallback(long offset, long noffset, TopicAndPartition tAndP) {
+            public TopicPartitionInvocationCallback(long offset, TopicAndPartition tAndP) {
                 m_offset = offset;
-                m_nextOffset = noffset;
                 m_topicAndPartition = tAndP;
             }
 
@@ -558,8 +556,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             m_seenOffset.add(currentNext);
                             //From first find the last continuous offset and commit that.
                             commit = m_seenOffset.first();
-                            while (m_seenOffset.contains(++commit)) {
-                                //
+                            while (m_seenOffset.contains(commit+1)) {
+                                commit++;
                             }
                             Set<Long> removeSet = m_seenOffset.headSet(commit);
                             if (removeSet != null) {
@@ -589,7 +587,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     assert(!m_pendingOffsets.isEmpty());
 
                     m_pendingOffsets.remove(m_offset);
-                    commitAndSaveOffset(m_nextOffset);
+                    commitAndSaveOffset(m_offset);
 
                 } catch (Throwable t) {
                     // Should never get here
@@ -691,11 +689,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             payload.get(bytes);
                             String line = new String(bytes, "UTF-8");
                             CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition);
+                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, m_topicAndPartition);
                             m_pendingOffsets.add(currentOffset);
                             if (!callProcedure(cb, invocation)) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
-                                m_currentOffset.set(messageAndOffset.nextOffset());
+                                m_currentOffset.set(currentOffset);
                                 m_pendingOffsets.remove(currentOffset);
                                 continue;
                             }
