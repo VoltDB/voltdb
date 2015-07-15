@@ -106,8 +106,9 @@ public class SnapshotVerifier {
     }
 
     private static void printHelpAndQuit( int code) {
-        System.out.println("Usage\nSpecific snapshot: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier snapshot_name --dir dir1 --dir dir2 --dir dir3");
-        System.out.println("All snapshots: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier --dir dir1 --dir dir2 --dir dir3");
+        System.out.println("Usage: snapshotverifier --help");
+        System.out.println("Specific snapshot: snapshotverifier snapshot_name --dir dir1 --dir dir2 --dir dir3");
+        System.out.println("All snapshots: snapshotverifier --dir dir1 --dir dir2 --dir dir3");
         System.exit(code);
     }
 }

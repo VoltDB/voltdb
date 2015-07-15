@@ -100,6 +100,7 @@ public class VoltLogger {
         public void log(Level level, Object message, Throwable t);
         public void l7dlog(Level level, String key, Object[] params, Throwable t);
         public long getLogLevels(VoltLogger loggers[]);
+        public void setLevel(Level level);
     }
 
     /*
@@ -301,6 +302,10 @@ public class VoltLogger {
 
     public long getLogLevels(VoltLogger loggers[]) {
         return m_logger.getLogLevels(loggers);
+    }
+
+    public void setLevel(Level level) {
+        m_logger.setLevel(level);
     }
 
     /**

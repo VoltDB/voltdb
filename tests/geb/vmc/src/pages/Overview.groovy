@@ -148,6 +148,8 @@ class Overview extends Module {
         rabbitMqBrokerName          { $(class:"labelCollapsed", text:rabbitMqBrokerTest) }
         rabbitMqAmqpName            { $(class:"labelCollapsed", text:rabbitMqAmqpTest) }
         customName                  { $(class:"labelCollapsed", text:customTest) }
+
+        elasticSearchName           { $(class:"labelCollapsed", text:elasticSearchTest) }
         
         confirmyesbtn			    { $("#btnSaveConfigOk", text:"Yes") }
         
@@ -156,7 +158,13 @@ class Overview extends Module {
         newTextField                { $("#txtName1") }
         newValueField               { $("#txtValue1") }
         deleteFirstProperty         { $("#deleteFirstProperty") }
-            
+
+
+        // EXPORT POPUP: ELASTICSEARCH
+        endpointES                      { $("#txtEndpointES") }
+        endpointESValue                   { $("#txtEndpointESValue") }
+
+
         // EXPORT POPUP: FILE
         type                        { $("#txtFileType") }
         nonce                       { $("#txtnonce") }
@@ -257,7 +265,8 @@ class Overview extends Module {
     String rabbitMqBrokerTest   = getRabbitmqBrokerTest()
     String rabbitMqAmqpTest     = getRabbitmqAmqpTest()
     String customTest           = getCustomTest()
-    
+    String elasticSearchTest             = getElasticSearchTest()
+
     def String getName() {
     	return "addUser(1,'" + getUsernameOneForSecurity() + "','" + getRoleOneForSecurity() + "');"
     }
@@ -268,6 +277,10 @@ class Overview extends Module {
     
     def String getFileTest() {
         return getFileTestName() + " (FILE)"
+    }
+
+    def String getElasticSearchTest() {
+        return getElasticSearchTestName() + " (FILE)"
     }
     
     def String getJdbcTest() {
@@ -655,6 +668,14 @@ class Overview extends Module {
         customTestName = br.readLine()
         return customTestName
     }
+
+    def String getElasticSearchTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+        String elasticSearchTestName
+        while((elasticSearchTestName = br.readLine()) != ("#elasticSearchTestName")) {}
+        elasticSearchTestName = br.readLine()
+        return elasticSearchTestName
+    }
     
     def void clickSave() {
         int count = 0
@@ -824,6 +845,14 @@ class Overview extends Module {
     	while((customConnectorClass = br.readLine()) != ("#customConnectorClass")) {}
         customConnectorClass = br.readLine()
         return customConnectorClass
+    }
+
+    def String getElasticSearchValueOne() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+        String elasticSearchValue
+        while((elasticSearchValue = br.readLine()) != ("#endpointValue")) {}
+        elasticSearchValue = br.readLine()
+        return elasticSearchValue
     }
     
     

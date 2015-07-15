@@ -28,7 +28,7 @@ public class PortGeneratorForTest extends PortGenerator {
 
     public PortProvider pprovider = null;
 
-    class PortProvider {
+    public class PortProvider {
 
         public int nClient = -1;
         public int nAdmin = -1;

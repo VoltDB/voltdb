@@ -676,6 +676,25 @@ public class TestJDBCQueries {
     }
 
     @Test
+    public void testQueryBatchRepeat() throws Exception
+    {
+
+        String q = String.format("insert into %s(id) values(?)", data[2].tablename);
+        PreparedStatement pStmt = conn.prepareStatement(q);
+
+        for (int i = 1; i < 5000; i++) {
+            pStmt.setInt(1, i);
+            pStmt.addBatch();
+            if (i % 200 == 0) {
+                int[] resultCodes = pStmt.executeBatch();
+                // The batch will be reset to empty , per ENG-8531.
+                assertEquals(200, resultCodes.length);
+            }
+        }
+
+    }
+
+    @Test
     public void testParameterizedQueries() throws Exception
     {
         for (Data d : data) {
