@@ -91,7 +91,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             }
         } else if (suspect instanceof Database) {
             if ("isActiveActiveDRed".equalsIgnoreCase(field)) {
-                return "Incompatible DR modes between two cluster";
+                return "Incompatible DR modes between two clusters";
             }
         } else if (suspect instanceof Column) {
             if ("defaultvalue".equals(field) ||
