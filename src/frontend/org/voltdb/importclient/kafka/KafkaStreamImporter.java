@@ -327,7 +327,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
         private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
-        private final Map<Long, Long> m_seenOffset = Collections.synchronizedMap(new HashMap<Long, Long>());
+        private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 500);
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private final TopicAndPartition m_topicAndPartition;
@@ -537,41 +537,57 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 return true;
             }
 
-            @Override
-            public void clientCallback(ClientResponse response) throws Exception {
+            private void commitAndSaveOffset(long currentNext) {
                 try {
-                    //We should never get here wiht no pending offsets.
-                    assert(!m_pendingOffsets.isEmpty());
-
-                    if (m_pendingOffsets.first() != m_offset) {
-                        m_pendingOffsets.remove(m_offset);
-                        //Add after we have removed from pending.
-                        m_seenOffset.put(m_offset, m_nextOffset);
+                    //Queue up commit offset points.
+                    m_seenOffset.add(m_nextOffset);
+                    if (m_seenOffset.size() >= m_perTopicPendingLimit) {
+                        //Last possible commit point.
+                        long commit = m_seenOffset.last();
+                        //Highest commit we have seen after me will be committed.
+                        if (commitOffset(commit)) {
+                            debug("Committed offset " + commit + " for " + m_topicAndPartition);
+                            m_currentOffset.set(commit);
+                        }
+                        m_seenOffset.clear();
                         return;
                     }
-                    m_pendingOffsets.remove(m_offset);
-                    //If I am lowest in pending commit anything I have seen after me in sequence.
-                    long commit = m_nextOffset;
-                    while (true) {
-                        Long n2 = m_seenOffset.get(commit);
-                        if (n2 == null) {
-                            break;
-                        }
-                        commit = n2;
-                        m_seenOffset.remove(commit);
+                    //From first find the last continuous offset and commit that.
+                    long commit = m_seenOffset.first();
+                    while (m_seenOffset.contains(++commit)) {
+                        //
                     }
+                    Set<Long> removeSet = m_seenOffset.headSet(commit);
+                    m_seenOffset.removeAll(removeSet);
+
                     //Highest commit we have seen after me will be committed.
                     if (commitOffset(commit)) {
                         debug("Committed offset " + commit + " for " + m_topicAndPartition);
                         m_currentOffset.set(commit);
                     }
+                } catch (Exception ex) {
+                    error("Failed to commit and save offset " + currentNext, ex);
+                }
+            }
+
+            @Override
+            public void clientCallback(ClientResponse response) throws Exception {
+                try {
+                    //We should never get here with no pending offsets.
+                    assert(!m_pendingOffsets.isEmpty());
+
+                    m_pendingOffsets.remove(m_offset);
+                    commitAndSaveOffset(m_nextOffset);
+
                 } catch (Throwable t) {
+                    // Should never get here
                   t.printStackTrace();
                 }
             }
 
         }
 
+        //Sleep with backoff.
         private int backoffSleep(int fetchFailedCount) {
             try {
                 Thread.sleep(1000 * fetchFailedCount++);
@@ -608,9 +624,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         FetchResponse fetchResponse = null;
                         try {
                             fetchResponse = consumer.fetch(req);
+                            if (fetchResponse == null) {
+                                fetchFailedCount = backoffSleep(fetchFailedCount);
+                                continue;
+                            }
                         } catch (Exception ex) {
                             error("Failed to fetch from " + m_topicAndPartition, ex);
                             fetchFailedCount = backoffSleep(fetchFailedCount);
+                            continue;
                         }
 
                         if (fetchResponse.hasError()) {
@@ -648,6 +669,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             }
                             ByteBuffer payload = messageAndOffset.message().payload();
 
+                            currentFetchCount++;
                             byte[] bytes = new byte[payload.limit()];
                             payload.get(bytes);
                             String line = new String(bytes, "UTF-8");
@@ -660,7 +682,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 m_pendingOffsets.remove(currentOffset);
                                 continue;
                             }
-                            currentFetchCount++;
                         }
                     }
 
@@ -670,6 +691,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         } catch (InterruptedException ie) {
                         }
                     }
+                }
+                info("Partition fecher stopping for " + m_topicAndPartition);
+                int cnt = 1;
+                while (m_pendingOffsets.size() > 0) {
+                    cnt = backoffSleep(cnt);
                 }
                 info("Partition fecher stopped for " + m_topicAndPartition);
             } catch (Exception ex) {
