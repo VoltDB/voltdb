@@ -23,28 +23,13 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
     run("mkdir -p " + builddir)
     # change to it
     with cd(builddir):
-        # do the checkouts, collect checkout errors on both community &
-        # pro repos so user gets status on both checkouts
-        message = ""
+        # do the checkouts
         run("git clone git@github.com:VoltDB/voltdb.git")
-        result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
-        if result.failed:
-            message = "VoltDB checkout failed. Missing branch %s." % rbmqExportGit
-
+        run("cd voltdb; git checkout %s" % voltdbGit)
         run("git clone git@github.com:VoltDB/pro.git")
-        result = run("cd pro; git checkout %s" % proGit, warn_only=True)
-        if result.failed:
-            message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
-
+        run("cd pro; git checkout %s" % proGit)
         run("git clone git@github.com:VoltDB/export-rabbitmq.git")
-        result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
-        # Probably ok to use master for export-rabbitmq.
-        if result.failed:
-            print "\nExport-rabbitmg branch %s checkout failed. Defaulting to master." % rbmqExportGit
-
-        if len(message) > 0:
-            abort(message)
-
+        run("cd export-rabbitmq; git checkout %s" % rbmqExportGit)
         return run("cat voltdb/version.txt").strip()
 
 ################################################
