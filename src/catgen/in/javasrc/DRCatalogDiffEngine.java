@@ -94,7 +94,6 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             if ("isActiveActiveDRed".equalsIgnoreCase(field)) {
                 return "Incompatible DR modes between two clusters";
             }
-            // the only two allowed changes at database level of catalog
             if ("schema".equalsIgnoreCase(field) ||
                 "securityprovider".equalsIgnoreCase(field)) {
                 return null;
