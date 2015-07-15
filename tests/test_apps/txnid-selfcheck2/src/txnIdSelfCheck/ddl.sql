@@ -189,18 +189,24 @@ CREATE TABLE capr
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
+, tmstmp	 timestamp			NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_cr PRIMARY KEY (p,id)
-);
+, LIMIT PARTITION ROWS 10 EXECUTE (
+	DELETE FROM CAPR WHERE -1 = id
+) );
 
 CREATE TABLE capp
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
+, tmstmp 	 timestamp			NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_cp PRIMARY KEY (p,id)
-);
-PARTITION TABLE trup ON COLUMN p;
+, LIMIT PARTITION ROWS 10 EXECUTE (
+	DELETE FROM CAPP WHERE -1 = id
+) );
+PARTITION TABLE capp ON COLUMN p;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -251,3 +257,6 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
 PARTITION PROCEDURE TRUPScanAggTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURScanAggTable;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPTableInsert;
+PARTITION PROCEDURE CAPPTableInsert ON TABLE capp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPRTableInsert;

@@ -180,6 +180,7 @@ public class ClientThread extends BenchmarkThread {
             if (cnt-m_cnt < 0 )
                 hardStop("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+(cnt-1));
             m_cnt = cnt+1;
+            
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
@@ -187,7 +188,7 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-            VoltTable data = results[3];
+            
             try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }

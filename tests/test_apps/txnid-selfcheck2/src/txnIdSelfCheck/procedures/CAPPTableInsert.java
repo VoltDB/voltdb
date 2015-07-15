@@ -30,7 +30,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
 
 public class CAPPTableInsert extends VoltProcedure {
-    final SQLStmt insertcapp = new SQLStmt("insert into capp values (NOW,?,?,?);");
+    final SQLStmt insertcapp = new SQLStmt("insert into capp values (?,?,NOW,?);");
 
     public VoltTable[] run(long p, byte[] data) {
         voltQueueSQL(insertcapp, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);

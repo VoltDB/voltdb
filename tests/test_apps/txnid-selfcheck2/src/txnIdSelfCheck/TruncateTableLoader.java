@@ -134,13 +134,6 @@ public class TruncateTableLoader extends BenchmarkThread {
                         m_permits.acquire();
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
-                        try {
-                            String mcapName = "CAPR";
-                            if (tableName.equals("TRUP")) mcapName = "CAPP";
-                            client.callProcedure(new InsertCallback(latch), mcapName + "TableInsert", p, data); // here
-                        } catch (Exception e) {
-                            log.error("Catching general exception, catch a specific exception. Also probably check a table size or two. ");
-                        }
                     }
                     latch.await(10, TimeUnit.SECONDS);
                     long nextRowCount = -1;

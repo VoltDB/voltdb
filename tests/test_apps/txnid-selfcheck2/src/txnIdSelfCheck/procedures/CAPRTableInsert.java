@@ -24,11 +24,12 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 public class CAPRTableInsert extends VoltProcedure {
-    final SQLStmt insert = new SQLStmt("insert into capr values (?,?,?);");
+    final SQLStmt insert = new SQLStmt("insert into capr values (?,?,NOW,?);");
 
     public VoltTable[] run(long p, byte[] data) {
         voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);
