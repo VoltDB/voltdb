@@ -917,7 +917,7 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@GC",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
-        Procedures.put("@ResetDatabaseReplication",
+        Procedures.put("@ResetDR",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
     }
 
