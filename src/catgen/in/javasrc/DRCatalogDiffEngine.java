@@ -45,6 +45,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     public static Pair<Long, String> serializeCatalogCommandsForDr(Catalog catalog) {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         StringBuilder sb = new StringBuilder();
+        db.writeCommandForField(sb, "isActiveActiveDRed", true);
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
@@ -92,6 +93,11 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         } else if (suspect instanceof Database) {
             if ("isActiveActiveDRed".equalsIgnoreCase(field)) {
                 return "Incompatible DR modes between two clusters";
+            }
+            // the only two allowed changes at database level of catalog
+            if ("schema".equalsIgnoreCase(field) ||
+                "securityprovider".equalsIgnoreCase(field)) {
+                return null;
             }
         } else if (suspect instanceof Column) {
             if ("defaultvalue".equals(field) ||
