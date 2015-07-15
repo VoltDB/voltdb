@@ -48,12 +48,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * or disabled.
      */
     private static final boolean doAllTests    = false;
-    private static final boolean ENG_8306_DONE = false;
-    private static final boolean ENG_8325_DONE = false;
-    private static final boolean ENG_8628_DONE = false;
-    private static final boolean ENG_8633_DONE = false;
-    private static final boolean ENG_8636_DONE = false;
-    private static final boolean ENG_8638_DONE = false;
+    private static final boolean HSQL232_ENG_8306_DONE = false;
+    private static final boolean HSQL232_ENG_8325_DONE = false;
+    private static final boolean HSQL232_ENG_8628_DONE = false;
+    private static final boolean HSQL232_ENG_8633_DONE = false;
+    private static final boolean HSQL232_ENG_8636_DONE = false;
+    private static final boolean HSQL232_ENG_8638_DONE = false;
 
     private static final boolean doTest(boolean flag) {
         return doAllTests || flag;
@@ -645,7 +645,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "having max(wage) IN " +
                     "       (select wage from R1) " +
                     "order by dept desc";
-            if (doTest(ENG_8306_DONE)) {
+            if (doTest(HSQL232_ENG_8306_DONE)) {
                 // Uncomment these tests when ENG-8306 "HAVING with subquery" is fixed
                 validateTableOfLongs(client, sql, new long[][] {{2}, {1}});
             } else {
@@ -658,7 +658,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "having max(wage) + 1 - 1 " +
                     "       IN (select wage from R1) " +
                     "order by dept desc";
-            if (doTest(ENG_8306_DONE)) {
+            if (doTest(HSQL232_ENG_8306_DONE)) {
                 // Uncomment these tests when ENG-8306 "HAVING with subquery" is fixed
                 validateTableOfLongs(client, sql, new long[][] {{2}, {1}});
             } else {
@@ -975,7 +975,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       (select WAGE, DEPT from R2 where ID = R1.ID))" +
                 "      IS NULL " +
                 "order by ID;";
-        if (doTest(ENG_8633_DONE)) {
+        if (doTest(HSQL232_ENG_8633_DONE)) {
             validateTableOfLongs(client, sql, new long[][] {{100}, {101}, {102}});
         }
 
@@ -987,7 +987,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "        where ID = 107))" +
                 "      IS NULL " +
                 "order by ID;";
-        if (doTest(ENG_8633_DONE)) {
+        if (doTest(HSQL232_ENG_8633_DONE)) {
             validateTableOfLongs(client, sql, new long[][] {{100}, {101}, {102}});
         }
     }
@@ -1930,14 +1930,14 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
         if (!isHSQL()) {
-            if (doTest(ENG_8325_DONE)) {
+            if (doTest(HSQL232_ENG_8325_DONE)) {
                 sql =   "select ID from R1 " +
                         "where WAGE NOT IN " +
                         "      (select WAGE from R2 " +
                         "       where ID IN (100, 102, 103));";
                 validateTableOfLongs(client, sql, EMPTY_TABLE);
             }
-            if (doTest(ENG_8325_DONE)) {
+            if (doTest(HSQL232_ENG_8325_DONE)) {
                 sql =   "select ID from R1 " +
                         "where NOT WAGE IN " +
                         "          (select WAGE from R2 " +
@@ -2118,7 +2118,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       where ID > 107);";
         validateTableOfLongs(client, sql, new long[][] {{100}});
 
-        if (doTest(ENG_8325_DONE)) {
+        if (doTest(HSQL232_ENG_8325_DONE)) {
             // The inner set consists only of NULLs
             sql =   "select ID from R1 " +
                     "where WAGE = ALL " +
@@ -2276,7 +2276,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "     ON T1.ID = P2.DEPT " +
                 "where T1.ID = 3 " +
                 "order by T1.ID;";
-        if (doTest(ENG_8633_DONE)) {
+        if (doTest(HSQL232_ENG_8633_DONE)) {
             validateTableOfLongs(client, sql, new long[][] {{3, 1}});
         }
 
@@ -2365,7 +2365,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "from R1 " +
                     "group by dept, wage " +
                     "order by dept, wage;";
-            if (doTest(ENG_8628_DONE)) {
+            if (doTest(HSQL232_ENG_8628_DONE)) {
                 validateTableOfLongs(client, sql, new long[][] {
                         {1, 1, 2}, {1, 1, 1}, {1, 1, 1}, {2, 1, 2}, {2, 2, 2}, {2,1,2}});
             }
@@ -2375,7 +2375,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "from R1 " +
                     "group by dept " +
                     "order by dept;";
-            if (doTest(ENG_8628_DONE)) {
+            if (doTest(HSQL232_ENG_8628_DONE)) {
                 validateTableOfLongs(client, sql, new long[][] {{1,3,8}, {2, 4, 7}});
             }
         }
@@ -2445,7 +2445,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
 
         // duplicates the subquery expression
-        if (doTest(ENG_8636_DONE)) {
+        if (doTest(HSQL232_ENG_8636_DONE)) {
             sql =   "select R1.DEPT, " +
                     "       abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as tag1, " +
                     "       abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as tag2, " +
@@ -2475,7 +2475,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "count(*) as ct from R1 " +
                 "group by dept, tag1 " +
                 "order by dept, ct;";
-        if (doTest(ENG_8636_DONE)) {
+        if (doTest(HSQL232_ENG_8636_DONE)) {
             validateTableOfLongs(client, sql, new long[][] {{1,2,7,1}, {1,1,6,2}, {2,1,6,1}, {2,3,8,3}});
         }
 
@@ -2523,7 +2523,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "from R_ENG8145_2 parent " +
                 "group by id " +
                 "order by id;";
-        if (doTest(ENG_8636_DONE)) {
+        if (doTest(HSQL232_ENG_8636_DONE)) {
             validateTableOfLongs(client, sql, expected);
         }
 
@@ -2532,7 +2532,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "insert into R_ENG8173_1 values (1, 'goo', 25);");
 
         VoltTable vt = null;
-        if (doTest(ENG_8638_DONE)) {
+        if (doTest(HSQL232_ENG_8638_DONE)) {
             // These queries were failing because we weren't calling "resolveColumnIndexes"
             // for subqueries that appeared on the select list (as part of a projection node).
             vt = client.callProcedure("@AdHoc",
@@ -2857,7 +2857,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
-        if (doTest(ENG_8325_DONE)) {
+        if (doTest(HSQL232_ENG_8325_DONE)) {
             // R1 2, 10, 1 = R2 4, 10, 1 and 5, 10, 1
             sql =   "select R1.ID from R1 " +
                     "where (R1.WAGE, R1.DEPT) = ALL " +
@@ -2969,7 +2969,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) from r1)", new long[] {300});
         validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) - 30 from r1) + 30", new long[] {300});
 
-        if (doTest(ENG_8325_DONE)) {
+        if (doTest(HSQL232_ENG_8325_DONE)) {
             // The IN operator takes a VectorExpression on its RHS, which uses the "args" field.
             // Make sure that we can handle subqueries in there too.
             validateTableOfScalarLongs(client,

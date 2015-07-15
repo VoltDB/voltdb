@@ -870,9 +870,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (ParsedColInfo col : m_displayColumns) {
             // A VoltDB extension to avoid an NPE.
             if ((col.alias != null && col.alias.equals(order_col.alias)) || col.expression.equals(order_exp)) {
-            /* disable 1 line
-            if (col.alias.equals(order_col.alias) || col.expression.equals(order_exp)) {
-            ... disabled 1 line. */
                 col.orderBy = true;
                 col.ascending = order_col.ascending;
 
