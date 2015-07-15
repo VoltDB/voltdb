@@ -57,7 +57,7 @@ public class CappedTableLoader extends BenchmarkThread {
     byte threads;
 
     CappedTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
-        setName("TruncateTableLoader");
+        setName("CappedTableLoader");
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
@@ -69,7 +69,7 @@ public class CappedTableLoader extends BenchmarkThread {
         // make this run more than other threads
         setPriority(getPriority() + 1);
 
-        log.info("TruncateTableLoader table: "+ tableName + " targetCount: " + targetCount);
+        log.info("CappedTableLoader table: "+ tableName + " targetCount: " + targetCount);
     }
 
     void shutdown() {
@@ -88,14 +88,15 @@ public class CappedTableLoader extends BenchmarkThread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception { // fix this
             byte status = clientResponse.getStatus();
-            if (status == ClientResponse.GRACEFUL_FAILURE ||
-                    status == ClientResponse.USER_ABORT) {
-                // log what happened
-                log.info("TruncateTableLoader gracefully failed to insert into table " + tableName + " and this should happen. ");
-            } else 
+            if (status == ClientResponse.GRACEFUL_FAILURE) {
+                // logging this case makes the log massive. 
+                // log.info("CappedTableLoader acceptably failed to insert into " + tableName + ". ");
+            } else if ( status == ClientResponse.USER_ABORT) {
+                log.error("User abort while attempting to insert into table "+ tableName );
+            } else
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("TruncateTableLoader ungracefully failed to insert into table " + tableName);
+                log.error("CappedTableLoader ungracefully failed to insert into table " + tableName);
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
@@ -144,6 +145,8 @@ public class CappedTableLoader extends BenchmarkThread {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
                     currentRowCount = nextRowCount;
+                    if (exceedsPartitionLimit()) 
+                        hardStop("Capped table  exceeds 10 rows, this shoudln't happen. Exiting. ");
                 }
             }
             catch (Exception e) {
@@ -151,34 +154,33 @@ public class CappedTableLoader extends BenchmarkThread {
                 log.error("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) { }
             }
-
+            
 
             // check for row overflow
             try {
-                if (tableName.equals("CAPR")) {
-                    currentRowCount = TxnId2Utils.getRowCount(client, tableName);
-                    if (currentRowCount > 100) // The number 10 will show up a lot, and it should be made variable ... but how? 
-                        hardStop("Replicated capped table exceeds 10 rows, this shoudln't happen. Exiting. ");
-                } else {
-                    if (exceedsPartitionLimit()) 
-                        hardStop("Partitioned capped table  exceeds 10 rows, this shoudln't happen. Exiting. ");
-                }
+                if (exceedsPartitionLimit()) 
+                    hardStop("Capped table  exceeds 10 rows, this shoudln't happen. Exiting. ");
             } catch (Exception e) {
-                hardStop("getrowcount exception", e);
+                hardStop("exceeds partition limit exception", e);
             }
         }
-        log.info("TruncateTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
+        log.info("CappedTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
     }
     
 
     
     private boolean exceedsPartitionLimit() throws NoConnectionsException, IOException, ProcCallException {
-        VoltTable stats = TxnId2Utils.doAdHoc(client, "exec @Statistics table 0").getResults()[0];
+        VoltTable stats = TxnId2Utils.doStatistics(client, "table").getResults()[0];
         while (stats.advanceRow()) {
-            // check some stuff
-            break;
+            long rowlim = stats.getLong(11);
+            if (rowlim > 0) {// only check rows with a limit
+                long rowcnt = stats.getLong(7);
+                if (rowcnt > rowlim) {
+                    Benchmark.hardStop("tuple_count: "+rowcnt+" exceeds tuple_limit: "+rowlim+" for table " + stats.getString(5) + " on partition " + stats.getLong(4));
+                }
+            }
         }
-        return true;
+        return false;
     }
 
 }

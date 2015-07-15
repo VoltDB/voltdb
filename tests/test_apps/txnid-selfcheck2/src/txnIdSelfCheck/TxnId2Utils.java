@@ -62,6 +62,26 @@ public enum TxnId2Utils {;
             }
         }
     }
+    
+    static ClientResponse doStatistics(Client client, String query) throws NoConnectionsException, IOException, ProcCallException {
+        Boolean sleep = false;
+        Boolean noConnections = false;
+        Boolean timedOutOnce = false;
+        while (true) {
+            try {
+                ClientResponse cr = client.callProcedure("@Statistics", query);
+                if (cr.getStatus() == ClientResponse.SUCCESS) {
+                    Benchmark.txnCount.incrementAndGet();
+                    return cr;
+                } else {
+                    log.debug(cr.getStatusString());
+                    Benchmark.hardStop("unexpected response", cr);
+                }
+            } catch (Exception e) {
+                Benchmark.hardStop(e);
+            }
+        }
+    }
 
     static long getRowCount(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = doAdHoc(client, "select count(*) from " + tableName + ";");
