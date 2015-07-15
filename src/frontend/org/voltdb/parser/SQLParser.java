@@ -66,6 +66,27 @@ public class SQLParser extends SQLPatternFactory
     //========== Private Parsing Data ==========
 
     /**
+     * Pattern: SET <PARAMETER NAME> <PARAMETER VALUE>
+     *
+     * Capture groups:
+     *  (1) parameter name
+     *  (2) parameter value
+     */
+    private static final Pattern SET_GLOBAL_PARAM = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "SET" +                             // SET
+            "\\s+([\\w_]+)" +                   // (1) PARAMETER NAME
+            "\\s*=\\s*([\\w_]+)" +              // (2) PARAMETER VALUE
+            "\\s*;\\z"                          // (end statement)
+            );
+    static final Pattern SET_GLOBAL_PARAM_FOR_WHITELIST = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "SET" +                             // SET
+            "\\s+.*\\z"                         // (end statement)
+            );
+    /**
      * Pattern: PARTITION PROCEDURE|TABLE ...
      *
      * Capture groups:
@@ -307,7 +328,8 @@ public class SQLParser extends SQLPatternFactory
             "\\AREPLICATE|" +
             "\\AEXPORT|" +
             "\\AIMPORT|" +
-            "\\ADR" +
+            "\\ADR|" +
+            "\\ASET" +
             ")" +                                  // end (group 1)
             "\\s" +                                // one required whitespace to terminate keyword
             "");
@@ -504,6 +526,16 @@ public class SQLParser extends SQLPatternFactory
             "^[\\w*.$]+$", Pattern.CASE_INSENSITIVE);
 
     //========== Public Interface ==========
+
+    /**
+     * Match statement against set global parameter pattern
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchSetGlobalParam(String statement)
+    {
+        return SET_GLOBAL_PARAM.matcher(statement);
+    }
 
     /**
      * Match statement against pattern for all VoltDB-specific statement preambles
@@ -1695,7 +1727,7 @@ public class SQLParser extends SQLPatternFactory
      *
      * @param batch  A SQL string containing multiple statements separated by semicolons
      * @return true if the first keyword of the first statement is a DDL verb
-     *     like CREATE, ALTER, DROP, PARTITION, DR, or EXPORT,
+     *     like CREATE, ALTER, DROP, PARTITION, DR, SET or EXPORT,
      *     or if the batch is empty.
      *     See the official list of DDL verbs in the "// Supported verbs" section of
      *     the static initializer for SQLLexer.VERB_TOKENS)
