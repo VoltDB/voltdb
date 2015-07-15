@@ -89,6 +89,10 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             if ("estimatedtuplecount".equals(field)) {
                 return null;
             }
+        } else if (suspect instanceof Database) {
+            if ("isActiveActiveDRed".equalsIgnoreCase(field)) {
+                return "Incompatible DR modes between two cluster";
+            }
         } else if (suspect instanceof Column) {
             if ("defaultvalue".equals(field) ||
                 "defaulttype".equals(field) ||
