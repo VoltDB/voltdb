@@ -27,6 +27,7 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/CatalogUtil.h"
 #include "common/types.h"
+#include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
 #include "expressions/expressionutil.h"
 #include "expressions/functionexpression.h"
@@ -67,31 +68,21 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catal
     // Column is stored as map<String, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
     const int numColumns = static_cast<int>(catalogTable.columns().size());
-    vector<ValueType> columnTypes(numColumns);
-    vector<int32_t> columnLengths(numColumns);
-    vector<bool> columnAllowNull(numColumns);
-    vector<bool> columnInBytes(numColumns);
+    TupleSchemaBuilder schemaBuilder(numColumns);
+
     map<string, catalog::Column*>::const_iterator col_iterator;
-    vector<string> columnNames(numColumns);
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
+
         const catalog::Column *catalog_column = col_iterator->second;
-        const int columnIndex = catalog_column->index();
-        const ValueType type = static_cast<ValueType>(catalog_column->type());
-        columnTypes[columnIndex] = type;
-        const int32_t size = static_cast<int32_t>(catalog_column->size());
-        //Strings length is provided, other lengths are derived from type
-        bool varlength = (type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY);
-        const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
-        columnLengths[columnIndex] = length;
-        columnAllowNull[columnIndex] = catalog_column->nullable();
-        columnInBytes[columnIndex] = catalog_column->inbytes();
+        schemaBuilder.setColumnAtIndex(catalog_column->index(),
+                                       static_cast<ValueType>(catalog_column->type()),
+                                       static_cast<int32_t>(catalog_column->size()),
+                                       catalog_column->nullable(),
+                                       catalog_column->inbytes());
     }
 
-    return TupleSchema::createTupleSchema(columnTypes,
-                                          columnLengths,
-                                          columnAllowNull,
-                                          columnInBytes);
+    return schemaBuilder.build();
 }
 
 bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
