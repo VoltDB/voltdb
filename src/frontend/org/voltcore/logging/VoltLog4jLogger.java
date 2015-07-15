@@ -163,6 +163,11 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         return logLevels;
     }
 
+    @Override
+    public void setLevel(Level level) {
+        m_logger.setLevel(getPriorityForLevel(level));
+    }
+
     /**
      * Static method to change the Log4j config globally.
      * @param xmlConfig The text of a Log4j config file.

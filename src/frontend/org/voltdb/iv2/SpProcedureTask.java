@@ -76,7 +76,7 @@ public class SpProcedureTask extends ProcedureTask
         SpTransactionState txnState = (SpTransactionState)m_txnState;
         final InitiateResponseMessage response = processInitiateTask(txnState.m_initiationMsg, siteConnection);
         if (!response.shouldCommit()) {
-            m_txnState.setNeedsRollback();
+            m_txnState.setNeedsRollback(true);
         }
         completeInitiateTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
@@ -135,7 +135,7 @@ public class SpProcedureTask extends ProcedureTask
         SpTransactionState txnState = (SpTransactionState)m_txnState;
         final InitiateResponseMessage response = processInitiateTask(txnState.m_initiationMsg, siteConnection);
         if (!response.shouldCommit()) {
-            m_txnState.setNeedsRollback();
+            m_txnState.setNeedsRollback(true);
         }
         if (!m_txnState.isReadOnly()) {
             assert(siteConnection.getLatestUndoToken() != Site.kInvalidUndoToken) :
