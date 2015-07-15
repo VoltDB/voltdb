@@ -53,7 +53,7 @@ import org.voltdb.exceptions.EEException;
 
 /**
  * An implementation of Site which provides only the functionality
- * necessary to run read-only multipartition transactions.  A pool
+ * necessary to run read-only multi-partition transactions.  A pool
  * of these will be used to run multiple read-only transactions
  * concurrently.
  */
@@ -91,9 +91,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     {
         throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
     }
-
-    // Advanced in complete transaction.
-    private long m_currentTxnId = Long.MIN_VALUE;
 
     SiteProcedureConnection getSiteProcedureConnection()
     {
@@ -256,7 +253,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_partitionId = partitionId;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_currentTxnId = Long.MIN_VALUE;
     }
 
     /** Update the loaded procedures. */
@@ -286,9 +282,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             while (m_shouldContinue) {
                 // Normal operation blocks the site thread on the sitetasker queue.
                 SiteTasker task = m_scheduler.take();
-                if (task instanceof TransactionTask) {
-                    m_currentTxnId = ((TransactionTask)task).getTxnId();
-                }
                 task.run(getSiteProcedureConnection());
             }
         }
