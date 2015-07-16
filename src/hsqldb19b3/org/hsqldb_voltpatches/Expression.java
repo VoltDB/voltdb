@@ -2612,7 +2612,7 @@ public class Expression implements Cloneable {
             opAsString = "a MULTICOLUMN operation"; break; // an uninteresting!? ExpressionColumn case
 
         default:
-            opAsString = " the unknown operator from OpTypes.java with numeric code (" + String.valueOf(exprOp) + ")";
+            opAsString = "the unknown operator from OpTypes.java with numeric code (" + String.valueOf(exprOp) + ")";
         }
         throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                 "VoltDB does not support " + opAsString);
