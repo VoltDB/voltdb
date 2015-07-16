@@ -595,6 +595,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int partitionId,
             final int hostId,
             final String hostname,
+            final int drClusterId,
             final int tempTableMemory,
             final BackendTarget target,
             final int port,
@@ -624,6 +625,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_partitionId,
                 m_hostId,
                 m_hostname,
+                drClusterId,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
                 createDrReplicatedStream);
@@ -658,6 +660,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int partitionId,
             final int hostId,
             final String hostname,
+            final int drClusterId,
             final long tempTableMemory,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream)
@@ -672,6 +675,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(siteId);
         m_data.putInt(partitionId);
         m_data.putInt(hostId);
+        m_data.putInt(drClusterId);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
         m_data.putInt(createDrReplicatedStream ? 1 : 0);

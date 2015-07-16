@@ -494,6 +494,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_partitionId,
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
+                        m_context.cluster.getDrclusterid(),
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
@@ -508,6 +509,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_partitionId,
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
+                            m_context.cluster.getDrclusterid(),
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
