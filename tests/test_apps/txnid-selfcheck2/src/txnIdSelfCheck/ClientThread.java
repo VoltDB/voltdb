@@ -24,12 +24,12 @@
 package txnIdSelfCheck;
 
 import java.io.InterruptedIOException;
-
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.jfree.util.Log;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -71,7 +71,7 @@ public class ClientThread extends BenchmarkThread {
     static Random rn = new Random(31); // deterministic sequence
     final Random m_random = new Random();
     final Semaphore m_permits;
-    public long m_cnt = -1;
+    public long m_cnt = 0;
     public boolean m_connected = true;
 
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
@@ -177,8 +177,16 @@ public class ClientThread extends BenchmarkThread {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 throw new UserProcCallException(response);
             }
-
+            
+            ClientResponse rowsresponse;
+            try {
+                if (m_type)
+                rowsresponse = TxnId2Utils.doAdHoc(m_client, "select count(*) from partitioned where cid = "+m_cid+";");
+            } catch (Exception e) {
+                Benchmark.hardStop("adhoc error");
+            }
             VoltTable[] results = response.getResults();
+            VoltTable[] rows = response.getResults()[0].
             
             VoltTable data = results[3];
             long cnt = data.fetchRow(0).getLong("cnt");
@@ -187,8 +195,8 @@ public class ClientThread extends BenchmarkThread {
             if (!m_connected) {
                 System.out.println("Reconnected to DB, cid:"+m_cid+" expected cnt val:"+(m_cnt+1)+" returned cnt val:"+cnt+" dif: "+(cnt-m_cnt-1));
                 m_connected = true;
-                //if (cnt-m_cnt > 1)
-                //    throw new VoltAbortException("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+(cnt-1));
+                if (cnt-m_cnt > 1)
+                    throw new VoltAbortException("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+(cnt-1));
             }
             m_cnt = cnt;
             m_txnsRun.incrementAndGet();

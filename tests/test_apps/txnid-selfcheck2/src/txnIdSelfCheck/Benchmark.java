@@ -57,7 +57,6 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
-import txnIdSelfCheck.procedures.UpdateBaseProc;
 
 public class Benchmark {
 
@@ -512,6 +511,8 @@ public class Benchmark {
     BigTableLoader replicatedLoader = null;
     TruncateTableLoader partitionedTruncater = null;
     TruncateTableLoader replicatedTruncater = null;
+    CappedTableLoader partitionedCapped = null;
+    CappedTableLoader replicatedCapped = null;
     LoadTableLoader plt = null;
     LoadTableLoader rlt = null;
     ReadThread readThread = null;
@@ -586,26 +587,14 @@ public class Benchmark {
         log.info("Loading Filler Tables...");
         log.info(HORIZONTAL_RULE);
 
-<<<<<<< HEAD
-        BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
-                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
-        //partitionedLoader.start();
-        BigTableLoader replicatedLoader = null;
-=======
         partitionedLoader = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
         partitionedLoader.start();
         replicatedLoader = null;
->>>>>>> refs/remotes/origin/master
         if (config.mpratio > 0.0) {
             replicatedLoader = new BigTableLoader(client, "bigr",
-<<<<<<< HEAD
-                             (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
-            //replicatedLoader.start();
-=======
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
             replicatedLoader.start();
->>>>>>> refs/remotes/origin/master
         }
 
         // wait for the filler tables to load up
@@ -632,14 +621,7 @@ public class Benchmark {
             Thread.sleep(1000);
             System.out.println("Wait for hashinator..");
         }
-
-<<<<<<< HEAD
-        
-        TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
-=======
-
         partitionedTruncater = new TruncateTableLoader(client, "trup",
->>>>>>> refs/remotes/origin/master
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedTruncater.start();
         replicatedTruncater = null;
@@ -649,64 +631,39 @@ public class Benchmark {
             replicatedTruncater.start();
         }
         
-        // Make this clone the capped table loader thread. 
-        CappedTableLoader partitionedCapper = new CappedTableLoader(client, "capp",
+        partitionedCapped = new CappedTableLoader(client, "capp", // more
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
-        partitionedTruncater.start();
-        CappedTableLoader replicatedCapper = null;
+        partitionedCapped.start();
         if (config.mpratio > 0.0) {
-            replicatedCapper = new CappedTableLoader(client, "capr",
+            replicatedCapped = new CappedTableLoader(client, "capr", // more
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
-            replicatedCapper.start();
+            replicatedCapped.start();
         }
 
         plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
-<<<<<<< HEAD
-        //plt.start(); 
-        LoadTableLoader rlt = null;
-=======
         plt.start();
         rlt = null;
->>>>>>> refs/remotes/origin/master
         if (config.mpratio > 0.0) {
-<<<<<<< HEAD
-        rlt = new LoadTableLoader(client, "loadmp",
-                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
-        //rlt.start(); 
-=======
             rlt = new LoadTableLoader(client, "loadmp",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
             rlt.start();
->>>>>>> refs/remotes/origin/master
         }
 
         readThread = new ReadThread(client, config.threads, config.threadoffset,
                 config.allowinprocadhoc, config.mpratio, permits);
-        //readThread.start();
+        readThread.start();
 
         adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio, permits);
         if (!config.disableadhoc) {
-            //adHocMayhemThread.start();
+            adHocMayhemThread.start();
         }
 
-<<<<<<< HEAD
-        InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
-        // idpt.start();
-        DdlThread ddlt = new DdlThread(client);
-=======
         idpt = new InvokeDroppedProcedureThread(client);
         idpt.start();
         ddlt = new DdlThread(client);
->>>>>>> refs/remotes/origin/master
         // XXX/PSR ddlt.start();
-<<<<<<< HEAD
-        
-        List<ClientThread> clientThreads = new ArrayList<ClientThread>();
-=======
-
         clientThreads = new ArrayList<ClientThread>();
->>>>>>> refs/remotes/origin/master
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
                     config.allowinprocadhoc, config.mpratio);
@@ -785,13 +742,11 @@ public class Benchmark {
                 adHocMayhemThread.join();
                 idpt.join();
                 ddlt.join();
-
                 //Shutdown LoadTableLoader
                 rlt.shutdown();
                 plt.shutdown();
                 rlt.join();
                 plt.join();
-
                 for (ClientThread clientThread : clientThreads) {
                     clientThread.join();
                 }
@@ -802,7 +757,6 @@ public class Benchmark {
                 /*
                 shutdown.set(true);
                 es.shutdownNow();
-
                 // block until all outstanding txns return
                 client.drain();
                 client.close();
