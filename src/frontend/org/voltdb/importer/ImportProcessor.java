@@ -17,11 +17,15 @@
 
 package org.voltdb.importer;
 
+import java.net.URI;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleException;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.launch.Framework;
 import org.voltcore.logging.VoltLogger;
@@ -32,10 +36,6 @@ import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
-import java.net.URI;
-import java.util.HashSet;
-import java.util.Set;
-import org.osgi.framework.BundleException;
 
 public class ImportProcessor implements ImportDataProcessor {
 
@@ -44,12 +44,10 @@ public class ImportProcessor implements ImportDataProcessor {
     private final Map<String, BundleWrapper> m_bundlesByName = new HashMap<String, BundleWrapper>();
     private final Framework m_framework;
     private final ChannelDistributer m_distributer;
-    private final ChannelChangeNotifier m_channelNotifier;
 
     public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework) throws BundleException {
         m_framework = framework;
         m_distributer = distributer;
-        m_channelNotifier = new ChannelChangeNotifier();
     }
 
     //This abstracts OSGi based and class based importers.
@@ -160,7 +158,7 @@ public class ImportProcessor implements ImportDataProcessor {
 
                     bw.setChannelDistributer(m_distributer);
                     //Register callback
-                    m_channelNotifier.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
+                    m_distributer.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
                     m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
                 }
                 importHandler.readyForData();
@@ -172,14 +170,11 @@ public class ImportProcessor implements ImportDataProcessor {
             }
         }
         //Start polling for channel assignments.
-        m_channelNotifier.startPolling(m_distributer.getChannelAssignmentQueue());
     }
 
     @Override
     public synchronized void shutdown() {
         try {
-            //Stop the notifier
-            m_channelNotifier.shutdown();
             //Stop all the bundle wrappers.
             for (BundleWrapper bw : m_bundles.values()) {
                 try {

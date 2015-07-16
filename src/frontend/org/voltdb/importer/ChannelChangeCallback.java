@@ -17,9 +17,8 @@
 
 package org.voltdb.importer;
 
-import java.net.URI;
-import java.util.Set;
 
 public interface ChannelChangeCallback {
-    void onChange(Set<URI> added, Set<URI> removed, Set<URI> assigned, int version);
+    void onChange(ImporterChannelAssignment assignment);
+    void onClusterStateChange(VersionedOperationMode mode);
 }

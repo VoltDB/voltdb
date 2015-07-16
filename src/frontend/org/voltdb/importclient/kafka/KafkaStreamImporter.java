@@ -19,13 +19,10 @@ package org.voltdb.importclient.kafka;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import kafka.api.FetchRequestBuilder;
-
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
-import kafka.javaapi.consumer.SimpleConsumer;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -37,8 +34,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+
 import kafka.api.ConsumerMetadataRequest;
 import kafka.api.FetchRequest;
+import kafka.api.FetchRequestBuilder;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.cluster.Broker;
 import kafka.common.ErrorMapping;
@@ -52,6 +51,7 @@ import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
+import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
 
@@ -62,6 +62,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
+import org.voltdb.importer.ImporterChannelAssignment;
+import org.voltdb.importer.VersionedOperationMode;
 
 /**
  * Based on SimpleConsumer Implement a BundleActivator interface and extend ImportHandlerProxy.
@@ -735,9 +737,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
     //On getting this event kick off ready
     @Override
-    public void onChange(Set<URI> added, Set<URI> removed, Set<URI> assigned, int version) {
+    public void onChange(ImporterChannelAssignment assignment) {
         if (m_stopping) {
-            info("Importer is stopping ignoring the change notification.");
+            info("Importer is stopping, ignoring the change notification.");
+            return;
         }
         if (m_es == null) {
             //Create executor with sufficient threads.
@@ -745,7 +748,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
 
         //For addeed create fetchers...make sure existing fetchers are not there.
-        for (URI nuri : added) {
+        for (URI nuri : assignment.getAdded()) {
             Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
             for (String topic : m_topicList) {
                 topicMap.put(topic, Collections.singletonList(0));
@@ -774,7 +777,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
 
         //For removed shutdown the fetchers if all are removed the importer will be closed/shutdown?
-        for (URI r : removed) {
+        for (URI r : assignment.getRemoved()) {
             TopicPartitionFetcher fetcher = m_fetchers.get(r.toString());
             if (fetcher != null) {
                 fetcher.shutdown();
@@ -784,6 +787,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
     }
 
+    // TODO: implement
+    @Override
+    public void onClusterStateChange(VersionedOperationMode mode) {
+        info("cluster state change notification: " + mode);
+    }
 
     /**
      * This is called when server is ready to accept any transactions.

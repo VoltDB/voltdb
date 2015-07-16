@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import org.voltdb.client.ProcedureCallback;
 
 /**
@@ -171,7 +172,12 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     }
 
     @Override
-    public void onChange(Set<URI> added, Set<URI> removed, Set<URI> assigned, int version) {
+    public void onChange(ImporterChannelAssignment assignment) {
+        throw new UnsupportedOperationException("For Distributed Importer this must be implemented.");
+    }
+
+    @Override
+    public void onClusterStateChange(VersionedOperationMode mode) {
         throw new UnsupportedOperationException("For Distributed Importer this must be implemented.");
     }
 }

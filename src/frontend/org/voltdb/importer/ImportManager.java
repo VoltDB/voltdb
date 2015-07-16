@@ -17,20 +17,20 @@
 
 package org.voltdb.importer;
 
+import static org.voltcore.common.Constants.VOLT_TMP_DIR;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceLoader;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
-import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
@@ -59,7 +59,6 @@ public class ImportManager {
     private final Map<String, String> m_frameworkProps;
     private final Framework m_framework;
     private final int m_myHostId;
-    private BlockingDeque<ChannelAssignment> m_queue = new LinkedBlockingDeque<ChannelAssignment>(Integer.getInteger("voltdb.import.maxchannels", 2048));
     private final ChannelDistributer m_distributer;
     /**
      * Get the global instance of the ImportManager.
@@ -72,7 +71,7 @@ public class ImportManager {
     protected ImportManager(int myHostId, HostMessenger messenger) throws BundleException {
         m_myHostId = myHostId;
         m_messenger = messenger;
-        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId), m_queue);
+        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId), null);
 
         //create properties for osgi
         m_frameworkProps = new HashMap<String, String>();
