@@ -40,8 +40,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.zk.ZKTestBase;
-import org.voltdb.OperationMode;
-import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -133,10 +131,6 @@ public class TestChannelDistributer extends ZKTestBase {
         Set<URI> expected = uris;
         // add nine
         distributers.get(UNO).registerChannels(YO, uris);
-        // cluster is not in running operation mode
-        assertNull(queue.poll(200, TimeUnit.MILLISECONDS));
-
-        zks.get(ZERO).setData(VoltZK.operationMode, OperationMode.RUNNING.getBytes(), -1);
         Set<URI> actual = getAdded(9);
 
         assertEquals(expected, actual);
@@ -180,7 +174,6 @@ public class TestChannelDistributer extends ZKTestBase {
     public void testHostFailure() throws Exception {
         Set<URI> uris = generateURIs(9);
         Set<URI> expected = uris;
-        zks.get(ZERO).setData(VoltZK.operationMode, OperationMode.RUNNING.getBytes(), -1);
         // add nine
         distributers.get(UNO).registerChannels(YO, uris);
         Set<URI> actual = getAdded(9);

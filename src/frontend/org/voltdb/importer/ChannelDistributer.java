@@ -290,11 +290,11 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 );
         m_eb = new AsyncEventBus(m_buses, eventBusFaultHandler);
         m_eb.register(this);
-        m_mode = new AtomicStampedReference<>(OperationMode.INITIALIZING, 0);
+        m_mode = new AtomicStampedReference<>(OperationMode.RUNNING, 0);
         m_undispatched = new LinkedList<>();
 
         // Prime directory structure if needed
-        mkdirs(zk, VoltZK.operationMode, OperationMode.INITIALIZING.getBytes());
+        mkdirs(zk, VoltZK.operationMode, OperationMode.RUNNING.getBytes());
         mkdirs(zk, HOST_DN, EMPTY_ARRAY);
         mkdirs(zk, MASTER_DN, EMPTY_ARRAY);
 
@@ -1166,7 +1166,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if ( stamp[0] > stat.getVersion()) {
                     return;
                 }
-                OperationMode next = data != null ?  OperationMode.valueOf(data) : OperationMode.INITIALIZING;
+                OperationMode next = data != null ?  OperationMode.valueOf(data) : OperationMode.RUNNING;
                 if (!m_mode.compareAndSet(prev, next, stamp[0], stat.getVersion())) {
                     return;
                 }
