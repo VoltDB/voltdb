@@ -160,8 +160,8 @@ function async-benchmark() {
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         kafkaimporter.client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
-        --warmup=2 \
-        --duration=120 \
+        --warmup=10 \
+        --duration=60 \
         --servers=localhost
 }
 

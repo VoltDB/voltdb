@@ -57,10 +57,10 @@ public class MatchChecks {
                 mirrorRowCount = getMirrorTableRowCount(innerClient);
                 System.out.println("\tDelete rows: " + findAndDeleteMatchingRows(innerClient));
                 System.out.println("\tMirror table row count: " + mirrorRowCount);
-                if (mirrorRowCount == 0) { // indicates everything matched and table empty
-                    System.out.println("mirrorRowCount is 0. Stop?");
-                    //timer.cancel();
-                    //timer.purge();
+                if (mirrorRowCount == 0) { // indicates everything matched and mirror table empty
+                    System.out.println("mirrorRowCount is 0. Stopping...");
+                    timer.cancel();
+                    timer.purge();
                 }
             }
         }, 0, interval);
@@ -106,8 +106,8 @@ public class MatchChecks {
         return rows;
     }
 
-	public static long getImportTableRowCount(Client client) {
-		// check row count in import table
+    public static long getImportTableRowCount(Client client) {
+        // check row count in import table
         long importRowCount = 0;
         try {
             VoltTable[] countQueryResult = client.callProcedure("CountImport").getResults();
@@ -117,6 +117,6 @@ public class MatchChecks {
         }
         System.out.println("Import table row count: " + importRowCount);
         return importRowCount;
-	}
+    }
 }
 

@@ -175,7 +175,7 @@ public class KafkaImportBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-    	ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
         long thrup;
 
@@ -222,8 +222,8 @@ public class KafkaImportBenchmark {
             benchmarkStartTS = System.currentTimeMillis();
             schedulePeriodicStats();
 
-            //System.out.println("starting data checker...");
-            //checkTimer = matchChecks.checkTimer(5000, client);
+            System.out.println("starting data checker...");
+            checkTimer = matchChecks.checkTimer(5000, client);
 
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
@@ -242,7 +242,7 @@ public class KafkaImportBenchmark {
             System.out.println("Done waiting for import & export tables");
         } finally {
             // cancel periodic stats printing
-            System.out.println("Canceling stats");
+            System.out.println("Cancel periodic stats");
             statsTimer.cancel();
             finalInsertCount.addAndGet(icnt);
         }
@@ -295,9 +295,9 @@ public class KafkaImportBenchmark {
         // start watcher that compares mirror table which contains all
         // the export data with the import table that's rows back from Kafka.
         // Arg is interval to wait between checks
-        System.out.println("starting data checker...");
-        @SuppressWarnings("static-access")
-        Timer t = matchChecks.checkTimer(5000, client);
+        // System.out.println("starting data checker...");
+        // @SuppressWarnings("static-access")
+        // Timer t = matchChecks.checkTimer(5000, client);
 
         runner.join(); // writers are done
 
@@ -311,11 +311,11 @@ public class KafkaImportBenchmark {
         client.close();
 
         if (testResult == true) {
-        	System.out.println("Test passed!");
-        	System.exit(0);
+            System.out.println("Test passed!");
+            System.exit(0);
         } else {
-        	System.out.println("Test failed!");
-        	System.exit(1);
+            System.out.println("Test failed!");
+            System.exit(1);
         }
     }
 }
