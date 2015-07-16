@@ -101,7 +101,7 @@ public class KafkaLoader {
         if (m_config.useSuppliedProcedure) {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
         } else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.upsertMode, new KafkaBulkLoaderCallback());
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.upsert, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
         m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
@@ -168,7 +168,7 @@ public class KafkaLoader {
         public String table = "";
 
         @Option(desc = "use upsert instead of insert", hasArg = false)
-        boolean upsertMode = false;
+        boolean upsert = false;
 
         /**
          * Validate command line options.

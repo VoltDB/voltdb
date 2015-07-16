@@ -306,7 +306,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         boolean useSuppliedProcedure = false;
 
         @Option(desc = "use upsert instead of insert", hasArg = false)
-        boolean upsertMode = DEFAULT_UPSERT_MODE;
+        boolean upsert = DEFAULT_UPSERT_MODE;
         /**
          * Validate command line options.
          */
@@ -440,7 +440,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             if (config.useSuppliedProcedure) {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.upsertMode, errHandler);
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.upsert, errHandler);
             }
 
             CSVFileReader.initializeReader(cfg, csvClient, listReader);

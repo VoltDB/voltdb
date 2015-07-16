@@ -76,7 +76,7 @@ public class PerPartitionTable {
     //Name of table
     final String m_tableName;
     // Upsert Mode Flag
-    final byte m_upsertMode;
+    final byte m_upsert;
 
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
@@ -116,7 +116,7 @@ public class PerPartitionTable {
         m_partitionId = partitionId;
         m_isMP = isMP;
         m_procName = firstLoader.m_procName;
-        m_upsertMode = (byte) (firstLoader.m_upsertMode ? 1:0);
+        m_upsert = (byte) (firstLoader.m_upsert ? 1:0);
         m_partitionRowQueue = new LinkedBlockingQueue<VoltBulkLoaderRow>(minBatchTriggerSize*5);
         m_minBatchTriggerSize = minBatchTriggerSize;
         m_columnInfo = firstLoader.m_colInfo;
@@ -258,11 +258,11 @@ public class PerPartitionTable {
 
         try {
             if (m_isMP) {
-                m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsertMode, toSend);
+                m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
             } else {
                 Object rpartitionParam = HashinatorLite.valueToBytes(toSend.fetchRow(0).get(
                         m_partitionedColumnIndex, m_partitionColumnType));
-                m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsertMode, toSend);
+                m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
             }
         } catch (IOException e) {
             final ClientResponse r = new ClientResponseImpl(

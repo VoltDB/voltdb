@@ -63,7 +63,7 @@ public class VoltBulkLoader {
     // Batch size requested for this instance of VoltBulkLoader
     final int m_maxBatchSize;
     // Flag to indicate to use upsert instead of insert
-    final boolean m_upsertMode;
+    final boolean m_upsert;
     // Callback used to notify users of failed row inserts
     final BulkLoaderFailureCallBack m_notificationCallBack;
     //Array of PerPartitionTables from which this VoltBulkLoader chooses to put a row in
@@ -116,7 +116,7 @@ public class VoltBulkLoader {
         this.m_clientImpl = vblGlobals.m_clientImpl;
         this.m_maxBatchSize = maxBatchSize;
         this.m_notificationCallBack = blfcb;
-        this.m_upsertMode = upsertMode;
+        this.m_upsert = upsertMode;
 
         m_vblGlobals = vblGlobals;
 
