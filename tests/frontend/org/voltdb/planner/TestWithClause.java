@@ -25,7 +25,7 @@ package org.voltdb.planner;
 
 public class TestWithClause extends PlannerTestCase {
     private static final boolean allTests = false;
-    private static final boolean HSQL232_ENG_8638_DONE = true;
+    // hsql232 ENG-8626
     private static final boolean HSQL232_ENG_8626_DONE = false;
     private static final boolean doTest(boolean condition) {
         return allTests || condition;
