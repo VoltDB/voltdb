@@ -96,4 +96,9 @@ public class VoltUtilLoggingLogger implements VoltLogger.CoreVoltLogger {
         return 0;
     }
 
+    @Override
+    public void setLevel(Level level) {
+        m_logger.setLevel(getPriorityForLevel(level));
+    }
+
 }
