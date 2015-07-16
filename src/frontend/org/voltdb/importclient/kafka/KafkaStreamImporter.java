@@ -550,6 +550,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         synchronized(m_seenOffset) {
                             m_seenOffset.clear();
                         }
+                        info("Seen offset commit list is too big. Size " + m_perTopicPendingLimit + " Commiting highest offset and clean.");
                         return;
                     }
                     long commit;
@@ -558,13 +559,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             m_seenOffset.add(currentNext);
                             //From first find the last continuous offset and commit that.
                             commit = m_seenOffset.first();
-                            while (m_seenOffset.contains(commit+1)) {
-                                commit++;
-                            }
-                            Set<Long> removeSet = m_seenOffset.headSet(commit);
-                            if (removeSet != null) {
-                                debug("Remove set is: " + removeSet.size());
-                                m_seenOffset.removeAll(removeSet);
+                            while (m_seenOffset.contains(++commit)) {
+                                m_seenOffset.remove(commit);
                             }
                         } else {
                            commit =  currentNext;
@@ -695,10 +691,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             m_pendingOffsets.add(currentOffset);
                             if (!callProcedure(cb, invocation)) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
+                                m_pendingOffsets.remove(messageAndOffset.nextOffset());
+                                //Not in pending but let sequencer coomit account for this and clear.
                                 synchronized(m_seenOffset) {
                                     m_seenOffset.add(messageAndOffset.nextOffset());
                                 }
-                                m_pendingOffsets.remove(messageAndOffset.nextOffset());
                                 continue;
                             }
                         }
