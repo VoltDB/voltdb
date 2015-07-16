@@ -145,9 +145,11 @@ public class CappedTableLoader extends BenchmarkThread {
                     if (nextRowCount == currentRowCount) {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
+                    
+                    try { Thread.sleep(15000); } catch (Exception e2) {}
                     currentRowCount = nextRowCount;
-                    //if (exceedsPartitionLimit()) 
-                        //hardStop("Capped table exceeds 10 rows, this shoudln't happen and it shouldn't be tested here. Exiting. ");
+                    if (exceedsPartitionLimit()) 
+                        hardStop("Capped table exceeds 10 rows, this shoudln't happen and it shouldn't be tested here. Exiting. ");
                 }
             }
             catch (Exception e) {
@@ -181,20 +183,20 @@ public class CappedTableLoader extends BenchmarkThread {
             long rowcnt = stats.getLong(7);
             String tabname = stats.getString(5);
             long partition = stats.getLong(4);
-            if (rowlim > 0) {// only check rows with a limit
+            if (tabname.equals("CAPR") || tabname.equals("CAPP")) {// only check rows with a limit
                 if (tabname.equals("CAPR")) {
                     if (replicated_cnt == -1)
                         replicated_cnt = rowcnt+1000*partition;
                     else {
                         if (replicated_cnt%1000 != rowcnt) {
                             log.error("CAPR on Partition:"+partition+" has TUPLE_COUNT:"+rowcnt+", which does not match Partition:"+(replicated_cnt/1000)+" with CAPR.TUPLE_COUNT:"+replicated_cnt%1000);
-                            //ret = true;
+                            ret = true;
                         }
                     }
                 }
                 if (rowcnt > rowlim) {
                     log.error("Table "+tabname+" on partition "+partition+" has TUPLE_COUNT:"+rowcnt+" > TUPLE_LIMIT:"+rowlim);
-                    ret = true;
+                    //ret = true;
                 }
             }
         }
