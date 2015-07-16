@@ -432,7 +432,7 @@ def get_html_table_element_color(value, error_below, strong_warn_below, warn_bel
     return color
 
 def get_numerical_html_table_element(value, error_below=-1, strong_warn_below=0, warn_below=0,
-                                     error_above=1000000000, strong_warn_above=1000000, warn_above=100000,
+                                     error_above=1000000000, strong_warn_above=1000000, warn_above=100000,  # 1 billion, 1 million, 100,000
                                      use_gray=False):
     return ('<td align=right%s>%d</td>' %
             (get_html_table_element_color(value, error_below, strong_warn_below, warn_below,
@@ -440,7 +440,7 @@ def get_numerical_html_table_element(value, error_below=-1, strong_warn_below=0,
              value) )
 
 def get_time_html_table_element(seconds, error_below=0, strong_warn_below=0, warn_below=0,
-                                error_above=21600, strong_warn_above=3600, warn_above=600,  # 6 hours, 1 hour, 10 minutes
+                                error_above=28800, strong_warn_above=3600, warn_above=600,  # 8 hours, 1 hour, 10 minutes
                                 use_gray=False):
     return ('<td align=right%s>%s</td>' %
             (get_html_table_element_color(seconds, error_below, strong_warn_below, warn_below,
