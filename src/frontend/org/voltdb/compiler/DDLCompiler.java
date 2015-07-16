@@ -59,6 +59,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -800,6 +801,31 @@ public class DDLCompiler {
             else {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "While configuring dr, table %s was not present in the catalog.", tableName));
+            }
+            return true;
+        }
+
+        statementMatcher = SQLParser.matchSetGlobalParam(statement);
+        if (statementMatcher.matches()) {
+            String name = statementMatcher.group(1).toUpperCase();
+            String value = statementMatcher.group(2).toUpperCase();
+            switch (name) {
+                case DatabaseConfiguration.DR_MODE_NAME:
+                    if (value.equals(DatabaseConfiguration.ACTIVE_ACTIVE)) {
+                        db.setIsactiveactivedred(true);
+                    }
+                    else if (value.equals(DatabaseConfiguration.ACTIVE_PASSIVE) || value.equals("DEFAULT")) {
+                        db.setIsactiveactivedred(false);
+                    }
+                    else {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid parameter value for %s. Candidate values are %s, %s/DEFAULT",
+                                name, DatabaseConfiguration.ACTIVE_ACTIVE, DatabaseConfiguration.ACTIVE_PASSIVE));
+                    }
+                    break;
+                default:
+                    throw m_compiler.new VoltCompilerException(String.format(
+                        "Unknown global parameter: %s. Candidate parameters are %s", name, DatabaseConfiguration.allNames));
             }
             return true;
         }

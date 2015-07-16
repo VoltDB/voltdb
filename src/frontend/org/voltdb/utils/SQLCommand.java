@@ -146,17 +146,15 @@ public class SQLCommand
             KeyMap keyMap = interactiveReader.getKeys();
             keyMap.bind(new Character(KeyMap.CTRL_D).toString(), new ActionListener() {
                 @Override
-                public void actionPerformed(ActionEvent e)
-                {
+                public void actionPerformed(ActionEvent e) {
                     CursorBuffer cursorBuffer = interactiveReader.getCursorBuffer();
                     if (cursorBuffer.length() == 0) {
                         System.exit(m_exitCode);
-                    }
-                    else {
+                    } else {
                         try {
                             interactiveReader.delete();
+                        } catch (IOException e1) {
                         }
-                        catch (IOException e1) {}
                     }
                 }
             });
@@ -330,13 +328,16 @@ public class SQLCommand
         String subcommand = SQLParser.parseShowStatementSubcommand(line);
         if (subcommand != null) {
             if (subcommand.equals("proc") || subcommand.equals("procedures")) {
-               execListProcedures();
+                execListProcedures();
             }
             else if (subcommand.equals("tables")) {
                 execListTables();
             }
             else if (subcommand.equals("classes")) {
                 execListClasses();
+            }
+            else if (subcommand.equals("config") || subcommand.equals("configuration")) {
+                execListConfigurations();
             }
             else {
                 String errorCase = (subcommand.equals("") || subcommand.equals(";")) ?
@@ -364,6 +365,12 @@ public class SQLCommand
 
         // It wasn't a locally-interpreted directive.
         return false;
+    }
+
+    private static void execListConfigurations() throws Exception {
+        VoltTable configData = m_client.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
+        if (configData.getRowCount() != 0)
+            printConfig(configData);
     }
 
     private static void execListClasses() {
@@ -463,6 +470,19 @@ public class SQLCommand
             }
         }
         System.out.println();
+    }
+
+    private static void printConfig(VoltTable configData) {
+        System.out.println();
+        System.out.println(String.format("%-20s%-20s%-60s", "NAME", "VALUE", "DESCRIPTION"));
+        for (int i=0; i<100; i++) {
+            System.out.print('-');
+        }
+        System.out.println();
+        while (configData.advanceRow()) {
+            System.out.println(String.format("%-20s%-20s%-60s",
+                    configData.getString(0), configData.getString(1), configData.getString(2)));
+        }
     }
 
     private static void printTables(final String name, final Collection<String> tables)
