@@ -868,7 +868,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // tagging the actual display column as being also an order by column
         // helps later when trying to determine ORDER BY coverage (for determinism).
         for (ParsedColInfo col : m_displayColumns) {
-            if (col.alias.equals(order_col.alias) || col.expression.equals(order_exp)) {
+            if ((col.alias != null && col.alias.equals(order_col.alias)) || col.expression.equals(order_exp)) {
                 col.orderBy = true;
                 col.ascending = order_col.ascending;
 
