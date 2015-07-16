@@ -327,6 +327,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final int m_consumerSocketTimeout;
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
+        private final AtomicLong m_committedOffset = new AtomicLong(-1);
         private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 50000);
@@ -571,7 +572,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     //Highest commit we have seen after me will be committed.
                     if (commitOffset(commit)) {
                         debug("Committed offset " + commit + " for " + m_topicAndPartition);
-                        m_currentOffset.set(commit);
+                        m_committedOffset.set(commit);
                     }
                     //If this happens we will come back again on next callback.
                 } catch (Exception ex) {
@@ -678,7 +679,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
                             long currentOffset = messageAndOffset.offset();
                             //if currentOffset is less means we have already pushed it and also check pending queue.
-                            if (currentOffset < m_currentOffset.get() || m_pendingOffsets.contains(currentOffset)) {
+                            if (currentOffset < m_currentOffset.get()) {
                                 continue;
                             }
                             ByteBuffer payload = messageAndOffset.message().payload();
@@ -693,12 +694,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             if (!callProcedure(cb, invocation)) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
                                 m_pendingOffsets.remove(messageAndOffset.nextOffset());
-                                //Not in pending but let sequencer coomit account for this and clear.
-                                synchronized(m_seenOffset) {
-                                    m_seenOffset.add(messageAndOffset.nextOffset());
-                                }
-                                continue;
                             }
+                            m_currentOffset.set(messageAndOffset.nextOffset());
                         }
                     }
 
