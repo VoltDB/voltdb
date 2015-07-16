@@ -4,9 +4,7 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-
-    <!-- <admin-mode port="21211" adminstartup="true"/> -->
-
+    <commandlog enabled="false" />
     <import>
         <configuration module="kafkastream.jar" type="custom" enabled="true">
             <property name="brokers">kafka2:9092</property>

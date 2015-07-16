@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.List;
 import kafka.javaapi.consumer.SimpleConsumer;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -443,7 +442,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                 }
             }
-            info("Coordinator for consumer is: " + m_coordinator);
+            info("Coordinator for " + m_topicAndPartition + " consumer is: " + m_coordinator);
         }
 
         public long getLastOffset(long whichTime) {
