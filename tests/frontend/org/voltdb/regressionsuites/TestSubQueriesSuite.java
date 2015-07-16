@@ -48,11 +48,17 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * or disabled.
      */
     private static final boolean doAllTests    = false;
+    // hsql232 ENG-8306
     private static final boolean HSQL232_ENG_8306_DONE = false;
+    // hsql232 ENG-8325
     private static final boolean HSQL232_ENG_8325_DONE = false;
+    // hsql232 ENG-8628
     private static final boolean HSQL232_ENG_8628_DONE = false;
+    // hsql232 ENG-8633
     private static final boolean HSQL232_ENG_8633_DONE = false;
+    // hsql232 ENG-8636
     private static final boolean HSQL232_ENG_8636_DONE = false;
+    // hsql232 ENG-8638
     private static final boolean HSQL232_ENG_8638_DONE = false;
 
     private static final boolean doTest(boolean flag) {
