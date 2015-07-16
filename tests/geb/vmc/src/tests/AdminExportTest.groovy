@@ -147,6 +147,18 @@ class AdminExportTest extends TestBase {
         waitFor(waitTime) { page.overview.exportConnectorClass.isDisplayed() }
     }
 
+    def "Verify Add Configuration for ELASTICSEARCH"() {
+        when: 'Open Add ConfigurationPopup'
+        page.overview.openAddConfigurationPopup()
+        page.overview.textType.value("ELASTICSEARCH")
+        then: 'Check elements'
+        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+        waitFor(waitTime) { page.overview.endpointES.value().equals("endpoint") }
+        waitFor(waitTime) { page.overview.endpointESValue.isDisplayed() }
+    }
+
     def "Verify Error messages of Add Configuration for FILE"() {
         when: 'Open Add ConfigurationPopup'
         page.overview.openAddConfigurationPopup()
@@ -280,6 +292,26 @@ class AdminExportTest extends TestBase {
         then: 'Error messages are displayed'
         waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
         waitFor(waitTime) { page.overview.errorExportConnectorClass.isDisplayed() }
+    }
+
+    def "Verify Error messages of Add Configuration for ELASTICSEARCH"() {
+        when: 'Open Add ConfigurationPopup'
+        page.overview.openAddConfigurationPopup()
+        page.overview.textType.value("ELASTICSEARCH")
+        then: 'Check elements'
+        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+
+        waitFor(waitTime) { page.overview.endpointES.value().equals("endpoint") }
+        waitFor(waitTime) { page.overview.endpointESValue.isDisplayed() }
+
+
+        when: 'Save button is clicked'
+        page.overview.save.click()
+        then: 'Error messages are displayed'
+        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+        waitFor(waitTime) { page.overview.errorEndpointESValue.isDisplayed() }
     }
 
     def "Verify Add Configuration for FILE created"() {
