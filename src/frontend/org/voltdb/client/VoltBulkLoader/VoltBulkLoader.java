@@ -40,7 +40,7 @@ import org.voltdb.client.ClientResponse;
  * VoltBulkLoader is meant to run for long periods of time. Multiple threads can
  * operate on a single instance of the VoltBulkLoader to feed and bulk load a
  * single table. It is also possible for multiple instances of the
- * VoltBulkLoader to operate concurrently no the same table or different tables
+ * VoltBulkLoader to operate concurrently on the same table or different tables
  * as long as they share the same Client instance.
  *
  * All instances of VoltBulkLoader using a common Client share a pool of threads
@@ -132,6 +132,13 @@ public class VoltBulkLoader {
         m_partitionedColumnIndex = -1;
         m_partitionColumnType = VoltType.NULL;
 
+        // Check the primary key if upsert is enabled
+        VoltTable pkeyInfo = null;
+        if (m_upsert) {
+            pkeyInfo = m_clientImpl.callProcedure("@SystemCatalog",
+                "PRIMARYKEYS").getResults()[0];
+        }
+
         int sleptTimes = 0;
         while (!m_clientImpl.isHashinatorInitialized() && sleptTimes < 120) {
             try {
@@ -142,6 +149,22 @@ public class VoltBulkLoader {
 
         if (sleptTimes >= 120) {
             throw new IllegalStateException("VoltBulkLoader unable to start due to uninitialized Client.");
+        }
+
+        if (m_upsert) {
+            boolean hasPkey = false;
+            while (pkeyInfo.advanceRow()) {
+                String table = pkeyInfo.getString("TABLE_NAME");
+                if (tableName.equalsIgnoreCase(table)) {
+                    hasPkey = true;
+                    break;
+                }
+            }
+            if (!hasPkey) {
+                //VoltBulkLoader will exit.
+                throw new IllegalArgumentException(String.format("Upsert could not be performed on table %s of no primary key.",
+                        tableName));
+            }
         }
 
         while (procInfo.advanceRow()) {
@@ -174,6 +197,7 @@ public class VoltBulkLoader {
             VoltTable.ColumnInfo ci = new VoltTable.ColumnInfo(cname, type);
             m_colInfo[i] = ci;
         }
+
 
         int sitesPerHost = 1;
         int kfactor = 0;

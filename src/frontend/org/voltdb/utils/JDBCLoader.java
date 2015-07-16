@@ -238,8 +238,8 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         // This is set to true when -p option us used.
         boolean useSuppliedProcedure = false;
 
-        @Option(desc = "use upsert instead of insert", hasArg = false)
-        boolean upsert = false;
+        @Option(desc = "Use upsert instead of insert", hasArg = false)
+        boolean update = false;
 
         /**
          * Validate command line options.
@@ -269,6 +269,10 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             }
             if ((procedure != null) && (procedure.trim().length() > 0)) {
                 useSuppliedProcedure = true;
+            }
+            if ((useSuppliedProcedure) && (update)){
+                update = false;
+                exitWithMessageAndUsage("update is not applicable when stored procedure specified");
             }
             if ("".equals(jdbctable.trim())) {
                 jdbctable = table;
@@ -342,7 +346,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             if (config.useSuppliedProcedure) {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.upsert, errHandler);
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
             }
 
             //Created Source reader

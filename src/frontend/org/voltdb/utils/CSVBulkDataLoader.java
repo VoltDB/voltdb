@@ -39,6 +39,11 @@ public class CSVBulkDataLoader implements CSVDataLoader {
         m_errHandler = errHandler;
     }
 
+    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
+            BulkLoaderErrorHandler errHandler) throws Exception    {
+        this(client, tableName, batchSize, false, errHandler);
+    }
+
     @Override
     public void setFlushInterval(int delay, int seconds) {
         m_loader.setFlushInterval(delay, seconds);

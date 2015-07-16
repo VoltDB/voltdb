@@ -400,7 +400,7 @@ public class TestCSVLoader {
                                                                          // and should exist in the table
         };
 
-        String[] myVaildTableData = {
+        String[] myValidTableData = {
                 "3,3,3,333333, third ,NULL, 3.33," + currentTime,
                 "2,5,5,5555555,  \"abcde\"g, 5.50, 5.55," + currentTime,
                 "1,6,NULL,666666, sixth, 6.60, 6.66," + currentTime
@@ -409,7 +409,7 @@ public class TestCSVLoader {
         int invalidLineCnt = 0;
         int validLineCnt = myData.length;
         int validUpsertLineCnt = 3;
-        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt, validUpsertLineCnt, myVaildTableData);
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt, validUpsertLineCnt, myValidTableData);
     }
 
     //Test using Upsert instead of insert.
@@ -1062,7 +1062,7 @@ public class TestCSVLoader {
                 out_csv.close();
             }
             catch( Exception e) {
-                System.err.print( e.getMessage() );
+                e.printStackTrace();
             }
 
             CSVLoader.testMode = true;
