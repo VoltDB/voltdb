@@ -597,7 +597,7 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
 
 #ifndef NDEBUG
-    if( ! m_schema->isCompatibleForCopy(source.m_schema)) {
+    if( ! m_schema->isCompatibleForMemcpy(source.m_schema)) {
         std::ostringstream message;
         message << "src  tuple: " << source.debug("") << std::endl;
         message << "src schema: " << source.m_schema->debug() << std::endl;
@@ -703,7 +703,7 @@ inline void TableTuple::copy(const TableTuple &source) {
     assert(m_data);
 
 #ifndef NDEBUG
-    if( ! m_schema->isCompatibleForCopy(source.m_schema)) {
+    if( ! m_schema->isCompatibleForMemcpy(source.m_schema)) {
         std::ostringstream message;
         message << "src  tuple: " << source.debug("") << std::endl;
         message << "src schema: " << source.m_schema->debug() << std::endl;

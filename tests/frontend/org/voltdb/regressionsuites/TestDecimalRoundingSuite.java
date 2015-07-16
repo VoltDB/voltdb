@@ -269,6 +269,53 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
                             "Attempted to subtract 0.000000000001 from -99999999999999999999999999.999999999999 causing overflow/underflow");
             cr = client.callProcedure("@AdHoc", "truncate table decimaltable;");
             assertEquals(getRoundingString("Table Cleanup failure"), ClientResponse.SUCCESS, cr.getStatus());
+
+            //
+            // Try it with unrepresentable numbers.
+            //
+            String positiveTest = "insert into decimaltable values 99999999999999999999999999.9999999999995;";
+            String positiveTestMsg = "Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: " +
+                                     "Error compiling query: java.lang.RuntimeException: " +
+                                     "Decimal 100000000000000000000000000.000000000000 has more than 38 digits of precision.";
+            String negativeTest = "insert into decimaltable values -99999999999999999999999999.9999999999995;";
+            String negativeTestMsg = "Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: " +
+                                     "Error compiling query: java.lang.RuntimeException: " +
+                                     "Decimal -100000000000000000000000000.000000000000 has more than 38 digits of precision.";
+            switch (mode) {
+            case HALF_DOWN:
+            case DOWN:
+                // Rounding DOWN always rounds towards zero.  So, we always get a
+                // representable number.
+                cr = client.callProcedure("@AdHoc", positiveTest);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                cr = client.callProcedure("@AdHoc", negativeTest);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                break;
+            case FLOOR:
+                // Floor rounds to the next lowest fixed point number.  So,
+                // we never get positive overflow, but we may get negative overflow.
+                cr = client.callProcedure("@AdHoc", positiveTest);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                verifyStmtFails(client, negativeTest, negativeTestMsg);
+                break;
+            case CEILING:
+                // Ceiling rounds to the next highest representable number.  So
+                // we never get negative overflow, but we may get positive
+                // overflow.
+                cr = client.callProcedure("@AdHoc", negativeTest);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                verifyStmtFails(client, positiveTest, positiveTestMsg);
+                break;
+            case HALF_UP:
+            case UP:
+                verifyStmtFails(client, positiveTest, positiveTestMsg);
+                verifyStmtFails(client, negativeTest, negativeTestMsg);
+                break;
+            default:
+                // Missed Case.  We only test six of the eight possible
+                // rounding modes.  This is here in case the test is expanded.
+                fail("Missed Rounding Case");
+            }
         }
     }
 
@@ -563,7 +610,15 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
     private static void addConfig(int idx, MultiConfigSuiteBuilder builder, VoltProjectBuilder project, Map<String, String> properties) {
         LocalCluster config = null;
         config = new LocalCluster("sqlinsert-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI, properties);
-        config.setPrefix(Integer.toString(idx));
+        String renabled = (properties != null) ? properties.get(m_roundingEnabledProperty) : "defEnabled";
+        String rmode = (properties != null) ? properties.get(m_roundingModeProperty) : "defEnabled";
+        if (renabled == null) {
+            renabled = "defEnabled";
+        }
+        if (rmode == null) {
+            rmode = "defMode";
+        }
+        config.setPrefix(renabled + "-" + rmode);
         config.setHasLocalServer(false);
         boolean success = config.compile(project);
         assert(success);
