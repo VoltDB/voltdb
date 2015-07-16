@@ -34,6 +34,7 @@ import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CatalogUtil;
 
@@ -41,7 +42,7 @@ import org.voltdb.utils.CatalogUtil;
  *
  * @author akhanzode
  */
-public class ImportManager {
+public class ImportManager implements ChannelChangeCallback {
 
     /**
      * Processors also log using this facility.
@@ -72,6 +73,7 @@ public class ImportManager {
         m_myHostId = myHostId;
         m_messenger = messenger;
         m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId), null);
+        m_distributer.registerCallback("__IMPORT_MANAGER__", this);
 
         //create properties for osgi
         m_frameworkProps = new HashMap<String, String>();
@@ -90,8 +92,12 @@ public class ImportManager {
 
     /**
      * Create the singleton ImportManager and initialize.
+     * @param myHostId my host id in cluster
+     * @param catalogContext current catalog context
+     * @param messenger messenger to get to ZK
+     * @throws org.osgi.framework.BundleException
      */
-    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) throws BundleException {
+    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException {
         ImportManager em = new ImportManager(myHostId, messenger);
 
         m_self = em;
@@ -129,8 +135,13 @@ public class ImportManager {
             return;
         }
         m_processor.get().shutdown();
-        //Unset until it gets recreated.
+        //Unset until it gets started.
         m_processor.set(null);
+    }
+
+    public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
+        m_self.create(m_myHostId, m_distributer, catalogContext, messenger.getZK());
+        m_self.readyForData(catalogContext, messenger);
     }
 
     //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
@@ -138,8 +149,7 @@ public class ImportManager {
         //Shutdown and recreate.
         m_self.close();
         assert(m_processor.get() == null);
-        m_self.create(m_myHostId, m_distributer, catalogContext, messenger.getZK());
-        m_self.readyForData(catalogContext, messenger);
+        m_self.start(catalogContext, messenger);
     }
 
     public void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
@@ -153,6 +163,28 @@ public class ImportManager {
         }
         //Tell import processors and in turn ImportHandlers that we are ready to take in data.
         m_processor.get().readyForData(catalogContext, messenger);
+    }
+
+    @Override
+    public void onChange(ImporterChannelAssignment assignment) {
+        //We do nothing each importer will get notified with their assignments.
+    }
+
+    @Override
+    public void onClusterStateChange(VersionedOperationMode mode) {
+        OperationMode m = mode.getMode();
+        switch (m) {
+            case PAUSED:
+                importLog.info("Cluster is paused shutting down all importers.");
+                close();
+                importLog.info("Cluster is paused all importers shutdown.");
+                break;
+            case RUNNING:
+                importLog.info("Cluster is resumed STARTING all importers.");
+                start(VoltDB.instance().getCatalogContext(), VoltDB.instance().getHostMessenger());
+                importLog.info("Cluster is resumed STARTED all importers.");
+                break;
+        }
     }
 
 }
