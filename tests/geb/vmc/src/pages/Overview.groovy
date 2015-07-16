@@ -280,7 +280,7 @@ class Overview extends Module {
     }
 
     def String getElasticSearchTest() {
-        return getElasticSearchTestName() + " (FILE)"
+        return getElasticSearchTestName() + " (ELASTICSEARCH)"
     }
     
     def String getJdbcTest() {
