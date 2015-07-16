@@ -39,6 +39,7 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.IndexRef;
@@ -646,6 +647,39 @@ public class TestDDLCompiler extends TestCase {
         "DR TABLE T;\n" +
         "EXPORT TABLE T;");
         String schemaPath = schemaFile.getPath();
+
+        try {
+            assertFalse(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+
+        // cleanup after the test
+        jarOut.delete();
+    }
+
+    public void testSetDatabaseConfig() {
+        File jarOut = new File("setDatabaseConfig.jar");
+        jarOut.deleteOnExit();
+
+        VoltCompiler compiler = new VoltCompiler();
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(
+        "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
+        "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+        "DR TABLE T;");
+        String schemaPath = schemaFile.getPath();
+
+        try {
+            assertTrue(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+
+        schemaFile = VoltProjectBuilder.writeStringToTempFile(
+        "SET DR_MOD=ACTIVE_ACTIVE;\n" +
+        "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+        "DR TABLE T;");
+        schemaPath = schemaFile.getPath();
 
         try {
             assertFalse(compiler.compileFromDDL(jarOut.getPath(), schemaPath));

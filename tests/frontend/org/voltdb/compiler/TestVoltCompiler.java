@@ -380,6 +380,48 @@ public class TestVoltCompiler extends TestCase {
         return compiler.m_errors;
     }
 
+    public void testPartitionProcedureWarningMessage() throws IOException {
+        String ddl = "CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, NUM INTEGER, PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
+                "create procedure myTestProc as select num from PKEY_BIGINT where pkey = ? order by 1;";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+
+        String expectedWarning =
+                "This procedure myTestProc would benefit from being partitioned, by adding a "
+                + "'PARTITION ON TABLE PKEY_BIGINT COLUMN ON PKEY PARAMETER 0' clause to the "
+                + "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
+
+        boolean findMatched = false;
+        for (Feedback fb : compiler.m_warnings) {
+            System.out.println(fb.getStandardFeedbackLine());
+            if (fb.getStandardFeedbackLine().contains(expectedWarning)) {
+                findMatched = true;
+                break;
+            }
+        }
+        assertTrue(findMatched);
+    }
+
     public void testSnapshotSettings() throws IOException {
         String schemaPath = "";
         try {

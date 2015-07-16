@@ -1071,7 +1071,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[14];
+        ColumnInfo[] expectedSchema = new ColumnInfo[15];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -1086,6 +1086,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[11] = new ColumnInfo("DURATION", VoltType.BIGINT);
         expectedSchema[12] = new ColumnInfo("THROUGHPUT", VoltType.FLOAT);
         expectedSchema[13] = new ColumnInfo("RESULT", VoltType.STRING);
+        expectedSchema[14] = new ColumnInfo("TYPE", VoltType.STRING);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         // Finagle a snapshot
