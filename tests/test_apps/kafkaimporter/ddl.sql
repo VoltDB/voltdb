@@ -52,6 +52,7 @@ CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertImport;
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.MatchRows;
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.DeleteRows;
 
-create procedure CountMirror as select count(*) from kafkamirrortable1;
+CREATE PROCEDURE CountMirror as select count(*) from kafkamirrortable1;
+CREATE PROCEDURE CountImport as select count(*) from kafkaimporttable1;
 
 -- END_OF_BATCH

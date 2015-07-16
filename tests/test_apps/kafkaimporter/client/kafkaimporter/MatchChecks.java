@@ -58,8 +58,9 @@ public class MatchChecks {
                 System.out.println("\tDelete rows: " + findAndDeleteMatchingRows(innerClient));
                 System.out.println("\tMirror table row count: " + mirrorRowCount);
                 if (mirrorRowCount == 0) { // indicates everything matched and table empty
-                    timer.cancel();
-                    timer.purge();
+                    System.out.println("mirrorRowCount is 0. Stop?");
+                    //timer.cancel();
+                    //timer.purge();
                 }
             }
         }, 0, interval);

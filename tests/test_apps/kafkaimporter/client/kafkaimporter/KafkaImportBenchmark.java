@@ -68,6 +68,7 @@ public class KafkaImportBenchmark {
     final Config config;
     // Timer for periodic stats printing
     Timer statsTimer;
+    static Timer checkTimer;
     // Benchmark start time
     long benchmarkStartTS;
 
@@ -125,6 +126,7 @@ public class KafkaImportBenchmark {
      */
     public KafkaImportBenchmark(Config config) {
         this.config = config;
+        periodicStatsContext = client.createStatsContext();
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
@@ -187,15 +189,6 @@ public class KafkaImportBenchmark {
     }
 
     /**
-     * Prints the results of the voting simulation and statistics
-     * about performance.
-     *
-     * @throws Exception if anything unexpected happens.
-     */
-    public synchronized void printResults() throws Exception {
-    }
-
-    /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
      *
@@ -230,7 +223,7 @@ public class KafkaImportBenchmark {
             schedulePeriodicStats();
 
             //System.out.println("starting data checker...");
-            //matchChecks.checkTimer(5000, client);
+            //checkTimer = matchChecks.checkTimer(5000, client);
 
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
@@ -246,12 +239,12 @@ public class KafkaImportBenchmark {
             // check for export completion
             exportMon.waitForStreamedAllocatedMemoryZero();
             importMon.waitForStreamedAllocatedMemoryZero();
+            System.out.println("Done waiting for import & export tables");
         } finally {
             // cancel periodic stats printing
+            System.out.println("Canceling stats");
             statsTimer.cancel();
             finalInsertCount.addAndGet(icnt);
-            // print the summary results
-            printResults();
         }
     }
 
@@ -302,7 +295,6 @@ public class KafkaImportBenchmark {
         // start watcher that compares mirror table which contains all
         // the export data with the import table that's rows back from Kafka.
         // Arg is interval to wait between checks
-        // TODO: make interval a command line argument
         System.out.println("starting data checker...");
         @SuppressWarnings("static-access")
         Timer t = matchChecks.checkTimer(5000, client);
@@ -314,6 +306,7 @@ public class KafkaImportBenchmark {
         // not all the rows got to Kafka or not all the rows got imported back.
         boolean testResult = FinalCheck.check(client);
 
+        checkTimer.cancel();
         client.drain();
         client.close();
 

@@ -161,7 +161,7 @@ function async-benchmark() {
         kafkaimporter.client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
         --warmup=2 \
-        --duration=190 \
+        --duration=120 \
         --servers=localhost
 }
 

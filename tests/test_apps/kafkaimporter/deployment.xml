@@ -10,7 +10,7 @@
     <import>
         <configuration module="kafkastream.jar" type="custom" enabled="true">
             <property name="brokers">kafka2:9092</property>
-            <property name="topics">T8_KAFKAEXPORTTABLE1</property>
+            <property name="topics">T2_KAFKAEXPORTTABLE1</property>
             <property name="procedure">InsertImport</property>
         </configuration>
     </import>
@@ -21,7 +21,7 @@
             <property name="producer.type">async</property>
             <property name="request.required.acks">1</property>
             <property name="skipinternals">true</property>
-            <property name="topic.prefix">T8_</property>
+            <property name="topic.prefix">T2_</property>
         </configuration>
     </export>
 </deployment>
