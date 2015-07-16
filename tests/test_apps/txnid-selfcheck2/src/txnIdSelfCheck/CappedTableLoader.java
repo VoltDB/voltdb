@@ -146,8 +146,8 @@ public class CappedTableLoader extends BenchmarkThread {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
                     currentRowCount = nextRowCount;
-                    if (exceedsPartitionLimit()) 
-                        hardStop("Capped table exceeds 10 rows, this shoudln't happen and it shouldn't be tested here. Exiting. ");
+                    //if (exceedsPartitionLimit()) 
+                        //hardStop("Capped table exceeds 10 rows, this shoudln't happen and it shouldn't be tested here. Exiting. ");
                 }
             }
             catch (Exception e) {
