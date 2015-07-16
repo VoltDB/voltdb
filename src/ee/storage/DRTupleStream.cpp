@@ -310,7 +310,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
             type = static_cast<DRRecordType>((int)type + 5);
             interestingColumns = &(indexPair.first->getColumnIndices());
             rowMetadataSz += sizeof(int32_t);
-            columnCount = interestingColumns->size();
+            columnCount = static_cast<int>(interestingColumns->size());
         } else {
             columnCount = tuple.sizeInValues();
         }
