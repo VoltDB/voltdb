@@ -660,6 +660,15 @@ public class CatalogDiffEngine {
                 return null;
             }
         }
+        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
+            String source = (String)suspect.getField("drMasterHost");
+            if (source.isEmpty() && (Boolean)suspect.getField("drConsumerEnabled")) {
+                restrictionQualifier = " while DR is enabled";
+            }
+            else {
+                return null;
+            }
+        }
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {

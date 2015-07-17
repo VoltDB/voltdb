@@ -788,7 +788,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_config.m_isEnterprise && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
                 byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
-                if (drProducerHost == null || drProducerHost.isEmpty()) {
+                if (m_catalogContext.cluster.getDrconsumerenabled() &&
+                        (drProducerHost == null || drProducerHost.isEmpty())) {
                     VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
                 }
                 try {
