@@ -70,7 +70,7 @@ public:
 protected:
     bool p_init(AbstractPlanNode*,
             TempTableLimits* limits);
-    bool p_execute(const NValueArray &params);
+    bool p_execute();
 private:
     VoltDBEngine *engine;
 };

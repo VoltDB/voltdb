@@ -172,7 +172,7 @@ public:
      * Inlined aggregate will not allocate its own output table,
      * but will use other's output table instead.
      */
-    virtual TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+    virtual TableTuple p_execute_init(ProgressMonitorProxy* pmp,
             const TupleSchema * schema, TempTable* newTempTable = NULL);
 
     /**
@@ -193,7 +193,7 @@ public:
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 
-    void executeAggBase(const NValueArray& params);
+    void executeAggBase();
 
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing
@@ -276,13 +276,13 @@ public:
     // same reason for serial and partial
     ~AggregateHashExecutor();
 
-    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+    TableTuple p_execute_init(ProgressMonitorProxy* pmp,
                               const TupleSchema * schema, TempTable* newTempTable  = NULL);
     bool p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 
 private:
-    virtual bool p_execute(const NValueArray& params);
+    virtual bool p_execute();
     HashAggregateMapType m_hash;
 };
 
@@ -300,7 +300,7 @@ public:
         m_failPrePredicateOnFirstRow(false) { }
     ~AggregateSerialExecutor();
 
-    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+    TableTuple p_execute_init(ProgressMonitorProxy* pmp,
                               const TupleSchema * schema, TempTable* newTempTable  = NULL);
     bool p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
@@ -314,7 +314,7 @@ protected:
     TableTuple m_passThroughTupleSource;
 
 private:
-    virtual bool p_execute(const NValueArray& params);
+    virtual bool p_execute();
 };
 
 
@@ -325,13 +325,13 @@ public:
         AggregateExecutorBase(engine, abstract_node), m_atTheFirstRow(true) { }
     ~AggregatePartialExecutor();
 
-    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+    TableTuple p_execute_init(ProgressMonitorProxy* pmp,
                               const TupleSchema * schema, TempTable* newTempTable  = NULL);
     bool p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 
 private:
-    virtual bool p_execute(const NValueArray& params);
+    virtual bool p_execute();
     void initPartialHashGroupByKeyTuple(const TableTuple& nextTuple);
 
     bool m_atTheFirstRow;

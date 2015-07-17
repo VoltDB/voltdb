@@ -102,7 +102,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
-bool ProjectionExecutor::p_execute(const NValueArray &params) {
+bool ProjectionExecutor::p_execute() {
 #ifndef NDEBUG
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
 #endif
@@ -132,6 +132,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     //
     TableIterator iterator = input_table->iteratorDeletingAsWeGo();
     assert (tuple.sizeInValues() == input_table->columnCount());
+    const NValueArray& params = *ExecutorContext::getExecutorContext()->getParameterContainer();
     while (iterator.next(tuple)) {
         //
         // Project (or replace) values from input tuple
