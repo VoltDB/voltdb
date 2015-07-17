@@ -180,9 +180,9 @@ public class ClientThread extends BenchmarkThread {
             }
             */
             VoltTable[] results = response.getResults();
-            
+
             VoltTable data = results[3];
-            
+
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
@@ -190,7 +190,7 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-            
+
             try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }

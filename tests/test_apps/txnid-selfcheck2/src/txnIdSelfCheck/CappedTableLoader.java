@@ -90,7 +90,7 @@ public class CappedTableLoader extends BenchmarkThread {
         public void clientCallback(ClientResponse clientResponse) throws Exception { // fix this
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
-                // This case is what happens when the table fails to delete enough rows to make room for the next insert. 
+                // This case is what happens when the table fails to delete enough rows to make room for the next insert.
                 // log.info("CappedTableLoader acceptably failed to insert into " + tableName + ". ");
             } else if ( status == ClientResponse.USER_ABORT) {
                 log.error("User abort while attempting to insert into table "+ tableName );
@@ -145,10 +145,10 @@ public class CappedTableLoader extends BenchmarkThread {
                     if (nextRowCount == currentRowCount) {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
-                    
+
                     try { Thread.sleep(15000); } catch (Exception e2) {}
                     currentRowCount = nextRowCount;
-                    if (exceedsPartitionLimit()) 
+                    if (exceedsPartitionLimit())
                         hardStop("Capped table exceeds 10 rows, this shoudln't happen and it shouldn't be tested here. Exiting. ");
                 }
             }
@@ -158,11 +158,11 @@ public class CappedTableLoader extends BenchmarkThread {
                 hardStop("exceeds partition limit exception :: "+ e.getMessage(), e);
                 try { Thread.sleep(3000); } catch (Exception e2) { }
             }
-            
+
 
             // check for row overflow
             try {
-                if (exceedsPartitionLimit()) 
+                if (exceedsPartitionLimit())
                     hardStop("Capped table  exceeds 10 rows, this shoudln't happen. Exiting. ");
             } catch (Exception e) {
                 System.out.println("Exception number 2");
@@ -171,9 +171,8 @@ public class CappedTableLoader extends BenchmarkThread {
         }
         log.info("CappedTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
     }
-    
 
-    
+
     private boolean exceedsPartitionLimit() throws NoConnectionsException, IOException, ProcCallException {
         VoltTable stats = TxnId2Utils.doStatistics(client, "table").getResults()[0];
         boolean ret = false;

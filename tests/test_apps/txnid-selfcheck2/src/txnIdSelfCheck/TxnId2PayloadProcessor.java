@@ -73,7 +73,7 @@ public class TxnId2PayloadProcessor
     public final String KeyFormat;
     private final int Entropy;
     private final Random Rand = new Random(0);
-    
+
     /*
      * Volt deals with 2 megs at the most so 4 megabytes of entropy is plenty
      */

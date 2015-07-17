@@ -161,10 +161,10 @@ public class TruncateTableLoader extends BenchmarkThread {
             } catch (Exception e) {
                 hardStop("getrowcount exception", e);
             }
-            
-            
 
-            try { // here is where to check for capped rather than truncate. 
+
+
+            try { // here is where to check for capped rather than truncate.
                 log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());
