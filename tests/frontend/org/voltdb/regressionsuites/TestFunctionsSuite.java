@@ -1589,7 +1589,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestPower7x();
         subtestPower07x();
         subtestSqrt();
-        subtestLog();
+        subtestNaturalLog();
     }
 
     public void subtestCeiling() throws Exception
@@ -1714,7 +1714,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, nonnegs, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    public void subtestLog() throws Exception
+    public void subtestNaturalLog() throws Exception
     {
         final String[] fname = {"LOG", "LN"};
         final double[] resultValues = new double[nonnegnonzeros.length];
@@ -1729,6 +1729,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         final String expectedFormat = "DOUBLE";
         for (String log : fname) {
             functionTest(log, nonnegnonzeros, resultValues, filters, monotonic, ascending, expectedFormat);
+        }
+
+        // Adhoc Queries
+        String sql = "select * from P1 where ID > LOG(0)";
+        Client client = getClient();
+        // valid adhoc SQL query
+        sql = "select * from P1 where ID > LOG(1)";
+        client.callProcedure("@AdHoc", sql);
+
+        // execute with an invalid argument to LOG()
+        try {
+            client.callProcedure("@AdHoc", sql);
+        } catch (ProcCallException excp) {
+            assertTrue(excp.getMessage().contains("invalid argument for natural logarithm"));
         }
     }
 
