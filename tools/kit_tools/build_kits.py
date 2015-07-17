@@ -23,13 +23,28 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
     run("mkdir -p " + builddir)
     # change to it
     with cd(builddir):
-        # do the checkouts
+        # do the checkouts, collect checkout errors on both community &
+        # pro repos so user gets status on both checkouts
+        message = ""
         run("git clone git@github.com:VoltDB/voltdb.git")
-        run("cd voltdb; git checkout %s" % voltdbGit)
+        result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
+        if result.failed:
+            message = "VoltDB checkout failed. Missing branch %s." % rbmqExportGit
+
         run("git clone git@github.com:VoltDB/pro.git")
-        run("cd pro; git checkout %s" % proGit)
+        result = run("cd pro; git checkout %s" % proGit, warn_only=True)
+        if result.failed:
+            message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
+
         run("git clone git@github.com:VoltDB/export-rabbitmq.git")
-        run("cd export-rabbitmq; git checkout %s" % rbmqExportGit)
+        result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
+        # Probably ok to use master for export-rabbitmq.
+        if result.failed:
+            print "\nExport-rabbitmg branch %s checkout failed. Defaulting to master." % rbmqExportGit
+
+        if len(message) > 0:
+            abort(message)
+
         return run("cat voltdb/version.txt").strip()
 
 ################################################
@@ -299,6 +314,20 @@ try:
 
 except Exception as e:
     print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
+    build_errors=True
+
+try:
+# build kits on the mini
+    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
+        assert versionCentos == versionMac
+        buildCommunity()
+        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+        buildPro()
+        buildRabbitMQExport(versionMac)
+        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+except Exception as e:
+    print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
 # build debian kit
