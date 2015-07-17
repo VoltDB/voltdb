@@ -114,7 +114,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
             assert(executor);
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute()) {
+            if (!executor->execute(*m_staticParams)) {
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
             }

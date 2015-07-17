@@ -140,7 +140,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
-bool IndexCountExecutor::p_execute()
+bool IndexCountExecutor::p_execute(const NValueArray &params)
 {
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();

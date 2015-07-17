@@ -373,7 +373,7 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool UnionExecutor::p_execute() {
+bool UnionExecutor::p_execute(const NValueArray &params) {
     return m_setOperator->processTuples();
 }
 
