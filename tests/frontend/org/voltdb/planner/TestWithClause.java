@@ -25,12 +25,8 @@ package org.voltdb.planner;
 
 public class TestWithClause extends PlannerTestCase {
     private static final boolean allTests = false;
-    private static final boolean WITH_IN_FROM = false;
-    private static final boolean WITH_DEFINED_IN_IN = false;
-    private static final boolean WITH_IN_EXISTS = false;
-    private static final boolean ENG_8638_DONE = false;
-    private static final boolean WITH_USED_IN_IN = false;
-    private static final boolean ENG_8626_DONE = false;
+    // hsql232 ENG-8626
+    private static final boolean HSQL232_ENG_8626_DONE = false;
     private static final boolean doTest(boolean condition) {
         return allTests || condition;
     }
@@ -75,17 +71,16 @@ public class TestWithClause extends PlannerTestCase {
         // needs an alias, including dept_count in the FROM clause.
         // I think this is an error, and is discussed in ENG-8638.
         //
-        doCompileTest(ENG_8638_DONE,
-                      "WITH dept_count AS (\n" +
-                      "  SELECT deptno, COUNT(*) as dc\n" +
-                      "  FROM   employee\n" +
-                      "  GROUP BY deptno)\n" +
-                      "SELECT e.name AS employee_name,\n" +
-                      "       dept_count.dc AS emp_dept_count\n" +
-                      "FROM   employee e,\n" +
-                      "       dept_count\n" +
-                      "WHERE  e.deptno = deptno;" +
-                      "");
+        compile("WITH dept_count AS (\n" +
+                "  SELECT deptno, COUNT(*) as dc\n" +
+                "  FROM   employee\n" +
+                "  GROUP BY deptno)\n" +
+                "SELECT e.name AS employee_name,\n" +
+                "       dept_count.dc AS emp_dept_count\n" +
+                "FROM   employee e,\n" +
+                "       dept_count\n" +
+                "WHERE  e.deptno = deptno;" +
+                "");
     }
 
     public void testDoubleWith() throws Exception {
@@ -115,17 +110,16 @@ public class TestWithClause extends PlannerTestCase {
     }
 
     public void testWithInFrom() throws Exception {
-        doCompileTest(WITH_IN_FROM,
-                      "SELECT e.name AS employee_name, \n" +
-                      "       dc.dept_count AS emp_dept_count \n" +
-                      "FROM   employee e, \n" +
-                      "       (WITH dept_count AS ( \n" +
-                      "         SELECT deptno, COUNT(*) AS dept_count \n" +
-                      "        FROM   employee \n" +
-                      "        GROUP BY deptno) \n" +
-                      "       select * from dept_count) as dc \n" +
-                      "WHERE  e.deptno = dc.deptno; \n" +
-                      "");
+        compile("SELECT e.name AS employee_name, \n" +
+                "       dc.dept_count AS emp_dept_count \n" +
+                "FROM   employee e, \n" +
+                "       (WITH dept_count AS ( \n" +
+                "         SELECT deptno, COUNT(*) AS dept_count \n" +
+                "        FROM   employee \n" +
+                "        GROUP BY deptno) \n" +
+                "       select * from dept_count) as dc \n" +
+                "WHERE  e.deptno = dc.deptno; \n" +
+                "");
     }
     public void testWithInIn() throws Exception {
         // Logically the "dc.deptno" and "as dc" in the RHS of the
@@ -142,16 +136,15 @@ public class TestWithClause extends PlannerTestCase {
                 "");
         // This is very close to the previous query.  But it does not have
         // the logically unnecessary alias for dept_count.
-        doCompileTest(ENG_8638_DONE,
-                      "SELECT e.name AS employee_name\n " +
-                      "FROM   employee e\n " +
-                      "WHERE  e.deptno in ( WITH dept_count AS (\n " +
-                      "                              SELECT deptno\n " +
-                      "                        FROM   employee emp\n " +
-                      "                        GROUP BY deptno\n " +
-                      "                        HAVING count(*) > 5)\n " +
-                      "                    select deptno from dept_count);\n " +
-                      "");
+        compile("SELECT e.name AS employee_name\n " +
+                "FROM   employee e\n " +
+                "WHERE  e.deptno in ( WITH dept_count AS (\n " +
+                "                              SELECT deptno\n " +
+                "                        FROM   employee emp\n " +
+                "                        GROUP BY deptno\n " +
+                "                        HAVING count(*) > 5)\n " +
+                "                    select deptno from dept_count);\n " +
+                "");
 
         // This fails because the From clause in the main select statement
         // references the with-view named "dept_ident" without an alias.
@@ -159,7 +152,7 @@ public class TestWithClause extends PlannerTestCase {
         // However, if we give it an alias, then the compilation fails
         // because the parenthesized expression "e.deptno in (deptno)"
         // generates a VALUELIST which we don't know what to do with.
-        doCompileTest(ENG_8638_DONE & ENG_8626_DONE,
+        doCompileTest(HSQL232_ENG_8626_DONE,
                       "WITH dept_ident AS (\n" +
                       "  SELECT deptno \n" +
                       "  FROM   employee\n" +
@@ -173,7 +166,7 @@ public class TestWithClause extends PlannerTestCase {
         // This fails because the WHERE expression "e.deptno IN ( di.deptno )"
         // generates a tree with a VALUELIST in the HSQLDB AST, and we cannot
         // translate it yet.  This is the complaint of ENG-8626.
-        doCompileTest(ENG_8626_DONE,
+        doCompileTest(HSQL232_ENG_8626_DONE,
                       "WITH dept_ident AS (\n" +
                       "  SELECT deptno \n" +
                       "  FROM   employee\n" +
@@ -201,16 +194,15 @@ public class TestWithClause extends PlannerTestCase {
                 "");
         // This is the same query as above, but without the logically unnecessary
         // alias.
-        doCompileTest(ENG_8638_DONE,
-                      "SELECT e.name AS employee_name\n" +
-                      "FROM   employee e\n" +
-                      "WHERE  exists ( WITH dept_count AS (\n" +
-                      "                       SELECT deptno, COUNT(*) AS dept_size\n" +
-                      "               FROM   employee\n" +
-                      "               GROUP BY deptno\n" +
-                      "               HAVING count(*) > 5)\n" +
-                      "               select deptno from dept_count);\n" +
-                      "");
+        compile("SELECT e.name AS employee_name\n" +
+                "FROM   employee e\n" +
+                "WHERE  exists ( WITH dept_count AS (\n" +
+                "                       SELECT deptno, COUNT(*) AS dept_size\n" +
+                "               FROM   employee\n" +
+                "               GROUP BY deptno\n" +
+                "               HAVING count(*) > 5)\n" +
+                "               select deptno from dept_count);\n" +
+                "");
     }
 
     /**

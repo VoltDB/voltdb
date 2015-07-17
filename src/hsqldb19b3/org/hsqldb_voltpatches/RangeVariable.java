@@ -2098,13 +2098,23 @@ public class RangeVariable {
 
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
             if (rangeTable instanceof TableDerived) {
-                if (tableAlias == null || tableAlias.name == null) {
-                    // VoltDB require derived sub select table with user specified alias
-                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                            "SQL Syntax error: Every derived table must have its own alias.");
+                String tableName = null;
+                if (tableAlias != null && tableAlias.name != null) {
+                    // If we have an alias, then use it.
+                    tableName = tableAlias.name;
+                } else {
+                    // If we don't have an alias, try to get the name from
+                    // the range table.
+                    tableName = rangeTable.getName().getNameString();
+                    if (tableName == null) {
+                        // If we've got nothing, then give up.
+                        // VoltDB require derived sub select table with user specified alias
+                        throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                                "SQL Syntax error: Every derived table must have its own alias.");
+                    }
                 }
 
-                scan.attributes.put("table", tableAlias.name.toUpperCase());
+                scan.attributes.put("table", tableName.toUpperCase());
 
                 // The parameter list will be appended to the top-level statement,
                 // so just pass an empty parameter list for the inner statements.
