@@ -205,6 +205,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
     EXPECT_FALSE(schema4->equals(schema2.get()));
 }
 
+
 TEST_F(TupleSchemaTest, MaxSerializedTupleSize) {
     voltdb::TupleSchemaBuilder builder(3); // 3 visible columns
     builder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
