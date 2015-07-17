@@ -315,14 +315,16 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
     public void testBigBatchAdvancedException() throws IOException, ProcCallException {
         System.out.println("test testBigBatchAdvancedException...");
         Client client = getClient();
+        String sql;
 
         // so many more permutations
         bigBatchAdvancedChecker(client, 0, 1, 1, 150, 1, 1, 1, 0, new double[]{0.1, 500.1}, 2);
         bigBatchAdvancedChecker(client, 0, 1, 1, 250, 1, 1, 1, 0, new double[]{0.1, 500.1}, 2);
         bigBatchAdvancedChecker(client, 0, 0, 1, 150, 0, 0, 0, 0, new double[]{}, 0);
 
+        //
         // Test multiple procedure call suggested from code review
-        String sql;
+        //
 
         // big batch roll back
         client.callProcedure("SPBigBatchAdvancedOnPartitionTable", 0, 1, 1, 150, 0, 0, 0, 0);
@@ -336,8 +338,54 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
         }
         sql = "select distinct ratio from P1 order by 1;";
         validateTableColumnOfScalarFloat(client, sql, new double[]{0.1});
-    }
 
+
+        // clear the data
+        client.callProcedure("@AdHoc", "truncate table P1");
+
+        //
+        // Test the try catch and re-throw case
+        //
+
+        // SP
+        try {
+            client.callProcedure("SPCatchRethrowOnPartitionTable", 0, 1);
+            fail();
+        } catch(Exception e) {
+            assertTrue(e.getMessage().contains("User's SP constraint error message"));
+        }
+        sql = "select distinct ratio from P1 order by 1;";
+        validateTableColumnOfScalarFloat(client, sql, new double[]{});
+
+        // two batches in the try catch block
+        try {
+            client.callProcedure("SPCatchRethrowOnPartitionTable", 0, 0);
+        } catch(Exception e) {
+            assertTrue(e.getMessage().contains("User's SP constraint error message"));
+        }
+        sql = "select distinct ratio from P1 order by 1;";
+        validateTableColumnOfScalarFloat(client, sql, new double[]{});
+
+        // MP
+        try {
+            client.callProcedure("MPCatchRethrowOnPartitionTable", 1);
+            fail();
+        } catch(Exception e) {
+            System.err.println(e.getMessage());
+            assertTrue(e.getMessage().contains("User's MP constraint error message"));
+        }
+        sql = "select distinct ratio from P1 order by 1;";
+        validateTableColumnOfScalarFloat(client, sql, new double[]{});
+
+        // two batches in the try catch block
+        try {
+            client.callProcedure("MPCatchRethrowOnPartitionTable", 0);
+        } catch(Exception e) {
+            assertTrue(e.getMessage().contains("User's MP constraint error message"));
+        }
+        sql = "select distinct ratio from P1 order by 1;";
+        validateTableColumnOfScalarFloat(client, sql, new double[]{});
+    }
 
 
     public TestCatchExceptionsInProcedure(String name) {
@@ -350,7 +398,9 @@ public class TestCatchExceptionsInProcedure extends RegressionSuite {
         org.voltdb_testprocs.regressionsuites.catchexceptions.MPInsertOnPartitionTable.class,
         org.voltdb_testprocs.regressionsuites.catchexceptions.SPMultipleTryCatchOnPartitionTable.class,
         org.voltdb_testprocs.regressionsuites.catchexceptions.SPBigBatchOnPartitionTable.class,
-        org.voltdb_testprocs.regressionsuites.catchexceptions.SPBigBatchAdvancedOnPartitionTable.class
+        org.voltdb_testprocs.regressionsuites.catchexceptions.SPBigBatchAdvancedOnPartitionTable.class,
+        org.voltdb_testprocs.regressionsuites.catchexceptions.SPCatchRethrowOnPartitionTable.class,
+        org.voltdb_testprocs.regressionsuites.catchexceptions.MPCatchRethrowOnPartitionTable.class
         };
 
     static public junit.framework.Test suite() {
