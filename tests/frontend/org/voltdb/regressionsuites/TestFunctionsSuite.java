@@ -1589,7 +1589,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestPower7x();
         subtestPower07x();
         subtestSqrt();
-        subtestLog();
+        subtestNaturalLog();
     }
 
     public void subtestCeiling() throws Exception
@@ -1714,7 +1714,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, nonnegs, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    public void subtestLog() throws Exception
+    public void subtestNaturalLog() throws Exception
     {
         final String[] fname = {"LOG", "LN"};
         final double[] resultValues = new double[nonnegnonzeros.length];
@@ -1729,6 +1729,42 @@ public class TestFunctionsSuite extends RegressionSuite {
         final String expectedFormat = "DOUBLE";
         for (String log : fname) {
             functionTest(log, nonnegnonzeros, resultValues, filters, monotonic, ascending, expectedFormat);
+        }
+
+        // Adhoc Queries
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (5, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
+
+        // valid adhoc SQL query
+        String sql = "select * from P1 where ID > LOG(1)";
+        client.callProcedure("@AdHoc", sql);
+
+        // execute Log() with invalid arguments
+        try {
+            sql = "select LOG(0) from P1";
+            client.callProcedure("@AdHoc", sql);
+            fail("Expected for Log(zero) result: invalid result value (-inf)");
+        } catch (ProcCallException excp) {
+            if (isHSQL()) {
+                assertTrue(excp.getMessage().contains("invalid argument for natural logarithm"));
+            } else {
+                assertTrue(excp.getMessage().contains("Invalid result value (-inf)"));
+            }
+        }
+
+        try {
+            sql = "select LOG(-10) from P1";
+            client.callProcedure("@AdHoc", sql);
+            fail("Expected resultfor Log(negative #): invalid result value (nan)");
+        } catch (ProcCallException excp) {
+            if (isHSQL()) {
+                assertTrue(excp.getMessage().contains("invalid argument for natural logarithm"));
+            } else {
+                assertTrue(excp.getMessage().contains("Invalid result value (nan)"));
+            }
         }
     }
 
