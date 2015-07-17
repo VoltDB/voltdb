@@ -105,8 +105,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
     private final String m_coreBindId;
     final String networkThreadName;
 
-    private final int m_networkId;
-
     private final NinjaKeySet m_ninjaSelectedKeys;
 
     /**
@@ -124,7 +122,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
     VoltNetwork(int networkId, String coreBindId, String networkName) {
         m_thread = new Thread(this, "Volt " + networkName + " Network - " + networkId);
         networkThreadName = new String("Volt " + networkName + " Network - " + networkId);
-        m_networkId = networkId;
         m_thread.setDaemon(true);
         m_coreBindId = coreBindId;
         try {
@@ -138,7 +135,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
 
     VoltNetwork( Selector s) {
         m_thread = null;
-        m_networkId = 0;
         m_selector = s;
         m_coreBindId = null;
         networkThreadName = new String("Test Selector Thread");
