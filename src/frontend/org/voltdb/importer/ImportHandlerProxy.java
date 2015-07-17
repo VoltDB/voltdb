@@ -40,6 +40,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     private Method m_error_log;
     private Method m_warn_log;
     private Method m_error_log_withT;
+    private Method m_error_log_rateLimited;
     private Method m_debug_log;
 
     @Override
@@ -103,6 +104,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         m_error_log = m_handler.getClass().getMethod("error", String.class);
         m_warn_log = m_handler.getClass().getMethod("warn", String.class);
         m_debug_log = m_handler.getClass().getMethod("debug", String.class);
+        m_error_log_rateLimited = m_handler.getClass().getMethod("error", Throwable.class, String.class, Object[].class);
         m_error_log_withT = m_handler.getClass().getMethod("error", String.class, Throwable.class);
     }
 
@@ -117,10 +119,10 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     }
 
     @Override
-    public void error(String message, Throwable t) {
+    public void error(Throwable t, String format, Object...args) {
         try {
             if (m_error_log != null) {
-                m_error_log_withT.invoke(m_handler, message, t);
+                m_error_log_rateLimited.invoke(m_handler, t, format, args);
             }
         } catch (Exception ex) {
         }
@@ -131,6 +133,16 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         try {
             if (m_error_log != null) {
                 m_error_log.invoke(m_handler, message);
+            }
+        } catch (Exception ex) {
+        }
+    }
+
+    @Override
+    public void error(String message, Throwable t) {
+        try {
+            if (m_error_log != null) {
+                m_error_log_withT.invoke(m_handler, message, t);
             }
         } catch (Exception ex) {
         }
