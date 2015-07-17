@@ -165,8 +165,9 @@ public class TestPlansLimit extends PlannerTestCase {
         List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
 
         // no push down for aggregate nodes
+        //@TODO LIMIT node is inline with aggragate
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
-        checkInlineLimitWithOrderby(pns, true);
+        checkInlineLimitWithOrderby(pns, true, true);
 
         pns = compileToFragments("select A1 from T1 order by A1 limit 1");
         checkInlineLimitAndOrderbyWithReceive(pns, true);
@@ -176,21 +177,27 @@ public class TestPlansLimit extends PlannerTestCase {
 
         // no push down
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
-        checkInlineLimitWithOrderby(pns, false);
+        checkInlineLimitWithOrderby(pns, false, false);
 
         // Replicated table
         pns = compileToFragments("select A1 from R1 order by A1 limit 1");
-        checkInlineLimitWithOrderby(pns, false);
+        checkInlineLimitWithOrderby(pns, false, false);
     }
 
 
-    private void checkInlineLimitWithOrderby(List<AbstractPlanNode> pns, boolean pushdown) {
+    private void checkInlineLimitWithOrderby(List<AbstractPlanNode> pns, boolean pushdown, boolean mergereceive) {
         AbstractPlanNode p;
 
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
         p = p.getChild(0);
-        assertTrue(p instanceof OrderByPlanNode);
+        if (!mergereceive) {
+            assertTrue(p instanceof OrderByPlanNode);
+        } else {
+            assertTrue(p instanceof ReceivePlanNode);
+            assertTrue(((ReceivePlanNode)p).isMergeReceive());
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.ORDERBY));
+        }
         assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
 
         if (pushdown) {

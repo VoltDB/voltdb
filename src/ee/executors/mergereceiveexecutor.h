@@ -46,6 +46,8 @@
 #ifndef HSTOREORDERBYMERGEEXECUTOR_H
 #define HSTOREORDERBYMERGEEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
@@ -55,6 +57,7 @@ namespace voltdb {
     class TempTable;
     class OrderByPlanNode;
     class LimitPlanNode;
+    class AggregateExecutorBase;
 
     /**
      * The ORDER BY executor to be used at the coordinator node
@@ -74,7 +77,9 @@ namespace voltdb {
         OrderByPlanNode* m_orderby_node;
         LimitPlanNode* m_limit_node;
 
-        TempTable* m_tmpInputTable;
+        AggregateExecutorBase* m_agg_exec;
+
+        boost::scoped_ptr<TempTable> m_tmpInputTable;
     };
 
 }

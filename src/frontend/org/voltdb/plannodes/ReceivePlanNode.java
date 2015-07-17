@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.Collection;
 import java.util.Map;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -33,11 +34,14 @@ public class ReceivePlanNode extends AbstractPlanNode {
     final static String m_nondeterminismDetail = "multi-fragment plan results can arrive out of order";
 
     public enum Members {
-        MERGE_RECEIVE;
+        MERGE_RECEIVE,
+        OUTPUT_SCHEMA_PRE_AGG;
     }
 
     // Indicator to tell whether the Receive node needs to mergesort results from individual partitions
     private boolean m_mergeReceive = false;
+    // Output schema before the inline aggregate node
+    private NodeSchema m_outputSchemaPreInlineAgg = null;
 
     public ReceivePlanNode() {
         super();
@@ -53,7 +57,23 @@ public class ReceivePlanNode extends AbstractPlanNode {
     {
         // default behavior: just copy the input schema
         // to the output schema
-        super.generateOutputSchema(db);
+        assert(m_children.size() == 1);
+        m_children.get(0).generateOutputSchema(db);
+        m_outputSchemaPreInlineAgg =
+            m_children.get(0).getOutputSchema().copyAndReplaceWithTVE();
+
+        if (m_mergeReceive) {
+            AbstractPlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
+            if (aggrNode != null) {
+                aggrNode.generateOutputSchema(db);
+                m_outputSchema = aggrNode.getOutputSchema().copyAndReplaceWithTVE();
+            } else {
+                m_outputSchema = m_outputSchemaPreInlineAgg;
+            }
+        } else {
+            m_outputSchema = m_outputSchemaPreInlineAgg;
+        }
+
         // except, while technically the resulting output schema is just a pass-through,
         // when the plan gets fragmented, this receive node will be at the bottom of the
         // fragment and will need its own serialized copy of its (former) child's output schema.
@@ -67,8 +87,8 @@ public class ReceivePlanNode extends AbstractPlanNode {
         assert(m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        assert (input_schema.equals(m_outputSchema));
-        for (SchemaColumn col : m_outputSchema.getColumns())
+        assert (input_schema.equals(m_outputSchemaPreInlineAgg));
+        for (SchemaColumn col : m_outputSchemaPreInlineAgg.getColumns())
         {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
@@ -76,13 +96,24 @@ public class ReceivePlanNode extends AbstractPlanNode {
             int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
-        m_outputSchema.sortByTveIndex();
+        m_outputSchemaPreInlineAgg.sortByTveIndex();
 
         if (m_mergeReceive) {
-            AbstractPlanNode pn = getInlinePlanNode(PlanNodeType.ORDERBY);
-            assert(pn != null && pn instanceof OrderByPlanNode);
-            OrderByPlanNode opn = (OrderByPlanNode) pn;
-            opn.resolveSortIndexesUsingSchema(input_schema);
+            AbstractPlanNode orderNode = getInlinePlanNode(PlanNodeType.ORDERBY);
+            assert(orderNode != null && orderNode instanceof OrderByPlanNode);
+            OrderByPlanNode opn = (OrderByPlanNode) orderNode;
+            opn.resolveSortIndexesUsingSchema(m_outputSchemaPreInlineAgg);
+
+            AggregatePlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
+            if (aggrNode != null) {
+                aggrNode.resolveColumnIndexesUsingSchema(m_outputSchemaPreInlineAgg);
+                m_outputSchema = aggrNode.getOutputSchema().clone();
+                m_outputSchema.sortByTveIndex();
+            } else {
+                m_outputSchema = m_outputSchemaPreInlineAgg;
+            }
+        } else {
+            m_outputSchema = m_outputSchemaPreInlineAgg;
         }
     }
 
@@ -91,6 +122,14 @@ public class ReceivePlanNode extends AbstractPlanNode {
         super.toJSONString(stringer);
         if (m_mergeReceive == true) {
             stringer.key(Members.MERGE_RECEIVE.name()).value(m_mergeReceive);
+            if (m_outputSchemaPreInlineAgg != m_outputSchema) {
+                stringer.key(Members.OUTPUT_SCHEMA_PRE_AGG.name());
+                stringer.array();
+                for (SchemaColumn column : m_outputSchemaPreInlineAgg.getColumns()) {
+                    column.toJSONString(stringer, true);
+                }
+                stringer.endArray();
+            }
         }
     }
 
@@ -99,6 +138,19 @@ public class ReceivePlanNode extends AbstractPlanNode {
         helpLoadFromJSONObject(jobj, db);
         if (jobj.has(Members.MERGE_RECEIVE.name())) {
             m_mergeReceive = jobj.getBoolean(Members.MERGE_RECEIVE.name());
+            if (m_mergeReceive == true) {
+                if (jobj.has(Members.OUTPUT_SCHEMA_PRE_AGG.name())) {
+                    m_outputSchemaPreInlineAgg = new NodeSchema();
+                    m_hasSignificantOutputSchema = true;
+                    JSONArray jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA_PRE_AGG.name() );
+                    int size = jarray.length();
+                    for( int i = 0; i < size; i++ ) {
+                        m_outputSchemaPreInlineAgg.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
+                    }
+                } else {
+                    m_outputSchemaPreInlineAgg = m_outputSchema;
+                }
+            }
         }
     }
 
