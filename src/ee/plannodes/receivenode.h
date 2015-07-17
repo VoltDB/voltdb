@@ -46,7 +46,10 @@
 #ifndef HSTORERECEIVENODE_H
 #define HSTORERECEIVENODE_H
 
+#include <vector>
+
 #include "abstractplannode.h"
+#include "common/TupleSchema.h"
 
 namespace voltdb {
 
@@ -54,17 +57,19 @@ class ReceivePlanNode : public AbstractPlanNode
 {
 public:
     ReceivePlanNode();
+    ~ReceivePlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
-    bool isMergeReceive() const {
-        return m_mergeReceive;
-    }
+    bool isMergeReceive() const { return m_mergeReceive; }
+    TupleSchema* allocateTupleSchemaPreAgg() const;
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
 
 private:
     bool m_mergeReceive;
+    // output schema pre inline aggregation and projection
+    std::vector<SchemaColumn*> m_outputSchemaPreAgg;
 };
 
 } // namespace voltdb
