@@ -149,14 +149,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             if (!(o instanceof HostAndPort)) {
                 return false;
             }
+            if (this.getClass() != o.getClass()) {
+                return false;
+            }
             HostAndPort hap = (HostAndPort )o;
             if (hap == this) {
                 return true;
             }
-            if (hap.getHost().equals(getHost()) && hap.getPort() == getPort()) {
-                return true;
-            }
-            return false;
+            return (hap.getHost().equals(getHost()) && hap.getPort() == getPort());
         }
     }
 
@@ -371,13 +371,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         }
                     }
                 } catch (Exception e) {
-                    error("Error in finding leader for " + m_topicAndPartition, e);
+                    error(e, "Error in finding leader for " + m_topicAndPartition);
                 } finally {
                     closeConsumer(consumer);
                 }
             }
             if (returnMetaData == null) {
-                error("Failed to find Leader for " + m_topicAndPartition);
+                error(null, "Failed to find Leader for " + m_topicAndPartition);
             }
             return returnMetaData;
         }
@@ -416,11 +416,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             BlockingChannel channel = null;
             for (int i = 0; i < 3; i++) {
                 try {
-                    //This can go to any broker
+                    //Note: This can go to any broker which is fine.
                     channel = new BlockingChannel(m_coordinator.getHost(), m_coordinator.getPort(),
-                            BlockingChannel.UseDefaultBufferSize(),
-                            BlockingChannel.UseDefaultBufferSize(),
-                            m_consumerSocketTimeout /* read timeout in millis */);
+                            BlockingChannel.UseDefaultBufferSize(), BlockingChannel.UseDefaultBufferSize(), m_consumerSocketTimeout);
                     channel.connect();
                     int correlationId = 0;
                     channel.send(new ConsumerMetadataRequest(m_groupId, ConsumerMetadataRequest.CurrentVersion(), correlationId++, CLIENT_ID));
@@ -436,7 +434,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                     error(null, "Failed to get Offset Coordinator for " + m_topicAndPartition + " Code: " + metadataResponse.errorCode());
                 } catch (Exception e) {
-                    // retry the query (after backoff)??=
+                    // retry the query backoff and retry
                     error(e, "Failed to get Offset Coordinator for " + m_topicAndPartition);
                     backoffSleep(i+1);
                 } finally {
