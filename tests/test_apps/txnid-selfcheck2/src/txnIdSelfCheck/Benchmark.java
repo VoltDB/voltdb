@@ -178,6 +178,9 @@ public class Benchmark {
         String disabledthreads = "none";
         ArrayList<String> disabledThreads = null;
 
+        @Option(desc = "Rate limit BigTableLoaders.")
+        boolean rateLimited = true;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -604,9 +607,6 @@ public class Benchmark {
             }
             Thread.sleep(10000);
         }
-
-        // get memory size
-        long rss = getRss();
 
         // get stats
         try {

@@ -55,8 +55,9 @@ public class BigTableLoader extends BenchmarkThread {
     long rowsLoaded = 0;
     long nTruncates = 0;
     AtomicLong rowCount;
+    boolean rateLimited;
 
-    BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount, AtomicLong rowCount) {
+    BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount, AtomicLong rowCount, boolean rateLimited) {
         setName("BigTableLoader-"+tableName);
         setDaemon(true);
 
@@ -68,6 +69,7 @@ public class BigTableLoader extends BenchmarkThread {
         m_permits = permits;
         this.partitionCount = partitionCount;
         this.rowCount = rowCount;
+        this.rateLimited = rateLimited;
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
@@ -135,15 +137,15 @@ public class BigTableLoader extends BenchmarkThread {
                     // try to insert batchSize random rows
                     for (int i = 0; i < batchSize; i++) {
                         long p = Math.abs((long)(r.nextGaussian() * this.partitionCount));
-                        /* XXX/PSR byass rate limiting for initial loading
-                        try { 
-                           m_permits.acquire();
+                        try {
+                            if (rateLimited)
+                                m_permits.acquire();
                         } catch (InterruptedException e) {
                             if (!m_shouldContinue.get()) {
                                 return;
                             }
                             log.error("BigTableLoader thread interrupted while waiting for permit. " + e.getMessage());
-                        }*/
+                        }
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch, rowCount), tableName.toUpperCase() + "TableInsert", p, data);
                     }
