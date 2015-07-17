@@ -34,28 +34,24 @@ class AdminExportEditTest extends TestBase {
     def "Verify Edit in a Configuration"() {
         when: 'Open Add ConfigurationPopup'
         page.overview.openAddConfigurationPopup()
+        page.overview.textType.value("KAFKA")
         then: 'Check elements'
         waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
 	    waitFor(waitTime) { page.overview.save.isDisplayed() }
 	    waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-	    waitFor(waitTime) { page.overview.type.value().equals("type") }
-	    waitFor(waitTime) { page.overview.nonce.value().equals("nonce") }
-	    waitFor(waitTime) { page.overview.outdir.value().equals("outdir") }
-	    waitFor(waitTime) { page.overview.typeValue.isDisplayed() }
-	    waitFor(waitTime) { page.overview.nonceValue.isDisplayed() }
-	    waitFor(waitTime) { page.overview.outdirValue.isDisplayed() } 
+        waitFor(waitTime) { page.overview.metadatabroker.value().equals("metadata.broker.list") }
+	    waitFor(waitTime) { page.overview.metadatabroker.isDisplayed() }
+
 	    
 	    when: 'Provide values for add configuration'
-	    page.overview.stream.value("fileTest")
-	    page.overview.typeValue.value("typeValue")
-	    page.overview.nonceValue.value("nonceValue")
-	    page.overview.outdirValue.value("outdirValue")
+	    page.overview.stream.value("kafkaTest")
+	    page.overview.metadatabrokerValue.value("metadataValue")
 	    then: 'Click Save'
 	    page.overview.clickSave()
 	    when: 'Expand export'
 	    page.overview.expandExport()
-	    then: 'Display the created FILE'
-	    waitFor(waitTime) { page.overview.fileName.isDisplayed() }
+	    then: 'Display the created KAFKA'
+	    waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
 	    println("Configuration created")
 	    
 	    // Edit: Add Configuration
@@ -89,12 +85,8 @@ class AdminExportEditTest extends TestBase {
         waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
 	    waitFor(waitTime) { page.overview.save.isDisplayed() }
 	    waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-	    waitFor(waitTime) { page.overview.type.value().equals("type") }
-	    waitFor(waitTime) { page.overview.nonce.value().equals("nonce") }
-	    waitFor(waitTime) { page.overview.outdir.value().equals("outdir") }
-	    waitFor(waitTime) { page.overview.typeValue.isDisplayed() }
-	    waitFor(waitTime) { page.overview.nonceValue.isDisplayed() }
-	    waitFor(waitTime) { page.overview.outdirValue.isDisplayed() }
+        waitFor(waitTime) { page.overview.metadatabroker.value().equals("metadata.broker.list") }
+	    waitFor(waitTime) { page.overview.metadatabrokerValue.isDisplayed() }
 	    waitFor(waitTime) { page.overview.newTextField.isDisplayed() }
 	    waitFor(waitTime) { page.overview.newValueField.isDisplayed() }
         then: 'Check for previous changes'
@@ -114,66 +106,139 @@ class AdminExportEditTest extends TestBase {
         page.overview.clickSave()
         
         // Edit: Change the file type to kafka
-        
+
         when: 'Edit button is displayed'
-	    waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
-        
+
         when: 'Check all the properties'
         waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-	    waitFor(waitTime) { page.overview.save.isDisplayed() }
-	    waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
         then: 'Check for previous changes'
         waitFor(waitTime) { page.overview.jdbcdriverValue.value().equals("value") }
         waitFor(waitTime) { page.overview.jdbcurlValue.value().equals("value") }
-        
+
         when: 'Change to kafka'
         page.overview.textType.value("KAFKA")
         then: 'jdbc text fields are displayed'
         page.overview.metadatabrokerValue.isDisplayed()
-        
+
         when: 'Provide values for kafka'
         page.overview.metadatabrokerValue.value("metadataValue")
         then: 'Click Save'
         page.overview.clickSave()
-        
-        
-        // Edit: Change the file type to kafka
-        /*
+
+
+
+       Edit: Change the file type to ELASTICSEARCH
+
         when: 'Edit button is displayed'
-	    waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
-        
+
         when: 'Check all the properties'
         waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-	    waitFor(waitTime) { page.overview.save.isDisplayed() }
-	    waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-	    waitFor(waitTime) { page.overview.type.value().equals("type") }
-	    waitFor(waitTime) { page.overview.nonce.value().equals("nonce") }
-	    waitFor(waitTime) { page.overview.outdir.value().equals("outdir") }
-	    waitFor(waitTime) { page.overview.typeValue.isDisplayed() }
-	    waitFor(waitTime) { page.overview.nonceValue.isDisplayed() }
-	    waitFor(waitTime) { page.overview.outdirValue.isDisplayed() }
-	    waitFor(waitTime) { page.overview.newTextField.isDisplayed() }
-	    waitFor(waitTime) { page.overview.newValueField.isDisplayed() }
-	    waitFor(waitTime) { page.overview.newTextField.value().equals("value1") }
-	    waitFor(waitTime) { page.overview.newValueField.value().equals("value2") }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+
         then: 'Check for previous changes'
-        waitFor(waitTime) { page.overview.jdbcdriverValue.value().equals("value") }
-        waitFor(waitTime) { page.overview.jdbcurlValue.value().equals("value") }
-        
-        when: 'Change to kafka'
-        page.overview.textType.value("KAFKA")
-        then: 'jdbc text fields are displayed'
-        page.overview.metadatabrokerValue.isDisplayed()
-        
-        when: 'Provide values for kafka'
-        page.overview.metadatabrokerValue.value("metadataValue")
+        waitFor(waitTime) { page.overview.metadatabrokerValue.value().equals("metadataValue") }
+
+
+        when: 'Change to ELASTICSEARCH'
+        page.overview.textType.value("ELASTICSEARCH")
+        then: 'ELASTICSEARCH text fields are displayed'
+        waitFor(waitTime) { page.overview.endpointESValue.isDisplayed() }
+
+        when: 'Provide values for ELASTICSEARCH'
+        page.overview.endpointESValue.value("endpointValue")
         then: 'Click Save'
         page.overview.clickSave()
-        */
+
+        //Edit: Change the file type to HTTP
+
+        when: 'Edit button is displayed'
+        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+        then: 'Click edit button'
+        page.overview.editExportConfiguration.click()
+
+        when: 'Check all the properties'
+        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+
+        then: 'Check for previous changes'
+        waitFor(waitTime) { page.overview.endpointESValue.value().equals("endpointValue") }
+
+
+        when: 'Change to HTTP'
+        page.overview.textType.value("HTTP")
+        then: 'HTTP text fields are displayed'
+        waitFor(waitTime) { page.overview.endpointValue.isDisplayed() }
+
+        when: 'Provide values for HTTP'
+        page.overview.endpointValue.value("endValue")
+        then: 'Click Save'
+        page.overview.clickSave()
+
+
+       // Edit: Change the file type to RABBITMQ
+
+//        when: 'Edit button is displayed'
+//        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+//        then: 'Click edit button'
+//        page.overview.editExportConfiguration.click()
+//
+//        when: 'Check all the properties'
+//        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+//        waitFor(waitTime) { page.overview.save.isDisplayed() }
+//        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+//
+//        then: 'Check for previous changes'
+//        waitFor(waitTime) { page.overview.endpointValue.value().equals("endValue") }
+//
+//
+//        when: 'Change to RABBITMQ'
+//        page.overview.textType.value("RABBITMQ")
+//        then: 'RABBITMQ text fields are displayed'
+//        waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
+//
+//        when: 'Provide values for RABBITMQ'
+//        page.overview.rabbitMqValue.value("brokerValue")
+//        then: 'Click Save'
+//        page.overview.clickSave()
+
+
+        // Edit: Change the file type to CUSTOM
+
+//        when: 'Edit button is displayed'
+//        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+//        then: 'Click edit button'
+//        page.overview.editExportConfiguration.click()
+//
+//        when: 'Check all the properties'
+//        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+//        waitFor(waitTime) { page.overview.save.isDisplayed() }
+//        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+//
+//        then: 'Check for previous changes'
+//        waitFor(waitTime) { page.overview.metadatabrokerValue.value().equals("brokerValue") }
+//
+//
+//
+//        when: 'Change to CUSTOM'
+//        page.overview.textType.value("CUSTOM")
+//        then: 'CUSTOM text fields are displayed'
+//        waitFor(waitTime) { page.overview.metadatabrokerValue.isDisplayed() }
+//
+//        when: 'Provide values for CUSTOM'
+//        page.overview.endpointESValue.value("endpointValue")
+//        then: 'Click Save'
+//        page.overview.clickSave()
+
         // Delete Configuration
         
         when: 'Edit button is displayed'
