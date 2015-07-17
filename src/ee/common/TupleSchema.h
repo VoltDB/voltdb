@@ -27,6 +27,7 @@
 
 #include "common/FatalException.hpp"
 #include "common/types.h"
+#include "common/NValue.hpp"
 
 #define UNINLINEABLE_OBJECT_LENGTH 64
 #define UNINLINEABLE_CHARACTER_LENGTH 16
@@ -134,6 +135,8 @@ public:
 
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
+
+    inline size_t getMaxTupleSerializationSize() const;
 
     /** Get a string representation of this schema for debugging */
     std::string debug() const;
@@ -334,6 +337,21 @@ inline uint16_t TupleSchema::getUninlinedObjectColumnInfoIndex(const int objectC
 inline void TupleSchema::setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex) {
     reinterpret_cast<uint16_t*>(m_data)[objectColumnIndex] = objectColumnInfoIndex;
 }
+
+// NOTE This assumes tables with no hidden columns
+inline size_t TupleSchema::getMaxTupleSerializationSize() const {
+    size_t bytes = sizeof(int32_t); // placeholder for tuple length
+    for (int i = 0;i < m_columnCount; ++i) {
+        const TupleSchema::ColumnInfo* columnInfo = getColumnInfoPrivate(i);
+        int32_t factor = (columnInfo->type == VALUE_TYPE_VARCHAR && !columnInfo->inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
+        if (columnInfo->type == VALUE_TYPE_VARCHAR || columnInfo->type == VALUE_TYPE_VARBINARY) {
+            bytes += sizeof(int32_t); // value length placeholder for variable length columns
+        }
+        bytes += columnInfo->length * factor;
+    }
+    return bytes;
+}
+
 } // namespace voltdb
 
 #endif // TUPLESCHEMA_H_

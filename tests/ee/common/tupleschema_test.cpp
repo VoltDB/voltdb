@@ -205,6 +205,19 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
     EXPECT_FALSE(schema4->equals(schema2.get()));
 }
 
+TEST_F(TupleSchemaTest, MaxTupleSerializationSize) {
+    voltdb::TupleSchemaBuilder builder(3); // 3 visible columns
+    builder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
+    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
+                             64,     // length
+                             true,   // allow nulls
+                             false); // length not in bytes
+    builder.setColumnAtIndex(2, VALUE_TYPE_TIMESTAMP);
+    ScopedTupleSchema schema(builder.build());
+
+    EXPECT_EQ((4 + 16 + (4 + 64 * 4) + 8), schema.get()->getMaxTupleSerializationSize());
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

@@ -83,11 +83,24 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getIntegerValue(rand() % (1 << 31));
         case VALUE_TYPE_BIGINT:
             return ValueFactory::getBigIntValue(rand());
+        case VALUE_TYPE_DECIMAL: {
+            char characters[29];
+            int i;
+            for (i = 0; i < 15; ++i) {
+                characters[i] = (char)(48 + (rand() % 10));
+            }
+            characters[i] = '.';
+            for (i = 16; i < 28; ++i) {
+                characters[i] = (char)(48 + (rand() % 10));
+            }
+            characters[i] = '\0';
+            return ValueFactory::getDecimalValueFromString(string(characters));
+        }
         case VALUE_TYPE_DOUBLE:
             return ValueFactory::getDoubleValue((rand() % 10000) / (double)(rand() % 10000));
         case VALUE_TYPE_VARCHAR: {
-            int length = (rand() % 10);
-            char characters[11];
+            int length = (rand() % 8);
+            char characters[9];
             for (int ii = 0; ii < length; ii++) {
                 characters[ii] = (char)(32 + (rand() % 94)); //printable characters
             }
@@ -96,8 +109,8 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getStringValue(string(characters));
         }
         case VALUE_TYPE_VARBINARY: {
-            int length = (rand() % 16);
-            unsigned char bytes[17];
+            int length = (rand() % 8);
+            unsigned char bytes[9];
             for (int ii = 0; ii < length; ii++) {
                 bytes[ii] = (unsigned char)rand() % 256; //printable characters
             }

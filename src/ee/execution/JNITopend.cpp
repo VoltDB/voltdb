@@ -72,6 +72,8 @@ class JNILocalFrameBarrier {
 JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecutionEngine(caller) {
     // Cache the method id for better performance. It is valid until the JVM unloads the class:
     // http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/design.html#wp17074
+    jclass tmpClass = NULL;
+
     jclass jniClass = m_jniEnv->GetObjectClass(m_javaExecutionEngine);
     VOLT_TRACE("found class: %d", jniClass == NULL);
     if (jniClass == NULL) {
@@ -130,12 +132,14 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_exportManagerClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_exportManagerClass));
-    if (m_exportManagerClass == NULL) {
+    tmpClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_exportManagerClass));
+    m_jniEnv->DeleteLocalRef(m_exportManagerClass);
+    if (tmpClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_exportManagerClass != NULL);
+        assert(tmpClass != NULL);
         throw std::exception();
     }
+    m_exportManagerClass = tmpClass;
 
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
@@ -164,12 +168,14 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_partitionDRGatewayClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_partitionDRGatewayClass));
-    if (m_partitionDRGatewayClass == NULL) {
+    tmpClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_partitionDRGatewayClass));
+    m_jniEnv->DeleteLocalRef(m_partitionDRGatewayClass);
+    if (tmpClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_partitionDRGatewayClass != NULL);
+        assert(tmpClass != NULL);
         throw std::exception();
     }
+    m_partitionDRGatewayClass = tmpClass;
 
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
@@ -181,6 +187,16 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
+            m_partitionDRGatewayClass,
+            "reportDRConflict",
+            "(IJJLjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
+    if (m_reportDRConflictMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_reportDRConflictMID != NULL);
+        throw std::exception();
+    }
+
     m_encoderClass = m_jniEnv->FindClass("org/voltdb/utils/Encoder");
     if (m_encoderClass == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -188,12 +204,14 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_encoderClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_encoderClass));
-    if (m_encoderClass == NULL) {
+    tmpClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_encoderClass));
+    m_jniEnv->DeleteLocalRef(m_encoderClass);
+    if (tmpClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_encoderClass != NULL);
+        assert(tmpClass != NULL);
         throw std::exception();
     }
+    m_encoderClass = tmpClass;
 
     m_decodeBase64AndDecompressToBytesMID = m_jniEnv->GetStaticMethodID(
             m_encoderClass,
@@ -393,6 +411,9 @@ void JNITopend::crashVoltDB(FatalException e) {
 
 JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
+    m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
+    m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
+    m_jniEnv->DeleteGlobalRef(m_encoderClass);
 }
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
@@ -474,5 +495,66 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
         m_jniEnv->DeleteLocalRef(buffer);
     }
     return retval;
+}
+
+int JNITopend::reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            string tableName, Table* input, Table* output) {
+    if (input != NULL && output != NULL) {
+        // prepare tablename
+        jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
+
+        // prepare input buffer
+        size_t serializeSize = input->getAccurateSizeToSerialize(false);
+        char* backingCharArray = new char[serializeSize];
+        ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
+        input->serializeToWithoutTotalSize(conflictSerializeOutput);
+
+        jobject inputBuffer = m_jniEnv->NewDirectByteBuffer(
+            static_cast<void*>(backingCharArray),
+            static_cast<int32_t>(serializeSize));
+        if (inputBuffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+
+        // prepare output buffer
+        size_t outputSerializeSize = output->getColumnHeaderSizeToSerialize(false) +
+                                     sizeof(int32_t) + // tuple count placeholder
+                                     output->schema()->getMaxTupleSerializationSize();
+        char* outputBackingCharArray = new char[outputSerializeSize];
+        ReferenceSerializeOutput outputSerializeOutput(outputBackingCharArray, outputSerializeSize);
+        // NOTE passed-in output table should have only schema and no tuples
+        output->serializeToWithoutTotalSize(outputSerializeOutput);
+
+        jobject outputBuffer = m_jniEnv->NewDirectByteBuffer(
+            static_cast<void*>(outputBackingCharArray),
+            static_cast<int32_t>(outputSerializeSize));
+        if (outputBuffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+
+        int32_t retval = m_jniEnv->CallStaticIntMethod(
+            m_partitionDRGatewayClass,
+            m_reportDRConflictMID,
+            partitionId,
+            remoteSequenceNumber,
+            remoteUniqueId,
+            tableNameString,
+            inputBuffer,
+            outputBuffer);
+
+        ReferenceSerializeInputBE filledOutputSerializeInput(outputBackingCharArray, outputSerializeSize);
+        output->loadTuplesFrom(filledOutputSerializeInput);
+
+        m_jniEnv->DeleteLocalRef(tableNameString);
+        m_jniEnv->DeleteLocalRef(inputBuffer);
+        m_jniEnv->DeleteLocalRef(outputBuffer);
+
+        return retval;
+    }
+    // -1 indicates error in parameters provided, for now
+    return -1;
 }
 }
