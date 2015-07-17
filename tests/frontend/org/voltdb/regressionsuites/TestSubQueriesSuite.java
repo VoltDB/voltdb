@@ -58,8 +58,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
     private static final boolean HSQL232_ENG_8633_DONE = false;
     // hsql232 ENG-8636
     private static final boolean HSQL232_ENG_8636_DONE = false;
-    // hsql232 ENG-8638
-    private static final boolean HSQL232_ENG_8638_DONE = false;
 
     private static final boolean doTest(boolean flag) {
         return doAllTests || flag;
@@ -2541,28 +2539,26 @@ public class TestSubQueriesSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "insert into R_ENG8173_1 values (1, 'goo', 25);");
 
         VoltTable vt = null;
-        if (doTest(HSQ232_ENG_8638_DONE)) {
-            // These queries were failing because we weren't calling "resolveColumnIndexes"
-            // for subqueries that appeared on the select list (as part of a projection node).
-            vt = client.callProcedure("@AdHoc",
-                    "select *, (select SUM(NUM) from R_ENG8173_1) " +
-                    "from R_ENG8173_1 A1 " +
-                    "order by DESC;").getResults()[0];
+        // These queries were failing because we weren't calling "resolveColumnIndexes"
+        // for subqueries that appeared on the select list (as part of a projection node).
+        vt = client.callProcedure("@AdHoc",
+                "select *, (select SUM(NUM) from R_ENG8173_1) " +
+                "from R_ENG8173_1 A1 " +
+                "order by DESC;").getResults()[0];
 
-            assertTrue (vt.advanceRow());
-            assertEquals(0, vt.getLong(0));
-            assertEquals("foo", vt.getString(1));
-            assertEquals(50, vt.getLong(2));
-            assertEquals(75, vt.getLong(3));
+        assertTrue (vt.advanceRow());
+        assertEquals(0, vt.getLong(0));
+        assertEquals("foo", vt.getString(1));
+        assertEquals(50, vt.getLong(2));
+        assertEquals(75, vt.getLong(3));
 
-            assertTrue (vt.advanceRow());
-            assertEquals(1, vt.getLong(0));
-            assertEquals("goo", vt.getString(1));
-            assertEquals(25, vt.getLong(2));
-            assertEquals(75, vt.getLong(3));
+        assertTrue (vt.advanceRow());
+        assertEquals(1, vt.getLong(0));
+        assertEquals("goo", vt.getString(1));
+        assertEquals(25, vt.getLong(2));
+        assertEquals(75, vt.getLong(3));
 
-            assertFalse(vt.advanceRow());
-        }
+        assertFalse(vt.advanceRow());
         sql =   "select (select SUM(NUM) + SUM(ID) from R_ENG8173_1) " +
                 "from R_ENG8173_1 A1 order by DESC;";
         validateTableOfLongs(client, sql, new long[][] {{76}, {76}});
