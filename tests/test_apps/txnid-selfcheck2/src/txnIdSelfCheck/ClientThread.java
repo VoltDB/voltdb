@@ -171,8 +171,16 @@ public class ClientThread extends BenchmarkThread {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 throw new UserProcCallException(response);
             }
-
+            
+            ClientResponse rowsresponse;
+            try {
+                if (m_type)
+                rowsresponse = TxnId2Utils.doAdHoc(m_client, "select count(*) from partitioned where cid = "+m_cid+";");
+            } catch (Exception e) {
+                Benchmark.hardStop("adhoc error");
+            }
             VoltTable[] results = response.getResults();
+            
             VoltTable data = results[3];
             long cnt = data.fetchRow(0).getLong("cnt");
             
@@ -245,6 +253,7 @@ public class ClientThread extends BenchmarkThread {
         while (m_shouldContinue.get()) {
             try {
                 m_permits.acquire();
+                //System.out.println("Starting here. "); // This message can become overwhealming
                 runOne();
             }
             catch (NoConnectionsException e) {

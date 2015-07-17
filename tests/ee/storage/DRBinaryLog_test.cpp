@@ -57,7 +57,7 @@ public:
     DRBinaryLogTest()
       : m_undoToken(0)
       , m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
-            NULL, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream))
+            NULL, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0))
     {
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;

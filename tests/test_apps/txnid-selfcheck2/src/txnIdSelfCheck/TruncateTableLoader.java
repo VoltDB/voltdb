@@ -148,8 +148,7 @@ public class TruncateTableLoader extends BenchmarkThread {
                     }
                     currentRowCount = nextRowCount;
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
                 log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
@@ -165,7 +164,7 @@ public class TruncateTableLoader extends BenchmarkThread {
             
             
 
-            try {
+            try { // here is where to check for capped rather than truncate. 
                 log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());

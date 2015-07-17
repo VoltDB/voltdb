@@ -400,7 +400,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             ActivePlanRepository.clear();
 
             // set up site structure
-            final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
+            final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4); // TODO: computation threads?
             m_computationService =
                     CoreUtils.getListeningExecutorService(
                             "Computation service thread",
@@ -457,7 +457,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
 
-            buildClusterMesh(isRejoin || m_joining);
+            buildClusterMesh(isRejoin || m_joining); // TODO: explore this! Lots of threads created here.
 
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);

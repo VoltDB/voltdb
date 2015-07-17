@@ -111,9 +111,6 @@ public class UpdateBaseProc extends VoltProcedure {
         // not seen by the server, hopefully this will bisect where they're occuring.
         data = retval[3];
         validateCIDData(data, getClass().getName());
-        
-        VoltTableRow row = data.fetchRow(0);
-        assert(row.getVarbinary("value").length != 0);
 
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
@@ -172,9 +169,6 @@ public class UpdateBaseProc extends VoltProcedure {
         // not seen by the server, hopefully this will bisect where they're occurring.
         data = retval[3];
         validateCIDData(data, getClass().getName());
-        
-        VoltTableRow row = data.fetchRow(0);
-        assert(row.getVarbinary("value").length != 0);
 
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");

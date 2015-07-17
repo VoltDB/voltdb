@@ -116,6 +116,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int partitionId,
             final int hostId,
             final String hostname,
+            final int drClusterId,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream)
@@ -142,6 +143,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     partitionId,
                     hostId,
                     getStringBytes(hostname),
+                    drClusterId,
                     tempTableMemory * 1024 * 1024,
                     createDrReplicatedStream,
                     EE_COMPACTION_THRESHOLD);

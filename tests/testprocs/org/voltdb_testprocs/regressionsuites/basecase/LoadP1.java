@@ -26,8 +26,6 @@ package org.voltdb_testprocs.regressionsuites.basecase;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 
 @ProcInfo(
            singlePartition = false)

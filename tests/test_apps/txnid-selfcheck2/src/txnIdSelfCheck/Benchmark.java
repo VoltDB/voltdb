@@ -742,13 +742,11 @@ public class Benchmark {
                 adHocMayhemThread.join();
                 idpt.join();
                 ddlt.join();
-
                 //Shutdown LoadTableLoader
                 rlt.shutdown();
                 plt.shutdown();
                 rlt.join();
                 plt.join();
-
                 for (ClientThread clientThread : clientThreads) {
                     clientThread.join();
                 }
@@ -759,7 +757,6 @@ public class Benchmark {
                 /*
                 shutdown.set(true);
                 es.shutdownNow();
-
                 // block until all outstanding txns return
                 client.drain();
                 client.close();
