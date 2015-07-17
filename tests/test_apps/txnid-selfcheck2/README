@@ -38,6 +38,6 @@ Other exceptions/errors may be logged and then the client will continue if possi
 Some threads like the adhoc, read, or loader threads may just stop on failure,
 leaving the primary write transactions still running.
 
-Valid total simulanious thread counts for clients is 127. To run two clients at once,
-set an offset using the command line argunments so two clients don't claim the same
+Valid total simultanious thread counts for clients is 127. To run two clients at once,
+set an offset using the command line arguments so two clients don't claim the same
 range of [0,127].

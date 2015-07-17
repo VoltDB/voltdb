@@ -378,7 +378,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         long insertTimeEnd;
 
         final CSVConfig cfg = new CSVConfig();
+
         cfg.parse(CSVLoader.class.getName(), args);
+        System.out.println(CSVLoader.class.getName()+", "+cfg.toString()+", Args:["+args[0].toString()+","+args[1].toString()+"]");
         config = cfg;
         if (config.noquotechar) {
             config.quotechar = '\u0000';

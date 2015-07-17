@@ -85,15 +85,15 @@ function benchmark-help() {
 
 function benchmark() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=120 \
         --servers=localhost \
-        --threads=20 \
+        --threads=49 \
         --threadoffset=0 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
+        --minvaluesize=1024000 \
+        --maxvaluesize=1024000 \
         --entropy=127 \
         --fillerrowsize=10240 \
         --replfillerrowmb=32 \

@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -414,7 +413,7 @@ public class VoltBulkLoader {
     }
 
     public VoltType[] getColumnTypes() {
-        return (VoltType[])m_mappedColumnTypes.values().toArray(new VoltType[m_mappedColumnTypes.size()]);
+        return m_mappedColumnTypes.values().toArray(new VoltType[m_mappedColumnTypes.size()]);
     }
 
 }
