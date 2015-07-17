@@ -587,6 +587,7 @@ public class Benchmark {
         log.info("Loading Filler Tables...");
         log.info(HORIZONTAL_RULE);
 
+        
         partitionedLoader = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
         partitionedLoader.start();
@@ -596,6 +597,7 @@ public class Benchmark {
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
             replicatedLoader.start();
         }
+        
 
         // wait for the filler tables to load up
         //partitionedLoader.join();
@@ -621,6 +623,7 @@ public class Benchmark {
             Thread.sleep(1000);
             System.out.println("Wait for hashinator..");
         }
+        
         partitionedTruncater = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedTruncater.start();
