@@ -2115,7 +2115,6 @@ public class PlanAssembler {
         if ( ! IndexType.isScannable(index.getType())) {
             return;
         }
-
         ArrayList<AbstractExpression> bindings = new ArrayList<>();
         gbInfo.m_coveredGroupByColumns = calculateGroupbyColumnsCovered(
                 index, fromTableAlias, bindings);

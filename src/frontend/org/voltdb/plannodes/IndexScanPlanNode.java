@@ -327,8 +327,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     @Override
     public boolean isOutputOrdered() {
-        return getSortDirection() != SortDirectionType.INVALID &&
-                getInlinePlanNode(PlanNodeType.HASHAGGREGATE) == null;
+        // Index Scan output is ordered if either its scan direction is set to ASC or DSC
+        // or it has inline SERIAL or PARTIAL aggregation. In the latter case,
+        // the aggregate preserves the output order
+        return getSortDirection() != SortDirectionType.INVALID ||
+                getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                        getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE) != null;
     }
 
     /**
