@@ -67,6 +67,13 @@ namespace voltdb {
         return pushDRBufferRetval;
     }
 
+    int DummyTopend::reportDRConflict(int32_t partitionId,
+                int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+                std::string tableName, Table* input, Table* output) {
+        // TODO conform to return value contract of reportDRConflict()
+        return 0;
+    }
+
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
 
     std::string DummyTopend::decodeBase64AndDecompress(const std::string& buffer) {

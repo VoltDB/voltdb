@@ -144,6 +144,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     };
 
+    public int processDRConflict(int partitionId, long remoteSequenceNumber, long remoteUniqueId,
+                                 String tableName, ByteBuffer input, ByteBuffer output) {
+        final BBContainer cont = DBBPool.wrapBB(input);
+        DBBPool.registerUnsafeMemory(cont.address());
+        cont.discard();
+        return 0;
+    }
+
     public static synchronized long pushDRBuffer(
             int partitionId,
             long startSequenceNumber,
@@ -242,4 +250,13 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
+
+    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, long remoteUniqueId,
+                                       String tableName, ByteBuffer input, ByteBuffer output) {
+        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
+        if (pdrg == null) {
+            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
+        }
+        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, remoteUniqueId, tableName, input, output);
+    }
 }

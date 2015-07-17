@@ -164,6 +164,16 @@ public:
         return bytes;
     }
 
+    // return the number of bytes when serialized for regular usage
+    size_t serializationSize() const {
+        size_t bytes = sizeof(int32_t);
+        int cols = sizeInValues();
+        for (int i = 0; i < cols; ++i) {
+            bytes += serializedColumnSize(i);
+        }
+        return bytes;
+    }
+
     // Return the amount of memory allocated for non-inlined objects
     size_t getNonInlinedMemorySize() const
     {
@@ -434,6 +444,40 @@ private:
                   return (sizeof (int32_t) + ValuePeeker::peekObjectLength_withoutNull(getNValue(colIndex)));
               }
               return (size_t)0;
+          default:
+            // let caller handle this error
+            throwDynamicSQLException(
+                    "Unknown ValueType %s found during Export serialization.",
+                    valueToString(columnType).c_str() );
+            return (size_t)0;
+        }
+    }
+
+    inline size_t serializedColumnSize(int colIndex) const {
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
+        voltdb::ValueType columnType = columnInfo->getVoltType();
+        switch (columnType) {
+          case VALUE_TYPE_TINYINT:
+              return sizeof (int8_t);
+          case VALUE_TYPE_SMALLINT:
+              return sizeof (int16_t);
+          case VALUE_TYPE_INTEGER:
+              return sizeof (int32_t);
+          case VALUE_TYPE_BIGINT:
+          case VALUE_TYPE_TIMESTAMP:
+          case VALUE_TYPE_DOUBLE:
+              return sizeof (int64_t);
+          case VALUE_TYPE_DECIMAL:
+              return 16;
+          case VALUE_TYPE_VARCHAR:
+          case VALUE_TYPE_VARBINARY:
+              // 32 bit length preceding value and
+              // actual character data without null string terminator.
+              if (!isNull(colIndex))
+              {
+                  return (sizeof(int32_t) + ValuePeeker::peekObjectLength_withoutNull(getNValue(colIndex)));
+              }
+              return sizeof(int32_t);
           default:
             // let caller handle this error
             throwDynamicSQLException(
