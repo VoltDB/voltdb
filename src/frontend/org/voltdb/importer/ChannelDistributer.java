@@ -38,7 +38,6 @@ import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -277,7 +276,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
      * @param hostId
      * @param queue
      */
-    public ChannelDistributer(ZooKeeper zk, String hostId, BlockingDeque<ChannelAssignment> queue) {
+    public ChannelDistributer(ZooKeeper zk, String hostId) {
         Preconditions.checkArgument(
                 hostId != null && !hostId.trim().isEmpty(),
                 "hostId is null or empty"
@@ -1249,7 +1248,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         next = Maps.filterEntries(prev, not(inRemoved));
                     } while (!m_specs.compareAndSet(prev, next, sstamp[0], sstamp[0]+1));
 
-                    LOG.info("(" + m_hostId + ") hosts " + removed + " no longer servicing importer channels");
+                    LOG.info("(" + m_hostId + ") host(s) " + removed + " no longer servicing importer channels");
 
                     if (m_isLeader && !m_done.get()) {
                         m_es.submit(new AssignChannels());

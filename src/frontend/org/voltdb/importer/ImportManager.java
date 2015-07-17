@@ -20,7 +20,6 @@ package org.voltdb.importer;
 import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -72,7 +71,7 @@ public class ImportManager implements ChannelChangeCallback {
     protected ImportManager(int myHostId, HostMessenger messenger) throws BundleException {
         m_myHostId = myHostId;
         m_messenger = messenger;
-        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId), null);
+        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
         m_distributer.registerCallback("__IMPORT_MANAGER__", this);
 
         //create properties for osgi

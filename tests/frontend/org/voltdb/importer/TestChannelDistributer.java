@@ -116,9 +116,9 @@ public class TestChannelDistributer extends ZKTestBase {
                 .put(DUE,  getClient(2))
                 .build();
         distributers = ImmutableMap.<String, ChannelDistributer>builder()
-                .put(ZERO, new ChannelDistributer(zks.get(ZERO), ZERO, null))
-                .put(UNO,  new ChannelDistributer(zks.get(UNO), UNO, null))
-                .put(DUE,  new ChannelDistributer(zks.get(DUE), DUE, null))
+                .put(ZERO, new ChannelDistributer(zks.get(ZERO), ZERO))
+                .put(UNO,  new ChannelDistributer(zks.get(UNO), UNO))
+                .put(DUE,  new ChannelDistributer(zks.get(DUE), DUE))
                 .build();
         for (ChannelDistributer cd: distributers.values()) {
             cd.registerCallback(YO, new Collector());
