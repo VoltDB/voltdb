@@ -35,6 +35,9 @@ import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltcore.logging.Level;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
@@ -59,6 +62,7 @@ public class ImportHandler {
     private static final AtomicLong m_lock = new AtomicLong(0);
 
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
+    final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext, CatalogContext catContext) {
@@ -231,6 +235,16 @@ public class ImportHandler {
         return success;
     }
 
+    //Do rate limited logging for messages.
+    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
+                m_logger, level,
+                cause, format, args
+                );
+    }
+
     /**
      * Log info message
      * @param message
@@ -269,6 +283,10 @@ public class ImportHandler {
      */
     public void error(String message, Throwable t) {
         m_logger.error(message, t);
+    }
+
+    public void error(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.ERROR, t, format, args);
     }
 
 }

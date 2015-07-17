@@ -188,7 +188,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             try {
                 resp = consumer.send(req);
             } catch (Exception ex) {
-                error("Failed to send topic metada request for topic " + topic, ex);
+                error(ex, "Failed to send topic metada request for topic " + topic);
                 continue;
             }
 
@@ -434,10 +434,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         consumer = null;
                         break;
                     }
-                    error("Failed to get Offset Coordinator for " + m_topicAndPartition + " Code: " + metadataResponse.errorCode());
+                    error(null, "Failed to get Offset Coordinator for " + m_topicAndPartition + " Code: " + metadataResponse.errorCode());
                 } catch (Exception e) {
                     // retry the query (after backoff)??=
-                    error("Failed to get Offset Coordinator for " + m_topicAndPartition, e);
+                    error(e, "Failed to get Offset Coordinator for " + m_topicAndPartition);
                     backoffSleep(i+1);
                 } finally {
                     if (channel != null) {
@@ -478,7 +478,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 long[] offsets = response.offsets(m_topicAndPartition.topic(), m_topicAndPartition.partition());
                 return offsets[0];
             } catch (Exception ex) {
-                error("Failed to get last Offset for " + m_topicAndPartition, ex);
+                error(ex, "Failed to get last Offset for " + m_topicAndPartition);
             }
             return -1;
         }
@@ -528,12 +528,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         return false;
                     }
                 } catch (Exception e) {
-                    error("Failed to commit Offset for " + m_topicAndPartition, e);
+                    error(e, "Failed to commit Offset for " + m_topicAndPartition);
                     return false;
                 }
                 final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
                 if (code != ErrorMapping.NoError()) {
-                    error("Commit Offset Failed to commit for " + m_topicAndPartition + " Code: " + code);
+                    error(null, "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: " + code);
                     return false;
                 }
                 return true;
@@ -576,7 +576,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                     //If this happens we will come back again on next callback.
                 } catch (Exception ex) {
-                    error("Failed to commit and save offset " + currentNext, ex);
+                    error(ex, "Failed to commit and save offset " + currentNext);
                 }
             }
 
@@ -644,7 +644,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 continue;
                             }
                         } catch (Exception ex) {
-                            error("Failed to fetch from " + m_topicAndPartition, ex);
+                            error(ex, "Failed to fetch from " + m_topicAndPartition);
                             fetchFailedCount = backoffSleep(fetchFailedCount);
                             continue;
                         }
@@ -653,7 +653,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             // Something went wrong!
                             short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
                             fetchFailedCount = backoffSleep(fetchFailedCount);
-                            error("Failed to fetch messages for " + m_topicAndPartition + " Code " + code);
+                            error(null, "Failed to fetch messages for " + m_topicAndPartition + " Code " + code);
                             if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                                 // We asked for an invalid offset. For simple case ask for the last element to reset
                                 info("Invalid offset requested for " + m_topicAndPartition);
@@ -666,7 +666,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             leaderBroker = findNewLeader();
                             if (leaderBroker == null) {
                                 //point to original leader which will fail and we fall back again here.
-                                error("Failed to find leader continue with old leader: " + m_leader);
+                                error(null, "Failed to find leader continue with old leader: " + m_leader);
                                 leaderBroker = m_leader;
                             } else {
                                 if (!leaderBroker.equals(m_leader)) {

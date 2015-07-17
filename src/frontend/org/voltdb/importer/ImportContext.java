@@ -117,16 +117,24 @@ public interface ImportContext {
 
     /**
      * log error message
-     * @param message message to log to Volt server logging system.
+     * @param format message to log to Volt server logging system.
      * @param t throwable to be logged.
+     * @param args arguments to formatter
      */
-    public void error(String message, Throwable t);
+    public void error(Throwable t, String format, Object...args);
 
     /**
      * log error message
      * @param message message to log to Volt server logging system.
      */
     public void error(String message);
+
+    /**
+     * log error message
+     * @param message message to log to Volt server logging system.
+     * @param t cause of error
+     */
+    public void error(String message, Throwable t);
 
     /**
      * log warn message
