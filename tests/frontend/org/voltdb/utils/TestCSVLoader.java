@@ -385,7 +385,7 @@ public class TestCSVLoader {
             "--escape=\\",
             "--skip=0",
             "--limitrows=100",
-            "--upsertMode",
+            "--update",
             "BlAh"
         };
         String currentTime = new TimestampType().toString();
@@ -428,7 +428,7 @@ public class TestCSVLoader {
             "--escape=\\",
             "--skip=0",
             "--limitrows=100",
-            "--upsertMode",
+            "--update",
             "BlAh"
         };
         String currentTime = new TimestampType().toString();
