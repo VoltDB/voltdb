@@ -378,6 +378,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          std::string hostname,
+                         int32_t drClusterId,
                          int64_t tempTableMemoryLimit,
                          bool createDrReplicatedStream,
                          int32_t compactionThreshold)
@@ -437,7 +438,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             hostname,
                                             hostId,
                                             m_drStream,
-                                            m_drReplicatedStream);
+                                            m_drReplicatedStream,
+                                            drClusterId);
     return true;
 }
 

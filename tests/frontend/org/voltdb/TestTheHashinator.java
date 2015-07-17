@@ -234,6 +234,7 @@ public class TestTheHashinator {
                         0,
                         0,
                         "",
+                        0,
                         100,
                         config, false);
 
@@ -267,6 +268,7 @@ public class TestTheHashinator {
                         0,
                         0,
                         "",
+                        0,
                         100,
                         hashinatorConfig, false);
 
@@ -339,6 +341,7 @@ public class TestTheHashinator {
                             0,
                             0,
                             "",
+                            0,
                             100,
                             hashinatorConfig, false);
 
@@ -384,6 +387,7 @@ public class TestTheHashinator {
                         0,
                         0,
                         "",
+                        0,
                         100,
                         new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
 
@@ -419,7 +423,7 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash() throws Exception {
         byte configBytes[] = TheHashinator.getConfigureBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 0, 100, new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
@@ -457,6 +461,7 @@ public class TestTheHashinator {
                         0,
                         0,
                         "",
+                        0,
                         100,
                         new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
 
@@ -526,6 +531,7 @@ public class TestTheHashinator {
                         0,
                         0,
                         "",
+                        0,
                         100,
                         new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(2), 0, 0), false);
         final byte configBytes[] = TheHashinator.getConfigureBytes(2);
@@ -590,6 +596,7 @@ public class TestTheHashinator {
                         0,
                         0,
                         "",
+                        0,
                         100,
                         new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(6), 0, 0), false);
         for (int i = 0; i < 2500; i++) {

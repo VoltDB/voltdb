@@ -741,6 +741,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             byte hostname[],
+            int drClusterId,
             long tempTableMemory,
             boolean createDrReplicatedStream,
             int compactionThreshold);
