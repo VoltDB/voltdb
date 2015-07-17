@@ -85,7 +85,8 @@ struct FunctionTest : public Test {
                                   "localhost",
                                   0,
                                   (DRTupleStream *)0,
-                                  (DRTupleStream *)0) {}
+                                  (DRTupleStream *)0,
+                                  0) {}
         /**
          * A template for calling unary function call expressions.  For any C++
          * type T, define the function "NValue getSomeValue(T val)" to
