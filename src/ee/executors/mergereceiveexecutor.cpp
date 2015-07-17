@@ -47,6 +47,8 @@
 #include <vector>
 #include <utility>
 
+#include <boost/lexical_cast.hpp>
+
 #include "mergereceiveexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -54,11 +56,13 @@
 #include "plannodes/receivenode.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/ProgressMonitorProxy.h"
+#include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
+#include "plannodes/receivenode.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
 
@@ -92,6 +96,7 @@ void merge_sort(const std::vector<TableTuple>& tuples,
     TupleComparer comp,
     int limit,
     int offset,
+    AggregateExecutorBase* agg_exec,
     TempTable* output_table,
     ProgressMonitorProxy pmp) {
 
@@ -114,6 +119,7 @@ void merge_sort(const std::vector<TableTuple>& tuples,
 
     int tupleCnt = 0;
     int tupleSkipped = 0;
+
     while (limit == -1 || tupleCnt < limit) {
         range_iterator rangeIt = partitions.begin();
         // remove partitions that are empty
@@ -134,7 +140,14 @@ void merge_sort(const std::vector<TableTuple>& tuples,
                 if (tupleSkipped++ < offset) {
                     continue;
                 }
-                output_table->insertTupleNonVirtual(tuple);
+                if (agg_exec != NULL) {
+                    if (agg_exec->p_execute_tuple(tuple)) {
+                    // Get enough rows for LIMIT
+                    break;
+                }
+                } else {
+                    output_table->insertTempTuple(tuple);
+                }
                 ++tupleCnt;
                 pmp.countdownProgress();
             }
@@ -150,42 +163,61 @@ void merge_sort(const std::vector<TableTuple>& tuples,
         if (tupleSkipped++ < offset) {
             continue;
         }
-        output_table->insertTupleNonVirtual(tuple);
+
+        if (agg_exec != NULL) {
+            if (agg_exec->p_execute_tuple(tuple)) {
+                // Get enough rows for LIMIT
+                break;
+            }
+        } else {
+            output_table->insertTempTuple(tuple);
+        }
+
         ++tupleCnt;
         pmp.countdownProgress();
     }
 }
 
+TempTable* allocate_temp_table(CatalogId databaseId, TupleSchema* schema, TempTableLimits* limits, const char* tempTableName) {
+    assert(limits);
+    assert(schema);
+    int column_count = schema->columnCount();
+    std::vector<std::string> column_names;
+    column_names.reserve(column_count);
+
+    for (int ctr = 0; ctr < column_count; ctr++) {
+        column_names.push_back(boost::lexical_cast<std::string>(ctr));
+    }
+
+    return TableFactory::getTempTable(databaseId,
+                                      tempTableName,
+                                      schema,
+                                      column_names,
+                                      limits);
+}
+
 }
 
 MergeReceiveExecutor::MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-    : AbstractExecutor(engine, abstract_node), m_limit_node(NULL), m_tmpInputTable(NULL)
+    : AbstractExecutor(engine, abstract_node), m_orderby_node(NULL), m_limit_node(NULL),
+    m_agg_exec(NULL), m_tmpInputTable()
 { }
 
 bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
 {
-    VOLT_TRACE("init OrderByMerge Executor");
+    VOLT_TRACE("init MergeReceive Executor");
+
+    ReceivePlanNode* merge_receive_node = dynamic_cast<ReceivePlanNode*>(abstract_node);
+    assert(merge_receive_node != NULL);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
-    // Create a temp table to collect tuples from multiple partitions
-    m_tmpInputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                              "tempInput",
-                                                              m_abstractNode->generateTupleSchema(),
-                                                              m_tmpOutputTable->getColumnNames(),
-                                                              limits);
-
     // inline OrderByPlanNode
-    m_orderby_node = dynamic_cast<OrderByPlanNode*>(abstract_node->
+    m_orderby_node = dynamic_cast<OrderByPlanNode*>(merge_receive_node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_ORDERBY));
     assert(m_orderby_node != NULL);
-
-    // pickup an inlined limit, if one exists
-    m_limit_node = dynamic_cast<LimitPlanNode*>(abstract_node->
-                                     getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
-
     #if defined(VOLT_LOG_LEVEL)
     #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
         const std::vector<AbstractExpression*>& sortExprs = m_orderby_node->getSortExpressions();
@@ -194,6 +226,29 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
         }
     #endif
     #endif
+
+    // pickup an inlined limit, if one exists
+    m_limit_node = dynamic_cast<LimitPlanNode*>(merge_receive_node->
+                                     getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+
+    // aggregate
+    m_agg_exec = voltdb::getInlineAggregateExecutor(merge_receive_node);
+
+    // Create a temp table to collect tuples from multiple partitions
+    if (m_agg_exec != NULL) {
+        TupleSchema* pre_agg_schema = merge_receive_node->allocateTupleSchemaPreAgg();
+        assert(pre_agg_schema != NULL);
+        m_tmpInputTable.reset(allocate_temp_table(m_abstractNode->databaseId(),
+                                                  pre_agg_schema,
+                                                  limits,
+                                                  "tempInput"));
+    } else {
+        m_tmpInputTable.reset(TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                         "tempInput",
+                                                         m_abstractNode->generateTupleSchema(),
+                                                         m_tmpOutputTable->getColumnNames(),
+                                                         limits));
+    }
 
     return true;
 }
@@ -205,18 +260,9 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     // The assumption is that the dependencies results are are sorted.
     int64_t previousTupleCount = 0;
     std::vector<int64_t> partitionTupleCounts;
-
-    //
-    // OPTIMIZATION: NESTED LIMIT
-    int limit = -1;
-    int offset = 0;
-    if (m_limit_node != NULL) {
-        m_limit_node->getLimitAndOffsetByReference(params, limit, offset);
-    }
-
     do {
-        loadedDeps = m_engine->loadNextDependency(m_tmpInputTable);
-        int currentTupleCount = m_tmpInputTable->activeTupleCount();
+        loadedDeps = m_engine->loadNextDependency(m_tmpInputTable.get());
+        int64_t currentTupleCount = m_tmpInputTable->activeTupleCount();
         if (currentTupleCount != previousTupleCount) {
             partitionTupleCounts.push_back(currentTupleCount - previousTupleCount);
             previousTupleCount = currentTupleCount;
@@ -226,26 +272,47 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     // Unload tuples into a vector to be merge-sorted
     VOLT_TRACE("Running MergeReceive '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table PreSort:\n '%s'", m_tmpInputTable->debug().c_str());
-    TableIterator iterator = m_tmpInputTable->iterator();
-    TableTuple tuple(m_tmpInputTable->schema());
     std::vector<TableTuple> xs;
     xs.reserve(m_tmpInputTable->activeTupleCount());
 
     ProgressMonitorProxy pmp(m_engine, this);
-    while (iterator.next(tuple))
+
+    TableTuple input_tuple;
+    if (m_agg_exec != NULL) {
+        VOLT_TRACE("Init inline aggregate...");
+        input_tuple = m_agg_exec->p_execute_init(params, &pmp, m_tmpInputTable->schema(), m_tmpOutputTable);
+    } else {
+        input_tuple = m_tmpOutputTable->tempTuple();
+    }
+
+
+    TableIterator iterator = m_tmpInputTable->iterator();
+    while (iterator.next(input_tuple))
     {
         pmp.countdownProgress();
-        assert(tuple.isActive());
-        xs.push_back(tuple);
+        assert(input_tuple.isActive());
+        xs.push_back(input_tuple);
+    }
+
+    //
+    // OPTIMIZATION: NESTED LIMIT
+    int limit = -1;
+    int offset = 0;
+    if (m_limit_node != NULL) {
+        m_limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
     // Merge Sort
     TupleComparer comp(m_orderby_node->getSortExpressions(), m_orderby_node->getSortDirections());
-    merge_sort(xs, partitionTupleCounts, comp, limit, offset, m_tmpOutputTable, pmp);
+    merge_sort(xs, partitionTupleCounts, comp, limit, offset, m_agg_exec, m_tmpOutputTable, pmp);
 
     VOLT_TRACE("Result of MergeReceive:\n '%s'", m_tmpOutputTable->debug().c_str());
 
-    cleanupInputTempTable(m_tmpInputTable);
+    if (m_agg_exec != NULL) {
+        m_agg_exec->p_execute_finish();
+    }
+
+    cleanupInputTempTable(m_tmpInputTable.get());
 
     return true;
 }
