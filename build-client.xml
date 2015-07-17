@@ -92,6 +92,9 @@
                   org/json_voltpatches/**/*.java
                   org/voltdb/importer/ImportContext.java
                   org/voltdb/importer/ImportHandlerProxy.java
+                  org/voltdb/importer/ChannelChangeCallback.java
+                  org/voltdb/importer/VersionedOperationMode.java
+                  org/voltdb/importer/ImporterChannelAssignment.java
                   org/voltdb/importer/Invocation.java
                   jsr166y/**/*.java
                   io/netty_voltpatches/NinjaKeySet.java
@@ -126,6 +129,7 @@
                   org/voltdb/common/Constants.java
                   org/voltdb/jdbc/**/*.java
                   org/voltdb/LatencyBucketSet.java
+                  org/voltdb/OperationMode.java
                   org/voltdb/ParameterConverter.java
                   org/voltdb/ParameterSet.java
                   org/voltdb/PrivateVoltTableFactory.java
@@ -150,7 +154,10 @@
                   org/voltdb/VoltTypeException.java
                   org/voltdb/importer/ImportContext.java
                   org/voltdb/importer/ImportHandlerProxy.java
+                  org/voltdb/importer/ChannelChangeCallback.java
                   org/voltdb/importer/Invocation.java
+                  org/voltdb/importer/VersionedOperationMode.java
+                  org/voltdb/importer/ImporterChannelAssignment.java
                   "
 />
 

@@ -50,7 +50,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
     @Override
     public void start(BundleContext context)
     {
-        context.registerService(ImportHandlerProxy.class.getName(), this, null);
+        context.registerService(Log4jSocketHandlerImporter.class.getName(), this, null);
     }
 
     @Override
