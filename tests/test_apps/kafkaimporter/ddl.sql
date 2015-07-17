@@ -48,6 +48,7 @@ EXPORT TABLE kafkaexporttable1;
 LOAD classes sp.jar;
 
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertExport;
+CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertFinal;
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertImport;
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.MatchRows;
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.DeleteRows;

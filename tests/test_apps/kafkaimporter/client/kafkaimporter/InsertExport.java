@@ -45,6 +45,15 @@ public class InsertExport {
         }
     }
 
+    public void insertFinal(long key, long value) {
+        try {
+            m_client.callProcedure(new InsertCallback(), "InsertFinal", key, value);
+        } catch (IOException e) {
+            System.out.println("Exception calling stored procedure InsertFinal");
+            e.printStackTrace();
+        }
+    }
+
     static class InsertCallback implements ProcedureCallback {
 
         @Override

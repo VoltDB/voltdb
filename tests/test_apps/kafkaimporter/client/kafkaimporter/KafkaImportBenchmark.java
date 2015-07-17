@@ -239,6 +239,7 @@ public class KafkaImportBenchmark {
             // check for export completion
             exportMon.waitForStreamedAllocatedMemoryZero();
             importMon.waitForStreamedAllocatedMemoryZero();
+            exportProc.insertFinal(-1, -1);
             System.out.println("Done waiting for import & export tables");
         } finally {
             // cancel periodic stats printing
