@@ -111,7 +111,7 @@ public class UpdateBaseProc extends VoltProcedure {
         // not seen by the server, hopefully this will bisect where they're occuring.
         data = retval[3];
         validateCIDData(data, getClass().getName());
-        
+
         VoltTableRow row = data.fetchRow(0);
         if (row.getVarbinary("value").length == 0)
             throw new VoltAbortException("Value column contained no data in UpdateBaseProc");
@@ -173,7 +173,7 @@ public class UpdateBaseProc extends VoltProcedure {
         // not seen by the server, hopefully this will bisect where they're occurring.
         data = retval[3];
         validateCIDData(data, getClass().getName());
-        
+
         VoltTableRow row = data.fetchRow(0);
         if (row.getVarbinary("value").length == 0)
             throw new VoltAbortException("Value column contained no data in UpdateBaseProc");
