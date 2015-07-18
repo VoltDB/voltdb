@@ -179,7 +179,7 @@ public class Benchmark {
         ArrayList<String> disabledThreads = null;
 
         @Option(desc = "Rate limit BigTableLoaders.")
-        boolean rateLimited = true;
+        boolean bigtableratelimited = true;
 
         @Override
         public void validate() {
