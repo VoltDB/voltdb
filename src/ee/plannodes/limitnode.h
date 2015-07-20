@@ -66,7 +66,7 @@ public:
     PlanNodeType getPlanNodeType() const;
 
     // evaluate possibly parameterized limit and offsets.
-    void getLimitAndOffsetByReference(int &limit, int &offset);
+    void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
 
     std::string debugInfo(const std::string &spacer) const;
 

@@ -129,7 +129,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool UpdateExecutor::p_execute() {
+bool UpdateExecutor::p_execute(const NValueArray &params) {
     assert(m_inputTable);
 
     // target table should be persistenttable

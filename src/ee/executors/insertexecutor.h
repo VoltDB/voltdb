@@ -82,7 +82,7 @@ public:
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
-        bool p_execute();
+        bool p_execute(const NValueArray &params);
 
         InsertPlanNode* m_node;
         TempTable* m_inputTable;
