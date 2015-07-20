@@ -218,7 +218,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
         info("Available Channels are: " + availableResources);
         //Create an executor serice with Queue.
-        m_es = Executors.newFixedThreadPool(availableResources.size() + 1);
+        m_es = Executors.newFixedThreadPool(availableResources.size() + 1,
+                getThreadFactory("KafkaImporter", "KafkaImporterTopicFetcher", ImportHandlerProxy.MEDIUM_STACK_SIZE));
         return availableResources;
     }
 
@@ -414,13 +415,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
         public void getOffsetCoordinator() {
             BlockingChannel channel = null;
+            int correlationId = 0;
             for (int i = 0; i < 3; i++) {
                 try {
                     //Note: This can go to any broker which is fine.
                     channel = new BlockingChannel(m_coordinator.getHost(), m_coordinator.getPort(),
                             BlockingChannel.UseDefaultBufferSize(), BlockingChannel.UseDefaultBufferSize(), m_consumerSocketTimeout);
                     channel.connect();
-                    int correlationId = 0;
                     channel.send(new ConsumerMetadataRequest(m_groupId, ConsumerMetadataRequest.CurrentVersion(), correlationId++, CLIENT_ID));
                     ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
 

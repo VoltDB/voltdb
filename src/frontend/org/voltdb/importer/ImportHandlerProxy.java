@@ -21,7 +21,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.Set;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.client.ProcedureCallback;
 
@@ -31,6 +33,10 @@ import org.voltdb.client.ProcedureCallback;
  * @author akhanzode
  */
 public abstract class ImportHandlerProxy implements ImportContext, ChannelChangeCallback {
+
+    public static final int SMALL_STACK_SIZE = 1024 * 256;
+    public static final int MEDIUM_STACK_SIZE = 1024 * 512;
+    private static final AtomicLong m_createdThreadCount = new AtomicLong(0);
 
     private Object m_handler = null;
     private Method m_callProcMethod;
@@ -192,4 +198,26 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     public void onClusterStateChange(VersionedOperationMode mode) {
         throw new UnsupportedOperationException("For Distributed Importer this must be implemented.");
     }
+
+    /**
+     * Get thread factory for a group with thread names.
+     * @param groupName - group name of new ThreadGroup
+     * @param name - names of the thread auto incremented so identify each thread in the group
+     * @param stackSize - see static definations
+     * @return  ThreadFactory to be used for your executor service.
+     */
+    public static ThreadFactory getThreadFactory(final String groupName, final String name, final int stackSize) {
+        final ThreadGroup group = new ThreadGroup(Thread.currentThread().getThreadGroup(), groupName);
+
+        return new ThreadFactory() {
+            @Override
+            public synchronized Thread newThread(final Runnable r) {
+                final String threadName = name + " - " + m_createdThreadCount.getAndIncrement();
+                Thread t = new Thread(group, r, threadName, stackSize);
+                t.setDaemon(true);
+                return t;
+            }
+        };
+    }
+
 }
