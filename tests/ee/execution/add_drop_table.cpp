@@ -41,7 +41,7 @@ class AddDropTableTest : public Test {
   public:
     AddDropTableTest()
         : m_clusterId(0), m_databaseId(0), m_siteId(0), m_partitionId(0),
-          m_hostId(101), m_hostName("host101")
+          m_hostId(101), m_hostName("host101"), m_drClusterId(0)
     {
         m_engine = new VoltDBEngine();
 
@@ -58,8 +58,9 @@ class AddDropTableTest : public Test {
                              m_partitionId,
                              m_hostId,
                              m_hostName,
-                             false,
-                             DEFAULT_TEMP_TABLE_MEMORY);
+                             m_drClusterId,
+                             DEFAULT_TEMP_TABLE_MEMORY,
+                             false);
         m_engine->updateHashinator( HASHINATOR_LEGACY,
                                    (char*)&partitionCount,
                                     NULL,
@@ -132,6 +133,7 @@ class AddDropTableTest : public Test {
     CatalogId m_partitionId;
     CatalogId m_hostId;
     std::string m_hostName;
+    CatalogId m_drClusterId;
     VoltDBEngine *m_engine;
     char *m_resultBuffer;
     char *m_exceptionBuffer;
