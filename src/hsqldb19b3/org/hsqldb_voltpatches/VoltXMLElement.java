@@ -27,12 +27,14 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.voltdb.sqlparser.syntax.symtab.IAST;
+
 /**
  * Used to fake generate XML without actually generating the text and parsing it.
  * A performance optimization, and something of a simplicity win
  *
  */
-public class VoltXMLElement {
+public class VoltXMLElement implements IAST {
 
     public String name;
     public final Map<String, String> attributes = new TreeMap<String, String>();

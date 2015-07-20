@@ -55,7 +55,7 @@
 <fileset id="voltpro.src.dir" file="." excludes="**"/>
 
 <!-- import the pro build.xml if it exists and is requested -->
-<import file="${voltpro}/build.xml" optional="true"/>
+<import file="${env.VOLTPRO}/build.xml" optional="true"/>
 
 <property name='base.dir'                    location='.' />
 <property name='build.dir'                   location='obj/${build}' />
@@ -69,9 +69,28 @@
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
 <property name='doc.dir'                     location='doc' />
 <property name='src.gpl.dir'                 location='src/frontend' />
+<!-- SQLParser Properties -->
+<property name='src.sqlparser.syntax.dir'    location='src/voltsqlparser/syntax' />
+<property name='pkg.sqlparser.syntax.dir'    location='${src.sqlparser.syntax.dir}/org/voltdb/sqlparser/syntax' />
+<property name='src.sqlparser.semantics.dir' location='src/voltsqlparser/semantics' />
+<property name='pkg.sqlparser.semantics.dir' location='${src.sqlparser.semantics.dir}/org/voltdb/sqlparser/semantics' />
+
+<!-- Antlr4 properties -->
+<property name='antlr.version'               value='4.5' />
+<property name='generated.dir'               location='target' />
+<property name='src.generated.dir'           location='${generated.dir}/generated-sources' />
+<property name='src.antlr.generated.dir'     location='${src.generated.dir}/antlr4' />
+<property name='pkg.antlr.generated.dir'     location='${src.antlr.generated.dir}/org/voltdb/sqlparser/syntax/grammar' />
+<property name='lib.antlr.dir'               location='lib' />
+<property name='antlr.runtime.name'          location='${lib.antlr.dir}/antlr-runtime-${antlr.version}.jar' />
+<property name='antlr.complete.name'         location='${lib.antlr.dir}/antlr-${antlr.version}-complete.jar' />
+<property name='antlr4.touch.name'           value='antlr4.touch' />
+<property name='antlr4.touch'                location='${src.generated.dir}/${antlr4.touch.name}' />
+
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
 <property name='src.test.dir'                location='tests/frontend' />
 <property name='src.testproc.dir'            location='tests/testprocs' />
+<property name='src.test.assertions.dir'     location='tests/assertions' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
 <property name='src.dbmonitor.dir'           location='src/frontend/org/voltdb/dbmonitor' />
@@ -649,15 +668,6 @@ DISTRIBUTION
         else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
         <isset property="os.mac"/>
     </condition>
-
-    <!-- Call shell script that handles copying native libs so they can be packaged together -->
-    <exec dir='.' executable="/usr/bin/env" failonerror='true'>
-        <arg value='bash' />
-        <arg value='tools/copy-lib.sh'/>
-        <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
-        <arg value='${dist.version}' />
-    </exec>
-
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
             <include name="libvoltdb*" />
@@ -955,6 +965,9 @@ JAR BUILDING
         <fileset dir="${src.gpl.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
         </fileset>
+        <fileset dir="${src.test.assertions.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/**" />
+        </fileset>
         <fileset dir="${src.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
         </fileset>
@@ -983,13 +996,46 @@ JAVA COMPILATION
 <target name="compile" depends="catalog, dbbpool_gen, project_gen, deployment_gen, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
+<!--
+***************************************
+Antlr4 Compilation Macro
+***************************************
+-->
+<target name="check_for_sql_grammar">
+    <uptodate property="sqlGrammarIsUpToDate"
+	      targetfile="${antlr4.touch}"
+	      srcfile="${pkg.sqlparser.syntax.dir}/grammar/SQLParser.g4" />
+</target>    
+<target name="compile_sql_grammar"
+	depends="check_for_sql_grammar"
+	description="Compile the VoltDB SQL Parser using ANTLR4."
+	unless="sqlGrammarIsUpToDate" > 
+    <path id="antlr.class.path">
+	<pathelement location="${antlr.complete.name}" />
+    </path>
+    <java classname="org.antlr.v4.Tool" fork="true" failonerror="true"
+	  dir="${pkg.sqlparser.syntax.dir}/grammar">
+        <arg value="-o"/>
+        <arg value="${pkg.antlr.generated.dir}"/>
+	<arg value="-listener" />
+	<arg value="-no-visitor" />
+	<arg value="-encoding" />
+	<arg value="UTF-8" />
+	<arg value="SQLParser.g4" />
+    <classpath>
+       <path refid="antlr.class.path"/>
+    </classpath>
+    </java>
+    <touch file="${antlr4.touch}" mkdirs="true"/>
+</target>
+
 <target name="compile_client">
     <ant antfile="build-client.xml" target="compile" inheritAll="false">
         <property name="build" value="${build}"/>
     </ant>
 </target>
 
-<target name="compile_core" depends="compile_client">
+<target name="compile_core" depends="compile_sql_grammar, compile_client">
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
     <mkdir dir='${build.testproc.dir}' />
@@ -998,7 +1044,7 @@ JAVA COMPILATION
         executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
         failonerror='true' />
     <depend
-        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${src.testproc.dir}:${vendor.src.dir}"
+        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.assertions.dir}:${src.test.dir}:${src.testproc.dir}:${vendor.src.dir}"
         destdir="${build.prod.dir}:${build.test.dir}:${build.testproc.dir}"
         cache="${depcache}">
         <classpath refid="project.classpath" />
@@ -1078,9 +1124,19 @@ JAVA COMPILATION
     </copy>
 
     <!-- compile the individual source directories -->
+    <!-- sqlparser syntax -->
+    <echo level="info" message="Compiling SQL Parser ANTLR Generated Packages." />
+    <invoke-javac srcdir="${src.antlr.generated.dir}" />
+    <echo level="info" message="Compiling SQL Parser Syntax Packages." />
+    <invoke-javac srcdir="${src.sqlparser.syntax.dir}" />
+    <!-- sqlparser semantics -->
+    <echo level="info" message="Compiling SQL Parser Semantics Packages." />
+    <invoke-javac srcdir="${src.sqlparser.semantics.dir}" />
     <!-- hsql -->
+    <echo level="info" message="Compiling HSQLDB Packages." />
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
     <!-- voltcore and third-party java (including our zookeeper -->
+    <echo level="info" message="Compiling Third-Party Java Packages." />
     <invoke-javac
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="org/voltcore/**/*.java,org/apache/**/*.java
@@ -1099,6 +1155,7 @@ JAVA COMPILATION
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
+    <invoke-javac srcdir="${src.test.assertions.dir}" destdir='${build.test.dir}' />
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
         excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>
 </target>
@@ -2275,6 +2332,7 @@ PROJECT FILE SCHEMA CODE GENERATION
         description="Remove other generated source files.">
     <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
     <delete file="${src.ee.dir}/org_voltcore_utils_DBBPool.h" />
+    <delete dir="${generated.dir}" />
 </target>
 
 <!--

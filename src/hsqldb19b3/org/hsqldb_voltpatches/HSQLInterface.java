@@ -17,6 +17,7 @@
 
 package org.hsqldb_voltpatches;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -29,6 +30,9 @@ import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
+import org.voltdb.sqlparser.semantics.symtab.Column;
+import org.voltdb.sqlparser.syntax.SQLParserDriver;
 
 /**
  * This class is built to create a single in-memory database
@@ -43,8 +47,7 @@ import org.voltcore.logging.VoltLogger;
  * </ul>
  */
 public class HSQLInterface {
-    private VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
-
+    static private final VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
     static public String XML_SCHEMA_NAME = "databaseschema";
     /**
      * Naming conventions for unnamed indexes and constraints
@@ -57,7 +60,10 @@ public class HSQLInterface {
     static public String AUTO_GEN_CONSTRAINT_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
     static public String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
     static public String AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX = AUTO_GEN_PREFIX + "CONSTRAINT_IDX_";
-
+    /*
+     * This is the VoltDB Sql Parser catalog.
+     */
+    private CatalogAdapter m_catalogAdapter = new CatalogAdapter();
     /**
      * The spacer to use for nested XML elements
      */
@@ -201,6 +207,10 @@ public class HSQLInterface {
             expectFailure = true;
         }
 
+        // get old and new XML representations for the affected table
+        VoltXMLElement tableXMLNew = null, tableXMLOld = null;
+        // This will add the internal representation of the DDL to
+        // HSQL or VoltSQLParser, whichever is configured.
         runDDLCommand(ddl);
 
         // If we expect to fail, but the statement above didn't bail...
@@ -210,11 +220,9 @@ public class HSQLInterface {
         }
         // sanity checks for non-failure
         assert(stmtInfo != null);
+        tableXMLNew = getXMLForTable(expectedTableAffected);
 
-        // get old and new XML representations for the affected table
-        VoltXMLElement tableXMLNew = null, tableXMLOld = null;
         if (expectedTableAffected != null) {
-            tableXMLNew = getXMLForTable(expectedTableAffected);
             tableXMLOld = lastSchema.get(expectedTableAffected);
         }
 
@@ -265,9 +273,13 @@ public class HSQLInterface {
      * encountered.
      */
     public void runDDLCommand(String ddl) throws HSQLParseException {
-        Result result = sessionProxy.executeDirectStatement(ddl);
-        if (result.hasError()) {
-            throw new HSQLParseException(result.getMainString());
+        if (usingVoltSQLParser()) {
+            processDDLStatementsUsingVoltSQLParser(ddl, null);
+        } else {
+            Result result = sessionProxy.executeDirectStatement(ddl);
+            if (result.hasError()) {
+                throw new HSQLParseException(result.getMainString());
+            }
         }
     }
 
@@ -276,7 +288,7 @@ public class HSQLInterface {
      * on every DDL statment in the file.
      *
      * @param path Path to a text file containing semi-colon
-     * delimeted SQL DDL statements.
+     * delimited SQL DDL statements.
      * @throws HSQLParseException throws an exeption if there
      * is a problem reading, parsing, or running the file.
      */
@@ -301,60 +313,102 @@ public class HSQLInterface {
      * @return Pseudo XML representation of the compiled statement.
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
+     * @throws HSQLParseException
      */
     public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
-        Statement cs = null;
-        // clear the expression node id set for determinism
-        sessionProxy.resetVoltNodeIds();
-
-        try {
-            cs = sessionProxy.compileStatement(sql);
-        } catch( HsqlException hex) {
-            // a switch in case we want to give more error details on additional error codes
-            switch( hex.getErrorCode()) {
-            case -ErrorCode.X_42581:
-                throw new HSQLParseException("SQL Syntax error in \"" + sql + "\" " + hex.getMessage());
-            default:
-                throw new HSQLParseException(hex.getMessage());
-            }
-        } catch (Throwable t) {
-            throw new HSQLParseException(t.getMessage());
-        }
-
-        //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
-        Result result = Result.newPrepareResponse(cs);
-        if (result.hasError()) {
-            throw new HSQLParseException(result.getMainString());
-        }
-
         VoltXMLElement xml = null;
-        xml = cs.voltGetStatementXML(sessionProxy);
-       if (m_logger.isDebugEnabled()) {
-           try {
-               /*
-                * Sometimes exceptions happen.
-                */
-               m_logger.debug(String.format("SQL: %s\n", sql));;
-               m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
-               m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
-           } catch (Exception ex) {
-               System.out.printf("Exception: %s\n", ex.getMessage());
-               ex.printStackTrace(System.out);
-           }
+        Statement cs = null;
+        if (!usingVoltSQLParser()) {
+            // clear the expression node id set for determinism
+            sessionProxy.resetVoltNodeIds();
+
+            try {
+                cs = sessionProxy.compileStatement(sql);
+            } catch( HsqlException hex) {
+                // a switch in case we want to give more error details on additional error codes
+                switch( hex.getErrorCode()) {
+                case -ErrorCode.X_42581:
+                    throw new HSQLParseException("SQL Syntax error in \"" + sql + "\" " + hex.getMessage());
+                default:
+                    throw new HSQLParseException(hex.getMessage());
+                }
+            } catch (Throwable t) {
+                throw new HSQLParseException(t.getMessage());
+            }
+
+            //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
+            Result result = Result.newPrepareResponse(cs);
+            if (result.hasError()) {
+                throw new HSQLParseException(result.getMainString());
+            }
+            xml = cs.voltGetStatementXML(sessionProxy);
+            // this releases some small memory hsql uses that builds up over time if not
+            // cleared
+            // if it's not called for every call of getXMLCompiledStatement, that's ok;
+            // it'll get called next time
+            sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
+
+            // clean up sql-in expressions
+            fixupInStatementExpressions(xml);
+        } else {
+            xml = getVoltXMLFromDQLUsingVoltSQLParser(sql, null);
         }
-
-        // this releases some small memory hsql uses that builds up over time if not
-        // cleared
-        // if it's not called for every call of getXMLCompiledStatement, that's ok;
-        // it'll get called next time
-        sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
-
-        // clean up sql-in expressions
-        fixupInStatementExpressions(xml);
-
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug("\nSQL: " + sql + "\n");
+            if (cs != null) {
+                m_logger.debug("\nHSQLDB: " + cs.describe(sessionProxy) + "\n");
+            } else {
+                m_logger.debug("\nHSQLDB: None\n");
+            }
+            if (xml != null) {
+                m_logger.debug("\nVoltDB: " + xml.toString() + "\n");
+            } else {
+                m_logger.debug("\nVoltDB: None\n");
+            }
+        }
         assert(xml != null);
 
+        return xml;
+    }
+
+    public VoltXMLElement getVoltCatalogXML(String aTableName, CatalogAdapter aAdapter) {
+        VoltXMLElement xml = new VoltXMLElement(XML_SCHEMA_NAME);
+        CatalogAdapter adapter = aAdapter;
+        if (adapter == null) {
+            adapter = m_catalogAdapter;
+        }
+        xml.withValue("name", "databaseschema");
+        for (String tblName : adapter.getTableNames()) {
+            if ((aTableName != null) && (!aTableName.equalsIgnoreCase(tblName))) {
+                continue;
+            }
+            org.voltdb.sqlparser.semantics.symtab.Table table = adapter.getTableByName(tblName);
+            VoltXMLElement tableXML = new VoltXMLElement("table");
+            tableXML.withValue("name", table.getName().toUpperCase());
+            xml.children.add(tableXML);
+            VoltXMLElement columnsXML = new VoltXMLElement("columns");
+            columnsXML.withValue("name", "columns");
+            tableXML.children.add(columnsXML);
+            int colidx = 0;
+            for (String colName : table.getColumnNames()) {
+                Column col = table.getColumnByName(colName);
+                VoltXMLElement colXML = new VoltXMLElement("column");
+                colXML.withValue("name", colName.toUpperCase())
+                      .withValue("index", Integer.toString(colidx))
+                      .withValue("nullable", "false")
+                      .withValue("size", Long.toString(col.getMaxSize()))
+                      .withValue("valuetype", col.getType().getName().toUpperCase());
+                colidx += 1;
+                columnsXML.children.add(colXML);
+            }
+            VoltXMLElement indicesXML = new VoltXMLElement("indexes");
+            indicesXML.withValue("name", "indexes");
+            tableXML.children.add(indicesXML);
+            VoltXMLElement constraintsXML = new VoltXMLElement("constraints");
+            constraintsXML.withValue("name", "constraints");
+            tableXML.children.add(constraintsXML);
+        }
         return xml;
     }
 
@@ -555,23 +609,27 @@ public class HSQLInterface {
      */
     public VoltXMLElement getXMLForTable(String tableName) throws HSQLParseException {
         VoltXMLElement xml = emptySchema.duplicate();
+        if (usingVoltSQLParser()) {
+            return getVoltCatalogXML(tableName, m_catalogAdapter);
+        } else {
 
-        // search all the tables XXX probably could do this non-linearly,
-        //  but i don't know about case-insensitivity yet
-        HashMappedList hsqlTables = getHSQLTables();
-        for (int i = 0; i < hsqlTables.size(); i++) {
-            Table table = (Table) hsqlTables.get(i);
-            String candidateTableName = table.getName().name;
+            // search all the tables XXX probably could do this non-linearly,
+            //  but i don't know about case-insensitivity yet
+            HashMappedList hsqlTables = getHSQLTables();
+            for (int i = 0; i < hsqlTables.size(); i++) {
+                Table table = (Table) hsqlTables.get(i);
+                String candidateTableName = table.getName().name;
 
-            // found the table of interest
-            if (candidateTableName.equalsIgnoreCase(tableName)) {
-                VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
-                assert(vxmle != null);
-                xml.children.add(vxmle);
-                return xml;
+                // found the table of interest
+                if (candidateTableName.equalsIgnoreCase(tableName)) {
+                    VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
+                    assert(vxmle != null);
+                    xml.children.add(vxmle);
+                    return xml;
+                }
             }
+            return null;
         }
-        return null;
     }
 
     /**
@@ -590,4 +648,57 @@ public class HSQLInterface {
         //  but i don't know about case-insensitivity yet
         return schemaManager.getTables(schemaName);
     }
+
+
+    /**
+     * Process a hunk of DDL.  If aAdapter is null, use the adapter in
+     * this HSQLInterface, which is the catalog of the existing database.
+     *
+     * @param sql
+     * @param aAdapter
+     * @throws HSQLParseException
+     */
+    public void processDDLStatementsUsingVoltSQLParser(String sql, CatalogAdapter aAdapter) throws HSQLParseException {
+        CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
+        VoltParserFactory factory = new VoltParserFactory(adapter);
+        VoltDDLListener listener = new VoltDDLListener(factory);
+        processSQLWithListener(sql, adapter, listener);
+    }
+
+    private void processSQLWithListener(String sql, CatalogAdapter adapter, VoltDDLListener listener) throws HSQLParseException {
+        SQLParserDriver driver;
+        try {
+            driver = new SQLParserDriver(sql, listener);
+        } catch (IOException e) {
+            throw new HSQLParseException(e.getMessage());
+        }
+        driver.walk(listener);
+        if (listener.hasErrors()) {
+            throw new HSQLParseException(listener.getErrorMessagesAsString());
+        }
+    }
+
+    /**
+     * Process a DQL string and return the VoltXML for the resulting
+     * catalog.  If the CatalogAdapter is supplied use it.  If it is
+     * null, use the HSQLInterface's CatalogAdapter, which is the one
+     * representing the current database.  Note that this *does not*
+     * update the CatalogAdapter.  This is just a DQL statement.
+     *
+     * @param sql
+     * @return
+     * @throws HSQLParseException
+     */
+    public VoltXMLElement getVoltXMLFromDQLUsingVoltSQLParser(String aSQL, CatalogAdapter aAdapter) throws HSQLParseException {
+        CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
+        VoltParserFactory factory = new VoltParserFactory(adapter);
+        VoltDDLListener listener = new VoltDDLListener(factory);
+        processSQLWithListener(aSQL, adapter, listener);
+        return listener.getVoltXML();
+    }
+
+    private boolean usingVoltSQLParser() {
+        return Boolean.getBoolean("useVoltSQLParser");
+    }
+
 }
