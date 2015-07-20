@@ -46,6 +46,7 @@
 
 #include "common/SQLException.h"
 #include "common/ValuePeeker.hpp"
+#include "common/executorcontext.hpp"
 
 #include <sstream>
 
@@ -63,10 +64,11 @@ PlanNodeType LimitPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_LIMI
  * is inlined. Centralize it here.
  */
 void
-LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limitOut, int &offsetOut)
+LimitPlanNode::getLimitAndOffsetByReference(int &limitOut, int &offsetOut)
 {
     limitOut = limit;
     offsetOut = offset;
+    const NValueArray& params = *ExecutorContext::getExecutorContext()->getParameterContainer();
 
     // Limit and offset parameters strictly integers. Can't limit <?=varchar>.
     // Converting the loop counter to NValue's doesn't make it cleaner -

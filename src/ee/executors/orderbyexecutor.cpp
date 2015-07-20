@@ -144,7 +144,7 @@ private:
 };
 
 bool
-OrderByExecutor::p_execute(const NValueArray &params)
+OrderByExecutor::p_execute()
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
@@ -161,7 +161,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     int offset = -1;
     if (limit_node != NULL)
     {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
+        limit_node->getLimitAndOffsetByReference(limit, offset);
     }
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
