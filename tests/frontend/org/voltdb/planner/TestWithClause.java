@@ -24,13 +24,6 @@
 package org.voltdb.planner;
 
 public class TestWithClause extends PlannerTestCase {
-    private static final boolean allTests = false;
-    // hsql232 ENG-8626
-    private static final boolean HSQL232_ENG_8626_DONE = false;
-    private static final boolean doTest(boolean condition) {
-        return allTests || condition;
-    }
-
     @Override
     protected void setUp() throws Exception {
         final boolean planForSinglePartitionFalse = false;
@@ -41,14 +34,6 @@ public class TestWithClause extends PlannerTestCase {
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-    }
-
-    private final void doCompileTest(boolean enabled, String sql) {
-        if (doTest(enabled)) {
-            compile(sql);
-        } else {
-            failToCompile(sql);
-        }
     }
 
     public void testSimpleWith() throws Exception {
@@ -136,33 +121,6 @@ public class TestWithClause extends PlannerTestCase {
                 "                     SELECT dc.deptno FROM dept_count as dc);\n " +
                 "");
 
-        // This fails because the parenthesized expression "e.deptno in (deptno)"
-        // generates a VALUELIST which we don't know what to do with.  ENG-8626
-        // addresses this.
-        doCompileTest(HSQL232_ENG_8626_DONE,
-                      "WITH dept_ident AS (\n" +
-                      "  SELECT deptno \n" +
-                      "  FROM   employee\n" +
-                      "  GROUP BY deptno)\n" +
-                      "SELECT e.name AS employee_name\n" +
-                      "FROM   employee e,\n" +
-                      "       dept_ident\n" +
-                      "WHERE  e.deptno IN ( deptno );" +
-                      "");
-
-        // This fails because the WHERE expression "e.deptno IN ( di.deptno )"
-        // generates a tree with a VALUELIST in the HSQLDB AST, and we cannot
-        // translate it yet.  This is the complaint of ENG-8626.
-        doCompileTest(HSQL232_ENG_8626_DONE,
-                      "WITH dept_ident AS (\n" +
-                      "  SELECT deptno \n" +
-                      "  FROM   employee\n" +
-                      "  GROUP BY deptno )\n" +
-                      "SELECT e.name AS employee_name\n" +
-                      "FROM   employee e,\n" +
-                      "       dept_ident AS di\n" +
-                      "WHERE  e.deptno IN ( di.deptno );" +
-                      "");
 
     }
 
