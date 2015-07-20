@@ -148,4 +148,9 @@ public interface ImportContext {
      */
     public void debug(String message);
 
+    public boolean isDebugEnabled();
+    public boolean isTraceEnabled();
+    public boolean isInfoEnabled();
+
+    public void trace(String message);
 }

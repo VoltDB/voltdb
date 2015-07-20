@@ -48,6 +48,10 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     private Method m_error_log_withT;
     private Method m_error_log_rateLimited;
     private Method m_debug_log;
+    private Method m_trace_log;
+    private Method m_debug_enabled;
+    private Method m_trace_enabled;
+    private Method m_info_enabled;
 
     @Override
     public boolean canContinue() {
@@ -110,8 +114,12 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         m_error_log = m_handler.getClass().getMethod("error", String.class);
         m_warn_log = m_handler.getClass().getMethod("warn", String.class);
         m_debug_log = m_handler.getClass().getMethod("debug", String.class);
+        m_trace_log = m_handler.getClass().getMethod("debug", String.class);
         m_error_log_rateLimited = m_handler.getClass().getMethod("error", Throwable.class, String.class, Object[].class);
         m_error_log_withT = m_handler.getClass().getMethod("error", String.class, Throwable.class);
+        m_debug_enabled = m_handler.getClass().getMethod("isDebugEnabled", (Class<?>[] )null);
+        m_info_enabled = m_handler.getClass().getMethod("isInfoEnabled", (Class<?>[] )null);
+        m_trace_enabled = m_handler.getClass().getMethod("isTraceEnabled", (Class<?>[] )null);
     }
 
     @Override
@@ -172,6 +180,49 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
             }
         } catch (Exception ex) {
         }
+    }
+
+    @Override
+    public void trace(String message) {
+        try {
+            if (m_debug_log != null) {
+                m_trace_log.invoke(m_handler, message);
+            }
+        } catch (Exception ex) {
+        }
+    }
+
+    @Override
+    public boolean isDebugEnabled() {
+        try {
+            if (m_debug_enabled != null) {
+                return (Boolean )m_debug_enabled.invoke(m_handler);
+            }
+        } catch (Exception ex) {
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isTraceEnabled() {
+        try {
+            if (m_debug_enabled != null) {
+                return (Boolean )m_trace_enabled.invoke(m_handler);
+            }
+        } catch (Exception ex) {
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isInfoEnabled() {
+        try {
+            if (m_debug_enabled != null) {
+                return (Boolean )m_info_enabled.invoke(m_handler);
+            }
+        } catch (Exception ex) {
+        }
+        return false;
     }
 
     @Override

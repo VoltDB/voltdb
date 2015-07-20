@@ -188,12 +188,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             try {
                 resp = consumer.send(req);
             } catch (Exception ex) {
+                //Only called once.
                 error(ex, "Failed to send topic metada request for topic " + topic);
                 continue;
             }
 
             List<TopicMetadata> metaData = resp.topicsMetadata();
             if (metaData == null) {
+                //called once.
                 error("Failed to get topic metadata for topic " + topic);
                 continue;
             }
@@ -404,7 +406,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
             }
             //Unable to find return null for recheck.
-            info("Failed to find new leader for " + m_topicAndPartition);
+            error(null, "Failed to find new leader for " + m_topicAndPartition);
             return null;
         }
 
@@ -433,7 +435,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         consumer = null;
                         break;
                     }
-                    error(null, "Failed to get Offset Coordinator for " + m_topicAndPartition + " Code: " + metadataResponse.errorCode());
+                    final String msg = "Failed to get Offset Coordinator for " + m_topicAndPartition + " Code: %d";
+                    error(null, msg, metadataResponse.errorCode());
                 } catch (Exception e) {
                     // retry the query backoff and retry
                     error(e, "Failed to get Offset Coordinator for " + m_topicAndPartition);
@@ -532,7 +535,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
                 final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
                 if (code != ErrorMapping.NoError()) {
-                    error(null, "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: " + code);
+                    final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: %d";
+                    error(null, msg, code);
                     return false;
                 }
                 return true;
@@ -570,12 +574,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                     //Highest commit we have seen after me will be committed.
                     if (commitOffset(commit)) {
-                        debug("Committed offset " + commit + " for " + m_topicAndPartition);
+                        if (isDebugEnabled()) {
+                            debug("Committed offset " + commit + " for " + m_topicAndPartition);
+                        }
                         m_committedOffset.set(commit);
                     }
                     //If this happens we will come back again on next callback.
                 } catch (Exception ex) {
-                    error(ex, "Failed to commit and save offset " + currentNext);
+                    error(ex, "Failed to commit and save offset %d", currentNext);
                 }
             }
 
@@ -643,7 +649,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 continue;
                             }
                         } catch (Exception ex) {
-                            error(ex, "Failed to fetch from " + m_topicAndPartition);
+                            error(ex, "Failed to fetch from %s", m_topicAndPartition);
                             fetchFailedCount = backoffSleep(fetchFailedCount);
                             continue;
                         }
@@ -651,8 +657,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         if (fetchResponse.hasError()) {
                             // Something went wrong!
                             short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
+                            error(null, "Failed to fetch messages for %s Code: %d", m_topicAndPartition, code);
                             fetchFailedCount = backoffSleep(fetchFailedCount);
-                            error(null, "Failed to fetch messages for " + m_topicAndPartition + " Code " + code);
                             if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                                 // We asked for an invalid offset. For simple case ask for the last element to reset
                                 info("Invalid offset requested for " + m_topicAndPartition);
@@ -665,7 +671,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             leaderBroker = findNewLeader();
                             if (leaderBroker == null) {
                                 //point to original leader which will fail and we fall back again here.
-                                error(null, "Failed to find leader continue with old leader: " + m_leader);
+                                error(null, "Failed to find leader continue with old leader: %s", m_leader);
                                 leaderBroker = m_leader;
                             } else {
                                 if (!leaderBroker.equals(m_leader)) {
@@ -684,14 +690,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             ByteBuffer payload = messageAndOffset.message().payload();
 
                             currentFetchCount++;
-                            byte[] bytes = new byte[payload.limit()];
-                            payload.get(bytes);
-                            String line = new String(bytes, "UTF-8");
+                            String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),"UTF-8");
                             CSVInvocation invocation = new CSVInvocation(m_procedure, line);
                             TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition);
                             m_pendingOffsets.add(currentOffset);
                             if (!callProcedure(cb, invocation)) {
-                                debug("Failed to process Invocation possibly bad data: " + line);
+                                if (isDebugEnabled()) {
+                                    debug("Failed to process Invocation possibly bad data: " + line);
+                                }
                                 synchronized(m_seenOffset) {
                                     //Make this failed offset known to seen offsets so committer can push ahead.
                                     m_seenOffset.add(messageAndOffset.nextOffset());

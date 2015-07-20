@@ -269,6 +269,18 @@ public class ImportHandler {
         m_logger.warn(message);
     }
 
+    public boolean isDebugEnabled() {
+        return m_logger.isDebugEnabled();
+    }
+
+    public boolean isTraceEnabled() {
+        return m_logger.isTraceEnabled();
+    }
+
+    public boolean isInfoEnabled() {
+        return m_logger.isInfoEnabled();
+    }
+
     /**
      * Log debug message
      * @param message
