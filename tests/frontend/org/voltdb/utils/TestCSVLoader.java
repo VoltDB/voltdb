@@ -994,7 +994,7 @@ public class TestCSVLoader {
     }
 
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
-            int validLineCnt, int validLineUpsertCnt, String[] vaildData) throws Exception {
+            int validLineCnt, int validLineUpsertCnt, String[] validData) throws Exception {
         try{
             BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
             for (String aMy_data : my_data) {
@@ -1050,12 +1050,12 @@ public class TestCSVLoader {
         assertEquals(invalidLineCnt, invalidlinecnt);
 
         // validate upsert the correct data
-        if (vaildData != null && vaildData.length > 0) {
+        if (validData != null && validData.length > 0) {
             tearDown();
             setup();
             try{
                 BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
-                for (String aMy_data : vaildData) {
+                for (String aMy_data : validData) {
                     out_csv.write(aMy_data + "\n");
                 }
                 out_csv.flush();
