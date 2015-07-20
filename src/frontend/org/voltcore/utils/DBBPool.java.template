@@ -460,6 +460,7 @@ public final class DBBPool {
     public static void registerUnsafeMemory(long pointer) {
 #ifdef MEMCHECK_FULL
         m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" registered " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
+        m_deletedStuff.remove(pointer);
 #endif
     }
 #ifdef MEMCHECK_FULL
@@ -513,6 +514,7 @@ public final class DBBPool {
 #ifdef MEMCHECK_FULL
         final long pointer = retcont.address();
         m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
+        m_deletedStuff.remove(pointer);
 #endif
         return retcont;
     }
