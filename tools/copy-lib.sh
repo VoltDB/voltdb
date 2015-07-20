@@ -13,20 +13,24 @@ fi
 
 OS=`uname`
 
-echo '$1 is ', $1
-echo '$2 is ', $2
-echo 'lib is ', obj/release/nativelibs/libvoltdb*.jnilib
+echo '$1 is' $1
+echo '$2 is' $2
+echo 'lib is' obj/release/nativelibs/libvoltdb*.jnilib
 
 if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb-${2}.jnilib ]
 then
     # the Mac case...
+    # clean up target directory on volt0, just to be safe
+    ssh volt0 "cd lib; rm -rf obj"
+
+    # now copy the new native lib over to the linux side
     tar cf - obj/release/nativelibs/ | ssh volt0 "cd libs; tar xf -"
     exit 0
 else
     # the Linux case...
     if [ -e ~/libs/obj/release/nativelibs/libvoltdb-${2}.jnilib ]; then
         mkdir -p $1
-        cp ~/libs/obj/release/nativelibs/libvoltdb-${2}.jnilib $1
+        mv ~/libs/obj/release/nativelibs/libvoltdb-${2}.jnilib $1
         exit 0
     else
         echo "++++++++++++++nativelibs not found!"
