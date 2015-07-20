@@ -249,6 +249,11 @@ class Overview extends Module {
         // error message
         errorMsgHeartbeat		{ $("#errorHeartbeatTimeout") }
         errorQuery				{ $("#errorQueryTimeout") }
+
+        //error message for Add Property
+
+        errorPropertyName1 {$("#errorName1")}
+        errorPropertyValue1 {$("#errorValue1")}
     }
     
     int numberOfTrials = 10

@@ -701,4 +701,63 @@ class AdminExportTest extends TestBase {
             println("Configuration deleted")
         }
     }
+
+    def "Verify Add Property in Export Configuration"(){
+
+        when: 'Open Add ConfigurationPopup'
+        page.overview.openAddConfigurationPopup()
+        page.overview.textType.value("KAFKA")
+        then: 'Check elements'
+        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+        waitFor(waitTime) { page.overview.metadatabroker.value().equals("metadata.broker.list") }
+        waitFor(waitTime) { page.overview.metadatabroker.isDisplayed() }
+
+        when: 'Add property is clicked'
+        page.overview.addProperty.click()
+        then: 'New text and value fields are displayed'
+        waitFor(waitTime) { page.overview.newTextField.isDisplayed() }
+        waitFor(waitTime) { page.overview.newValueField.isDisplayed() }
+        waitFor(waitTime) { page.overview.deleteFirstProperty.isDisplayed() }
+        when: 'Provide values for add configuration'
+        page.overview.stream.value("kafkaTest")
+        page.overview.metadatabrokerValue.value("metadataValue")
+        page.overview.newTextField.value("value1")
+        page.overview.newValueField.value("value2")
+        then: 'Click Save'
+        page.overview.clickSave()
+        when: 'Expand export'
+        page.overview.expandExport()
+        then: 'Display the created KAFKA'
+        waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
+        println("Configuration created")
+
+
+    }
+
+    def "Verify Error messages of Add Property in Export Configuration"() {
+        when: 'Open Add ConfigurationPopup'
+        page.overview.openAddConfigurationPopup()
+        page.overview.textType.value("KAFKA")
+        then: 'Check elements'
+        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+        waitFor(waitTime) { page.overview.metadatabroker.value().equals("metadata.broker.list") }
+        waitFor(waitTime) { page.overview.metadatabroker.isDisplayed() }
+
+        when: 'Add property is clicked'
+        page.overview.addProperty.click()
+        then: 'New text and value fields are displayed'
+        waitFor(waitTime) { page.overview.newTextField.isDisplayed() }
+        waitFor(waitTime) { page.overview.newValueField.isDisplayed() }
+        waitFor(waitTime) { page.overview.deleteFirstProperty.isDisplayed() }
+        when: 'Save button is clicked'
+        page.overview.save.click()
+        then: 'Error messages are displayed'
+        waitFor(waitTime) { page.overview.errorPropertyName1.isDisplayed() }
+        waitFor(waitTime) { page.overview.errorPropertyValue1.isDisplayed() }
+
+    }
 }

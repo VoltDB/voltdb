@@ -31,16 +31,19 @@ class AdminExportEditTest extends TestBase {
 		}
     }
 
-    def "Verify Edit in a Configuration"() {
+    def "Verify Edit in an Export Configuration"() {
+        int count = 0
+        testStatus = false
+
         when: 'Open Add ConfigurationPopup'
         page.overview.openAddConfigurationPopup()
         page.overview.textType.value("KAFKA")
         then: 'Check elements'
         waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-	    waitFor(waitTime) { page.overview.save.isDisplayed() }
-	    waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
         waitFor(waitTime) { page.overview.metadatabroker.value().equals("metadata.broker.list") }
-	    waitFor(waitTime) { page.overview.metadatabroker.isDisplayed() }
+        waitFor(waitTime) { page.overview.metadatabroker.isDisplayed() }
 
 	    
 	    when: 'Provide values for add configuration'
@@ -198,7 +201,25 @@ class AdminExportEditTest extends TestBase {
         waitFor(waitTime) { page.overview.cancel.isDisplayed() }
 
         then: 'Check for previous changes'
-        waitFor(waitTime) { page.overview.endpointValue.value().equals("endValue") }
+
+
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    waitFor(waitTime) { page.overview.endpointValue.value().equals("endValue") }
+                }
+                then:
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
+        }
+
 
 
         when: 'Change to RABBITMQ'
