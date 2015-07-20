@@ -7,10 +7,7 @@
 {@columntype = "timestamp"}
 {@comparableconstant = "'1967-10-01 15:25:26.123457'"}
 {@comparabletype = "timestamp"}
--- OK. comparablevalue is not a constant generator, here.
--- just fudging a type-friendly placeholder until ad hoc timestamp composition is supported
---{@comparablevalue = "_value[timestamp]"}
-{@comparablevalue = "_variable[timestamp]"}
+{@comparablevalue = "_value[timestamp]"}
 {@dmlcolumnpredicate = "_timestampcolumnpredicate"}
 {@dmltable = "_table"}
 {@fromtables = "_table"}
