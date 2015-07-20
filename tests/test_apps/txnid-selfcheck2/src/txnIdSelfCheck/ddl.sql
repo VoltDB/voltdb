@@ -216,6 +216,8 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedBase;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedBase;
 
 -- real procedures
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SelectFromSinglePartition;
+PARTITION PROCEDURE SelectFromSinglePartition ON TABLE capp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SetupAdHocTables;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedSP;
 PARTITION PROCEDURE UpdatePartitionedSP ON TABLE partitioned COLUMN cid;

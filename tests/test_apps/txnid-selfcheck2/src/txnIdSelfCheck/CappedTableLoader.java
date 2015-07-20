@@ -55,7 +55,7 @@ public class CappedTableLoader extends BenchmarkThread {
     long insertsTried = 0;
     long rowsLoaded = 0;
     float mpRatio;
-    byte threads;
+    byte cnt = 0;
 
     CappedTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
         setName("CappedTableLoader");
@@ -146,9 +146,9 @@ public class CappedTableLoader extends BenchmarkThread {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
 
-                    try { Thread.sleep(15000); } catch (Exception e2) {}
+                    try { Thread.sleep(1000); } catch (Exception e2) {}
                     currentRowCount = nextRowCount;
-                    if (exceedsPartitionLimit())
+                    if (exceedsPartitionLimit()) // this test should change so the wait is not necessary.
                         hardStop("Capped table exceeds 10 rows, this shoudln't happen and it shouldn't be tested here. Exiting. ");
                 }
             }
@@ -172,10 +172,20 @@ public class CappedTableLoader extends BenchmarkThread {
         log.info("CappedTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
     }
 
-
     private boolean exceedsPartitionLimit() throws NoConnectionsException, IOException, ProcCallException {
-        VoltTable stats = TxnId2Utils.doStatistics(client, "table").getResults()[0];
         boolean ret = false;
+        /*ClientResponse cr;
+        while (false/*part < partitions) {
+            System.out.println();
+        }*/
+        VoltTable stats = TxnId2Utils.doStatistics(client, "index", 0).getResults()[0];
+        if (cnt == 5) {
+            System.out.println(stats.toFormattedString());
+            return true; // try the index command with hard coded limit.
+        }
+        cnt += 1;
+        return false;
+        /*
         long replicated_cnt = -1;
         while (stats.advanceRow()) {
             long rowlim = stats.getLong(11);
@@ -201,7 +211,6 @@ public class CappedTableLoader extends BenchmarkThread {
         }
         if (ret)
             log.error("See tables CAPR and CAPP for each partition, as well as above errors ::\n"+stats.toFormattedString());
-        return ret;
+        return ret;*/
     }
-
 }

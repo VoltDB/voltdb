@@ -170,15 +170,7 @@ public class ClientThread extends BenchmarkThread {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 throw new UserProcCallException(response);
             }
-            /*
-            ClientResponse rowsresponse;
-            try {
-                if (m_type)
-                rowsresponse = TxnId2Utils.doAdHoc(m_client, "select count(*) from partitioned where cid = "+m_cid+";");
-            } catch (Exception e) {
-                Benchmark.hardStop("adhoc error");
-            }
-            */
+
             VoltTable[] results = response.getResults();
 
             VoltTable data = results[3];

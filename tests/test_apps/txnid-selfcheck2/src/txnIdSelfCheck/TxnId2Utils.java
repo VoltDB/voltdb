@@ -86,13 +86,13 @@ public enum TxnId2Utils {;
         }
     }
 
-    static ClientResponse doStatistics(Client client, String query) throws NoConnectionsException, IOException, ProcCallException {
+    static ClientResponse doStatistics(Client client, String arg1, int arg2) throws NoConnectionsException, IOException, ProcCallException {
         Boolean sleep = false;
         Boolean noConnections = false;
         Boolean timedOutOnce = false;
         while (true) {
             try {
-                ClientResponse cr = client.callProcedure("@Statistics", query);
+                ClientResponse cr = client.callProcedure("@Statistics", arg1,arg2);
                 if (cr.getStatus() == ClientResponse.SUCCESS) {
                     Benchmark.txnCount.incrementAndGet();
                     return cr;

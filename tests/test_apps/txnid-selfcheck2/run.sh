@@ -88,12 +88,12 @@ function benchmark() {
     java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
-        --duration=120 \
+        --duration=600 \
         --servers=localhost \
         --threads=49 \
         --threadoffset=0 \
-        --minvaluesize=1024000 \
-        --maxvaluesize=1024000 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
         --entropy=127 \
         --fillerrowsize=10240 \
         --replfillerrowmb=32 \
