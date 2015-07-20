@@ -744,6 +744,14 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack blfcb) throws Exception
+    {
+        synchronized(m_vblGlobals) {
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, blfcb);
+        }
+    }
+
+    @Override
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception
     {
         synchronized(m_vblGlobals) {
