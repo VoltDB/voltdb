@@ -71,7 +71,7 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
-bool SendExecutor::p_execute() {
+bool SendExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("started SEND");
 
     Table* inputTable = m_abstractNode->getInputTable();
