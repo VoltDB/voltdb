@@ -32,9 +32,6 @@
 	    <zipgroupfileset dir="${base.dir}/lib/" includes="metrics-core-2.2.0.jar" />
 	    <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="kafka_2.10-0.8.2.1.jar" />
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="scala-library-2.10.4.jar" />
-            <!-- <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="zookeeper-3.4.6.jar" /> -->
-            <!-- <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="zkclient-0.3.jar" /> -->
-            <!-- <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="kafka-clients-0.8.2.1.jar" /> -->
             <manifest>
                 <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka.KafkaStreamImporter" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
