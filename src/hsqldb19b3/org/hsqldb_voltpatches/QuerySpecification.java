@@ -241,6 +241,8 @@ public class QuerySpecification extends QueryExpression {
             throw Error.error(ErrorCode.X_42564);
         }
 
+        // A VoltDB extension to eliminate an incorrect HSQLDB guard.
+        /* disable 14 lines ...
         if (indexLimitVisible > 0) {
             if (e.opType == OpTypes.MULTICOLUMN) {
                 if (((ExpressionColumn) e).getTableName() == null) {
@@ -255,6 +257,9 @@ public class QuerySpecification extends QueryExpression {
                 throw Error.error(ErrorCode.X_42578);
             }
         }
+        ... disabled 14 lines */
+        // End of VoltDB extension
+
 
         exprColumnList.add(e);
 

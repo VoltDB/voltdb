@@ -24,17 +24,6 @@
 package org.voltdb.planner;
 
 public class TestWithClause extends PlannerTestCase {
-    private static final boolean allTests = false;
-    private static final boolean WITH_IN_FROM = false;
-    private static final boolean WITH_DEFINED_IN_IN = false;
-    private static final boolean WITH_IN_EXISTS = false;
-    private static final boolean ENG_8638_DONE = false;
-    private static final boolean WITH_USED_IN_IN = false;
-    private static final boolean ENG_8626_DONE = false;
-    private static final boolean doTest(boolean condition) {
-        return allTests || condition;
-    }
-
     @Override
     protected void setUp() throws Exception {
         final boolean planForSinglePartitionFalse = false;
@@ -47,170 +36,120 @@ public class TestWithClause extends PlannerTestCase {
         super.tearDown();
     }
 
-    private final void doCompileTest(boolean enabled, String sql) {
-        if (doTest(enabled)) {
-            compile(sql);
-        } else {
-            failToCompile(sql);
-        }
-    }
-
     public void testSimpleWith() throws Exception {
         compile("WITH dept_count AS (\n" +
-                "  SELECT deptno, COUNT(*) AS dc\n" +
-                "  FROM   employee\n" +
-                "  GROUP BY deptno)\n" +
+                "    SELECT deptno, COUNT(*) AS dc\n" +
+                "    FROM   employee\n" +
+                "    GROUP BY deptno)\n" +
                 "SELECT e.name AS employee_name,\n" +
                 "       dc AS emp_dept_count\n" +
                 "FROM   employee e,\n" +
-                "       dept_count as ddd\n" +
+                "       dept_count AS ddd\n" +
                 "WHERE  e.deptno = ddd.deptno;" +
                 "");
     }
 
     public void testSimpleWithNoDot() throws Exception {
-        // This seems like a plausible query.  The unqualified variable
-        // dept_no in the where clause can only be satisfied by the
-        // table dept_count.  But HSQLDB tells us every derived table
-        // needs an alias, including dept_count in the FROM clause.
-        // I think this is an error, and is discussed in ENG-8638.
-        //
-        doCompileTest(ENG_8638_DONE,
-                      "WITH dept_count AS (\n" +
-                      "  SELECT deptno, COUNT(*) as dc\n" +
-                      "  FROM   employee\n" +
-                      "  GROUP BY deptno)\n" +
-                      "SELECT e.name AS employee_name,\n" +
-                      "       dept_count.dc AS emp_dept_count\n" +
-                      "FROM   employee e,\n" +
-                      "       dept_count\n" +
-                      "WHERE  e.deptno = deptno;" +
-                      "");
+        // Use a with clause as an alias for a subquery.
+        compile("WITH dept_count AS (\n" +
+                "    SELECT deptno, " +
+                "           COUNT(*) AS dc\n" +
+                "    FROM   employee\n" +
+                "    GROUP BY deptno)\n" +
+                "SELECT e.name AS employee_name,\n" +
+                "       dept_count.dc AS emp_dept_count\n" +
+                "FROM   employee e,\n" +
+                "       dept_count\n" +
+                "WHERE  e.deptno = deptno;" +
+                "");
     }
 
     public void testDoubleWith() throws Exception {
-        compile("WITH dept_count AS (\n" +
-                "  SELECT deptno, COUNT(*) AS dept_count\n" +
-                "  FROM   employee\n" +
-                "  GROUP BY deptno),\n" +
+        compile("WITH " +
+                "  dept_count AS (\n" +
+                "    SELECT deptno, " +
+                "           COUNT(*) AS dept_count\n" +
+                "    FROM   employee\n" +
+                "    GROUP BY deptno),\n" +
                 "  current_proj AS (\n" +
-                "  select e.empno as empno,\n" +
-                "         p.description as pdesc\n" +
-                "  from\n" +
-                "   employee as e,\n" +
-                "        project as p,\n" +
-                "   project_participation pd\n" +
-                "  where e.empno = pd.empno\n" +
-                "  and   p.projectno = pd.projectno\n" +
-                "  and   pd.end_date is null )\n" +
+                "    SELECT e.empno AS empno,\n" +
+                "           p.description AS pdesc\n" +
+                "    FROM employee AS e,\n" +
+                "         project AS p,\n" +
+                "         project_participation pd\n" +
+                "    WHERE     e.empno = pd.empno\n" +
+                "          AND p.projectno = pd.projectno\n" +
+                "          AND pd.end_date is null )\n" +
                 "SELECT e.name AS employee_name,\n" +
                 "       dc.dept_count AS emp_dept_count,\n" +
                 "       cp.pdesc\n" +
                 "FROM   employee e,\n" +
                 "       dept_count dc,\n" +
                 "       current_proj cp\n" +
-                "WHERE  e.deptno = dc.deptno\n" +
-                "and    cp.empno = e.empno;\n" +
+                "WHERE      e.deptno = dc.deptno\n" +
+                "       AND cp.empno = e.empno;\n" +
                 "");
     }
 
     public void testWithInFrom() throws Exception {
-        doCompileTest(WITH_IN_FROM,
-                      "SELECT e.name AS employee_name, \n" +
-                      "       dc.dept_count AS emp_dept_count \n" +
-                      "FROM   employee e, \n" +
-                      "       (WITH dept_count AS ( \n" +
-                      "         SELECT deptno, COUNT(*) AS dept_count \n" +
-                      "        FROM   employee \n" +
-                      "        GROUP BY deptno) \n" +
-                      "       select * from dept_count) as dc \n" +
-                      "WHERE  e.deptno = dc.deptno; \n" +
-                      "");
+        compile("SELECT e.name AS employee_name, \n" +
+                "       dc.dept_count AS emp_dept_count \n" +
+                "FROM   employee e, \n" +
+                "       (WITH " +
+                "          dept_count AS ( \n" +
+                "            SELECT deptno, COUNT(*) AS dept_count \n" +
+                "            FROM   employee \n" +
+                "            GROUP BY deptno ) \n" +
+                "        select * FROM dept_count) AS dc \n" +
+                "WHERE  e.deptno = dc.deptno; \n" +
+                "");
     }
     public void testWithInIn() throws Exception {
-        // Logically the "dc.deptno" and "as dc" in the RHS of the
-        // "in" operation is not necessary.  However, HSQLDB gives
-        // an error without it.  When ENG-8638 is
+        // Note that dept_count is an alias for a subquery and
+        // an alias for a column in that subquery.  While this
+        // might be worst practice in practice, in a test it
+        // makes sense, because we want to test that HSQLDB
+        // gets the scope rules right.
         compile("SELECT e.name AS employee_name\n " +
                 "FROM   employee e\n " +
-                "WHERE  e.deptno in ( WITH dept_count AS (\n " +
-                "                              SELECT deptno, COUNT(*) AS dept_count\n " +
+                "WHERE  e.deptno IN ( WITH dept_count AS (\n " +
+                "                        SELECT deptno, " +
+                "                               COUNT(*) AS dept_count\n " +
                 "                        FROM   employee emp\n " +
                 "                        GROUP BY deptno\n " +
                 "                        HAVING count(*) > 5)\n " +
-                "                    select dc.deptno from dept_count as dc);\n " +
+                "                     SELECT dc.deptno FROM dept_count as dc);\n " +
                 "");
-        // This is very close to the previous query.  But it does not have
-        // the logically unnecessary alias for dept_count.
-        doCompileTest(ENG_8638_DONE,
-                      "SELECT e.name AS employee_name\n " +
-                      "FROM   employee e\n " +
-                      "WHERE  e.deptno in ( WITH dept_count AS (\n " +
-                      "                              SELECT deptno\n " +
-                      "                        FROM   employee emp\n " +
-                      "                        GROUP BY deptno\n " +
-                      "                        HAVING count(*) > 5)\n " +
-                      "                    select deptno from dept_count);\n " +
-                      "");
 
-        // This fails because the From clause in the main select statement
-        // references the with-view named "dept_ident" without an alias.
-        // This is an HSQLDB error condition which may be incorrect.
-        // However, if we give it an alias, then the compilation fails
-        // because the parenthesized expression "e.deptno in (deptno)"
-        // generates a VALUELIST which we don't know what to do with.
-        doCompileTest(ENG_8638_DONE & ENG_8626_DONE,
-                      "WITH dept_ident AS (\n" +
-                      "  SELECT deptno \n" +
-                      "  FROM   employee\n" +
-                      "  GROUP BY deptno)\n" +
-                      "SELECT e.name AS employee_name\n" +
-                      "FROM   employee e,\n" +
-                      "       dept_ident\n" +
-                      "WHERE  e.deptno IN ( deptno );" +
-                      "");
-
-        // This fails because the WHERE expression "e.deptno IN ( di.deptno )"
-        // generates a tree with a VALUELIST in the HSQLDB AST, and we cannot
-        // translate it yet.  This is the complaint of ENG-8626.
-        doCompileTest(ENG_8626_DONE,
-                      "WITH dept_ident AS (\n" +
-                      "  SELECT deptno \n" +
-                      "  FROM   employee\n" +
-                      "  GROUP BY deptno)\n" +
-                      "SELECT e.name AS employee_name\n" +
-                      "FROM   employee e,\n" +
-                      "       dept_ident as di\n" +
-                      "WHERE  e.deptno IN ( di.deptno );" +
-                      "");
 
     }
 
     public void testWithInExists() throws Exception {
         // The alias "dept_count as dc" is logically unnecessary in the
-        // main select of the argument to exists.  It is required by
-        // the HSQLDB bug ENG-8638.
+        // main select of the argument to exists.  Again, we are pushing
+        // HSQLDB's scope envelope a bit with WITH clauses.
         compile("SELECT e.name AS employee_name\n" +
                 "FROM   employee e\n" +
                 "WHERE  exists ( WITH dept_count AS (\n" +
-                "                       SELECT deptno, COUNT(*) AS dept_size\n" +
-                "               FROM   employee\n" +
-                "               GROUP BY deptno\n" +
-                "               HAVING count(*) > 5)\n" +
-                "               select dc.deptno from dept_count as dc);\n" +
+                "                  SELECT deptno," +
+                "                         COUNT(*) AS dept_size\n" +
+                "                  FROM   employee\n" +
+                "                  GROUP BY deptno\n" +
+                "                  HAVING count(*) > 5 )\n" +
+                "               SELECT dc.deptno FROM dept_count AS dc);\n" +
                 "");
         // This is the same query as above, but without the logically unnecessary
         // alias.
-        doCompileTest(ENG_8638_DONE,
-                      "SELECT e.name AS employee_name\n" +
-                      "FROM   employee e\n" +
-                      "WHERE  exists ( WITH dept_count AS (\n" +
-                      "                       SELECT deptno, COUNT(*) AS dept_size\n" +
-                      "               FROM   employee\n" +
-                      "               GROUP BY deptno\n" +
-                      "               HAVING count(*) > 5)\n" +
-                      "               select deptno from dept_count);\n" +
-                      "");
+        compile("SELECT e.name AS employee_name\n" +
+                "FROM   employee e\n" +
+                "WHERE  exists ( WITH dept_count AS (\n" +
+                "                  SELECT deptno, \n" +
+                "                         COUNT(*) AS dept_size\n" +
+                "                  FROM   employee\n" +
+                "                  GROUP BY deptno\n" +
+                "                  HAVING count(*) > 5)\n" +
+                "                SELECT deptno FROM dept_count);\n" +
+                "");
     }
 
     /**
@@ -222,21 +161,21 @@ public class TestWithClause extends PlannerTestCase {
     public void testSubquery1() throws Exception {
         compile("SELECT e.name AS employee_name,\n" +
                 "       dc.dept_count AS emp_dept_count,\n" +
-                "       cp.pdesc as Project_Description\n" +
+                "       cp.pdesc AS Project_Description\n" +
                 "FROM   employee e,\n" +
-                "       (SELECT deptno, COUNT(*) AS dept_count\n" +
-                "         FROM   employee\n" +
-                "             GROUP BY deptno) dc,\n" +
-                "       (select e.empno as empno,\n" +
-                "               p.description as pdesc\n" +
-                "       from\n" +
-                "              employee as e,\n" +
-                "               project as p,\n" +
-                "              project_participation pd\n" +
-                "        where e.empno = pd.empno\n" +
-                "        and   p.projectno = pd.projectno\n" +
-                "        and   pd.end_date is null) as cp\n" +
-                "WHERE  e.deptno = dc.deptno\n" +
+                "       (SELECT deptno,\n" +
+                "               COUNT(*) AS dept_count\n" +
+                "        FROM   employee\n" +
+                "        GROUP BY deptno) AS dc,\n" +
+                "       (SELECT e.empno AS empno,\n" +
+                "               p.description AS pdesc\n" +
+                "        FROM employee AS e,\n" +
+                "             project  AS p,\n" +
+                "             project_participation AS pd\n" +
+                "        WHERE e.empno = pd.empno\n" +
+                "        AND   p.projectno = pd.projectno\n" +
+                "        AND   pd.end_date IS NULL) AS cp\n" +
+                "WHERE  e.deptno = deptno\n" +
                 "and    cp.empno = e.empno;\n" +
                 "");
     }
