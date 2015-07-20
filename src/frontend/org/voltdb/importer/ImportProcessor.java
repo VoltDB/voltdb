@@ -36,6 +36,10 @@ import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.voltcore.utils.CoreUtils;
 
 public class ImportProcessor implements ImportDataProcessor {
 
@@ -44,6 +48,7 @@ public class ImportProcessor implements ImportDataProcessor {
     private final Map<String, BundleWrapper> m_bundlesByName = new HashMap<String, BundleWrapper>();
     private final Framework m_framework;
     private final ChannelDistributer m_distributer;
+    private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
 
     public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework) throws BundleException {
         m_framework = framework;
@@ -144,48 +149,68 @@ public class ImportProcessor implements ImportDataProcessor {
     }
 
     @Override
-    public synchronized void readyForData(CatalogContext catContext, HostMessenger messenger) {
+    public synchronized void readyForData(final CatalogContext catContext, final HostMessenger messenger) {
 
-        for (BundleWrapper bw : m_bundles.values()) {
-            try {
-                ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, catContext);
-                //Set the internal handler
-                bw.setHandler(importHandler);
-                if (!bw.m_handlerProxy.isRunEveryWhere()) {
-                    //This is a distributed and fault tolerant importer so get the resources.
-                    Set<URI> allResources = bw.m_handlerProxy.getAllResponsibleResources();
-                    m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
+        m_es.submit(new Runnable() {
+            @Override
+            public void run() {
+                for (BundleWrapper bw : m_bundles.values()) {
+                    try {
+                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, catContext);
+                        //Set the internal handler
+                        bw.setHandler(importHandler);
+                        if (!bw.m_handlerProxy.isRunEveryWhere()) {
+                            //This is a distributed and fault tolerant importer so get the resources.
+                            Set<URI> allResources = bw.m_handlerProxy.getAllResponsibleResources();
+                            m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
 
-                    bw.setChannelDistributer(m_distributer);
-                    //Register callback
-                    m_distributer.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
-                    m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
+                            bw.setChannelDistributer(m_distributer);
+                            //Register callback
+                            m_distributer.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
+                            m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
+                        }
+                        importHandler.readyForData();
+                        m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
+                    } catch (Exception ex) {
+                        //Should never fail. crash.
+                        VoltDB.crashLocalVoltDB("Import failed to set Handler", true, ex);
+                        m_logger.error("Failed to start the import handler: " + bw.m_handlerProxy.getName(), ex);
+                    }
                 }
-                importHandler.readyForData();
-                m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
-            } catch (Exception ex) {
-                //Should never fail. crash.
-                VoltDB.crashLocalVoltDB("Import failed to set Handler", true, ex);
-                m_logger.error("Failed to start the import handler: " + bw.m_handlerProxy.getName(), ex);
             }
-        }
-        //Start polling for channel assignments.
+        });
     }
 
     @Override
     public synchronized void shutdown() {
-        try {
-            //Stop all the bundle wrappers.
-            for (BundleWrapper bw : m_bundles.values()) {
+        //Task that shutdowns all the bundles we wait for it to finish.
+        Future<?> task = m_es.submit(new Runnable() {
+            @Override
+            public void run() {
                 try {
-                    bw.stop();
+                    //Stop all the bundle wrappers.
+                    for (BundleWrapper bw : m_bundles.values()) {
+                        try {
+                            bw.stop();
+                        } catch (Exception ex) {
+                            m_logger.error("Failed to stop the import handler: " + bw.m_handlerProxy.getName(), ex);
+                        }
+                    }
+                    m_bundles.clear();
                 } catch (Exception ex) {
-                    m_logger.error("Failed to stop the import handler: " + bw.m_handlerProxy.getName(), ex);
+                    m_logger.error("Failed to stop the import bundles.", ex);
+                    Throwables.propagate(ex);
                 }
             }
-            m_bundles.clear();
+        });
+        //And wait for it.
+        try {
+            task.get();
+            m_es.shutdown();
+            m_es.awaitTermination(365, TimeUnit.DAYS);
         } catch (Exception ex) {
-            m_logger.error("Failed to stop the import bundles.", ex);
+            m_logger.error("Failed to stop import processor.", ex);
+            ex.printStackTrace();
         }
     }
 

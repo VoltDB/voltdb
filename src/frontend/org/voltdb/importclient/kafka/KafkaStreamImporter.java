@@ -34,6 +34,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import kafka.api.ConsumerMetadataRequest;
 import kafka.api.FetchRequest;
@@ -103,6 +105,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private final Map<String, TopicPartitionFetcher> m_fetchers = new HashMap<String, TopicPartitionFetcher>();
 
     private ExecutorService m_es = null;
+
+    private static final Pattern legalTopicNamesPattern = Pattern.compile("[a-zA-Z0-9\\._\\-]+");
+    private static final int topicMaxNameLength = 255;
 
     //Simple Host and Port abstraction....dont want to use our big stuff here orgi bundle import nastiness.
     public static class HostAndPort {
@@ -189,7 +194,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 resp = consumer.send(req);
             } catch (Exception ex) {
                 //Only called once.
-                error(ex, "Failed to send topic metada request for topic " + topic);
+                error(ex, "Failed to send topic metadata request for topic " + topic);
                 continue;
             }
 
@@ -293,6 +298,19 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         if (m_topicList == null || m_topicList.isEmpty()) {
             throw new RuntimeException("Missing topic(s).");
         }
+        for (String topic : m_topicList) {
+            if (topic.contains("..") || topic.contains(".")) {
+                throw new RuntimeException("topic name cannot be \".\" or \"..\"");
+            }
+            if (topic.length() > topicMaxNameLength) {
+                throw new RuntimeException("topic name is illegal, can't be longer than "
+                        + topicMaxNameLength + " characters");
+            }
+            if (!legalTopicNamesPattern.matcher(topic).matches()) {
+                throw new RuntimeException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '.', '_' and '-'");
+            }
+        }
+
        String brokers = m_properties.getProperty("brokers", "").trim();
         if (brokers.isEmpty()) {
             throw new RuntimeException("Missing kafka broker");
