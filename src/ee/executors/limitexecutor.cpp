@@ -84,7 +84,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
 }
 
 bool
-LimitExecutor::p_execute(const NValueArray &params)
+LimitExecutor::p_execute()
 {
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
     assert(node);
@@ -104,7 +104,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     int tuples_skipped = 0;
     int limit = -1;
     int offset = -1;
-    node->getLimitAndOffsetByReference(params, limit, offset);
+    node->getLimitAndOffsetByReference(limit, offset);
 
     while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
     {

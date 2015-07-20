@@ -77,7 +77,7 @@ public:
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
-    bool p_execute(const NValueArray &params);
+    bool p_execute();
 
     UpdatePlanNode* m_node;
 
