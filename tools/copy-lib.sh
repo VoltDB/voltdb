@@ -7,6 +7,8 @@
 # For automated builds only; harmless in a dev build but adds no value
 # so enabled only in the "test" user context
 
+# Note: this will need additional work if there are simultaneous builds on the Mac side.
+
 if [ "$USER" != "test" ]; then
     exit 0
 fi
