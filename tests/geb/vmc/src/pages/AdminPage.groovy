@@ -197,6 +197,11 @@ class AdminPage extends VoltDBManagementCenterPage {
         samestreamnameerrorpopup	{ $("#updateInnerErrorPopup")}
         samestreamnameerrorOk		{ $("#btnUpdateErrorOk", text:"Ok")}
 
+        //Admin Import
+        importbtn			{ $("#row-5 > td.configLabel > a", text:"Import")}
+        noimportconfigtxt			{ $("#importConfiguration > tr > td.configLabel")}
+
+
         // SECURITY POPUP
         securityPopup				{ $(class:"popup_content14") }
         securityPopupOk             { $("#btnSecurityOk") }

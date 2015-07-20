@@ -38,13 +38,13 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -129,7 +129,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     final SiteTaskerQueue m_scheduler;
 
     /*
-     * There is really no legit reason to touch the initiator mailbox from the site,
+     * There is really no legitimate reason to touch the initiator mailbox from the site,
      * but it turns out to be necessary at startup when restoring a snapshot. The snapshot
      * has the transaction id for the partition that it must continue from and it has to be
      * set at all replicas of the partition.
@@ -181,16 +181,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Undo token state for the corresponding EE.
     public final static long kInvalidUndoToken = -1L;
-    long latestUndoToken = 0L;
-    long latestUndoTxnId = Long.MIN_VALUE;
+    private long m_latestUndoToken = 0L;
+    private long m_latestUndoTxnId = Long.MIN_VALUE;
 
     private long getNextUndoToken(long txnId)
     {
-        if (txnId != latestUndoTxnId) {
-            latestUndoTxnId = txnId;
-            return ++latestUndoToken;
+        if (txnId != m_latestUndoTxnId) {
+            m_latestUndoTxnId = txnId;
+            return ++m_latestUndoToken;
         } else {
-            return latestUndoToken;
+            return m_latestUndoToken;
         }
     }
 
@@ -200,14 +200,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * See ENG-5242
      */
     private long getNextUndoTokenBroken() {
-        latestUndoTxnId = m_currentTxnId;
-        return ++latestUndoToken;
+        m_latestUndoTxnId = m_currentTxnId;
+        return ++m_latestUndoToken;
     }
 
     @Override
     public long getLatestUndoToken()
     {
-        return latestUndoToken;
+        return m_latestUndoToken;
     }
 
     // Advanced in complete transaction.
@@ -494,6 +494,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_partitionId,
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
+                        m_context.cluster.getDrclusterid(),
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
@@ -508,6 +509,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_partitionId,
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
+                            m_context.cluster.getDrclusterid(),
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
@@ -838,6 +840,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_spHandleForSnapshotDigest = Math.max(m_spHandleForSnapshotDigest, spHandle);
     }
 
+    /**
+     * Java level related stuffs that are also needed to roll back
+     * @param undoLog
+     * @param undo
+     */
     private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
         if (undoLog == null) return;
 
@@ -870,19 +877,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         //Any new txnid will create a new undo quantum, including the same txnid again
-        latestUndoTxnId = Long.MIN_VALUE;
+        m_latestUndoTxnId = Long.MIN_VALUE;
         //If the begin undo token is not set the txn never did any work so there is nothing to undo/release
         if (beginUndoToken == Site.kInvalidUndoToken) return;
         if (rollback) {
             m_ee.undoUndoToken(beginUndoToken);
         }
         else {
-            assert(latestUndoToken != Site.kInvalidUndoToken);
-            assert(latestUndoToken >= beginUndoToken);
-            if (latestUndoToken > beginUndoToken) {
-                m_ee.releaseUndoToken(latestUndoToken);
+            assert(m_latestUndoToken != Site.kInvalidUndoToken);
+            assert(m_latestUndoToken >= beginUndoToken);
+            if (m_latestUndoToken > beginUndoToken) {
+                m_ee.releaseUndoToken(m_latestUndoToken);
             }
         }
+
+        // java level roll back
         handleUndoLog(undoLog, rollback);
     }
 

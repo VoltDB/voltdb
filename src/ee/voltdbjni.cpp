@@ -263,6 +263,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint partitionId,
     jint hostId,
     jbyteArray hostname,
+    jint drClusterId,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
     jint compactionThreshold)
@@ -289,6 +290,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    partitionId,
                                    hostId,
                                    hostString,
+                                   drClusterId,
                                    tempTableMemory,
                                    createDrReplicatedStream,
                                    static_cast<int32_t>(compactionThreshold));

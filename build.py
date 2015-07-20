@@ -380,13 +380,14 @@ if whichtests in ("${eetestsuite}", "logging"):
 if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test
-     serializeio_test
-     undolog_test
-     valuearray_test
+     elastic_hashinator_test
      nvalue_test
      pool_test
+     serializeio_test
      tabletuple_test
-     elastic_hashinator_test
+     tupleschema_test
+     undolog_test
+     valuearray_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):

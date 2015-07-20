@@ -703,6 +703,45 @@ public class TestDRCatalogDiffs {
         assertTrue(diff.errors(), diff.supported());
     }
 
+    @Test
+    public void testActiveActiveDR() throws Exception {
+        String nodeOneSchema =
+                "SET DR=ACTIVE;\n" +
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;";
+        String nodeTwoSchema =
+                "SET DR=ACTIVE;\n" +
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;";
+        CatalogDiffEngine diff = runCatalogDiff(nodeOneSchema, nodeTwoSchema);
+        assertTrue(diff.errors(), diff.supported());
+    }
+    @Test
+    public void testActivePassiveDR() throws Exception {
+        String nodeOneSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;";
+        String nodeTwoSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;";
+        CatalogDiffEngine diff = runCatalogDiff(nodeOneSchema, nodeTwoSchema);
+        assertTrue(diff.errors(), diff.supported());
+    }
+
+    @Test
+    public void testIncompatibleDRMode() throws Exception {
+        String nodeOneSchema =
+                "SET DR=ACTIVE;\n" +
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;";
+        String nodeTwoSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;";
+        CatalogDiffEngine diff = runCatalogDiff(nodeOneSchema, nodeTwoSchema);
+        assertFalse(diff.supported());
+        assertTrue(diff.errors().contains("Incompatible DR modes between two clusters"));
+    }
+
     private CatalogDiffEngine runCatalogDiff(String masterSchema, String replicaSchema) throws Exception {
         Catalog masterCatalog = createCatalog(masterSchema);
         Catalog replicaCatalog = createCatalog(replicaSchema);
