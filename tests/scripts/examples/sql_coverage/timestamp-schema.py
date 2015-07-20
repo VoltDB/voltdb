@@ -26,6 +26,7 @@
     "P_TIMESTAMP": {
         "columns": (("PAST", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("PRESENT", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("FUTURE", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
@@ -34,6 +35,7 @@
     "R_TIMESTAMP": {
         "columns": (("PAST", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("PRESENT", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("FUTURE", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
