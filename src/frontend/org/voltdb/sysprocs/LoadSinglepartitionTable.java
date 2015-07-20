@@ -105,7 +105,8 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
             }
             if (!hasPkey) {
                 throw new VoltAbortException(
-                        String.format("LoadSinglepartitionTable in upsert mode incompatible with table %s as it lacks a primary key.",
+                        String.format("The --update argument cannot be used for LoadingSinglePartionTable because the table %s does not have a primary key. "
+                                + "Either remove the --update argument or add a primary key to the table.",
                                 tableName));
             }
         }

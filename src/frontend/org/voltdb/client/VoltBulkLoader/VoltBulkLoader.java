@@ -162,7 +162,8 @@ public class VoltBulkLoader {
             }
             if (!hasPkey) {
                 //VoltBulkLoader will exit.
-                throw new IllegalArgumentException(String.format("Upsert could not be performed on table %s of no primary key.",
+                throw new IllegalArgumentException(String.format("The --update argument cannot be used because the table %s does not have a primary key. "
+                        + "Either remove the --update argument or add a primary key to the table.",
                         tableName));
             }
         }

@@ -174,7 +174,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             }
             if (!hasPkey) {
                 throw new VoltAbortException(
-                        String.format("LoadMultipartitionTable in upsert mode incompatible with table %s as it lacks a primary key.",
+                        String.format("The --update argument cannot be used for LoadMultipartitionTable because the table %s does not have a primary key. "
+                                + "Either remove the --update argument or add a primary key to the table.",
                                 tableName));
             }
         }
