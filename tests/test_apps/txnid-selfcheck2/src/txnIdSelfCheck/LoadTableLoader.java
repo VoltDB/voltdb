@@ -278,7 +278,7 @@ public class LoadTableLoader extends BenchmarkThread {
                 byte upsertMode = (byte) (m_random.nextFloat() < upsertratio ? 1: 0);
                 byte upsertHitMode = (byte) ((upsertMode != 0) && (m_random.nextFloat() < upserthitratio) ? 1: 0);
 
-                CountDownLatch latch = new CountDownLatch(batchSize);
+                CountDownLatch latch = new CountDownLatch(batchSize + batchSize * upsertHitMode);
                 final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
 
                 // try to insert batchSize random rows
@@ -286,7 +286,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     m_table.clearRowData();
                     m_permits.acquire();
                     long p = Math.abs(r.nextLong());
-                    m_table.addRow(p, p, Calendar.getInstance().getTimeInMillis());
+                    m_table.addRow(Calendar.getInstance().getTimeInMillis() + p, p, Calendar.getInstance().getTimeInMillis());
                     boolean success = false;
                     if (!m_isMP) {
                         Object rpartitionParam
