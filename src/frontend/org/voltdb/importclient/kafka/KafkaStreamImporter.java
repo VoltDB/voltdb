@@ -723,7 +723,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                     //Make this failed offset known to seen offsets so committer can push ahead.
                                     m_seenOffset.add(messageAndOffset.nextOffset());
                                 }
-                                m_pendingOffsets.remove(messageAndOffset.nextOffset());
+                                m_pendingOffsets.remove(currentOffset);
                             }
                             m_currentOffset.set(messageAndOffset.nextOffset());
                         }
