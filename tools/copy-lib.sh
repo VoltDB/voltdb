@@ -23,7 +23,7 @@ if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb-${2}.jnilib ]
 then
     # the Mac case...
     # clean up target directory on volt0, just to be safe
-    ssh volt0 "cd lib; rm -rf obj"
+    ssh volt0 "cd libs; rm -rf obj"
 
     # now copy the new native lib over to the linux side
     tar cf - obj/release/nativelibs/ | ssh volt0 "cd libs; tar xf -"
