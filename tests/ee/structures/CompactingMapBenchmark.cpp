@@ -60,7 +60,8 @@ int64_t getMicrosNow () {
     gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000000 + tv.tv_usec;
 }
-
+#define PRINT_FREQUENCY 100
+#define WARM_UP 50
 #define MAXSCALE 10000000
 
 int VEC[MAXSCALE] = {};
@@ -123,6 +124,7 @@ public:
         m_duration = 0;
         m_count = 0;
     }
+
 private:
     int m_name;
 
@@ -131,13 +133,20 @@ private:
     int m_count;
 };
 
-void resultPrinter(std::string name, int scale, std::vector<BenchmarkRecorder*>& result) {
+void resultPrinter(std::string name, int scale,
+        BenchmarkRecorder benVoltMap, BenchmarkRecorder benStl,
+        BenchmarkRecorder benBoost, BenchmarkRecorder benVoltHash) {
     std::cout << "Benchmark: " << name << ", scale size " << scale << "\n";
 
+    std::vector<BenchmarkRecorder> result;
+    result.push_back(benVoltMap);
+    result.push_back(benStl);
+    result.push_back(benBoost);
+    result.push_back(benVoltHash);
+
     for (int i = 0; i < result.size(); i++) {
-        BenchmarkRecorder ben = *result[i];
+        BenchmarkRecorder ben = result[i];
         ben.print();
-        ben.reset();
     }
 }
 
@@ -166,8 +175,8 @@ void BenchmarkRun(
     printf("=============\n"
             "Benchmark starts with parameters as\n"
             "DATA_SCALE %d\n"
-            "SLEEP_IN_SECONDS %d"
-            "READON_OPS_REPEAT %d"
+            "SLEEP_IN_SECONDS %d\n"
+            "READON_OPS_REPEAT %d\n"
             "runScan = %s\n"
             "runScanNoEndCheck = %s\n"
             "runLookup = %s\n"
@@ -207,65 +216,59 @@ void BenchmarkRun(
     boost::unordered_multimap<int,int>::iterator iter_boost_map;
     voltdb::CompactingHashTable<int,int>::iterator iter_volt_hash;
 
-    // benchmark
-    BenchmarkRecorder benVoltMap(VoltMap);
-    BenchmarkRecorder benStl(STLMap);
-    BenchmarkRecorder benBoost(BoostUnorderedMap);
-    BenchmarkRecorder benVoltHash(VoltHash);
-
-    std::vector<BenchmarkRecorder*> result;
-    result.push_back(&benVoltMap);
-    result.push_back(&benStl);
-    result.push_back(&benBoost);
-    result.push_back(&benVoltHash);
-
     //
     // INSERT the data
     //
     printf("Preparing to run INSERT benchmark in %d seconds...\n", SLEEP_IN_SECONDS);
     sleep(SLEEP_IN_SECONDS);
 
-    if (runVoltMap) {
-        benVoltMap.start();
-        for (int i = 0; i < DATA_SCALE; i++) {
-            int val = input[i];
-            voltMap.insert(std::pair<int,int>(val, val));
+    {
+        BenchmarkRecorder benVoltMap(VoltMap), benStl(STLMap), benBoost(BoostUnorderedMap), benVoltHash(VoltHash);
+        if (runVoltMap) {
+            benVoltMap.start();
+            for (int i = 0; i < DATA_SCALE; i++) {
+                int val = input[i];
+                voltMap.insert(std::pair<int,int>(val, val));
+            }
+            benVoltMap.stop();
         }
-        benVoltMap.stop();
-    }
 
-    if (runStlMap) {
-        benStl.start();
-        for (int i = 0; i < DATA_SCALE; i++) {
-            int val = input[i];
-            stlMap.insert(std::pair<int,int>(val, val));
+        if (runStlMap) {
+            benStl.start();
+            for (int i = 0; i < DATA_SCALE; i++) {
+                int val = input[i];
+                stlMap.insert(std::pair<int,int>(val, val));
+            }
+            benStl.stop();
         }
-        benStl.stop();
-    }
 
-    if (runBoostMap) {
-        benBoost.start();
-        for (int i = 0; i < DATA_SCALE; i++) {
-            int val = input[i];
-            boostMap.insert(std::pair<int,int>(val, val));
+        if (runBoostMap) {
+            benBoost.start();
+            for (int i = 0; i < DATA_SCALE; i++) {
+                int val = input[i];
+                boostMap.insert(std::pair<int,int>(val, val));
+            }
+            benBoost.stop();
         }
-        benBoost.stop();
-    }
 
-    if (runVoltHash) {
-        benVoltHash.start();
-        for (int i = 0; i < DATA_SCALE; i++) {
-            int val = input[i];
-            voltHash.insert(val, val);
+        if (runVoltHash) {
+            benVoltHash.start();
+            for (int i = 0; i < DATA_SCALE; i++) {
+                int val = input[i];
+                voltHash.insert(val, val);
+            }
+            benVoltHash.stop();
         }
-        benVoltHash.stop();
+
+        resultPrinter("INSERT", DATA_SCALE, benVoltMap, benStl, benBoost, benVoltHash);
     }
-    resultPrinter("INSERT", DATA_SCALE, result);
 
     //
     // SCAN
     //
     if (runScan) {
+        BenchmarkRecorder benVoltMap(VoltMap), benStl(STLMap), benBoost(BoostUnorderedMap), benVoltHash(VoltHash);
+
         printf("Preparing to run SCAN benchmark in %d seconds...\n", SLEEP_IN_SECONDS);
         sleep(SLEEP_IN_SECONDS);
 
@@ -273,7 +276,13 @@ void BenchmarkRun(
         // Read only operations has a scale factor to repeat the tests
         //
         for (int i = 0; i < READON_OPS_REPEAT; i++) {
-            printf("Running SCAN benchmark for the %d time...\n", i+1);
+            // clean up
+            if (i == WARM_UP) {
+                benVoltMap.reset();
+                benStl.reset();
+                printf("Finish warm up...\n");
+            }
+
             if (runVoltMap) {
                 iter_volt_map = voltMap.begin();
                 benVoltMap.start();
@@ -292,21 +301,26 @@ void BenchmarkRun(
                 benStl.stop();
             }
         }
-        resultPrinter("SCAN", DATA_SCALE, result);
-
+        resultPrinter("SCAN", DATA_SCALE, benVoltMap, benStl, benBoost, benVoltHash);
     }
 
     //
     // SCAN WITHOUT END CHECK
     //
     if (runScanNoEndCheck) {
+        BenchmarkRecorder benVoltMap(VoltMap), benStl(STLMap), benBoost(BoostUnorderedMap), benVoltHash(VoltHash);
         printf("Preparing to run Scan benchmark without END() function call in %d seconds...\n", SLEEP_IN_SECONDS);
         sleep(SLEEP_IN_SECONDS);
 
         for (int i = 0; i < READON_OPS_REPEAT; i++) {
-            // SCAN without END() factor
-            printf("Running SCAN without END() benchmark for the %d time...\n", i+1);
+            // clean up
+            if (i == WARM_UP) {
+                benVoltMap.reset();
+                benStl.reset();
+                printf("Finish warm up...\n");
+            }
 
+            // SCAN without END() factor
             if (runVoltMap) {
                 iter_volt_map = voltMap.begin();
                 benVoltMap.start();
@@ -325,7 +339,7 @@ void BenchmarkRun(
                 benStl.stop();
             }
         }
-        resultPrinter("SCAN without END() factor", DATA_SCALE, result);
+        resultPrinter("SCAN without END() factor", DATA_SCALE, benVoltMap, benStl, benBoost, benVoltHash);
     }
 
 
@@ -333,14 +347,22 @@ void BenchmarkRun(
     // LOOKUP
     //
     if (runLookup) {
+        BenchmarkRecorder benVoltMap(VoltMap), benStl(STLMap), benBoost(BoostUnorderedMap), benVoltHash(VoltHash);
         int* keys = getRandomValues(ITERATIONS, BIGGEST_VAL);
 
         printf("Preparing to run LOOKUP benchmark in %d seconds...\n", SLEEP_IN_SECONDS);
         sleep(SLEEP_IN_SECONDS);
 
         for (int i = 0; i < READON_OPS_REPEAT; i++) {
+            // clean up
+            if (i == WARM_UP) {
+                benVoltMap.reset();
+                benStl.reset();
+                benBoost.reset();
+                benVoltHash.reset();
+                printf("Finish warm up...\n");
+            }
 
-            printf("Running LOOKUP benchmark for the %d time...\n", i+1);
             if (runVoltMap) {
                 benVoltMap.start();
                 for (int i = 0; i< ITERATIONS; i++) {
@@ -377,13 +399,14 @@ void BenchmarkRun(
                 benVoltHash.stop();
             }
         }
-        resultPrinter("LOOK UP", ITERATIONS, result);
+        resultPrinter("LOOKUP", ITERATIONS, benVoltMap, benStl, benBoost, benVoltHash);
     }
 
     //
     // DELETE
     //
     if (runDelete) {
+        BenchmarkRecorder benVoltMap(VoltMap), benStl(STLMap), benBoost(BoostUnorderedMap), benVoltHash(VoltHash);
         int* deletes = getRandomValues(ITERATIONS, BIGGEST_VAL);
         printf("Preparing to run DELETE benchmark in %d seconds...\n", SLEEP_IN_SECONDS);
         sleep(SLEEP_IN_SECONDS);
@@ -424,7 +447,7 @@ void BenchmarkRun(
             benVoltHash.stop();
         }
 
-        resultPrinter("DELETE", ITERATIONS, result);
+        resultPrinter("DELETE", ITERATIONS, benVoltMap, benStl, benBoost, benVoltHash);
     }
 
     // still holds the data before the destructor gets called
@@ -469,27 +492,29 @@ int main(int argc, char *argv[]) {
     int sleep_in_seconds = 5;
     int readon_ops_repeat = 1;
 
-    if (argc > 1 && *argv[1] == '-') {
+    if ((argc > 1 && *argv[1] == '-') || argc <= 3) {
         printf("Input parameters, first 3 required: ("
                 "data_scale, sleep_in_seconds, readon_ops_repeat"
                 "runScan, runScanNoEndCheck, runLookup, runDelete, "
                 "runVoltMap, runStlMap, runBoostMap, runVoltHash)\n");
+        return 0;
+    }
+    data_scale = std::atoi(argv[1]);
+    if (data_scale > MAXSCALE) {
+        printf("data scale larger than %d is not supported\n", MAXSCALE);
+        return 0;
     }
 
-    if (argc > 3) {
-        data_scale = std::atoi(argv[1]);
-        sleep_in_seconds = std::atoi(argv[2]);
-        readon_ops_repeat = std::atoi(argv[3]);
+    sleep_in_seconds = std::atoi(argv[2]);
+    readon_ops_repeat = std::atoi(argv[3]) + WARM_UP;
 
-        // 0 is FALSE, others are TRUE
-        for (int i = 3; i < argc; i++) {
-            params.push_back(isTrue(argv[i]));
-        }
-
-        // ONLY test with input parameters
-        BenchmarkRunWrapper(data_scale,sleep_in_seconds,readon_ops_repeat,params);
+    // 0 is FALSE, others are TRUE
+    for (int i = 3; i < argc; i++) {
+        params.push_back(isTrue(argv[i]));
     }
 
+    // ONLY test with input parameters
+    BenchmarkRunWrapper(data_scale,sleep_in_seconds,readon_ops_repeat,params);
 
     return 0;
 }
