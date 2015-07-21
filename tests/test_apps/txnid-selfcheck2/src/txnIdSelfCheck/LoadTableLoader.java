@@ -271,6 +271,7 @@ public class LoadTableLoader extends BenchmarkThread {
 
         CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
         cdtask.start();
+        long p = 0;
         try {
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
@@ -282,16 +283,11 @@ public class LoadTableLoader extends BenchmarkThread {
                 final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
 
                 // try to insert batchSize random rows
-                long p_nano = System.nanoTime();
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
                     m_permits.acquire();
-                    long p = Math.abs(r.nextLong());
-                    m_table.addRow(p_nano, p, Calendar.getInstance().getTimeInMillis());
-                    if (System.nanoTime() == p_nano) {
-                        TimeUnit.NANOSECONDS.sleep(10);
-                    }
-                    p_nano = System.nanoTime();
+                    m_table.addRow(p, p + Calendar.getInstance().getTimeInMillis(), Calendar.getInstance().getTimeInMillis());
+                    p++;
                     boolean success = false;
                     if (!m_isMP) {
                         Object rpartitionParam
