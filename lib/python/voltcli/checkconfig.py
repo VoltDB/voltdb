@@ -33,20 +33,9 @@ def check_thp_config():
     for filename in thp_filenames:
         with file(filename) as f:
             if '[always]' in f.read():
-                return "The kernel is configured to always use transparent " \
-                    "huge pages. This is not a supported configuration for " \
-                    "running VoltDB. To disable this feature, please run the " \
-                    "following:\n" \
-                    "for f in /sys/kernel/mm/*transparent_hugepage/enabled; do\n" \
-                    "    if test -f $f; then echo never > $f; fi\n" \
-                    "done\n" \
-                    "for f in /sys/kernel/mm/*transparent_hugepage/defrag; do\n" \
-                    "    if test -f $f; then echo never > $f; fi\n" \
-                    "done\n" \
-                    "As root, you may add these options to your " \
-                    "/etc/rc.local file. It is acceptable to replace 'never' " \
-                    "with 'madvise' in the above commands to allow applications " \
-                    "to opt into using transparent huge pages."
+                return "The kernel is configured to use transparent huge pages (THP). " \
+                    "This is not supported when running VoltDB. See the VoltDB Administrator's " \
+                    "Guide for instructions for disabling THP."
 
 def check_config():
     return check_thp_config()
