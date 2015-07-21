@@ -145,11 +145,9 @@ public class CappedTableLoader extends BenchmarkThread {
                     if (nextRowCount == currentRowCount) {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
-
-                    try { Thread.sleep(1000); } catch (Exception e2) {}
                     currentRowCount = nextRowCount;
-                    if (exceedsPartitionLimit()) // this test should change so the wait is not necessary.
-                        hardStop("Capped table exceeds 10 rows, this shoudln't happen and it shouldn't be tested here. Exiting. ");
+                    if (exceedsPartitionLimit() || messyStats()) // this test should change so the wait is not necessary.
+                        hardStop("Capped table exceeds 10 rows, this shoudln't happen. Exiting. ");
                 }
             }
             catch (Exception e) {
@@ -174,43 +172,55 @@ public class CappedTableLoader extends BenchmarkThread {
 
     private boolean exceedsPartitionLimit() throws NoConnectionsException, IOException, ProcCallException {
         boolean ret = false;
-        /*ClientResponse cr;
-        while (false/*part < partitions) {
-            System.out.println();
-        }*/
-        VoltTable stats = TxnId2Utils.doStatistics(client, "index", 0).getResults()[0];
-        if (cnt == 5) {
-            System.out.println(stats.toFormattedString());
-            return true; // try the index command with hard coded limit.
+        VoltTable partitions = client.callProcedure("@GetPartitionKeys", 
+                "INTEGER").getResults()[0];
+        long count = TxnId2Utils.doAdHoc(client,"SELECT COUNT(*) FROM capr;").getResults()[0].fetchRow(0).getLong(0);
+        if (count > 10) {
+            log.error("Replicated table CAPR has more rows ("+count+") than the limit set by capped collections (10)");
+            ret = true;
         }
-        cnt += 1;
-        return false;
-        /*
-        long replicated_cnt = -1;
+        while (partitions.advanceRow()) {
+            long id = partitions.getLong(0);
+            long key = partitions.getLong(1);
+            count = client.callProcedure("CAPPCountRows",key).getResults()[0].fetchRow(0).getLong(0);
+            if (count > 10) {
+                log.error("Replicated table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id);
+                ret = true;
+            }
+        }
+        if (ret)
+            log.error("See tables CAPR and CAPP for each partition, as well as above errors ::\n"+partitions.toFormattedString());
+        return ret;
+    }
+    
+    private boolean messyStats() throws NoConnectionsException, IOException, ProcCallException {
+        boolean ret = false;
+        VoltTable stats = TxnId2Utils.doStatistics(client,"table",0).getResults()[0];
+        int replicated_cnt = -1;
         while (stats.advanceRow()) {
-            long rowlim = stats.getLong(11);
-            long rowcnt = stats.getLong(7);
             String tabname = stats.getString(5);
-            long partition = stats.getLong(4);
             if (tabname.equals("CAPR") || tabname.equals("CAPP")) {// only check rows with a limit
+                int partition = (int)stats.getLong(4);
+                int rowcnt = (int)stats.getLong(7);
+                int rowlim = (int)stats.getLong(11);
                 if (tabname.equals("CAPR")) {
                     if (replicated_cnt == -1)
                         replicated_cnt = rowcnt+1000*partition;
                     else {
                         if (replicated_cnt%1000 != rowcnt) {
-                            log.error("CAPR on Partition:"+partition+" has TUPLE_COUNT:"+rowcnt+", which does not match Partition:"+(replicated_cnt/1000)+" with CAPR.TUPLE_COUNT:"+replicated_cnt%1000);
-                            ret = true;
+                            log.error("@Statistics reported that CAPR on Partition:"+partition+" has TUPLE_COUNT:"+rowcnt+", which does not match Partition:"+(replicated_cnt/1000)+" with CAPR.TUPLE_COUNT:"+replicated_cnt%1000);
+                            //ret = true;
                         }
                     }
                 }
                 if (rowcnt > rowlim) {
                     log.error("Table "+tabname+" on partition "+partition+" has TUPLE_COUNT:"+rowcnt+" > TUPLE_LIMIT:"+rowlim);
-                    //ret = true;
+                    ret = true;
                 }
             }
         }
         if (ret)
-            log.error("See tables CAPR and CAPP for each partition, as well as above errors ::\n"+stats.toFormattedString());
-        return ret;*/
+            log.info(stats.toFormattedString());
+        return ret;
     }
 }
