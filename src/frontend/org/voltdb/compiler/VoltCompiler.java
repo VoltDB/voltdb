@@ -165,6 +165,11 @@ public class VoltCompiler {
 
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
 
+    /// Set this to true to automatically retry a failed attempt to round-trip
+    /// a rebuild of a catalog for its canonical ddl. This gives a chance to
+    /// set breakpoints and step through only the failure cases.
+    public static boolean RETRY_FAILED_CATALOG_REBUILD_UNDER_DEBUG = false;
+
     /**
      * Represents output from a compile. This works similarly to Log4j; there
      * are different levels of feedback including info, warning, error, and
@@ -516,9 +521,21 @@ public class VoltCompiler {
         autoGenCompiler.m_currentFilename = AUTOGEN_DDL_FILE_NAME;
         Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase, null, null,
                 autogenReaderList, autoGenJarOutput);
-        FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
+        FilteredCatalogDiffEngine diffEng =
+                new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog, false);
         String diffCmds = diffEng.commands();
         if (diffCmds != null && !diffCmds.equals("")) {
+            if (RETRY_FAILED_CATALOG_REBUILD_UNDER_DEBUG) {
+                // Take two steps back to retry and debug the catalog rebuild
+                // that generated an unintended change.
+                // With the flag set, this becomes a good place for an initial
+                // breakpoint to debug the rebuild.
+                autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase, null, null,
+                        autogenReaderList, autoGenJarOutput);
+            }
+            // Re-run diff more verbosely as a pre-crash test diagnostic.
+            diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog, true);
+            diffCmds = diffEng.commands();
             VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed! " +
                     "The offending diffcmds were: " + diffCmds);
         }
