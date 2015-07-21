@@ -1653,11 +1653,19 @@ public class DDLCompiler {
                         String msg = String.format("Index %s with subquery expression(s) is not supported.", name);
                         throw this.m_compiler.new VoltCompilerException(msg);
                     }
+                    // The expr cannot contain time sensitive function calls.
+                    // This seems to mean exactly that the expr cannot contain calls
+                    // to the function voltGetCurrentTimestampId.
                     if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
                         String msg = String.format("Index %s cannot include the function NOW or CURRENT_TIMESTAMP.", name);
                         throw this.m_compiler.new VoltCompilerException(msg);
                     }
-
+                    // The expr cannot contain calls to aggregate expressions.
+                    if (!expr.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
+                        String msg = String.format("Index %s with aggregate expression(s) is not supported.",
+                                                   name);
+                        throw m_compiler.new VoltCompilerException(msg);
+                    }
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
                     exprs.add(expr);

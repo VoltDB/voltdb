@@ -4060,6 +4060,29 @@ public class TestVoltCompiler extends TestCase {
         checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal",
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < parent.title ) );");
     }
+
+    public void testAggregateExpressionsInIndices() throws Exception {
+        String ddl = "create table alpha (id integer not null, seqnum float);";
+        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, avg(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, max(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, min(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, count(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, count(*));");
+        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, sum(id));");
+    }
+
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;
         for (String string : diagnostics) {
