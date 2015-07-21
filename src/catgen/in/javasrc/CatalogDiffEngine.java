@@ -21,6 +21,7 @@
 
 package org.voltdb.catalog;
 
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -36,6 +37,7 @@ import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 
 public class CatalogDiffEngine {
 
@@ -91,8 +93,12 @@ public class CatalogDiffEngine {
      * @param prev Tip of the old catalog.
      * @param next Tip of the new catalog.
      */
-    public CatalogDiffEngine(final Catalog prev, final Catalog next) {
+    public CatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose) {
         m_supported = true;
+        if (forceVerbose) {
+            m_triggeredVerbosity = true;
+            m_triggerForVerbosity = "always on";
+        }
 
         // store the complete set of old and new indexes so some extra checking can be done with
         // constraints and new/updated unique indexes
@@ -119,6 +125,10 @@ public class CatalogDiffEngine {
                                ( m_supported ? " <none>" : "\n" + errors()));
             System.out.println("DEBUG VERBOSE diffRecursively Commands: " + commands());
         }
+    }
+
+    public CatalogDiffEngine(Catalog prev, Catalog next) {
+        this(prev, next, false);
     }
 
     public String commands() {
@@ -1140,6 +1150,18 @@ public class CatalogDiffEngine {
                             System.out.println("DEBUG VERBOSE diffRecursively found a scalar change to '" + field + "':");
                             System.out.println("DEBUG VERBOSE diffRecursively prev:" + prevValue);
                             System.out.println("DEBUG VERBOSE diffRecursively new :" + newValue);
+                            if (field.equals("plannodetree")) {
+                                try {
+                                    System.out.println("DEBUG VERBOSE where prev plannodetree expands to: " +
+                                            new String(Encoder.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
+                                }
+                                catch (UnsupportedEncodingException e) {}
+                                try {
+                                    System.out.println("DEBUG VERBOSE and new plannodetree expands to: " +
+                                            new String(Encoder.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
+                                }
+                                catch (UnsupportedEncodingException e) {}
+                            }
                         }
                         writeModification(newType, prevType, field);
                     }
