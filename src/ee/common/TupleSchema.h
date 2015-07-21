@@ -146,6 +146,17 @@ public:
      * column info array. */
     uint16_t getUninlinedObjectColumnInfoIndex(const int objectColumnIndex) const;
 
+    /** Returns the number of variable-length hidden columns that are too long
+     * to be inlined into tuple storage.
+     *
+     * For now this will always return 0, as uninlined hidden columns are not yet
+     * supported.  This method exists for debug assertions and to call out places
+     * where we'd need to make changes should we ever support this.
+     */
+    uint16_t getUninlinedObjectHiddenColumnCount() const {
+        return m_uninlinedObjectHiddenColumnCount;
+    }
+
     /** Returns true if other TupleSchema is equal to this one.  Both
      *  visible and hidden columns must match for schemas to be
      *  equal. */
@@ -174,6 +185,15 @@ public:
     /** Returns column info object for columnIndex-th hidden column.  */
     const ColumnInfo* getHiddenColumnInfo(int columnIndex) const;
     ColumnInfo* getHiddenColumnInfo(int columnIndex);
+
+    /** Returns the offset of the first hidden column in the tuple.
+     * In debug builds, asserts if there are no hidden columns. */
+    size_t offsetOfHiddenColumns() const;
+
+    /** Returns the length of all the hidden columns in the tuple, so
+     * that hidden columns can be memcpy'd from one tuple to another.
+     * In debug builds, asserts if there are no hidden columns. */
+    size_t lengthOfAllHiddenColumns() const;
 
 private:
 
@@ -220,6 +240,7 @@ private:
     // number of hidden columns
     // currently unlined values in hidden columns are not possible
     uint16_t m_hiddenColumnCount;
+    static const uint16_t m_uninlinedObjectHiddenColumnCount = 0;
 
     /*
      * Data storage for:
@@ -264,6 +285,17 @@ inline uint32_t TupleSchema::tupleLength() const {
     // index "m_columnCount - 1" has the offset for the last visible column
     return getColumnInfoPrivate(totalColumnCount())->offset;
 }
+
+inline size_t TupleSchema::offsetOfHiddenColumns() const {
+    assert (hiddenColumnCount() > 0);
+    return getColumnInfoPrivate(columnCount())->offset;
+}
+
+inline size_t TupleSchema::lengthOfAllHiddenColumns() const {
+    assert (hiddenColumnCount() > 0);
+    return tupleLength() - offsetOfHiddenColumns();
+}
+
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnIndex) const {
     return &reinterpret_cast<const ColumnInfo*>(m_data + (sizeof(uint16_t) * m_uninlinedObjectColumnCount))[columnIndex];

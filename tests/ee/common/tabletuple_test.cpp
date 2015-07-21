@@ -25,6 +25,8 @@
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
 #include "common/ThreadLocalPool.h"
+#include "common/TupleSchemaBuilder.h"
+#include "test_utils/ScopedTupleSchema.hpp"
 
 using namespace voltdb;
 using namespace std;
@@ -84,6 +86,37 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     delete[] non_inline_tuple.address();
     non_inline_string.free();
     TupleSchema::freeTupleSchema(non_inline_schema);
+}
+
+TEST_F(TableTupleTest, HiddenColumns)
+{
+    TupleSchemaBuilder builder(2, 2);
+    builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
+    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 256);
+    builder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
+    builder.setHiddenColumnAtIndex(1, VALUE_TYPE_VARCHAR, 10);
+    ScopedTupleSchema schema(builder.build());
+
+    StandAloneTupleStorage autoStorage(schema.get());
+    const TableTuple& tuple = autoStorage.tuple();
+
+    NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
+    NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
+    NValue nvalHiddenBigint = ValueFactory::getBigIntValue(1066);
+    NValue nvalHiddenString = ValueFactory::getStringValue("platypus");
+
+    tuple.setNValue(0, nvalVisibleBigint);
+    tuple.setNValue(1, nvalVisibleString);
+    tuple.setHiddenNValue(0, nvalHiddenBigint);
+    tuple.setHiddenNValue(1, nvalHiddenString);
+
+    EXPECT_EQ(0, tuple.getNValue(0).compare(nvalVisibleBigint));
+    EXPECT_EQ(0, tuple.getNValue(1).compare(nvalVisibleString));
+    EXPECT_EQ(0, tuple.getHiddenNValue(0).compare(nvalHiddenBigint));
+    EXPECT_EQ(0, tuple.getHiddenNValue(1).compare(nvalHiddenString));
+
+    nvalVisibleString.free();
+    nvalHiddenString.free();
 }
 
 int main() {
