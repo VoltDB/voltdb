@@ -17,10 +17,18 @@
 
 package org.voltdb;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.UUID;
+import static org.voltcore.common.Constants.VOLT_TMP_DIR;
+
 import org.voltcore.logging.VoltLogger;
 
 public class EELibraryLoader {
 
+    public static final String USE_JAVA_LIBRARY_PATH = "use.javalib";
     private static boolean voltSharedLibraryLoaded = false;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -56,7 +64,12 @@ public class EELibraryLoader {
                     assert(versionString != null);
                     final String libname = "voltdb-" + versionString;
                     hostLog.info("Loading native VoltDB code ("+libname+"). A confirmation message will follow if the loading is successful.");
-                    System.loadLibrary(libname);
+                    if (Boolean.getBoolean(USE_JAVA_LIBRARY_PATH)) {
+                        System.loadLibrary(libname);
+                    } else {
+                        File libFile = getNativeLibraryFile(libname);
+                        System.load(libFile.getAbsolutePath());
+                    }
                     voltSharedLibraryLoaded = true;
                     hostLog.info("Successfully loaded native VoltDB library " + libname + ".");
                 } catch (Throwable e) {
@@ -80,5 +93,92 @@ public class EELibraryLoader {
             }
         }
         return voltSharedLibraryLoaded;
+    }
+
+    /*
+     * Returns the native library file copied into a readable location.
+     */
+    private static File getNativeLibraryFile(String libname) {
+
+        // for now, arch is always x86_64
+        String pathFormat = "/org/voltdb/native/%s/x86_64";
+        String libPath = null;
+        if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+            libPath = String.format(pathFormat, "Mac");
+        } else {
+            libPath = String.format(pathFormat, "Linux");
+        }
+
+        String libFileName = System.mapLibraryName(libname);
+        if (EELibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
+            // mapLibraryName does not give us the correct name on mac sometimes
+            if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+                libFileName = "lib" + libname + ".jnilib";
+            }
+            if (EELibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
+                String msg = "Could not find library resource using path: " + libPath + "/" + libFileName;
+                hostLog.warn(msg);
+                throw new RuntimeException(msg);
+            }
+        }
+
+        File tmpFilePath = new File(System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir")));
+        try {
+            return loadLibraryFile(libPath, libFileName, tmpFilePath.getAbsolutePath());
+        } catch(IOException e) {
+            hostLog.error("Error loading Volt library file from jar", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static File loadLibraryFile(String libFolder, String libFileName, String tmpFolder) throws IOException {
+        hostLog.debug("Loading library from jar using path=" + libFolder + "/" + libFileName);
+
+        // Using UUID as in Snappy, but we probably don't need it?
+        String uuid = UUID.randomUUID().toString();
+        String extractedLibFileName = String.format("voltdb-%s-%s", uuid, libFileName);
+        File extractedLibFile = new File(tmpFolder, extractedLibFileName);
+
+        String libPath = libFolder + "/" + libFileName;
+        // Extract a native library file into the target directory
+        InputStream reader = null;
+        FileOutputStream writer = null;
+        try {
+            reader = EELibraryLoader.class.getResourceAsStream(libPath);
+            try {
+                writer = new FileOutputStream(extractedLibFile);
+
+                byte[] buffer = new byte[8192];
+                int bytesRead = 0;
+                while ((bytesRead = reader.read(buffer)) != -1) {
+                    writer.write(buffer, 0, bytesRead);
+                }
+            }
+            finally {
+                if (writer != null) {
+                    writer.close();
+                }
+            }
+        }
+        finally {
+            if (reader != null) {
+                reader.close();
+            }
+
+            // Delete the extracted lib file on JVM exit.
+            extractedLibFile.deleteOnExit();
+        }
+
+        // Set executable (x) flag to enable Java to load the native library
+        boolean success = extractedLibFile.setReadable(true) &&
+                extractedLibFile.setWritable(true, true) &&
+                extractedLibFile.setExecutable(true);
+        if (!success) {
+            String msg = "Could not update extracted lib file " + extractedLibFile + " to be rwx";
+            hostLog.warn(msg);
+            throw new RuntimeException(msg);
+        }
+
+        return new File(tmpFolder, extractedLibFileName);
     }
 }

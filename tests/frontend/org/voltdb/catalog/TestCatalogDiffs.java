@@ -845,8 +845,8 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         builder.addLiteralSchema("\nEXPORT TABLE A;");
-        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2");
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2.jar");
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
 
         builder = new VoltProjectBuilder();
@@ -865,8 +865,8 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("B", "C1");
         builder.addLiteralSchema("\nEXPORT TABLE B;");
-        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2");
-        catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2.jar");
+        catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2.jar");
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
@@ -1209,6 +1209,24 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
 
         builder.addLiteralSchema("\nDR TABLE A;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
+
+    public void testSetDRActiveActiveOnEmptyTable() throws IOException {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;" +
+                                 "\nDR TABLE A;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nSET " + DatabaseConfiguration.DR_MODE_NAME +
+                                 "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
         verifyDiffIfEmptyTable(catOriginal, catUpdated);

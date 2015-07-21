@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import java.io.IOException;
 import java.util.Map;
 
 public interface ProducerDRGateway {
@@ -30,21 +29,12 @@ public interface ProducerDRGateway {
     /**
      * Start listening on the ports
      */
-    public abstract void bindPorts(boolean drProducerEnabled, int listenPort, String portInterface);
+    public abstract void initialize(boolean drProducerEnabled, int listenPort, String portInterface);
 
     /**
      * @return true if bindPorts has been called.
      */
     public abstract boolean isStarted();
-
-    /**
-     * Called by an EE to make the buffer server is aware it's going to be
-     * handling buffers from a specific partition.
-     * Call this at startup before sending buffers.
-     * @param partitionId id of the initializing partition.
-     * @throws IOException
-     */
-    public abstract void initForSite(int partitionId) throws IOException;
 
     /**
      * @param ib This is really the invocation buffer
@@ -70,4 +60,9 @@ public interface ProducerDRGateway {
     public abstract int getDRClusterId();
 
     public void truncateDRLogsForRestore(Map<Integer, Long> sequenceNumbers);
+
+    /**
+     * Clear all queued DR buffers for a master, useful when the replica goes away
+     */
+    public void resetDRProducer();
 }

@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.BackendTarget;
@@ -503,23 +504,37 @@ public class TestSQLTypesSuite extends RegressionSuite {
     public void testPassingDateAndTimeObjectsBeforeEpochToStatements() throws Exception {
         final Client client = this.getClient();
 
-        long microsecondsSinceEpoch = -1001003050L;
-        TimestampType tst_micro = new TimestampType(microsecondsSinceEpoch);
+        Random rn = new Random();
 
-        // Add 1 more millis from epoch
-        java.sql.Timestamp ts_micro = VoltTypeUtil.getSqlTimestampFromMicrosSinceEpoch(microsecondsSinceEpoch);
+        for (int i = 0; i < 100; ++i) {
+            long ts = rn.nextLong();
+            long[] timestampValues = {
+                    ts, // random
+                    ts / 1000 * 1000, // even milliseconds
+                    ts / 1000000 * 1000000, // even seconds
+                    ts / 1000000 * -1000000 // even seconds
+            };
 
-        client.callProcedure("Insert", "ALLOW_NULLS", 0, 0, 0, 0, 0,
-                             null, tst_micro, null,
-                             null, null, null, null, null, null);
+            for (long microsecondsSinceEpoch: timestampValues) {
+                TimestampType tst_micro = new TimestampType(microsecondsSinceEpoch);
 
-        VoltTable vt;
-        vt = client.callProcedure("@AdHoc", "Select A_TIMESTAMP from allow_nulls where pkey = 0").getResults()[0];
-        assertTrue(vt.advanceRow());
-        assertEquals(microsecondsSinceEpoch, vt.getTimestampAsLong(0));
-        assertEquals(tst_micro, vt.getTimestampAsTimestamp(0));
-        assertEquals(ts_micro, vt.getTimestampAsSqlTimestamp(0));
+                // Add 1 more millis from epoch
+                java.sql.Timestamp ts_micro = VoltTypeUtil.getSqlTimestampFromMicrosSinceEpoch(microsecondsSinceEpoch);
 
+                client.callProcedure("Insert", "ALLOW_NULLS", 0, 0, 0, 0, 0,
+                                     null, tst_micro, null,
+                                     null, null, null, null, null, null);
+
+                VoltTable vt;
+                vt = client.callProcedure("@AdHoc", "Select A_TIMESTAMP from allow_nulls where pkey = 0").getResults()[0];
+                assertTrue(vt.advanceRow());
+                assertEquals(microsecondsSinceEpoch, vt.getTimestampAsLong(0));
+                assertEquals(tst_micro, vt.getTimestampAsTimestamp(0));
+                assertEquals(ts_micro, vt.getTimestampAsSqlTimestamp(0));
+
+                client.callProcedure("@AdHoc", "truncate table allow_nulls;");
+            }
+        }
     }
 
     // ENG-1276

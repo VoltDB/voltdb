@@ -34,6 +34,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses. It calls
@@ -41,7 +42,7 @@ import org.voltdb.catalog.Procedure;
  */
 public class ImportClientResponseAdapter implements Connection, WriteStream {
     public static interface Callback {
-        public void handleResponse(ClientResponse response);
+        public void handleResponse(ClientResponse response) throws Exception;
     }
 
     private final long m_connectionId;
@@ -53,8 +54,11 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
         private DBBPool.BBContainer m_cont;
         private long m_id;
-        public ImportCallback(final DBBPool.BBContainer cont) {
+        private final ProcedureCallback m_cb;
+
+        public ImportCallback(final DBBPool.BBContainer cont, ProcedureCallback cb) {
             m_cont = cont;
+            m_cb = cb;
         }
 
         public void setId(long id) {
@@ -69,9 +73,12 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         }
 
         @Override
-        public void handleResponse(ClientResponse response) {
+        public void handleResponse(ClientResponse response) throws Exception {
             discard();
             m_pendingCallbacks.remove(m_id);
+            if (m_cb != null) {
+                m_cb.clientCallback(response);
+            }
         }
 
     }
@@ -80,9 +87,9 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         return m_pendingCallbacks.size();
     }
 
-    public boolean createTransaction(Procedure catProc, StoredProcedureInvocation task,
+    public boolean createTransaction(Procedure catProc, ProcedureCallback proccb, StoredProcedureInvocation task,
             DBBPool.BBContainer tcont, int partition, long nowNanos) {
-            ImportCallback cb = new ImportCallback(tcont);
+            ImportCallback cb = new ImportCallback(tcont, proccb);
             long cbhandle = registerCallback(cb);
             cb.setId(cbhandle);
             task.setClientHandle(cbhandle);
@@ -147,7 +154,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                 callback.handleResponse(resp);
             }
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             throw new RuntimeException("Unable to deserialize ClientResponse in ImportClientResponseAdapter", e);
         }

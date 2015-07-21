@@ -35,6 +35,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -49,6 +50,7 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -109,6 +111,7 @@ import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
@@ -134,7 +137,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.text.SimpleDateFormat;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -169,9 +171,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.4EA1";
+    static final String m_defaultVersionString = "5.4";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.4EA1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.4\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -199,7 +201,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     boolean m_jsonEnabled;
 
     // IV2 things
-    List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
+    TreeMap<Integer, Initiator> m_iv2Initiators = new TreeMap<Integer, Initiator>();
     Cartographer m_cartographer = null;
     LeaderAppointer m_leaderAppointer = null;
     GlobalServiceElector m_globalServiceElector = null;
@@ -606,15 +608,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 // Pass the local HSIds to the MPI so it can farm out buddy sites
                 // to the RO MP site pool
                 List<Long> localHSIds = new ArrayList<Long>();
-                for (Initiator ii : m_iv2Initiators) {
+                for (Initiator ii : m_iv2Initiators.values()) {
                     localHSIds.add(ii.getInitiatorHSId());
                 }
                 m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
-                m_iv2Initiators.add(m_MPI);
+                m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
 
                 // Make a list of HDIds to join
                 Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<Integer, Long>();
-                for (Initiator init : m_iv2Initiators) {
+                for (Initiator init : m_iv2Initiators.values()) {
                     if (init.isRejoinable()) {
                         partsToHSIdsToRejoin.put(init.getPartitionId(), init.getInitiatorHSId());
                     }
@@ -813,7 +815,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             try {
                 final String serializedCatalog = m_catalogContext.catalog.serialize();
                 boolean createMpDRGateway = true;
-                for (Initiator iv2init : m_iv2Initiators) {
+                for (Initiator iv2init : m_iv2Initiators.values()) {
                     iv2init.configure(
                             getBackendTargetType(),
                             m_catalogContext,
@@ -1240,16 +1242,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return topo;
     }
 
-    private List<Initiator> createIv2Initiators(Collection<Integer> partitions,
+    private TreeMap<Integer, Initiator> createIv2Initiators(Collection<Integer> partitions,
                                                 StartAction startAction,
                                                 List<Integer> m_partitionsToSitesAtStartupForExportInit)
     {
-        List<Initiator> initiators = new ArrayList<Initiator>();
+        TreeMap<Integer, Initiator> initiators = new TreeMap<Integer, Initiator>();
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
                     m_snapshotCompletionMonitor, startAction);
-            initiators.add(initiator);
+            initiators.put(partition, initiator);
             m_partitionsToSitesAtStartupForExportInit.add(partition);
         }
         return initiators;
@@ -1976,7 +1978,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
                 // tell the iv2 sites to stop their runloop
                 if (m_iv2Initiators != null) {
-                    for (Initiator init : m_iv2Initiators)
+                    for (Initiator init : m_iv2Initiators.values())
                         init.shutdown();
                 }
 
@@ -2535,7 +2537,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
          * IV2: After the command log is initialized, force the writing of the initial
          * viable replay set.  Turns into a no-op with no command log, on the non-leader sites, and on the MPI.
          */
-        for (Initiator initiator : m_iv2Initiators) {
+        for (Initiator initiator : m_iv2Initiators.values()) {
             initiator.enableWritingIv2FaultLog();
         }
 
@@ -2560,6 +2562,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // Start listening on the DR ports
             prepareReplication();
+
+            //Tell import processors that they can start ingesting data.
+            ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+
         }
 
         try {
@@ -2570,9 +2576,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
             VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
-
-        //Tell import processors that they can start ingesting data.
-        ImportManager.instance().readyForData(m_catalogContext, m_messenger);
 
         if (m_startMode != null) {
             m_mode = m_startMode;
@@ -2651,7 +2654,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private void prepareReplication() {
         try {
             if (m_producerDRGateway != null) {
-                m_producerDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled(),
+                m_producerDRGateway.initialize(m_catalogContext.cluster.getDrproducerenabled(),
                         VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
                         VoltDB.getDefaultReplicationInterface());
             }
@@ -2713,6 +2716,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Override
     public void onSyncSnapshotCompletion() {
         m_leaderAppointer.onSyncSnapshotCompletion();
+    }
+
+    @Override
+    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
+        if (partition == MpInitiator.MP_INIT_PID) {
+            m_iv2Initiators.get(m_iv2Initiators.firstKey()).setDurableUniqueIdListener(listener);
+        }
+        else {
+            Initiator init = m_iv2Initiators.get(partition);
+            assert init != null;
+            init.setDurableUniqueIdListener(listener);
+        }
     }
 
     @Override

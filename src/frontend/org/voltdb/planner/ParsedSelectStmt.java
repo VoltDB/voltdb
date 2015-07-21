@@ -691,16 +691,34 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseDisplayColumn(VoltXMLElement child, boolean isDistributed) {
         ParsedColInfo col = new ParsedColInfo();
         m_aggregationList.clear();
-        AbstractExpression colExpr = parseExpressionTree(child);;
+        AbstractExpression colExpr = parseExpressionTree(child);
         if (colExpr instanceof ConstantValueExpression) {
             assert(colExpr.getValueType() != VoltType.NUMERIC);
         }
         assert(colExpr != null);
+
         if (isDistributed) {
             colExpr = colExpr.replaceAVG();
             updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(colExpr);
+
+        // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
+        if(isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
+            AbstractExpression expr = new OperatorExpression();;
+            expr.setExpressionType(ExpressionType.OPERATOR_CAST);
+            VoltType voltType = colExpr.getValueType();
+            expr.setValueType(voltType);
+            expr.setInBytes(colExpr.getInBytes());
+
+            // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
+            // so assume max length for variable-length types (VARCHAR and VARBINARY).
+            expr.setValueSize(expr.getInBytes() ? voltType.getMaxLengthInBytes() : VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS);
+            expr.setLeft(colExpr);
+
+            // switch the new expression for CAST
+            colExpr = expr;
+        }
 
         if (child.name.equals("columnref")) {
             col.expression = colExpr;
@@ -877,7 +895,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseHavingExpression(VoltXMLElement havingNode, boolean isDistributed) {
         m_aggregationList.clear();
         assert(havingNode.children.size() == 1);
-        m_having = parseExpressionTree(havingNode.children.get(0));
+        m_having = parseConditionTree(havingNode.children.get(0));
         assert(m_having != null);
         if (! m_having.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
             throw new PlanningErrorException(
@@ -1156,35 +1174,32 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Verify the edge case of EXISTS ( table-agg-without-having-groupby) for which
         // the correct handling is to optimize out the exists clause entirely as trivially true or
         // false if limit = 0 or offset > 0
-        // Can't optimize away the entire expression with limit and/or offset parameters
-        boolean canReplaceWithCVE = (m_having == null && m_groupByColumns.isEmpty() && !hasLimitOrOffsetParameters()) ||
-                m_limitOffset.getLimit() == 0;
-        if (canReplaceWithCVE) {
-            if ( m_limitOffset.getLimit() == 0) {
+        if (m_limitOffset.getLimit() == 0) {
+            return ConstantValueExpression.getFalse();
+        }
+        // Except for "limit 0 offset ?" which is already covered,
+        // can't optimize away the entire expression if there are limit and/or offset parameters
+        if (m_having == null &&
+                m_groupByColumns.isEmpty() &&
+                ! hasLimitOrOffsetParameters() &&
+                displaysAgg()) {
+            if (m_limitOffset.getOffset() == 0) {
+                return ConstantValueExpression.getTrue();
+            } else {
                 return ConstantValueExpression.getFalse();
-            }
-            for(ParsedColInfo displayColumn : m_displayColumns) {
-                assert(displayColumn.expression != null);
-                if (displayColumn.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    if (m_limitOffset.getOffset() == 0) {
-                        return ConstantValueExpression.getTrue();
-                    } else {
-                        return ConstantValueExpression.getFalse();
-                    }
-                }
             }
         }
 
         // Remove ORDER BY columns
         m_orderColumns.clear();
 
-        // Can drop GROUP BY expressions if there are no HAVING/OFFEST expressions
+        // Can drop GROUP BY expressions if there are no HAVING/OFFSET expressions
         if (m_having == null && !hasOffset()) {
             m_groupByColumns.clear();
             m_groupByExpressions.clear();
         }
 
-        // Remove  all non-aggregate display columns if GROUP BY is empty
+        // Remove all non-aggregate display columns if GROUP BY is empty
         if (m_groupByColumns.isEmpty()) {
             Iterator<ParsedColInfo >iter = m_displayColumns.iterator();
             while(iter.hasNext()) {
@@ -1195,7 +1210,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
 
-        // If  m_displayColumns is empty from the previous step
+        // If m_displayColumns is empty from the previous step
         // add a single dummy column
         if (m_displayColumns.isEmpty()) {
             ParsedColInfo col = new ParsedColInfo();

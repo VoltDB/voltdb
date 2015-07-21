@@ -88,7 +88,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring,
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica {
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
@@ -483,7 +483,11 @@ ul.topRightList {
     max-width: 600px;
     overflow: auto;
 }
-.helpAboutWrap { overflow: auto;height: 380px;}
+
+.helpAboutWrap {
+    overflow: auto;
+    height: 380px;
+}
 
 .line {
     border-right: 1px solid #AAAAAA;
@@ -779,6 +783,7 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
     float: left;
     width: 100%;
     background: #fff;
+    overflow: auto;
 }
 
 .tab_content {
@@ -905,11 +910,11 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
 }
 
 .icon-procedures {
-    background-position: left -986px;
+    background-position: left -988px;
 }
 
 .icon-tables {
-    background-position: left -1043px;
+    background-position: left -1046px;
 }
 
 input.search-box {
@@ -1295,7 +1300,10 @@ ul.catalogNav {
 #tblSystemOverview tr:first-child td {
     border-top: none;
 }
-tr.trLicenseInfo td { border: none !important;}
+
+tr.trLicenseInfo td {
+    border: none !important;
+}
 
 
 .sysOverviewContent {
@@ -2227,7 +2235,7 @@ ul.adminClusterList li a.stop {
 
 ul.adminClusterList li a.shutdown {
     display: inline-block;
-    background-position: -786px -56px;
+    background-position: -965px -56px;
     width: 40px;
     height: 36px;
 }
@@ -2667,7 +2675,7 @@ input.exitableFilePrefix {
 
         .tblshutdown tr td a.shutdown {
             display: inline-block;
-            background-position: -786px -105px;
+            background-position: -166px -105px;
             width: 40px;
             height: 36px;
             line-height: 39px;
@@ -2675,7 +2683,7 @@ input.exitableFilePrefix {
 
         .tblshutdown tr td a.disableServer {
             display: inline-block;
-            background-position: -978px -150px;
+            background-position: -359px -150px;
             width: 40px;
             height: 36px;
             line-height: 39px;
@@ -2957,7 +2965,7 @@ a.restoreBtn {
 }
 
 .securityDelete {
-    background-position: -1042px -12px;
+    background-position: -1221px -12px;
     width: 25px;
     height: 20px;
     position: relative;
@@ -3200,6 +3208,7 @@ table.tblPopup {
 }
 
 /****DR *******/
+
 .drWrapper {
     margin: 20px 0 0 0;
 }
@@ -3211,6 +3220,22 @@ table.tblPopup {
 .drShowHide {
     background: #FFFFFF;
     padding: 20px;
+}
+
+.clpShowHide {
+    background: #FFFFFF;
+    padding: 20px;
+}
+
+.clpWrapper {
+    margin: 20px 0 0 0;
+}
+ .clpWrapper .content {
+        margin-bottom: 2px;
+    }
+
+ .dr {
+  padding: 4px 0 8px 0;
 }
 
 .masterWrapper {
@@ -3293,6 +3318,10 @@ tr.drSubSection td {
 
 .icon-replica {
     background-position: left -1653px;
+}
+
+.icon-command {
+    background-position: left -1701px;
 }
 
 .warningDr {
@@ -3408,6 +3437,20 @@ a:hover.changePsd {
             padding: 0;
             float: left;
         }
+.cmdLogLegend {
+    margin: 0 0 0 90px;
+}
+
+    .cmdLogLegend ul {
+        margin: 0 0 0 10px;
+        padding: 0;
+    }
+
+        .cmdLogLegend ul li {
+            margin: 0 10px;
+            padding: 0;
+            float: left;
+        }
 
 .dotGray {
     background-color: #D3D3D3;
@@ -3449,6 +3492,27 @@ a:hover.changePsd {
     right: 14px;
 }
 
+.dotRed {
+    background-color: #FEACAC;
+    border-radius: 50%;
+    height: 12px;
+    position: relative;
+    top: 11px;
+    width: 12px;
+    right: 14px;
+}
+
+.dotLightBlue {
+    background-color: #4D9ECF;
+    border-radius: 50%;
+    height: 12px;
+    position: relative;
+    top: 11px;
+    width: 12px;
+    right: 14px;
+
+}
+
 .partitionHeight {
     width: 90%;
     height: 358px;
@@ -3458,9 +3522,35 @@ a:hover.changePsd {
     width: 90%;
     height: 0px;
 }
+.logHeight {
+       width: 90%;
+    height: 364px;
+}
+
+
 
 /*********************************************media Qu********************/
 
+@media (max-width: 300px) {
+    ul.topRightList li {
+        padding:12px 0 0 2px;
+    }
+    .refreshBtn{ margin-bottom: 10px;}
+    .slimScrollDiv {
+            margin-top: 70px;
+        }
+            .menuHome { display: none;}
+
+        ul.tabs li {
+            float: none;
+        }
+        .tabScroller { margin-top:30px}
+}
+@media (max-width: 320px) {
+    ul.topRightList li {
+        padding:12px 0 0 2px;
+    }
+}
 @media (max-width: 360px) {
     .headerAdminContent {
         height: 65px;
@@ -3545,6 +3635,7 @@ a:hover.changePsd {
 }
 
 @media (max-width: 699px) {
+    .logHeight {height: 364px;}
 
     ul.topRightList li.responsiveMenuPlaceHolder {
         display: block;
@@ -3867,6 +3958,9 @@ a:hover.changePsd {
         height: 350px;
         margin-top: 30px;
     }
+    .logHeight {
+        height: 364px;
+    }
 }
 
 @media (min-width: 320px) and (max-width: 479px) {
@@ -3880,6 +3974,10 @@ a:hover.changePsd {
     .partitionHeight {
         height: 300px;
         margin-top: 30px;
+    }
+    .logHeight {
+        height: 330px;
+
     }
 
 
@@ -4064,6 +4162,7 @@ a:hover.changePsd {
 }
 
 @media (width: 320px) {
+    
 
     input.icon-search {
         width: 182px;
@@ -4099,10 +4198,33 @@ a:hover.changePsd {
     }
 }
 
+
 @media (min-width: 300px) and (max-width:438px) {
     .partitionHeight {
         height: 300px;
     }
+     .logHeight {
+          height: 364px;
+          position: relative;
+          top: -19px;
+    }
+}
+
+@media (min-width: 768px) and (max-width:1023px) {
+ .logHeight {
+        height: 364px;
+        position: relative;
+        top: -22px;
+     }
+
+}
+
+@media (width: 1024px) {
+    .logHeight {
+        height: 364px;
+        position: relative;
+        top: -7px;
+     }
 }
 
 
@@ -4110,6 +4232,7 @@ a:hover.changePsd {
     .partitionHeight {
         height: 310px;
     }
+     
 
     .drScroll {
         overflow: visible !important;

@@ -164,7 +164,20 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
+    public void testLoadMultipartitionTableProceduresUpsertWithNoPrimaryKey() throws Exception{
+        // using insert for @Load*Table
+        byte upsertMode = (byte) 1;
+        Client client = getClient();
+        // should not be able to upsert to new_order since it has no primary key
+        try {
+            client.callProcedure("@LoadMultipartitionTable", "new_order",  upsertMode, null);
+            fail();
+        } catch (ProcCallException ex) {}
+    }
+
     public void testLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
+        // using insert for @Load*Table
+        byte upsertMode = (byte) 0;
         Client client = getClient();
 
         /*
@@ -178,7 +191,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         // try the failure case first
         try {
-            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, 1);
+            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", upsertMode, null);
             fail();
         } catch (ProcCallException ex) {}
 
@@ -229,11 +242,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         try {
             try {
                 client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
-                                 partitioned_table);
+                            upsertMode, partitioned_table);
                 fail();
             } catch (ProcCallException e) {}
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
-                                 replicated_table);
+                            upsertMode, replicated_table);
 
             // 20 rows per site for the replicated table.  Wait for it...
             int rowcount = 0;
@@ -421,6 +434,31 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
         }
         try {
+            client.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
+            fail("AdHoc create did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+        try {
+            client.callProcedure("@AdHoc", "DROP TABLE pause_test_tbl;");
+            fail("AdHoc drop did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+        try {
+            client.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+            fail("AdHoc create proc did not fail in pause mode");
+        } catch(ProcCallException e) {
+            assertTrue(e.getMessage().contains("Server is paused"));
+        }
+
+        // admin should work fine
+        admin.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
+        admin.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
+        admin.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
+        admin.callProcedure("@AdHoc", "DROP TABLE ddl_test1;");
+
+        try {
             resp = client.callProcedure("@UpdateLogging", m_loggingConfig);
             fail();
         } catch(ProcCallException e) {
@@ -438,10 +476,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         resp = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM pause_test_tbl");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(2, resp.getResults()[0].asScalarLong());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
         resp = client.callProcedure("pauseTestCount");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(2, resp.getResults()[0].asScalarLong());
+        assertEquals(3, resp.getResults()[0].asScalarLong());
 
         // resume
         resp = admin.callProcedure("@Resume");
@@ -496,6 +534,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         "  TEST_ID SMALLINT DEFAULT '0' NOT NULL\n" +
                         ");\n");
 
+        project.setUseDDLSchema(true);
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);

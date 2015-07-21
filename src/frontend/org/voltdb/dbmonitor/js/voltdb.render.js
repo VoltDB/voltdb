@@ -353,17 +353,27 @@ function alertNodeClicked(obj) {
                     var rawData;
                     if (connection != null)
                         rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
-
                     onInformationLoaded(loadAdminDeploymentInformation(connection), rawData);
                 });
             }
+        };
+
+
+        this.GetExportProperties = function (onInformationLoaded) {
+
+            VoltDBService.GetExportProperties(function (connection) {
+                var rawData;
+                if (connection != null)
+                    rawData = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+
+                onInformationLoaded(loadExportProperties(connection), rawData);
+            });
         };
 
         this.GetProceduresInfo = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-
                 setKFactor(connection);
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
@@ -492,11 +502,27 @@ function alertNodeClicked(obj) {
         //
 
         //Get host and site count
-        this.GetHostAndSiteCount = function (onInformationLoaded) {
-            var countDetails = {};
+        this.GetDeploymentInformation = function (onInformationLoaded) {
+            var deploymentDetails = {};
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-                getCountDetails(connection, countDetails);
-                onInformationLoaded(countDetails);
+                getDeploymentDetails(connection, deploymentDetails);
+                onInformationLoaded(deploymentDetails);
+            });
+        };
+
+        this.GetCommandLogInformation = function (onInformationLoaded) {
+            var cmdLogDetails = {};
+            VoltDBService.GetCommandLogInformation(function (connection) {
+                getCommandLogDetails(connection, cmdLogDetails);
+                onInformationLoaded(cmdLogDetails);
+            });
+        };
+
+        this.GetSnapshotStatus = function (onInformationLoaded) {
+            var snapshotDetails = {};
+            VoltDBService.GetSnapshotStatus(function (connection) {
+                getSnapshotStatus(connection, snapshotDetails);
+                onInformationLoaded(snapshotDetails);
             });
         };
 
@@ -739,9 +765,25 @@ function alertNodeClicked(obj) {
                     adminConfigValues['drListen'] = data.dr.listen;
                     adminConfigValues['drPort'] = data.dr.port;
                 }
+
+                //import
+
+                if (data.import != null) {
+                    adminConfigValues['importConfiguration'] = data.import.configuration;
+                }
             }
 
             return adminConfigValues;
+        };
+
+        var loadExportProperties = function (connection) {
+            var exportProperties = {};
+            if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'] != null) {
+                var data = connection.Metadata['SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
+                exportProperties['type'] = data.types;
+            }
+
+            return exportProperties;
         };
 
 
@@ -2142,6 +2184,7 @@ function alertNodeClicked(obj) {
                 repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 repData["HOST_ID"] = info[colIndex["HOST_ID"]];
+                repData["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 repData["STATE"] = info[colIndex["STATE"]];
                 repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
                 repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
@@ -2397,11 +2440,12 @@ function alertNodeClicked(obj) {
             return portConfigValues;
         };
 
-        var getCountDetails = function (connection, countDetails) {
+        var getDeploymentDetails = function (connection, countDetails) {
             var colIndex = {};
             var counter = 0;
             var hostCount = 0;
             var siteCount = 0;
+            var commandLogStatus = false;
             if (connection.Metadata['@SystemInformation_DEPLOYMENT'] == null) {
                 return;
             }
@@ -2419,12 +2463,75 @@ function alertNodeClicked(obj) {
                 if (info[colIndex["PROPERTY"]] == "sitesperhost") {
                     siteCount = info[colIndex["VALUE"]];
                 }
+                if (info[colIndex["PROPERTY"]] == "commandlogenabled") {
+                    commandLogStatus = info[colIndex["VALUE"]];
+                }
             });
             if (!countDetails.hasOwnProperty("DETAILS")) {
                 countDetails["DETAILS"] = {};
             }
             countDetails["DETAILS"]["HOSTCOUNT"] = hostCount;
             countDetails["DETAILS"]["SITECOUNT"] = siteCount;
+            countDetails["DETAILS"]["COMMANDLOGSTATUS"] = commandLogStatus;
+        };
+
+        var getCommandLogDetails = function (connection, cmdLogDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_COMMANDLOG'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_COMMANDLOG'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "OUTSTANDING_TXNS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "OUTSTANDING_BYTES" || columnInfo["name"] == "SEGMENT_COUNT" ||
+                    columnInfo["name"] == "FSYNC_INTERVAL" || columnInfo["name"] == "IN_USE_SEGMENT_COUNT")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+
+            connection.Metadata['@Statistics_COMMANDLOG'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!cmdLogDetails.hasOwnProperty(hostName)) {
+                    cmdLogDetails[hostName] = {};
+                }
+                cmdLogDetails[hostName]["OUTSTANDING_TXNS"] = info[colIndex["OUTSTANDING_TXNS"]];
+                cmdLogDetails[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                cmdLogDetails[hostName]["OUTSTANDING_BYTES"] = info[colIndex["OUTSTANDING_BYTES"]];
+                cmdLogDetails[hostName]["SEGMENT_COUNT"] = info[colIndex["SEGMENT_COUNT"]];
+                cmdLogDetails[hostName]["FSYNC_INTERVAL"] = info[colIndex["FSYNC_INTERVAL"]];
+                cmdLogDetails[hostName]["IN_USE_SEGMENT_COUNT"] = info[colIndex["IN_USE_SEGMENT_COUNT"]];
+            });
+        };
+
+        var getSnapshotStatus = function (connection, snapshotDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_SNAPSHOTSTATUS'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_SNAPSHOTSTATUS'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PATH" || columnInfo["name"] == "START_TIME" || columnInfo["name"] == "END_TIME")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_SNAPSHOTSTATUS'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!snapshotDetails.hasOwnProperty(hostName)) {
+                    snapshotDetails[hostName] = [];
+                }
+                var snapshot = {                    
+                    "TIMESTAMP": info[colIndex["TIMESTAMP"]],
+                    "PATH": info[colIndex["PATH"]],
+                    "START_TIME": info[colIndex["START_TIME"]],
+                    "END_TIME": info[colIndex["END_TIME"]]
+                };
+                snapshotDetails[hostName].push(snapshot);
+            });
         };
 
         var validateServerSpecificSettings = function (overviewValues) {
@@ -2751,9 +2858,57 @@ function alertNodeClicked(obj) {
 
         this.getAdminconfiguration = function (onInformationLoaded) {
             VoltDBService.GetSystemInformationDeployment(function (connection) {
+                // this.getCommandLogStatus(connection, status);
+
                 onInformationLoaded(connection);
             });
         };
+
+
+        //var getCommandLogStatus = function (connection, status) {
+        //    var colIndex = {};
+        //    var colIndex2 = {};
+        //    var counter = 0;
+        //    var replicationRate1M = 0;
+        //    if (connection.Metadata['@SystemInformation_DEPLOYMENT'] == null) {
+        //        return;
+        //    }
+
+        //    connection.Metadata['@SystemInformation_DEPLOYMENT'].schema.forEach(function (columnInfo) {
+        //        //if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M")
+        //        //    colIndex[columnInfo["name"]] = counter;
+        //        //counter++;
+        //    });
+
+        //    counter = 0;
+        //    connection.Metadata['@SystemInformation_DEPLOYMENT_completeData'][1].schema.forEach(function (columnInfo) {
+        //        //if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == 'IS_COVERED')
+        //        //    colIndex2[columnInfo["name"]] = counter;
+        //        //counter++;
+        //    });
+
+        //    connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
+        //        //if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
+        //        //    replicationDetails["DR_GRAPH"] = {};
+        //        //    replicationDetails["DR_GRAPH"]["REPLICATION_DATA"] = [];
+        //        //}
+
+        //        //replicationRate1M += (info[colIndex["REPLICATION_RATE_1M"]] == null || info[colIndex["REPLICATION_RATE_1M"]] < 0) ? 0 : info[colIndex["REPLICATION_RATE_1M"]];
+
+        //        //var repData = {};
+        //        //repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+        //        //replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+        //        //repData["HOST_ID"] = info[colIndex["HOST_ID"]];
+        //        //repData["STATE"] = info[colIndex["STATE"]];
+        //        //repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
+        //        //repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
+        //        //replicationDetails["DR_GRAPH"]["REPLICATION_DATA"].push(repData);
+
+        //    });
+
+        //    //replicationDetails["DR_GRAPH"]['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1], colIndex2['IS_COVERED']);
+        //    //replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M / 1000;
+        //};
 
         this.updateAdminConfiguration = function (updatedData, onInformationLoaded) {
             VoltDBService.UpdateAdminConfiguration(updatedData, function (connection) {

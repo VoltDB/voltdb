@@ -44,7 +44,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
     // Register ImportHandlerProxy service.
     @Override
     public void start(BundleContext context) throws Exception {
-        context.registerService(ImportHandlerProxy.class.getName(), this, null);
+        context.registerService(SocketStreamImporter.class.getName(), this, null);
     }
 
     @Override

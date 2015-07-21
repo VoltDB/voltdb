@@ -25,7 +25,6 @@ class AdminPage extends VoltDBManagementCenterPage {
         serverbutton				{ $("#serverName") }
         serverconfirmation			{ $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
 
-
         servernamelist			    {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
         servername			        {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
         mainservername			    {$("#serverListWrapperAdmin")}
@@ -93,7 +92,6 @@ class AdminPage extends VoltDBManagementCenterPage {
         clustertransactionminutesmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         clustertransactionminutesmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
-
         // Network interfaces
         title1				        { $(text:"Overview") }
         sitePerHost			        { $(class:"configLabel", text:"Sites Per Host") }
@@ -105,7 +103,6 @@ class AdminPage extends VoltDBManagementCenterPage {
         commandLogging		        { $(class:"labelCollapsed", text:"Command Logging") }
         export				        { $(class:"labelCollapsed", text:"Export") }
         advanced			        { $(class:"labelCollapsed", text:"Advanced") }
-
 
         sitePerHostValue			{ $("#sitePerHost") }
         ksafetyValue				{ $("#kSafety") }
@@ -200,6 +197,11 @@ class AdminPage extends VoltDBManagementCenterPage {
         samestreamnameerrorpopup	{ $("#updateInnerErrorPopup")}
         samestreamnameerrorOk		{ $("#btnUpdateErrorOk", text:"Ok")}
 
+        //Admin Import
+        importbtn			{ $("#row-5 > td.configLabel > a", text:"Import")}
+        noimportconfigtxt			{ $("#importConfiguration > tr > td.configLabel")}
+
+
         // SECURITY POPUP
         securityPopup				{ $(class:"popup_content14") }
         securityPopupOk             { $("#btnSecurityOk") }
@@ -248,7 +250,6 @@ class AdminPage extends VoltDBManagementCenterPage {
      * currently exists (displayed).
      * @return true if the "Directories" area currently exists.
      */
-
     def boolean doesDirectoriesExist() {
         return directories.displayed
     }

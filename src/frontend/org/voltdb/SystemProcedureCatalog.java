@@ -167,6 +167,7 @@ public class SystemProcedureCatalog {
         builder.put("@Explain",                 new Config(null,                                           true,  true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@ExplainProc",             new Config(null,                                           true,  true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@SendSentinel",            new Config(null,                                           true,  false, false, 0, VoltType.INVALID,   true,  false, false, true, false));
+        builder.put("@ResetDR",                 new Config(null,                                           true,  false, false, 0, VoltType.INVALID,   false, false, true,  true, false));
         listing = builder.build();
     }
 }

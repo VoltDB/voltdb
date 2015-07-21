@@ -36,7 +36,7 @@ public class ComparisonExpression extends AbstractExpression {
         QUANTIFIER;
     }
 
-    private QuantifierType m_qunatifier = QuantifierType.NONE;
+    private QuantifierType m_quantifier = QuantifierType.NONE;
 
     public ComparisonExpression(ExpressionType type) {
         super(type);
@@ -56,11 +56,11 @@ public class ComparisonExpression extends AbstractExpression {
     }
 
     public void setQuantifier(QuantifierType quantifier) {
-        m_qunatifier = quantifier;
+        m_quantifier = quantifier;
     }
 
     public QuantifierType getQuantifier() {
-        return m_qunatifier;
+        return m_quantifier;
     }
 
     @Override
@@ -71,20 +71,20 @@ public class ComparisonExpression extends AbstractExpression {
     @Override
     public boolean equals(Object obj) {
         if (super.equals(obj) && obj instanceof ComparisonExpression) {
-            return m_qunatifier.equals(((ComparisonExpression)obj).m_qunatifier);
+            return m_quantifier.equals(((ComparisonExpression)obj).m_quantifier);
         }
         return false;
     }
 
     @Override
     public int hashCode() {
-        return super.hashCode() + m_qunatifier.hashCode();
+        return super.hashCode() + m_quantifier.hashCode();
     }
 
     @Override
     public Object clone() {
         ComparisonExpression clone = (ComparisonExpression) super.clone();
-        clone.m_qunatifier = m_qunatifier;
+        clone.m_quantifier = m_quantifier;
         return clone;
     }
 
@@ -92,17 +92,17 @@ public class ComparisonExpression extends AbstractExpression {
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         super.loadFromJSONObject(obj);
        if (obj.has(Members.QUANTIFIER.name())) {
-           m_qunatifier = QuantifierType.get(obj.getInt(Members.QUANTIFIER.name()));
+           m_quantifier = QuantifierType.get(obj.getInt(Members.QUANTIFIER.name()));
        } else {
-           m_qunatifier = QuantifierType.NONE;
+           m_quantifier = QuantifierType.NONE;
        }
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        if (m_qunatifier != QuantifierType.NONE) {
-            stringer.key(Members.QUANTIFIER.name()).value(m_qunatifier.getValue());
+        if (m_quantifier != QuantifierType.NONE) {
+            stringer.key(Members.QUANTIFIER.name()).value(m_quantifier.getValue());
         }
     }
 
@@ -210,6 +210,8 @@ public class ComparisonExpression extends AbstractExpression {
         ExpressionType type = getExpressionType();
         return "(" + m_left.explain(impliedTableName) +
             " " + type.symbol() + " " +
+            (m_quantifier == QuantifierType.NONE ? "" :
+                (m_quantifier.name() + " ")) +
             m_right.explain(impliedTableName) + ")";
     }
 

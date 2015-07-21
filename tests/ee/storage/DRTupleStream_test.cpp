@@ -77,7 +77,7 @@ public:
     DRTupleStreamTest()
       : m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL,
                                       (NValueArray*)NULL, (VoltDBEngine*)NULL,
-                                      "localhost", 2, &m_wrapper, NULL))
+                                      "localhost", 2, &m_wrapper, NULL, 0))
     {
         m_wrapper.m_enabled = true;
         srand(0);
