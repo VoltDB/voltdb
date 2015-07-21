@@ -277,7 +277,7 @@ public:
     inline const NValue getHiddenNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
-        assert(idx < m_schema->columnCount());
+        assert(idx < m_schema->hiddenColumnCount());
 
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
         const voltdb::ValueType columnType = columnInfo->getVoltType();
