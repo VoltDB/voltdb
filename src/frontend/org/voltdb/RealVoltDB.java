@@ -786,7 +786,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
 
             // Configure consumer-side DR if relevant
-            if (m_config.m_isEnterprise && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+            if (m_config.m_isEnterprise &&
+                    (m_config.m_replicationRole == ReplicationRole.REPLICA ||
+                     m_catalogContext.database.getIsactiveactivedred())) {
                 String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
                 byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
                 if (drProducerHost == null || drProducerHost.isEmpty()) {
