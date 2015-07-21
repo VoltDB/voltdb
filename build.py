@@ -442,7 +442,7 @@ if whichtests in ("${eetestsuite}", "structures"):
      CompactingMapIndexCountTest
      CompactingHashTest
      CompactingPoolTest
-     CompactingBenchmark
+     CompactingMapBenchmark
     """
 
 if whichtests in ("${eetestsuite}", "plannodes"):
