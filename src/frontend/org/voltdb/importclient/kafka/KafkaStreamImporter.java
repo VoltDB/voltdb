@@ -648,9 +648,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
                         if (m_currentOffset.get() < 0) {
                             fetchFailedCount = backoffSleep(fetchFailedCount);
-                            continue;
+                            info("Latest offset not found for " + m_topicAndPartition + " using earliest offset.");
+                            //No latest time available so get earliest known for this consumer group.
+                            m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.EarliestTime()));
                         }
                         info("Starting offset for " + m_topicAndPartition + " is set to: " + m_currentOffset.get());
+                        continue;
                     }
                     long currentFetchCount = 0;
                     //Build fetch request of we have a valid offset and not too many are pending.
