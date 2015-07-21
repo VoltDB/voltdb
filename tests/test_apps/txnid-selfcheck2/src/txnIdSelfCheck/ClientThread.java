@@ -24,11 +24,11 @@
 package txnIdSelfCheck;
 
 import java.io.InterruptedIOException;
-
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
@@ -71,6 +71,7 @@ public class ClientThread extends BenchmarkThread {
     static Random rn = new Random(31); // deterministic sequence
     final Random m_random = new Random();
     final Semaphore m_permits;
+    public long m_cnt = 0;
 
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
             boolean allowInProcAdhoc, float mpRatio)
@@ -145,6 +146,7 @@ public class ClientThread extends BenchmarkThread {
                 expectedTables = 5;
                 break;
             }
+            
 
             byte[] payload = m_processor.generateForStore().getStoreValue();
 
@@ -172,7 +174,15 @@ public class ClientThread extends BenchmarkThread {
             }
 
             VoltTable[] results = response.getResults();
-
+            
+            VoltTable data = results[3];
+            long cnt = data.fetchRow(0).getLong("cnt");
+            
+            // check to see if the DB's last count matches with the last count reported by the server...
+            if (cnt < m_cnt)
+                Benchmark.hardStop("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+(cnt-1));
+            
+            m_cnt = cnt + 1;
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
@@ -180,7 +190,6 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-            VoltTable data = results[3];
             try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }
@@ -237,6 +246,7 @@ public class ClientThread extends BenchmarkThread {
         while (m_shouldContinue.get()) {
             try {
                 m_permits.acquire();
+                //System.out.println("Starting here. "); // This message can become overwhealming
                 runOne();
             }
             catch (NoConnectionsException e) {

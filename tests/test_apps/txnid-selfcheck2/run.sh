@@ -68,7 +68,11 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" ~/voltdb-ent-5.4/bin/voltdb create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+function recover() {
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" voltdb recover -d deployment.xml
 }
 
 # run the client that drives the example
@@ -85,20 +89,20 @@ function benchmark-help() {
 
 function benchmark() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
-        --duration=120 \
-        --servers=localhost \
-        --threads=20 \
-        --threadoffset=0 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
+        --duration=99999 \
+        --servers=volt13i \
+        --threads=120 \
+	--threadoffset=0 \
+        --minvaluesize=1024000 \
+        --maxvaluesize=1024000 \
         --entropy=127 \
         --fillerrowsize=10240 \
         --replfillerrowmb=32 \
         --partfillerrowmb=128 \
-        --progresstimeout=120 \
+        --progresstimeout=99999 \
         --usecompression=false \
         --allowinprocadhoc=false
 }
