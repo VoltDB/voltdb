@@ -22,7 +22,7 @@ class AdminExportEditTest extends TestBase {
 				page.openAdminPage()
 				then: 'should be on Admin page'
 				at AdminPage
-				
+
 				break
 			} catch (org.openqa.selenium.ElementNotVisibleException e) {
 				println("ElementNotVisibleException: Unable to Start the test")
@@ -31,16 +31,19 @@ class AdminExportEditTest extends TestBase {
 		}
     }
 
-    def "Verify Edit in a Configuration"() {
+    def "Verify Edit in an Export Configuration"() {
+        int count = 0
+        testStatus = false
+
         when: 'Open Add ConfigurationPopup'
         page.overview.openAddConfigurationPopup()
         page.overview.textType.value("KAFKA")
         then: 'Check elements'
         waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-	    waitFor(waitTime) { page.overview.save.isDisplayed() }
-	    waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
         waitFor(waitTime) { page.overview.metadatabroker.value().equals("metadata.broker.list") }
-	    waitFor(waitTime) { page.overview.metadatabroker.isDisplayed() }
+        waitFor(waitTime) { page.overview.metadatabroker.isDisplayed() }
 
 	    
 	    when: 'Provide values for add configuration'
@@ -132,7 +135,7 @@ class AdminExportEditTest extends TestBase {
 
 
 
-       Edit: Change the file type to ELASTICSEARCH
+      // Edit: Change the file type to ELASTICSEARCH
 
         when: 'Edit button is displayed'
         waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
@@ -187,57 +190,116 @@ class AdminExportEditTest extends TestBase {
 
        // Edit: Change the file type to RABBITMQ
 
-//        when: 'Edit button is displayed'
-//        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
-//        then: 'Click edit button'
-//        page.overview.editExportConfiguration.click()
-//
-//        when: 'Check all the properties'
-//        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-//        waitFor(waitTime) { page.overview.save.isDisplayed() }
-//        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-//
-//        then: 'Check for previous changes'
-//        waitFor(waitTime) { page.overview.endpointValue.value().equals("endValue") }
-//
-//
-//        when: 'Change to RABBITMQ'
-//        page.overview.textType.value("RABBITMQ")
-//        then: 'RABBITMQ text fields are displayed'
-//        waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
-//
-//        when: 'Provide values for RABBITMQ'
-//        page.overview.rabbitMqValue.value("brokerValue")
-//        then: 'Click Save'
-//        page.overview.clickSave()
+        when: 'Edit button is displayed'
+        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+        then: 'Click edit button'
+        page.overview.editExportConfiguration.click()
+
+        when: 'Check all the properties'
+        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+
+        then: 'Check for previous changes'
+
+
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    waitFor(waitTime) { page.overview.endpointValue.value().equals("endValue") }
+                }
+                then:
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
+        }
+
+
+
+        when: 'Change to RABBITMQ'
+        page.overview.textType.value("RABBITMQ")
+        then: 'RABBITMQ text fields are displayed'
+        waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
+
+        when: 'Provide values for RABBITMQ'
+        page.overview.rabbitMqValue.value("brokerValue")
+        then: 'Click Save'
+        page.overview.clickSave()
 
 
         // Edit: Change the file type to CUSTOM
 
-//        when: 'Edit button is displayed'
-//        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
-//        then: 'Click edit button'
-//        page.overview.editExportConfiguration.click()
-//
-//        when: 'Check all the properties'
-//        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-//        waitFor(waitTime) { page.overview.save.isDisplayed() }
-//        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-//
-//        then: 'Check for previous changes'
-//        waitFor(waitTime) { page.overview.metadatabrokerValue.value().equals("brokerValue") }
-//
-//
-//
-//        when: 'Change to CUSTOM'
-//        page.overview.textType.value("CUSTOM")
-//        then: 'CUSTOM text fields are displayed'
-//        waitFor(waitTime) { page.overview.metadatabrokerValue.isDisplayed() }
-//
-//        when: 'Provide values for CUSTOM'
-//        page.overview.endpointESValue.value("endpointValue")
-//        then: 'Click Save'
-//        page.overview.clickSave()
+        when: 'Edit button is displayed'
+        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+        then: 'Click edit button'
+        page.overview.editExportConfiguration.click()
+
+        when: 'Check all the properties'
+        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+
+        then: 'Check for previous changes'
+       // waitFor(waitTime) { page.overview.metadatabrokerValue.value().equals("brokerValue") }
+
+
+
+        when: 'Change to CUSTOM'
+        page.overview.textType.value("CUSTOM")
+        then: 'CUSTOM text fields are displayed'
+        waitFor(waitTime) { page.overview.exportConnectorClass.isDisplayed() }
+
+        when: 'Provide values for CUSTOM'
+        String customConnectorClass = page.overview.getCustomConnectorClass()
+        page.overview.exportConnectorClass.value(customConnectorClass)
+
+        then: 'Click Save'
+        page.overview.clickSave()
+
+
+        // Edit: Change the file type to FILE
+
+        when: 'Edit button is displayed'
+        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+        then: 'Click edit button'
+        page.overview.editExportConfiguration.click()
+
+        when: 'Check all the properties'
+
+
+
+        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+        waitFor(waitTime) { page.overview.save.isDisplayed() }
+        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+        then: 'Check for previous changes'
+
+
+        when: 'Change to FILE'
+        page.overview.textType.value("FILE")
+        then: 'FILE text fields are displayed'
+        waitFor(waitTime) { page.overview.typeValue.isDisplayed() }
+        waitFor(waitTime) { page.overview.nonceValue.isDisplayed() }
+        waitFor(waitTime) { page.overview.outdirValue.isDisplayed() }
+
+        when: 'Provide values for FILE'
+        waitFor(waitTime) { page.overview.type.value().equals("type") }
+        waitFor(waitTime) { page.overview.nonce.value().equals("nonce") }
+        waitFor(waitTime) { page.overview.outdir.value().equals("outdir") }
+        String fileValueOne     = page.overview.getFileValueOne()
+        String fileValueTwo     = page.overview.getFileValueTwo()
+        String fileValueThree   = page.overview.getFileValueThree()
+
+        page.overview.typeValue.value(fileValueOne)
+        page.overview.nonceValue.value(fileValueTwo)
+        page.overview.outdirValue.value(fileValueThree)
+        then: 'Click Save'
+        page.overview.clickSave()
 
         // Delete Configuration
         
