@@ -282,11 +282,16 @@ public class LoadTableLoader extends BenchmarkThread {
                 final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
 
                 // try to insert batchSize random rows
+                long p_nano = System.nanoTime();
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
                     m_permits.acquire();
                     long p = Math.abs(r.nextLong());
-                    m_table.addRow(Calendar.getInstance().getTimeInMillis() + p, p, Calendar.getInstance().getTimeInMillis());
+                    m_table.addRow(p_nano, p, Calendar.getInstance().getTimeInMillis());
+                    if (System.nanoTime() == p_nano) {
+                        TimeUnit.NANOSECONDS.sleep(10);
+                    }
+                    p_nano = System.nanoTime();
                     boolean success = false;
                     if (!m_isMP) {
                         Object rpartitionParam
