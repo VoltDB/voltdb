@@ -38,6 +38,7 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/TupleSchema.h"
+#include "common/TupleSchemaBuilder.h"
 #include "common/tabletuple.h"
 #include "common/StreamBlock.h"
 #include "storage/streamedtable.h"
@@ -62,18 +63,14 @@ public:
                                         noParams, noEngine, "", 0, NULL, NULL, 0);
 
         // set up the schema used to fill the new buffer
-        std::vector<ValueType> columnTypes;
-        std::vector<int32_t> columnLengths;
-        std::vector<bool> columnAllowNull;
+        TupleSchemaBuilder schemaBuilder(COLUMN_COUNT);
         for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnTypes.push_back(VALUE_TYPE_INTEGER);
-            columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            columnAllowNull.push_back(false);
+            schemaBuilder.setColumnAtIndex(i,
+                                           VALUE_TYPE_INTEGER,
+                                           NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),
+                                           false);
         }
-        m_schema =
-          TupleSchema::createTupleSchemaForTest(columnTypes,
-                                         columnLengths,
-                                         columnAllowNull);
+        m_schema.reset(schemaBuilder.build());
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
@@ -82,7 +79,7 @@ public:
         // deal with the horrible hack that needs to set the first
         // value to true (rtb?? what is this horrible hack?)
         *(reinterpret_cast<bool*>(m_tupleMemory)) = true;
-        m_tuple = new TableTuple(m_schema);
+        m_tuple = new TableTuple(m_schema.get());
         m_tuple->move(m_tupleMemory);
 
         // a simple helper around the constructor that sets the
@@ -101,8 +98,6 @@ public:
 
     virtual ~StreamedTableTest() {
         delete m_tuple;
-        if (m_schema)
-            TupleSchema::freeTupleSchema(m_schema);
         delete m_table;
         delete m_context;
         m_quantum->release();
@@ -117,7 +112,7 @@ protected:
     ExecutorContext *m_context;
 
     StreamedTable *m_table;
-    TupleSchema* m_schema;
+    ScopedTupleSchema m_schema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
 

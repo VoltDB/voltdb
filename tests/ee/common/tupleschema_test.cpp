@@ -26,9 +26,9 @@
 #include "harness.h"
 #include "common/TupleSchema.h"
 #include "common/TupleSchemaBuilder.h"
-#include "test_utils/ScopedTupleSchema.hpp"
 
 using voltdb::TupleSchema;
+using voltdb::ScopedTupleSchema;
 using voltdb::ValueType;
 using voltdb::VALUE_TYPE_BIGINT;
 using voltdb::VALUE_TYPE_DECIMAL;

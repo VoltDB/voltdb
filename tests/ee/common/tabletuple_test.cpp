@@ -26,7 +26,6 @@
 #include "common/ValueFactory.hpp"
 #include "common/ThreadLocalPool.h"
 #include "common/TupleSchemaBuilder.h"
-#include "test_utils/ScopedTupleSchema.hpp"
 
 using namespace voltdb;
 using namespace std;
@@ -48,12 +47,12 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     all_inline_lengths.push_back(NValue::
                                  getTupleStorageSize(VALUE_TYPE_BIGINT));
     all_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH/MAX_BYTES_PER_UTF8_CHARACTER - 1);
-    TupleSchema* all_inline_schema =
+    ScopedTupleSchema all_inline_schema(
         TupleSchema::createTupleSchemaForTest(all_types,
                                        all_inline_lengths,
-                                       column_allow_null);
+                                       column_allow_null));
 
-    TableTuple inline_tuple(all_inline_schema);
+    TableTuple inline_tuple(all_inline_schema.get());
     inline_tuple.move(new char[inline_tuple.tupleLength()]);
     inline_tuple.setNValue(0, ValueFactory::getBigIntValue(100));
     NValue inline_string = ValueFactory::getStringValue("dude");
@@ -62,19 +61,18 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
 
     delete[] inline_tuple.address();
     inline_string.free();
-    TupleSchema::freeTupleSchema(all_inline_schema);
 
     // Now check that an non-inlined schema returns the right thing.
     vector<int32_t> non_inline_lengths;
     non_inline_lengths.push_back(NValue::
                                  getTupleStorageSize(VALUE_TYPE_BIGINT));
     non_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH + 10000);
-    TupleSchema* non_inline_schema =
+    ScopedTupleSchema non_inline_schema(
         TupleSchema::createTupleSchemaForTest(all_types,
                                        non_inline_lengths,
-                                       column_allow_null);
+                                       column_allow_null));
 
-    TableTuple non_inline_tuple(non_inline_schema);
+    TableTuple non_inline_tuple(non_inline_schema.get());
     non_inline_tuple.move(new char[non_inline_tuple.tupleLength()]);
     non_inline_tuple.setNValue(0, ValueFactory::getBigIntValue(100));
     string strval = "123456";
@@ -85,7 +83,6 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
 
     delete[] non_inline_tuple.address();
     non_inline_string.free();
-    TupleSchema::freeTupleSchema(non_inline_schema);
 }
 
 TEST_F(TableTupleTest, HiddenColumns)

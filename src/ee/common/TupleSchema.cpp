@@ -222,8 +222,8 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
     return schema;
 }
 
-void TupleSchema::freeTupleSchema(TupleSchema *schema) {
-    delete[] reinterpret_cast<char*>(schema);
+void TupleSchema::operator delete(void* ptr) {
+    ::delete[] static_cast<char*>(ptr);
 }
 
 void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_t length, bool allowNull,

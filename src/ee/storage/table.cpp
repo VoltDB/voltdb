@@ -97,7 +97,7 @@ Table::~Table() {
 
     // clear the schema
     if (m_ownsTupleSchema) {
-        TupleSchema::freeTupleSchema(m_schema);
+        delete m_schema;
     }
 
     m_schema = NULL;
@@ -112,7 +112,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 
     // copy the tuple schema
     if (m_ownsTupleSchema) {
-        TupleSchema::freeTupleSchema(m_schema);
+        delete m_schema;
     }
     m_ownsTupleSchema = ownsTupleSchema;
     m_schema  = schema;

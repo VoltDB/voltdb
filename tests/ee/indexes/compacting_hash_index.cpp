@@ -87,23 +87,23 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     columnAllowNull.push_back(false);
 
-    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                         columnLengths,
-                                                         columnAllowNull);
+    ScopedTupleSchema schema(TupleSchema::createTupleSchemaForTest(columnTypes,
+                                                                   columnLengths,
+                                                                   columnAllowNull));
 
     TableIndexScheme scheme("test_index", HASH_TABLE_INDEX,
                             columnIndices, TableIndex::simplyIndexColumns(),
-                            false, false, schema);
+                            false, false, schema.get());
     index = TableIndexFactory::getInstance(scheme);
 
-    TableTuple *tuple1 = newTuple(schema, 0, 10);
+    TableTuple *tuple1 = newTuple(schema.get(), 0, 10);
     index->addEntry(tuple1);
-    TableTuple *tuple2 = newTuple(schema, 0, 11);
+    TableTuple *tuple2 = newTuple(schema.get(), 0, 11);
     index->addEntry(tuple2);
-    TableTuple *tuple3 = newTuple(schema, 0, 12);
+    TableTuple *tuple3 = newTuple(schema.get(), 0, 12);
     index->addEntry(tuple3);
 
-    TableTuple *tuple4 = newTuple(schema, 0, 10);
+    TableTuple *tuple4 = newTuple(schema.get(), 0, 10);
     EXPECT_TRUE(index->replaceEntryNoKeyChange(*tuple4, *tuple1));
 
     EXPECT_FALSE(index->exists(tuple1));
@@ -112,7 +112,6 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
     EXPECT_TRUE(index->exists(tuple4));
 
     delete index;
-    TupleSchema::freeTupleSchema(schema);
     delete[] tuple1->address();
     delete tuple1;
     delete[] tuple2->address();

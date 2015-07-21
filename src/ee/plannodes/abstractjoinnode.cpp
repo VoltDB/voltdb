@@ -61,8 +61,6 @@ AbstractJoinPlanNode::~AbstractJoinPlanNode()
     BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
         delete scol;
     }
-
-    TupleSchema::freeTupleSchema(m_tupleSchemaPreAgg);
 }
 
 void AbstractJoinPlanNode::getOutputColumnExpressions(
@@ -118,10 +116,10 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
             SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
             m_outputSchemaPreAgg.push_back(outputColumn);
         }
-        m_tupleSchemaPreAgg = AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
+        m_tupleSchemaPreAgg.reset(AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg));
     }
     else {
-        m_tupleSchemaPreAgg = NULL;
+        m_tupleSchemaPreAgg.reset(NULL);
     }
 
 }

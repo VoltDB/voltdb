@@ -46,6 +46,8 @@
 #ifndef HSTOREJOINNODE_H
 #define HSTOREJOINNODE_H
 
+#include "boost/scoped_ptr.hpp"
+
 #include "abstractplannode.h"
 
 namespace voltdb {
@@ -63,7 +65,7 @@ public:
     AbstractExpression* getPreJoinPredicate() const { return m_preJoinPredicate.get(); }
     AbstractExpression* getJoinPredicate() const { return m_joinPredicate.get(); }
     AbstractExpression* getWherePredicate() const { return m_wherePredicate.get(); }
-    const TupleSchema* getTupleSchemaPreAgg() const { return m_tupleSchemaPreAgg; }
+    const TupleSchema* getTupleSchemaPreAgg() const { return m_tupleSchemaPreAgg.get(); }
     void getOutputColumnExpressions(std::vector<AbstractExpression*>& outputExpressions) const;
 
 protected:
@@ -90,7 +92,7 @@ protected:
     // output schema pre inline aggregation
     std::vector<SchemaColumn*> m_outputSchemaPreAgg;
 
-    TupleSchema* m_tupleSchemaPreAgg;
+    boost::scoped_ptr<TupleSchema> m_tupleSchemaPreAgg;
 };
 
 } // namespace voltdb

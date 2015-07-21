@@ -421,8 +421,8 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     m_prePredicate = node->getPrePredicate();
     m_postPredicate = node->getPostPredicate();
 
-    m_groupByKeySchema = constructGroupBySchema(false);
-    m_groupByKeyPartialHashSchema = NULL;
+    m_groupByKeySchema.reset(constructGroupBySchema(false));
+    m_groupByKeyPartialHashSchema.reset(NULL);
     if (m_partialSerialGroupByColumns.size() > 0) {
         for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
             if (std::find(m_partialSerialGroupByColumns.begin(),
@@ -433,7 +433,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
                 m_partialHashGroupByColumns.push_back(ii);;
             }
         }
-        m_groupByKeyPartialHashSchema = constructGroupBySchema(true);
+        m_groupByKeyPartialHashSchema.reset(constructGroupBySchema(true));
     }
 
     return true;
@@ -591,13 +591,13 @@ TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
     executeAggBase(params);
     m_pmp = pmp;
 
-    m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
+    m_nextGroupByKeyStorage.init(m_groupByKeySchema.get(), &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
     nextGroupByKeyTuple.move(NULL);
 
     m_inputSchema = schema;
 
-    m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
+    m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema.get());
     // set the schema first because of the NON-null check in MOVE function
     m_inProgressGroupByKeyTuple.move(NULL);
 
@@ -849,7 +849,7 @@ TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
             params, pmp, schema, newTempTable);
 
     m_atTheFirstRow = true;
-    m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
+    m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema.get(), &m_memoryPool);
     TableTuple& nextPartialGroupByKeyTuple = m_nextGroupByKeyStorage;
     nextPartialGroupByKeyTuple.move(NULL);
 

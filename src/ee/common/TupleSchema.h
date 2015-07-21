@@ -25,6 +25,8 @@
 #include <iostream>
 #include <vector>
 
+#include "boost/scoped_ptr.hpp"
+
 #include "common/FatalException.hpp"
 #include "common/types.h"
 
@@ -123,8 +125,11 @@ public:
                                           const TupleSchema *second,
                                           const std::vector<uint16_t> secondSet);
 
-    /** Static factory method to destroy a TupleSchema object. Set to null after this call */
-    static void freeTupleSchema(TupleSchema *schema);
+    ~TupleSchema() {}
+
+    /** TupleSchema instances are allocated as char[] under the hood,
+        so we need to overload delete to deallocate them properly. */
+    void operator delete(void *ptr);
 
     /** Return the number of (visible) columns in the schema for the tuple. */
     inline uint16_t columnCount() const;
@@ -227,11 +232,10 @@ private:
             std::vector<int32_t> columnSizes,
             std::vector<bool> columnInBytes);
 
-    // can't (shouldn't) call constructors or destructor
+    // can't (shouldn't) call constructors
     // prevents TupleSchema from being created on the stack
     TupleSchema() {}
     TupleSchema(const TupleSchema &ts) {};
-    ~TupleSchema() {}
 
     // number of columns
     uint16_t m_columnCount;
@@ -334,6 +338,14 @@ inline uint16_t TupleSchema::getUninlinedObjectColumnInfoIndex(const int objectC
 inline void TupleSchema::setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex) {
     reinterpret_cast<uint16_t*>(m_data)[objectColumnIndex] = objectColumnInfoIndex;
 }
+
+// A class to automatically free TupleSchema instances, which cannot
+// be allocated on the stack due to variable-length data that follows
+// each instance.  TupleSchema's delete operator is overloaded so that
+// it frees memory correctly.
+typedef boost::scoped_ptr<voltdb::TupleSchema> ScopedTupleSchema;
+typedef boost::scoped_ptr<const voltdb::TupleSchema> ScopedConstTupleSchema;
+
 } // namespace voltdb
 
 #endif // TUPLESCHEMA_H_

@@ -396,11 +396,11 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
         columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
         columnAllowNull.push_back(false);
     }
-    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                                columnLengths,
-                                                                columnAllowNull);
+    ScopedTupleSchema schema(TupleSchema::createTupleSchemaForTest(columnTypes,
+                                                                   columnLengths,
+                                                                   columnAllowNull));
     char tupleMemory[(2 + 1) * 8];
-    TableTuple tuple(tupleMemory, schema);
+    TableTuple tuple(tupleMemory, schema.get());
 
     for (int ii = 0; ii < 100;) {
         int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, 42);
@@ -411,8 +411,6 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
         stream.endTransaction();
         ii += 5;
     }
-
-    TupleSchema::freeTupleSchema(schema);
 
     int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
     int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);

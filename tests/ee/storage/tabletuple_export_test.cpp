@@ -24,6 +24,7 @@
 #include "harness.h"
 #include "common/tabletuple.h"
 #include "common/TupleSchema.h"
+#include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
 #include "common/serializeio.h"
 #include "common/ExportSerializeIo.h"
@@ -42,45 +43,22 @@ class TableTupleExportTest : public Test {
     void verSer(int, char*);
     ThreadLocalPool m_pool;
   public:
-    std::vector<ValueType> columnTypes;
-    std::vector<int32_t> columnLengths;
-    std::vector<bool> columnAllowNull;
-    TupleSchema *m_schema;
-
-    void addToSchema(ValueType vt, bool allownull) {
-        columnTypes.push_back(vt);
-        columnLengths.push_back(NValue::getTupleStorageSize(vt));
-        columnAllowNull.push_back(allownull);
-    }
+    ScopedTupleSchema m_schema;
 
     TableTupleExportTest() {
-        bool allownull = true;
-
-        // note that maxELSize() cares about the string tuple offsets..
-
-        // set up a schema with each supported column type
-        addToSchema(VALUE_TYPE_TINYINT, allownull);  // 0
-        addToSchema(VALUE_TYPE_SMALLINT, allownull); // 1
-        addToSchema(VALUE_TYPE_INTEGER, allownull);  // 2
-        addToSchema(VALUE_TYPE_BIGINT, allownull);   // 3
-        addToSchema(VALUE_TYPE_TIMESTAMP, allownull); // 4
-        addToSchema(VALUE_TYPE_DECIMAL, allownull);   // 5
-
-        // need explicit lengths for varchar columns
-        columnTypes.push_back(VALUE_TYPE_VARCHAR);  // 6
-        columnLengths.push_back(15);
-        columnAllowNull.push_back(allownull);
-
-        columnTypes.push_back(VALUE_TYPE_VARCHAR);   // 7
-        columnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH * 2);
-        columnAllowNull.push_back(allownull);
-
-        m_schema = TupleSchema::createTupleSchemaForTest(
-            columnTypes, columnLengths, columnAllowNull);
+        TupleSchemaBuilder schemaBuilder(8);
+        schemaBuilder.setColumnAtIndex(0, VALUE_TYPE_TINYINT);
+        schemaBuilder.setColumnAtIndex(1, VALUE_TYPE_SMALLINT);
+        schemaBuilder.setColumnAtIndex(2, VALUE_TYPE_INTEGER);
+        schemaBuilder.setColumnAtIndex(3, VALUE_TYPE_BIGINT);
+        schemaBuilder.setColumnAtIndex(4, VALUE_TYPE_TIMESTAMP);
+        schemaBuilder.setColumnAtIndex(5, VALUE_TYPE_DECIMAL);
+        schemaBuilder.setColumnAtIndex(6, VALUE_TYPE_VARCHAR, 15);
+        schemaBuilder.setColumnAtIndex(7, VALUE_TYPE_VARCHAR, UNINLINEABLE_OBJECT_LENGTH * 2);
+        m_schema.reset(schemaBuilder.build());
     }
 
     ~TableTupleExportTest() {
-        TupleSchema::freeTupleSchema(m_schema);
     }
 
 };
@@ -92,11 +70,10 @@ TableTupleExportTest::maxElSize(std::vector<uint16_t> &keep_offsets,
                              bool useNullStrings)
 {
     TableTuple *tt;
-    TupleSchema *ts;
+    ScopedTupleSchema ts(TupleSchema::createTupleSchema(m_schema.get(), keep_offsets));
     char buf[1024]; // tuple data
 
-    ts = TupleSchema::createTupleSchema(m_schema, keep_offsets);
-    tt = new TableTuple(buf, ts);
+    tt = new TableTuple(buf, ts.get());
 
     // if the tuple includes strings, add some content
     // assuming all Export tuples were allocated for persistent
@@ -126,7 +103,6 @@ TableTupleExportTest::maxElSize(std::vector<uint16_t> &keep_offsets,
     // and cleanup
     tt->freeObjectColumns();
     delete tt;
-    TupleSchema::freeTupleSchema(ts);
 
     return sz;
 }
@@ -239,11 +215,10 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
                              uint8_t *nullArray, char *dataPtr, bool nulls)
 {
     TableTuple *tt;
-    TupleSchema *ts;
+    ScopedTupleSchema ts(TupleSchema::createTupleSchema(m_schema.get(), keep_offsets));
     char buf[1024]; // tuple data
 
-    ts = TupleSchema::createTupleSchema(m_schema, keep_offsets);
-    tt = new TableTuple(buf, ts);
+    tt = new TableTuple(buf, ts.get());
 
     // assuming all Export tuples were allocated for persistent
     // storage and choosing set* api accordingly here.
@@ -321,7 +296,6 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
     // and cleanup
     tt->freeObjectColumns();
     delete tt;
-    TupleSchema::freeTupleSchema(ts);
     return io.position();
 }
 

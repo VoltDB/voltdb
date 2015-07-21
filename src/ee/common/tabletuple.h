@@ -494,7 +494,6 @@ class StandAloneTupleStorage {
         }
 
         ~StandAloneTupleStorage() {
-            TupleSchema::freeTupleSchema(m_tupleSchema);
         }
 
         /** Allocates enough memory for a given schema
@@ -504,16 +503,13 @@ class StandAloneTupleStorage {
             assert(schema != NULL);
 
             // TupleSchema can go away, so copy it here and keep it with our tuple.
-            if (m_tupleSchema != NULL) {
-                TupleSchema::freeTupleSchema(m_tupleSchema);
-            }
-            m_tupleSchema = TupleSchema::createTupleSchema(schema);
+            m_tupleSchema.reset(TupleSchema::createTupleSchema(schema));
 
             // note: apparently array new of the form
             //   new char[N]()
             // will zero-initialize the allocated memory.
             m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]());
-            m_tuple.m_schema = m_tupleSchema;
+            m_tuple.m_schema = m_tupleSchema.get();
             m_tuple.move(m_tupleStorage.get());
             m_tuple.setAllNulls();
             m_tuple.setActiveTrue();
@@ -530,7 +526,7 @@ class StandAloneTupleStorage {
 
         boost::scoped_array<char> m_tupleStorage;
         TableTuple m_tuple;
-        TupleSchema* m_tupleSchema;
+        ScopedTupleSchema m_tupleSchema;
 };
 
 inline TableTuple::TableTuple() :

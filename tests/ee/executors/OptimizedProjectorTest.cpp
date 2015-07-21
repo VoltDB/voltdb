@@ -309,7 +309,7 @@ public:
     void runProjectionTest(const std::vector<eetest::TypeAndSize>& tableTypes,
                            const OptimizedProjector& baselineProjector) {
 
-        TupleSchema* dstSchema = createSchemaEz(tableTypes);
+        ScopedTupleSchema dstSchema(createSchemaEz(tableTypes));
 
         boost::scoped_ptr<voltdb::Table> srcTable(createTableEz(eetest::PERSISTENT, tableTypes));
         eetest::fillTable(srcTable.get(), NUM_ROWS);
@@ -330,7 +330,7 @@ public:
             permutedProjector.permuteOnIndexBitForTest(numBits, i);
 
             OptimizedProjector optimizedProjector = OptimizedProjector(permutedProjector);
-            optimizedProjector.optimize(dstSchema, srcTable->schema());
+            optimizedProjector.optimize(dstSchema.get(), srcTable->schema());
 
             // Depending on how we're permuting, we can figure out how many optimized steps
             // there should be:
@@ -359,7 +359,6 @@ public:
             ASSERT_TRUE_WITH_MESSAGE(successAndRate.first, "Memcpy src and dst failed to verify");
         }
 
-        TupleSchema::freeTupleSchema(dstSchema);
         std::cout << "            ";
     }
 };
@@ -435,10 +434,10 @@ TEST_F(OptimizedProjectorTest, ProjectNonTVE)
     }
 
     std::vector<eetest::TypeAndSize> types(NUM_COLS, eetest::BIGINT);
-    TupleSchema* schema = createSchemaEz(types);
+    ScopedTupleSchema schema(createSchemaEz(types));
 
     OptimizedProjector projector(toRawPtrVector(exprs));
-    projector.optimize(schema, schema);
+    projector.optimize(schema.get(), schema.get());
 
     // There should be at most 3 steps. The plus operator in the
     // middle of the tuple will break up the memcpy steps.  The steps
@@ -448,8 +447,6 @@ TEST_F(OptimizedProjectorTest, ProjectNonTVE)
 
     size_t expectedNumSteps = std::min(::int64_t(3), NUM_COLS);
     ASSERT_EQ(expectedNumSteps, projector.numSteps());
-
-    TupleSchema::freeTupleSchema(schema);
 }
 
 TEST_F(OptimizedProjectorTest, ProjectTypeMismatch)
@@ -459,9 +456,9 @@ TEST_F(OptimizedProjectorTest, ProjectTypeMismatch)
     // this case---it should be treated like a non-TVE.
 
     std::vector<eetest::TypeAndSize> colTypes(NUM_COLS, eetest::INTEGER);
-    TupleSchema* srcSchema = createSchemaEz(colTypes);
+    ScopedTupleSchema srcSchema(createSchemaEz(colTypes));
     colTypes[NUM_COLS / 2] = eetest::BIGINT;
-    TupleSchema* dstSchema = createSchemaEz(colTypes);
+    ScopedTupleSchema dstSchema(createSchemaEz(colTypes));
 
     std::vector<boost::shared_ptr<AbstractExpression> > exprs(NUM_COLS);
     for (int i = 0; i < NUM_COLS; ++i) {
@@ -470,15 +467,12 @@ TEST_F(OptimizedProjectorTest, ProjectTypeMismatch)
     }
 
     OptimizedProjector projector(toRawPtrVector(exprs));
-    projector.optimize(dstSchema, srcSchema);
+    projector.optimize(dstSchema.get(), srcSchema.get());
 
     // Should be at most 3 steps, because implicit cast is a
     // combo-breaker.
     size_t expectedNumSteps = std::min(::int64_t(3), NUM_COLS);
     ASSERT_EQ(expectedNumSteps, projector.numSteps());
-
-    TupleSchema::freeTupleSchema(dstSchema);
-    TupleSchema::freeTupleSchema(srcSchema);
 }
 
 } // end namespace voltdb

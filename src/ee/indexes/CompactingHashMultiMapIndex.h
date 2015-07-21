@@ -175,7 +175,7 @@ class CompactingHashMultiMapIndex : public TableIndex
 
     const KeyType setKeyFromTuple(const TableTuple *tuple) const
     {
-        KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
+        KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, getKeySchema());
         return result;
     }
 

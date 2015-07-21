@@ -27,11 +27,9 @@
 #include "boost/scoped_ptr.hpp"
 
 #include "harness.h"
-#include "test_utils/ScopedTupleSchema.hpp"
 
 #include "common/tabletuple.h"
 #include "common/types.h"
-#include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
 #include "execution/VoltDBEngine.h"
 #include "storage/table.h"
@@ -46,7 +44,6 @@ using voltdb::Table;
 using voltdb::TableFactory;
 using voltdb::TableIterator;
 using voltdb::TableTuple;
-using voltdb::TupleSchemaBuilder;
 using voltdb::VALUE_TYPE_BIGINT;
 using voltdb::VALUE_TYPE_VARCHAR;
 using voltdb::ValueFactory;

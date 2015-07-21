@@ -453,11 +453,11 @@ TEST_F(IndexTest, IntsUnique) {
     vector<int32_t>
         keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
-    TupleSchema* keySchema =
+    ScopedTupleSchema keySchema(
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
                                        keyColumnLengths,
-                                       keyColumnAllowNull);
-    TableTuple searchkey(keySchema);
+                                       keyColumnAllowNull));
+    TableTuple searchkey(keySchema.get());
     searchkey.move(new char[searchkey.tupleLength()]);
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
@@ -588,7 +588,6 @@ TEST_F(IndexTest, IntsUnique) {
         exceptionThrown = true;
     }
     EXPECT_TRUE(exceptionThrown);
-    TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
 
@@ -616,11 +615,11 @@ TEST_F(IndexTest, IntsMulti) {
     vector<int32_t>
         keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
-    TupleSchema* keySchema =
+    ScopedTupleSchema keySchema(
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
                                        keyColumnLengths,
-                                       keyColumnAllowNull);
-    TableTuple searchkey(keySchema);
+                                       keyColumnAllowNull));
+    TableTuple searchkey(keySchema.get());
     searchkey.move(new char[searchkey.tupleLength()]);
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
@@ -743,7 +742,6 @@ TEST_F(IndexTest, IntsMulti) {
     tmptuple.
         setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     EXPECT_EQ(true, table->insertTuple(tmptuple));
-    TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
 
@@ -754,8 +752,8 @@ TEST_F(IndexTest, TupleKeyUnique) {
     vector<bool> keyColumnAllowNull(indexWidth, true);
     vector<ValueType> keyColumnTypes(indexWidth, VALUE_TYPE_BIGINT);
     vector<int32_t> keyColumnLengths(indexWidth, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    TupleSchema *keySchema = TupleSchema::createTupleSchemaForTest(keyColumnTypes, keyColumnLengths, keyColumnAllowNull);
-    TableTuple searchkey(keySchema);
+    ScopedTupleSchema keySchema(TupleSchema::createTupleSchemaForTest(keyColumnTypes, keyColumnLengths, keyColumnAllowNull));
+    TableTuple searchkey(keySchema.get());
     // provide storage for search key tuple
     searchkey.move(new char[searchkey.tupleLength()]);
 
@@ -816,7 +814,6 @@ TEST_F(IndexTest, TupleKeyUnique) {
 
     // TEST moveToEnd
 
-    TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
 
@@ -848,11 +845,11 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
     vector<int32_t>
     keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
-    TupleSchema* keySchema =
+    ScopedTupleSchema keySchema(
             TupleSchema::createTupleSchemaForTest(keyColumnTypes,
                     keyColumnLengths,
-                    keyColumnAllowNull);
-    TableTuple searchkey(keySchema);
+                    keyColumnAllowNull));
+    TableTuple searchkey(keySchema.get());
     searchkey.move(new char[searchkey.tupleLength()]);
 
     // partial index search test
@@ -906,7 +903,6 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
     EXPECT_TRUE(tuple.isNullTuple());
 
     // clean up
-    TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
 
@@ -936,11 +932,11 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
     vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
-    TupleSchema* keySchema =
+    ScopedTupleSchema keySchema(
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
                                        keyColumnLengths,
-                                       keyColumnAllowNull);
-    TableTuple searchkey(keySchema);
+                                       keyColumnAllowNull));
+    TableTuple searchkey(keySchema.get());
     searchkey.move(new char[searchkey.tupleLength()]);
 
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
@@ -997,7 +993,6 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     tuple = index->nextValueAtKey(indexCursorNew);
     EXPECT_TRUE(tuple.isNullTuple());
 
-    TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
 
@@ -1022,11 +1017,11 @@ TEST_F(IndexTest, ReentrantHashUnique) {
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
     vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
-    TupleSchema* keySchema =
+    ScopedTupleSchema keySchema(
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
                                        keyColumnLengths,
-                                       keyColumnAllowNull);
-    TableTuple searchkey(keySchema);
+                                       keyColumnAllowNull));
+    TableTuple searchkey(keySchema.get());
     searchkey.move(new char[searchkey.tupleLength()]);
 
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
@@ -1053,7 +1048,6 @@ TEST_F(IndexTest, ReentrantHashUnique) {
     tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
-    TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
 
@@ -1078,11 +1072,11 @@ TEST_F(IndexTest, ReentrantHashMultiple) {
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
     vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
-    TupleSchema* keySchema =
+    ScopedTupleSchema keySchema(
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
                                        keyColumnLengths,
-                                       keyColumnAllowNull);
-    TableTuple searchkey(keySchema);
+                                       keyColumnAllowNull));
+    TableTuple searchkey(keySchema.get());
     searchkey.move(new char[searchkey.tupleLength()]);
 
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
@@ -1110,7 +1104,6 @@ TEST_F(IndexTest, ReentrantHashMultiple) {
     tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
-    TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
 

@@ -400,11 +400,11 @@ TEST_F(ExpressionTest, HashRange) {
     types.push_back(voltdb::VALUE_TYPE_BIGINT);
     types.push_back(voltdb::VALUE_TYPE_INTEGER);
 
-    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(types,columnSizes,allowNull);
+    ScopedTupleSchema schema(TupleSchema::createTupleSchemaForTest(types,columnSizes,allowNull));
 
     boost::scoped_array<char> tupleStorage(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
 
-    TableTuple t(tupleStorage.get(), schema);
+    TableTuple t(tupleStorage.get(), schema.get());
     const time_t seed = time(NULL);
     std::cout << "Seed " << seed << std::endl;
     srand(static_cast<unsigned int>(seed));
@@ -424,7 +424,6 @@ TEST_F(ExpressionTest, HashRange) {
             ASSERT_FALSE(inrange.isTrue());
         }
     }
-    TupleSchema::freeTupleSchema(schema);
 }
 
 TEST_F(ExpressionTest, Timestamp) {

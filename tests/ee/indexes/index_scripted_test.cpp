@@ -178,7 +178,7 @@ void cleanUp()
     pool.clear();
 
     for (int i = 0; i < schemaCache.size(); ++i)
-        TupleSchema::freeTupleSchema(schemaCache[i]);
+        delete schemaCache[i];
     schemaCache.clear();
 
     tuples.clear();

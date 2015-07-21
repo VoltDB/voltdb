@@ -487,7 +487,7 @@ public:
 
     const TupleSchema *getKeySchema() const
     {
-        return m_keySchema;
+        return m_keySchema.get();
     }
 
     virtual std::string debug() const;
@@ -513,7 +513,7 @@ protected:
     TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme);
 
     TableIndexScheme m_scheme;
-    const TupleSchema * const m_keySchema;
+    ScopedConstTupleSchema m_keySchema;
     const std::string m_id;
 
     // counters

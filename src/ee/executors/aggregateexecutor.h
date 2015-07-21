@@ -162,9 +162,6 @@ public:
     { }
     ~AggregateExecutorBase()
     {
-        // NULL safe operation
-        TupleSchema::freeTupleSchema(m_groupByKeySchema);
-        TupleSchema::freeTupleSchema(m_groupByKeyPartialHashSchema);
     }
 
     /**
@@ -226,7 +223,7 @@ protected:
     std::vector<int> m_passThroughColumns;
     std::vector<int> m_aggregateOutputColumns;
     Pool m_memoryPool;
-    TupleSchema* m_groupByKeySchema;
+    ScopedTupleSchema m_groupByKeySchema;
     std::vector<ExpressionType> m_aggTypes;
     std::vector<bool> m_distinctAggs;
     std::vector<AbstractExpression*> m_groupByExpressions;
@@ -244,7 +241,7 @@ protected:
     // used for partial aggregation.
     std::vector<int> m_partialSerialGroupByColumns;
     std::vector<int> m_partialHashGroupByColumns;
-    TupleSchema* m_groupByKeyPartialHashSchema;
+    ScopedTupleSchema m_groupByKeyPartialHashSchema;
 
     // used for inline limit for serial/partial aggregate
     int m_limit;

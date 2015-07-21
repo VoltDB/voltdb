@@ -181,9 +181,9 @@ public:
     }
 
     void freeSchemaAndIndexForPerformanceDifference() {
-        TupleSchema::freeTupleSchema(m_schema);
-        TupleSchema::freeTupleSchema(m_schema1);
-        TupleSchema::freeTupleSchema(m_schema2);
+        delete m_schema;
+        delete m_schema1;
+        delete m_schema2;
         m_schema = m_schema1 = m_schema2 = NULL;
         delete m_index;
         delete m_indexWithoutPointer1;
@@ -219,23 +219,23 @@ TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     columnAllowNull.push_back(false);
 
-    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                         columnLengths,
-                                                         columnAllowNull);
+    ScopedTupleSchema schema(TupleSchema::createTupleSchemaForTest(columnTypes,
+                                                                   columnLengths,
+                                                                   columnAllowNull));
 
     TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
                             columnIndices, TableIndex::simplyIndexColumns(),
-                            false, false, schema);
+                            false, false, schema.get());
     index = TableIndexFactory::getInstance(scheme);
 
-    TableTuple *tuple1 = newTuple(schema, 0, 10);
+    TableTuple *tuple1 = newTuple(schema.get(), 0, 10);
     index->addEntry(tuple1);
-    TableTuple *tuple2 = newTuple(schema, 0, 11);
+    TableTuple *tuple2 = newTuple(schema.get(), 0, 11);
     index->addEntry(tuple2);
-    TableTuple *tuple3 = newTuple(schema, 0, 12);
+    TableTuple *tuple3 = newTuple(schema.get(), 0, 12);
     index->addEntry(tuple3);
 
-    TableTuple *tuple4 = newTuple(schema, 0, 10);
+    TableTuple *tuple4 = newTuple(schema.get(), 0, 10);
     EXPECT_TRUE(index->replaceEntryNoKeyChange(*tuple4, *tuple1));
 
     EXPECT_FALSE(index->exists(tuple1));
@@ -244,7 +244,6 @@ TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
     EXPECT_TRUE(index->exists(tuple4));
 
     delete index;
-    TupleSchema::freeTupleSchema(schema);
     delete[] tuple1->address();
     delete tuple1;
     delete[] tuple2->address();
