@@ -76,7 +76,22 @@ std::string TableTuple::debug(const std::string& tableName) const {
             }
             buffer << ")";
         }
+
+        if (m_schema->hiddenColumnCount() > 0) {
+            buffer << " hidden->";
+            for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
+                buffer << "(";
+                if (isNull(ctr)) {
+                    buffer << "<NULL>";
+                } else {
+                    buffer << getHiddenNValue(ctr).debug();
+                }
+                buffer << ")";
+            }
+        }
     }
+
+
 
     uint64_t addressNum = (uint64_t)address();
     buffer << " @" << addressNum;
@@ -88,19 +103,7 @@ std::string TableTuple::debug(const std::string& tableName) const {
 std::string TableTuple::debugNoHeader() const {
     assert(m_schema);
     assert(m_data);
-
-    std::ostringstream buffer;
-    buffer << "TableTuple(notable) ->";
-
-    for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
-        if (isNull(ctr)) {
-            buffer << "<NULL>";
-        } else {
-            buffer << "(" << getNValue(ctr).debug() << ")";
-        }
-    }
-    std::string ret(buffer.str());
-    return ret;
+    return debug("");
 }
 
 }

@@ -63,12 +63,15 @@ TableCatalogDelegate::~TableCatalogDelegate()
     }
 }
 
-TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catalogTable) {
+TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Database const &catalogDatabase,
+                                                     catalog::Table const &catalogTable) {
     // Columns:
     // Column is stored as map<String, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
     const int numColumns = static_cast<int>(catalogTable.columns().size());
-    TupleSchemaBuilder schemaBuilder(numColumns);
+    bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable.isDRed();
+    TupleSchemaBuilder schemaBuilder(numColumns,
+                                     needsDRTimestamp ? 1 : 0); // number of hidden columns
 
     map<string, catalog::Column*>::const_iterator col_iterator;
     for (col_iterator = catalogTable.columns().begin();
@@ -80,6 +83,19 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catal
                                        static_cast<int32_t>(catalog_column->size()),
                                        catalog_column->nullable(),
                                        catalog_column->inbytes());
+    }
+
+    if (needsDRTimestamp) {
+        // Create a hidden timestamp column for a DRed table in an
+        // active-active context.
+        //
+        // Column will be marked as not nullable in TupleSchema,
+        // because we never expect a null value here, but this is not
+        // actually enforced at runtime.
+        schemaBuilder.setHiddenColumnAtIndex(0,
+                                             VALUE_TYPE_BIGINT,
+                                             8,      // field size in bytes
+                                             false); // nulls not allowed
     }
 
     return schemaBuilder.build();
@@ -269,7 +285,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     }
 
     // get the schema for the table
-    TupleSchema *schema = createTupleSchema(catalogTable);
+    TupleSchema *schema = createTupleSchema(catalogDatabase, catalogTable);
 
     // Indexes
     map<string, TableIndexScheme> index_map;
