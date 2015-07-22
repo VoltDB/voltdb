@@ -26,24 +26,23 @@ package txnIdSelfCheck.procedures;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
-public class TRUPScanAggTableMP extends VoltProcedure {
-    final SQLStmt max = new SQLStmt("select max(id) from (select * from trup) t;");
-    // add select for CAPP?
+public class CAPPCountPartitionRows extends VoltProcedure {
 
+    public final SQLStmt countRows = new SQLStmt(
+            "SELECT COUNT(*) FROM capp;");
 
-    public VoltTable[] run(long p, byte shouldRollback) {
-        voltQueueSQL(max);
-        VoltTable[] results = voltExecuteSQL(true);
-        if (results[0].getRowCount() != 1) {
-            throw new VoltAbortException("rowcount for max is not one");
-        }
-        if (shouldRollback != 0) {
-            throw new VoltAbortException("EXPECTED ROLLBACK");
-        }
-        return results;
+    /**
+     * Procedure main logic.
+     *
+     * @param partitionValue Partitioning key for this procedure.
+     * @return The number of rows in the partition.
+     */
+    public long run(int partitionValue) {
+
+        // Count the rows in the current partition.
+        voltQueueSQL(countRows, EXPECT_SCALAR_LONG);
+        return voltExecuteSQL()[0].fetchRow(0).getLong(0);
     }
 }
-

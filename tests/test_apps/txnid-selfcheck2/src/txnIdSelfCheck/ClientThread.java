@@ -173,6 +173,8 @@ public class ClientThread extends BenchmarkThread {
 
             VoltTable[] results = response.getResults();
 
+            VoltTable data = results[3];
+
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
@@ -180,7 +182,7 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-            VoltTable data = results[3];
+
             try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }
@@ -237,6 +239,7 @@ public class ClientThread extends BenchmarkThread {
         while (m_shouldContinue.get()) {
             try {
                 m_permits.acquire();
+                //System.out.println("Starting here. "); // This message can become overwhealming
                 runOne();
             }
             catch (NoConnectionsException e) {

@@ -864,6 +864,7 @@ public class VoltDB {
     /**
      * Entry point for the VoltDB server process.
      * @param args Requires catalog and deployment file locations.
+     * @throws InterruptedException
      */
     public static void main(String[] args) {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());

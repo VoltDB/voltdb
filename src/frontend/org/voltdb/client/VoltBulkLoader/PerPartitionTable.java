@@ -27,19 +27,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
-
 import org.voltdb.ParameterConverter;
-import org.voltdb.client.HashinatorLite;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.HashinatorLite;
 import org.voltdb.client.ProcedureCallback;
 
 /**
@@ -247,7 +245,6 @@ public class PerPartitionTable {
             }
             table.addRow(row_args);
         }
-
         return new PartitionProcedureCallback(buf);
     }
 

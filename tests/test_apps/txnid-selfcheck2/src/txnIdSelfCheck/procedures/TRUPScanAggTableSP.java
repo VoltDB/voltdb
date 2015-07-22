@@ -31,6 +31,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 
 public class TRUPScanAggTableSP extends VoltProcedure {
     final SQLStmt max = new SQLStmt("select max(id) from (select * from trup) t;");
+    // add select for CAPP?
 
 
     public VoltTable[] run(long p, byte shouldRollback) {

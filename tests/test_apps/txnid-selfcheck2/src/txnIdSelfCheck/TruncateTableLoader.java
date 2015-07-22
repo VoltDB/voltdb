@@ -32,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -40,7 +42,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 public class TruncateTableLoader extends BenchmarkThread {
-
 
     final Client client;
     final long targetCount;
@@ -56,6 +57,7 @@ public class TruncateTableLoader extends BenchmarkThread {
     long rowsLoaded = 0;
     long nTruncates = 0;
     float mpRatio;
+    boolean capped;
 
     TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
         setName("TruncateTableLoader");
@@ -146,8 +148,7 @@ public class TruncateTableLoader extends BenchmarkThread {
                     }
                     currentRowCount = nextRowCount;
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
                 log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
@@ -161,7 +162,9 @@ public class TruncateTableLoader extends BenchmarkThread {
                 hardStop("getrowcount exception", e);
             }
 
-            try {
+
+
+            try { // here is where to check for capped rather than truncate.
                 log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());

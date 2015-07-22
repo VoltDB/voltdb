@@ -26,6 +26,7 @@ package txnIdSelfCheck;
 import java.io.IOException;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
