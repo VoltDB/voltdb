@@ -164,6 +164,12 @@ public class Benchmark {
 
         @Option(desc = "Allow set ratio of mp to sp workload.")
         float mpratio = (float)0.20;
+        
+        @Option(desc = "Allow set ratio of upsert to insert workload.")     
+        float upsertratio = (float)0.50;       
+        
+        @Option(desc = "Allow set ratio of upsert against exist column.")
+        float upserthitratio = (float)0.20;
 
         @Override
         public void validate() {
@@ -180,6 +186,8 @@ public class Benchmark {
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
             if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
+            if (upsertratio < 0.0 || upsertratio > 1.0) exitWithMessageAndUsage("upsertratio must be between 0.0 and 1.0");     
+            if (upserthitratio < 0.0 || upserthitratio > 1.0) exitWithMessageAndUsage("upserthitratio must be between 0.0 and 1.0");
         }
 
         @Override
@@ -590,12 +598,12 @@ public class Benchmark {
 
         partitionedLoader = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
-        //partitionedLoader.start();
+        partitionedLoader.start();
         replicatedLoader = null;
         if (config.mpratio > 0.0) {
             replicatedLoader = new BigTableLoader(client, "bigr",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
-            //replicatedLoader.start();
+            replicatedLoader.start();
         }
 
 

@@ -73,24 +73,24 @@ function server() {
 
 # run the client that drives the example
 function client() {
-    benchmark
+    async-benchmark
 }
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function benchmark-help() {
+function async-benchmark-help() {
     srccompile
     java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
 }
 
-function benchmark() {
+function async-benchmark() {
     srccompile
     java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
-        --duration=600 \
+        --duration=120 \
         --servers=localhost \
-        --threads=49 \
+        --threads=20 \
         --threadoffset=0 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \

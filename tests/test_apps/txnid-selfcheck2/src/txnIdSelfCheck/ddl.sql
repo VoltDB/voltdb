@@ -143,6 +143,7 @@ CREATE TABLE loadp
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
+, CONSTRAINT pkey_id_forLoadPartitionSP PRIMARY KEY (cid, txnid)
 );
 PARTITION TABLE loadp ON COLUMN cid;
 CREATE TABLE cploadp
@@ -150,6 +151,7 @@ CREATE TABLE cploadp
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
+, CONSTRAINT pkey_id_forCopyLoadPartitionedSP PRIMARY KEY (cid, txnid)
 );
 PARTITION TABLE cploadp ON COLUMN cid;
 
@@ -160,12 +162,14 @@ CREATE TABLE loadmp
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
+, CONSTRAINT pkey_id_forLoadPartitionMP PRIMARY KEY (cid, txnid)
 );
 CREATE TABLE cploadmp
 (
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
+, CONSTRAINT pkey_id_forCopyLoadPartitionMP PRIMARY KEY (cid, txnid)
 );
 
 CREATE TABLE trur
