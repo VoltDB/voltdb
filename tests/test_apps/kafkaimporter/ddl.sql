@@ -48,18 +48,12 @@ EXPORT TABLE kafkaexporttable1;
 -- Stored procedures
 LOAD classes sp.jar;
 
-CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertExport;
-PARTITION PROCEDURE InsertExport ON TABLE Kafkamirrortable1 COLUMN key;
+CREATE PROCEDURE PARTITION ON TABLE KafkaImportTable1 COLUMN key FROM class kafkaimporter.db.procedures.InsertImport;
+CREATE PROCEDURE PARTITION ON TABLE Kafkamirrortable1 COLUMN key FROM class kafkaimporter.db.procedures.InsertExport;
+CREATE PROCEDURE PARTITION ON TABLE KafkaMirrorTable1 COLUMN key FROM class kafkaimporter.db.procedures.DeleteRows;
 
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertFinal;
-
-CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertImport;
-PARTITION PROCEDURE InsertImport ON TABLE KafkaImportTable1 COLUMN key;
-
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.MatchRows;
-
-CREATE PROCEDURE FROM class kafkaimporter.db.procedures.DeleteRows;
-PARTITION PROCEDURE DeleteRows ON TABLE KafkaMirrorTable1 COLUMN key;
 
 CREATE PROCEDURE CountMirror as select count(*) from kafkamirrortable1;
 CREATE PROCEDURE CountImport as select count(*) from kafkaimporttable1;
