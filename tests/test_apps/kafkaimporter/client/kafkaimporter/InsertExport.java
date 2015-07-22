@@ -71,7 +71,7 @@ public class InsertExport {
         public void clientCallback(ClientResponse clientResponse)
                 throws Exception {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-            	String msg = String.format("%s k: %12ld, v: %12ld callback fault: %s", proc, key, value, clientResponse.getStatusString());
+            	String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
             	System.err.println(msg);
             }
         }

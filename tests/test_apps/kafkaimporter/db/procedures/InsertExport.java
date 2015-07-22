@@ -45,9 +45,9 @@ import org.voltdb.VoltProcedure;
 //    )
 
 public class InsertExport extends VoltProcedure {
-    public final String sqlBase = "(key, value) VALUES (?, ?)";
-    public final SQLStmt exportInsert = new SQLStmt("INSERT INTO kafkaExportTable1 " + sqlBase);
-    public final SQLStmt mirrorInsert = new SQLStmt("INSERT INTO kafkaMirrorTable1 " + sqlBase);
+    public final String sqlSuffix = "(key, value) VALUES (?, ?)";
+    public final SQLStmt exportInsert = new SQLStmt("INSERT INTO kafkaExportTable1 " + sqlSuffix);
+    public final SQLStmt mirrorInsert = new SQLStmt("INSERT INTO kafkaMirrorTable1 " + sqlSuffix);
 
     public long run(long key, long value)
     {
