@@ -383,11 +383,6 @@ public class SetFunction implements Serializable {
             return Type.SQL_INTEGER;
         }
 
-        // A VoltDB extension APPROX_COUNT_DISTINCT
-        if (setType == OpTypes.APPROX_COUNT_DISTINCT) {
-            return Type.SQL_DOUBLE;
-        }
-        // End of VoltDB extension
         // A VoltDB extension to handle aggfnc(*) syntax errors.
         // If the argument node does not have
         // a data type, it may be '*'.  If the
@@ -472,6 +467,21 @@ public class SetFunction implements Serializable {
                 }
                 break;
 
+            // A VoltDB extension for APPROX_COUNT_DISTINCT
+            case OpTypes.APPROX_COUNT_DISTINCT :
+                switch (dataType) {
+                case Types.TINYINT :
+                case Types.SQL_SMALLINT :
+                case Types.SQL_INTEGER :
+                case Types.SQL_BIGINT :
+                case Types.SQL_DOUBLE :
+                case Types.SQL_DECIMAL :
+                case Types.SQL_TIMESTAMP :
+                    return Type.SQL_DOUBLE;
+                default:
+                    throw Error.error(ErrorCode.X_42565);
+                }
+            // End of VoltDB extension for APPROX_COUNT_DISTINCT
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "SetFunction");
         }

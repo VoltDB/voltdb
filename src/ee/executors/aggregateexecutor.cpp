@@ -370,7 +370,6 @@ public:
         case VALUE_TYPE_INTEGER:
         case VALUE_TYPE_BIGINT:
         case VALUE_TYPE_TIMESTAMP:
-        case VALUE_TYPE_BOOLEAN:
             bigintVal = ValuePeeker::peekAsRawInt64(val);
             elem = reinterpret_cast<char*>(&bigintVal);
             len = sizeof(bigintVal);
@@ -408,13 +407,18 @@ protected:
 
     static uint8_t registerBitWidth() {
         // Setting this value higher makes for a more accurate
-        // estimate (based on my experiments), but means that the
-        // hyperloglog sent to the coordinator will be larger.
+        // estimate but means that the hyperloglogs sent to the
+        // coordinator from each partition will be larger.
         //
         // This value is called "b" in the hyperloglog code
         // and papers.  Size of the hyperloglog will be
         // 2^b + 1 bytes.
-        return 11;
+        //
+        // For the version of hyperloglog we use in VoltDB, the max
+        // value allowed for b is 16, so the hyperloglogs sent to the
+        // coordinator will be 65537 bytes apiece, which seems
+        // reasonable.
+        return 16;
     }
 
 private:
