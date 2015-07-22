@@ -81,7 +81,13 @@ Table* TableFactory::getPersistentTable(
         table = new PersistentTable(partitionColumn, signature, tableIsMaterialized, tableAllocationTargetSize, tupleLimit, drEnabled);
     }
 
-    initCommon(databaseId, table, name, schema, columnNames, true, compactionThreshold);
+    initCommon(databaseId,
+               table,
+               name,
+               schema,
+               columnNames,
+               true,  // table will take ownership of TupleSchema object
+               compactionThreshold);
 
     // initialize stats for the table
     configureStats(databaseId, name, table);
