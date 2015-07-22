@@ -73,12 +73,12 @@ function server() {
 
 # run the client that drives the example
 function client() {
-    async-benchmark
+    benchmark
 }
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function async-benchmark-help() {
+function aysnc-benchmark-help() {
     srccompile
     java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
 }
