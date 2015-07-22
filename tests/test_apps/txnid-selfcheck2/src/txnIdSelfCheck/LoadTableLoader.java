@@ -240,6 +240,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     if (workList.size() <= 0) {
                         Thread.sleep(2000);
                     }
+                    log.info("WorkList Size: " + workList.size());
                     CountDownLatch clatch = new CountDownLatch(workList.size());
                     for (Long lcid : workList) {
                         client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid);
@@ -272,6 +273,8 @@ public class LoadTableLoader extends BenchmarkThread {
         CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
         cdtask.start();
         long p = 0;
+        List<Long> cidList = new ArrayList<Long>(batchSize);
+        List<Long> timeList = new ArrayList<Long>(batchSize);
         try {
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
@@ -279,14 +282,19 @@ public class LoadTableLoader extends BenchmarkThread {
                 byte upsertMode = (byte) (m_random.nextFloat() < upsertratio ? 1: 0);
                 byte upsertHitMode = (byte) ((upsertMode != 0) && (m_random.nextFloat() < upserthitratio) ? 1: 0);
 
-                CountDownLatch latch = new CountDownLatch(batchSize + batchSize * upsertHitMode);
+                CountDownLatch latch = new CountDownLatch(batchSize);
                 final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
+                cidList.clear();
+                timeList.clear();
 
-                // try to insert batchSize random rows
+                // try to insert/upsert batchSize random rows
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
                     m_permits.acquire();
-                    m_table.addRow(p, p + Calendar.getInstance().getTimeInMillis(), Calendar.getInstance().getTimeInMillis());
+                    long nanotime = System.nanoTime();
+                    m_table.addRow(p, p + nanotime, nanotime);
+                    cidList.add(p);
+                    timeList.add(nanotime);
                     p++;
                     boolean success = false;
                     if (!m_isMP) {
@@ -296,12 +304,16 @@ public class LoadTableLoader extends BenchmarkThread {
                         if (upsertHitMode != 0) {// for test upsert an existing row, insert it and then upsert same row again.
                             success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 0, m_table);
                         }
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, upsertMode, m_table);
+                        else {
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, upsertMode, m_table);
+                        }
                     } else {
                         if (upsertHitMode != 0) {
                             success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 0, m_table);
                         }
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, upsertMode, m_table);
+                        else {
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, upsertMode, m_table);
+                        }
                     }
                     //Ad if successfully queued but remove if proc fails.
                     if (success) {
@@ -312,8 +324,29 @@ public class LoadTableLoader extends BenchmarkThread {
                         }
                     }
                 }
+
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
+
+                // try to upsert if want the collision
+                if (upsertHitMode != 0) {
+                    CountDownLatch upserHitLatch = new CountDownLatch(batchSize * upsertHitMode);
+                    for (int i = 0; i < batchSize; i++) {
+                        m_table.clearRowData();
+                        m_permits.acquire();
+                        m_table.addRow(cidList.get(i), cidList.get(i) + timeList.get(i), timeList.get(i));
+                        boolean success = false;
+                        if (!m_isMP) {
+                            Object rpartitionParam = TheHashinator.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.BIGINT));
+                            success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, upsertMode, m_table);
+                        } else {
+                            success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, m_tableName, upsertMode, m_table);
+                        }
+                    }
+                    //Wait for all additional upsert @Load{SP|MP}Done
+                    upserHitLatch.await();
+                }
+
                 cpDelQueue.addAll(lcpDelQueue);
                 long nextRowCount = 0;
                 try { nextRowCount = TxnId2Utils.getRowCount(client, m_tableName);
