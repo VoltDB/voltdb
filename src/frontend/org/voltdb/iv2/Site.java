@@ -73,6 +73,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
@@ -374,12 +375,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
+        public void forceAllBuffersToDiskForDRAndExport(final boolean nofsync)
         {
             m_drGateway.forceAllDRNodeBuffersToDisk(nofsync);
             if (m_mpDrGateway != null) {
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
+            ExportManager.syncExport(nofsync);
         }
 
         @Override
