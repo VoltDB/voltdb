@@ -34,14 +34,27 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 public class MatchChecks {
-    static class DeleteCallback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse response) {
+	final static String GET_MIRROR_TABLE_ROW_COUNT = "getMirrorTableRowCount";
+    final static String FIND_DELETE_MATCHING_ROWS = "findAndDeleteMatchingRows";
+    final static String GET_IMPORT_TABLE_ROW_COUNT = "getImportTableRowCount";
 
-                // Make sure the procedure succeeded. If not,
-                // report the error.
-            if (response.getStatus() != ClientResponse.SUCCESS) {
-                System.err.println(response.getStatusString());
+    static class DeleteCallback implements ProcedureCallback {
+    	final String proc;
+    	final long key;
+
+    	DeleteCallback(String proc, long key) {
+    	    this.proc = proc;
+    	    this.key = key;
+    	}
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+
+            // Make sure the procedure succeeded. If not,
+            // report the error.
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+            	String msg = String.format("%s k: %12ld, v: %12ld callback fault: %s", proc, key, clientResponse.getStatusString());
+            	System.err.println(msg);
               }
          }
     }
@@ -97,7 +110,7 @@ public class MatchChecks {
             long key = results.getLong(0);
             // System.out.println("Key: " + key);
             try {
-                client.callProcedure(new DeleteCallback(), "DeleteRows", key);
+                client.callProcedure(new DeleteCallback(FIND_DELETE_MATCHING_ROWS, key), FIND_DELETE_MATCHING_ROWS, key);
             } catch (IOException e) {
                 e.printStackTrace();
             }

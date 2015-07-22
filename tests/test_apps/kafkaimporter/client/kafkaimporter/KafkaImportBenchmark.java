@@ -52,6 +52,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 
+import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
 
 public class KafkaImportBenchmark {
@@ -145,11 +146,12 @@ public class KafkaImportBenchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     static void dbconnect(String servers) throws InterruptedException, Exception {
-        System.out.println("Connecting to VoltDB Interface...");
+    	final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
-        String[] serverArray = servers.split(",");
+    	System.out.println("Connecting to VoltDB Interface...");
         client = ClientFactory.createClient();
-        for (String server : serverArray) {
+
+        for (String server: COMMA_SPLITTER.split(servers)) {
             System.out.println("..." + server);
             client.createConnection(server);
         }
@@ -204,7 +206,7 @@ public class KafkaImportBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         SecureRandom rnd = new SecureRandom();
-        rnd.setSeed(Thread.currentThread().getId());
+        rnd.setSeed(System.identityHashCode(Thread.currentThread()));
         long icnt = 0;
         try {
             // Run the benchmark loop for the requested warmup time

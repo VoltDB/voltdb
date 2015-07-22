@@ -31,6 +31,8 @@ import org.voltdb.client.ProcedureCallback;
 
 public class InsertExport {
     final Client m_client;
+    final static String INSERT_PN = "InsertFinal";
+    final static String EXPORT_PN = "InsertExport";
 
     public InsertExport(Client client) {
         m_client = client;
@@ -38,7 +40,7 @@ public class InsertExport {
 
     public void insertExport(long key, long value) {
         try {
-            m_client.callProcedure(new InsertCallback(), "InsertExport", key, value);
+            m_client.callProcedure(new InsertCallback(EXPORT_PN, key, value), EXPORT_PN, key, value);
         } catch (IOException e) {
             System.out.println("Exception calling stored procedure InsertExport");
             e.printStackTrace();
@@ -47,7 +49,7 @@ public class InsertExport {
 
     public void insertFinal(long key, long value) {
         try {
-            m_client.callProcedure(new InsertCallback(), "InsertFinal", key, value);
+            m_client.callProcedure(new InsertCallback(INSERT_PN, key, value), INSERT_PN, key, value);
         } catch (IOException e) {
             System.out.println("Exception calling stored procedure InsertFinal");
             e.printStackTrace();
@@ -55,12 +57,22 @@ public class InsertExport {
     }
 
     static class InsertCallback implements ProcedureCallback {
+    	final String proc;
+    	final long key;
+    	final long value;
+
+    	InsertCallback(String proc, long key, long value) {
+    	    this.proc = proc;
+    	    this.key = key;
+    	    this.value = value;
+    	}
 
         @Override
         public void clientCallback(ClientResponse clientResponse)
                 throws Exception {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                System.err.println(clientResponse.getStatusString());
+            	String msg = String.format("%s k: %12ld, v: %12ld callback fault: %s", proc, key, value, clientResponse.getStatusString());
+            	System.err.println(msg);
             }
         }
 

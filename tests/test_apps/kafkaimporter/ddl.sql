@@ -42,6 +42,7 @@ CREATE TABLE kafkaexporttable1
                   value BIGINT NOT NULL
      );
 
+PARTITION TABLE kafkaexporttable1 ON COLUMN KEY;
 EXPORT TABLE kafkaexporttable1;
 
 -- Stored procedures
