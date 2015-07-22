@@ -29,7 +29,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedSet;
 
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
@@ -210,7 +209,7 @@ public class ClusterConfig
         {
             if ((m_hostCount - origStartCount) > m_replicationFactor + 1)
             {
-                m_errorMsg = String.format("You can only add %d servers at a time for k=&d",
+                m_errorMsg = String.format("You can only add %d servers at a time for k=%d",
                         m_replicationFactor + 1, m_replicationFactor);
                 return false;
             }
@@ -236,10 +235,6 @@ public class ClusterConfig
             m_neededReplicas = neededReplicas;
         }
 
-        boolean needsReplicas() {
-            return m_neededReplicas > 0;
-        }
-
         @Override
         public int hashCode() {
             return m_partitionId.hashCode();
@@ -250,10 +245,6 @@ public class ClusterConfig
                 throw new RuntimeException("ClusterConfig error: Attempted to replicate a partition too many times");
             }
             m_neededReplicas--;
-        }
-
-        public boolean canUseAsReplica(Node n) {
-            return needsReplicas() && m_master != n && !m_replicas.contains(n);
         }
 
         @Override
@@ -488,61 +479,6 @@ public class ClusterConfig
             return m_root.getGroupSiblingsOf(new String[]{null});
         }
     }
-
-    /*
-     * Are there any partitions that are not fully replicated
-     */
-    private static boolean needReplication(List<Partition> partitions) {
-        for (Partition p : partitions) {
-            if (p.needsReplicas()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /*
-     * Find the node that can take more replicas,
-     * has the least number of replication connections,
-     * and where the number of replication connections are equal,
-     * where the number of replicated partitions is smallest
-     */
-    Node nextNotFullNode(SortedSet<Node> nodes, int sitesPerNode) {
-        ArrayList<Node> notFullList = new ArrayList<Node>();
-        for (Node n : nodes) {
-            if (n.partitionCount() < sitesPerNode) {
-                notFullList.add(n);
-            }
-        }
-
-        Node leastConnectedNode = null;
-        for (Node n : notFullList) {
-            if (leastConnectedNode == null) {
-                leastConnectedNode = n;
-                continue;
-            }
-
-            /*
-             * Pick the one with the fewest connections, and for those that have the same number
-             * of connections, pick the one that is replicating the fewest partitions
-             */
-            if (n.m_replicationConnections.size() <= leastConnectedNode.m_replicationConnections.size()) {
-                int sumA = 0;
-                for (int connections : n.m_replicationConnections.values()) {
-                    sumA += connections;
-                }
-                int sumB = 0;
-                for (int connections : leastConnectedNode.m_replicationConnections.values()) {
-                    sumB += connections;
-                }
-                if (sumA < sumB) {
-                    leastConnectedNode = n;
-                }
-            }
-        }
-        return leastConnectedNode;
-    }
-
 
     /*
      * Original placement strategy that doesn't get very good performance
