@@ -203,9 +203,9 @@ class TestBase extends GebReportingSpec {
      * white-space only) lines in the output (default is true).
      * @param finalChars - the character(s) that, if specified, indicate the
      * end of a 'line', or command; consecutive lines will be concatenated
-     * (separated by a space) and returned as a single line, until this is
-     * found at the end of a line; default is '', an empty string, meaning
-     * each line will be returned separately.
+     * until this is found at the end of a line, and then returned as a single
+     * line; default is '', an empty string, meaning each line will be returned
+     * separately, without concatenation.
      * @return a list of lines from the specified file.
      */
     def List<String> getFileLines(File file, String commentChars='#',
@@ -222,7 +222,7 @@ class TestBase extends GebReportingSpec {
                         lines.add(tmp + line)
                         tmp = ''
                     } else {
-                        tmp += line + ' '
+                        tmp += line
                     }
                 }
             }
