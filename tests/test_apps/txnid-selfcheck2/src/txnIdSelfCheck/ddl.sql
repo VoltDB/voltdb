@@ -143,7 +143,6 @@ CREATE TABLE loadp
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
-, CONSTRAINT pkey_id_forLoadPartitionSP PRIMARY KEY (cid, txnid)
 );
 PARTITION TABLE loadp ON COLUMN cid;
 CREATE TABLE cploadp
@@ -151,7 +150,6 @@ CREATE TABLE cploadp
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
-, CONSTRAINT pkey_id_forCopyLoadPartitionedSP PRIMARY KEY (cid, txnid)
 );
 PARTITION TABLE cploadp ON COLUMN cid;
 
@@ -162,14 +160,12 @@ CREATE TABLE loadmp
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
-, CONSTRAINT pkey_id_forLoadPartitionMP PRIMARY KEY (cid, txnid)
 );
 CREATE TABLE cploadmp
 (
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
-, CONSTRAINT pkey_id_forCopyLoadPartitionMP PRIMARY KEY (cid, txnid)
 );
 
 CREATE TABLE trur
@@ -189,6 +185,28 @@ CREATE TABLE trup
 );
 PARTITION TABLE trup ON COLUMN p;
 
+CREATE TABLE capr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, tmstmp	 timestamp			NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_cr PRIMARY KEY (p,id)
+, LIMIT PARTITION ROWS 10 EXECUTE (
+	DELETE FROM CAPR WHERE tmstmp < NOW
+) );
+
+CREATE TABLE capp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, tmstmp 	 timestamp			NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_cp PRIMARY KEY (p,id)
+, LIMIT PARTITION ROWS 10 EXECUTE (
+	DELETE FROM CAPP WHERE tmstmp < NOW
+) );
+PARTITION TABLE capp ON COLUMN p;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -239,3 +257,8 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
 PARTITION PROCEDURE TRUPScanAggTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURScanAggTable;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPTableInsert;
+PARTITION PROCEDURE CAPPTableInsert ON TABLE capp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPRTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
+PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;

@@ -165,12 +165,6 @@ public class Benchmark {
         @Option(desc = "Allow set ratio of mp to sp workload.")
         float mpratio = (float)0.20;
 
-        @Option(desc = "Allow set ratio of upsert to insert workload.")
-        float upsertratio = (float)0.50;
-
-        @Option(desc = "Allow set ratio of upsert against exist column.")
-        float upserthitratio = (float)0.20;
-
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -186,8 +180,6 @@ public class Benchmark {
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
             if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
-            if (upsertratio < 0.0 || upsertratio > 1.0) exitWithMessageAndUsage("upsertratio must be between 0.0 and 1.0");
-            if (upserthitratio < 0.0 || upserthitratio > 1.0) exitWithMessageAndUsage("upserthitratio must be between 0.0 and 1.0");
         }
 
         @Override
@@ -519,6 +511,8 @@ public class Benchmark {
     BigTableLoader replicatedLoader = null;
     TruncateTableLoader partitionedTruncater = null;
     TruncateTableLoader replicatedTruncater = null;
+    CappedTableLoader partitionedCapped = null;
+    CappedTableLoader replicatedCapped = null;
     LoadTableLoader plt = null;
     LoadTableLoader rlt = null;
     ReadThread readThread = null;
@@ -593,15 +587,17 @@ public class Benchmark {
         log.info("Loading Filler Tables...");
         log.info(HORIZONTAL_RULE);
 
+
         partitionedLoader = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
-        partitionedLoader.start();
+        //partitionedLoader.start();
         replicatedLoader = null;
         if (config.mpratio > 0.0) {
             replicatedLoader = new BigTableLoader(client, "bigr",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
-            replicatedLoader.start();
+            //replicatedLoader.start();
         }
+
 
         // wait for the filler tables to load up
         //partitionedLoader.join();
@@ -628,7 +624,6 @@ public class Benchmark {
             System.out.println("Wait for hashinator..");
         }
 
-
         partitionedTruncater = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedTruncater.start();
@@ -637,6 +632,15 @@ public class Benchmark {
             replicatedTruncater = new TruncateTableLoader(client, "trur",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
             replicatedTruncater.start();
+        }
+
+        partitionedCapped = new CappedTableLoader(client, "capp", // more
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
+        partitionedCapped.start();
+        if (config.mpratio > 0.0) {
+            replicatedCapped = new CappedTableLoader(client, "capr", // more
+                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
+            replicatedCapped.start();
         }
 
         plt = new LoadTableLoader(client, "loadp",
@@ -662,7 +666,6 @@ public class Benchmark {
         idpt.start();
         ddlt = new DdlThread(client);
         // XXX/PSR ddlt.start();
-
         clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
@@ -742,13 +745,11 @@ public class Benchmark {
                 adHocMayhemThread.join();
                 idpt.join();
                 ddlt.join();
-
                 //Shutdown LoadTableLoader
                 rlt.shutdown();
                 plt.shutdown();
                 rlt.join();
                 plt.join();
-
                 for (ClientThread clientThread : clientThreads) {
                     clientThread.join();
                 }
@@ -759,7 +760,6 @@ public class Benchmark {
                 /*
                 shutdown.set(true);
                 es.shutdownNow();
-
                 // block until all outstanding txns return
                 client.drain();
                 client.close();

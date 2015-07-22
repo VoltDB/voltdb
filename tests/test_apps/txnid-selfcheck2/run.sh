@@ -78,19 +78,19 @@ function client() {
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function aysnc-benchmark-help() {
+function benchmark-help() {
     srccompile
     java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
 }
 
-function async-benchmark() {
+function benchmark() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
-        --duration=120 \
+        --duration=600 \
         --servers=localhost \
-        --threads=20 \
+        --threads=49 \
         --threadoffset=0 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
