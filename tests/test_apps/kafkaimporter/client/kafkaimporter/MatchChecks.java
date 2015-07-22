@@ -37,13 +37,13 @@ public class MatchChecks {
     final static String DELETE_ROWS = "DeleteRows";
 
     static class DeleteCallback implements ProcedureCallback {
-    	final String proc;
-    	final long key;
+        final String proc;
+        final long key;
 
-    	DeleteCallback(String proc, long key) {
-    	    this.proc = proc;
-    	    this.key = key;
-    	}
+        DeleteCallback(String proc, long key) {
+            this.proc = proc;
+            this.key = key;
+        }
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {
@@ -51,8 +51,8 @@ public class MatchChecks {
             // Make sure the procedure succeeded. If not,
             // report the error.
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-            	String msg = String.format("%s k: %12d, callback fault: %s", proc, key, clientResponse.getStatusString());
-            	System.err.println(msg);
+                String msg = String.format("%s k: %12d, callback fault: %s", proc, key, clientResponse.getStatusString());
+                System.err.println(msg);
               }
          }
     }

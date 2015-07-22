@@ -146,9 +146,9 @@ public class KafkaImportBenchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     static void dbconnect(String servers) throws InterruptedException, Exception {
-    	final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
+        final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
-    	System.out.println("Connecting to VoltDB Interface...");
+        System.out.println("Connecting to VoltDB Interface...");
         client = ClientFactory.createClient();
 
         for (String server: COMMA_SPLITTER.split(servers)) {

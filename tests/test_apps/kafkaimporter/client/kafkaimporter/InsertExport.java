@@ -57,22 +57,22 @@ public class InsertExport {
     }
 
     static class InsertCallback implements ProcedureCallback {
-    	final String proc;
-    	final long key;
-    	final long value;
+        final String proc;
+        final long key;
+        final long value;
 
-    	InsertCallback(String proc, long key, long value) {
-    	    this.proc = proc;
-    	    this.key = key;
-    	    this.value = value;
-    	}
+        InsertCallback(String proc, long key, long value) {
+            this.proc = proc;
+            this.key = key;
+            this.value = value;
+        }
 
         @Override
         public void clientCallback(ClientResponse clientResponse)
                 throws Exception {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-            	String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
-            	System.err.println(msg);
+                String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
+                System.err.println(msg);
             }
         }
 
