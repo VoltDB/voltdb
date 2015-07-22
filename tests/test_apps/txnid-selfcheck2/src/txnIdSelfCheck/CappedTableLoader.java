@@ -146,21 +146,20 @@ public class CappedTableLoader extends BenchmarkThread {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
                     currentRowCount = nextRowCount;
-                    if (exceedsPartitionLimit() || messyStats()) // this test should change so the wait is not necessary.
+                    if (exceedsCappedLimit())
                         hardStop("Capped table exceeds 10 rows, this shoudln't happen. Exiting. ");
                 }
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
                 log.error("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
-                hardStop("exceeds partition limit exception :: "+ e.getMessage(), e);
                 try { Thread.sleep(3000); } catch (Exception e2) { }
             }
 
 
             // check for row overflow
             try {
-                if (exceedsPartitionLimit())
+                if (exceedsCappedLimit())
                     hardStop("Capped table  exceeds 10 rows, this shoudln't happen. Exiting. ");
             } catch (Exception e) {
                 System.out.println("Exception number 2");
@@ -170,7 +169,7 @@ public class CappedTableLoader extends BenchmarkThread {
         log.info("CappedTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
     }
 
-    private boolean exceedsPartitionLimit() throws NoConnectionsException, IOException, ProcCallException {
+    private boolean exceedsCappedLimit() throws NoConnectionsException, IOException, ProcCallException {
         boolean ret = false;
         VoltTable partitions = client.callProcedure("@GetPartitionKeys", 
                 "INTEGER").getResults()[0];
@@ -182,45 +181,14 @@ public class CappedTableLoader extends BenchmarkThread {
         while (partitions.advanceRow()) {
             long id = partitions.getLong(0);
             long key = partitions.getLong(1);
-            count = client.callProcedure("CAPPCountRows",key).getResults()[0].fetchRow(0).getLong(0);
+            count = client.callProcedure("CAPPCountPartitionRows",key).getResults()[0].fetchRow(0).getLong(0);
             if (count > 10) {
                 log.error("Replicated table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id);
                 ret = true;
             }
         }
         if (ret)
-            log.error("See tables CAPR and CAPP for each partition, as well as above errors ::\n"+partitions.toFormattedString());
-        return ret;
-    }
-    
-    private boolean messyStats() throws NoConnectionsException, IOException, ProcCallException {
-        boolean ret = false;
-        VoltTable stats = TxnId2Utils.doStatistics(client,"table",0).getResults()[0];
-        int replicated_cnt = -1;
-        while (stats.advanceRow()) {
-            String tabname = stats.getString(5);
-            if (tabname.equals("CAPR") || tabname.equals("CAPP")) {// only check rows with a limit
-                int partition = (int)stats.getLong(4);
-                int rowcnt = (int)stats.getLong(7);
-                int rowlim = (int)stats.getLong(11);
-                if (tabname.equals("CAPR")) {
-                    if (replicated_cnt == -1)
-                        replicated_cnt = rowcnt+1000*partition;
-                    else {
-                        if (replicated_cnt%1000 != rowcnt) {
-                            log.error("@Statistics reported that CAPR on Partition:"+partition+" has TUPLE_COUNT:"+rowcnt+", which does not match Partition:"+(replicated_cnt/1000)+" with CAPR.TUPLE_COUNT:"+replicated_cnt%1000);
-                            //ret = true;
-                        }
-                    }
-                }
-                if (rowcnt > rowlim) {
-                    log.error("Table "+tabname+" on partition "+partition+" has TUPLE_COUNT:"+rowcnt+" > TUPLE_LIMIT:"+rowlim);
-                    ret = true;
-                }
-            }
-        }
-        if (ret)
-            log.info(stats.toFormattedString());
+            log.error("See tables CAPR and CAPP for each partition, as well as above errors.");
         return ret;
     }
 }

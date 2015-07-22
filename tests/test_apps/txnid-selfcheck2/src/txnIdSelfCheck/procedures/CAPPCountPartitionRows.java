@@ -28,7 +28,7 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
-public class CAPPCountRows extends VoltProcedure {
+public class CAPPCountPartitionRows extends VoltProcedure {
 
     public final SQLStmt countRows = new SQLStmt(
             "SELECT COUNT(*) FROM capp;");
