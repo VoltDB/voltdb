@@ -155,16 +155,6 @@ public class CappedTableLoader extends BenchmarkThread {
                 log.error("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) { }
             }
-
-
-            // check for row overflow
-            try {
-                if (exceedsCappedLimit())
-                    hardStop("Capped table  exceeds 10 rows, this shoudln't happen. Exiting. ");
-            } catch (Exception e) {
-                System.out.println("Exception number 2");
-                hardStop("exceeds partition limit exception :: "+ e.getMessage(), e);
-            }
         }
         log.info("CappedTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
     }
@@ -187,8 +177,6 @@ public class CappedTableLoader extends BenchmarkThread {
                 ret = true;
             }
         }
-        if (ret)
-            log.error("See tables CAPR and CAPP for each partition, as well as above errors.");
         return ret;
     }
 }
