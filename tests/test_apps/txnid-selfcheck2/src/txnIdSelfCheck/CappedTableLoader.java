@@ -171,7 +171,7 @@ public class CappedTableLoader extends BenchmarkThread {
 
     private boolean exceedsCappedLimit() throws NoConnectionsException, IOException, ProcCallException {
         boolean ret = false;
-        VoltTable partitions = client.callProcedure("@GetPartitionKeys", 
+        VoltTable partitions = client.callProcedure("@GetPartitionKeys",
                 "INTEGER").getResults()[0];
         long count = TxnId2Utils.doAdHoc(client,"SELECT COUNT(*) FROM capr;").getResults()[0].fetchRow(0).getLong(0);
         if (count > 10) {
