@@ -35,6 +35,11 @@ import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltcore.logging.Level;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -54,8 +59,10 @@ public class ImportHandler {
     private boolean m_stopped = false;
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
+    private static final AtomicLong m_lock = new AtomicLong(0);
 
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
+    final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext, CatalogContext catContext) {
@@ -120,7 +127,17 @@ public class ImportHandler {
         return (table!=null);
     }
 
+    public class NullCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+        }
+    }
+
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
+        return callProcedure(ic, new NullCallback(), proc, fieldList);
+    }
+
+    public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
             m_logger.warn("Server is paused and is currently unavailable - please try again later.");
@@ -206,8 +223,8 @@ public class ImportHandler {
 
         boolean success;
         //Synchronize this to create good handles across all ImportHandlers
-        synchronized(ImportHandler.class) {
-            success = m_adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
+        synchronized(ImportHandler.m_lock) {
+            success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
         }
         if (!success) {
             tcont.discard();
@@ -216,6 +233,16 @@ public class ImportHandler {
             m_submitSuccessCount.incrementAndGet();
         }
         return success;
+    }
+
+    //Do rate limited logging for messages.
+    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
+                m_logger, level,
+                cause, format, args
+                );
     }
 
     /**
@@ -233,4 +260,45 @@ public class ImportHandler {
     public void error(String message) {
         m_logger.error(message);
     }
+
+    /**
+     * Log warn message
+     * @param message
+     */
+    public void warn(String message) {
+        m_logger.warn(message);
+    }
+
+    public boolean isDebugEnabled() {
+        return m_logger.isDebugEnabled();
+    }
+
+    public boolean isTraceEnabled() {
+        return m_logger.isTraceEnabled();
+    }
+
+    public boolean isInfoEnabled() {
+        return m_logger.isInfoEnabled();
+    }
+
+    /**
+     * Log debug message
+     * @param message
+     */
+    public void debug(String message) {
+        m_logger.debug(message);
+    }
+
+    /**
+     * Log error message
+     * @param message
+     */
+    public void error(String message, Throwable t) {
+        m_logger.error(message, t);
+    }
+
+    public void error(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.ERROR, t, format, args);
+    }
+
 }
