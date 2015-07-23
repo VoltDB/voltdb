@@ -31,15 +31,20 @@ then
 else
     # the Linux case...
     echo "+++ (pre) target directory:"
-    ls -lRtr $2
+    echo ls -lRtr ~/libs/obj/release/nativelibs/
+    ls -lRtr ~/libs/obj/release/nativelibs/
+    echo ls -lRtr $1
+    ls -lRtr $1
     if [ -e ~/libs/obj/release/nativelibs/libvoltdb-${2}.jnilib ]; then
         mkdir -p $1
         mv ~/libs/obj/release/nativelibs/libvoltdb-${2}.jnilib $1
-        exit 0
     else
         echo "++++++++++++++nativelibs not found!"
-        exit 0
     fi
     echo "+++ (post) target directory:"
-    ls -lRtr $2
+    echo ls -lRtr ~/libs/obj/release/nativelibs/
+    ls -lRtr ~/libs/obj/release/nativelibs/
+    echo ls -lRtr $1
+    ls -lRtr $1
+    exit 0
 fi
