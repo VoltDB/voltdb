@@ -7,8 +7,6 @@
 # For automated builds only; harmless in a dev build but adds no value
 # so enabled only in the "test" user context
 
-# Note: this will need additional work if there are simultaneous builds on the Mac side.
-
 if [ "$USER" != "test" ]; then
     exit 0
 fi
@@ -17,34 +15,21 @@ OS=`uname`
 
 echo '$1 is' $1
 echo '$2 is' $2
-echo 'lib is' obj/release/nativelibs/libvoltdb*.jnilib
+echo 'lib is ', obj/release/nativelibs/libvoltdb*
 
 if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb-${2}.jnilib ]
 then
     # the Mac case...
-    # clean up target directory on volt0, just to be safe
-    # ssh volt0 "cd libs; rm -rf obj"
-
-    # now copy the new native lib over to the linux side
-    tar cvf - obj/release/nativelibs/ | ssh volt0 "cd libs; tar xf -"
+    tar cf - obj/release/nativelibs/ | ssh volt0 "cd libs; tar xf -"
     exit 0
 else
     # the Linux case...
-    echo "+++ (pre) target directory:"
-    echo ls -lRtr ~/libs/obj/release/nativelibs/
-    ls -lRtr ~/libs/obj/release/nativelibs/
-    echo ls -lRtr $1
-    ls -lRtr $1
     if [ -e ~/libs/obj/release/nativelibs/libvoltdb-${2}.jnilib ]; then
         mkdir -p $1
-        mv ~/libs/obj/release/nativelibs/libvoltdb-${2}.jnilib $1
+        cp ~/libs/obj/release/nativelibs/libvoltdb-${2}.jnilib $1
     else
         echo "++++++++++++++nativelibs not found!"
     fi
-    echo "+++ (post) target directory:"
-    echo ls -lRtr ~/libs/obj/release/nativelibs/
-    ls -lRtr ~/libs/obj/release/nativelibs/
-    echo ls -lRtr $1
-    ls -lRtr $1
     exit 0
 fi
+exit 0
