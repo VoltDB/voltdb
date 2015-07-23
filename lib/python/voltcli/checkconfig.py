@@ -25,16 +25,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Command(
-    bundles = VOLT.ServerBundle('rejoin',
-                                needs_catalog=False,
-                                supports_live=True,
-                                default_host=False,
-                                safemode_available=False,
-                                supports_daemon=True,
-                                supports_multiple_daemons=True,
-                                check_environment_config=True),
-    description = 'Rejoin the current node to a VoltDB cluster.'
-)
-def rejoin(runner):
-    runner.go()
+import glob
+
+def check_thp_config():
+    thp_filenames = glob.glob("/sys/kernel/mm/*transparent_hugepage/enabled")
+    thp_filenames += glob.glob("/sys/kernel/mm/*transparent_hugepage/defrag")
+    for filename in thp_filenames:
+        with file(filename) as f:
+            if '[always]' in f.read():
+                return "The kernel is configured to use transparent huge pages (THP). " \
+                    "This is not supported when running VoltDB. See the VoltDB Administrator's " \
+                    "Guide for instructions for disabling THP."
+
+def check_config():
+    return check_thp_config()
