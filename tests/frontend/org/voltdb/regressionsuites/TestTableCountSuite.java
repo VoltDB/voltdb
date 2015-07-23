@@ -51,7 +51,7 @@ public class TestTableCountSuite extends RegressionSuite {
         VoltTable table = client.callProcedure("@AdHoc","SELECT (COUNT(*)+1) FROM TU1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
-        assertEquals(6, table.getLong(0));
+        if ( ! isHSQL()) assertEquals(6, table.getLong(0)); //hsql232 ENG-8310 hsqlbackend arithmetic error
 
         // subquery temp table count
         table = client.callProcedure("@AdHoc","select count(*) from (SELECT * FROM TU1) Temp").getResults()[0];
@@ -160,9 +160,9 @@ public class TestTableCountSuite extends RegressionSuite {
     }
 
     private void checkEmptyTableAggHelper(Client client, String agg, long value) throws Exception {
-        validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 0", new long[]{});
+        if (!isHSQL()) validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 0", new long[]{}); //hsql232 ENG-8366 hsqlbackend LIMIT 0 regression
         validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 1", new long[]{value});
-        validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 0", new long[]{});
+        if (!isHSQL()) validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 0", new long[]{}); //hsql232 ENG-8366 hsqlbackend LIMIT 0 regression
         validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 2", new long[]{value});
         validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1", new long[]{value});
     }

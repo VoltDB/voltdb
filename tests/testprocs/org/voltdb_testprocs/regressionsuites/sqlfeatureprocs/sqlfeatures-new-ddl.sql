@@ -42,7 +42,10 @@ priority SMALLINT,
 CONSTRAINT tblimit3_exec_complex LIMIT PARTITION ROWS 3
   EXECUTE (DELETE FROM capped3_limit_exec_complex
            WHERE may_be_purged = 1
-           AND relevance IN ('irrelevant', 'worthless', 'moot')
+-- hsql232 ENG-8325 IN LIST:           AND relevance IN ('irrelevant', 'worthless', 'moot')
+           AND (relevance = 'irrelevant' -- required workaround hsql232 ENG-8325 IN LIST
+             OR relevance = 'worthless'  -- required workaround hsql232 ENG-8325 IN LIST
+             OR relevance = 'moot')      -- required workaround hsql232 ENG-8325 IN LIST
            AND priority < 16384)
 );
 
