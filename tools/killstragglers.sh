@@ -11,7 +11,7 @@ IGNORE="JENKINS_HOME|zookeeper.server.quorum.QuorumPeerMain|kafka.Kafka"
 if [ $USER = "test" ]; then
     SUDO=sudo
 fi
-for P in `$SUDO netstat -tnlp | egrep 'LISTEN.*/java' | tr -s \  | cut -d\  -f7 | cut -d\/ -f1 | sort | uniq | grep -v $(pgrep -f "$IGNORE")`
+for P in `$SUDO pgrep -f org.voltdb.VoltDB | xargs`
 do
     logger -sp user.notice -t TESTKILL "User $USER $BUILD_TAG Killing `$SUDO ps --no-headers -p $P -o pid,user,command`"
     $SUDO kill -9 $P
