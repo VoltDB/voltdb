@@ -627,7 +627,7 @@ public class AuthSystem {
         private final String m_user;
         private final byte [] m_password;
 
-        public HashAuthenticationRequest(final String user, final byte [] hash, final ClientAuthHashScheme scheme) {
+        public HashAuthenticationRequest(final String user, final byte [] hash) {
             m_user = user;
             m_password = hash;
         }

@@ -685,7 +685,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (ap == AuthProvider.KERBEROS) {
                     arq = context.authSystem.new KerberosAuthenticationRequest(socket);
                 } else {
-                    arq = context.authSystem.new HashAuthenticationRequest(username, password, hashScheme);
+                    arq = context.authSystem.new HashAuthenticationRequest(username, password);
                 }
                 /*
                  * Authenticate the user.
