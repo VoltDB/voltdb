@@ -65,37 +65,39 @@
 #
 {"testName":"InsertIntOutOfBounds",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3000, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"Unable to convert string 3000 to byte"}}
 {"testName":"InsertExtraVarchar",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"exceeds the size of the VARCHAR"}}
 {"testName":"InsertVarcharAsInt",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant integer value"}}
 {"testName":"InsertVarcharAsBigInt",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant bigint value"}}
 {"testName":"InsertVarcharAsSmallInt",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant smallint value"}}
 {"testName":"InsertVarcharAsTinyInt",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant tinyint value"}}
 {"testName":"InsertVarCharAsFloat",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'VARCHAR', 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant float value"}}
 {"testName":"InsertVarcharAsDecimal",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'VARCHAR', 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant decimal value"}}
 {"testName":"InsertVarcharAsTimestamp",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'VARCHAR', 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant timestamp value"}}
 {"testName":"InsertBadParamCount",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(NotEnoughParameters)",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"column count mismatch"}}
 {"testName":"InsertNullNotNull",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, A, null, C, null, E, null)",
- "response":{"result":"ERROR","status":"FAILURE"}}
+# Note: a more precise expected error than "PlanningErrorException" would be good here, but the
+# current error "user lacks privilege or object not found: A" seems wrong, so likely to change
+ "response":{"result":"ERROR","status":"FAILURE","error":"PlanningErrorException"}}
 
 
 #
@@ -141,10 +143,10 @@
 #             "status":"SUCCESS"}}
 {"testName":"SelectBadColumn",
    "sqlCmd":"SELECT badColumn FROM partitioned_table",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"object not found: BADCOLUMN"}}
 {"testName":"SelectBadTable",
    "sqlCmd":"SELECT * FROM bad_table",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"object not found: BAD_TABLE"}}
 
 
 #
@@ -196,37 +198,39 @@
 #
 {"testName":"UpsertIntOutOfBounds",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3000, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"Unable to convert string 3000 to byte"}}
 {"testName":"UpsertExtraVarchar",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"exceeds the size of the VARCHAR"}}
 {"testName":"UpsertVarcharAsInt",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant integer value"}}
 {"testName":"UpsertVarcharAsBigInt",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant bigint value"}}
 {"testName":"UpsertVarcharAsSmallInt",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant smallint value"}}
 {"testName":"UpsertVarcharAsTinyInt",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant tinyint value"}}
 {"testName":"UpsertVarCharAsFloat",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'VARCHAR', 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant float value"}}
 {"testName":"UpsertVarcharAsDecimal",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'VARCHAR', 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant decimal value"}}
 {"testName":"UpsertVarcharAsTimestamp",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'VARCHAR', 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant timestamp value"}}
 {"testName":"UpsertBadParamCount",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(NotEnoughParameters)",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"column count mismatch"}}
 {"testName":"UpsertNullNotNull",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, A, null, C, null, E, null)",
- "response":{"result":"ERROR","status":"FAILURE"}}
+# Note: a more precise expected error than "PlanningErrorException" would be good here, but the
+# current error "user lacks privilege or object not found: A" seems wrong, so likely to change
+ "response":{"result":"ERROR","status":"FAILURE","error":"PlanningErrorException"}}
 
 
 #
@@ -258,7 +262,7 @@
 {"testName":"InsertIntoSelectPart2Repl",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
              INSERT INTO replicated_table SELECT * FROM partitioned_table WHERE rowid=1 ORDER BY rowid",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"partitioned data for insertion into replicated table"}}
 # Select from Partitioned, Insert into (another) Partition should fail:
 {"testName":"InsertIntoSelectPart2Part",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
@@ -266,7 +270,7 @@
              type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
              type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\n
              FROM partitioned_table WHERE rowid=1 ORDER BY rowid",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"one partition to another, which is unsupported"}}
 
 
 #
@@ -291,12 +295,12 @@
 {"testName":"UpsertIntoSelectNoOrderBy",
    "sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
              UPSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1;               ",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"non-deterministic"}}
 # Select from Partitioned, Upsert into Replicated should fail:
 {"testName":"UpsertIntoSelectPart2Repl",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
              UPSERT INTO replicated_table SELECT * FROM partitioned_table WHERE rowid=1 ORDER BY rowid",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"partitioned data for insertion into replicated table"}}
 # Select from Partitioned, Upsert into (another) Partition should fail:
 {"testName":"UpsertIntoSelectPart2Part",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
@@ -304,7 +308,7 @@
              type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
              type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\n
              FROM partitioned_table WHERE rowid=1 ORDER BY rowid",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"one partition to another, which is unsupported"}}
 
 
 #
@@ -369,7 +373,7 @@
 #             "status":"SUCCESS"}}
 {"testName":"SysInvalid",
    "sqlCmd":"exec PARTITIONED_TABLE.badProc",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"PARTITIONED_TABLE.badProc\" is undefined"}}
 
 
 #
@@ -463,29 +467,29 @@
    "sqlCmd":"drop table ddl_table if exists;\n
              Create table ddl_table (i integer, j tinyint, k bigint);\n
              Alter table ddl_table drop column j alter table ddl_table drop column k",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"unexpected token: ALTER"}}
 {"testName":"DdlAlterTableAddAdd",
    "sqlCmd":"drop table ddl_table if exists;\n
              Create table ddl_table (i integer);\n
              Alter table ddl_table add column j bigint alter table ddl_table add column k tinyint",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"unexpected token: ALTER"}}
 # try to create a view from an undefined table
 {"testName":"DdlCreateViewInvalid",
    "sqlCmd":"create view ddl_no_table_view (gb, ct) as select i, count(*) from ddl_no_table_exists group by i",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"object not found: DDL_NO_TABLE_EXISTS"}}
 
 #
 # try to create a procedure with a ddl statement (not supported) inside it.
 #
 {"testName":"DdlCreateProcInvalidCreate",
    "sqlCmd":"create procedure as create table dynamic_table (i integer)",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"Invalid CREATE PROCEDURE"}}
 {"testName":"DdlCreateProcInvalidDrop",
    "sqlCmd":"create procedure as drop table dynamic_table if exists",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"Invalid CREATE PROCEDURE"}}
 {"testName":"DdlCreateProcInvalidAlter",
    "sqlCmd":"create procedure as alter table dynamic_table add column j integer;",
- "response":{"result":"ERROR","status":"FAILURE"}}
+ "response":{"result":"ERROR","status":"FAILURE","error":"Invalid CREATE PROCEDURE"}}
 
 # Finally, drop ddl_table, so test is repeatable.
 {"testName":"DdlDropTable",
