@@ -381,7 +381,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             if (m_mpDrGateway != null) {
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
-            ExportManager.syncExport(nofsync);
+            ExportManager.sync(nofsync);
         }
 
         @Override

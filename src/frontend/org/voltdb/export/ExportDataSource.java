@@ -588,26 +588,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }));
     }
 
-    private class SyncExportRunnable implements Runnable {
-        private final boolean nofsync;
-        SyncExportRunnable(final boolean nofsync) {
-            this.nofsync = nofsync;
+    private class SyncRunnable implements Runnable {
+        private final boolean m_nofsync;
+        SyncRunnable(final boolean nofsync) {
+            this.m_nofsync = nofsync;
         }
 
         @Override
         public void run() {
             try {
-                //Don't do a real sync, just write the in memory buffers
-                //to a file. @Quiesce or blocking snapshot will do the sync
-                m_committedBuffers.sync(nofsync);
+                m_committedBuffers.sync(m_nofsync);
             } catch (IOException e) {
                 exportLog.error(e);
             }
         }
     }
 
-    public ListenableFuture<?> syncExport(final boolean nofsync) {
-        return m_es.submit(new SyncExportRunnable(nofsync));
+    public ListenableFuture<?> sync(final boolean nofsync) throws Exception {
+        try {
+            return m_es.submit(new SyncRunnable(nofsync));
+        } catch (Exception e) {
+            throw e;
+        }
     }
 
     public ListenableFuture<?> close() {

@@ -784,19 +784,20 @@ public class ExportGeneration {
         return m_drainedSources.get() == m_numSources;
     }
 
-    public void syncExport(final boolean nofsync) {
+    public void sync(final boolean nofsync) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
 
-        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
-            for (ExportDataSource source : dataSources.values()) {
-                tasks.add(source.syncExport(nofsync));
-            }
-        }
-
         try {
-            Futures.allAsList(tasks).get();
+            for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : dataSources.values()) {
+                    tasks.add(source.sync(nofsync));
+                }
+            }
+
+            if (!tasks.isEmpty())
+                Futures.allAsList(tasks).get();
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unexpected exception syncing export data during snapshot save.", true, e);
+            exportLog.error("Unexpected exception syncing export data during snapshot save.", e);
         }
     }
 
