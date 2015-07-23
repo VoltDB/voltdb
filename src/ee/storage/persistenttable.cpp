@@ -579,6 +579,11 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
 
+    // handle any materialized views
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+    }
+
     /**
      * Remove the current tuple from any indexes.
      */
@@ -600,11 +605,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
                                     m_name.c_str(), index->getName().c_str());
             }
         }
-    }
-
-    // handle any materialized views
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -761,13 +761,13 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // The tempTuple is forever!
     assert(&target != &m_tempTuple);
 
-    // Just like insert, we want to remove this tuple from all of our indexes
-    deleteFromAllIndexes(&target);
-
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleDelete(target, fallible);
     }
+
+    // Just like insert, we want to remove this tuple from all of our indexes
+    deleteFromAllIndexes(&target);
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
