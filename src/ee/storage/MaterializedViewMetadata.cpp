@@ -26,6 +26,8 @@
 #include "catalog/columnref.h"
 #include "catalog/column.h"
 #include "catalog/table.h"
+#include "catalog/planfragment.h"
+#include "catalog/statement.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "expressions/constantvalueexpression.h"
@@ -33,9 +35,15 @@
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
+#include "execution/VoltDBEngine.h"
+#include "execution/ExecutorVector.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
 
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
+typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
+
+using namespace std;
 namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
@@ -72,6 +80,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 
     // handle index for min / max support
     setIndexForMinMax(mvInfo->indexForMinMax());
+    setFallbackExecutorVectors(mvInfo->fallbackQueryStmts());
 
     allocateBackedTuples();
 
@@ -145,6 +154,36 @@ void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catal
         }
     }
     allocateMinMaxSearchKeyTuple();
+}
+
+string hexDecodeToString(const string hexString) {
+    size_t len = hexString.length();
+    string retval;
+    for(int i=0; i<len; i+=2) {
+        string byte = hexString.substr(i,2);
+        char chr = (char) (int)strtol(byte.c_str(), NULL, 16);
+        retval.push_back(chr);
+    }
+    return retval;
+}
+
+void MaterializedViewMetadata::setFallbackExecutorVectors(catalog::CatalogMap<catalog::Statement> fallbackQueryStmts) {
+    m_fallbackExecutorVectors.clear();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    BOOST_FOREACH (LabeledStatement labeledStatement, m_mvInfo->fallbackQueryStmts()) {
+        catalog::Statement *stmt = labeledStatement.second;
+        const string b64plan = stmt->fragments().begin()->second->plannodetree();
+        string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
+        string explanation = hexDecodeToString(stmt->explainplan());
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+            cout << explanation << endl;
+        }
+
+        boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
+        // We don't need the send executor.
+        execVec->getRidOfSendExecutor();
+        m_fallbackExecutorVectors.push_back(execVec);
+    }
 }
 
 void MaterializedViewMetadata::freeBackedTuples()
@@ -592,6 +631,13 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
 
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
 {
+    // For debug:
+    if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        cout << "================== processTupleDelete ==================" << endl;
+        cout << "oldTuple: " << endl << oldTuple.debugNoHeader() << endl;
+        cout << "srcTable: " << endl << m_srcTable->debug() << endl;
+        cout << "========================================================" << endl;
+    }
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && !m_filterPredicate->eval(&oldTuple, NULL).isTrue())
         return;
@@ -640,7 +686,6 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
         NValue newValue = existingValue;
         if ( ! oldValue.isNull()) {
-            int reversedForMin = 1; // initially assume that agg is not MIN.
             switch(m_aggTypes[aggIndex]) {
             case EXPRESSION_TYPE_AGGREGATE_SUM:
                 newValue = existingValue.op_subtract(oldValue);
@@ -649,22 +694,45 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 newValue = oldValue.isNull() ? existingValue : existingValue.op_decrement();
                 break;
             case EXPRESSION_TYPE_AGGREGATE_MIN:
-                reversedForMin = -1; // fall through...
+                // fall through...
                 /* no break */
             case EXPRESSION_TYPE_AGGREGATE_MAX:
                 if (oldValue.compare(existingValue) == 0) {
                     // re-calculate MIN / MAX
                     newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
 
-                    // indexscan if an index is available, otherwise tablescan
-                    if (m_indexForMinMax[minMaxAggIdx]) {
-                        newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
-                                                                  reversedForMin, aggIndex, minMaxAggIdx);
-                    } else {
-                        VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
-                        newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
-                                                                     reversedForMin, aggIndex);
-                        VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
+                    // build parameters.
+                    ExecutorContext* context = ExecutorContext::getExecutorContext();
+                    NValueArray &params = *context->getParameterContainer();
+                    // the parameters are the groupby columns and the aggregation column.
+                    vector<NValue> backups(m_groupByColumnCount + 1);
+                    int colindex;
+                    for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+                        backups[colindex] = params[colindex];
+                        params[colindex] = m_existingTuple.getNValue(colindex);
+                    }
+                    backups[colindex] = params[colindex];
+                    params[colindex] = oldValue;
+                    // executing the stored plan.
+                    const vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
+                    Table *retval = context->executeExecutors(executorList, 0);
+                    assert(retval);
+                    // get the fallback value from the returned table.
+                    TableIterator iterator = retval->iterator();
+                    TableTuple tuple(retval->schema());
+                    if (iterator.next(tuple) && iterator.next(tuple)) {
+                        newValue = tuple.getNValue(0);
+                    }
+                    // For debug:
+                    // if (context->m_siteId == 0) {
+                    //     cout << "oldTuple: " << oldTuple.debugNoHeader() << endl;
+                    //     cout << "Return table: " << endl << retval->debug() << endl;
+                    //     cout << "newValue: " << newValue.debug() << endl;
+                    // }
+                    // restore
+                    context->cleanupExecutorsForSubquery(executorList);
+                    for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
+                        params[colindex] = backups[colindex];
                     }
                 }
                 break;

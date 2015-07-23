@@ -31,6 +31,7 @@ namespace voltdb {
 class AbstractExpression;
 class PersistentTable;
 class TableIndex;
+class ExecutorVector;
 
 /**
  * Manage the inserts, deletes and updates for a materialized view table based on changes to
@@ -74,6 +75,14 @@ public:
         if ( ! index ) { return false; }
         return index->getColumnIndices().size() == m_groupByColumnCount + 1;
     }
+
+    // Returns the fallback executor vectors
+    std::vector< boost::shared_ptr<ExecutorVector> > getFallbackExecutorVectors() {
+        return m_fallbackExecutorVectors;
+    }
+
+    void setFallbackExecutorVectors(catalog::CatalogMap<catalog::Statement> fallbackQueryStmts);
+
 private:
 
     void freeBackedTuples();
@@ -120,6 +129,8 @@ private:
 
     // the index on srcTable which can be used to maintain min/max
     std::vector<TableIndex *> m_indexForMinMax;
+    // Executor vectors to be executed when fallback on min/max value is needed (ENG-8641).
+    std::vector< boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
