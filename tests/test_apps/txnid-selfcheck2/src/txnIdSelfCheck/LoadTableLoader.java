@@ -199,7 +199,7 @@ public class LoadTableLoader extends BenchmarkThread {
             Benchmark.txnCount.incrementAndGet();
             long cnt = clientResponse.getResults()[0].asScalarLong();
             if (cnt != expected_delete) {
-                log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt);
+                log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt + " Expected: " + expected_delete);
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the loader
                 m_shouldContinue.set(false);
