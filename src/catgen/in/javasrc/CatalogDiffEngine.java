@@ -624,13 +624,18 @@ public class CatalogDiffEngine {
         }
 
         // Support any modification of these
+
+        // I added Statement and PlanFragment for the need of materialized view recalculation plan updates.
+        // ENG-8641, yzhang.
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
             suspect instanceof SnapshotSchedule ||
             suspect instanceof UserRef ||
             suspect instanceof GroupRef ||
-            suspect instanceof ColumnRef) {
+            suspect instanceof ColumnRef ||
+            suspect instanceof Statement ||
+            suspect instanceof PlanFragment) {
             return null;
         }
 
