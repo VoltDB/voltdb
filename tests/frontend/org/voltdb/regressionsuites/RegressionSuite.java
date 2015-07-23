@@ -388,7 +388,7 @@ public class RegressionSuite extends TestCase {
     }
 
     static protected void validateTableOfLongs(Client c, String sql, long[][] expected)
-            throws Exception, IOException, ProcCallException {
+            throws NoConnectionsException, IOException, ProcCallException {
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, expected);
     }
