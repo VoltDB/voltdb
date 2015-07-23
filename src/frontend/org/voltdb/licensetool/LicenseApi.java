@@ -31,5 +31,6 @@ public interface LicenseApi {
     public Calendar expires();
     public boolean verify() throws LicenseException;
     public boolean isDrReplicationAllowed();
+    public boolean isDrActiveActiveAllowed();
     public boolean isCommandLoggingAllowed();
 }
