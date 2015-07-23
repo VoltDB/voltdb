@@ -530,8 +530,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                                        joinNode.getJoinType() != JoinType.INNER;
 
         // When the inner plan is an IndexScan, there MAY be a choice of whether to join using a
-        // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLJ will have an advantage over the
-        // NLIJ in the cases where it applies, since it does a single access or iteration over the index
+        // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLIJ will have an advantage over the
+        // NLJ in the cases where it applies, since it does a single access or iteration over the index
         // and caches the result, where the NLIJ does an index access or iteration for each outer row.
         // The NestLoopJoin applies when the inner IndexScan is driven only by parameter and constant
         // expressions determined at the start of the query. That requires that none of the IndexScan's
@@ -584,7 +584,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 joinClauses.addAll(innerAccessPath.otherExprs);
                 AbstractExpression indexScanPredicate = ExpressionUtil.combine(innerExpr);
                 ((IndexScanPlanNode)innerPlan).setPredicate(indexScanPredicate);
+            } else if (innerJoinNode instanceof BranchNode && joinNode.getJoinType() == JoinType.LEFT) {
+                // If innerJoinNode is LEAF node, the "otherExprs" has been applied as predicates already.
+                // If the join type is INNER john, it has been pushed down.
+                // nest loop join index case has been handled, so let's go to nlj without index case.
+
+                // otherExpr of innerAccessPath comes from its parentNode's joinInnerList.
+                // For Outer join (LEFT ONLY at this point), it could mean a join predicate on the table of
+                // the inner node ONLY, that can not be pushed down.
+                joinClauses.addAll(innerAccessPath.otherExprs);
             }
+
             nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
 
             // combine the tails plan graph with the new head node
@@ -625,6 +635,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return null;
         }
         ajNode.setJoinType(joinNode.getJoinType());
+        // pre-join expressions
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
         ajNode.resolveSortDirection();
