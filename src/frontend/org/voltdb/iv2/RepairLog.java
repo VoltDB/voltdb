@@ -276,13 +276,13 @@ public class RepairLog
         items.addAll(m_logMP);
         long maxSeenBinaryLogUniqueId = m_maxSeenMpBinaryLogUniqueId;
         long maxSeenBinaryLogDRId = m_maxSeenMpBinaryLogDRId;
-        long maxSeenLocalSpUniqueId = m_maxSeenLocalSpUniqueId;
-        long maxSeenLocalMpUniqueId = m_maxSeenLocalMpUniqueId;
+        long maxSeenLocalDrUniqueId = m_maxSeenLocalSpUniqueId;
         // SP repair requests also want the SP transactions
         if (!forMPI) {
             maxSeenBinaryLogUniqueId = m_maxSeenSpBinaryLogUniqueId;
             maxSeenBinaryLogDRId = m_maxSeenSpBinaryLogDRId;
             items.addAll(m_logSP);
+            maxSeenLocalDrUniqueId = m_maxSeenLocalMpUniqueId;
         }
 
         // Contents need to be sorted in increasing spHandle order
@@ -302,8 +302,7 @@ public class RepairLog
                         m_lastSpHandle,
                         m_lastMpHandle,
                         TheHashinator.getCurrentVersionedConfigCooked(),
-                        maxSeenLocalSpUniqueId,
-                        maxSeenLocalMpUniqueId,
+                        maxSeenLocalDrUniqueId,
                         maxSeenBinaryLogDRId,
                         maxSeenBinaryLogUniqueId);
         responses.add(hheader);

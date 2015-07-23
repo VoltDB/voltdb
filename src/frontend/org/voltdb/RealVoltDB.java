@@ -1642,7 +1642,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      */
     void buildClusterMesh(boolean isRejoin) {
         final String leaderAddress = m_config.m_leader;
-        HostAndPort hostAndPort= MiscUtils.getHostAndPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
+        HostAndPort hostAndPort = MiscUtils.getHostAndPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
         String hostname = hostAndPort.getHostText();
         int port = hostAndPort.getPort();
 

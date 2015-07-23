@@ -37,8 +37,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private int m_ofTotal = 0;
     private long m_handle = Long.MIN_VALUE;
     private long m_txnId;
-    private long m_localSpUniqueId;
-    private long m_localMpUniqueId;
+    private long m_localDrUniqueId;
 
     /*
      * The largest seen original (master cluster) ids
@@ -81,7 +80,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     public Iv2RepairLogResponseMessage(long requestId, int ofTotal,
             long spHandle, long txnId,
             Pair<Long, byte[]> versionedHashinatorConfig,
-            long spUniqueId, long mpUniqueId,
+            long drUniqueId,
             long binaryLogSequenceNumber, long binaryLogUniqueId)
     {
         super();
@@ -90,8 +89,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = ofTotal;
         m_handle = spHandle;
         m_txnId = txnId;
-        m_localSpUniqueId = spUniqueId;
-        m_localMpUniqueId = mpUniqueId;
+        m_localDrUniqueId = drUniqueId;
         m_binaryLogDRId = binaryLogSequenceNumber;
         m_binaryLogUniqueId = binaryLogUniqueId;
         m_hashinatorVersion = versionedHashinatorConfig.getFirst();
@@ -122,12 +120,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         return m_txnId;
     }
 
-    public long getLocalSpUniqueId() {
-        return m_localSpUniqueId;
-    }
-
-    public long getLocalMpUniqueId() {
-        return m_localMpUniqueId;
+    public long getLocalDrUniqueId() {
+        return m_localDrUniqueId;
     }
 
     public long getBinaryLogSequenceNumber() {
@@ -166,8 +160,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
         msgsize += 8; // txnId
-        msgsize += 8; // localSpUniqueId
-        msgsize += 8; // localMpUniqueId
+        msgsize += 8; // localDrUniqueId
         msgsize += 8; // binaryLogDRId
         msgsize += 8; // binaryLogUniqueId
         if (m_payload != null) {
@@ -190,8 +183,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putInt(m_ofTotal);
         buf.putLong(m_handle);
         buf.putLong(m_txnId);
-        buf.putLong(m_localSpUniqueId);
-        buf.putLong(m_localMpUniqueId);
+        buf.putLong(m_localDrUniqueId);
         buf.putLong(m_binaryLogDRId);
         buf.putLong(m_binaryLogUniqueId);
 
@@ -220,8 +212,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = buf.getInt();
         m_handle = buf.getLong();
         m_txnId = buf.getLong();
-        m_localSpUniqueId = buf.getLong();
-        m_localMpUniqueId = buf.getLong();
+        m_localDrUniqueId = buf.getLong();
         m_binaryLogDRId = buf.getLong();
         m_binaryLogUniqueId = buf.getLong();
 

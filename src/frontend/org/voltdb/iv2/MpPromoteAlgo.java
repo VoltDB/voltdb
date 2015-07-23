@@ -172,11 +172,11 @@ public class MpPromoteAlgo implements RepairAlgo
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
             }
 
-            if (response.getBinaryLogSequenceNumber() == 0) {
+            if (response.getSequence() == 0) {
                 // The first Repair Log message contains the maximum values needed by DR for promotion
-                assert response.getLocalMpUniqueId() == Long.MIN_VALUE ||
-                        UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalMpUniqueId()) ==  MpInitiator.MP_INIT_PID;
-                m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, response.getLocalMpUniqueId());
+                assert response.getLocalDrUniqueId() == Long.MIN_VALUE ||
+                        UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalDrUniqueId()) ==  MpInitiator.MP_INIT_PID;
+                m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, response.getLocalDrUniqueId());
                 m_maxBinaryLogSequenceNumber = Math.max(m_maxBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
                 m_maxBinaryLogUniqueId = Math.max(m_maxBinaryLogUniqueId, response.getBinaryLogUniqueId());
             }

@@ -180,11 +180,11 @@ public class SpPromoteAlgo implements RepairAlgo
             if (response.getHandle() != Long.MAX_VALUE) {
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
             }
-            if (response.getBinaryLogSequenceNumber() == 0) {
+            if (response.getSequence() == 0) {
                 // The first Repair Log message contains the maximum values needed by DR for promotion
-                assert response.getLocalSpUniqueId() == Long.MIN_VALUE ||
-                        UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalSpUniqueId()) !=  MpInitiator.MP_INIT_PID;
-                m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, response.getLocalSpUniqueId());
+                assert response.getLocalDrUniqueId() == Long.MIN_VALUE ||
+                        UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalDrUniqueId()) !=  MpInitiator.MP_INIT_PID;
+                m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, response.getLocalDrUniqueId());
                 m_maxSeenBinaryLogSequenceNumber = Math.max(m_maxSeenBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
                 m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, response.getBinaryLogUniqueId());
             }
