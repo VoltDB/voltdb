@@ -2063,7 +2063,7 @@ public class TestVoltCompiler extends TestCase {
     {
         // Test indexes.
         String ddl = "";
-        String errorIndexMsg = "Index IDX_T_TM cannot include the function NOW or CURRENT_TIMESTAMP.";
+        String errorIndexMsg = "Index \"IDX_T_TM\" cannot include the function NOW or CURRENT_TIMESTAMP.";
         ddl = "create table t(id integer not null, tm timestamp);\n" +
               "create index idx_t_tm on t(since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm));";
         checkDDLErrorMessage(ddl, errorIndexMsg);
@@ -4059,17 +4059,24 @@ public class TestVoltCompiler extends TestCase {
         // Scalar subquery not allowed in indices.
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
                                     "create index bidx on books ( select title from books as child where child.cash = books.cash );");
-        checkDDLAgainstScalarSubquerySchema("Index BIDX1 with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Index \"BIDX1\" with subquery sources is not supported.",
                                     "create index bidx1 on books ( ( select title from books as child where child.cash = books.cash ) ) ;");
-        checkDDLAgainstScalarSubquerySchema("Index BIDX2 with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Index \"BIDX2\" with subquery sources is not supported.",
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );");
         // Scalar subquery not allowed in materialize views.
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select cash, count(*) from books where ( select cash from books as child where books.title = child.title ) < 100 group by cash;\n");
+        /*
+         // This query is not actually correct.  The problem is not the existence
+         // of the subquery in the display list, but that the group by
+         // clause is uses alias for the display list subquery.  This is
+         // arguably not standard SQL, but it is frequently implemented
+         // this way.
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
+        */
     }
 
     public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
@@ -4087,6 +4094,41 @@ public class TestVoltCompiler extends TestCase {
         checkDDLAgainstScalarSubquerySchema("Object not found: PARENT",
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < parent.title ) );");
     }
+
+    public void testAggregateExpressionsInIndices() throws Exception {
+        String ddl = "create table alpha (id integer not null, seqnum float);";
+        // Test for time sensitive queries.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
+                                    ddl,
+                                    "create index faulty on alpha(id, NOW);");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, CURRENT_TIMESTAMP);");
+        // Test for aggregate calls.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + avg(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + max(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + min(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + count(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + count(*));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, 100 + sum(id));");
+        // Test for subqueries.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with subquery sources is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id = (select id + id from alpha));");
+    }
+
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;
         for (String string : diagnostics) {
