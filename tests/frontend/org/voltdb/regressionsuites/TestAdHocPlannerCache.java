@@ -30,6 +30,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AsyncCompilerAgent;
@@ -126,6 +127,16 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         checkCacheStatistics(client, m_cache1_level, m_cache2_level, m_cache1_hits, m_cache2_hits, m_cache_misses);
     }
 
+    
+    public void testENG8424() throws IOException, ProcCallException{
+        System.out.println("testENG8424...");
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "select * from tb;");
+        VoltTable vt = client.callProcedure("@Statistics", "PLANNER", 0).getResults()[0];
+        vt.advanceRow();
+        assertEquals(1, vt.getLong("CACHE1_LEVEL"));
+        ++m_cache1_level;
+    }
 
     public void testAdHocPlannerCache() throws IOException, ProcCallException {
          System.out.println("testAdHocPlannerCache...");
@@ -840,9 +851,10 @@ public class TestAdHocPlannerCache extends RegressionSuite {
                 + "create procedure proc1 AS select num as number from R1 where id > ? order by num;"
                 + ""
                 ;
-
+        final String literalSchemaENG8424="create table tb (a integer);";
         try {
             project.addLiteralSchema(literalSchema);
+            project.addLiteralSchema(literalSchemaENG8424);
         } catch (IOException e) {
             assertFalse(true);
         }
