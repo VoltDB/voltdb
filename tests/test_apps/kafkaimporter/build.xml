@@ -20,6 +20,7 @@
         <delete dir="${voltdbroot.dir}"/>
         <delete dir="${basedir}/felix-cache"/>
         <delete file="${jar.dir}/client.jar"/>
+        <delete file="${jar.dir}/sp.jar"/>
         <delete file="${basedir}/catalog-report.html"/>
     </target>
 
