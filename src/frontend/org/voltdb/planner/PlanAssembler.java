@@ -282,7 +282,10 @@ public class PlanAssembler {
                 // The execution engine expects to see the outer table on the left side only
                 // which means that RIGHT joins need to be converted to the LEFT ones
                 ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
-                simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
+
+                if (! m_parsedSelect.hasJoinOrder()) {
+                    simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
+                }
             }
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
