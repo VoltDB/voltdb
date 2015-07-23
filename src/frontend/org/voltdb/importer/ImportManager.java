@@ -17,6 +17,8 @@
 
 package org.voltdb.importer;
 
+import java.io.File;
+import java.io.IOException;
 import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 
 import java.util.HashMap;
@@ -68,7 +70,7 @@ public class ImportManager implements ChannelChangeCallback {
         return m_self;
     }
 
-    protected ImportManager(int myHostId, HostMessenger messenger) throws BundleException {
+    protected ImportManager(int myHostId, HostMessenger messenger) throws BundleException, IOException {
         m_myHostId = myHostId;
         m_messenger = messenger;
         m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
@@ -82,7 +84,17 @@ public class ImportManager implements ChannelChangeCallback {
         // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-framework/apache-felix-framework-configuration-properties.html
         m_frameworkProps.put("org.osgi.framework.storage.clean", "onFirstInit");
         String tmpFilePath = System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"));
-        m_frameworkProps.put("felix.cache.rootdir", tmpFilePath);
+        //Create a directory in temp + username
+        File f = new File(tmpFilePath, System.getProperty("user.name"));
+        if (!f.isDirectory() && !f.mkdirs()) {
+            throw new IOException("Failed to importer cache directory: " + f.getAbsolutePath());
+        }
+        if (!f.canWrite()) {
+            throw new IOException("Importer cache directory not writable: " + f.getAbsolutePath());
+        }
+        m_frameworkProps.put("felix.cache.rootdir", f.getAbsolutePath());
+        //felix.cache.locking set to false.
+        m_frameworkProps.put("felix.cache.locking", Boolean.FALSE.toString());
         m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
         importLog.info("Framework properties are: " + m_frameworkProps);
         m_framework = m_frameworkFactory.newFramework(m_frameworkProps);
@@ -95,8 +107,9 @@ public class ImportManager implements ChannelChangeCallback {
      * @param catalogContext current catalog context
      * @param messenger messenger to get to ZK
      * @throws org.osgi.framework.BundleException
+     * @throws java.io.IOException
      */
-    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException {
+    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
         ImportManager em = new ImportManager(myHostId, messenger);
 
         m_self = em;
