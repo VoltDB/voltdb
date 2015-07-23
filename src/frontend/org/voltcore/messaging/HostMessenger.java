@@ -553,7 +553,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 fhost.enableRead(VERBOTEN_THREADS);
             } catch (Exception e) {
                 m_networkLog.error("Error joining new node", e);
-                m_knownFailedHosts.add(hostId);
+                addFailedHost(hostId);
                 removeForeignHost(hostId);
                 return;
             }
