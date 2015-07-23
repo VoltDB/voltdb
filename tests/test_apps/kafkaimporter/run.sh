@@ -57,7 +57,7 @@ function cleanall() {
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
-    ant client
+    ant all
 }
 
 # compile the procedure and client jarfiles if they don't exist
