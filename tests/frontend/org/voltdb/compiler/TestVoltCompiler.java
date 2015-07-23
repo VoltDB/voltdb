@@ -2022,7 +2022,7 @@ public class TestVoltCompiler extends TestCase {
     {
         // Test indexes.
         String ddl = "";
-        String errorIndexMsg = "Index IDX_T_TM cannot include the function NOW or CURRENT_TIMESTAMP.";
+        String errorIndexMsg = "Index \"IDX_T_TM\" cannot include the function NOW or CURRENT_TIMESTAMP.";
         ddl = "create table t(id integer not null, tm timestamp);\n" +
               "create index idx_t_tm on t(since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm));";
         checkDDLErrorMessage(ddl, errorIndexMsg);
@@ -2406,7 +2406,9 @@ public class TestVoltCompiler extends TestCase {
                 "create table t2(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (id, num, total) " +
                 "as select t1.id, st2.num, count(*) from t1 join (select id ,num from t2) st2 on t1.id = st2.id group by t1.id, st2.num; \n";
-//not yet hsql232 - subqueries        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+        /* not yet hsql232 - subqueries
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+        // not yet hwal232 */
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
@@ -4063,24 +4065,36 @@ public class TestVoltCompiler extends TestCase {
 
     public void testAggregateExpressionsInIndices() throws Exception {
         String ddl = "create table alpha (id integer not null, seqnum float);";
-        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+        // Test for time sensitive queries.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
+                                    ddl,
+                                    "create index faulty on alpha(id, NOW());");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
                                    ddl,
-                                   "create index faulty on alpha(id, avg(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   "create index faulty on alpha(id, CURRENT_TIMESTAMP);");
+        // Test for aggregate calls.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
                                    ddl,
-                                   "create index faulty on alpha(id, max(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   "create index faulty on alpha(id, seqnum + avg(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
                                    ddl,
-                                   "create index faulty on alpha(id, min(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   "create index faulty on alpha(id, seqnum + max(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
                                    ddl,
-                                   "create index faulty on alpha(id, count(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   "create index faulty on alpha(id, seqnum + min(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
                                    ddl,
-                                   "create index faulty on alpha(id, count(*));");
-        checkDDLAgainstGivenSchema(".*Index FAULTY with aggregate expression\\(s\\) is not supported\\.",
+                                   "create index faulty on alpha(id, seqnum + count(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
                                    ddl,
-                                   "create index faulty on alpha(id, sum(id));");
+                                   "create index faulty on alpha(id, seqnum + count(*));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, 100 + sum(id));");
+        // Test for subqueries.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with subquery sources is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id = (select id + id from alpha));");
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {

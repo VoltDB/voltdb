@@ -356,6 +356,7 @@ public class QuerySpecification extends QueryExpression {
 
         resolveExpressionTypes(session);
         resolveAggregates();
+        resolveReferences(session, RangeGroup.emptyArray);
 
         for (int i = 0; i < unionColumnTypes.length; i++) {
             unionColumnTypes[i] = Type.getAggregateType(unionColumnTypes[i],
