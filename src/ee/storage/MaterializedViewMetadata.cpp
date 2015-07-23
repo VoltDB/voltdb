@@ -53,8 +53,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     , m_filterPredicate(parsePredicate(mvInfo))
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
-    , m_minMaxSearchKeyBackingStore(NULL)
-    , m_minMaxSearchKeyBackingStoreSize(0)
     , m_aggColumnCount(parseAggregation(mvInfo))
 {
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
@@ -78,8 +76,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
         }
     }
 
-    // handle index for min / max support
-    setIndexForMinMax(mvInfo->indexForMinMax());
+    // set up fallback query executors for min/max recalculation (ENG-8641)
     setFallbackExecutorVectors(mvInfo->fallbackQueryStmts());
 
     allocateBackedTuples();
@@ -132,30 +129,6 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     oldTarget->decrementRefcount();
 }
 
-void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax)
-{
-    std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
-    m_indexForMinMax.clear();
-    for (catalog::CatalogMap<catalog::IndexRef>::field_map_iter idxIterator = indexForMinOrMax.begin();
-         idxIterator != indexForMinOrMax.end(); idxIterator++) {
-        catalog::IndexRef *idx = idxIterator->second;
-        if (idx->name().compare("") == 0) {
-            // The min/max column doesn't have a supporting index.
-            m_indexForMinMax.push_back(NULL);
-        }
-        else {
-            // The min/max column has a supporting index.
-            for (int i = 0; i < candidates.size(); ++i) {
-                if (idx->name().compare(candidates[i]->getName()) == 0) {
-                    m_indexForMinMax.push_back(candidates[i]);
-                    break;
-                }
-            } // end for
-        }
-    }
-    allocateMinMaxSearchKeyTuple();
-}
-
 string hexDecodeToString(const string hexString) {
     size_t len = hexString.length();
     string retval;
@@ -191,31 +164,6 @@ void MaterializedViewMetadata::freeBackedTuples()
     delete[] m_searchKeyBackingStore;
     delete[] m_updatedTupleBackingStore;
     delete[] m_emptyTupleBackingStore;
-    delete[] m_minMaxSearchKeyBackingStore;
-}
-
-void MaterializedViewMetadata::allocateMinMaxSearchKeyTuple()
-{
-    size_t minMaxSearchKeyBackingStoreSize = 0;
-    BOOST_FOREACH(TableIndex *index, m_indexForMinMax) {
-        // Because there might be a lot of indexes, find the largest space they may consume
-        // so that they can all share one space and use different schemas. (ENG-8512)
-        if ( minMaxIndexIncludesAggCol(index) &&
-                index->getKeySchema()->tupleLength() + 1 > minMaxSearchKeyBackingStoreSize) {
-             minMaxSearchKeyBackingStoreSize = index->getKeySchema()->tupleLength() + 1;
-        }
-    }
-    if (minMaxSearchKeyBackingStoreSize == m_minMaxSearchKeyBackingStoreSize) {
-        return;
-    }
-    m_minMaxSearchKeyBackingStoreSize = minMaxSearchKeyBackingStoreSize;
-    delete[] m_minMaxSearchKeyBackingStore;
-    m_minMaxSearchKeyBackingStore = NULL;
-    // If the minMaxIndex contains agg cols, need to allocate a searchKeyTuple and backing store for it. (ENG-6511)
-    if ( m_minMaxSearchKeyBackingStoreSize > 0 ) {
-        m_minMaxSearchKeyBackingStore = new char[m_minMaxSearchKeyBackingStoreSize];
-        memset(m_minMaxSearchKeyBackingStore, 0, m_minMaxSearchKeyBackingStoreSize);
-    }
 }
 
 void MaterializedViewMetadata::allocateBackedTuples()
@@ -355,162 +303,6 @@ inline NValue MaterializedViewMetadata::getAggInputFromSrcTuple(int aggIndex, co
         int srcColIdx = m_aggColIndexes[aggIndex];
         return tuple.getNValue(srcColIdx);
     }
-}
-
-NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
-                                                                const NValue &existingValue,
-                                                                const NValue &initialNull,
-                                                                int negate_for_min,
-                                                                int aggIndex,
-                                                                int minMaxAggIdx)
-{
-    AbstractExpression *aggExpr = NULL;
-    int srcColIdx = -1;
-    if (m_aggExprs.size() != 0) {
-        aggExpr = m_aggExprs[aggIndex];
-    } else {
-        srcColIdx = m_aggColIndexes[aggIndex];
-    }
-    NValue newVal = initialNull;
-    TableIndex *selectedIndex = m_indexForMinMax[minMaxAggIdx];
-    IndexCursor minMaxCursor(selectedIndex->getTupleSchema());
-
-    // Search for the min / max fallback value. use indexs differently according to their types.
-    // (Does the index include min / max aggCol? - ENG-6511)
-    if ( minMaxIndexIncludesAggCol(selectedIndex) ) {
-        // Assemble the m_minMaxSearchKeyTuple with
-        // group-by column values and the old min/max value.
-        m_minMaxSearchKeyTuple = TableTuple(selectedIndex->getKeySchema());
-        m_minMaxSearchKeyTuple.move(m_minMaxSearchKeyBackingStore);
-        for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-            NValue value = getGroupByValueFromSrcTuple(colindex, oldTuple);
-            m_minMaxSearchKeyTuple.setNValue(colindex, value);
-        }
-        NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
-        m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
-        TableTuple tuple;
-        // Search for the new min/max value and keep it in tuple.
-        if (negate_for_min == -1) {
-            // min()
-            selectedIndex->moveToKeyOrGreater(&m_minMaxSearchKeyTuple, minMaxCursor);
-        }
-        else {
-            // max()
-            selectedIndex->moveToGreaterThanKey(&m_minMaxSearchKeyTuple, minMaxCursor);
-            selectedIndex->moveToPriorEntry(minMaxCursor);
-        }
-        while ( ! (tuple = selectedIndex->nextValue(minMaxCursor)).isNullTuple() ) {
-            // If the cursor already moved out of the target group range, exit the loop.
-            for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-                NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
-                if ( value.compare(m_searchKeyValue[colindex]) != 0 ) {
-                    return initialNull;
-                }
-            }
-            // skip the oldTuple and apply post filter
-            if (tuple.equals(oldTuple) ||
-                (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
-                continue;
-            }
-            NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
-            if (current.isNull()) {
-                return initialNull;
-            }
-            newVal = current;
-            break;
-        }
-    }
-    else {
-        // Use sub-optimal index (only group-by columns).
-        selectedIndex->moveToKey(&m_searchKeyTuple, minMaxCursor);
-        VOLT_TRACE("Starting to scan tuples using index %s\n", selectedIndex->debug().c_str());
-        TableTuple tuple;
-        while (!(tuple = selectedIndex->nextValueAtKey(minMaxCursor)).isNullTuple()) {
-            // skip the oldTuple and apply post filter
-            if (tuple.equals(oldTuple) ||
-                (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
-                continue;
-            }
-            VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
-            NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
-            if (current.isNull()) {
-                continue;
-            }
-            if (current.compare(existingValue) == 0) {
-                newVal = current;
-                VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
-                break;
-            }
-            VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
-            if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
-                newVal = current;
-                VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
-            }
-        }
-    }
-    return newVal;
-}
-
-NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
-                                                                   const NValue &existingValue,
-                                                                   const NValue &initialNull,
-                                                                   int negate_for_min,
-                                                                   int aggIndex)
-{
-    AbstractExpression *aggExpr = NULL;
-    int srcColIdx = -1;
-    if (m_aggExprs.size() != 0) {
-        aggExpr = m_aggExprs[aggIndex];
-    } else {
-        srcColIdx = m_aggColIndexes[aggIndex];
-    }
-    NValue newVal = initialNull;
-    // loop through tuples to find the MIN / MAX
-    bool skippedOne = false;
-    TableTuple tuple(m_srcTable->schema());
-    TableIterator &iterator = m_srcTable->iterator();
-    VOLT_TRACE("Starting iteration on: %s\n", m_srcTable->debug().c_str());
-    while (iterator.next(tuple)) {
-        // apply post filter
-        VOLT_TRACE("Checking tuple: %s\n", tuple.debugNoHeader().c_str());
-        if (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue()) {
-            continue;
-        }
-        VOLT_TRACE("passed 1\n");
-        int comparison = 0;
-        for (int idx = 0; idx < m_groupByColumnCount; idx++) {
-            NValue foundKey = getGroupByValueFromSrcTuple(idx, tuple);
-            comparison = m_searchKeyValue[idx].compare(foundKey);
-            if (comparison != 0) {
-                break;
-            }
-        }
-        if (comparison != 0) {
-            continue;
-        }
-        VOLT_TRACE("passed 2\n");
-        NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
-        if (current.isNull()) {
-            continue;
-        }
-        if (current.compare(existingValue) == 0) {
-            if (!skippedOne) {
-                VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
-                skippedOne = true;
-                continue;
-            }
-            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
-            newVal = current;
-            break;
-        }
-        VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
-        if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
-            newVal = current;
-            VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
-        }
-    }
-    VOLT_TRACE("\tFinal: new best %s\n", newVal.debug().c_str());
-    return newVal;
 }
 
 void MaterializedViewMetadata::initializeTupleHavingNoGroupBy()

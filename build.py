@@ -174,7 +174,6 @@ CTX.INPUT['catalog'] = """
  constraintref.cpp
  database.cpp
  index.cpp
- indexref.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp

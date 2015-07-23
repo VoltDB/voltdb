@@ -145,7 +145,6 @@ begin MaterializedViewInfo           "Information used to build and update a mat
   string predicate                   "A filtering predicate"
   string groupbyExpressionsJson      "A serialized representation of the groupby expression trees"
   string aggregationExpressionsJson  "A serialized representation of the aggregation expression trees"
-  IndexRef* indexForMinMax           "The name of index on srcTable which can be used to maintain min()/max()"
   Statement* fallbackQueryStmts      "Statements to search for mview min/max fallback value"
 end
 
@@ -206,10 +205,6 @@ end
 begin ColumnRef    "A reference to a table column"
   int index        "The index within the set"
   Column? column   "The table column being referenced"
-end
-
-begin IndexRef     "A reference to an index"
-  string name      "The name of the index referenced"
 end
 
 begin Constraint            "A constraint on a database table"
