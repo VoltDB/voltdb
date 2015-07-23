@@ -39,10 +39,8 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
@@ -239,6 +237,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     cpDelQueue.drainTo(workList, 10);
                     if (workList.size() <= 0) {
                         Thread.sleep(2000);
+                        continue;
                     }
                     log.info("WorkList Size: " + workList.size());
                     CountDownLatch clatch = new CountDownLatch(workList.size());
@@ -295,6 +294,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     m_table.addRow(p, p + nanotime, nanotime);
                     cidList.add(p);
                     timeList.add(nanotime);
+                    //Increment p so that we always get new key.
                     p++;
                     boolean success = false;
                     if (!m_isMP) {
@@ -325,8 +325,10 @@ public class LoadTableLoader extends BenchmarkThread {
                     }
                 }
 
+                log.info("Waiting for all inserts for @Load* done.");
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
+                log.info("Done Waiting for all inserts for @Load* done.");
 
                 // try to upsert if want the collision
                 if (upsertHitMode != 0) {
@@ -335,16 +337,21 @@ public class LoadTableLoader extends BenchmarkThread {
                         m_table.clearRowData();
                         m_permits.acquire();
                         m_table.addRow(cidList.get(i), cidList.get(i) + timeList.get(i), timeList.get(i));
-                        boolean success = false;
+                        boolean success;
                         if (!m_isMP) {
                             Object rpartitionParam = TheHashinator.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.BIGINT));
-                            success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, upsertMode, m_table);
+                            success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte )1, m_table);
                         } else {
-                            success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, m_tableName, upsertMode, m_table);
+                            success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, m_tableName, (byte )1, m_table);
+                        }
+                        if (!success) {
+                            log.error("Failed to invoke upsert for: " + cidList.get(i));
                         }
                     }
+                    log.info("Waiting for all upsert for @Load* done.");
                     //Wait for all additional upsert @Load{SP|MP}Done
                     upserHitLatch.await();
+                    log.info("Done Waiting for all upsert for @Load* done.");
                 }
 
                 cpDelQueue.addAll(lcpDelQueue);
