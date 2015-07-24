@@ -17,17 +17,16 @@
 
 package org.voltdb.importer;
 
-import java.io.File;
-import java.io.IOException;
 import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
@@ -38,6 +37,8 @@ import org.voltdb.CatalogContext;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CatalogUtil;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  *
@@ -57,11 +58,10 @@ public class ImportManager implements ChannelChangeCallback {
     private static ImportManager m_self;
     private final HostMessenger m_messenger;
 
-    private final FrameworkFactory m_frameworkFactory;
     private final Map<String, String> m_frameworkProps;
-    private final Framework m_framework;
     private final int m_myHostId;
-    private final ChannelDistributer m_distributer;
+    private Framework m_framework;
+    private ChannelDistributer m_distributer;
     /**
      * Get the global instance of the ImportManager.
      * @return The global single instance of the ImportManager.
@@ -70,34 +70,41 @@ public class ImportManager implements ChannelChangeCallback {
         return m_self;
     }
 
-    protected ImportManager(int myHostId, HostMessenger messenger) throws BundleException, IOException {
+    protected ImportManager(int myHostId, HostMessenger messenger) throws IOException {
         m_myHostId = myHostId;
         m_messenger = messenger;
-        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
-        m_distributer.registerCallback("__IMPORT_MANAGER__", this);
 
-        //create properties for osgi
-        m_frameworkProps = new HashMap<String, String>();
-        //Need this so that ImportContext is available.
-        m_frameworkProps.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
-                + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0,org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0");
-        // more properties available at: http://felix.apache.org/documentation/subprojects/apache-felix-framework/apache-felix-framework-configuration-properties.html
-        m_frameworkProps.put("org.osgi.framework.storage.clean", "onFirstInit");
         String tmpFilePath = System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"));
         //Create a directory in temp + username
         File f = new File(tmpFilePath, System.getProperty("user.name"));
-        if (!f.isDirectory() && !f.mkdirs()) {
-            throw new IOException("Failed to importer cache directory: " + f.getAbsolutePath());
+        if (!f.exists() && !f.mkdirs()) {
+            throw new IOException("Failed to create required OSGI cache directory: " + f.getAbsolutePath());
         }
-        if (!f.canWrite()) {
-            throw new IOException("Importer cache directory not writable: " + f.getAbsolutePath());
+
+        if (!f.isDirectory() || !f.canRead() || !f.canWrite() || !f.canExecute()) {
+            throw new IOException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
         }
-        m_frameworkProps.put("felix.cache.rootdir", f.getAbsolutePath());
-        //felix.cache.locking set to false.
-        m_frameworkProps.put("felix.cache.locking", Boolean.FALSE.toString());
-        m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
+
+        m_frameworkProps = ImmutableMap.<String,String>builder()
+                .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
+                    + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0"
+                    + ",org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0")
+                .put("org.osgi.framework.storage.clean", "onFirstInit")
+                .put("felix.cache.rootdir", f.getAbsolutePath())
+                .put("felix.cache.locking", Boolean.FALSE.toString())
+                .build();
+
+    }
+
+    private void startOSGiFramework() throws BundleException {
+        if (m_distributer != null) return;
+
+        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
+        m_distributer.registerCallback("__IMPORT_MANAGER__", this);
+
+        FrameworkFactory frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
         importLog.info("Framework properties are: " + m_frameworkProps);
-        m_framework = m_frameworkFactory.newFramework(m_frameworkProps);
+        m_framework = frameworkFactory.newFramework(m_frameworkProps);
         m_framework.start();
     }
 
@@ -113,7 +120,7 @@ public class ImportManager implements ChannelChangeCallback {
         ImportManager em = new ImportManager(myHostId, messenger);
 
         m_self = em;
-        em.create(myHostId, m_self.m_distributer, catalogContext, messenger.getZK());
+        em.create(myHostId, catalogContext);
     }
 
     /**
@@ -121,12 +128,14 @@ public class ImportManager implements ChannelChangeCallback {
      * @param catalogContext
      * @param partitions
      */
-    private synchronized void create(int myHostId, ChannelDistributer distributer, CatalogContext catalogContext, ZooKeeper zk) {
+    private synchronized void create(int myHostId, CatalogContext catalogContext) {
         try {
             if (catalogContext.getDeployment().getImport() == null) {
                 return;
             }
-            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, distributer, m_framework);
+            startOSGiFramework();
+
+            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
@@ -152,7 +161,7 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
-        m_self.create(m_myHostId, m_distributer, catalogContext, messenger.getZK());
+        m_self.create(m_myHostId, catalogContext);
         m_self.readyForData(catalogContext, messenger);
     }
 

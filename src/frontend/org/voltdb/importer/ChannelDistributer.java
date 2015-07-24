@@ -992,7 +992,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
      *
      */
     class GetHostChannels extends GetData {
-        Optional<DistributerException> fault = Optional.absent();
         Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
 
         final String host;
@@ -1090,7 +1089,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
      */
     class GetChannels extends GetData {
 
-        Optional<DistributerException> fault = Optional.absent();
         Optional<NavigableSet<ChannelSpec>> channels = Optional.absent();
 
         public GetChannels(String path) {
