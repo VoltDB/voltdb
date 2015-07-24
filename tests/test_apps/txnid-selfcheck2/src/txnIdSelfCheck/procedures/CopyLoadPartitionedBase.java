@@ -29,23 +29,16 @@ import org.voltdb.VoltTable;
 
 public class CopyLoadPartitionedBase extends VoltProcedure {
 
-    public VoltTable[] doWork(SQLStmt select, SQLStmt insert, long cid) {
+    public VoltTable[] doWork(SQLStmt insertinto, long cid) {
         // Get row for cid and copy to new table.
-        voltQueueSQL(select, cid);
+        voltQueueSQL(insertinto,cid);
         VoltTable[] results = voltExecuteSQL();
         VoltTable data = results[0];
-        if (data.getRowCount() != 1) {
-            throw new VoltAbortException("Failed to find cid that should exist: cid=" + cid);
+        int cnt = (int) data.fetchRow(0).getLong(0);
+        if (cnt != 1) {
+            throw new VoltAbortException("incorrect number of inserted rows=" + cnt + " for cid=" + cid);
         }
-        data.advanceRow();
-        long rcid = data.getLong(0);
-        if (rcid != cid) {
-            throw new VoltAbortException("Failed to find cid does not match. (" + rcid + ":" + cid + ")");
-        }
-        long txnid = data.getLong(1);
-        long rowid = data.getLong(2);
-        voltQueueSQL(insert, rcid, txnid, rowid);
-        return voltExecuteSQL();
+        return results;
     }
 
     public long run() {
