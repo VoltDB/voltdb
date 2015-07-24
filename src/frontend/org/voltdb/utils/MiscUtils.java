@@ -157,6 +157,10 @@ public class MiscUtils {
                     return false;
                 }
 
+                public boolean isDrActiveActiveAllowed() {
+                    return false;
+                }
+
                 @Override
                 public boolean isCommandLoggingAllowed() {
                     return false;

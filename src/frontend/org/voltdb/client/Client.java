@@ -373,9 +373,11 @@ public interface Client {
      *
      * @param tableName Name of table that bulk inserts are to be applied to.
      * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
+     * @param upsertMode set to true if want upsert instead of insert
      * @param blfcb Callback procedure used for notification of failed inserts.
      * @return instance of VoltBulkLoader
      * @throws Exception if tableName can't be found in the catalog.
      */
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception;
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
 }

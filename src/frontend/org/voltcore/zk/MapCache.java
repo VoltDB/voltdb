@@ -27,7 +27,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -44,7 +43,6 @@ import org.voltcore.zk.ZKUtil.ByteArrayCallback;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Tracker monitors and provides snapshots of a single ZK node's
@@ -121,7 +119,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
     @Override
     public void put(String key, JSONObject value) throws KeeperException, InterruptedException {
         try {
-            String createdNode = m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
+            m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
                     Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (KeeperException.NodeExistsException e) {
             m_zk.setData(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(), -1);

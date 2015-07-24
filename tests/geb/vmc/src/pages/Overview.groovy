@@ -163,7 +163,7 @@ class Overview extends Module {
         // EXPORT POPUP: ELASTICSEARCH
         endpointES                      { $("#txtEndpointES") }
         endpointESValue                   { $("#txtEndpointESValue") }
-
+        errorEndpointESValue          { $("#errorEndpointESValue") }
 
         // EXPORT POPUP: FILE
         type                        { $("#txtFileType") }
@@ -249,6 +249,11 @@ class Overview extends Module {
         // error message
         errorMsgHeartbeat		{ $("#errorHeartbeatTimeout") }
         errorQuery				{ $("#errorQueryTimeout") }
+
+        //error message for Add Property
+
+        errorPropertyName1 {$("#errorName1")}
+        errorPropertyValue1 {$("#errorValue1")}
     }
     
     int numberOfTrials = 10
@@ -280,9 +285,9 @@ class Overview extends Module {
     }
 
     def String getElasticSearchTest() {
-        return getElasticSearchTestName() + " (FILE)"
+        return getElasticSearchTestName() + " (ELASTICSEARCH)"
     }
-    
+
     def String getJdbcTest() {
         return getJdbcTestName() + " (JDBC)"
     }

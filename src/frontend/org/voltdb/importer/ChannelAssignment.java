@@ -17,9 +17,15 @@
 
 package org.voltdb.importer;
 
+import java.net.URI;
+import java.util.List;
 import java.util.NavigableSet;
 import java.util.Set;
 
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSetMultimap;
+import com.google_voltpatches.common.collect.SetMultimap;
 import com.google_voltpatches.common.collect.Sets;
 
 public class ChannelAssignment {
@@ -28,12 +34,15 @@ public class ChannelAssignment {
     final Set<ChannelSpec> removed;
     final NavigableSet<ChannelSpec> channels;
     final int version;
+    final List<ImporterChannelAssignment> assignments;
 
     ChannelAssignment(NavigableSet<ChannelSpec> prev, NavigableSet<ChannelSpec> next, int version) {
         this.version  = version;
         this.added    = Sets.difference(next, prev);
         this.removed  = Sets.difference(prev, next);
         this.channels = next;
+
+        this.assignments = perImporterAssignments();
     }
 
     public Set<ChannelSpec> getAdded() {
@@ -60,5 +69,42 @@ public class ChannelAssignment {
     public String toString() {
         return "ChannelAssignment [added=" + added + ", removed=" + removed
                 + ", channels=" + channels + ", version=" + version + "]";
+    }
+
+    public List<ImporterChannelAssignment> getImporterChannelAssignments() {
+        return assignments;
+    }
+
+    private SetMultimap<String, URI> mapByImporter(Set<ChannelSpec> specs) {
+        ImmutableSetMultimap.Builder<String, URI> mmbldr = ImmutableSetMultimap.builder();
+        for (ChannelSpec spec: specs) {
+            mmbldr.put(spec.getImporter(),spec.getUri());
+        }
+        return mmbldr.build();
+    }
+
+    private List<ImporterChannelAssignment> perImporterAssignments() {
+
+        ImmutableSet.Builder<String> sbldr = ImmutableSet.builder();
+        for (ChannelSpec spec: Sets.union(added, removed)) {
+            sbldr.add(spec.getImporter());
+        }
+
+        ImmutableList.Builder<ImporterChannelAssignment> lbldr = ImmutableList.builder();
+
+        final SetMultimap<String, URI> added = mapByImporter(getAdded());
+        final SetMultimap<String, URI> removed = mapByImporter(getRemoved());
+        final SetMultimap<String, URI> assigned = mapByImporter(getChannels());
+
+        for (String importer: sbldr.build()) {
+            lbldr.add(new ImporterChannelAssignment(
+                    importer,
+                    added.get(importer),
+                    removed.get(importer),
+                    assigned.get(importer),
+                    version
+                    ));
+        }
+        return lbldr.build();
     }
 }

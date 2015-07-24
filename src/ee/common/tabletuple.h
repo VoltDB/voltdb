@@ -202,6 +202,13 @@ public:
      * a persistent table!
      */
     void setNValue(const int idx, voltdb::NValue value) const;
+
+    /*
+     * Like the above method except for "hidden" fields, not
+     * accessible in the normal codepath.
+     */
+    void setHiddenNValue(const int idx, voltdb::NValue value) const;
+
     /*
      * Copies range of NValues from one tuple to another.
      */
@@ -259,6 +266,20 @@ public:
         assert(idx < m_schema->columnCount());
 
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        const voltdb::ValueType columnType = columnInfo->getVoltType();
+        const char* dataPtr = getDataPtr(columnInfo);
+        const bool isInlined = columnInfo->inlined;
+
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
+    }
+
+    /** Like the above method but for hidden columns. */
+    inline const NValue getHiddenNValue(const int idx) const {
+        assert(m_schema);
+        assert(m_data);
+        assert(idx < m_schema->hiddenColumnCount());
+
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
         const voltdb::ValueType columnType = columnInfo->getVoltType();
         const char* dataPtr = getDataPtr(columnInfo);
         const bool isInlined = columnInfo->inlined;
@@ -555,6 +576,20 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) const
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes);
 }
 
+inline void TableTuple::setHiddenNValue(const int idx, voltdb::NValue value) const
+{
+    assert(m_schema);
+    assert(m_data);
+
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
+    value = value.castAs(columnInfo->getVoltType());
+    const bool isInlined = columnInfo->inlined;
+    const bool isInBytes = columnInfo->inBytes;
+    char *dataPtr = getWritableDataPtr(columnInfo);
+    const int32_t columnLength = columnInfo->length;
+    value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes);
+}
+
 /** Multi column version. */
 inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) const
 {
@@ -687,6 +722,17 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                 setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
             }
         }
+
+        // Copy any hidden columns that follow normal visible ones.
+        if (m_schema->hiddenColumnCount() > 0) {
+            // If we ever add support for uninlined hidden columns,
+            // we'll need to do update this code.
+            assert(m_schema->getUninlinedObjectHiddenColumnCount() == 0);
+            ::memcpy(m_data + TUPLE_HEADER_SIZE + m_schema->offsetOfHiddenColumns(),
+                     source.m_data + TUPLE_HEADER_SIZE + m_schema->offsetOfHiddenColumns(),
+                     m_schema->lengthOfAllHiddenColumns());
+        }
+
         // This obscure assignment is propagating the tuple flags rather than leaving it to the caller.
         // TODO: It would be easier for the caller to simply set the values it wants upon return.
         m_data[0] = source.m_data[0];
