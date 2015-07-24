@@ -387,7 +387,7 @@ protected:
         return allocatedTupleCount() - activeTupleCount() > std::max(static_cast<int64_t>((m_tuplesPerBlock * 3)), (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100);  /* using the integer percentage */
     }
 
-    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
+    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
     // per table-type initialization
     virtual void onSetColumns() {

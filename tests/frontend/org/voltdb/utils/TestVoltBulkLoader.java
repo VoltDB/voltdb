@@ -524,6 +524,31 @@ public class TestVoltBulkLoader extends TestCase {
         test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
+    public void testUpsertWithNoPrimaryKey() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        int myBatchSize = 200;
+
+        Object [][]myData = {
+            {1,1,1},
+            {2,2,2},
+            {3,3,3},
+            {4,4,4},
+        };
+        Integer[] failures = {};
+        ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
+        boolean upsert = true;
+        try {
+            test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0, upsert);
+            fail();
+        }catch (IllegalArgumentException e){};
+    }
+
     public void testStrictQuote() throws Exception
     {
         String mySchema =
@@ -1001,6 +1026,12 @@ public class TestVoltBulkLoader extends TestCase {
 
     public void test_Interface(String my_schema, Object[][] my_data,
             int my_batchSize, ArrayList<Integer> expectedFailList, int flushInterval) throws Exception {
+        test_Interface(my_schema, my_data,
+                my_batchSize, expectedFailList, flushInterval, false);
+    }
+
+    public void test_Interface(String my_schema, Object[][] my_data,
+            int my_batchSize, ArrayList<Integer> expectedFailList, int flushInterval, boolean upsert) throws Exception {
         try{
             pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
             pathToDeployment = Configuration.getPathToCatalogForTest("vbl.xml");
@@ -1025,7 +1056,7 @@ public class TestVoltBulkLoader extends TestCase {
 
             prepare();
             TestFailureCallback testCallback = new TestFailureCallback();
-            VoltBulkLoader bulkLoader = client1.getNewBulkLoader("BLAH", my_batchSize, testCallback);
+            VoltBulkLoader bulkLoader = client1.getNewBulkLoader("BLAH", my_batchSize, upsert, testCallback);
             if (flushInterval > 0) {
                 bulkLoader.setFlushInterval(0, flushInterval);
             }
@@ -1095,10 +1126,17 @@ public class TestVoltBulkLoader extends TestCase {
         }
     }
 
-
     public void test_multiplexing( String my_schema, boolean multipleClients, boolean multipleLoaders, boolean multiPartTable,
             String my_tableName1, Object[][] my_data1, int my_batchSize1, ArrayList<Integer> expectedFailList1, boolean abort1,
             String my_tableName2, Object[][] my_data2, int my_batchSize2, ArrayList<Integer> expectedFailList2, boolean abort2) throws Exception {
+            test_multiplexing(my_schema, multipleClients, multipleLoaders, multiPartTable,
+                    my_tableName1, my_data1, my_batchSize1, expectedFailList1, abort1, false,
+                    my_tableName2, my_data2, my_batchSize2, expectedFailList2, abort2, false);
+    }
+
+    public void test_multiplexing( String my_schema, boolean multipleClients, boolean multipleLoaders, boolean multiPartTable,
+            String my_tableName1, Object[][] my_data1, int my_batchSize1, ArrayList<Integer> expectedFailList1, boolean abort1, boolean upsert1,
+            String my_tableName2, Object[][] my_data2, int my_batchSize2, ArrayList<Integer> expectedFailList2, boolean abort2, boolean upsert2) throws Exception {
         try{
             pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
             pathToDeployment = Configuration.getPathToCatalogForTest("vbl.xml");
@@ -1145,10 +1183,10 @@ public class TestVoltBulkLoader extends TestCase {
             TestFailureCallback testCallback1 = new TestFailureCallback();
             TestFailureCallback testCallback2 = new TestFailureCallback();
 
-            VoltBulkLoader bulkLoader1 = client1.getNewBulkLoader(my_tableName1, my_batchSize1, testCallback1);
+            VoltBulkLoader bulkLoader1 = client1.getNewBulkLoader(my_tableName1, my_batchSize1, upsert1, testCallback1);
             VoltBulkLoader bulkLoader2;
             if (multipleLoaders) {
-                bulkLoader2 = client2.getNewBulkLoader(my_tableName2, my_batchSize2, testCallback2);
+                bulkLoader2 = client2.getNewBulkLoader(my_tableName2, my_batchSize2, upsert2, testCallback2);
                 if (!multipleClients && sameTable) {
                     assert(bulkLoader1.getMaxBatchSize() == Math.min(my_batchSize1, my_batchSize2));
                     assert(bulkLoader1.getMaxBatchSize() == bulkLoader2.getMaxBatchSize());
