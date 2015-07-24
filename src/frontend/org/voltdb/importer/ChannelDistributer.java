@@ -173,7 +173,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             lock.acquire();
             lock.release();
         } catch (InterruptedException ex) {
-            throw loggedDistributerException(ex, "iterruped while waiting for a semaphare");
+            throw loggedDistributerException(ex, "interruped while waiting for a semaphare");
         }
     }
 
@@ -309,12 +309,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 );
         ElectLeader elector = new ElectLeader(MASTER_DN, electionCandidate);
 
-        opMode.getMode();
-        monitor.getChildren();
         createHostNode.getNode();
         elector.elect();
 
         m_candidate = electionCandidate.getNode();
+        opMode.getMode();
+        monitor.getChildren();
         // monitor the master list
         new GetChannels(MASTER_DN).getChannels();
     }
@@ -950,7 +950,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             Code code = Code.get(rc);
             if (code == Code.OK) {
                 this.stat = Optional.of(stat);
-                this.data = Optional.of(data != null ? data : EMPTY_ARRAY);
+                this.data = Optional.of(data != null && data.length > 0 ? data : EMPTY_ARRAY);
             } else if (code == Code.NONODE || code == Code.SESSIONEXPIRED || m_done.get()) {
                 // keep the fault but don't log it
                 KeeperException e = KeeperException.create(code);
@@ -992,7 +992,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
      *
      */
     class GetHostChannels extends GetData {
-        Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
+        volatile Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
 
         final String host;
         final Predicate<Map.Entry<ChannelSpec,String>> thisHost;
@@ -1089,7 +1089,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
      */
     class GetChannels extends GetData {
 
-        Optional<NavigableSet<ChannelSpec>> channels = Optional.absent();
+        volatile Optional<NavigableSet<ChannelSpec>> channels = Optional.absent();
 
         public GetChannels(String path) {
             super(path);
@@ -1110,6 +1110,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                             );
                     return;
                 }
+
                 int [] stamp = new int[]{0};
                 NavigableSet<ChannelSpec> oldspecs = m_channels.get(stamp);
                 if (stamp[0] >= stat.getVersion()) {
@@ -1134,7 +1135,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         NavigableSet<ChannelSpec> getChannels() {
             acquireAndRelease(lock);
-            if (fault.isPresent()) throw fault.get();
+            if (fault.isPresent()) {
+                throw fault.get();
+            }
             return channels.get();
         }
     }
@@ -1144,7 +1147,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
      * operational mode
      */
     class GetOperationMode extends GetData {
-        Optional<VersionedOperationMode> mode = Optional.absent();
+        volatile Optional<VersionedOperationMode> opmode = Optional.absent();
 
         GetOperationMode(String path) {
             super(path);
@@ -1157,13 +1160,22 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
-                OperationMode next = nodeData != null ?  OperationMode.valueOf(nodeData) : OperationMode.RUNNING;
-                mode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
+                OperationMode next = OperationMode.RUNNING;
+                if (nodeData != null && nodeData.length > 0) try {
+                    next = OperationMode.valueOf(nodeData);
+                } catch (IllegalArgumentException e) {
+                    fault = Optional.of(loggedDistributerException(
+                            e, "unable to decode content in operation node: \"%s\"",
+                            new String(nodeData, StandardCharsets.UTF_8)
+                            ));
+                    return;
+                }
+                opmode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
 
                 int [] stamp = new int[]{0};
                 OperationMode prev = m_mode.get(stamp);
                 if (stamp[0] > stat.getVersion()) {
-                    mode = Optional.of(new VersionedOperationMode(prev, stamp[0]));
+                    opmode = Optional.of(new VersionedOperationMode(prev, stamp[0]));
                     return;
                 }
                 if (!m_mode.compareAndSet(prev, next, stamp[0], stat.getVersion())) {
@@ -1172,7 +1184,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (m_isLeader && !m_done.get() && next == OperationMode.RUNNING) {
                     m_es.submit(new AssignChannels());
                 }
-                m_eb.post(mode.get());
+                m_eb.post(opmode.get());
 
             } finally {
                 lock.release();
@@ -1186,11 +1198,13 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         VersionedOperationMode getMode() {
             acquireAndRelease(lock);
-            if (fault.isPresent()) throw fault.get();
-            if (!mode.isPresent()) {
+            if (fault.isPresent()) {
+                throw fault.get();
+            }
+            if (!opmode.isPresent()) {
                 throw new DistributerException("failed to mirror cluster operation mode");
             }
-            return mode.get();
+            return opmode.get();
         }
     }
 
