@@ -1157,17 +1157,18 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
+                OperationMode next = data != null ?  OperationMode.valueOf(data) : OperationMode.RUNNING;
+                mode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
 
                 int [] stamp = new int[]{0};
                 OperationMode prev = m_mode.get(stamp);
-                if ( stamp[0] > stat.getVersion()) {
+                if (stamp[0] > stat.getVersion()) {
+                    mode = Optional.of(new VersionedOperationMode(prev, stamp[0]));
                     return;
                 }
-                OperationMode next = data != null ?  OperationMode.valueOf(data) : OperationMode.RUNNING;
                 if (!m_mode.compareAndSet(prev, next, stamp[0], stat.getVersion())) {
                     return;
                 }
-                mode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
                 if (m_isLeader && !m_done.get() && next == OperationMode.RUNNING) {
                     m_es.submit(new AssignChannels());
                 }

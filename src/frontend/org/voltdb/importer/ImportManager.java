@@ -34,7 +34,6 @@ import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
-import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CatalogUtil;
 
@@ -193,8 +192,7 @@ public class ImportManager implements ChannelChangeCallback {
 
     @Override
     public void onClusterStateChange(VersionedOperationMode mode) {
-        OperationMode m = mode.getMode();
-        switch (m) {
+        switch (mode.getMode()) {
             case PAUSED:
                 importLog.info("Cluster is paused shutting down all importers.");
                 close();
@@ -205,6 +203,9 @@ public class ImportManager implements ChannelChangeCallback {
                 start(VoltDB.instance().getCatalogContext(), VoltDB.instance().getHostMessenger());
                 importLog.info("Cluster is resumed STARTED all importers.");
                 break;
+            default:
+                break;
+
         }
     }
 
