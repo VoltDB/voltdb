@@ -242,7 +242,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     }
                     CountDownLatch clatch = new CountDownLatch(workList.size());
                     for (Long lcid : workList) {
-                        client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid);
+                        client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid, r.nextInt(2));
                     }
                     clatch.await();
                     CountDownLatch dlatch = new CountDownLatch(workList.size());
