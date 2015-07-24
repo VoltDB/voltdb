@@ -372,11 +372,17 @@ public class Inits {
             catalog.execute(serializedCatalog);
             serializedCatalog = null;
 
+            String result = CatalogUtil.checkLicenseConstraint(catalog, m_rvdb.getLicenseApi());
+            if (result != null) {
+                hostLog.fatal(result);
+                VoltDB.crashLocalVoltDB(result);
+            }
+
             // note if this fails it will print an error first
             // This is where we compile real catalog and create runtime
             // catalog context. To validate deployment we compile and create
             // a starter context which uses a placeholder catalog.
-            String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
+            result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
                 hostLog.fatal(result);
                 VoltDB.crashLocalVoltDB(result);

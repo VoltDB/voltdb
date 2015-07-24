@@ -38,6 +38,7 @@ import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
@@ -55,10 +56,16 @@ public class AsyncCompilerAgent {
 
     // accept work via this mailbox
     Mailbox m_mailbox;
+    private LicenseApi m_licenseApi;
+
+    public AsyncCompilerAgent(LicenseApi licenseApi) {
+        m_licenseApi = licenseApi;
+        m_helper = new AsyncCompilerAgentHelper(m_licenseApi);
+    }
 
     // The helper for catalog updates, back after its exclusive three year tour
     // of Europe, Scandinavia, and the sub-continent.
-    AsyncCompilerAgentHelper m_helper = new AsyncCompilerAgentHelper();
+    AsyncCompilerAgentHelper m_helper;
 
     // do work in this executor service
     final ListeningExecutorService m_es =
