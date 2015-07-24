@@ -65,7 +65,7 @@ public class TestClusterCompiler extends TestCase
         }
     }
 
-    public void testSufficientHostsToReplicate()
+    public void testInSufficientHostsToReplicate()
     {
         // 2 hosts, 6 sites per host, 2 copies of each partition.
         // there are sufficient execution sites, but insufficient hosts
