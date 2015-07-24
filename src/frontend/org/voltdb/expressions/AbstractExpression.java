@@ -1101,17 +1101,17 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param msg  The StringBuffer to pack with the error message tail.
      * @return true iff the expression can be part of an index.
      */
-    public static boolean isIndexableExpression(AbstractExpression expr, StringBuffer msg) {
-        if (AbstractExpression.containsFunctionById(expr, FunctionSQL.voltGetCurrentTimestampId())) {
+    public boolean isIndexableExpression(StringBuffer msg) {
+        if (containsFunctionById(this, FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
-        } else if (!expr.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+        } else if (!findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
             // There may not be any of these in HSQL1.9.3b.  However, in
             // HSQL2.3.2 subqueries are stored as expressions.  So, we may
             // find some here.  We will keep it here for the moment.
             msg.append(String.format("with subquery sources is not supported."));
             return false;
-        } else if (!expr.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
+        } else if (!findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
             msg.append("with aggregate expression(s) is not supported.");
             return false;
         } else {
@@ -1131,7 +1131,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public static boolean areIndexableExpressions(List<AbstractExpression> checkList, StringBuffer msg) {
         for (AbstractExpression expr : checkList) {
-            if (!isIndexableExpression(expr, msg)) {
+            if (!expr.isIndexableExpression(msg)) {
                 return false;
             }
         }

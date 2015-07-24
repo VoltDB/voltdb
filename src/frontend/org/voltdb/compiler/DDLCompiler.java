@@ -2494,21 +2494,6 @@ public class DDLCompiler {
         return predicate;
     }
 
-    private void addArgumentExpressions(List<AbstractExpression> checkExpressions, AbstractExpression expr) {
-        AbstractExpression arg = expr.getLeft();
-        if (arg != null) {
-            checkExpressions.add(arg);
-        }
-        arg = expr.getRight();
-        if (arg != null) {
-            checkExpressions.add(arg);
-        }
-        List<AbstractExpression> args = expr.getArgs();
-        if (args != null) {
-            checkExpressions.addAll(args);
-        }
-    }
-
     /**
      * Verify the materialized view meets our arcane rules about what can and can't
      * go in a materialized view. Throw hopefully helpful error messages when these
@@ -2539,8 +2524,10 @@ public class DDLCompiler {
             // arguments.  If this display column is not an aggregate expression,
             // then check it all.
             AbstractExpression expr = outcol.expression;
-            if (expr.getClass() == AggregateExpression.class) {
-                addArgumentExpressions(checkExpressions, expr);
+            if (expr instanceof AggregateExpression) {
+                if (expr.getLeft() != null) {
+                    checkExpressions.add(expr.getLeft());
+                }
             } else {
                 checkExpressions.add(expr);
             }
@@ -2558,7 +2545,9 @@ public class DDLCompiler {
                 msg.append("must have non-group by columns aggregated by sum, count, min or max.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
-            addArgumentExpressions(checkExpressions, outcol.expression);
+            if (outcol.expression.getLeft() != null) {
+                checkExpressions.add(outcol.expression.getLeft());
+            }
         }
 
         AbstractExpression where = stmt.getSingleTableFilterExpression();
