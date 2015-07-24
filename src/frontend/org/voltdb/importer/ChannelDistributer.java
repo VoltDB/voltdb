@@ -297,7 +297,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         mkdirs(zk, HOST_DN, EMPTY_ARRAY);
         mkdirs(zk, MASTER_DN, EMPTY_ARRAY);
 
-        GetOperationalMode opMode = new GetOperationalMode(VoltZK.operationMode);
+        GetOperationMode opMode = new GetOperationMode(VoltZK.operationMode);
         MonitorHostNodes monitor = new MonitorHostNodes(HOST_DN);
         CreateNode createHostNode = new CreateNode(
                 joinZKPath(HOST_DN, hostId),
@@ -951,11 +951,11 @@ public class ChannelDistributer implements ChannelChangeCallback {
             if (code == Code.OK) {
                 this.stat = Optional.of(stat);
                 this.data = Optional.of(data != null ? data : EMPTY_ARRAY);
-            } else if (code == Code.NONODE || code == Code.SESSIONEXPIRED) {
+            } else if (code == Code.NONODE || code == Code.SESSIONEXPIRED || m_done.get()) {
                 // keep the fault but don't log it
                 KeeperException e = KeeperException.create(code);
                 fault = Optional.of(new DistributerException(path + " went away", e));
-            } else if (!m_done.get()) {
+            } else {
                 fault = checkCode(code, "unable to read data in %s", path);
             }
         }
@@ -1096,14 +1096,14 @@ public class ChannelDistributer implements ChannelChangeCallback {
         }
 
         @Override
-        public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
+        public void processResult(int rc, String path, Object ctx, byte[] nodeData, Stat stat) {
             try {
-                internalProcessResults(rc, path, ctx, data, stat);
+                internalProcessResults(rc, path, ctx, nodeData, stat);
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
                 try {
-                    channels = Optional.of(asChannelSet(data));
+                    channels = Optional.of(asChannelSet(data.get()));
                 } catch (IllegalArgumentException|JSONException e) {
                     fault = Optional.of(
                             loggedDistributerException(e, "failed to parse json in %s", path)
@@ -1143,21 +1143,21 @@ public class ChannelDistributer implements ChannelChangeCallback {
      * An extension of {@link GetData} that monitors the content of the cluster
      * operational mode
      */
-    class GetOperationalMode extends GetData {
+    class GetOperationMode extends GetData {
         Optional<VersionedOperationMode> mode = Optional.absent();
 
-        GetOperationalMode(String path) {
+        GetOperationMode(String path) {
             super(path);
         }
 
         @Override
-        public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
+        public void processResult(int rc, String path, Object ctx, byte[] nodeData, Stat stat) {
             try {
-                internalProcessResults(rc, path, ctx, data, stat);
+                internalProcessResults(rc, path, ctx, nodeData, stat);
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
-                OperationMode next = data != null ?  OperationMode.valueOf(data) : OperationMode.RUNNING;
+                OperationMode next = nodeData != null ?  OperationMode.valueOf(nodeData) : OperationMode.RUNNING;
                 mode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
 
                 int [] stamp = new int[]{0};
@@ -1181,7 +1181,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new GetOperationalMode(path);
+            new GetOperationMode(path);
         }
 
         VersionedOperationMode getMode() {
