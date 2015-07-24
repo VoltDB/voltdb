@@ -622,6 +622,13 @@ public class MockVoltDB implements VoltDBInterface
                 return false;
             }
 
+            public boolean isDrActiveActiveAllowed() {
+                // TestExecutionSite (and probably others)
+                // use MockVoltDB without requiring unique
+                // zmq ports for the DR replicator.
+                return false;
+            }
+
             @Override
             public boolean isCommandLoggingAllowed() {
                 return true;
