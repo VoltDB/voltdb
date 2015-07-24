@@ -2141,8 +2141,6 @@ public class DDLCompiler {
             // prepare info for aggregation columns.
             List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
             boolean hasAggregationExprs = false;
-            boolean hasMinOrMaxAgg = false;
-            ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
                 ParsedColInfo col = stmt.m_displayColumns.get(i);
                 AbstractExpression aggExpr = col.expression.getLeft();
@@ -2150,17 +2148,11 @@ public class DDLCompiler {
                     hasAggregationExprs = true;
                 }
                 aggregationExprs.add(aggExpr);
-                if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
-                        col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
-                    hasMinOrMaxAgg = true;
-                    minMaxAggs.add(aggExpr);
-                }
             }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
             MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
-            assert(minMaxAggs.size() == fallbackQueryXMLs.size());
             compileFallbackQueriesAndUpdateCatalog(db, fallbackQueryXMLs, matviewinfo);
 
             // set Aggregation Expressions.

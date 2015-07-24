@@ -61,25 +61,20 @@ public class MatViewFallbackQueryXMLGenerator {
          * This function will turn the XML for materialized view definitions like:
          *     SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2;
          * into fallback query XMLs like:
-         *     SELECT abs(v1) FROM ENG6511 WHERE d1=? AND d2=? AND abs(v1)>=? ORDER BY abs(v1) LIMIT 2;
-         *     SELECT abs(v1) FROM ENG6511 WHERE d1=? AND d2=? AND abs(v1)<=? ORDER BY abs(v1) DESC LIMIT 2;
+         *     SELECT min(v1) FROM ENG6511 WHERE d1=? AND d2=?;
+         *     SELECT max(v1) FROM ENG6511 WHERE d1=? AND d2=?;
          ********************************************************************************************************/
-        VoltXMLElement groupcolumnsElement = VoltXMLElementHelper.getFirstChild(m_xml, "groupcolumns");
-        List<VoltXMLElement> parameters = VoltXMLElementHelper.getFirstChild(m_xml, "parameters").children;
         List<VoltXMLElement> columns = VoltXMLElementHelper.getFirstChild(m_xml, "columns").children;
-        List<VoltXMLElement> ordercolumns = VoltXMLElementHelper.getFirstChild(m_xml, "ordercolumns", true).children;
-        List<VoltXMLElement> tablescans = VoltXMLElementHelper.getFirstChild(m_xml, "tablescans").children;
-        // Add the joincond to the last table scan element.
-        VoltXMLElement tablescanForJoinCond = tablescans.get(tablescans.size() - 1);
-        List<VoltXMLElement> joincond = VoltXMLElementHelper.getFirstChild(tablescanForJoinCond, "joincond", true).children;
+        List<VoltXMLElement> parameters = VoltXMLElementHelper.getFirstChild(m_xml, "parameters").children;
+        VoltXMLElement groupcolumnsElement = VoltXMLElementHelper.getFirstChild(m_xml, "groupcolumns");
 
-        // 1. Add XMLElements for "LIMIT" =======================================================================
-        //    LIMIT 2
-        m_xml.children.addAll( 0, VoltXMLElementHelper.buildLimitElements( 2, nextElementId() ) );
-
-        // 2. Turn groupby into joincond (WHERE) ================================================================
+        // 1. Turn groupby into joincond (WHERE) ================================================================
         if (groupcolumnsElement != null) {
             // If there is no group by clause, then nothing needs to be transformed.
+            List<VoltXMLElement> tablescans = VoltXMLElementHelper.getFirstChild(m_xml, "tablescans").children;
+            VoltXMLElement tablescanForJoinCond = tablescans.get(tablescans.size() - 1);
+            // Add the joincond to the last table scan element.
+            List<VoltXMLElement> joincond = VoltXMLElementHelper.getFirstChild(tablescanForJoinCond, "joincond", true).children;
             List<VoltXMLElement> groupcolumns = groupcolumnsElement.children;
             VoltXMLElement joincondFromGroupby = null;
             for (int i=0; i<m_groupByColumnsParsedInfo.size(); ++i) {
@@ -107,49 +102,20 @@ public class MatViewFallbackQueryXMLGenerator {
             m_xml.children.remove(groupcolumnsElement);
         }
 
-        // 3. Process aggregation columns =====================================================================
+        // 2. Process aggregation columns =====================================================================
         List<VoltXMLElement> originalColumns = new ArrayList<VoltXMLElement>();
         originalColumns.addAll(columns);
-        // If the materialized view definition doesn't have groupby column, joincond.size() == 0
-        VoltXMLElement joincondTemplate = joincond.size() > 0 ? joincond.get(0) : null;
         columns.clear();
-        String index = String.valueOf(m_groupByColumnsParsedInfo.size());
+
+        // Add one min/max columns at a time as a new fallback query XML.
         for (int i=m_groupByColumnsParsedInfo.size()+1; i<m_displayColumnsParsedInfo.size(); ++i) {
             VoltXMLElement column = originalColumns.get(i);
             String optype = column.attributes.get("optype");
             if ( optype.equals("min") || optype.equals("max") ) {
-                String valueType = m_displayColumnsParsedInfo.get(i).expression.getValueType().getName();
-                // Add the min/max argument to the display column list.
-                VoltXMLElement aggArg = column.children.get(0);
-                if ( ! aggArg.name.equals("columnref") ) {
-                    // If the argument is not a columnref, i.e. it doesn't have a column name or an alias,
-                    // we need to give it an alias in order to pass checkPlanColumnMatch() in ParsedSelectStmt.
-                    String alias = column.attributes.get("alias");
-                    aggArg.attributes.put("alias", alias);
-                }
-                columns.add( aggArg );
-                parameters.add( VoltXMLElementHelper.buildParamElement( nextElementId(), index, valueType ) );
-                String operator = "greaterthanorequalto"; // min
-                boolean desc = false;
-                if ( optype.equals("max") ) {
-                    operator = "lessthanorequalto";
-                    desc = true;
-                }
-                VoltXMLElement aggColumnParamJoincondElement = VoltXMLElementHelper.buildColumnParamJoincondElement( operator, aggArg, lastElementId(), nextElementId() );
-                VoltXMLElement finalJoincond = VoltXMLElementHelper.mergeTwoElementsUsingOperator("and", nextElementId(), joincondTemplate, aggColumnParamJoincondElement);
-                if (joincond.size() == 0) {
-                    joincond.add( finalJoincond );
-                }
-                else {
-                    joincond.set( 0, finalJoincond );
-                }
-                ordercolumns.add( VoltXMLElementHelper.buildOrderColumnsElement( aggArg, desc, nextElementId() ) );
-                // finish for the current aggregation.
-                m_fallbackQueryXMLs.add( m_xml.duplicate() );
-                // reset for the next aggregation.
+                columns.add(column);
+                m_fallbackQueryXMLs.add(m_xml.duplicate());
+                // System.out.println(m_xml.toString());
                 columns.clear();
-                ordercolumns.clear();
-                parameters.remove(parameters.size() - 1);
             }
         }
     }

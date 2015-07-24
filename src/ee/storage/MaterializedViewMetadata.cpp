@@ -424,12 +424,12 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
 {
     // For debug:
-    if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-        cout << "================== processTupleDelete ==================" << endl;
-        cout << "oldTuple: " << endl << oldTuple.debugNoHeader() << endl;
-        cout << "srcTable: " << endl << m_srcTable->debug() << endl;
-        cout << "========================================================" << endl;
-    }
+    // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+    //     cout << "================== processTupleDelete ==================" << endl;
+    //     cout << "oldTuple: " << endl << oldTuple.debugNoHeader() << endl;
+    //     cout << "srcTable: " << endl << m_srcTable->debug() << endl;
+    //     cout << "========================================================" << endl;
+    // }
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && !m_filterPredicate->eval(&oldTuple, NULL).isTrue())
         return;
@@ -497,14 +497,12 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     ExecutorContext* context = ExecutorContext::getExecutorContext();
                     NValueArray &params = *context->getParameterContainer();
                     // the parameters are the groupby columns and the aggregation column.
-                    vector<NValue> backups(m_groupByColumnCount + 1);
+                    vector<NValue> backups(m_groupByColumnCount);
                     int colindex;
                     for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
                         backups[colindex] = params[colindex];
                         params[colindex] = m_existingTuple.getNValue(colindex);
                     }
-                    backups[colindex] = params[colindex];
-                    params[colindex] = oldValue;
                     // executing the stored plan.
                     const vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
                     Table *retval = context->executeExecutors(executorList, 0);
@@ -512,7 +510,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     // get the fallback value from the returned table.
                     TableIterator iterator = retval->iterator();
                     TableTuple tuple(retval->schema());
-                    if (iterator.next(tuple) && iterator.next(tuple)) {
+                    if (iterator.next(tuple)) {
                         newValue = tuple.getNValue(0);
                     }
                     // For debug:
@@ -523,7 +521,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     // }
                     // restore
                     context->cleanupExecutorsForSubquery(executorList);
-                    for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
+                    for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
                         params[colindex] = backups[colindex];
                     }
                 }
