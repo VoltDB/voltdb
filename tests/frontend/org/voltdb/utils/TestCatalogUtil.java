@@ -503,7 +503,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("export overflow directory: " + exportdir.getAbsolutePath() + " does not exist",
                    exportdir.exists());
         assertTrue("export overflow directory: " + exportdir.getAbsolutePath() + " is not a directory",
-                exportdir.isDirectory());
+                   exportdir.isDirectory());
         if (VoltDB.instance().getConfig().m_isEnterprise)
         {
             File commandlogdir = new File(voltdbroot, commandlogpath);
