@@ -85,7 +85,7 @@ function aysnc-benchmark-help() {
 
 function async-benchmark() {
     srccompile
-    java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=120 \

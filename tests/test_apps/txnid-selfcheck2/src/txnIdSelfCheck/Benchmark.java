@@ -595,7 +595,6 @@ public class Benchmark {
         log.info("Loading Filler Tables...");
         log.info(HORIZONTAL_RULE);
 
-
         partitionedLoader = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
         partitionedLoader.start();
@@ -605,7 +604,6 @@ public class Benchmark {
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
             replicatedLoader.start();
         }
-
 
         // wait for the filler tables to load up
         //partitionedLoader.join();
@@ -631,6 +629,7 @@ public class Benchmark {
             Thread.sleep(1000);
             System.out.println("Wait for hashinator..");
         }
+
 
         partitionedTruncater = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
@@ -674,6 +673,7 @@ public class Benchmark {
         idpt.start();
         ddlt = new DdlThread(client);
         // XXX/PSR ddlt.start();
+
         clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
@@ -753,11 +753,13 @@ public class Benchmark {
                 adHocMayhemThread.join();
                 idpt.join();
                 ddlt.join();
+
                 //Shutdown LoadTableLoader
                 rlt.shutdown();
                 plt.shutdown();
                 rlt.join();
                 plt.join();
+
                 for (ClientThread clientThread : clientThreads) {
                     clientThread.join();
                 }
@@ -768,6 +770,7 @@ public class Benchmark {
                 /*
                 shutdown.set(true);
                 es.shutdownNow();
+
                 // block until all outstanding txns return
                 client.drain();
                 client.close();
