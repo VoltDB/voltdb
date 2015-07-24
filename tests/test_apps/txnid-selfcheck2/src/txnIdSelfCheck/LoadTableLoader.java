@@ -239,7 +239,7 @@ public class LoadTableLoader extends BenchmarkThread {
                         Thread.sleep(2000);
                         continue;
                     }
-                    log.info("WorkList Size: " + workList.size());
+                    log.debug("WorkList Size: " + workList.size());
                     CountDownLatch clatch = new CountDownLatch(workList.size());
                     for (Long lcid : workList) {
                         client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid);
@@ -290,12 +290,12 @@ public class LoadTableLoader extends BenchmarkThread {
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
                     m_permits.acquire();
+                    //Increment p so that we always get new key.
+                    p++;
                     long nanotime = System.nanoTime();
                     m_table.addRow(p, p + nanotime, nanotime);
                     cidList.add(p);
                     timeList.add(nanotime);
-                    //Increment p so that we always get new key.
-                    p++;
                     boolean success = false;
                     if (!m_isMP) {
                         Object rpartitionParam
@@ -325,10 +325,10 @@ public class LoadTableLoader extends BenchmarkThread {
                     }
                 }
 
-                log.info("Waiting for all inserts for @Load* done.");
+                log.debug("Waiting for all inserts for @Load* done.");
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
-                log.info("Done Waiting for all inserts for @Load* done.");
+                log.debug("Done Waiting for all inserts for @Load* done.");
 
                 // try to upsert if want the collision
                 if (upsertHitMode != 0) {
@@ -348,10 +348,10 @@ public class LoadTableLoader extends BenchmarkThread {
                             log.error("Failed to invoke upsert for: " + cidList.get(i));
                         }
                     }
-                    log.info("Waiting for all upsert for @Load* done.");
+                    log.debug("Waiting for all upsert for @Load* done.");
                     //Wait for all additional upsert @Load{SP|MP}Done
                     upserHitLatch.await();
-                    log.info("Done Waiting for all upsert for @Load* done.");
+                    log.debug("Done Waiting for all upsert for @Load* done.");
                 }
 
                 cpDelQueue.addAll(lcpDelQueue);
