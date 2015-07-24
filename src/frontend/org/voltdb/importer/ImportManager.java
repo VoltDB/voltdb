@@ -146,7 +146,9 @@ public class ImportManager implements ChannelChangeCallback {
 
     public synchronized void shutdown() {
         close();
-        m_distributer.shutdown();
+        if (m_distributer != null) {
+            m_distributer.shutdown();
+        }
     }
 
     public synchronized void close() {
