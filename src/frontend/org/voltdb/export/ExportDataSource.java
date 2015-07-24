@@ -599,7 +599,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 m_committedBuffers.sync(m_nofsync);
             } catch (IOException e) {
-                exportLog.error(e);
+                exportLog.error("failed to sync export overflow", e);
             }
         }
     }
@@ -607,7 +607,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public ListenableFuture<?> sync(final boolean nofsync) throws Exception {
         try {
             return m_es.submit(new SyncRunnable(nofsync));
-        } catch (Exception e) {
+        } catch (RejectedExecutionException e) {
             throw e;
         }
     }

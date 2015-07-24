@@ -693,7 +693,7 @@ public class ExportManager
         }
     }
 
-    public static void sync(final boolean nofsync) {
+    public static synchronized void sync(final boolean nofsync) {
         exportLog.info("Syncing export data");
         ExportManager instance = instance();
         for (ExportGeneration generation : instance.m_generations.values()) {
