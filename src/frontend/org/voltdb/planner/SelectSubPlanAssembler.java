@@ -584,17 +584,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 joinClauses.addAll(innerAccessPath.otherExprs);
                 AbstractExpression indexScanPredicate = ExpressionUtil.combine(innerExpr);
                 ((IndexScanPlanNode)innerPlan).setPredicate(indexScanPredicate);
-            } else if (innerJoinNode instanceof BranchNode && joinNode.getJoinType() == JoinType.LEFT) {
-                // If innerJoinNode is LEAF node, the "otherExprs" has been applied as predicates already.
-                // If the join type is INNER john, it has been pushed down.
-                // nest loop join index case has been handled, so let's go to nlj without index case.
+            }
+            else if (innerJoinNode instanceof BranchNode && joinNode.getJoinType() == JoinType.LEFT) {
+                // If the innerJoinNode is a LEAF node OR if the join type is an INNER join,
+                // the conditions that apply to the inner side
+                // have been applied as predicates to the inner scan node already.
 
                 // otherExpr of innerAccessPath comes from its parentNode's joinInnerList.
                 // For Outer join (LEFT ONLY at this point), it could mean a join predicate on the table of
                 // the inner node ONLY, that can not be pushed down.
                 joinClauses.addAll(innerAccessPath.otherExprs);
             }
-
             nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
 
             // combine the tails plan graph with the new head node
@@ -635,7 +635,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return null;
         }
         ajNode.setJoinType(joinNode.getJoinType());
-        // pre-join expressions
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
         ajNode.resolveSortDirection();
