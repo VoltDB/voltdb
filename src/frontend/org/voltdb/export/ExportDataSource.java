@@ -604,7 +604,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> sync(final boolean nofsync) throws Exception {
+    public ListenableFuture<?> sync(final boolean nofsync) throws RejectedExecutionException {
         try {
             return m_es.submit(new SyncRunnable(nofsync));
         } catch (RejectedExecutionException e) {
