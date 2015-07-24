@@ -42,14 +42,18 @@ import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
+import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.utils.MiscUtils;
 
 public class TestAsyncCompilerAgent {
     // this object is spied on using mockito
     private AsyncCompilerAgent m_agent = null;
+    private LicenseApi m_licenseApi;
 
     @Before
     public void setUp() {
-        m_agent = spy(new AsyncCompilerAgent());
+        m_licenseApi = MiscUtils.licenseApiFactory();
+        m_agent = spy(new AsyncCompilerAgent(m_licenseApi));
     }
 
     @After
