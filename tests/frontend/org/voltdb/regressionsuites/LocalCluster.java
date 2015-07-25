@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -191,7 +192,11 @@ public class LocalCluster implements VoltServerConfig {
         assert (siteCount > 0);
         assert (hostCount > 0);
 
-        m_additionalProcessEnv = env;
+        m_additionalProcessEnv = env==null ? new HashMap<String, String>() : env;
+        if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
+            // set use.javalib for LocalCluster so that Eclipse runs will be OK.
+            m_additionalProcessEnv.put(EELibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
+        }
         // get the name of the calling class
         StackTraceElement[] traces = Thread.currentThread().getStackTrace();
         m_callingClassName = "UnknownClass";
@@ -241,25 +246,14 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         String classPath = System.getProperty("java.class.path") + ":" +
-            buildDir + File.separator + m_jarFileName;
+                buildDir + File.separator + m_jarFileName + ":" + buildDir + File.separator + "prod";
 
-        String javaLibraryPath = null;
-        if (m_additionalProcessEnv != null && m_additionalProcessEnv.containsKey(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
-            if (Boolean.parseBoolean(m_additionalProcessEnv.get(EELibraryLoader.USE_JAVA_LIBRARY_PATH))) {
-                // set the java lib path to the one for this process - Add obj/release/nativelibs
-                javaLibraryPath = System.getProperty("java.library.path");
-                if (javaLibraryPath == null || javaLibraryPath.trim().length() == 0) {
-                    javaLibraryPath = buildDir + "/nativelibs";
-                } else {
-                    javaLibraryPath += ":" + buildDir + "/nativelibs";
-                }
-            }
-        }
-
-        if (javaLibraryPath==null) {
-            // need this in classpath to find native library. Otherwise, don't add it to classpath to
-            // test override of loading EE lib from jar.
-            classPath = classPath + ":" + buildDir + File.separator + "prod";
+        // set the java lib path to the one for this process - Add obj/release/nativelibs
+        String javaLibraryPath = System.getProperty("java.library.path");
+        if (javaLibraryPath == null || javaLibraryPath.trim().length() == 0) {
+            javaLibraryPath = buildDir + "/nativelibs";
+        } else {
+            javaLibraryPath += ":" + buildDir + "/nativelibs";
         }
 
         // Remove the stored procedures from the classpath.  Out-of-process nodes will
@@ -884,6 +878,11 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
             rejoinCmdLn.m_internalPort = portGenerator.nextInternalPort();
             setPortsFromConfig(hostId, rejoinCmdLn);
+            if (this.m_additionalProcessEnv != null) {
+                for (String name : this.m_additionalProcessEnv.keySet()) {
+                    rejoinCmdLn.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
+                }
+            }
 
             if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
                 assert(m_versionOverrides[hostId] != null);

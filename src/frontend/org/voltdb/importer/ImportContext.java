@@ -17,8 +17,10 @@
 
 package org.voltdb.importer;
 
+import java.net.URI;
 import java.util.Properties;
 import java.util.Set;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  *
@@ -64,6 +66,14 @@ public interface ImportContext {
     public boolean callProcedure(Invocation invocation);
 
     /**
+     * Call this to get the ingested data passed to procedure.
+     * @param cb callback for results.
+     * @param invocation indicating what kind of data is passed in for this.
+     * @return true if successfully accepted the work.
+     */
+    public boolean callProcedure(ProcedureCallback cb, Invocation invocation);
+
+    /**
      * Returns max time in nanoseconds a call to callProcedure waits in backpressure.
      * @return
      */
@@ -97,15 +107,7 @@ public interface ImportContext {
      * @return list of resources identifier that will be persisted in Volt ZK for watching.
      * TODO make sure to get correct naming.
      */
-    public Set<String> getAllResponsibleResources();
-
-    /**
-     * This is called after importer system has allocated part of the responsible resources to the importer running on this node.
-     * This may get invoked during node failuers which may distribute additional resources this importer is now responsible for.
-     * @param allocated
-     * TODO make sure to get correct naming.
-     */
-    public void setAllocatedResources(Set<String> allocated);
+    public Set<URI> getAllResponsibleResources();
 
     /**
      * log info message
@@ -115,8 +117,40 @@ public interface ImportContext {
 
     /**
      * log error message
+     * @param format message to log to Volt server logging system.
+     * @param t throwable to be logged.
+     * @param args arguments to formatter
+     */
+    public void error(Throwable t, String format, Object...args);
+
+    /**
+     * log error message
      * @param message message to log to Volt server logging system.
      */
     public void error(String message);
 
+    /**
+     * log error message
+     * @param message message to log to Volt server logging system.
+     * @param t cause of error
+     */
+    public void error(String message, Throwable t);
+
+    /**
+     * log warn message
+     * @param message message to log to Volt server logging system.
+     */
+    public void warn(String message);
+
+    /**
+     * log debug message
+     * @param message message to log to Volt server logging system.
+     */
+    public void debug(String message);
+
+    public boolean isDebugEnabled();
+    public boolean isTraceEnabled();
+    public boolean isInfoEnabled();
+
+    public void trace(String message);
 }

@@ -735,11 +735,14 @@ public abstract class VoltTableRow {
             else
                 js.value(dec.toString());
             break;
+        // VoltType includes a few values that aren't valid column value types
         case INVALID:
             break;
         case NULL:
             break;
         case NUMERIC:
+            break;
+        case BOOLEAN:
             break;
         case VOLTTABLE:
             break;

@@ -305,6 +305,10 @@ public class TestImportSuite extends RegressionSuite {
 
         LocalCluster config;
         Map<String, String> additionalEnv = new HashMap<String, String>();
+        //Specify bundle location
+        String bundleLocation = System.getProperty("user.dir") + "/bundles";
+        System.out.println("Bundle location is: " + bundleLocation);
+        additionalEnv.put("voltdbbundlelocation", bundleLocation);
 
         final MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestImportSuite.class);
@@ -319,15 +323,16 @@ public class TestImportSuite extends RegressionSuite {
                 "port", "7001",
                 "decode", "true",
                 "procedure", "importTable.insert"));
-        project.addImport(true, "custom", "csv", "org.voltdb.importclient.SocketStreamImporter", props);
+        project.addImport(true, "custom", "csv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
         // configure log4j socket handler importer
         props = new Properties();
         props.putAll(ImmutableMap.<String, String>of(
                 "port", "6060",
+                "procedure", "importTable.insert",
                 "log-event-table", "log_events"));
-        project.addImport(true, "custom", null, "org.voltdb.importclient.Log4jSocketHandlerImporter", props);
+        project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
 
         /*
          * compile the catalog all tests start with

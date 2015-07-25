@@ -161,7 +161,6 @@ public class StatsProcOutputTable
 
         int kB = 1024;
         int mB = 1024 * kB;
-        int gB = 1024 * mB;
 
         VoltTable result = TableShorthand.tableFromShorthand(
             tableName +
