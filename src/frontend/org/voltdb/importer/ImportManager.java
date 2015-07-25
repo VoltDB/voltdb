@@ -35,6 +35,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -129,7 +130,8 @@ public class ImportManager implements ChannelChangeCallback {
      */
     private synchronized void create(int myHostId, CatalogContext catalogContext) {
         try {
-            if (catalogContext.getDeployment().getImport() == null) {
+            ImportType importElement = catalogContext.getDeployment().getImport();
+            if (importElement == null || importElement.getConfiguration().isEmpty()) {
                 return;
             }
             startOSGiFramework();
