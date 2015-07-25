@@ -32,6 +32,7 @@ from voltdbclient import *
 from voltcli import cli
 from voltcli import environment
 from voltcli import utility
+from voltcli import checkconfig
 
 #===============================================================================
 class BaseVerb(object):
@@ -406,7 +407,8 @@ class ServerBundle(JavaBundle):
                  daemon_name=None,
                  daemon_description=None,
                  daemon_output=None,
-                 supports_multiple_daemons=False):
+                 supports_multiple_daemons=False,
+                 check_environment_config=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
@@ -418,6 +420,7 @@ class ServerBundle(JavaBundle):
         self.daemon_description = daemon_description
         self.daemon_output = daemon_output
         self.supports_multiple_daemons = supports_multiple_daemons
+        self.check_environment_config = check_environment_config
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -453,6 +456,10 @@ class ServerBundle(JavaBundle):
                                   None))
 
     def go(self, verb, runner):
+        if self.check_environment_config:
+            incompatible_options = checkconfig.check_config()
+            if incompatible_options is not None:
+                utility.abort(incompatible_options)
         final_args = None
         if self.subcommand in ('create', 'recover'):
             if runner.opts.replica:

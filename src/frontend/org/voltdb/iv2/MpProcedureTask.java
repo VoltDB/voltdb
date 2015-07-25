@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
@@ -47,7 +46,6 @@ import com.google_voltpatches.common.collect.Maps;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-    private static final VoltLogger log = new VoltLogger("HOST");
 
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters

@@ -46,7 +46,7 @@ public class HTTPClientInterface {
     private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
-    AtomicReference<AuthenticatedConnectionCache> m_connections = new AtomicReference();
+    AtomicReference<AuthenticatedConnectionCache> m_connections = new AtomicReference<AuthenticatedConnectionCache>();
     static final int CACHE_TARGET_SIZE = 10;
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 

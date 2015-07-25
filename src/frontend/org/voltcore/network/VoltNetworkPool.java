@@ -42,7 +42,6 @@ public class VoltNetworkPool {
     }
 
     private static final VoltLogger m_logger = new VoltLogger(VoltNetworkPool.class.getName());
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private final VoltNetwork m_networks[];
     private final AtomicLong m_nextNetwork = new AtomicLong();
