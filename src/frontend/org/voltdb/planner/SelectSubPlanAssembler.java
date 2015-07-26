@@ -580,8 +580,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // InnerPlan is an IndexScan. In this case the inner and inner-outer
                 // non-index join expressions (if any) are in the otherExpr. The former should stay as
                 // an IndexScanPlan predicate and the latter stay at the NLJ node as a join predicate
-                List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs);
-                joinClauses.addAll(innerAccessPath.otherExprs);
+                ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
+                // PLEASE do not update the "innerAccessPath.otherExprs", it may be reused
+                // for other path evaluation on the other outer side join.
+                List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs, otherExprs);
+                joinClauses.addAll(otherExprs);
                 AbstractExpression indexScanPredicate = ExpressionUtil.combine(innerExpr);
                 ((IndexScanPlanNode)innerPlan).setPredicate(indexScanPredicate);
             }
@@ -644,19 +647,22 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /**
      * A method to filter out single TVE expressions.
      *
-     * @param expr List of expressions.
+     * @param expr List of single TVE expressions.
+     * @param otherExprs List of expressions other than TVE.
      * @return List of single TVE expressions from the input collection.
      *         They are also removed from the input.
      */
-    private static List<AbstractExpression> filterSingleTVEExpressions(List<AbstractExpression> exprs) {
+    private static List<AbstractExpression> filterSingleTVEExpressions(List<AbstractExpression> exprs,
+            List<AbstractExpression> otherExprs) {
         List<AbstractExpression> singleTVEExprs = new ArrayList<AbstractExpression>();
         for (AbstractExpression expr : exprs) {
             List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
             if (tves.size() == 1) {
                 singleTVEExprs.add(expr);
+            } else {
+                otherExprs.add(expr);
             }
         }
-        exprs.removeAll(singleTVEExprs);
         return singleTVEExprs;
     }
 
