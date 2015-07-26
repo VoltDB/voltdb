@@ -836,23 +836,30 @@ public class TestJoinsSuite extends RegressionSuite {
     private void subtestOuterJoinENG8692(Client client)
             throws NoConnectionsException, IOException, ProcCallException
     {
-
         client.callProcedure("@AdHoc", "INSERT INTO t1 VALUES(1);");
         client.callProcedure("@AdHoc", "INSERT INTO t2 VALUES(1);");
         client.callProcedure("@AdHoc", "INSERT INTO t3 VALUES(1);");
+        client.callProcedure("@AdHoc", "INSERT INTO t4 VALUES(1);");
+        client.callProcedure("@AdHoc", "INSERT INTO t4 VALUES(null);");
 
         String sql;
         long MINVAL = Long.MIN_VALUE;
 
+        // case 1: missing join expression
         sql = "SELECT * FROM t1 INNER JOIN t2 ON t1.i1 = t2.i2 RIGHT OUTER JOIN t3 ON t1.i1 = 1000;";
         validateTableOfLongs(client, sql, new long[][]{{MINVAL, MINVAL, 1}});
 
+        // case 2: more than 5 table joins
         sql = "SELECT * FROM t1 INNER JOIN t2 AS t2_copy1 ON t1.i1 = t2_copy1.i2 "
                 + "INNER JOIN t2 AS t2_copy2 ON t1.i1 = t2_copy2.i2 "
                 + "INNER JOIN t2 AS t2_copy3 ON t1.i1 = t2_copy3.i2 "
                 + "INNER JOIN t2 AS t2_copy4 ON t1.i1 = t2_copy4.i2 "
                 + "RIGHT OUTER JOIN t3 ON t1.i1 = t3.i3 AND t3.i3 < -1000;";
         validateTableOfLongs(client, sql, new long[][]{{MINVAL, MINVAL, MINVAL, MINVAL, MINVAL, 1}});
+
+        // case 3: reverse scan with null data
+        sql = "SELECT * FROM t1 INNER JOIN t2 ON t1.i1= t2.i2 INNER JOIN t4 ON t4.i4 < 45;";
+        validateTableOfLongs(client, sql, new long[][]{{1, 1, 1}});
     }
 
 
