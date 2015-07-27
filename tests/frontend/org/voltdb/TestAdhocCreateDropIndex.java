@@ -146,4 +146,111 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    public void testCreateDropIndexonView() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "ID integer not null," +
+                "VAL bigint, " +
+                "constraint PK_TREE primary key (ID)" +
+                ");\n" +
+                "create table FOO_R (" +
+                "ID integer not null," +
+                "VAL bigint, " +
+                "constraint PK_TREE_R primary key (ID)" +
+                ");\n"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // create a basic view
+            assertFalse(findTableInSystemCatalogResults("FOOVIEW"));
+            try {
+                m_client.callProcedure("@AdHoc",
+                    "create view FOOVIEW (VAL, TOTAL) as " +
+                    "select VAL, COUNT(*) from FOO group by VAL;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create a view");
+            }
+            assertTrue(findTableInSystemCatalogResults("FOOVIEW"));
+
+            // can't create same view again
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                    "create view FOOVIEW (VAL, TOTAL) as " +
+                    "select VAL, COUNT(*) from FOO group by VAL;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to create the same view twice", threw);
+            assertTrue(findTableInSystemCatalogResults("FOOVIEW"));
+
+            // Create index on view
+            assertFalse(findIndexInSystemCatalogResults("VALDEX"));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create index VALDEX on FOOVIEW (VAL);");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create an index on a view");
+            }
+            assertTrue(findIndexInSystemCatalogResults("VALDEX"));
+
+            // drop index
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "drop index VALDEX;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop an index on a view");
+            }
+            assertFalse(findIndexInSystemCatalogResults("VALDEX"));
+
+            // can't drop index twice
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "drop index VALDEX;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to drop bad index without if exists", threw);
+            assertFalse(findIndexInSystemCatalogResults("VALDEX"));
+            // unless we use if exists
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "drop index VALDEX if exists;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop a bad index with if exists");
+            }
+            assertFalse(findIndexInSystemCatalogResults("VALDEX"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }

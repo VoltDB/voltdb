@@ -2103,6 +2103,23 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
+    public void testDDLCompilerCreateAndDropIndexesOnMatView()
+    {
+        String ddl = "";
+
+        ddl = "create table foo(a integer, b float, c float);\n" +
+              "create view bar (a, b, total) as select a, b, count(*) as total from foo group by a, b;\n" +
+              "create index baridx on bar (a);\n" +
+              "drop index baridx;\n";
+        checkDDLErrorMessage(ddl, null);
+
+        ddl = "create table foo(a integer, b float);\n" +
+              "create view bar (a, total) as select a, count(*) as total from foo group by a;\n" +
+              "create index baridx on bar (a, total);\n" +
+              "drop index baridx;\n";
+        checkDDLErrorMessage(ddl, null);
+    }
+
     public void testColumnNameIndexHash()
     {
         List<Pair<String, IndexType>> passing
