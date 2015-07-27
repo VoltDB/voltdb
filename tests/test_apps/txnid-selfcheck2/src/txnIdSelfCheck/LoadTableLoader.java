@@ -191,18 +191,20 @@ public class LoadTableLoader extends BenchmarkThread {
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("LoadTableLoader ungracefully failed to copy from table " + m_tableName);
+                log.error("LoadTableLoader ungracefully failed to delete from table " + m_tableName);
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the loader
                 m_shouldContinue.set(false);
             }
             Benchmark.txnCount.incrementAndGet();
-            long cnt = clientResponse.getResults()[0].asScalarLong();
-            if (cnt != expected_delete) {
-                log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt + " Expected: " + expected_delete);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the loader
-                m_shouldContinue.set(false);
+            if (status == ClientResponse.SUCCESS) {
+                long cnt = clientResponse.getResults()[0].asScalarLong();
+                if (cnt != expected_delete) {
+                    log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt + " Expected: " + expected_delete);
+                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                    // stop the loader
+                    m_shouldContinue.set(false);
+                }
             }
         }
     }
