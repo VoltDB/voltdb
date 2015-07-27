@@ -174,6 +174,12 @@ public class ClusterConfig
                                        m_replicationFactor);
             return false;
         }
+        if ((m_hostCount * m_sitesPerHost) % (m_replicationFactor + 1) > 0)
+        {
+            m_errorMsg = "The cluster has more hosts and sites per hosts than required for the " +
+                "requested k-safety value.";
+            return false;
+        }
         m_errorMsg = "Cluster config contains no detected errors";
         return true;
     }
