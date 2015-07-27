@@ -183,4 +183,9 @@ class SpDurabilityListener implements DurabilityListener {
     public boolean completionCheckInitialized() {
         return (m_currentCompletionChecks != null);
     }
+
+    @Override
+    public void processDurabilityChecks(CommandLog.CompletionChecks completionChecks) {
+        m_spScheduler.processDurabilityChecks(completionChecks);
+    }
 }
