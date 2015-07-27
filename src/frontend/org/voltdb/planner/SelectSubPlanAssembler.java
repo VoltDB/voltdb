@@ -530,8 +530,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                                        joinNode.getJoinType() != JoinType.INNER;
 
         // When the inner plan is an IndexScan, there MAY be a choice of whether to join using a
-        // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLIJ will have an advantage over the
-        // NLJ in the cases where it applies, since it does a single access or iteration over the index
+        // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLJ will have an advantage over the
+        // NLIJ in the cases where it applies, since it does a single access or iteration over the index
         // and caches the result, where the NLIJ does an index access or iteration for each outer row.
         // The NestLoopJoin applies when the inner IndexScan is driven only by parameter and constant
         // expressions determined at the start of the query. That requires that none of the IndexScan's
@@ -645,12 +645,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * A method to filter out single TVE expressions.
+     * A method to filter out single-TVE expressions.
      *
-     * @param expr List of single TVE expressions.
-     * @param otherExprs List of expressions other than TVE.
-     * @return List of single TVE expressions from the input collection.
-     *         They are also removed from the input.
+     * @param expr List of single-TVE expressions.
+     * @param otherExprs List of multi-TVE expressions.
+     * @return List of single-TVE expressions from the input collection.
      */
     private static List<AbstractExpression> filterSingleTVEExpressions(List<AbstractExpression> exprs,
             List<AbstractExpression> otherExprs) {
