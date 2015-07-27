@@ -35,7 +35,6 @@ import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Stopwatch;
-import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.Collections2;
 import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -45,23 +44,21 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSetMultimap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.MultimapBuilder;
 import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.Multiset;
 import com.google_voltpatches.common.collect.Ordering;
 import com.google_voltpatches.common.collect.SetMultimap;
-import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenerCallQueue.Callback;
 import com.google_voltpatches.common.util.concurrent.Service.State;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -402,12 +399,7 @@ public final class ServiceManager {
 
     @GuardedBy("monitor")
     final SetMultimap<State, Service> servicesByState =
-        Multimaps.newSetMultimap(new EnumMap<State, Collection<Service>>(State.class),
-            new Supplier<Set<Service>>() {
-              @Override public Set<Service> get() {
-                return Sets.newLinkedHashSet();
-              }
-            });
+        MultimapBuilder.enumKeys(State.class).linkedHashSetValues().build();
 
     @GuardedBy("monitor")
     final Multiset<State> states = servicesByState.keys();
@@ -564,7 +556,7 @@ public final class ServiceManager {
           throw new TimeoutException("Timeout waiting for the services to stop. The following "
               + "services have not stopped: "
               + Multimaps.filterKeys(servicesByState,
-                  not(in(ImmutableSet.of(TERMINATED, FAILED)))));
+                  not(in(EnumSet.of(TERMINATED, FAILED)))));
         }
       } finally {
         monitor.leave();
@@ -577,7 +569,7 @@ public final class ServiceManager {
       try {
         for (Entry<State, Service> entry : servicesByState.entries()) {
           if (!(entry.getValue() instanceof NoOpService)) {
-            builder.put(entry.getKey(), entry.getValue());
+            builder.put(entry);
           }
         }
       } finally {
@@ -602,17 +594,13 @@ public final class ServiceManager {
       } finally {
         monitor.leave();
       }
-      Collections.sort(loadTimes, Ordering.<Long>natural()
+      Collections.sort(loadTimes, Ordering.natural()
           .onResultOf(new Function<Entry<Service, Long>, Long>() {
             @Override public Long apply(Map.Entry<Service, Long> input) {
               return input.getValue();
             }
           }));
-      ImmutableMap.Builder<Service, Long> builder = ImmutableMap.builder();
-      for (Entry<Service, Long> entry : loadTimes) {
-        builder.put(entry);
-      }
-      return builder.build();
+      return ImmutableMap.copyOf(loadTimes);
     }
 
     /**
@@ -771,7 +759,7 @@ public final class ServiceManager {
       if (state != null) {
         // Log before the transition, so that if the process exits in response to server failure,
         // there is a higher likelihood that the cause will be in the logs.
-        if (!(service instanceof NoOpService)) {
+        if (!(service instanceof NoOpService) ) {
           logger.log(Level.SEVERE, "Service " + service + " has failed in the " + from + " state.",
               failure);
         }

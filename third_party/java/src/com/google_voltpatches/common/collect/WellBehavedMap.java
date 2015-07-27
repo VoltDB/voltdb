@@ -17,6 +17,7 @@
 package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.j2objc.annotations.WeakOuter;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -64,6 +65,7 @@ final class WellBehavedMap<K, V> extends ForwardingMap<K, V> {
     return entrySet = new EntrySet();
   }
 
+  @WeakOuter
   private final class EntrySet extends Maps.EntrySet<K, V> {
     @Override
     Map<K, V> map() {

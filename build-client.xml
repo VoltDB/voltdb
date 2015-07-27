@@ -13,16 +13,16 @@
     </sequential>
 </macrodef>
 
-<macrodef name="invoke-javac16">
+<macrodef name="invoke-javac17">
     <attribute name="srcdir"/>
     <attribute name="destdir" default="${build.client.dir}"/>
     <attribute name="excludes" default=""/>
     <attribute name="includes" default=""/>
     <sequential>
         <javac
-            target="1.6"
-            source="1.6"
-            bootclasspath="${vendor.lib.dir}/classes-java1.6.jar"
+            target="1.7"
+            source="1.7"
+            bootclasspath="${vendor.lib.dir}/classes-java1.7.jar"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -90,14 +90,9 @@
                   org/cliffc_voltpatches/**/*.java
                   org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
-                  org/voltdb/importer/ImportContext.java
-                  org/voltdb/importer/ImportHandlerProxy.java
-                  org/voltdb/importer/ChannelChangeCallback.java
-                  org/voltdb/importer/VersionedOperationMode.java
-                  org/voltdb/importer/ImporterChannelAssignment.java
-                  org/voltdb/importer/Invocation.java
                   jsr166y/**/*.java
                   io/netty_voltpatches/NinjaKeySet.java
+                  org/codehaus_voltpatches/mojo/**/*.java
                   "
 />
 
@@ -317,8 +312,8 @@ JAVA COMPILATION
         <fileset dir="${src.gpl.dir}" includes="org/voltdb/*.properties"/>
     </copy>
 
-    <invoke-javac16 srcdir="${build.clientsrc.dir}">
-    </invoke-javac16>
+    <invoke-javac17 srcdir="${build.clientsrc.dir}">
+    </invoke-javac17>
 
 </target>
 

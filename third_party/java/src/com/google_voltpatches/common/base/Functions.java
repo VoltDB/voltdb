@@ -25,6 +25,7 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import java.io.Serializable;
 import java.util.Map;
 
+import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -33,14 +34,15 @@ import javax.annotation_voltpatches.Nullable;
  * <p>All methods return serializable functions as long as they're given serializable parameters.
  * 
  * <p>See the Guava User Guide article on <a href=
- * "http://code.google.com/p/guava-libraries/wiki/FunctionalExplained">the use of {@code
+ * "https://github.com/google/guava/wiki/FunctionalExplained">the use of {@code
  * Function}</a>.
  *
  * @author Mike Bostock
  * @author Jared Levy
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible
+@CheckReturnValue
 public final class Functions {
   private Functions() {}
 
@@ -62,12 +64,13 @@ public final class Functions {
 
     @Override
     public String apply(Object o) {
-      checkNotNull(o);  // eager for GWT.
+      checkNotNull(o); // eager for GWT.
       return o.toString();
     }
 
-    @Override public String toString() {
-      return "toString";
+    @Override
+    public String toString() {
+      return "Functions.toStringFunction()";
     }
   }
 
@@ -90,8 +93,9 @@ public final class Functions {
       return o;
     }
 
-    @Override public String toString() {
-      return "identity";
+    @Override
+    public String toString() {
+      return "Functions.identity()";
     }
   }
 
@@ -122,7 +126,8 @@ public final class Functions {
       return result;
     }
 
-    @Override public boolean equals(@Nullable Object o) {
+    @Override
+    public boolean equals(@Nullable Object o) {
       if (o instanceof FunctionForMapNoDefault) {
         FunctionForMapNoDefault<?, ?> that = (FunctionForMapNoDefault<?, ?>) o;
         return map.equals(that.map);
@@ -130,12 +135,14 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return map.hashCode();
     }
 
-    @Override public String toString() {
-      return "forMap(" + map + ")";
+    @Override
+    public String toString() {
+      return "Functions.forMap(" + map + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -170,7 +177,8 @@ public final class Functions {
       return (result != null || map.containsKey(key)) ? result : defaultValue;
     }
 
-    @Override public boolean equals(@Nullable Object o) {
+    @Override
+    public boolean equals(@Nullable Object o) {
       if (o instanceof ForMapWithDefault) {
         ForMapWithDefault<?, ?> that = (ForMapWithDefault<?, ?>) o;
         return map.equals(that.map) && Objects.equal(defaultValue, that.defaultValue);
@@ -178,12 +186,15 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return Objects.hashCode(map, defaultValue);
     }
 
-    @Override public String toString() {
-      return "forMap(" + map + ", defaultValue=" + defaultValue + ")";
+    @Override
+    public String toString() {
+      // TODO(cpovirk): maybe remove "defaultValue=" to make this look like the method call does
+      return "Functions.forMap(" + map + ", defaultValue=" + defaultValue + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -216,7 +227,8 @@ public final class Functions {
       return g.apply(f.apply(a));
     }
 
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj instanceof FunctionComposition) {
         FunctionComposition<?, ?, ?> that = (FunctionComposition<?, ?, ?>) obj;
         return f.equals(that.f) && g.equals(that.g);
@@ -224,11 +236,14 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return f.hashCode() ^ g.hashCode();
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
+      // TODO(cpovirk): maybe make this look like the method call does ("Functions.compose(...)")
       return g + "(" + f + ")";
     }
 
@@ -258,7 +273,8 @@ public final class Functions {
       return predicate.apply(t);
     }
 
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj instanceof PredicateFunction) {
         PredicateFunction<?> that = (PredicateFunction<?>) obj;
         return predicate.equals(that.predicate);
@@ -266,12 +282,14 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return predicate.hashCode();
     }
 
-    @Override public String toString() {
-      return "forPredicate(" + predicate + ")";
+    @Override
+    public String toString() {
+      return "Functions.forPredicate(" + predicate + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -299,7 +317,8 @@ public final class Functions {
       return value;
     }
 
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj instanceof ConstantFunction) {
         ConstantFunction<?> that = (ConstantFunction<?>) obj;
         return Objects.equal(value, that.value);
@@ -307,12 +326,14 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return (value == null) ? 0 : value.hashCode();
     }
 
-    @Override public String toString() {
-      return "constant(" + value + ")";
+    @Override
+    public String toString() {
+      return "Functions.constant(" + value + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -338,11 +359,13 @@ public final class Functions {
       this.supplier = checkNotNull(supplier);
     }
 
-    @Override public T apply(@Nullable Object input) {
+    @Override
+    public T apply(@Nullable Object input) {
       return supplier.get();
     }
     
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj instanceof SupplierFunction) {
         SupplierFunction<?> that = (SupplierFunction<?>) obj;
         return this.supplier.equals(that.supplier);
@@ -350,12 +373,14 @@ public final class Functions {
       return false;
     }
     
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return supplier.hashCode();
     }
     
-    @Override public String toString() {
-      return "forSupplier(" + supplier + ")";
+    @Override
+    public String toString() {
+      return "Functions.forSupplier(" + supplier + ")";
     }
     
     private static final long serialVersionUID = 0;

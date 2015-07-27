@@ -139,7 +139,7 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
-	<exclude name='classes-java1.6.jar' />
+	<exclude name='classes-java1.7.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -2005,7 +2005,7 @@ TEST CASES
       <fileset dir="${lib.dir}" includes ="*.jar" />
       <fileset dir='${vendor.lib.dir}'>
           <include name='*.jar' />
-	  <exclude name='classes-java1.6.jar' />
+	  <exclude name='classes-java1.7.jar' />
       </fileset>
       <pathelement location="${build.test.dir}" />
       <fileset refid="voltpro.classpath"/>

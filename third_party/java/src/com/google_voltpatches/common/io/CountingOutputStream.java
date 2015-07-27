@@ -16,13 +16,13 @@
 
 package com.google_voltpatches.common.io;
 
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+
 import com.google_voltpatches.common.annotations.Beta;
 
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-
-import javax.annotation_voltpatches.Nullable;
 
 /**
  * An OutputStream that counts the number of bytes written.
@@ -40,8 +40,8 @@ public final class CountingOutputStream extends FilterOutputStream {
    *
    * @param out the output stream to be wrapped
    */
-  public CountingOutputStream(@Nullable OutputStream out) {
-    super(out);
+  public CountingOutputStream(OutputStream out) {
+    super(checkNotNull(out));
   }
 
   /** Returns the number of bytes written. */

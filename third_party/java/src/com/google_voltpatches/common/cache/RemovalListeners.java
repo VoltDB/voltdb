@@ -18,8 +18,6 @@ package com.google_voltpatches.common.cache;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
-import com.google_voltpatches.common.annotations.Beta;
-
 import java.util.concurrent.Executor;
 
 /**
@@ -28,7 +26,6 @@ import java.util.concurrent.Executor;
  * @author Charles Fry
  * @since 10.0
  */
-@Beta
 public final class RemovalListeners {
 
   private RemovalListeners() {}

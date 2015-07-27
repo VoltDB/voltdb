@@ -20,6 +20,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.j2objc.annotations.WeakOuter;
 
 import java.util.Comparator;
 import java.util.Map;
@@ -88,6 +89,7 @@ class StandardRowSortedTable<R, C, V> extends StandardTable<R, C, V>
     return new RowSortedMap();
   }
 
+  @WeakOuter
   private class RowSortedMap extends RowMap implements SortedMap<R, Map<C, V>> {
     @Override
     public SortedSet<R> keySet() {

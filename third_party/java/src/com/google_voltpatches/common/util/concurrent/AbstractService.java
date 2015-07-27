@@ -172,7 +172,6 @@ public abstract class AbstractService implements Service {
         snapshot = new StateSnapshot(STARTING);
         starting();
         doStart();
-       // TODO(user): justify why we are catching Throwable and not RuntimeException
       } catch (Throwable startupFailure) {
         notifyFailed(startupFailure);
       } finally {
@@ -211,8 +210,6 @@ public abstract class AbstractService implements Service {
           default:
             throw new AssertionError("Unexpected state: " + previous);
         }
-        // TODO(user): justify why we are catching Throwable and not RuntimeException.  Also, we
-        // may inadvertently catch our AssertionErrors.
       } catch (Throwable shutdownFailure) {
         notifyFailed(shutdownFailure);
       } finally {

@@ -16,10 +16,11 @@
 
 package com.google_voltpatches.common.io;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.Beta;
-import com.google_voltpatches.common.base.Ascii;
+import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.AbstractIterator;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -95,6 +96,71 @@ public abstract class CharSource {
   }
 
   /**
+   * Returns the size of this source in chars, if the size can be easily determined without
+   * actually opening the data stream.
+   *
+   * <p>The default implementation returns {@link Optional#absent}. Some sources, such as a
+   * {@code CharSequence}, may return a non-absent value. Note that in such cases, it is
+   * <i>possible</i> that this method will return a different number of chars than would be
+   * returned by reading all of the chars.
+   *
+   * <p>Additionally, for mutable sources such as {@code StringBuilder}s, a subsequent read
+   * may return a different number of chars if the contents are changed.
+   *
+   * @since 19.0
+   */
+  @Beta
+  public Optional<Long> lengthIfKnown() {
+    return Optional.absent();
+  }
+
+  /**
+   * Returns the length of this source in chars, even if doing so requires opening and traversing
+   * an entire stream. To avoid a potentially expensive operation, see {@link #lengthIfKnown}.
+   *
+   * <p>The default implementation calls {@link #lengthIfKnown} and returns the value if present.
+   * If absent, it will fall back to a heavyweight operation that will open a stream,
+   * {@link Reader#skip(long) skip} to the end of the stream, and return the total number of chars
+   * that were skipped.
+   *
+   * <p>Note that for sources that implement {@link #lengthIfKnown} to provide a more efficient
+   * implementation, it is <i>possible</i> that this method will return a different number of chars
+   * than would be returned by reading all of the chars.
+   *
+   * <p>In either case, for mutable sources such as files, a subsequent read may return a different
+   * number of chars if the contents are changed.
+   *
+   * @throws IOException if an I/O error occurs in the process of reading the length of this source
+   * @since 19.0
+   */
+  @Beta
+  public long length() throws IOException {
+    Optional<Long> lengthIfKnown = lengthIfKnown();
+    if (lengthIfKnown.isPresent()) {
+      return lengthIfKnown.get();
+    }
+
+    Closer closer = Closer.create();
+    try {
+      Reader reader = closer.register(openStream());
+      return countBySkipping(reader);
+    } catch (Throwable e) {
+      throw closer.rethrow(e);
+    } finally {
+      closer.close();
+    }
+  }
+
+  private long countBySkipping(Reader reader) throws IOException {
+    long count = 0;
+    long read;
+    while ((read = reader.skip(Long.MAX_VALUE)) != 0) {
+      count += read;
+    }
+    return count;
+  }
+
+  /**
    * Appends the contents of this source to the given {@link Appendable} (such as a {@link Writer}).
    * Does not close {@code appendable} if it is {@code Closeable}.
    *
@@ -162,7 +228,7 @@ public abstract class CharSource {
    *
    * @throws IOException if an I/O error occurs in the process of reading from this source
    */
-  public @Nullable String readFirstLine() throws IOException {
+  @Nullable public String readFirstLine() throws IOException {
     Closer closer = Closer.create();
     try {
       BufferedReader reader = closer.register(openBufferedStream());
@@ -231,13 +297,22 @@ public abstract class CharSource {
   }
 
   /**
-   * Returns whether the source has zero chars. The default implementation is to open a stream and
-   * check for EOF.
+   * Returns whether the source has zero chars. The default implementation returns true if
+   * {@link #lengthIfKnown} returns zero, falling back to opening a stream and checking
+   * for EOF if the length is not known.
+   *
+   * <p>Note that, in cases where {@code lengthIfKnown} returns zero, it is <i>possible</i> that
+   * chars are actually available for reading. This means that a source may return {@code true} from
+   * {@code isEmpty()} despite having readable content.
    *
    * @throws IOException if an I/O error occurs
    * @since 15.0
    */
   public boolean isEmpty() throws IOException {
+    Optional<Long> lengthIfKnown = lengthIfKnown();
+    if (lengthIfKnown.isPresent() && lengthIfKnown.get() == 0L) {
+      return true;
+    }
     Closer closer = Closer.create();
     try {
       Reader reader = closer.register(openStream());
@@ -348,6 +423,16 @@ public abstract class CharSource {
       return seq.length() == 0;
     }
 
+    @Override
+    public long length() {
+      return seq.length();
+    }
+
+    @Override
+    public Optional<Long> lengthIfKnown() {
+      return Optional.of((long) seq.length());
+    }
+
     /**
      * Returns an iterable over the lines in the string. If the string ends in
      * a newline, a final empty string is not included to match the behavior of
@@ -399,7 +484,69 @@ public abstract class CharSource {
 
     @Override
     public String toString() {
-      return "CharSource.wrap(" + Ascii.truncate(seq, 30, "...") + ")";
+      return "CharSource.wrap(" + truncate(seq, 30, "...") + ")";
+    }
+
+    /**
+     * Truncates the given character sequence to the given maximum length. If the length of the
+     * sequence is greater than {@code maxLength}, the returned string will be exactly
+     * {@code maxLength} chars in length and will end with the given {@code truncationIndicator}.
+     * Otherwise, the sequence will be returned as a string with no changes to the content.
+     *
+     * <p>Examples:
+     *
+     * <pre>   {@code
+     *   truncate("foobar", 7, "..."); // returns "foobar"
+     *   truncate("foobar", 5, "..."); // returns "fo..." }</pre>
+     *
+     * <p><b>Note:</b> This method <i>may</i> work with certain non-ASCII text but is not safe for
+     * use with arbitrary Unicode text. It is mostly intended for use with text that is known to be
+     * safe for use with it (such as all-ASCII text) and for simple debugging text. When using this
+     * method, consider the following:
+     *
+     * <ul>
+     *   <li>it may split surrogate pairs</li>
+     *   <li>it may split characters and combining characters</li>
+     *   <li>it does not consider word boundaries</li>
+     *   <li>if truncating for display to users, there are other considerations that must be taken
+     *   into account</li>
+     *   <li>the appropriate truncation indicator may be locale-dependent</li>
+     *   <li>it is safe to use non-ASCII characters in the truncation indicator</li>
+     * </ul>
+     *
+     *
+     * @throws IllegalArgumentException if {@code maxLength} is less than the length of
+     *     {@code truncationIndicator}
+     */
+    /*
+     * <p>TODO(user, cpovirk): Use Ascii.truncate once it is available in our internal copy of
+     * guava_jdk5.
+     */
+    private static String truncate(CharSequence seq, int maxLength, String truncationIndicator) {
+      checkNotNull(seq);
+
+      // length to truncate the sequence to, not including the truncation indicator
+      int truncationLength = maxLength - truncationIndicator.length();
+
+      // in this worst case, this allows a maxLength equal to the length of the truncationIndicator,
+      // meaning that a string will be truncated to just the truncation indicator itself
+      checkArgument(truncationLength >= 0,
+          "maxLength (%s) must be >= length of the truncation indicator (%s)",
+          maxLength, truncationIndicator.length());
+
+      if (seq.length() <= maxLength) {
+        String string = seq.toString();
+        if (string.length() <= maxLength) {
+          return string;
+        }
+        // if the length of the toString() result was > maxLength for some reason, truncate that
+        seq = string;
+      }
+
+      return new StringBuilder(maxLength)
+          .append(seq, 0, truncationLength)
+          .append(truncationIndicator)
+          .toString();
     }
   }
 
@@ -438,6 +585,28 @@ public abstract class CharSource {
         }
       }
       return true;
+    }
+
+    @Override
+    public Optional<Long> lengthIfKnown() {
+      long result = 0L;
+      for (CharSource source : sources) {
+        Optional<Long> lengthIfKnown = source.lengthIfKnown();
+        if (!lengthIfKnown.isPresent()) {
+          return Optional.absent();
+        }
+        result += lengthIfKnown.get();
+      }
+      return Optional.of(result);
+    }
+
+    @Override
+    public long length() throws IOException {
+      long result = 0L;
+      for (CharSource source : sources) {
+        result += source.length();
+      }
+      return result;
     }
 
     @Override

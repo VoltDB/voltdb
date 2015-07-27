@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation_voltpatches.CheckReturnValue;
+
 /**
  * Contains static utility methods pertaining to primitive types and their
  * corresponding wrapper types.
@@ -30,6 +32,7 @@ import java.util.Set;
  * @author Kevin Bourrillion
  * @since 1.0
  */
+@CheckReturnValue
 public final class Primitives {
   private Primitives() {}
 
@@ -59,8 +62,11 @@ public final class Primitives {
     WRAPPER_TO_PRIMITIVE_TYPE = Collections.unmodifiableMap(wrapToPrim);
   }
 
-  private static void add(Map<Class<?>, Class<?>> forward,
-      Map<Class<?>, Class<?>> backward, Class<?> key, Class<?> value) {
+  private static void add(
+      Map<Class<?>, Class<?>> forward,
+      Map<Class<?>, Class<?>> backward,
+      Class<?> key,
+      Class<?> value) {
     forward.put(key, value);
     backward.put(value, key);
   }

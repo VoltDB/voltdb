@@ -22,6 +22,7 @@ import static com.google_voltpatches.common.collect.BoundType.OPEN;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.collect.Multiset.Entry;
+import com.google_voltpatches.j2objc.annotations.Weak;
 
 import java.util.Comparator;
 import java.util.Iterator;
@@ -47,7 +48,7 @@ final class SortedMultisets {
    */
   static class ElementSet<E> extends Multisets.ElementSet<E> implements
       SortedSet<E> {
-    private final SortedMultiset<E> multiset;
+    @Weak private final SortedMultiset<E> multiset;
 
     ElementSet(SortedMultiset<E> multiset) {
       this.multiset = multiset;
