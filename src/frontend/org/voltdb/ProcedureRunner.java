@@ -52,7 +52,6 @@ import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
@@ -1485,7 +1484,7 @@ public class ProcedureRunner {
                    m_txnState.m_spHandle,
                    m_txnState.uniqueId,
                    m_isReadOnly);
-       } catch (SQLException ex) {
+       } catch (Throwable ex) {
            if (! m_isReadOnly) {
                // roll back the current batch and re-throw the EE exception
                m_site.truncateUndoLog(true,
