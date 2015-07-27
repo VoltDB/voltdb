@@ -28,9 +28,9 @@ import org.voltdb.*;
 /**
  * Stored procedure that inserts a new row into the EMPLOYEE table, using the
  * next available ID, and the specified FIRST_NAME, LAST_NAME and DEPARTMENT.
- * 
+ *
  * Used by sqlcmdtest to test using LOAD CLASSES and REMOVE CLASSES in sqlcmd.
- * 
+ *
  * To build this into a .jar file, run voltdb/tests/sqlcmd/build_jar.sh, or
  * simply run 'ant sqlcmdtest', which does that automatically.
  */
