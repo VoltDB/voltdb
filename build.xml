@@ -139,6 +139,7 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
+	<exclude name='classes-java1.6.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -648,6 +649,15 @@ DISTRIBUTION
         else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
         <isset property="os.mac"/>
     </condition>
+
+    <!-- Call shell script that handles copying native libs so they can be packaged together -->
+    <exec dir='.' executable="/usr/bin/env" failonerror='true'>
+        <arg value='bash' />
+        <arg value='tools/copy-lib.sh'/>
+        <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
+        <arg value='${dist.version}' />
+    </exec>
+
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
             <include name="libvoltdb*" />
@@ -1993,7 +2003,10 @@ TEST CASES
     <class location="voltdb/voltdb-${dist.version}.jar" />
     <auxClasspath>
       <fileset dir="${lib.dir}" includes ="*.jar" />
-      <fileset dir="${vendor.lib.dir}" includes="*.jar" />
+      <fileset dir='${vendor.lib.dir}'>
+          <include name='*.jar' />
+	  <exclude name='classes-java1.6.jar' />
+      </fileset>
       <pathelement location="${build.test.dir}" />
       <fileset refid="voltpro.classpath"/>
     </auxClasspath>

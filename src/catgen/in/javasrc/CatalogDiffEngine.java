@@ -21,6 +21,8 @@
 
 package org.voltdb.catalog;
 
+import java.util.List;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -28,6 +30,7 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.Arrays;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
@@ -634,12 +637,14 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
             return null;
+        if (suspect instanceof Cluster && field.equals("drConsumerEnabled"))
+            return null;
         if (suspect instanceof Connector && "enabled".equals(field))
             return null;
         if (suspect instanceof Connector && "loaderclass".equals(field))
             return null;
         // ENG-6511 Allow materialized views to change the index they use dynamically.
-        if (suspect instanceof MaterializedViewInfo && field.equals("indexForMinMax"))
+        if (suspect instanceof IndexRef && field.equals("name"))
             return null;
 
         // Avoid over-generalization when describing limitations that are dependent on particular
@@ -803,23 +808,42 @@ public class CatalogDiffEngine {
 
     /**
      * @return null if the change is not possible under any circumstances.
-     * Return two strings if it is possible if the table is empty.
+     * Return a {@link java.util.List} of string arrays if it is possible if the table is empty.
+     * The list may be empty, otherwise each string array contains exactly two strings.
      * String 1 is name of a table if the change could be made if the table of that name had no tuples.
      * String 2 is the error message to show the user if that table isn't empty.
      */
-    public String[] checkModifyIfTableIsEmptyWhitelist(final CatalogType suspect,
-                                                     final CatalogType prevType,
-                                                     final String field)
+    public List<String[]> checkModifyIfTableIsEmptyWhitelist(final CatalogType suspect,
+                                                             final CatalogType prevType,
+                                                             final String field)
     {
-        // first is table name, second is error message
-        String[] retval = new String[2];
+        if (prevType instanceof Database) {
+            if(field.equalsIgnoreCase("isActiveActiveDRed")) {
+                List<String[]> retval = new ArrayList<>();
+                for (Table t : ((Database) suspect).getTables()) {
+                    if (t.getIsdred()) {
+                        String[] entry = new String[2];
+                        entry[0] = t.getTypeName();
+                        entry[1] = String.format(
+                                "Unable to change DR mode of table %s because it is not empty.",
+                                entry[0]);
+                        retval.add(entry);
+                    }
+                }
+                return retval;
+            }
+
+            return null;
+        }
 
         if (prevType instanceof Table) {
+            String[] entry = new String[2];
+
             Table prevTable = (Table) prevType; // safe because of enclosing if-block
             Database db = (Database) prevType.getParent();
 
             // table name
-            retval[0] = suspect.getTypeName();
+            entry[0] = suspect.getTypeName();
 
             // for now, no changes to export tables
             if (CatalogUtil.isTableExportOnly(db, prevTable)) {
@@ -829,29 +853,31 @@ public class CatalogDiffEngine {
             // allowed changes to a table
             if (field.equalsIgnoreCase("isreplicated")) {
                 // error message
-                retval[1] = String.format(
+                entry[1] = String.format(
                         "Unable to change whether table %s is replicated because it is not empty.",
-                        retval[0]);
-                return retval;
+                        entry[0]);
+                return Arrays.<String[]>asList(entry);
             }
             if (field.equalsIgnoreCase("partitioncolumn")) {
                 // error message
-                retval[1] = String.format(
+                entry[1] = String.format(
                         "Unable to change the partition column of table %s because it is not empty.",
-                        retval[0]);
-                return retval;
+                        entry[0]);
+                return Arrays.<String[]>asList(entry);
             }
             if (field.equalsIgnoreCase("isdred")) {
                 // error message
-                retval[1] = String.format(
+                entry[1] = String.format(
                         "Unable to enable DR on table %s because it is not empty.",
-                        retval[0]);
-                return retval;
+                        entry[0]);
+                return Arrays.<String[]>asList(entry);
             }
         }
 
         // handle narrowing columns and some modifications on empty tables
         if (prevType instanceof Column) {
+            String[] entry = new String[2];
+
             Table table = (Table) prevType.getParent();
             Column column = (Column)prevType;
             Database db = (Database) table.getParent();
@@ -865,47 +891,49 @@ public class CatalogDiffEngine {
             }
 
             // capture the table name
-            retval[0] = table.getTypeName();
+            entry[0] = table.getTypeName();
 
             if (field.equalsIgnoreCase("type")) {
                 // error message
-                retval[1] = String.format(
+                entry[1] = String.format(
                         "Unable to make a possibly-lossy type change to column %s in table %s because it is not empty.",
-                        prevType.getTypeName(), retval[0]);
-                return retval;
+                        prevType.getTypeName(), entry[0]);
+                return Arrays.<String[]>asList(entry);
             }
 
             if (field.equalsIgnoreCase("size")) {
                 // error message
-                retval[1] = String.format(
+                entry[1] = String.format(
                         "Unable to narrow the width of column %s in table %s because it is not empty.",
-                        prevType.getTypeName(), retval[0]);
-                return retval;
+                        prevType.getTypeName(), entry[0]);
+                return Arrays.<String[]>asList(entry);
             }
 
             // Nullability changes are allowed on empty tables.
             if (field.equalsIgnoreCase("nullable")) {
                 // Would be flipping the nullability, so invert the state for the message.
                 String alteredNullness = column.getNullable() ? "NOT NULL" : "NULL";
-                retval[1] = String.format(
+                entry[1] = String.format(
                         "Unable to change column %s null constraint to %s in table %s because it is not empty.",
-                        prevType.getTypeName(), alteredNullness, retval[0]);
-                return retval;
+                        prevType.getTypeName(), alteredNullness, entry[0]);
+                return Arrays.<String[]>asList(entry);
             }
         }
 
         if (prevType instanceof Index) {
+            String[] entry = new String[2];
+
             Table table = (Table) prevType.getParent();
             Index index = (Index)prevType;
 
             // capture the table name
-            retval[0] = table.getTypeName();
+            entry[0] = table.getTypeName();
             if (field.equalsIgnoreCase("expressionsjson")) {
                 // error message
-                retval[1] = String.format(
+                entry[1] = String.format(
                         "Unable to alter table %s with expression-based index %s becase table %s is not empty.",
-                        retval[0], index.getTypeName(), retval[0]);
-                return retval;
+                        entry[0], index.getTypeName(), entry[0]);
+                return Arrays.<String[]>asList(entry);
             }
 
         }
@@ -928,9 +956,9 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            String[] response = checkModifyIfTableIsEmptyWhitelist(newType, prevType, field);
+            List<String[]> responseList = checkModifyIfTableIsEmptyWhitelist(newType, prevType, field);
             // handle all the error messages and state from the modify check
-            processModifyResponses(errorMessage, response);
+            processModifyResponses(errorMessage, responseList);
         }
 
         // write the commands to make it so
@@ -954,33 +982,40 @@ public class CatalogDiffEngine {
      * and any response from the empty table check is processed here. This code
      * is basically in this method so it's not repeated 3 times for modify, add
      * and delete. See where it's called for context.
+     * If the responseList equals null, it is not possible to modify, otherwise we
+     * do the check described above for every element in the responseList, if there
+     * is no element in the responseList, it means no tables must be empty, which is
+     * totally fine.
      */
-    private void processModifyResponses(String errorMessage, String[] response) {
+    private void processModifyResponses(String errorMessage, List<String[]> responseList) {
         assert(errorMessage != null);
 
         // if no tablename, then it's just not possible
-        if (response == null) {
+        if (responseList == null) {
             m_supported = false;
             m_errors.append(errorMessage + "\n");
         }
         // otherwise, it's possible if a specific table is empty
         // collect the error message(s) and decide if it can be done inside @UAC
         else {
-            assert(response.length == 2);
-            String tableName = response[0]; assert(tableName != null);
-            String nonEmptyErrorMessage = response[1]; assert(nonEmptyErrorMessage != null);
+            for (String[] response : responseList) {
+                assert (response.length == 2);
+                String tableName = response[0];
+                assert (tableName != null);
+                String nonEmptyErrorMessage = response[1];
+                assert (nonEmptyErrorMessage != null);
 
-            String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
-            if (nonEmptyErrorMessage.length() == 0) {
-                // the empty string presumes there is already an error for this table
-                assert(existingErrorMessagesForNonEmptyTable != null);
-            }
-            else {
-                if (existingErrorMessagesForNonEmptyTable != null) {
-                    nonEmptyErrorMessage = nonEmptyErrorMessage + "\n" + existingErrorMessagesForNonEmptyTable;
+                String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
+                if (nonEmptyErrorMessage.length() == 0) {
+                    // the empty string presumes there is already an error for this table
+                    assert (existingErrorMessagesForNonEmptyTable != null);
+                } else {
+                    if (existingErrorMessagesForNonEmptyTable != null) {
+                        nonEmptyErrorMessage = nonEmptyErrorMessage + "\n" + existingErrorMessagesForNonEmptyTable;
+                    }
+                    // add indentation here so the formatting comes out right for the user #gianthack
+                    m_tablesThatMustBeEmpty.put(tableName, "  " + nonEmptyErrorMessage);
                 }
-                // add indentation here so the formatting comes out right for the user #gianthack
-                m_tablesThatMustBeEmpty.put(tableName, "  " + nonEmptyErrorMessage);
             }
         }
     }
@@ -1002,7 +1037,11 @@ public class CatalogDiffEngine {
         if (errorMessage != null) {
             String[] response = checkAddDropIfTableIsEmptyWhitelist(prevType, ChangeType.DELETION);
             // handle all the error messages and state from the modify check
-            processModifyResponses(errorMessage, response);
+            List<String[]> responseList = null;
+            if (response != null) {
+                responseList = Arrays.<String[]>asList(response);
+            }
+            processModifyResponses(errorMessage, responseList);
         }
 
         // write the commands to make it so
@@ -1030,7 +1069,11 @@ public class CatalogDiffEngine {
         if (errorMessage != null) {
             String[] response = checkAddDropIfTableIsEmptyWhitelist(newType, ChangeType.ADDITION);
             // handle all the error messages and state from the modify check
-            processModifyResponses(errorMessage, response);
+            List<String[]> responseList = null;
+            if (response != null) {
+                responseList = Arrays.<String[]>asList(response);
+            }
+            processModifyResponses(errorMessage, responseList);
         }
 
         // write the commands to make it so

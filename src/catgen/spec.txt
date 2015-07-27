@@ -15,7 +15,8 @@ begin Cluster                      "A set of connected hosts running one or more
   CommandLog* logconfig            "Command log configuration"
   int heartbeatTimeout             "How long to wait, in seconds, between messages before deciding a host is dead"
   bool useddlschema                "Manage the database schemas via catalog updates or live DDL"
-  bool drProducerEnabled           "Manage whether this cluster will log and distribute local DR transactions"
+  bool drConsumerEnabled           "Manage whether this consumer cluster will pull local DR transactions"
+  bool drProducerEnabled           "Manage whether this producer cluster will log and distribute local DR transactions"
   int drClusterId                  "Unique inter-cluster ID used to distinguish DR clusters"
   int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
   string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
@@ -45,6 +46,7 @@ begin Database                       "A set of schema, procedures and other meta
   Procedure* procedures              "The set of stored procedures/transactions for this database"
   Connector* connectors              "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
+  bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
   string securityprovider            "The security provider used to authenticate users"
 end
 
@@ -143,7 +145,7 @@ begin MaterializedViewInfo          "Information used to build and update a mate
   string predicate                  "A filtering predicate"
   string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
   string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
-  string indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
+  IndexRef* indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
 end
 
 begin AuthProgram javaonly "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
@@ -203,6 +205,10 @@ end
 begin ColumnRef    "A reference to a table column"
   int index        "The index within the set"
   Column? column   "The table column being referenced"
+end
+
+begin IndexRef     "A reference to an index"
+  string name      "The name of the index referenced"
 end
 
 begin Constraint            "A constraint on a database table"

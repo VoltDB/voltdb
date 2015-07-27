@@ -72,7 +72,8 @@ import com.google_voltpatches.common.primitives.Longs;
  */
 public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMessenger {
 
-    private static final VoltLogger logger = new VoltLogger("NETWORK");
+    private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
+    private static final VoltLogger m_hostLog = new VoltLogger("HOST");
 
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
 
@@ -121,15 +122,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         private void initNetworkThreads() {
             try {
-                logger.info("Default network thread count: " + this.networkThreads);
+                m_networkLog.info("Default network thread count: " + this.networkThreads);
                 Integer networkThreadConfig = Integer.getInteger("networkThreads");
                 if ( networkThreadConfig != null ) {
                     this.networkThreads = networkThreadConfig;
-                    logger.info("Overridden network thread count: " + this.networkThreads);
+                    m_networkLog.info("Overridden network thread count: " + this.networkThreads);
                 }
 
             } catch (Exception e) {
-                logger.error("Error setting network thread count", e);
+                m_networkLog.error("Error setting network thread count", e);
             }
         }
 
@@ -154,9 +155,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
         }
     }
-
-    private static final VoltLogger m_logger = new VoltLogger("org.voltdb.messaging.impl.HostMessenger");
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // I want to make these more dynamic at some point in the future --izzy
     public static final int AGREEMENT_SITE_ID = -1;
@@ -261,7 +259,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     addFailedHost(hostId);
                     removeForeignHost(hostId);
                     if (!m_shuttingDown) {
-                        logger.warn(String.format("Host %d failed", hostId));
+                        // info to avoid printing on the console more than once
+                        // reportForeignHostFailed should print on the console once
+                        m_networkLog.info(String.format("Host %d failed (DisconnectFailedHostsCallback)", hostId));
                     }
                 }
             }
@@ -300,7 +300,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         m_agreementSite.reportFault(initiatorSiteId);
         if (!m_shuttingDown) {
-            logger.warn(String.format("Host %d failed", hostId));
+            // should be the single console message a user sees when another node fails
+            m_networkLog.warn(String.format("Host %d failed. Cluster remains operational.", hostId));
         }
     }
 
@@ -308,7 +309,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized void relayForeignHostFailed(FaultMessage fm) {
         m_agreementSite.reportFault(fm);
         if (!m_shuttingDown) {
-            m_logger.warn("Someone else claims a host failed: " + fm);
+            m_networkLog.info("Someone else claims a host failed: " + fm);
         }
     }
 
@@ -386,7 +387,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             instance_id.put("coord",
                     ByteBuffer.wrap(m_config.coordinatorIp.getAddress().getAddress()).getInt());
             instance_id.put("timestamp", System.currentTimeMillis());
-            hostLog.debug("Cluster will have instance ID:\n" + instance_id.toString(4));
+            m_hostLog.debug("Cluster will have instance ID:\n" + instance_id.toString(4));
             byte[] payload = instance_id.toString(4).getBytes("UTF-8");
             m_zk.create(CoreZK.instance_id, payload, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
@@ -437,7 +438,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             catch (Exception e)
             {
                 String msg = "Unable to get instance ID info from " + CoreZK.instance_id;
-                hostLog.error(msg);
+                m_hostLog.error(msg);
                 throw new RuntimeException(msg, e);
             }
         }
@@ -450,7 +451,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public void notifyOfJoin(int hostId, SocketChannel socket, InetSocketAddress listeningAddress) {
-        logger.info(getHostId() + " notified of " + hostId);
+        m_networkLog.info(getHostId() + " notified of " + hostId);
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
@@ -537,7 +538,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 while (finishedJoining.hasRemaining() && System.currentTimeMillis() - start < 120000) {
                     int read = socket.read(finishedJoining);
                     if (read == -1) {
-                        hostLog.info("New connection was unable to establish mesh");
+                        m_networkLog.info("New connection was unable to establish mesh");
                         return;
                     } else if (read < 1) {
                         Thread.sleep(5);
@@ -551,8 +552,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
             } catch (Exception e) {
-                logger.error("Error joining new node", e);
-                m_knownFailedHosts.add(hostId);
+                m_networkLog.error("Error joining new node", e);
+                addFailedHost(hostId);
                 removeForeignHost(hostId);
                 return;
             }
@@ -654,7 +655,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_network.start();//network must be running for register to work
 
         for (int ii = 0; ii < hosts.length; ii++) {
-            logger.info(yourHostId + " notified of host " + hosts[ii]);
+            m_networkLog.info(yourHostId + " notified of host " + hosts[ii]);
             agreementSites.add(CoreUtils.getHSIdFromHostAndSite(hosts[ii], AGREEMENT_SITE_ID));
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;
@@ -812,7 +813,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 mbox.deliver(message);
                 return null;
             } else {
-                hostLog.info("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
+                m_networkLog.info("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
                 return null;
             }
         }
@@ -823,7 +824,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (fhost == null)
         {
             if (!m_knownFailedHosts.contains(hostId)) {
-                hostLog.warn(
+                m_networkLog.warn(
                         "Attempted to send a message to foreign host with id " +
                         hostId + " but there is no such host.");
             }
@@ -833,7 +834,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (!fhost.isUp())
         {
             if (!m_shuttingDown) {
-                m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
+                m_networkLog.info("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
             }
             return null;
         }
@@ -875,7 +876,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
             @Override
             public void deliver(VoltMessage message) {
-                hostLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
+                m_networkLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
             }
 
             @Override
@@ -1115,7 +1116,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public void setDeadHostTimeout(int timeout) {
         Preconditions.checkArgument(timeout > 0, "Timeout value must be > 0, was %s", timeout);
-        hostLog.info("Dead host timeout set to " + timeout + " milliseconds");
+        m_hostLog.info("Dead host timeout set to " + timeout + " milliseconds");
         m_config.deadHostTimeout = timeout;
         for (ForeignHost fh : m_foreignHosts.values()) {
             fh.updateDeadHostTimeout(timeout);

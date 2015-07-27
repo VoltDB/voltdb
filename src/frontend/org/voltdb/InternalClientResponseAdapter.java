@@ -33,6 +33,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * A very simple adapter for internal txn requests that deserializes bytes into client responses. It calls
@@ -40,7 +41,7 @@ import org.voltdb.client.ClientResponse;
  */
 public class InternalClientResponseAdapter implements Connection, WriteStream {
     public static interface Callback {
-        public void handleResponse(ClientResponse response);
+        public void handleResponse(ClientResponse response) throws Exception;
     }
 
     private final long m_connectionId;
@@ -52,11 +53,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
         private DBBPool.BBContainer m_cont;
         private long m_id;
-        private Callback m_chainedCallback;
+        private final ProcedureCallback m_cb;
 
-        public InternalCallback(final DBBPool.BBContainer cont, Callback chainedCallback) {
+        public InternalCallback(final DBBPool.BBContainer cont, ProcedureCallback cb) {
             m_cont = cont;
-            m_chainedCallback = chainedCallback;
+            m_cb = cb;
         }
 
         public void setId(long id) {
@@ -71,12 +72,12 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         }
 
         @Override
-        public void handleResponse(ClientResponse response) {
+        public void handleResponse(ClientResponse response) throws Exception {
             discard();
-            if (m_chainedCallback!=null) {
-                m_chainedCallback.handleResponse(response);
-            }
             m_pendingCallbacks.remove(m_id);
+            if (m_cb != null) {
+                m_cb.clientCallback(response);
+            }
         }
 
     }
@@ -85,14 +86,9 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         return m_pendingCallbacks.size();
     }
 
-    public boolean createTransaction(Procedure catProc, StoredProcedureInvocation task,
+    public boolean createTransaction(Procedure catProc, ProcedureCallback proccb, StoredProcedureInvocation task,
             DBBPool.BBContainer tcont, int partition, long nowNanos) {
-        return createTransaction(catProc, task, tcont, partition, nowNanos, null);
-    }
-
-    public boolean createTransaction(Procedure catProc, StoredProcedureInvocation task,
-            DBBPool.BBContainer tcont, int partition, long nowNanos, Callback inputCallback) {
-            InternalCallback cb = new InternalCallback(tcont, inputCallback);
+            InternalCallback cb = new InternalCallback(tcont, proccb);
             long cbhandle = registerCallback(cb);
             cb.setId(cbhandle);
             task.setClientHandle(cbhandle);
@@ -157,7 +153,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 callback.handleResponse(resp);
             }
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             throw new RuntimeException("Unable to deserialize ClientResponse in InternalClientResponseAdapter", e);
         }

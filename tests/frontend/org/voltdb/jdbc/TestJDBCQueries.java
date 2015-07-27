@@ -24,11 +24,14 @@
 package org.voltdb.jdbc;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.Date;
@@ -128,8 +131,110 @@ public class TestJDBCQueries {
                         new String[] {""}),
     };
 
+    static enum GetType {
+        BYTE,
+        SHORT,
+        INT,
+        LONG,
+        FLOAT,
+        DOUBLE,
+        BIGDECIMAL
+    }
+
+    static class GetNumberData {
+        final String[] insertData;
+        final GetType[] getType;
+        final Boolean testSuccess;
+
+        GetNumberData(String[] insertData, GetType[] getType, Boolean testSuccess) {
+            this.insertData = insertData;
+            this.getType = getType;
+            this.testSuccess = testSuccess;
+        }
+    }
+
+    static GetNumberData[] getNumberData = new GetNumberData[] {
+        new GetNumberData(
+                new String[] {"1", "1", "1", "1", "1", "1", "1"},
+                new GetType[] {GetType.BYTE, GetType.BYTE, GetType.BYTE,
+                        GetType.BYTE, GetType.BYTE, GetType.BYTE, GetType.BYTE},
+                true),
+        new GetNumberData(
+                new String[] {"1", "1", "1", "1", "1", "1", "1"},
+                new GetType[] {GetType.SHORT, GetType.SHORT, GetType.SHORT,
+                        GetType.SHORT, GetType.SHORT, GetType.SHORT, GetType.SHORT},
+                true),
+        new GetNumberData(
+                new String[] {"1", "1", "1", "1", "1", "1", "1"},
+                new GetType[] {GetType.INT, GetType.INT, GetType.INT,
+                        GetType.INT, GetType.INT, GetType.INT, GetType.INT},
+                true),
+        new GetNumberData(
+                new String[] {"1", "1", "1", "1", "1", "1", "1"},
+                new GetType[] {GetType.LONG, GetType.LONG, GetType.LONG,
+                        GetType.LONG, GetType.LONG, GetType.LONG, GetType.LONG},
+                true),
+        new GetNumberData(
+                new String[] {"1", "1", "1", "1", "1", "1", "1"},
+                new GetType[] {GetType.FLOAT, GetType.FLOAT, GetType.FLOAT,
+                        GetType.FLOAT, GetType.FLOAT, GetType.FLOAT, GetType.FLOAT},
+                true),
+        new GetNumberData(
+                new String[] {"1", "1", "1", "1", "1", "1", "1"},
+                new GetType[] {GetType.DOUBLE, GetType.DOUBLE, GetType.DOUBLE,
+                        GetType.DOUBLE, GetType.DOUBLE, GetType.DOUBLE, GetType.DOUBLE},
+                true),
+        new GetNumberData(
+                new String[] {"1", "1", "1", "1", "1", "1", "1"},
+                new GetType[] {GetType.BIGDECIMAL, GetType.BIGDECIMAL, GetType.BIGDECIMAL,
+                        GetType.BIGDECIMAL, GetType.BIGDECIMAL, GetType.BIGDECIMAL, GetType.BIGDECIMAL},
+                true),
+        new GetNumberData(
+                new String[] {Byte.toString(Byte.MAX_VALUE), Short.toString(Short.MAX_VALUE),
+                        Integer.toString(Integer.MAX_VALUE), Long.toString(Long.MAX_VALUE), Double.toString(Float.MAX_VALUE),
+                        Double.toString(Double.MAX_VALUE), new BigDecimal(Integer.MAX_VALUE).toString()},
+                new GetType[] {GetType.BYTE, GetType.SHORT, GetType.INT,
+                        GetType.LONG, GetType.FLOAT, GetType.DOUBLE, GetType.BIGDECIMAL},
+                true),
+        new GetNumberData(
+                new String[] {null, null, null, null, null, null, null},
+                new GetType[] {GetType.BYTE, GetType.SHORT, GetType.INT,
+                        GetType.LONG, GetType.FLOAT, GetType.DOUBLE, GetType.BIGDECIMAL},
+                true),
+        new GetNumberData(
+                new String[] {"1", "1", "1", Long.toString(Long.MAX_VALUE), "1", "1", "1"},
+                new GetType[] {GetType.BYTE, GetType.BYTE, GetType.BYTE,
+                        GetType.BYTE, GetType.BYTE, GetType.BYTE, GetType.BYTE},
+                false),
+        new GetNumberData(
+                new String[] {"1", "1", "1", Long.toString(Long.MAX_VALUE), "1", "1", "1"},
+                new GetType[] {GetType.SHORT, GetType.SHORT, GetType.SHORT,
+                        GetType.SHORT, GetType.SHORT, GetType.SHORT, GetType.SHORT},
+                false),
+        new GetNumberData(
+                new String[] {"1", "1", "1", Long.toString(Long.MAX_VALUE), "1", "1", "1"},
+                new GetType[] {GetType.INT, GetType.INT, GetType.INT,
+                        GetType.INT, GetType.INT, GetType.INT, GetType.INT},
+                false),
+        new GetNumberData(
+                new String[] {"1", "1", "1", "1", "1", Double.toString(Double.MAX_VALUE), "1"},
+                new GetType[] {GetType.FLOAT, GetType.FLOAT, GetType.FLOAT,
+                        GetType.FLOAT, GetType.FLOAT, GetType.FLOAT, GetType.FLOAT},
+                false)
+    };
+
     // Define Voter schema as well.
     public static final String voter_schema =
+            "CREATE TABLE all_numbers" +
+            "(" +
+            "  v1 tinyint" +
+            ", v2 smallint" +
+            ", v3 integer" +
+            ", v4 bigint" +
+            ", v5 float" +
+            ", v6 float" +
+            ", v7 decimal" +
+            ");" +
             "CREATE TABLE contestants" +
             "(" +
             "  contestant_number integer     NOT NULL" +
@@ -289,6 +394,96 @@ public class TestJDBCQueries {
         if (server != null) {
             try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
             server = null;
+        }
+    }
+
+    @Test
+    public void testGetNumberValues() throws Exception {
+        String insertStatement = "insert into all_numbers values(?, ?, ?, ?, ?, ?, ?)";
+        String selectStatement = "select * from all_numbers";
+        String deleteStatement = "delete from all_numbers";
+        for (GetNumberData data : getNumberData) {
+            PreparedStatement ins = conn.prepareStatement(insertStatement);
+            for (int i = 0; i < 7; i++) {
+                ins.setString(i+1, data.insertData[i]);
+            }
+            if (ins.executeUpdate() != 1) {
+                if (data.testSuccess)
+                    fail();
+                else
+                    continue;
+            }
+
+            Statement sel = conn.createStatement();
+            sel.execute(selectStatement);
+            ResultSet rs = sel.getResultSet();
+            rs.next();
+            for (int i = 0; i < 7; i++) {
+                try {
+                    switch(data.getType[i]) {
+                    case BYTE:
+                        Byte resByte = new Byte(rs.getByte(i+1));
+                        if (rs.wasNull())
+                            assertEquals(resByte, new Byte("0"));
+                        else
+                            assertEquals(resByte, new Byte(data.insertData[i]));
+                        break;
+                    case SHORT:
+                        Short resShort = new Short(rs.getShort(i+1));
+                        if (rs.wasNull())
+                            assertEquals(resShort, new Short("0"));
+                        else
+                            assertEquals(resShort, new Short(data.insertData[i]));
+                        break;
+                    case INT:
+                        Integer resInt = rs.getInt(i+1);
+                        if (rs.wasNull())
+                            assertEquals(resInt, new Integer("0"));
+                        else
+                            assertEquals(resInt, new Integer(data.insertData[i]));
+                        break;
+                    case LONG:
+                        Long resLong = rs.getLong(i+1);
+                        if (rs.wasNull())
+                            assertEquals(resLong, new Long("0"));
+                        else
+                            assertEquals(resLong, new Long(data.insertData[i]));
+                        break;
+                    case FLOAT:
+                        Float resFloat = rs.getFloat(i+1);
+                        if (rs.wasNull())
+                            assertEquals(resFloat, new Float("0"));
+                        else
+                            assertEquals(resFloat, new Float(data.insertData[i]));
+                        break;
+                    case DOUBLE:
+                        Double resDouble = rs.getDouble(i+1);
+                        if (rs.wasNull())
+                            assertEquals(resDouble, new Double("0"));
+                        else
+                            assertEquals(resDouble, new Double(data.insertData[i]));
+                        break;
+                    case BIGDECIMAL:
+                        BigDecimal resDec = rs.getBigDecimal(i+1);
+                        if (rs.wasNull())
+                            assertNull(resDec);
+                        else {
+                            int scale = resDec.scale();
+                            assertEquals(resDec, new BigDecimal(data.insertData[i]).setScale(scale));
+                        }
+                        break;
+                    }
+                } catch (Exception e) {
+                    if (data.testSuccess) {
+                        e.printStackTrace();
+                        fail();
+                    } else
+                        break;
+                }
+            }
+
+            Statement del = conn.createStatement();
+            del.execute(deleteStatement);
         }
     }
 
@@ -478,6 +673,25 @@ public class TestJDBCQueries {
             System.err.printf("ERROR: %s\n", e.getMessage());
             fail();
         }
+    }
+
+    @Test
+    public void testQueryBatchRepeat() throws Exception
+    {
+
+        String q = String.format("insert into %s(id) values(?)", data[2].tablename);
+        PreparedStatement pStmt = conn.prepareStatement(q);
+
+        for (int i = 1; i < 5000; i++) {
+            pStmt.setInt(1, i);
+            pStmt.addBatch();
+            if (i % 200 == 0) {
+                int[] resultCodes = pStmt.executeBatch();
+                // The batch will be reset to empty , per ENG-8531.
+                assertEquals(200, resultCodes.length);
+            }
+        }
+
     }
 
     @Test

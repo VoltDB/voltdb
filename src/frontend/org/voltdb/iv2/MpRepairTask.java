@@ -26,7 +26,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
-import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.rejoin.TaskLog;
 
 import com.google_voltpatches.common.base.Suppliers;
@@ -70,11 +69,9 @@ public class MpRepairTask extends SiteTasker
         synchronized (m_lock) {
             if (!m_repairRan) {
                 try {
-                    long txnid = Long.MIN_VALUE;
                     boolean success = false;
                     try {
-                        RepairResult res = algo.start().get();
-                        txnid = res.m_txnId;
+                        algo.start().get();
                         success = true;
                     } catch (CancellationException e) {}
                     if (success) {

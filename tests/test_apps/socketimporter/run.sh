@@ -62,6 +62,7 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
+    rm -rf felix-cache
     if [ ! -e socketstream.jar ] || [ ! -e socketstream-client.jar ]; then
         jars;
     fi
@@ -76,6 +77,39 @@ function server() {
     echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
     echo
     voltdb create -d deployment.xml -l $LICENSE -H $HOST
+}
+
+#kafka importer
+function kafka() {
+    jars-ifneeded
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST"
+    echo
+    voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST
+}
+
+#log4j importer
+function log4j() {
+    jars-ifneeded
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST"
+    echo
+    voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST
+}
+
+#all importer
+function all() {
+    jars-ifneeded
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "voltdb create -d deployment-all.xml -l $LICENSE -H $HOST"
+    echo
+    voltdb create -d deployment-all.xml -l $LICENSE -H $HOST
 }
 
 # load schema and procedures
@@ -127,7 +161,7 @@ function async-benchmark() {
         socketimporter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=2 \
-        --duration=20 \
+        --duration=190 \
         --servers=localhost \
         --sockservers=localhost:7001
 }

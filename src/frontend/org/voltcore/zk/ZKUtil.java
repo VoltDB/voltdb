@@ -123,14 +123,21 @@ public class ZKUtil {
 
     public static boolean uploadFileAsChunks(ZooKeeper zk, String zkPath, File file, boolean ephemeral)
             throws Exception {
-        if (file.exists() && file.canRead()) {
-            FileInputStream fis = new FileInputStream(file);
-            ByteBuffer fileBuffer = ByteBuffer.allocate((int)file.length());
-            while (fileBuffer.hasRemaining()) {
-                fis.getChannel().read(fileBuffer);
+        FileInputStream fis = null;
+        try {
+            if (file.exists() && file.canRead()) {
+                fis = new FileInputStream(file);
+                ByteBuffer fileBuffer = ByteBuffer.allocate((int)file.length());
+                while (fileBuffer.hasRemaining()) {
+                    fis.getChannel().read(fileBuffer);
+                }
+                fileBuffer.flip();
+                uploadBytesAsChunks(zk, zkPath, fileBuffer.array(), ephemeral);
             }
-            fileBuffer.flip();
-            uploadBytesAsChunks(zk, zkPath, fileBuffer.array(), ephemeral);
+        } finally {
+            if (fis != null) {
+                fis.close();
+            }
         }
         return true;
     }

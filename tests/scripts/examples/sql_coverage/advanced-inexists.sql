@@ -2,7 +2,9 @@
 
 --- DML: purge and regenerate random data first
 DELETE FROM @dmltable
-INSERT INTO @dmltable VALUES (@insertvals)
+{@insertvals_not_null = "_id, _value[string], _value[int16], _value[float]"}
+
+INSERT INTO @dmltable VALUES (@insertvals_not_null)
 
 -- TEMP, for debugging, just so I can quickly see what data was generated:
 --SELECT * FROM @fromtables ORDER BY @idcol
@@ -31,7 +33,7 @@ INSERT INTO @dmltable VALUES (@insertvals)
 {_colexpr |= "__[#col]/2"}
 
 --- Test IN/EXISTS Advanced cases
-SELECT * FROM @fromtables A01 WHERE _variable[@columntype] _maybe IN ( SELECT @agg(_variable[@comparabletype]) FROM @fromtables B WHERE B._variable[@columntype] _cmp A01._variable[@comparabletype] )
+SELECT * FROM @fromtables A01 WHERE _variable[#agg @columntype] _maybe IN ( SELECT @agg(__[#agg]) FROM @fromtables B WHERE B._variable[@comparabletype] _cmp A01._variable[@comparabletype] )
 SELECT * FROM @fromtables A02 WHERE EXISTS ( SELECT _variable[#GB]  FROM @fromtables B GROUP BY B.__[#GB] HAVING MAX(B._variable[@columntype]) _cmp  A02._variable[@columntype] )
 
 SELECT * FROM @fromtables A03 LHS _jointype JOIN @fromtables RHS_10 ON LHS.@idcol = RHS_10.@idcol where LHS._variable[@columntype] _maybe IN (SELECT _variable[@columntype] FROM @fromtables IN_TABLE)

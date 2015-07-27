@@ -1489,7 +1489,7 @@ public class TableHelper {
 
         // replicated tables
         if (t.m_extraMetadata.partitionColIndex == -1) {
-            client.callProcedure("@LoadMultipartitionTable", t.m_extraMetadata.name, t);
+            client.callProcedure("@LoadMultipartitionTable", t.m_extraMetadata.name, (byte) 0, t); // using insert here
         }
 
         // partitioned tables

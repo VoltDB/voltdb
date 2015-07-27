@@ -39,6 +39,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -263,6 +264,10 @@ public class LoadTableLoader extends BenchmarkThread {
 
     @Override
     public void run() {
+        // ratio of upsert for @Load*Table
+        final float upsertratio = 0.50F;
+        // ratio of upsert to an existing table for @Load*Table
+        final float upserthitratio = 0.20F;
 
         CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
         cdtask.start();
@@ -270,6 +275,9 @@ public class LoadTableLoader extends BenchmarkThread {
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
                 byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
+                byte upsertMode = (byte) (m_random.nextFloat() < upsertratio ? 1: 0);
+                byte upsertHitMode = (byte) ((upsertMode != 0) && (m_random.nextFloat() < upserthitratio) ? 1: 0);
+
                 CountDownLatch latch = new CountDownLatch(batchSize);
                 final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
 
@@ -284,9 +292,15 @@ public class LoadTableLoader extends BenchmarkThread {
                         Object rpartitionParam
                                 = TheHashinator.valueToBytes(m_table.fetchRow(0).get(
                                                 m_partitionedColumnIndex, VoltType.BIGINT));
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, m_table);
+                        if (upsertHitMode != 0) {// for test upsert an existing row, insert it and then upsert same row again.
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 1, m_table);
+                        }
+                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 1, m_table);
                     } else {
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, m_table);
+                        if (upsertHitMode != 0) {
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 1, m_table);
+                        }
+                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 1, m_table);
                     }
                     //Ad if successfully queued but remove if proc fails.
                     if (success) {

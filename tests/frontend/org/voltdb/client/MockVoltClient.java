@@ -350,6 +350,12 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize,
+            boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception {
+        return null;
+    }
+
+    @Override
     public ClientResponse updateClasses(File jarPath, String classesToDelete)
             throws IOException, NoConnectionsException, ProcCallException {
         // TODO Auto-generated method stub
@@ -362,5 +368,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         // TODO Auto-generated method stub
         return false;
     }
+
+
 
 }

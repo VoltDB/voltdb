@@ -22,13 +22,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
+import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 
 import org.voltcore.logging.VoltLogger;
 
 public class EELibraryLoader {
 
     public static final String USE_JAVA_LIBRARY_PATH = "use.javalib";
-    public static final String VOLT_TMP_DIR = "volt.tmpdir";
     private static boolean voltSharedLibraryLoaded = false;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");

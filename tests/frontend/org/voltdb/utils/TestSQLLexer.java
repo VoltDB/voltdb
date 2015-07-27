@@ -107,6 +107,8 @@ public class TestSQLLexer {
         checkDDL("partitiontable pants", null);
         checkDDL("-- partition table pants", null);
         checkDDL("partitoin table pants", null);
+
+        checkDDL("set abc=123", "set");
     }
 
     @Test
@@ -179,6 +181,8 @@ public class TestSQLLexer {
         tester.testOK("alter table pants add column blargy blarg;");
         tester.testOK("alter table pants add constraint blargy blarg;");
         tester.testOK("alter index pants");
+
+        tester.testOK("set abc=123;");
 
         //=== Statements that should be filtered out by the white-list.
 

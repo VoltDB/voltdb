@@ -169,8 +169,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
-    private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
-    private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
+    private final SnapshotDaemon m_snapshotDaemon;
+    private final SnapshotDaemonAdapter m_snapshotDaemonAdapter;
     private final InternalConnectionHandler m_internalConnectionHandler;
 
     // Atomically allows the catalog reference to change between access
@@ -686,7 +686,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (ap == AuthProvider.KERBEROS) {
                     arq = context.authSystem.new KerberosAuthenticationRequest(socket);
                 } else {
-                    arq = context.authSystem.new HashAuthenticationRequest(username, password, hashScheme);
+                    arq = context.authSystem.new HashAuthenticationRequest(username, password);
                 }
                 /*
                  * Authenticate the user.
@@ -1152,6 +1152,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
             Cartographer cartographer, int[] allPartitions) throws Exception {
         m_catalogContext.set(context);
+        m_snapshotDaemon = new SnapshotDaemon(context);
+        m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
         m_cartographer = cartographer;
 
         // pre-allocate single partition array
@@ -1873,6 +1875,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
             }
+            else if (task.procName.equals("@ResetDR")) {
+                return dispatchResetDR(task);
+            }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
@@ -2149,6 +2154,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
+
+    private ClientResponseImpl dispatchResetDR(StoredProcedureInvocation task) {
+        if (VoltDB.instance().getNodeDRGateway() != null) {
+            VoltDB.instance().getNodeDRGateway().resetDRProducer();
+        }
+        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+        t.addRow(VoltSystemProcedure.STATUS_OK);
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] {t}, "SUCCESS", task.clientHandle);
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch, Connection c)

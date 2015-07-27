@@ -18,9 +18,13 @@
 package org.voltdb;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -36,7 +40,14 @@ public class ImportHandler {
 
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
+    private final CatalogContext m_catalogContext;
     private boolean m_stopped = false;
+
+    private static final InternalClientResponseAdapter m_adapter = new InternalClientResponseAdapter(ClientInterface.INTERNAL_CID, "Importer");
+    private static final AtomicLong m_lock = new AtomicLong(0);
+
+    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
+    final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext,
@@ -44,6 +55,7 @@ public class ImportHandler {
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
         m_importContext = importContext;
+        m_catalogContext = catContext;
     }
 
     /**
@@ -93,14 +105,29 @@ public class ImportHandler {
         return VoltDB.instance().getClientInterface().getInternalConnectionHandler().hasTable(name);
     }
 
-    public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
-        if (!m_stopped) {
-            return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
-                    .callProcedure(ic.getBackpressureTimeout(), proc, fieldList);
-        } else {
-            m_logger.warn("Importer is in stopped state. Cannot execute procedures");
-            return false;
+    /*
+    public class NullCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
         }
+    }
+    */
+
+    public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
+        return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
+                .callProcedure(ic.getBackpressureTimeout(), proc, fieldList);
+        //return callProcedure(ic, new NullCallback(), proc, fieldList);
+    }
+
+
+    //Do rate limited logging for messages.
+    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
+                m_logger, level,
+                cause, format, args
+                );
     }
 
     /**
@@ -118,4 +145,45 @@ public class ImportHandler {
     public void error(String message) {
         m_logger.error(message);
     }
+
+    /**
+     * Log warn message
+     * @param message
+     */
+    public void warn(String message) {
+        m_logger.warn(message);
+    }
+
+    public boolean isDebugEnabled() {
+        return m_logger.isDebugEnabled();
+    }
+
+    public boolean isTraceEnabled() {
+        return m_logger.isTraceEnabled();
+    }
+
+    public boolean isInfoEnabled() {
+        return m_logger.isInfoEnabled();
+    }
+
+    /**
+     * Log debug message
+     * @param message
+     */
+    public void debug(String message) {
+        m_logger.debug(message);
+    }
+
+    /**
+     * Log error message
+     * @param message
+     */
+    public void error(String message, Throwable t) {
+        m_logger.error(message, t);
+    }
+
+    public void error(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.ERROR, t, format, args);
+    }
+
 }

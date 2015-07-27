@@ -55,7 +55,7 @@ class TableAndIndexTest : public Test {
         TableAndIndexTest() {
             NValueArray* noParams = NULL;
             VoltDBEngine* noEngine = NULL;
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, noEngine, "", 0, &drStream, &drReplicatedStream);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, noEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);

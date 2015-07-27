@@ -164,7 +164,20 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
+    public void testLoadMultipartitionTableProceduresUpsertWithNoPrimaryKey() throws Exception{
+        // using insert for @Load*Table
+        byte upsertMode = (byte) 1;
+        Client client = getClient();
+        // should not be able to upsert to new_order since it has no primary key
+        try {
+            client.callProcedure("@LoadMultipartitionTable", "new_order",  upsertMode, null);
+            fail();
+        } catch (ProcCallException ex) {}
+    }
+
     public void testLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
+        // using insert for @Load*Table
+        byte upsertMode = (byte) 0;
         Client client = getClient();
 
         /*
@@ -178,7 +191,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         // try the failure case first
         try {
-            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, 1);
+            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", upsertMode, null);
             fail();
         } catch (ProcCallException ex) {}
 
@@ -229,11 +242,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         try {
             try {
                 client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
-                                 partitioned_table);
+                            upsertMode, partitioned_table);
                 fail();
             } catch (ProcCallException e) {}
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
-                                 replicated_table);
+                            upsertMode, replicated_table);
 
             // 20 rows per site for the replicated table.  Wait for it...
             int rowcount = 0;

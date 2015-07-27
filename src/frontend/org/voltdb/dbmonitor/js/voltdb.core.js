@@ -23,7 +23,7 @@
             this.Metadata = {};
             this.ready = false;
             this.procedureCommands = {};
-            this.authorization = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password)
+            this.authorization = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
 
             this.getQueue = function () {
                 return (new iQueue(this));
@@ -34,12 +34,13 @@
                 credentials[credentials.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
+                var param = '';
+                param = credentials.join('&') + '&jsonp=?';
 
-                var param = credentials.join('&') + '&jsonp=?';
                 return param;
             };
 
-            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails) {
+            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails, isPostRequest) {
                 var s = [];
                 if (!(shortApiCallDetails != null && shortApiCallDetails != null)) {
                     if (!this.procedures.hasOwnProperty(procedure)) {
@@ -105,7 +106,12 @@
                 }
                 if (this.admin)
                     s[s.length] = 'admin=true';
-                var paramSet = s.join('&') + '&jsonp=?';
+                var paramSet = '';
+                if (!isPostRequest) {
+                    paramSet = s.join('&') + '&jsonp=?';
+                } else {
+                    paramSet = s.join('&');
+                }
 
                 if (VoltDBCore.shortApiCredentials == "" && VoltDBCore.isLoginVerified) {
                     var credentials = [];
@@ -139,9 +145,8 @@
                 if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote') {
                     params = this.BuildParamSetForClusterState(procedure);
                 } else {
-                    params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                    params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, false);
                 }
-                
                 if (typeof (params) == 'string') {
                     var headerLength = params.replace(/'/g, "%27").length;
                     if (headerLength > 5632) {
@@ -161,7 +166,7 @@
                     callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
             };
 
-            this.CallExecuteUpdate = function (procedure, parameters, callback, shortApiCallDetails) {
+            this.CallExecuteUpdate = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery) {
                 var uri;
                 if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
@@ -171,7 +176,6 @@
                     if (shortApiCallDetails.updatedData == null) {
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
-
                     uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
 
                     if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
@@ -182,19 +186,19 @@
                             VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
                         }
                         if (!shortApiCallDetails.hasOwnProperty("requestType")) {
-                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah, isSqlQuery);
                         } else if (shortApiCallDetails.requestType.toLowerCase() == "put") {
                             jQuery.putJSON(uri, shortApiCallDetails.updatedData, callback, ah);
                         } else if (shortApiCallDetails.requestType.toLowerCase() == "delete") {
                             jQuery.deleteJSON(uri, shortApiCallDetails.updatedData, callback, ah);
                         } else {
-                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah, isSqlQuery);
                         }
                     }
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
 
-                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, true);
                     if (typeof (params) == 'string') {
                         if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                             var ah = null;
@@ -247,8 +251,8 @@
                     return this;
                 };
 
-                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails,isLongTimeOut) {
-                    stack.push([procedure, parameters, callback, shortApiCallDetails, isLongTimeOut]);
+                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery) {
+                    stack.push([procedure, parameters, callback, shortApiCallDetails, isSqlQuery]);
                     return this;
                 };
                 this.EndExecute = function () {
@@ -263,7 +267,11 @@
                             (function (queue, item) {
                                 return function (response, headerInfo) {
                                     try {
-
+                                        if ($.type(response) == "string") {
+                                            response = json_parse(response, function (key, value) {
+                                                return value;
+                                            });
+                                        }
                                         if (VoltDBCore.hostIP == "") {
                                             VoltDBCore.hostIP = headerInfo;
                                         }
@@ -281,11 +289,11 @@
                                 };
                             })(this, item), isHighTimeout)).Callback;
 
-                        if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration)
-                            Connection.CallExecuteUpdate(item[0], item[1], callback, item[3]);
-                        else
+                        if ((shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration) || item[4] === true) {
+                            Connection.CallExecuteUpdate(item[0], item[1], callback, item[3], item[4]);
+                        } else {
                             Connection.CallExecute(item[0], item[1], callback, item[3]);
-
+                        }
                     } else {
                         executing = false;
                         if (onCompleteHandler != null) {
@@ -407,7 +415,9 @@
                 s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.HashedPassword);
             if (this.Admin)
                 s[s.length] = 'admin=true';
-            var paramSet = s.join('&') + '&jsonp=?';
+            var paramSet = '';
+            paramSet = s.join('&') + '&jsonp=?';
+
             return paramSet;
         };
 
@@ -510,9 +520,9 @@
             connectionQueue.Start();
 
             if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
-                connectionQueue.BeginExecute([], [], function (data) {                                      
+                connectionQueue.BeginExecute([], [], function (data) {
                     connection.Metadata[processName] = data;
-                    
+
                 }, shortApiCallDetails);
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
@@ -606,45 +616,69 @@
 })(window);
 
 jQuery.extend({
-    postJSON: function (url, formData, callback, authorization) {
-        if (VoltDBCore.hostIP == "") {
-            jQuery.ajax({
-                type: 'POST',
-                url: url,
-                data: formData,
-                dataType: 'json',
-                beforeSend: function (request) {
-                    if (authorization != null) {
-                        request.setRequestHeader("Authorization", authorization);
-                    }
-                },
-                success: function (data, textStatus, request) {
-                    var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
-                    callback(data, host);
-                },
-                error: function (e) {
-                    console.log(e);
-                }
-            });
+    postJSON: function (url, formData, callback, authorization, isSqlQuery) {
 
-        } else {
+        if (isSqlQuery == false) {
+            if (VoltDBCore.hostIP == "") {
+                jQuery.ajax({
+                    type: 'POST',
+                    url: url,
+                    data: formData,
+                    dataType: 'json',
+                    beforeSend: function (request) {
+                        if (authorization != null) {
+                            request.setRequestHeader("Authorization", authorization);
+                        }
+                    },
+                    success: function (data, textStatus, request) {
+                        var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
+                        callback(data, host);
+                    },
+                    error: function (e) {
+                        console.log(e);
+                    }
+                });
+
+            } else {
+                jQuery.ajax({
+                    type: 'POST',
+                    url: url,
+                    data: formData,
+                    dataType: 'json',
+                    beforeSend: function (request) {
+                        if (authorization != null) {
+                            request.setRequestHeader("Authorization", authorization);
+                        }
+                    },
+                    success: callback,
+                    error: function (e) {
+                        console.log(e.message);
+                    }
+                });
+            }
+        }
+
+        else {
             jQuery.ajax({
                 type: 'POST',
                 url: url,
                 data: formData,
-                dataType: 'json',
+                dataType: 'text',
                 beforeSend: function (request) {
                     if (authorization != null) {
                         request.setRequestHeader("Authorization", authorization);
                     }
                 },
-                success: callback,
+                success: function (data) {
+                    callback(data);
+                },
                 error: function (e) {
                     console.log(e.message);
                 }
             });
         }
     }
+
 });
 
 jQuery.extend({
@@ -686,6 +720,7 @@ jQuery.extend({
                 }
             });
         }
+
     }
 
 });

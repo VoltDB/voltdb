@@ -148,7 +148,7 @@ public class InternalConnectionHandler {
         boolean success;
         //Synchronize this to create good handles across all ImportHandlers
         synchronized(InternalConnectionHandler.class) {
-            success = m_adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
+            success = m_adapter.createTransaction(catProc, null, task, tcont, partition, nowNanos);
         }
         if (!success) {
             tcont.discard();
