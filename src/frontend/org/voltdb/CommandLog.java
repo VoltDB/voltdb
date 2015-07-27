@@ -120,6 +120,12 @@ public interface CommandLog {
          * triggered when the sync completes
          */
         public CompletionChecks startNewTaskList(int nextMaxRowCnt);
+
+        /**
+         * Process checks on the correct scheduler thread
+         * @param completionChecks
+         */
+        void processDurabilityChecks(CompletionChecks completionChecks);
     }
 
     /**
