@@ -26,6 +26,7 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
@@ -54,6 +55,8 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
 
 public class TestCatalogUtil extends TestCase {
@@ -516,6 +519,98 @@ public class TestCatalogUtil extends TestCase {
                        commandlogsnapshotdir.getAbsolutePath() + " is not a directory",
                        commandlogsnapshotdir.isDirectory());
         }
+    }
+
+    public void testCheckLicenseConstraint() {
+        catalog_db.setIsactiveactivedred(true);
+
+        LicenseApi lapi = new LicenseApi() {
+            @Override
+            public boolean initializeFromFile(File license) {
+                return false;
+            }
+
+            @Override
+            public boolean isTrial() {
+                return false;
+            }
+
+            @Override
+            public int maxHostcount() {
+                return 0;
+            }
+
+            @Override
+            public Calendar expires() {
+                return null;
+            }
+
+            @Override
+            public boolean verify() throws LicenseException {
+                return false;
+            }
+
+            @Override
+            public boolean isDrReplicationAllowed() {
+                return false;
+            }
+
+            @Override
+            public boolean isDrActiveActiveAllowed() {
+                return true;
+            }
+
+            @Override
+            public boolean isCommandLoggingAllowed() {
+                return false;
+            }
+        };
+        assertNull("Setting DR Active-Active should succeed with qualified license",
+                   CatalogUtil.checkLicenseConstraint(catalog, lapi));
+
+        lapi = new LicenseApi() {
+            @Override
+            public boolean initializeFromFile(File license) {
+                return false;
+            }
+
+            @Override
+            public boolean isTrial() {
+                return false;
+            }
+
+            @Override
+            public int maxHostcount() {
+                return 0;
+            }
+
+            @Override
+            public Calendar expires() {
+                return null;
+            }
+
+            @Override
+            public boolean verify() throws LicenseException {
+                return false;
+            }
+
+            @Override
+            public boolean isDrReplicationAllowed() {
+                return false;
+            }
+
+            @Override
+            public boolean isDrActiveActiveAllowed() {
+                return false;
+            }
+
+            @Override
+            public boolean isCommandLoggingAllowed() {
+                return false;
+            }
+        };
+        assertNotNull("Setting DR Active-Active should fail with unqualified license",
+                CatalogUtil.checkLicenseConstraint(catalog, lapi));
     }
 
     public void testCompileDeploymentAgainstEmptyCatalog() {
