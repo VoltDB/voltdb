@@ -173,7 +173,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             lock.acquire();
             lock.release();
         } catch (InterruptedException ex) {
-            throw loggedDistributerException(ex, "iterruped while waiting for a semaphare");
+            throw loggedDistributerException(ex, "interruped while waiting for a semaphare");
         }
     }
 
@@ -297,7 +297,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         mkdirs(zk, HOST_DN, EMPTY_ARRAY);
         mkdirs(zk, MASTER_DN, EMPTY_ARRAY);
 
-        GetOperationalMode opMode = new GetOperationalMode(VoltZK.operationMode);
+        GetOperationMode opMode = new GetOperationMode(VoltZK.operationMode);
         MonitorHostNodes monitor = new MonitorHostNodes(HOST_DN);
         CreateNode createHostNode = new CreateNode(
                 joinZKPath(HOST_DN, hostId),
@@ -309,12 +309,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 );
         ElectLeader elector = new ElectLeader(MASTER_DN, electionCandidate);
 
-        opMode.getMode();
-        monitor.getChildren();
         createHostNode.getNode();
         elector.elect();
 
         m_candidate = electionCandidate.getNode();
+        opMode.getMode();
+        monitor.getChildren();
         // monitor the master list
         new GetChannels(MASTER_DN).getChannels();
     }
@@ -950,12 +950,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
             Code code = Code.get(rc);
             if (code == Code.OK) {
                 this.stat = Optional.of(stat);
-                this.data = Optional.of(data != null ? data : EMPTY_ARRAY);
-            } else if (code == Code.NONODE || code == Code.SESSIONEXPIRED) {
+                this.data = Optional.of(data != null && data.length > 0 ? data : EMPTY_ARRAY);
+            } else if (code == Code.NONODE || code == Code.SESSIONEXPIRED || m_done.get()) {
                 // keep the fault but don't log it
                 KeeperException e = KeeperException.create(code);
                 fault = Optional.of(new DistributerException(path + " went away", e));
-            } else if (!m_done.get()) {
+            } else {
                 fault = checkCode(code, "unable to read data in %s", path);
             }
         }
@@ -992,8 +992,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
      *
      */
     class GetHostChannels extends GetData {
-        Optional<DistributerException> fault = Optional.absent();
-        Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
+        volatile Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
 
         final String host;
         final Predicate<Map.Entry<ChannelSpec,String>> thisHost;
@@ -1090,28 +1089,28 @@ public class ChannelDistributer implements ChannelChangeCallback {
      */
     class GetChannels extends GetData {
 
-        Optional<DistributerException> fault = Optional.absent();
-        Optional<NavigableSet<ChannelSpec>> channels = Optional.absent();
+        volatile Optional<NavigableSet<ChannelSpec>> channels = Optional.absent();
 
         public GetChannels(String path) {
             super(path);
         }
 
         @Override
-        public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
+        public void processResult(int rc, String path, Object ctx, byte[] nodeData, Stat stat) {
             try {
-                internalProcessResults(rc, path, ctx, data, stat);
+                internalProcessResults(rc, path, ctx, nodeData, stat);
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
                 try {
-                    channels = Optional.of(asChannelSet(data));
+                    channels = Optional.of(asChannelSet(data.get()));
                 } catch (IllegalArgumentException|JSONException e) {
                     fault = Optional.of(
                             loggedDistributerException(e, "failed to parse json in %s", path)
                             );
                     return;
                 }
+
                 int [] stamp = new int[]{0};
                 NavigableSet<ChannelSpec> oldspecs = m_channels.get(stamp);
                 if (stamp[0] >= stat.getVersion()) {
@@ -1136,7 +1135,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         NavigableSet<ChannelSpec> getChannels() {
             acquireAndRelease(lock);
-            if (fault.isPresent()) throw fault.get();
+            if (fault.isPresent()) {
+                throw fault.get();
+            }
             return channels.get();
         }
     }
@@ -1145,35 +1146,45 @@ public class ChannelDistributer implements ChannelChangeCallback {
      * An extension of {@link GetData} that monitors the content of the cluster
      * operational mode
      */
-    class GetOperationalMode extends GetData {
-        Optional<VersionedOperationMode> mode = Optional.absent();
+    class GetOperationMode extends GetData {
+        volatile Optional<VersionedOperationMode> opmode = Optional.absent();
 
-        GetOperationalMode(String path) {
+        GetOperationMode(String path) {
             super(path);
         }
 
         @Override
-        public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
+        public void processResult(int rc, String path, Object ctx, byte[] nodeData, Stat stat) {
             try {
-                internalProcessResults(rc, path, ctx, data, stat);
+                internalProcessResults(rc, path, ctx, nodeData, stat);
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
+                OperationMode next = OperationMode.RUNNING;
+                if (nodeData != null && nodeData.length > 0) try {
+                    next = OperationMode.valueOf(nodeData);
+                } catch (IllegalArgumentException e) {
+                    fault = Optional.of(loggedDistributerException(
+                            e, "unable to decode content in operation node: \"%s\"",
+                            new String(nodeData, StandardCharsets.UTF_8)
+                            ));
+                    return;
+                }
+                opmode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
 
                 int [] stamp = new int[]{0};
                 OperationMode prev = m_mode.get(stamp);
-                if ( stamp[0] > stat.getVersion()) {
+                if (stamp[0] > stat.getVersion()) {
+                    opmode = Optional.of(new VersionedOperationMode(prev, stamp[0]));
                     return;
                 }
-                OperationMode next = data != null ?  OperationMode.valueOf(data) : OperationMode.RUNNING;
                 if (!m_mode.compareAndSet(prev, next, stamp[0], stat.getVersion())) {
                     return;
                 }
-                mode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
                 if (m_isLeader && !m_done.get() && next == OperationMode.RUNNING) {
                     m_es.submit(new AssignChannels());
                 }
-                m_eb.post(mode.get());
+                m_eb.post(opmode.get());
 
             } finally {
                 lock.release();
@@ -1182,16 +1193,18 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new GetOperationalMode(path);
+            new GetOperationMode(path);
         }
 
         VersionedOperationMode getMode() {
             acquireAndRelease(lock);
-            if (fault.isPresent()) throw fault.get();
-            if (!mode.isPresent()) {
+            if (fault.isPresent()) {
+                throw fault.get();
+            }
+            if (!opmode.isPresent()) {
                 throw new DistributerException("failed to mirror cluster operation mode");
             }
-            return mode.get();
+            return opmode.get();
         }
     }
 
