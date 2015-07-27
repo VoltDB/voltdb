@@ -1630,29 +1630,6 @@ public class DDLCompiler {
         return true;
     }
 
-    /**
-     * This function will recursively find any function expression with ID functionId.
-     * If found, return true. Else, return false.
-     * @param expr
-     * @param functionId
-     * @return
-     */
-    public static boolean containsTimeSensitiveFunction(AbstractExpression expr, int functionId) {
-        if (expr == null || expr instanceof TupleValueExpression) {
-            return false;
-        }
-
-        List<AbstractExpression> functionsList = expr.findAllSubexpressionsOfClass(FunctionExpression.class);
-        for (AbstractExpression funcExpr: functionsList) {
-            assert(funcExpr instanceof FunctionExpression);
-            if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
@@ -2520,17 +2497,7 @@ public class DDLCompiler {
                 msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
-            // Gather up aggregate expressions.  Check their
-            // arguments.  If this display column is not an aggregate expression,
-            // then check it all.
-            AbstractExpression expr = outcol.expression;
-            if (expr instanceof AggregateExpression) {
-                if (expr.getLeft() != null) {
-                    checkExpressions.add(expr.getLeft());
-                }
-            } else {
-                checkExpressions.add(expr);
-            }
+            checkExpressions.add(outcol.expression);
         }
 
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
