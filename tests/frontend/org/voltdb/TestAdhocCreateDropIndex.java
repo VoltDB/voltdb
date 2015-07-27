@@ -144,11 +144,6 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                      "VAL1 float," +
                      "constraint PK_TREE primary key (ID)" +
                      ");\n" +
-                     "create table FOO_R (" +
-                     "ID integer not null," +
-                     "VAL bigint, " +
-                     "constraint PK_TREE_R primary key (ID)" +
-                     ");\n" +
                      "Partition table FOO on column ID;\n";
         createSchema(config, ddl, 2, 1, 0);
 
