@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -40,22 +39,15 @@ public class ImportHandler {
 
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private final CatalogContext m_catalogContext;
     private boolean m_stopped = false;
 
-    private static final InternalClientResponseAdapter m_adapter = new InternalClientResponseAdapter(ClientInterface.INTERNAL_CID, "Importer");
-    private static final AtomicLong m_lock = new AtomicLong(0);
-
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
     final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
-    public ImportHandler(ImportContext importContext,
-                         CatalogContext catContext) {
+    public ImportHandler(ImportContext importContext) {
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
         m_importContext = importContext;
-        m_catalogContext = catContext;
     }
 
     /**
@@ -114,8 +106,13 @@ public class ImportHandler {
     */
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
-        return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
-                .callProcedure(ic.getBackpressureTimeout(), proc, fieldList);
+        if (!m_stopped) {
+            return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
+                    .callProcedure(ic.getBackpressureTimeout(), proc, fieldList);
+        } else {
+            m_logger.warn("Importer is in stopped state. Cannot execute procedures");
+            return false;
+        }
         //return callProcedure(ic, new NullCallback(), proc, fieldList);
     }
 
