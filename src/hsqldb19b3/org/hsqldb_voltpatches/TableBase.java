@@ -369,7 +369,16 @@ public class TableBase {
                                                                       0, briColsCount);
         bestRowIdentifierStrict = isStrict;
 
+        // A VoltDB extension to support view-based indices
+        /* disable 1 line ...
         if (indexList[0].getColumnCount() > 0) {
+        ... disabled 1 line */
+
+        // if current table is a view and length of indexList[] is zero,
+        // don't try to evaluate bestIndex for that case
+        if (!(indexList.length == 0 && isView) &&
+            (indexList[0].getColumnCount() > 0)) {
+        // End of VoltDB extension
             bestIndex = indexList[0];
         }
     }
