@@ -256,7 +256,12 @@ public class FunctionCustom extends FunctionSQL {
 
         switch (tokenType) {
 
+            // A VoltDB extension to customize the SQL function set support
+            case Tokens.LOG :
+            /* disable 1 line
             case Tokens.LN :
+             ... disabled 1 line */
+            // End of VoltDB extension
             case Tokens.LCASE :
             case Tokens.UCASE :
             case Tokens.LENGTH :
