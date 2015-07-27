@@ -604,12 +604,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> sync(final boolean nofsync) throws RejectedExecutionException {
+    public ListenableFuture<?> sync(final boolean nofsync) {
         try {
             return m_es.submit(new SyncRunnable(nofsync));
         } catch (RejectedExecutionException e) {
-            throw e;
+            exportLog.error("Error scheduling export buffer sync", e);
         }
+        return null;
     }
 
     public ListenableFuture<?> close() {

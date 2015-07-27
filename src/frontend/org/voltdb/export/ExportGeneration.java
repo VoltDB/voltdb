@@ -786,14 +786,15 @@ public class ExportGeneration {
 
     public void sync(final boolean nofsync) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
+        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : dataSources.values()) {
+                ListenableFuture<?> syncFuture = source.sync(nofsync);
+                if (syncFuture != null)
+                    tasks.add(syncFuture);
+            }
+        }
 
         try {
-            for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
-                for (ExportDataSource source : dataSources.values()) {
-                    tasks.add(source.sync(nofsync));
-                }
-            }
-
             if (!tasks.isEmpty())
                 Futures.allAsList(tasks).get();
         } catch (Exception e) {
