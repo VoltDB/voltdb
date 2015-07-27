@@ -614,13 +614,18 @@ public class CatalogDiffEngine {
         }
 
         // Support any modification of these
+
+        // I added Statement and PlanFragment for the need of materialized view recalculation plan updates.
+        // ENG-8641, yzhang.
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
             suspect instanceof SnapshotSchedule ||
             suspect instanceof UserRef ||
             suspect instanceof GroupRef ||
-            suspect instanceof ColumnRef) {
+            suspect instanceof ColumnRef ||
+            suspect instanceof Statement ||
+            suspect instanceof PlanFragment) {
             return null;
         }
 
@@ -642,9 +647,6 @@ public class CatalogDiffEngine {
         if (suspect instanceof Connector && "enabled".equals(field))
             return null;
         if (suspect instanceof Connector && "loaderclass".equals(field))
-            return null;
-        // ENG-6511 Allow materialized views to change the index they use dynamically.
-        if (suspect instanceof IndexRef && field.equals("name"))
             return null;
 
         // Avoid over-generalization when describing limitations that are dependent on particular
