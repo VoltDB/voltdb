@@ -1340,8 +1340,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private void startResourceUsageMonitor() {
-        // Checks and acts, if the server runs out of resources.
-        //TODO: use configured value for this
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
         if (resMonitor.hasResourceLimitsConfigured()) {
             m_periodicWorks.add(scheduleWork(resMonitor, resourceMonitorInterval,
