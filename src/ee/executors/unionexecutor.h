@@ -71,7 +71,7 @@ class UnionExecutor : public AbstractExecutor {
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
-        bool p_execute();
+        bool p_execute(const NValueArray &params);
 
     private:
         boost::shared_ptr<detail::SetOperator> m_setOperator;

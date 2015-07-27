@@ -48,6 +48,7 @@ INSERT INTO @dmltable VALUES (@insertvals)
 
 -- TEMP, for debugging, just so I can quickly see what data was generated:
 --SELECT * FROM @fromtables ORDER BY @idcol
+--SELECT SUM(ID), SUM(NUM), SUM(RATIO) FROM @fromtables
 
 --- Test Scalar Subquery Advanced cases
 
@@ -84,6 +85,3 @@ SELECT (SELECT _genericagg(_variable[#agg string])   FROM @fromtables WHERE _var
 --SELECT (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _cmp A34._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A34 GROUP BY C0 HAVING C1 _cmp 12
 --SELECT _variable[#grp] C0, @agg(_variable[#agg]) C1  FROM @fromtables A35 GROUP BY C0 HAVING (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _cmp A35._variable[@comparabletype]) _cmp 12
 SELECT _variable[#grp] C0, @agg(_variable[#agg]) C1 FROM @fromtables A36 GROUP BY C0 HAVING @agg(__[#agg]) _cmp (SELECT @agg(__[#agg]) FROM @fromtables WHERE __[#grp] _cmp A36.__[#grp])
-
---- Queries with scalar subqueries containing a UNION (these ??)
--- TBD

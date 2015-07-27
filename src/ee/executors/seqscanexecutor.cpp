@@ -105,7 +105,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool SeqScanExecutor::p_execute() {
+bool SeqScanExecutor::p_execute(const NValueArray &params) {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
     Table* output_table = node->getOutputTable();
@@ -180,7 +180,7 @@ bool SeqScanExecutor::p_execute() {
         int limit = -1;
         int offset = -1;
         if (limit_node) {
-            limit_node->getLimitAndOffsetByReference(limit, offset);
+            limit_node->getLimitAndOffsetByReference(params, limit, offset);
         }
 
         int tuple_ctr = 0;
@@ -194,7 +194,7 @@ bool SeqScanExecutor::p_execute() {
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
-            temp_tuple = m_aggExec->p_execute_init(&pmp,
+            temp_tuple = m_aggExec->p_execute_init(params, &pmp,
                     inputSchema, output_temp_table);
         } else {
             temp_tuple = output_temp_table->tempTuple();

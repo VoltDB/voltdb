@@ -76,7 +76,7 @@ class MaterializeExecutor : public AbstractExecutor {
   protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
-    bool p_execute();
+    bool p_execute(const NValueArray &params);
 
   private:
     MaterializePlanNode* node;

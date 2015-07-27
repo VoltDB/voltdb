@@ -21,10 +21,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -60,7 +60,7 @@ public class Pause extends VoltSystemProcedure
             try {
                 VoltDB.instance().getHostMessenger().getZK().setData(
                         VoltZK.operationMode,
-                        OperationMode.PAUSED.toString().getBytes("UTF-8"), -1);
+                        OperationMode.PAUSED.getBytes(), -1);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

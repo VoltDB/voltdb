@@ -467,7 +467,7 @@ inline TupleSchema* AggregateExecutorBase::constructGroupBySchema(bool partial) 
                                           groupByColumnInBytes);
 }
 
-inline void AggregateExecutorBase::executeAggBase()
+inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
 {
     VOLT_DEBUG("started AGGREGATE");
     assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
@@ -481,7 +481,7 @@ inline void AggregateExecutorBase::executeAggBase()
     m_earlyReturn = false;
     LimitPlanNode* inlineLimitNode = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     if (inlineLimitNode) {
-        inlineLimitNode->getLimitAndOffsetByReference(m_limit, m_offset);
+        inlineLimitNode->getLimitAndOffsetByReference(params, m_limit, m_offset);
     }
 }
 
@@ -581,14 +581,14 @@ TableTuple& AggregateExecutorBase::swapWithInprogressGroupByKeyTuple() {
     return nextGroupByKeyTuple;
 }
 
-TableTuple AggregateExecutorBase::p_execute_init(ProgressMonitorProxy* pmp,
-                        const TupleSchema * schema, TempTable* newTempTable)
+TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
 {
     if (newTempTable != NULL) {
         m_tmpOutputTable = newTempTable;
     }
     m_memoryPool.purge();
-    executeAggBase();
+    executeAggBase(params);
     m_pmp = pmp;
 
     m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
@@ -618,16 +618,16 @@ void AggregateExecutorBase::p_execute_finish()
 
 AggregateHashExecutor::~AggregateHashExecutor() {}
 
-TableTuple AggregateHashExecutor::p_execute_init(ProgressMonitorProxy* pmp,
-                        const TupleSchema * schema, TempTable* newTempTable)
+TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
 {
     VOLT_TRACE("hash aggregate executor init..");
     m_hash.clear();
 
-    return AggregateExecutorBase::p_execute_init(pmp, schema, newTempTable);
+    return AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable);
 }
 
-bool AggregateHashExecutor::p_execute()
+bool AggregateHashExecutor::p_execute(const NValueArray& params)
 {
     // Input table
     Table* input_table = m_abstractNode->getInputTable();
@@ -639,7 +639,7 @@ bool AggregateHashExecutor::p_execute()
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     ProgressMonitorProxy pmp(m_engine, this);
 
-    TableTuple nextTuple = AggregateHashExecutor::p_execute_init(&pmp, inputSchema);
+    TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema);
 
     VOLT_TRACE("looping..");
     while (it.next(nextTuple)) {
@@ -716,11 +716,12 @@ void AggregateHashExecutor::p_execute_finish() {
 AggregateSerialExecutor::~AggregateSerialExecutor() {}
 
 
-TableTuple AggregateSerialExecutor::p_execute_init(ProgressMonitorProxy* pmp,
-                        const TupleSchema * schema, TempTable* newTempTable)
+TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
 {
     VOLT_TRACE("serial aggregate executor init..");
-    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(pmp, schema, newTempTable);
+    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(
+            params, pmp, schema, newTempTable);
 
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
     m_noInputRows = true;
@@ -734,7 +735,7 @@ TableTuple AggregateSerialExecutor::p_execute_init(ProgressMonitorProxy* pmp,
     return nextInputTuple;
 }
 
-bool AggregateSerialExecutor::p_execute()
+bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 {
     // Input table
     Table* input_table = m_abstractNode->getInputTable();
@@ -744,7 +745,7 @@ bool AggregateSerialExecutor::p_execute()
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine, this);
-    AggregateSerialExecutor::p_execute_init(&pmp, input_table->schema());
+    AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema());
 
     while (it.next(nextTuple)) {
         m_pmp->countdownProgress();
@@ -840,11 +841,12 @@ void AggregateSerialExecutor::p_execute_finish()
 //
 AggregatePartialExecutor::~AggregatePartialExecutor() {}
 
-TableTuple AggregatePartialExecutor::p_execute_init(ProgressMonitorProxy* pmp,
-                        const TupleSchema * schema, TempTable* newTempTable)
+TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
 {
     VOLT_TRACE("partial aggregate executor init..");
-    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(pmp, schema, newTempTable);
+    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(
+            params, pmp, schema, newTempTable);
 
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
@@ -857,7 +859,7 @@ TableTuple AggregatePartialExecutor::p_execute_init(ProgressMonitorProxy* pmp,
     return nextInputTuple;
 }
 
-bool AggregatePartialExecutor::p_execute()
+bool AggregatePartialExecutor::p_execute(const NValueArray& params)
 {
     // Input table
     Table* input_table = m_abstractNode->getInputTable(0);
@@ -867,7 +869,7 @@ bool AggregatePartialExecutor::p_execute()
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine, this);
-    AggregatePartialExecutor::p_execute_init(&pmp, input_table->schema());
+    AggregatePartialExecutor::p_execute_init(params, &pmp, input_table->schema());
 
     while (it.next(nextTuple)) {
         m_pmp->countdownProgress();

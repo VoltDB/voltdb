@@ -32,7 +32,8 @@
                                 default_host=False,
                                 safemode_available=False,
                                 supports_daemon=True,
-                                supports_multiple_daemons=True),
+                                supports_multiple_daemons=True,
+                                check_environment_config=True),
     description = 'Add the current node to a VoltDB cluster.'
 )
 def add(runner):
