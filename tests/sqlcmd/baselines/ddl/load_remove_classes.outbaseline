@@ -193,5 +193,3 @@ Command succeeded.
 
 drop table EMPLOYEE;
 Command succeeded.
-
-This line should cause the test to fail: I want to see whether that turns Jenkins red (I suspect not, since I see BUILD SUCCESSFUL).
