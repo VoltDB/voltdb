@@ -25,11 +25,19 @@ package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
+import java.util.Random;
 
 public class CopyLoadPartitionedSP extends CopyLoadPartitionedBase {
-    private final SQLStmt insertIntoStmt = new SQLStmt("INSERT INTO  cploadp SELECT cid,txnid,rowid from loadp WHERE cid=? ORDER BY cid;");
+
+    private final SQLStmt selectStmt = new SQLStmt("SELECT cid,txnid,rowid from loadp WHERE cid=? ORDER BY cid LIMIT 1;");
+    private final SQLStmt insertStmt = new SQLStmt("INSERT INTO  cploadp VALUES (?, ?, ?);");
+    private final SQLStmt insertIntoStmt = new SQLStmt("INSERT INTO cploadp SELECT cid,txnid,rowid FROM loadp WHERE cid=? ORDER BY cid;");
+    private Random r = new Random();
 
     public VoltTable[] run(long cid) {
-        return doWork(insertIntoStmt, cid);
+        boolean useSelect = r.nextInt(2) == 0 ? false : true;
+        if (useSelect)
+            return doWork(selectStmt, insertStmt, cid);
+        return doWork(null, insertIntoStmt, cid);
     }
 }
