@@ -497,12 +497,14 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     ExecutorContext* context = ExecutorContext::getExecutorContext();
                     NValueArray &params = *context->getParameterContainer();
                     // the parameters are the groupby columns and the aggregation column.
-                    vector<NValue> backups(m_groupByColumnCount);
-                    int colindex;
-                    for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+                    vector<NValue> backups(m_groupByColumnCount + 1);
+                    int colindex = 0;
+                    for (; colindex < m_groupByColumnCount; colindex++) {
                         backups[colindex] = params[colindex];
                         params[colindex] = m_existingTuple.getNValue(colindex);
                     }
+                    backups[colindex] = params[colindex];
+                    params[colindex] = oldValue;
                     // executing the stored plan.
                     const vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
                     Table *retval = context->executeExecutors(executorList, 0);
@@ -521,7 +523,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     // }
                     // restore
                     context->cleanupExecutorsForSubquery(executorList);
-                    for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+                    for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
                         params[colindex] = backups[colindex];
                     }
                 }

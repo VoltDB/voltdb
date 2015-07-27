@@ -67,14 +67,14 @@ public class MatViewFallbackQueryXMLGenerator {
         List<VoltXMLElement> columns = VoltXMLElementHelper.getFirstChild(m_xml, "columns").children;
         List<VoltXMLElement> parameters = VoltXMLElementHelper.getFirstChild(m_xml, "parameters").children;
         VoltXMLElement groupcolumnsElement = VoltXMLElementHelper.getFirstChild(m_xml, "groupcolumns");
+        List<VoltXMLElement> tablescans = VoltXMLElementHelper.getFirstChild(m_xml, "tablescans").children;
+        VoltXMLElement tablescanForJoinCond = tablescans.get(tablescans.size() - 1);
+        // Add the joincond to the last table scan element.
+        List<VoltXMLElement> joincond = VoltXMLElementHelper.getFirstChild(tablescanForJoinCond, "joincond", true).children;
 
         // 1. Turn groupby into joincond (WHERE) ================================================================
         if (groupcolumnsElement != null) {
             // If there is no group by clause, then nothing needs to be transformed.
-            List<VoltXMLElement> tablescans = VoltXMLElementHelper.getFirstChild(m_xml, "tablescans").children;
-            VoltXMLElement tablescanForJoinCond = tablescans.get(tablescans.size() - 1);
-            // Add the joincond to the last table scan element.
-            List<VoltXMLElement> joincond = VoltXMLElementHelper.getFirstChild(tablescanForJoinCond, "joincond", true).children;
             List<VoltXMLElement> groupcolumns = groupcolumnsElement.children;
             VoltXMLElement joincondFromGroupby = null;
             for (int i=0; i<m_groupByColumnsParsedInfo.size(); ++i) {
@@ -106,16 +106,31 @@ public class MatViewFallbackQueryXMLGenerator {
         List<VoltXMLElement> originalColumns = new ArrayList<VoltXMLElement>();
         originalColumns.addAll(columns);
         columns.clear();
-
+        // Parameter index for min/max column
+        String paramIndex = String.valueOf(m_groupByColumnsParsedInfo.size());
+        VoltXMLElement joincondTemplate = joincond.size() == 0 ? null : joincond.get(0);
+        joincond.clear();
         // Add one min/max columns at a time as a new fallback query XML.
         for (int i=m_groupByColumnsParsedInfo.size()+1; i<m_displayColumnsParsedInfo.size(); ++i) {
             VoltXMLElement column = originalColumns.get(i);
             String optype = column.attributes.get("optype");
             if ( optype.equals("min") || optype.equals("max") ) {
                 columns.add(column);
+                VoltXMLElement aggArg = column.children.get(0);
+                // if ( ! aggArg.name.equals("columnref")) {
+                //     String alias = column.attributes.get("alias");
+                //     aggArg.attributes.put("alias", alias);
+                // }
+                String operator = optype.equals("min") ? "greaterthanorequalto" : "lessthanorequalto";
+                String valueType = m_displayColumnsParsedInfo.get(i).expression.getValueType().getName();
+                parameters.add( VoltXMLElementHelper.buildParamElement(nextElementId(), paramIndex, valueType) );
+                VoltXMLElement aggArgJoincond = VoltXMLElementHelper.buildColumnParamJoincondElement(operator, aggArg, lastElementId(), nextElementId());
+                joincond.add( VoltXMLElementHelper.mergeTwoElementsUsingOperator("and", nextElementId(), joincondTemplate, aggArgJoincond) );
                 m_fallbackQueryXMLs.add(m_xml.duplicate());
+                // For debug:
                 // System.out.println(m_xml.toString());
                 columns.clear();
+                joincond.clear();
             }
         }
     }
