@@ -2502,13 +2502,13 @@ public class DDLCompiler {
 
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
-            msg.append("is missing count(*) as the column after the group by columns, a materialized view requirement.");
+            msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
         for (i++; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
-            if ((outcol.expression.getClass() != AggregateExpression.class)) {
+            if ((outcol.expression instanceof AggregateExpression)) {
                 msg.append("must have non-group by columns aggregated by sum, count, min or max.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
