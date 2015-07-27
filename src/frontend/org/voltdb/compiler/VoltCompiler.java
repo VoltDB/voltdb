@@ -169,6 +169,8 @@ public class VoltCompiler {
     private final static String m_emptyDDLComment = "-- This DDL file is a placeholder for starting without a user-supplied catalog.\n";
 
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
+
+    /**
      * Represents output from a compile. This works similarly to Log4j; there
      * are different levels of feedback including info, warning, error, and
      * unexpected error. Feedback can be output to a printstream (like stdout)
