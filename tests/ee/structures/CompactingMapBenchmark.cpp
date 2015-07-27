@@ -67,7 +67,7 @@ int64_t getMicrosNow () {
 int VEC[MAXSCALE] = {};
 
 int* getRandomValues(int size, int max) {
-    srand(getMicrosNow() % 1000000);
+    srand(static_cast<unsigned int>(getMicrosNow() % 1000000));
     for (int i = 0; i < size; i++) {
         int val = rand() % max;
         VEC[i] = val;
@@ -459,7 +459,7 @@ void BenchmarkRun(
 }
 
 void BenchmarkRunWrapper(int DATA_SCALE, int SLEEP_IN_SECONDS, int READON_OPS_REPEAT, std::vector<bool> params) {
-    int len = params.size();
+    size_t len = params.size();
 
     bool runScan=true, runScanNoEndCheck=false, runLookup=false, runDelete=false;
     int i = -1;
