@@ -1,4 +1,13 @@
 
+drop table r if exists;
+Command succeeded.
+
+drop table s if exists;
+Command succeeded.
+
+drop table t if exists;
+Command succeeded.
+
 --- Empty Class List -----------------------
 
 

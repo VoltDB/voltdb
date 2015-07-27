@@ -1,3 +1,8 @@
+-- In case these tables get left behind by previous tests:
+drop table r if exists;
+drop table s if exists;
+drop table t if exists;
+
 show classes;
 load classes sqlcmdtest-procs.jar;
 show classes;
