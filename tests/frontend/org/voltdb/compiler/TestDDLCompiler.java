@@ -42,7 +42,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.IndexRef;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 
@@ -312,290 +311,163 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.adhoc.executeSQLMP", false));
     }
 
-    public void testIndexedMinMaxViews() {
-        File jarOut = new File("indexedMinMaxViews.jar");
-        jarOut.deleteOnExit();
+    // temporarily disabled, not determined what to do with this test.
+    // ENG-8641, yzhang.
+    // public void testIndexedMinMaxViews() {
+    //     File jarOut = new File("indexedMinMaxViews.jar");
+    //     jarOut.deleteOnExit();
 
-        String schema[] = {
-                // no indexes (should produce warnings)
-                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-                "FROM T " +
-                "GROUP BY D1, D2, D3;\n" +
-                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
-                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-                "FROM T " +
-                "GROUP BY D1 + D2, ABS(D3);" +
-                "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-                "FROM T WHERE D1 > 3 " +
-                "GROUP BY D1, D2, D3;\n" +
-                "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
-                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-                "FROM T WHERE D1 > 3 " +
-                "GROUP BY D1 + D2, ABS(D3);",
+    //     String schema[] = {
+    //             // no indexes (should produce warnings)
+    //             "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+    //             "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //             "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //             "FROM T " +
+    //             "GROUP BY D1, D2, D3;\n" +
+    //             "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+    //             "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+    //             "FROM T " +
+    //             "GROUP BY D1 + D2, ABS(D3);" +
+    //             "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //             "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //             "FROM T WHERE D1 > 3 " +
+    //             "GROUP BY D1, D2, D3;\n" +
+    //             "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+    //             "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+    //             "FROM T WHERE D1 > 3 " +
+    //             "GROUP BY D1 + D2, ABS(D3);",
 
-                // schema with indexes (should have no warnings)
-               "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-               "CREATE INDEX T_TREE_1 ON T(D1);\n" +
-               "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
-               "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
-               "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
-               "CREATE INDEX T_TREE_5 ON T(D1, D2, D3) WHERE D1 > 3;\n" +
-               "CREATE INDEX T_TREE_6 ON T(D1+D2, ABS(D3)) WHERE D1 > 3;\n" +
-               "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-               "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-               "FROM T " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-               "FROM T " +
-               "GROUP BY D1 + D2, ABS(D3);" +
-               "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-               "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-               "FROM T WHERE D1 > 3 " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-               "FROM T WHERE D1 > 3 " +
-               "GROUP BY D1 + D2, ABS(D3);",
+    //             // schema with indexes (should have no warnings)
+    //            "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+    //            "CREATE INDEX T_TREE_1 ON T(D1);\n" +
+    //            "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
+    //            "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
+    //            "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
+    //            "CREATE INDEX T_TREE_5 ON T(D1, D2, D3) WHERE D1 > 3;\n" +
+    //            "CREATE INDEX T_TREE_6 ON T(D1+D2, ABS(D3)) WHERE D1 > 3;\n" +
+    //            "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //            "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //            "FROM T " +
+    //            "GROUP BY D1, D2, D3;\n" +
+    //            "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+    //            "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+    //            "FROM T " +
+    //            "GROUP BY D1 + D2, ABS(D3);" +
+    //            "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //            "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //            "FROM T WHERE D1 > 3 " +
+    //            "GROUP BY D1, D2, D3;\n" +
+    //            "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+    //            "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+    //            "FROM T WHERE D1 > 3 " +
+    //            "GROUP BY D1 + D2, ABS(D3);",
 
-               // schema with no indexes and mat view with no min / max
-               "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-               "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT) " +
-               "AS SELECT D1, D2, D3, COUNT(*) " +
-               "FROM T " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*) " +
-               "FROM T " +
-               "GROUP BY D1 + D2, ABS(D3);",
+    //            // schema with no indexes and mat view with no min / max
+    //            "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+    //            "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT) " +
+    //            "AS SELECT D1, D2, D3, COUNT(*) " +
+    //            "FROM T " +
+    //            "GROUP BY D1, D2, D3;\n" +
+    //            "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT) " +
+    //            "AS SELECT D1 + D2, ABS(D3), COUNT(*) " +
+    //            "FROM T " +
+    //            "GROUP BY D1 + D2, ABS(D3);",
 
-                // schema with index but can not be used for mat view with min / max
-                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
-                "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
-                "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
-                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3) WHERE D1 > 0;\n" +
-                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-                "FROM T WHERE D2 > 0 " +
-                "GROUP BY D1, D2, D3;\n" +
-                "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-                "FROM T " +
-                "GROUP BY D1, D2, D3;\n",
+    //             // schema with index but can not be used for mat view with min / max
+    //             "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+    //             "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
+    //             "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
+    //             "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
+    //             "CREATE INDEX T_TREE_4 ON T(D1, D2, D3) WHERE D1 > 0;\n" +
+    //             "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //             "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //             "FROM T WHERE D2 > 0 " +
+    //             "GROUP BY D1, D2, D3;\n" +
+    //             "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //             "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //             "FROM T " +
+    //             "GROUP BY D1, D2, D3;\n",
 
-                // schemas with index but can not be used for mat view with min / max
-                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
-                "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
-                "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
-                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3, VAL1);\n" +
-                "CREATE INDEX T_TREE_5 ON T(D1, D2, D3, ABS(VAL1));\n" +
-                "CREATE INDEX T_TREE_6 ON T(D1, D2-D3);\n" +
-                "CREATE INDEX T_TREE_7 ON T(D1, D2-D3, D3, D2);\n" +
-                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-                "FROM T " +
-                "GROUP BY D1, D2, D3;\n" +
-                "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-                "AS SELECT D1, D2-D3, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-                "FROM T " +
-                "GROUP BY D1, D2-D3, D3;",
+    //             // schemas with index but can not be used for mat view with min / max
+    //             "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+    //             "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
+    //             "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
+    //             "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
+    //             "CREATE INDEX T_TREE_4 ON T(D1, D2, D3, VAL1);\n" +
+    //             "CREATE INDEX T_TREE_5 ON T(D1, D2, D3, ABS(VAL1));\n" +
+    //             "CREATE INDEX T_TREE_6 ON T(D1, D2-D3);\n" +
+    //             "CREATE INDEX T_TREE_7 ON T(D1, D2-D3, D3, D2);\n" +
+    //             "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //             "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //             "FROM T " +
+    //             "GROUP BY D1, D2, D3;\n" +
+    //             "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //             "AS SELECT D1, D2-D3, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //             "FROM T " +
+    //             "GROUP BY D1, D2-D3, D3;",
 
-                // schemas with index but not all min/max columns in the view can have a usable index (ENG-8512)
-                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
-                "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
-                "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
-                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3, VAL1);\n" +
-                "CREATE INDEX T_TREE_5 ON T(D1, D2, D3, ABS(VAL1));\n" +
-                "CREATE INDEX T_TREE_6 ON T(D1, D2-D3, D3, ABS(VAL3));\n" +
-                "CREATE INDEX T_TREE_7 ON T(D1, D2, D3, VAL1 + VAL2);\n" +
-                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-                "FROM T " +
-                "GROUP BY D1, D2, D3;\n" +
-                "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-                "AS SELECT D1, D2-D3, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-                "FROM T " +
-                "GROUP BY D1, D2-D3, D3;",
-        };
+    //             // schemas with index but not all min/max columns in the view can have a usable index (ENG-8512)
+    //             "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+    //             "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
+    //             "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
+    //             "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
+    //             "CREATE INDEX T_TREE_4 ON T(D1, D2, D3, VAL1);\n" +
+    //             "CREATE INDEX T_TREE_5 ON T(D1, D2, D3, ABS(VAL1));\n" +
+    //             "CREATE INDEX T_TREE_6 ON T(D1, D2-D3, D3, ABS(VAL3));\n" +
+    //             "CREATE INDEX T_TREE_7 ON T(D1, D2, D3, VAL1 + VAL2);\n" +
+    //             "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //             "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //             "FROM T " +
+    //             "GROUP BY D1, D2, D3;\n" +
+    //             "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+    //             "AS SELECT D1, D2-D3, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+    //             "FROM T " +
+    //             "GROUP BY D1, D2-D3, D3;",
+    //     };
 
-        int expectWarning[] = { 4, 0, 0, 2, 2, 2 };
-        // boilerplate for making a project
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project><database><schemas>" +
-                "<schema path='%s' />" +
-                "</schemas></database></project>";
+    //     int expectWarning[] = { 4, 0, 0, 2, 2, 2 };
+    //     // boilerplate for making a project
+    //     final String simpleProject =
+    //             "<?xml version=\"1.0\"?>\n" +
+    //             "<project><database><schemas>" +
+    //             "<schema path='%s' />" +
+    //             "</schemas></database></project>";
 
-        VoltCompiler compiler = new VoltCompiler();
-        for (int ii = 0; ii < schema.length; ++ii) {
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
-            String schemaPath = schemaFile.getPath();
+    //     VoltCompiler compiler = new VoltCompiler();
+    //     for (int ii = 0; ii < schema.length; ++ii) {
+    //         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+    //         String schemaPath = schemaFile.getPath();
 
-            File projectFile = VoltProjectBuilder.writeStringToTempFile(
-                    String.format(simpleProject, schemaPath));
-            String projectPath = projectFile.getPath();
+    //         File projectFile = VoltProjectBuilder.writeStringToTempFile(
+    //                 String.format(simpleProject, schemaPath));
+    //         String projectPath = projectFile.getPath();
 
-            // compile successfully (but with two warnings hopefully)
-            boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
-            assertTrue(success);
+    //         // compile successfully (but with two warnings hopefully)
+    //         boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+    //         assertTrue(success);
 
-            // verify the warnings exist
-            int foundWarnings = 0;
-            for (VoltCompiler.Feedback f : compiler.m_warnings) {
-                if (f.message.toLowerCase().contains("min")) {
-                    System.out.println(f.message);
-                    foundWarnings++;
-                }
-            }
-            if (expectWarning[ii] != foundWarnings) {
-                if (expectWarning[ii] > foundWarnings) {
-                    System.out.println("Missed expected warning(s) for schema:");
-                } else {
-                    System.out.println("Unexpected warning(s) for schema:");
-                }
-                System.out.println(schema[ii]);
-            }
-            assertEquals(expectWarning[ii], foundWarnings);
+    //         // verify the warnings exist
+    //         int foundWarnings = 0;
+    //         for (VoltCompiler.Feedback f : compiler.m_warnings) {
+    //             if (f.message.toLowerCase().contains("min")) {
+    //                 System.out.println(f.message);
+    //                 foundWarnings++;
+    //             }
+    //         }
+    //         if (expectWarning[ii] != foundWarnings) {
+    //             if (expectWarning[ii] > foundWarnings) {
+    //                 System.out.println("Missed expected warning(s) for schema:");
+    //             } else {
+    //                 System.out.println("Unexpected warning(s) for schema:");
+    //             }
+    //             System.out.println(schema[ii]);
+    //         }
+    //         assertEquals(expectWarning[ii], foundWarnings);
 
-            // cleanup after the test
-            jarOut.delete();
-        }
-    }
-
-    private void assertIndexSelectionResult(CatalogMap<IndexRef> indexRefs, String... indexNames) {
-        assertEquals(indexRefs.size(), indexNames.length);
-        int i = 0;
-        for (IndexRef idx : indexRefs) {
-            assertEquals(idx.getName(), indexNames[i++]);
-        }
-    }
-
-    // ENG-6511
-    public void testMinMaxViewIndexSelection() {
-        File jarOut = new File("minMaxViewIndexSelection.jar");
-        jarOut.deleteOnExit();
-
-        // boilerplate for making a project
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project><database><schemas>" +
-                "<schema path='%s' />" +
-                "</schemas></database></project>";
-        String schema =
-
-                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE INDEX T_TREE_01 ON T(      D1,       D2                         );\n" +
-                "CREATE INDEX T_TREE_02 ON T(      D1,       D2,       VAL1             );\n" +
-                "CREATE INDEX T_TREE_03 ON T(      D1,       D2,  VAL1+VAL2             ) WHERE D1 > 3;\n" +
-                "CREATE INDEX T_TREE_04 ON T(      D1,       D2,         D3             );\n" +
-                "CREATE INDEX T_TREE_05 ON T(      D1,       D2,         D3,  VAL1+VAL2 );\n" +
-                "CREATE INDEX T_TREE_06 ON T(      D1,       D2,         D3,  VAL1+VAL2 ) WHERE D2 > 4;\n" +
-                "CREATE INDEX T_TREE_07 ON T(   D1+D2,  ABS(D3)                         );\n" +
-                "CREATE INDEX T_TREE_08 ON T(   D1+D2,  ABS(D3)                         ) WHERE D1 > 3;\n" +
-                "CREATE INDEX T_TREE_09 ON T(   D1+D2,  ABS(D3),       VAL1             );\n" +
-                "CREATE INDEX T_TREE_10 ON T(   D1+D2                                   );\n" +
-                "CREATE INDEX T_TREE_11 ON T( ABS(D3)                                   );\n" +
-
-                // Test no min/max
-                "CREATE VIEW VT01 (V_D1, V_D2, CNT, SUM_VAL1_VAL2, COUNT_VAL3) " +           // should have no index for min/max
-                "AS SELECT D1, D2, COUNT(*), SUM(VAL1 + VAL2), COUNT(VAL3) " +
-                "FROM T " +
-                "GROUP BY D1, D2;\n" +
-
-                // Test one single min/max
-                "CREATE VIEW VT02 (V_D1, V_D2, V_D3, CNT, MIN_VAL1) " +                      // should choose T_TREE_04
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1) " +
-                "FROM T " +
-                "GROUP BY D1, D2, D3;\n" +
-
-                // Test repeated min/max, single aggCol
-                "CREATE VIEW VT03 (V_D1, V_D2, CNT, MIN_VAL1, MAX_VAL1, MIN_VAL1_DUP) " +    // should choose T_TREE_02, T_TREE_02, T_TREE_02
-                "AS SELECT D1, D2, COUNT(*), MIN(VAL1), MAX(VAL1), MIN(VAL1) " +
-                "FROM T " +
-                "GROUP BY D1, D2;\n" +
-
-                // Test min/max with different aggCols
-                "CREATE VIEW VT04 (V_D1, V_D2, CNT, MIN_VAL1, MAX_VAL1, MIN_VAL2) " +        // should choose T_TREE_02, T_TREE_02, T_TREE_01
-                "AS SELECT D1, D2, COUNT(*), MIN(VAL1), MAX(VAL1), MIN(VAL2) " +
-                "FROM T " +
-                "GROUP BY D1, D2;\n" +
-
-                // Test min/max with single arithmetic aggExpr
-                "CREATE VIEW VT05 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +   // should choose T_TREE_05, T_TREE_05
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(VAL1 + VAL2) " +
-                "FROM T " +
-                "GROUP BY D1, D2, D3;\n" +
-
-                // Test min/max with different aggExprs
-                "CREATE VIEW VT06 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +   // should choose T_TREE_05, T_TREE_04
-                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX( ABS(VAL3) ) " +
-                "FROM T " +
-                "GROUP BY D1, D2, D3;\n" +
-
-                // Test min/max with expression in group-by, single aggCol
-                "CREATE VIEW VT07 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +     // should choose T_TREE_09, T_TREE_09
-                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL1), MAX(VAL1) " +
-                "FROM T " +
-                "GROUP BY D1 + D2, ABS(D3);\n" +
-
-                // Test min/max with predicate (partial index)
-                "CREATE VIEW VT08 (V_D1, V_D2, CNT, MIN_VAL1_VAL2) " +                       // should choose T_TREE_03
-                "AS SELECT D1, D2, COUNT(*), MIN(VAL1 + VAL2)" +
-                "FROM T WHERE D1 > 3 " +
-                "GROUP BY D1, D2;\n" +
-
-                // Test min/max with predicate, with expression in group-by
-                "CREATE VIEW VT09 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +     // should choose T_TREE_09, T_TREE_08
-                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-                "FROM T WHERE D1 > 3 " +
-                "GROUP BY D1 + D2, ABS(D3);\n" +
-
-                "CREATE VIEW VT10 (V_D1, V_D2, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL1) " +        // should choose T_TREE_02, T_TREE_02
-                "AS SELECT D1, D2, COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL1) " +
-                "FROM T " +
-                "GROUP BY D1, D2;" +
-
-                // Test min/max with no group by.
-                "CREATE VIEW VT11 (CNT, MIN_D1_D2, MAX_ABS_VAL3) " +                         // should choose T_TREE_10, T_TREE_11
-                "AS SELECT COUNT(*), MIN(D1+D2), MAX(ABS(D3)) " +
-                "FROM T;";
-
-        VoltCompiler compiler = new VoltCompiler();
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        String projectPath = projectFile.getPath();
-
-        // compile successfully
-        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
-        assertTrue(success);
-
-        CatalogMap<Table> tables = compiler.getCatalogDatabase().getTables();
-        Table t = tables.get("T");
-        CatalogMap<MaterializedViewInfo> views = t.getViews();
-        assertIndexSelectionResult( views.get("VT01").getIndexforminmax() );
-        assertIndexSelectionResult( views.get("VT02").getIndexforminmax(), "T_TREE_04" );
-        assertIndexSelectionResult( views.get("VT03").getIndexforminmax(), "T_TREE_02", "T_TREE_02", "T_TREE_02" );
-        assertIndexSelectionResult( views.get("VT04").getIndexforminmax(), "T_TREE_02", "T_TREE_02", "T_TREE_01" );
-        assertIndexSelectionResult( views.get("VT05").getIndexforminmax(), "T_TREE_05", "T_TREE_05" );
-        assertIndexSelectionResult( views.get("VT06").getIndexforminmax(), "T_TREE_05", "T_TREE_04" );
-        assertIndexSelectionResult( views.get("VT07").getIndexforminmax(), "T_TREE_09", "T_TREE_09" );
-        assertIndexSelectionResult( views.get("VT08").getIndexforminmax(), "T_TREE_03" );
-        assertIndexSelectionResult( views.get("VT09").getIndexforminmax(), "T_TREE_09", "T_TREE_08" );
-        assertIndexSelectionResult( views.get("VT10").getIndexforminmax(), "T_TREE_02", "T_TREE_02" );
-        assertIndexSelectionResult( views.get("VT11").getIndexforminmax(), "T_TREE_10", "T_TREE_11" );
-
-        // cleanup after the test
-        jarOut.delete();
-    }
+    //         // cleanup after the test
+    //         jarOut.delete();
+    //     }
+    // }
 
     public void testExportTables() {
         File jarOut = new File("exportTables.jar");
