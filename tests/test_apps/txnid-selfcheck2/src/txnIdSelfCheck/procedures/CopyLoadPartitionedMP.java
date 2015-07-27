@@ -27,11 +27,9 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
 
 public class CopyLoadPartitionedMP extends CopyLoadPartitionedBase {
-
-    private final SQLStmt selectStmt = new SQLStmt("SELECT cid,txnid,rowid from loadmp WHERE cid=? ORDER BY cid LIMIT 1;");
-    private final SQLStmt insertStmt = new SQLStmt("INSERT INTO  cploadmp VALUES (?, ?, ?);");
+    private final SQLStmt insertIntoStmt = new SQLStmt("INSERT INTO cploadmp SELECT cid,txnid,rowid from loadmp WHERE cid=? ORDER BY cid;");
 
     public VoltTable[] run(long cid) {
-        return doWork(selectStmt, insertStmt, cid);
+        return doWork(insertIntoStmt, cid);
     }
 }
