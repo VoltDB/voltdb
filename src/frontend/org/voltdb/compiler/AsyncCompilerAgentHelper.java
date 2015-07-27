@@ -37,7 +37,7 @@ import org.voltdb.utils.InMemoryJarfile;
 public class AsyncCompilerAgentHelper
 {
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
-    private LicenseApi m_licenseApi;
+    private final LicenseApi m_licenseApi;
 
     public AsyncCompilerAgentHelper(LicenseApi licenseApi) {
         m_licenseApi = licenseApi;

@@ -374,7 +374,6 @@ public class Inits {
 
             String result = CatalogUtil.checkLicenseConstraint(catalog, m_rvdb.getLicenseApi());
             if (result != null) {
-                hostLog.fatal(result);
                 VoltDB.crashLocalVoltDB(result);
             }
 
@@ -384,7 +383,6 @@ public class Inits {
             // a starter context which uses a placeholder catalog.
             result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
-                hostLog.fatal(result);
                 VoltDB.crashLocalVoltDB(result);
             }
 
