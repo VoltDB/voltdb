@@ -4068,16 +4068,14 @@ public class TestVoltCompiler extends TestCase {
                                     "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select cash, count(*) from books where ( select cash from books as child where books.title = child.title ) < 100 group by cash;\n");
-        /*
-         // This query is not actually correct.  The problem is not the existence
-         // of the subquery in the display list, but that the group by
-         // clause uses an alias for the display list subquery.  This is
-         // arguably not standard SQL, but it is frequently implemented
-         // this way.  Until we implement this properly we should just
-         // ignore this here.
+    }
+
+    /*
+     * When ENG-8727 is addressed, reenable this test.
+     */
+    public void notest8727SubqueriesInViewDisplayLists() throws Exception {
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
-        */
     }
 
     public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {

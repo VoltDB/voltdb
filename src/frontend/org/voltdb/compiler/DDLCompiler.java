@@ -2489,32 +2489,49 @@ public class DDLCompiler {
         List <AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
 
         int i;
+        // First, check the group by columns.  They are at
+        // the beginning of the display list.
         for (i = 0; i < groupColCount; i++) {
             ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
-
+            // The columns must be equal.
             if (!outcol.expression.equals(gbcol.expression)) {
                 msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
             checkExpressions.add(outcol.expression);
         }
-
+        // Now, the display list must have a count(*).
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
             msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
+        // Finally, the display columns must have aggregate
+        // calls.  But these are not any aggregate calls. They
+        // must be count(), min(), max() or sum().
         for (i++; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
-            if ((outcol.expression instanceof AggregateExpression)) {
+            // Note that this expression does not catch all aggregates.
+            // An instance of count(*) here, or avg() would cause the
+            // exception.  We just required count(*) above, but a
+            // second one would fail.
+            if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
                 msg.append("must have non-group by columns aggregated by sum, count, min or max.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
+            // Don't push the expression, though.  Push the argument.
+            // We will check for aggregate calls and fail, and we don't
+            // want to fail on legal aggregate expressions.
             if (outcol.expression.getLeft() != null) {
                 checkExpressions.add(outcol.expression.getLeft());
             }
+            assert(outcol.expression.getRight() == null);
+            assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
 
         AbstractExpression where = stmt.getSingleTableFilterExpression();

@@ -1101,7 +1101,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param msg  The StringBuffer to pack with the error message tail.
      * @return true iff the expression can be part of an index.
      */
-    public boolean isIndexableExpression(StringBuffer msg) {
+    private boolean isIndexableExpression(StringBuffer msg) {
         if (containsFunctionById(this, FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
@@ -1147,7 +1147,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return
      */
     public static boolean containsFunctionById(AbstractExpression expr, int functionId) {
-        if (expr == null || expr instanceof TupleValueExpression) {
+        if (expr == null || expr instanceof AbstractValueExpression) {
             return false;
         }
 
