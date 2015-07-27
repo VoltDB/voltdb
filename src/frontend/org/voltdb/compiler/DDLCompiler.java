@@ -2521,15 +2521,10 @@ public class DDLCompiler {
                 msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
-            // Gather up aggregate expressions.  Check their
+            // Gather up aggregate expressions for later legality check.
             // arguments.  If this display column is not an aggregate expression,
             // then check it all.
-            AbstractExpression expr = outcol.expression;
-            if (expr.getClass() == AggregateExpression.class) {
-                addArgumentExpressions(checkExpressions, expr);
-            } else {
-                checkExpressions.add(expr);
-            }
+            checkExpressions.add(outcol.expression);
         }
 
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
