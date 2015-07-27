@@ -1,0 +1,3 @@
+
+LOAD CLASSES sqlcmdtest.py;
+Command succeeded.
