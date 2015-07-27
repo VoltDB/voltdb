@@ -38,10 +38,11 @@ static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exce
 }
 #endif
 
-
 SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
     m_exceptionType(exceptionType), m_message(message)
 {
+    // SQL exception needs standard SQL error code returned also. Refer: SQLException class.
+    assert(exceptionType != VOLT_EE_EXCEPTION_TYPE_SQL && exceptionType != VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION);
     VOLT_DEBUG("Created SerializableEEException: type: %s message: %s",
                translateVoltEEExceptionTypeToString(exceptionType), message.c_str());
 }
