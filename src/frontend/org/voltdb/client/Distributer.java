@@ -889,7 +889,6 @@ class Distributer {
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
             ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
-        InetSocketAddress address = new InetSocketAddress(host, port);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
@@ -962,7 +961,6 @@ class Distributer {
             //Subscribe to topology updates before retrieving the current topo
             //so there isn't potential for lost updates
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
-            final ByteBuffer buf = serializeSPI(spi);
             cxn.createWork(System.nanoTime(),
                     spi.getHandle(),
                     spi.getProcName(),
