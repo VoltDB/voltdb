@@ -280,7 +280,6 @@ SnapshotCompletionInterest, Promotable
                 partitions.put(name, partSet);
             }
             JSONObject jsonPtoTxnId = jo.getJSONObject("partitionToTxnId");
-            @SuppressWarnings("unchecked")
             Iterator<String> it = jsonPtoTxnId.keys();
             while (it.hasNext()) {
                  String key = it.next();
@@ -752,7 +751,6 @@ SnapshotCompletionInterest, Promotable
 
             if (digest_detail.has("partitionTransactionIds")) {
                 JSONObject pidToTxnId = digest_detail.getJSONObject("partitionTransactionIds");
-                @SuppressWarnings("unchecked")
                 Iterator<String> it = pidToTxnId.keys();
                 while (it.hasNext()) {
                     String pidkey = it.next();
