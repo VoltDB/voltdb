@@ -221,9 +221,22 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // check if there is other filters for SELECT MAX(X) FROM T WHERE [other prefix filter AND ] X > / >= ?
         // but we should allow SELECT MAX(X) FROM T WHERE X = ?
         if (sortDirection == SortDirectionType.DESC && ispn.getSortDirection() == SortDirectionType.INVALID) {
-            if (numberOfExprs > 1 ||
-                    (numberOfExprs == 1 && aggExpr.bindingToIndexedExpression(exprs.get(0).getLeft()) == null)) {
+            if (numberOfExprs == 1 && aggExpr.bindingToIndexedExpression(exprs.get(0).getLeft()) == null) {
                 return plan;
+            }
+            else if (numberOfExprs > 1) {
+                // ENG-4016: Optimization for query SELECT MAX(X) FROM T WHERE [other prefix filters] X < / <= ?
+                boolean earlyReturn = true;
+                for (AbstractExpression ae : exprs) {
+                    if (aggExpr.bindingToIndexedExpression(ae.getLeft()) != null &&
+                            (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO ||
+                             ae.getExpressionType() == ExpressionType.COMPARE_LESSTHAN ||
+                             ae.getExpressionType() == ExpressionType.COMPARE_EQUAL) ) {
+                        earlyReturn = false;
+                        break;
+                    }
+                }
+                if (earlyReturn) { return plan; }
             }
         }
 
