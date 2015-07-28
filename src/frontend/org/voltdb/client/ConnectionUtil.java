@@ -48,7 +48,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Throwables;
-import java.util.BitSet;
 
 /**
  * A utility class for opening a connection to a Volt server and authenticating as well

@@ -25,7 +25,6 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.util.ArrayDeque;
-import java.util.HashMap;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.jni.ExecutionEngine;

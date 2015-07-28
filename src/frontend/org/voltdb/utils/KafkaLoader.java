@@ -35,7 +35,6 @@ import kafka.message.MessageAndMetadata;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
-import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;

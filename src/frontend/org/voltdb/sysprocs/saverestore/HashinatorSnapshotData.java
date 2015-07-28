@@ -18,14 +18,11 @@
 package org.voltdb.sysprocs.saverestore;
 
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterOutputStream;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.utils.InstanceId;
