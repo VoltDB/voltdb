@@ -443,6 +443,7 @@ if whichtests in ("${eetestsuite}", "structures"):
      CompactingMapIndexCountTest
      CompactingHashTest
      CompactingPoolTest
+     CompactingMapBenchmark
     """
 
 if whichtests in ("${eetestsuite}", "plannodes"):
