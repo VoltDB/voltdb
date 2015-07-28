@@ -52,6 +52,7 @@ public class TestSnapshotConverter extends SaveRestoreBase
     // Regression test for ENG-8609
     public void testSnapshotConverter() throws NoConnectionsException, IOException, ProcCallException
     {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
         Client client = getClient();
         int expectedLines = 10;
         Random r = new Random(Calendar.getInstance().getTimeInMillis());
@@ -63,9 +64,9 @@ public class TestSnapshotConverter extends SaveRestoreBase
 
         VoltTable[] results = null;
         try {
-            // This used to fail with table name "T_".
             results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, 1).getResults();
         } catch(Exception ex) {
+            ex.printStackTrace();
             fail();
         }
 
