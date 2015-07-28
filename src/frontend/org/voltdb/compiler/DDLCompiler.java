@@ -38,7 +38,6 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -69,8 +68,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.FunctionExpression;
-import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.parser.HSQLLexer;
@@ -1603,29 +1600,6 @@ public class DDLCompiler {
         return true;
     }
 
-    /**
-     * This function will recursively find any function expression with ID functionId.
-     * If found, return true. Else, return false.
-     * @param expr
-     * @param functionId
-     * @return
-     */
-    public static boolean containsTimeSensitiveFunction(AbstractExpression expr, int functionId) {
-        if (expr == null || expr instanceof TupleValueExpression) {
-            return false;
-        }
-
-        List<AbstractExpression> functionsList = expr.findAllSubexpressionsOfClass(FunctionExpression.class);
-        for (AbstractExpression funcExpr: functionsList) {
-            assert(funcExpr instanceof FunctionExpression);
-            if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
@@ -1637,29 +1611,24 @@ public class DDLCompiler {
 
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
         dummy.setTable(table);
-
+        StringBuffer msgsb = new StringBuffer(String.format("Index \"%s\" ", name));
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         List<AbstractExpression> exprs = null;
         // "parse" the WHERE expression for partial index if any
         AbstractExpression predicate = null;
+        // Some expressions have special validation in indices.  We
+        // gather all these up into the list checkExpressions.  We
+        // will check them all at once.
+        List<AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<AbstractExpression>();
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
-
-                    // The expr cannnot contain a scalar subquery.
-                    if (!expr.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
-                        String msg = String.format("Index %s with subquery expression(s) is not supported.", name);
-                        throw this.m_compiler.new VoltCompilerException(msg);
-                    }
-                    if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
-                        String msg = String.format("Index %s cannot include the function NOW or CURRENT_TIMESTAMP.", name);
-                        throw this.m_compiler.new VoltCompilerException(msg);
-                    }
-
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
+                    // We will check this for validity later.
+                    checkExpressions.add(expr);
                     exprs.add(expr);
                 }
             } else if (subNode.name.equals("predicate")) {
@@ -1668,6 +1637,11 @@ public class DDLCompiler {
             }
         }
 
+        // Check all the subexpressions we gathered up.
+        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msgsb)) {
+            // The error message will be in the StringBuffer msg.
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
+        }
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
@@ -1726,9 +1700,8 @@ public class DDLCompiler {
             // If the column type is not an integer, we cannot
             // make the index a hash.
             if (has_nonint_col) {
-                String msg = "Index " + name + " in table " + table.getTypeName() +
-                             " uses a non-hashable column " + nonint_col_name;
-                throw m_compiler.new VoltCompilerException(msg);
+                msgsb.append("in table " + table.getTypeName() + " uses a non-hashable column " + nonint_col_name);
+                throw m_compiler.new VoltCompilerException(msgsb.toString());
             }
             index.setType(IndexType.HASH_TABLE.getValue());
         }
@@ -1796,7 +1769,7 @@ public class DDLCompiler {
                 if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
                     String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
-                            index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
+                                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
                     m_compiler.addWarn(msg);
                 }
 
@@ -1806,10 +1779,10 @@ public class DDLCompiler {
             }
         }
 
-        String msg = "Created index: " + name + " on table: " +
-                    table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
+        String smsg = "Created index: " + name + " on table: " +
+                   table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
 
-        m_compiler.addInfo(msg);
+        m_compiler.addInfo(smsg);
 
         indexMap.put(name, index);
     }
@@ -2481,6 +2454,21 @@ public class DDLCompiler {
         return predicate;
     }
 
+    private void addArgumentExpressions(List<AbstractExpression> checkExpressions, AbstractExpression expr) {
+        AbstractExpression arg = expr.getLeft();
+        if (arg != null) {
+            checkExpressions.add(arg);
+        }
+        arg = expr.getRight();
+        if (arg != null) {
+            checkExpressions.add(arg);
+        }
+        List<AbstractExpression> args = expr.getArgs();
+        if (args != null) {
+            checkExpressions.addAll(args);
+        }
+    }
+
     /**
      * Verify the materialized view meets our arcane rules about what can and can't
      * go in a materialized view. Throw hopefully helpful error messages when these
@@ -2493,37 +2481,33 @@ public class DDLCompiler {
     private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
         int groupColCount = stmt.m_groupByColumns.size();
         int displayColCount = stmt.m_displayColumns.size();
-        String msg = "Materialized view \"" + viewName + "\" ";
-
-        if (stmt.hasSubquery()) {
-            msg += "with subquery sources is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
+        StringBuffer msgsb = new StringBuffer();
+        msgsb.append("Materialized view \"" + viewName + "\" ");
 
         if (stmt.m_tableList.size() != 1) {
-            msg += "has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-            "Only one source table is allowed.";
-            throw m_compiler.new VoltCompilerException(msg);
+            msgsb.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
+                       "Only one source table is allowed.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         if (stmt.orderByColumns().size() != 0) {
-            msg += "with ORDER BY clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
+            msgsb.append("with ORDER BY clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         if (stmt.hasLimitOrOffset()) {
-            msg += "with LIMIT or OFFSET clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
+            msgsb.append("with LIMIT or OFFSET clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         if (stmt.m_having != null) {
-            msg += "with HAVING clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
+            msgsb.append("with HAVING clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         if (displayColCount <= groupColCount) {
-            msg += "has too few columns.";
-            throw m_compiler.new VoltCompilerException(msg);
+            msgsb.append("has too few columns.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         List <AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
@@ -2534,16 +2518,19 @@ public class DDLCompiler {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
 
             if (!outcol.expression.equals(gbcol.expression)) {
-                msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
-                throw m_compiler.new VoltCompilerException(msg);
+                msgsb.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
+                throw m_compiler.new VoltCompilerException(msgsb.toString());
             }
+            // Gather up aggregate expressions for later legality check.
+            // arguments.  If this display column is not an aggregate expression,
+            // then check it all.
             checkExpressions.add(outcol.expression);
         }
 
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
-            msg += "is missing count(*) as the column after the group by columns, a materialized view requirement.";
-            throw m_compiler.new VoltCompilerException(msg);
+            msgsb.append("is missing count(*) as the column after the group by columns, a materialized view requirement.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         for (i++; i < displayColCount; i++) {
@@ -2552,21 +2539,21 @@ public class DDLCompiler {
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
-                msg += "must have non-group by columns aggregated by sum, count, min or max.";
-                throw m_compiler.new VoltCompilerException(msg);
+                msgsb.append("must have non-group by columns aggregated by sum, count, min or max.");
+                throw m_compiler.new VoltCompilerException(msgsb.toString());
             }
-            checkExpressions.add(outcol.expression);
+            checkExpressions.add(outcol.expression.getLeft());
         }
 
-        // Check unsupported SQL functions like: NOW, CURRENT_TIMESTAMP
         AbstractExpression where = stmt.getSingleTableFilterExpression();
-        checkExpressions.add(where);
+        if (where != null) {
+            checkExpressions.add(where);
+        }
 
-        for (AbstractExpression expr: checkExpressions) {
-            if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId())) {
-                msg += "cannot include the function NOW or CURRENT_TIMESTAMP.";
-                throw m_compiler.new VoltCompilerException(msg);
-            }
+        // Check all the subexpressions we gathered up.
+        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msgsb)) {
+            // The error message will be in the StringBuffer msg.
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
      }
 
