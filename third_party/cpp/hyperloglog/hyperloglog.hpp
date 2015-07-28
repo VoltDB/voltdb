@@ -13,10 +13,10 @@
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
-#include "murmur3.h"
+#include "murmur3/MurmurHash3.h"
 
 #define HLL_HASH_SEED 313
-
+namespace voltdb {
 namespace hll {
 
 static const double pow_2_32 = 4294967296.0; ///< 2^32
@@ -69,7 +69,7 @@ public:
      */
     void add(const char* str, uint32_t len) {
         uint32_t hash;
-        MurmurHash3_x86_32(str, len, HLL_HASH_SEED, (void*) &hash);
+        hash = MurmurHash3_x86_32(str, len, HLL_HASH_SEED);
         uint32_t index = hash >> (32 - b_);
         uint8_t rank = rho((hash << b_), 32 - b_);
         if (rank > M_[index]) {
@@ -110,7 +110,7 @@ public:
      * The number of registers in each must be the same.
      *
      * @param[in] other HyperLogLog instance to be merged
-     * 
+     *
      * @exception std::invalid_argument number of registers doesn't match.
      */
     void merge(const HyperLogLog& other) throw (std::invalid_argument) {
@@ -151,7 +151,7 @@ public:
         std::swap(b_, rhs.b_);
         std::swap(m_, rhs.m_);
         std::swap(alphaMM_, rhs.alphaMM_);
-        M_.swap(rhs.M_);       
+        M_.swap(rhs.M_);
     }
 
     /**
@@ -171,7 +171,7 @@ public:
 
     /**
      * Restore the status from a stream
-     * 
+     *
      * @param[in] is The input stream where the status is saved
      *
      * @exception std::runtime_error When failed to restore.
@@ -183,7 +183,7 @@ public:
         is.read((char*)&(tempHLL.M_[0]), sizeof(M_[0]) * tempHLL.m_);
         if(is.fail()){
            throw std::runtime_error("Failed to restore");
-        }       
+        }
         swap(tempHLL);
     }
 
@@ -204,6 +204,6 @@ private:
 
 };
 
-} // namespace hll
+} } // namespace voltdb::hll
 
 #endif // !defined(HYPERLOGLOG_HPP)

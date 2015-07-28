@@ -38,6 +38,8 @@ inline int32_t MurmurHash3_x64_128 ( int64_t value) {
     return MurmurHash3_x64_128(value, 0);
 }
 
+uint32_t MurmurHash3_x86_32(const void* key, uint32_t len, uint32_t seed);
+
 //-----------------------------------------------------------------------------
 
 }
