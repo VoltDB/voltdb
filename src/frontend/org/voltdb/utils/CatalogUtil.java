@@ -115,6 +115,7 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -505,6 +506,19 @@ public abstract class CatalogUtil {
 
         // It's valid.
         return true;
+    }
+
+    public static String checkLicenseConstraint(Catalog catalog, LicenseApi licenseApi) {
+        String prefix = "Unable to use feature not included in license: ";
+        String errMsg = null;
+
+        if (catalog.getClusters().get("cluster").getDatabases().get("database").getIsactiveactivedred()) {
+            if (!licenseApi.isDrActiveActiveAllowed()) {
+                errMsg = prefix + "DR Active-Active replication";
+            }
+        }
+
+        return errMsg;
     }
 
     public static String compileDeployment(Catalog catalog, String deploymentURL,
