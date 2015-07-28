@@ -32,7 +32,6 @@ import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.common.Constants;
@@ -700,10 +699,6 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
-        try {
-            OnDemandBinaryLogger.flush();
-        } catch (Throwable e) {}
-
         /*
          * InvocationTargetException suppresses information about the cause, so unwrap until
          * we get to the root cause
