@@ -357,41 +357,19 @@ public:
 
         ValueType vt = ValuePeeker::peekValueType(val);
 
-        char* elem = NULL;
-        uint32_t len = 0;
-
-        double doubleVal;
-        int64_t bigintVal;
-        TTInt decimalVal;
-
-        switch (vt) {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
-            bigintVal = ValuePeeker::peekAsRawInt64(val);
-            elem = reinterpret_cast<char*>(&bigintVal);
-            len = sizeof(bigintVal);
-            break;
-
-        case VALUE_TYPE_DOUBLE:
-            doubleVal = ValuePeeker::peekDouble(val);
-            elem = reinterpret_cast<char*>(&doubleVal);
-            len = sizeof(doubleVal);
-            break;
-
-        case VALUE_TYPE_DECIMAL:
-            decimalVal = ValuePeeker::peekDecimal(val);
-            elem = reinterpret_cast<char*>(&decimalVal);
-            len = sizeof(decimalVal);
-            break;
-
-        default:
-            assert(false);
+        if (vt == VALUE_TYPE_VARCHAR || vt == VALUE_TYPE_VARBINARY) {
+            // cannot (yet?) handle variable length types.  This
+            // should be enforced by the front end, so we don't
+            // actually expect this error.
+            std::ostringstream oss;
+            oss << "Unexpected " << valueToString(vt) << " as argument to APPROX_COUNT_DISTINCT";
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, oss.str().c_str());
         }
 
-        m_hyperLogLog.add(elem, len);
+        int32_t valLength;
+        const char* data = ValuePeeker::peekPointerToDataBytes(val, &valLength);
+
+        m_hyperLogLog.add(data, static_cast<uint32_t>(valLength));
     }
 
     virtual NValue finalize(ValueType type)
@@ -426,6 +404,11 @@ private:
     hll::HyperLogLog m_hyperLogLog;
 };
 
+/// When APPROX_COUNT_DISTINCT is split across two fragments of a
+/// plan, this agg represents the bottom half of the agg.  It's
+/// advance method is inherited from the super class, but it's
+/// finalize method produces a serialized hyperloglog to be accepted
+/// by a HYPERLOGLOGS_TO_CARD agg on the coordinator.
 class ValsToHyperLogLogAgg : public ApproxCountDistinctAgg {
 public:
     virtual NValue finalize(ValueType type)
@@ -433,6 +416,10 @@ public:
         assert (type == VALUE_TYPE_VARBINARY);
         // serialize the hyperloglog as varbinary, to send to
         // coordinator.
+        //
+        // TODO: We're doing a fair bit of copying here, first to the
+        // string stream, then to the temp varbinary object.  We could
+        // get away with just one copy here.
         std::ostringstream oss;
         hyperLogLog().dump(oss);
         return ValueFactory::getTempBinaryValue(oss.str().c_str(),
@@ -440,6 +427,10 @@ public:
     }
 };
 
+/// When APPROX_COUNT_DISTINCT is split across two fragments of a
+/// plan, this agg represents the top half of the agg.  It's finalize
+/// method is inherited from the super class, but it's advance method
+/// accepts serialized hyperloglogs from each partition.
 class HyperLogLogsToCardAgg : public ApproxCountDistinctAgg {
 public:
     virtual void advance(const NValue& val)
@@ -447,11 +438,15 @@ public:
         assert (ValuePeeker::peekValueType(val) == VALUE_TYPE_VARBINARY);
         assert (!val.isNull());
 
+        // TODO: we're doing some unnecessary copying here to
+        // deserialize the hyperloglog and merge it with the
+        // agg's HLL instance.
+
         int32_t len = ValuePeeker::peekObjectLength_withoutNull(val);
         char* data = static_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(val));
         assert (len > 0);
-        std::istringstream iss(std::string(data, static_cast<size_t>(len)));
 
+        std::istringstream iss(std::string(data, static_cast<size_t>(len)));
         hll::HyperLogLog distHll(registerBitWidth());
         distHll.restore(iss);
         hyperLogLog().merge(distHll);

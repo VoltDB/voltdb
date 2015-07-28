@@ -140,9 +140,9 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         // is reasonably bounded, by computing an exact answer.
         double expectedEstimates[] = {
                 859.613,
-                862.6527,
-                870.759,
-                247.4666,
+                865.6926,
+                879.880,
+                246.4629,
                 997.5537,
                 1001.615,
                 983.3405

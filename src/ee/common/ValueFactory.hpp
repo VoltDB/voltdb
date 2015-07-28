@@ -92,10 +92,12 @@ public:
         return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, reinterpret_cast<const char*>(rawBuf), (size_t)rawLength, NValue::getTempStringPool());
     }
 
+    /// Constructs a varbinary value copied into temporary string
+    /// pool.  Arguments provide a pointer to the raw bytes and the
+    /// size of the value.
     static inline NValue getTempBinaryValue(const char* rawBuf, int32_t rawLength) {
         return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, rawBuf, (size_t)rawLength, NValue::getTempStringPool());
     }
-
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
