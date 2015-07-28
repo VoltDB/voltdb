@@ -182,7 +182,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
-    private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
+    private AsyncCompilerAgent m_asyncCompilerAgent = null;
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
@@ -383,7 +383,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_messenger = null;
             m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
-            m_asyncCompilerAgent = new AsyncCompilerAgent();
+            m_asyncCompilerAgent = null;
             m_snapshotCompletionMonitor = null;
             m_catalogContext = null;
             m_partitionCountStats = null;
@@ -512,6 +512,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
                         "See previous log message for details.", false, null);
             }
+            m_asyncCompilerAgent = new AsyncCompilerAgent(m_licenseApi);
 
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");

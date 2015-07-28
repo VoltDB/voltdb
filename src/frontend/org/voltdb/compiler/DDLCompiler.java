@@ -811,16 +811,21 @@ public class DDLCompiler {
             String value = statementMatcher.group(2).toUpperCase();
             switch (name) {
                 case DatabaseConfiguration.DR_MODE_NAME:
-                    if (value.equals(DatabaseConfiguration.ACTIVE_ACTIVE)) {
-                        db.setIsactiveactivedred(true);
-                    }
-                    else if (value.equals(DatabaseConfiguration.ACTIVE_PASSIVE) || value.equals("DEFAULT")) {
-                        db.setIsactiveactivedred(false);
-                    }
-                    else {
-                        throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid parameter value for %s. Candidate values are %s, %s/DEFAULT",
-                                name, DatabaseConfiguration.ACTIVE_ACTIVE, DatabaseConfiguration.ACTIVE_PASSIVE));
+                    switch (value) {
+                        case DatabaseConfiguration.ACTIVE_ACTIVE: {
+                            db.setIsactiveactivedred(true);
+                        }
+                        break;
+                        case DatabaseConfiguration.ACTIVE_PASSIVE:
+                        case "DEFAULT": {
+                            db.setIsactiveactivedred(false);
+                        }
+                        break;
+                        default: {
+                            throw m_compiler.new VoltCompilerException(String.format(
+                                    "Invalid parameter value for %s. Candidate values are %s, %s/DEFAULT",
+                                    name, DatabaseConfiguration.ACTIVE_ACTIVE, DatabaseConfiguration.ACTIVE_PASSIVE));
+                        }
                     }
                     break;
                 default:

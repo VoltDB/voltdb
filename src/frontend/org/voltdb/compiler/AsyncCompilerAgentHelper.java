@@ -29,6 +29,7 @@ import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -36,6 +37,11 @@ import org.voltdb.utils.InMemoryJarfile;
 public class AsyncCompilerAgentHelper
 {
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
+    private final LicenseApi m_licenseApi;
+
+    public AsyncCompilerAgentHelper(LicenseApi licenseApi) {
+        m_licenseApi = licenseApi;
+    }
 
     public AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
         // create the change result and set up all the boiler plate
@@ -159,6 +165,12 @@ public class AsyncCompilerAgentHelper
             Catalog newCatalog = new Catalog();
             newCatalog.execute(newCatalogCommands);
 
+            String result = CatalogUtil.checkLicenseConstraint(newCatalog, m_licenseApi);
+            if (result != null) {
+                retval.errorMsg = result;
+                return retval;
+            }
+
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
                 // Go get the deployment string from the current catalog context
@@ -173,7 +185,7 @@ public class AsyncCompilerAgentHelper
                 }
             }
 
-            String result =
+            result =
                 CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
