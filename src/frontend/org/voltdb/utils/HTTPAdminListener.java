@@ -176,7 +176,7 @@ public class HTTPAdminListener {
                 URL url = VoltDB.class.getResource("dbmonitor" + target);
                 if (url == null) {
                     // write 404
-                    String msg = "404: Resource not found.\n"+url.toString();
+                    String msg = "404: Resource not found.\n"+"dbmonitor"+target;
                     response.setContentType("text/plain;charset=utf-8");
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                     baseRequest.setHandled(true);
