@@ -1611,7 +1611,7 @@ public class DDLCompiler {
 
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
         dummy.setTable(table);
-        StringBuffer msg = new StringBuffer(String.format("Index \"%s\" ", name));
+        StringBuffer msgsb = new StringBuffer(String.format("Index \"%s\" ", name));
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         List<AbstractExpression> exprs = null;
         // "parse" the WHERE expression for partial index if any
@@ -1638,9 +1638,9 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msgsb)) {
             // The error message will be in the StringBuffer msg.
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
@@ -1664,8 +1664,8 @@ public class DDLCompiler {
                 }
                 // disallow columns from VARBINARYs
                 if (colType == VoltType.VARBINARY) {
-                    String emsg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
-                    throw this.m_compiler.new VoltCompilerException(emsg);
+                    String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw this.m_compiler.new VoltCompilerException(msg);
                 }
             }
         } else {
@@ -1677,8 +1677,8 @@ public class DDLCompiler {
                 }
                 // disallow expressions of type VARBINARY
                 if (colType == VoltType.VARBINARY) {
-                    String emsg = "VARBINARY expressions are not currently supported as index keys.";
-                    throw this.m_compiler.new VoltCompilerException(emsg);
+                    String msg = "VARBINARY expressions are not currently supported as index keys.";
+                    throw this.m_compiler.new VoltCompilerException(msg);
                 }
             }
         }
@@ -1700,8 +1700,8 @@ public class DDLCompiler {
             // If the column type is not an integer, we cannot
             // make the index a hash.
             if (has_nonint_col) {
-                msg.append("in table " + table.getTypeName() + " uses a non-hashable column " + nonint_col_name);
-                throw m_compiler.new VoltCompilerException(msg.toString());
+                msgsb.append("in table " + table.getTypeName() + " uses a non-hashable column " + nonint_col_name);
+                throw m_compiler.new VoltCompilerException(msgsb.toString());
             }
             index.setType(IndexType.HASH_TABLE.getValue());
         }
@@ -1768,9 +1768,9 @@ public class DDLCompiler {
                 // if the index is a user-named index...
                 if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
-                    String emsg = String.format("Dropping index %s on table %s because it duplicates index %s.",
+                    String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                                              index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
-                    m_compiler.addWarn(emsg);
+                    m_compiler.addWarn(msg);
                 }
 
                 // drop the index and GTFO
@@ -2481,33 +2481,33 @@ public class DDLCompiler {
     private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
         int groupColCount = stmt.m_groupByColumns.size();
         int displayColCount = stmt.m_displayColumns.size();
-        StringBuffer msg = new StringBuffer();
-        msg.append("Materialized view \"" + viewName + "\" ");
+        StringBuffer msgsb = new StringBuffer();
+        msgsb.append("Materialized view \"" + viewName + "\" ");
 
         if (stmt.m_tableList.size() != 1) {
-            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
+            msgsb.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
                        "Only one source table is allowed.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         if (stmt.orderByColumns().size() != 0) {
-            msg.append("with ORDER BY clause is not supported.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            msgsb.append("with ORDER BY clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         if (stmt.hasLimitOrOffset()) {
-            msg.append("with LIMIT or OFFSET clause is not supported.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            msgsb.append("with LIMIT or OFFSET clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         if (stmt.m_having != null) {
-            msg.append("with HAVING clause is not supported.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            msgsb.append("with HAVING clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         if (displayColCount <= groupColCount) {
-            msg.append("has too few columns.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            msgsb.append("has too few columns.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         List <AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
@@ -2518,8 +2518,8 @@ public class DDLCompiler {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
 
             if (!outcol.expression.equals(gbcol.expression)) {
-                msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
-                throw m_compiler.new VoltCompilerException(msg.toString());
+                msgsb.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
+                throw m_compiler.new VoltCompilerException(msgsb.toString());
             }
             // Gather up aggregate expressions for later legality check.
             // arguments.  If this display column is not an aggregate expression,
@@ -2529,17 +2529,20 @@ public class DDLCompiler {
 
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
-            msg.append("is missing count(*) as the column after the group by columns, a materialized view requirement.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            msgsb.append("is missing count(*) as the column after the group by columns, a materialized view requirement.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
         for (i++; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
-            if ((outcol.expression.getClass() != AggregateExpression.class)) {
-                msg.append("must have non-group by columns aggregated by sum, count, min or max.");
-                throw m_compiler.new VoltCompilerException(msg.toString());
+            if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
+                msgsb.append("must have non-group by columns aggregated by sum, count, min or max.");
+                throw m_compiler.new VoltCompilerException(msgsb.toString());
             }
-            addArgumentExpressions(checkExpressions, outcol.expression);
+            checkExpressions.add(outcol.expression.getLeft());
         }
 
         AbstractExpression where = stmt.getSingleTableFilterExpression();
@@ -2548,9 +2551,9 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msgsb)) {
             // The error message will be in the StringBuffer msg.
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
      }
 
