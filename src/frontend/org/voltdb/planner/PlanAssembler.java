@@ -812,6 +812,7 @@ public class PlanAssembler {
                 assert (betsCostPlan != null);
                 AbstractPlanNode subQueryRoot = betsCostPlan.rootPlanGraph;
                 subQueryRoot.disconnectParents();
+                scanNode.clearChildren();
                 scanNode.addAndLinkChild(subQueryRoot);
             }
         } else {
