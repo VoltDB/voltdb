@@ -143,7 +143,7 @@ class Overview extends Module {
         
         fileName                    { $(class:"labelCollapsed", text:fileTest) }
         jdbcName                    { $(class:"labelCollapsed", text:jdbcTest) }
-        kafkaName                   { $(class:"labelCollapsed", text:kafkaTest) }
+        kafkaName                   { $(class:"labelCollapsed").first() }
         httpName                    { $(class:"labelCollapsed", text:httpTest) }
         rabbitMqBrokerName          { $(class:"labelCollapsed", text:rabbitMqBrokerTest) }
         rabbitMqAmqpName            { $(class:"labelCollapsed", text:rabbitMqAmqpTest) }
