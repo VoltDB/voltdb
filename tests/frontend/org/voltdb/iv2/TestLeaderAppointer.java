@@ -30,7 +30,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -60,7 +60,7 @@ public class TestLeaderAppointer extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 1;
     private ClusterConfig m_config = null;
-    private List<Integer> m_hostIds;
+    private Set<Integer> m_hostIds;
     private Map<Integer, String> m_hostGroups;
     private MpInitiator m_mpi = null;
     private HostMessenger m_hm = null;
@@ -111,7 +111,7 @@ public class TestLeaderAppointer extends ZKTestBase {
 
         m_config = new ClusterConfig(hostCount, sitesPerHost, replicationFactor);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(m_config.getPartitionCount()));
-        m_hostIds = new ArrayList<Integer>();
+        m_hostIds = Sets.newTreeSet();
         m_hostGroups = Maps.newHashMap();
         for (int i = 0; i < hostCount; i++) {
             m_hostIds.add(i);

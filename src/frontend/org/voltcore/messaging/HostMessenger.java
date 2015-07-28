@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -818,9 +819,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return hostname;
     }
 
-    public List<Integer> getLiveHostIds()
+    public Set<Integer> getLiveHostIds()
     {
-        List<Integer> hostids = new ArrayList<Integer>();
+        Set<Integer> hostids = Sets.newTreeSet();
         hostids.addAll(m_foreignHosts.keySet());
         hostids.add(m_localHostId);
         return hostids;
