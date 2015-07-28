@@ -71,4 +71,9 @@ public abstract class AbstractValueExpression extends AbstractExpression {
         // Nothing to do... This is all about pulling types UP from child expressions.
     }
 
+    @Override
+    protected boolean containsFunctionById(int functionId) {
+        return false;
+    }
+
 }
