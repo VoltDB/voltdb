@@ -52,7 +52,7 @@ class AdminExportEditTest extends TestBase {
 	    then: 'Click Save'
         page.overview.clickSave()
 	    when: 'Expand export'
-        page.overview.export.isDisplayed()
+
 	    page.overview.expandExport()
 	    then: 'Display the created KAFKA'
     waitFor(10) { page.overview.kafkaName.isDisplayed()}
@@ -86,7 +86,9 @@ class AdminExportEditTest extends TestBase {
         // Edit: Change the file type
 
         when: 'Edit button is displayed'
-        page.overview.expandExport()
+        if (page.overview.checkIfExportIsExpanded() == false)
+            page.overview.export.click()
+        println(page.overview.checkIfExportIsExpanded())
         waitFor(10) { page.overview.editExportConfiguration.isDisplayed()}
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
@@ -157,7 +159,7 @@ class AdminExportEditTest extends TestBase {
         page.overview.cancel.isDisplayed()
 
         then: 'Check for previous changes'
-        waitFor(waitTime) { page.overview.metadatabrokerValue.value().equals("metadataValue") }
+        waitFor(10) { page.overview.metadatabrokerValue.value().equals("metadataValue") }
 
 
         when: 'Change to ELASTICSEARCH'
@@ -177,8 +179,10 @@ class AdminExportEditTest extends TestBase {
 
         //Edit: Change the file type to HTTP
         when: 'Expand export'
-        page.overview.export.isDisplayed()
-        page.overview.expandExport()
+
+        if (page.overview.checkIfExportIsExpanded() == false)
+            page.overview.export.click()
+        println(page.overview.checkIfExportIsExpanded())
         then: 'Display the created KAFKA'
       //  waitFor(10) { page.overview.kafkaName.isDisplayed()}
         when: 'Edit button is displayed'
@@ -244,8 +248,10 @@ class AdminExportEditTest extends TestBase {
     def "Delete Export Configuration"(){
 
                 when: 'Edit button is displayed'
-                page.overview.export.isDisplayed()
-                page.overview.expandExport()
+
+                if (page.overview.checkIfExportIsExpanded() == false)
+                    page.overview.export.click()
+                println(page.overview.checkIfExportIsExpanded())
         waitFor(10) { page.overview.editExportConfiguration.isDisplayed()}
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
