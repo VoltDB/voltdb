@@ -2688,9 +2688,17 @@ public class Expression implements Cloneable {
             final List<String> id_list = new ArrayList<>();
             new Object() {
                 public void traverse(Expression exp) {
-                    for (Expression expr : exp.nodes) {
-                        if (expr != null)
-                            id_list.add(expr.voltGetUniqueId(session));
+                    assert(exp != null);
+                    if (exp instanceof ExpressionAggregate) {
+                        // do not count in the second boolean child for aggregate expression
+                        // introduced from hsqldb 2.3.2
+                        if (exp.nodes.length > 0)
+                            id_list.add(exp.nodes[0].voltGetUniqueId(session));
+                    } else {
+                        for (Expression expr : exp.nodes) {
+                            if (expr != null)
+                                id_list.add(expr.voltGetUniqueId(session));
+                        }
                     }
                 }
             }.traverse(this);
