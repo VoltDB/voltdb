@@ -379,9 +379,6 @@ public class FunctionSQL extends Expression {
             case FUNC_LN :
                 name      = Tokens.T_LN;
                 parseList = singleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             case FUNC_EXP :
