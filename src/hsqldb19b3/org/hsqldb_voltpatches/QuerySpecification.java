@@ -356,6 +356,11 @@ public class QuerySpecification extends QueryExpression {
 
         resolveExpressionTypes(session);
         resolveAggregates();
+        // A VoltDB extension to void an NPE.
+        // If we don't include this, the member variable
+        // unionColumnTypes is never initialized.
+        resolveReferences(session, RangeGroup.emptyArray);
+        // End of VoltDB extension
 
         for (int i = 0; i < unionColumnTypes.length; i++) {
             unionColumnTypes[i] = Type.getAggregateType(unionColumnTypes[i],

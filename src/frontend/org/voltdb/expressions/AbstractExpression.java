@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hsqldb_voltpatches.FunctionSQL;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -1091,4 +1092,66 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return false;
     }
 
+    /**
+     * Return true iff the given expression usable as part of an index expression.
+     * If false, put the tail of an error message in the string buffer.  The
+     * string buffer will be initialized with the name of the index.
+     *
+     * @param expr The expression to check
+     * @param msg  The StringBuffer to pack with the error message tail.
+     * @return true iff the expression can be part of an index.
+     */
+    public boolean isIndexableExpression(StringBuffer msg) {
+        if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
+            msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
+            return false;
+        } else if (!findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+            msg.append(String.format("with subquery sources is not supported."));
+            return false;
+        } else if (!findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
+            msg.append("with aggregate expression(s) is not supported.");
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * Return true iff the all of the expressions in the list can be part
+     * of an index expression.  As with isIndexableExpression, the StringBuffer
+     * parameter, msg, contains the name of the index.  Error messages
+     * should be appended to it.
+     *
+     * @param checkList
+     * @param msg
+     * @return
+     */
+    public static boolean areIndexableExpressions(List<AbstractExpression> checkList, StringBuffer msg) {
+        for (AbstractExpression expr : checkList) {
+            if (!expr.isIndexableExpression(msg)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * This function will recursively find any function expression with ID functionId.
+     * If found, return true. Otherwise, return false.  Note that AbstractValueExpression
+     * overrides this to return false.
+     *
+     * @param expr
+     * @param functionId
+     * @return
+     */
+    protected boolean containsFunctionById(int functionId) {
+        List<AbstractExpression> functionsList = findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (AbstractExpression funcExpr: functionsList) {
+            assert(funcExpr instanceof FunctionExpression);
+            if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
