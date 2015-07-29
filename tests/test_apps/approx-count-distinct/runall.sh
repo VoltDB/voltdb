@@ -14,6 +14,8 @@ echo "#rows/uniqe_vals  exact cardinality    approx cardinality" > bench_accurac
 ./run.sh 1024000 512000
 #./run.sh 2048000 1024000
 
-
-gnuplot bench_perf.gpl
-gnuplot bench_accuracy.gpl
+gnuplot=`which gnuplot`
+if [ "$gnuplot" != "" ]; then
+    gnuplot bench_perf.gpl
+    gnuplot bench_accuracy.gpl
+fi
