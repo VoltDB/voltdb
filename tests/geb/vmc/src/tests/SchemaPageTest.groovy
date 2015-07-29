@@ -125,9 +125,23 @@ class SchemaPageTest extends TestBase {
 
     def "header help exists" () {
         when:
-        at SchemaPage
+        at DbMonitorPage
         then:
-        page.header.checkShowHelp()
+        //page.header.checkShowHelp()
+        waitFor(30) { page.header.help.isDisplayed() }
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                interact {
+                    moveToElement(page.header.help)
+                }
+                waitFor(30) { page.header.showHelp.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already tried")
+            }
+        }
     }
 
     // HEADER TAB TESTS

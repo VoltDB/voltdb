@@ -1937,10 +1937,24 @@ class AdminTest extends TestBase {
     }
 
     def "header help exists" () {
-        when:
-        at AdminPage
-        then:
-        page.header.checkShowHelp()
+		when:
+		at DbMonitorPage
+		then:
+		//page.header.checkShowHelp()
+		waitFor(30) { page.header.help.isDisplayed() }
+		int count = 0
+		while(count<5) {
+			count++
+			try {
+				interact {
+					moveToElement(page.header.help)
+				}
+				waitFor(30) { page.header.showHelp.isDisplayed() }
+				break
+			} catch (geb.waiting.WaitTimeoutException e) {
+				println("Already tried")
+			}
+		}
     }
 
     // HEADER TAB TESTS
@@ -2059,10 +2073,30 @@ class AdminTest extends TestBase {
     // HELP POPUP TEST
 
     def "help popup existance" () {
-        when:
-        at AdminPage
-        then:
-        page.header.checkIfHelpIsOpen()
+		when:
+		at DbMonitorPage
+		then:
+		waitFor(waitTime) { page.header.help.isDisplayed() }
+		int count = 0
+		while(count<5) {
+			count++
+			try {
+				interact {
+					moveToElement(page.header.help)
+				}
+				waitFor(30) { page.header.showHelp.isDisplayed() }
+				break
+			} catch (geb.waiting.WaitTimeoutException e) {
+				println("Already tried")
+			}
+		}
+
+		when:
+		page.header.showHelp.click()
+		then:
+		//waitFor(waitTime) { page.header.popupTitle.isDisplayed() }
+		waitFor(waitTime) { page.header.popupClose.isDisplayed() }
+		waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }
 
     // FOOTER TESTS

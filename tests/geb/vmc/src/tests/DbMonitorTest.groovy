@@ -192,7 +192,21 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        page.header.checkShowHelp()
+        //page.header.checkShowHelp()
+        waitFor(30) { page.header.help.isDisplayed() }
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                interact {
+                    moveToElement(page.header.help)
+                }
+                waitFor(30) { page.header.showHelp.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already tried")
+            }
+        }
     }
 
     // HEADER TAB TESTS
@@ -315,7 +329,27 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        page.header.checkIfHelpIsOpen()
+        waitFor(waitTime) { page.header.help.isDisplayed() }
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                interact {
+                    moveToElement(page.header.help)
+                }
+                waitFor(30) { page.header.showHelp.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already tried")
+            }
+        }
+
+        when:
+        page.header.showHelp.click()
+        then:
+        //waitFor(waitTime) { page.header.popupTitle.isDisplayed() }
+        waitFor(waitTime) { page.header.popupClose.isDisplayed() }
+        waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }
 
     // FOOTER TESTS
@@ -2341,18 +2375,7 @@ class DbMonitorTest extends TestBase {
 		    } catch(geb.waiting.WaitTimeoutException e) {
 		        println("AJA BHAKOXAINA")
 		    }
-		    /*if(result.equals("minutes")) {
-		        println("The minimum value is " + stringMin + " and the time is in " + result )
-		        assert true
-		        break
-		    }
-		    else {
-		        println("FAIL: It is not in minutes")
-		        if(bigCount == 5) {
-		            println("TRULY FALSE")
-		            assert false
-		        }
-		    }*/
+
 		}
     }
 
@@ -2404,18 +2427,7 @@ class DbMonitorTest extends TestBase {
 		    } catch(geb.waiting.WaitTimeoutException e) {
 		        println("AJA BHAKOXAINA")
 		    }
-		    /*if(result.equals("minutes")) {
-		        println("The maximum value is " + stringMax + " and the time is in " + result )
-		        assert true
-		        break
-		    }
-		    else {
-		        println("FAIL: It is not in minutes")
-		        if(bigCount == 5) {
-		            println("TRULY FALSE")
-		            assert false
-		        }
-		    }*/
+
 		}
     }
 
@@ -2894,4 +2906,5 @@ class DbMonitorTest extends TestBase {
 
         page.runQuery()
     }
+
 }
