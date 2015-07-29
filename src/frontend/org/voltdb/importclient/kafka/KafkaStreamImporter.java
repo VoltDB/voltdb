@@ -34,7 +34,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import kafka.api.ConsumerMetadataRequest;
@@ -253,7 +252,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         for (TopicPartitionFetcher fetcher : m_fetchers.values()) {
             fetcher.shutdown();
         }
-        m_done.release();
         if (m_es != null) {
             //Now wait for fetchers to break out.
             m_es.shutdown();
@@ -265,6 +263,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             }
         }
         m_fetchers.clear();
+        m_done.release();
     }
 
     /**
@@ -351,7 +350,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final AtomicLong m_committedOffset = new AtomicLong(-1);
         private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
-        private final int m_perTopicPendingLimit = Integer.getInteger("voltdb.kafka.pertopicPendingLimit", 50000);
+        private final int m_perTopicPendingLimit = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private final TopicAndPartition m_topicAndPartition;
 
@@ -509,11 +508,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             private final long m_offset;
             private final long m_nextOffset;
             private final TopicAndPartition m_topicAndPartition;
+            private final AtomicLong m_cbcnt;
 
-            public TopicPartitionInvocationCallback(long offset, long noffset, TopicAndPartition tAndP) {
+            public TopicPartitionInvocationCallback(long offset, long noffset, TopicAndPartition tAndP, AtomicLong cbcnt) {
                 m_offset = offset;
                 m_nextOffset = noffset;
                 m_topicAndPartition = tAndP;
+                m_cbcnt = cbcnt;
             }
 
             public boolean commitOffset(long offset) {
@@ -608,7 +609,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 try {
                     //We should never get here with no pending offsets.
                     assert(!m_pendingOffsets.isEmpty());
-
+                    m_cbcnt.incrementAndGet();
                     m_pendingOffsets.remove(m_offset);
                     commitAndSaveOffset(m_nextOffset);
 
@@ -634,6 +635,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         public void run() {
             SimpleConsumer consumer = null;
             info("Starting partition fetcher for " + m_topicAndPartition);
+            long submitCount = 0;
+            AtomicLong cbcnt = new AtomicLong(0);
             try {
                 //Startwith the starting leader.
                 HostAndPort leaderBroker = m_leader;
@@ -713,7 +716,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             currentFetchCount++;
                             String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),"UTF-8");
                             CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition);
+                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition, cbcnt);
                             m_pendingOffsets.add(currentOffset);
                             if (!callProcedure(cb, invocation)) {
                                 if (isDebugEnabled()) {
@@ -725,8 +728,15 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 }
                                 m_pendingOffsets.remove(currentOffset);
                             }
+                            submitCount++;
                             m_currentOffset.set(messageAndOffset.nextOffset());
+                            if (m_shutdown) {
+                                break;
+                            }
                         }
+                    }
+                    if (m_shutdown) {
+                        break;
                     }
 
                     if (currentFetchCount == 0) {
@@ -736,12 +746,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         }
                     }
                 }
-                info("Partition fecher stopping for " + m_topicAndPartition);
-                int cnt = 1;
-                while (m_pendingOffsets.size() > 0) {
-                    cnt = backoffSleep(cnt);
-                }
-                info("Partition fecher stopped for " + m_topicAndPartition + " Last commit point is: " + m_currentOffset.get());
+                //Drain will make sure there is nothing in pending.
+                info("Partition fecher stopped for " + m_topicAndPartition
+                        + " Last commit point is: " + m_currentOffset.get()
+                        + " Callback Rcvd: " + cbcnt.get()
+                        + " Submitted: " + submitCount);
             } catch (Exception ex) {
                 error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
@@ -790,7 +799,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     String leaderKey = topic + "-" + partition;
                     URI assignedKey = URI.create("kafka:/" + topic + "/partition/" + partition);
                     //The fetcher must not have existed.
-                    if (!m_fetchers.containsKey(nuri) && nuri.equals(assignedKey)) {
+                    if (!m_fetchers.containsKey(nuri.toString()) && nuri.equals(assignedKey)) {
                         info("Channel " + assignedKey + " mastership is assigned to this node.");
                         HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
                         TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, assignedKey, topic, partition,

@@ -99,6 +99,8 @@ public class ImportHandler {
             @Override
             public void run() {
                 try {
+                    //Drain the adapter so all calbacks are done
+                    m_adapter.drain();
                     m_importContext.stop();
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -138,8 +140,11 @@ public class ImportHandler {
     }
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
+        if (m_stopped) {
+            return false;
+        }
         // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             m_logger.warn("Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
