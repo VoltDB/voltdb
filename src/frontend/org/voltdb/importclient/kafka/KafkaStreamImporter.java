@@ -756,6 +756,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             } finally {
                 closeConsumer(consumer);
                 consumer = null;
+                closeConsumer(m_offsetManager.getAndSet(null));
             }
         }
 
