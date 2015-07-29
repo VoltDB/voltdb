@@ -52,7 +52,7 @@ public:
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert(tuple1);
         if ( ! tuple1 ) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL,
+            throw SerializableEEException(
                     "TupleValueExpression::"
                     "eval:"
                     " Couldn't find tuple 1 (possible index scan planning error)");
