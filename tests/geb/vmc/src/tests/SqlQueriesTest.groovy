@@ -88,7 +88,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         // List of all 'genqa' tables should include the 'genqa' test tables
         GENQA_ALL_TABLES.addAll(GENQA_TEST_TABLES)
         // Move contents of the various files into memory
-        fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file, '#', false)) }
+        fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file, '#', false, (file == sqlQueriesFile ? '}' : ''))) }
     }
 
     def setup() { // called before each test
@@ -547,6 +547,9 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         debugPrint "\nquery         : " + query
         debugPrint "expect status : " + expectedResponse.status
         debugPrint "expect result : " + expectedResponse.result
+        if (expectedResponse.error != null) {
+            debugPrint "expect error  : " + expectedResponse.error
+        }
         debugPrint "\nactual results: " + page.getQueryResults()
         debugPrint "last result   : " + qResult
 
@@ -562,13 +565,52 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         debugPrint "actual status : " + status
         debugPrint "query duration: " + duration
         if (duration == null || duration.isEmpty()) {
-            println "WARNING: query duration '" + duration + "', for test '" +
+            println "\nWARNING: query duration '" + duration + "', for test '" +
                     sqlQueriesTestName + "' is null or empty!"
         }
 
-        then: 'check the error status, and query result'
+        and: 'for a non-matching result, check if it is just a trim issue, and print details'
+        if (expectedResponse.result != qResult) {
+            println "\nWARNING: query result does not match expected, for column(s):"
+            boolean allDiffsCausedByTrim = true
+            def expCols = expectedResponse.result.keySet()
+            def actCols = qResult.keySet()
+            for (String col: expCols) {
+                def expCol = expectedResponse.result.get(col)
+                def actCol = qResult.get(col)
+                if (!expCol.equals(actCol)) {
+                    println "  expected " + col + ": '" + expCol + "'"
+                    println "  actual   " + col + ": '" + actCol + "'"
+                    for (int i=0; i < expCol.size(); i++) {
+                        if (actCol != null && expCol[i].trim().equals(actCol[i])) {
+                            expCol[i] = actCol[i]
+                        } else {
+                            allDiffsCausedByTrim = false
+                        }
+                    }
+                }
+            }
+            // Check for any columns that occur in the actual, but not expected, results
+            for (String col: actCols) {
+                def expCol = expectedResponse.result.get(col)
+                if (expCol == null) {
+                    println "  expected " + col + ": '" + expCol + "'"
+                    println "  actual   " + col + ": '" + qResult.get(col) + "'"
+                    allDiffsCausedByTrim = false
+                }
+            }
+            if (allDiffsCausedByTrim) {
+                println "All these differences appear to be caused by Selenium calling trim() on the " +
+                        "column values, so this test (" + sqlQueriesTestName + ") will likely pass."
+            } else {
+                println "There are real differences here, so this test (" + sqlQueriesTestName + ") will fail."
+            }
+        }
+
+        then: 'check the query result, error status, and error message (if any)'
         expectedResponse.result == qResult
         expectedResponse.status == status
+        expectedResponse.error == null || (error != null && error.contains(expectedResponse.error))
 
         cleanup: 'delete all rows from the tables'
         runQuery(page, 'delete from partitioned_table;\ndelete from replicated_table')
