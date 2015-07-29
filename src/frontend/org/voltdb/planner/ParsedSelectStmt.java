@@ -1730,6 +1730,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (orderByExprs.contains(candidateExpr)) {
                 continue;
             }
+            // TODO: Here is where we fail ENG-8645.
             if (candidateExpr instanceof TupleValueExpression) {
                 // Simple column references can only be exactly equal to but not "based on" an ORDER BY.
                 return false;

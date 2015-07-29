@@ -8,6 +8,13 @@ create table ttree (
 create index cover2_TREE on ttree (a, b);
 create index cover3_TREE on ttree (a, c, b);
 
+create table ttree_with_key (
+  a bigint not null,
+  b bigint not null,
+  c bigint not null,
+  primary key (a, b, c)
+);
+
 create table thash (
   a bigint not null,
   b bigint not null,
