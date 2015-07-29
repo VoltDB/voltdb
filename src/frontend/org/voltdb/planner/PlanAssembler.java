@@ -808,10 +808,11 @@ public class PlanAssembler {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode) parentPlan;
             StmtTableScan tableScan = scanNode.getTableScan();
             if (tableScan instanceof StmtSubqueryScan) {
-                CompiledPlan betsCostPlan = ((StmtSubqueryScan)tableScan).getBestCostPlan();
-                assert (betsCostPlan != null);
-                AbstractPlanNode subQueryRoot = betsCostPlan.rootPlanGraph;
+                CompiledPlan bestCostPlan = ((StmtSubqueryScan)tableScan).getBestCostPlan();
+                assert (bestCostPlan != null);
+                AbstractPlanNode subQueryRoot = bestCostPlan.rootPlanGraph;
                 subQueryRoot.disconnectParents();
+                scanNode.clearChildren();
                 scanNode.addAndLinkChild(subQueryRoot);
             }
         } else {
