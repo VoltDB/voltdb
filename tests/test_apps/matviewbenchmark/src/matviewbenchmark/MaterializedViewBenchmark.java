@@ -360,7 +360,7 @@ public class MaterializedViewBenchmark {
                                      procStr + "_insert",
                                      i,
                                      grp,
-                                     i, i, i, i);
+                                     i, -i, i, -i);
                 }
                 else {
                     client.callProcedure(new NullCallback(),
@@ -382,7 +382,7 @@ public class MaterializedViewBenchmark {
                                          procStr + "_insert",
                                          i,
                                          i,
-                                         i, i, i, i);
+                                         i, -i, i, -i);
                 }
                 else {
                     client.callProcedure(new NullCallback(),
