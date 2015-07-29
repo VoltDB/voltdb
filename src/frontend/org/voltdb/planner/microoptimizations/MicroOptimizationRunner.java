@@ -34,8 +34,6 @@ public class MicroOptimizationRunner {
 
         // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.
         optimizations.add(new InlineAggregation());
-
-        optimizations.add(new ApproxCountDistinctDistributor());
     }
 
     public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)

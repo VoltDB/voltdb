@@ -382,16 +382,19 @@ public class AggregatePlanNode extends AbstractPlanNode {
     public void updateAggregate(
             int index,
             ExpressionType aggType) {
-        m_aggregateTypes.set(index, aggType);
-        assert(m_aggregateDistinct.get(index) == 0);
 
-        // update the node schema to the proper type here!
-        if (aggType == ExpressionType.AGGREGATE_VALS_TO_HYPERLOGLOG) {
-            int outputSchemaIndex = m_aggregateOutputColumns.get(index);
-            SchemaColumn schemaCol = m_outputSchema.getColumns().get(outputSchemaIndex);
-            schemaCol.getExpression().setValueType(VoltType.VARBINARY);
-            schemaCol.getExpression().setValueSize(65537);
-        }
+        // Create a new aggregate expression which we'll use to update the
+        // output schema (whose exprs are TVEs).
+        AggregateExpression aggExpr = new AggregateExpression(aggType);
+        aggExpr.finalizeValueTypes();
+
+        int outputSchemaIndex = m_aggregateOutputColumns.get(index);
+        SchemaColumn schemaCol = m_outputSchema.getColumns().get(outputSchemaIndex);
+        AbstractExpression schemaExpr = schemaCol.getExpression();
+        schemaExpr.setValueType(aggExpr.getValueType());
+        schemaExpr.setValueSize(aggExpr.getValueSize());
+
+        m_aggregateTypes.set(index, aggType);
     }
 
     public void addGroupByExpression(AbstractExpression expr)
