@@ -540,8 +540,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (!m_cl.isSynchronous()) {
                 assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
-            } else {
-                assert durabilityBackpressureFuture == null;
             }
         } else {
             m_pendingTasks.offer(task);
@@ -842,7 +840,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {
-                assert durabilityBackpressureFuture == null;
                 /* Getting here means that the task is the first fragment of an MP txn and
                  * synchronous command logging is on, so create a backlog for future tasks of
                  * this MP arrived before it's marked durable.
