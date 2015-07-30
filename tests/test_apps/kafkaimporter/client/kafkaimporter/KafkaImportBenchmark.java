@@ -215,7 +215,7 @@ public class KafkaImportBenchmark {
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
                 long value = System.currentTimeMillis();
-                long key = rnd.nextLong();
+                long key = icnt;
                 exportProc.insertExport(key, value);
                 icnt++;
             }
@@ -234,7 +234,7 @@ public class KafkaImportBenchmark {
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
                 long value = System.currentTimeMillis();
-                long key = rnd.nextLong();
+                long key = icnt;
                 exportProc.insertExport(key, value);
                 icnt++;
             }

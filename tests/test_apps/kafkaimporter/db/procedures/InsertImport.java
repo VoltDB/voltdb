@@ -22,16 +22,12 @@
  */
 
 /*
- * Stored procedure for ExportBenchmark
+ * Stored procedure for Kafka import
  *
- * 2 tables -- all datatypes with nullable and not nullable variants
+ * If incoming data is in the mirror table, delete that row.
  *
- * Call the SP with DB tables insert count and export tables insert count.
- * This allows mixing DB insert to export insert ratio, following the recent
- * Flipkart customer case where export rows could exceed DB inserts as much as 10:1.
- *
- * Since DB inserts and export inserts are parameterized, it's possible to try many
- * variations in the test driver.
+ * Else add to import table as a record of rows that didn't get
+ * into the mirror table, a major error!
  */
 
 package kafkaimporter.db.procedures;
@@ -47,13 +43,18 @@ import org.voltdb.VoltProcedure;
 public class InsertImport extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
     public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable1 " + sqlSuffix);
+    public final SQLStmt deleteMirrorRow = new SQLStmt("DELETE FROM kafkamirrortable1 WHERE key = ?");
 
     public long run(long key, long value)
     {
-        voltQueueSQL(importInsert, key, value);
 
-        // Execute queued statements
-        voltExecuteSQL(true);
+        voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key);
+        long deletedCount = voltExecuteSQL()[0].asScalarLong();
+
+        if (deletedCount > 0) {
+            voltQueueSQL(importInsert, key, value);
+            voltExecuteSQL(true);
+        }
         return 0;
     }
 }
