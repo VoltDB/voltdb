@@ -465,6 +465,10 @@ public class TestDeterminism extends PlannerTestCase {
         assertMPPlanDeterminism("select a, z from ppk where a = 1 and b < 10", "order by z, a");
     }
 
+    public void testMPDeterminismImpliedByParameter() {
+        assertPlanDeterminismCore("select * from ttree_with_key where b = ? order by a, c limit 1;", true, true, DeterminismMode.SAFER);
+    }
+
     private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content,
             DeterminismMode detMode)
     {

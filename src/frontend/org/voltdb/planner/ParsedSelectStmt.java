@@ -30,7 +30,12 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;
@@ -1683,9 +1688,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return orderByColumnsDetermineAllColumns(m_orderColumns, candidateColumns, outNonOrdered);
     }
 
-    static boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
-            List<ParsedColInfo> orderColumns,
-            List<AbstractExpression> nonOrdered)
+    boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
+                                                     List<ParsedColInfo> orderColumns,
+                                                     List<AbstractExpression> nonOrdered)
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : displayColumns) {
@@ -1709,7 +1714,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return orderByColumnsDetermineAllColumns(orderColumns, candidateColumns, null);
     }
 
-    private static boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
+    private boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
                                                       List<ParsedColInfo> candidateColumns,
                                                       List<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
@@ -1733,7 +1738,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // TODO: Here is where we fail ENG-8645.
             if (candidateExpr instanceof TupleValueExpression) {
                 // Simple column references can only be exactly equal to but not "based on" an ORDER BY.
-                return false;
+                return orderByColumnsDetermineOneColumn((TupleValueExpression)candidateExpr, orderColumns);
             }
 
             if (candidateExprHardCases == null) {
@@ -1797,6 +1802,73 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             result = false;
         }
         return result;
+    }
+
+    /**
+     * Given that the columns in orderColumns are ordered,
+     * is there a constraint on the table of candidateColumn
+     * which forces it to be ordered?
+     *
+     * @param candidateColumnExpr
+     * @param orderColumns
+     * @return
+     */
+    private boolean orderByColumnsDetermineOneColumn(
+            TupleValueExpression candidateColumnExpr, List<ParsedColInfo> orderColumns) {
+        /*
+         * Find a Table for this expression.
+         */
+        String tableName = candidateColumnExpr.getTableName();
+        if (tableName == null) {
+            return false;
+        }
+        Table table = getTableFromDB(tableName);
+        if (table == null) {
+            return false;
+        }
+        CatalogMap<Constraint> indices = table.getConstraints();
+        if (indices == null) {
+            return false;
+        }
+        String candidateColumnName = candidateColumnExpr.getColumnName();
+        if (candidateColumnName == null) {
+            return false;
+        }
+        Column candidateColumn = table.getColumns().get(candidateColumnName);
+        if (candidateColumn == null) {
+            return false;
+        }
+        // Gather up the order columns as columns for
+        // testing membership below.
+        Set<Column> orderColumnsAsColumns = new HashSet<Column>();
+        for (ParsedColInfo colInfo : orderColumns) {
+            Column col = table.getColumns().get(colInfo.columnName);
+            // If we can't get this column by name, then
+            // give up.  Nothing else will make us happy.
+            if (col == null) {
+                return false;
+            } else {
+                orderColumnsAsColumns.add(col);
+            }
+        }
+        for (Constraint constraint : indices) {
+            Index index = constraint.getIndex();
+            CatalogMap<ColumnRef> columns = index.getColumns();
+            // The query is made deterministic by this
+            // constraint and order-by clause iff the
+            // order-by and candidate columns are a
+            // superset of the index columns.  That is
+            // to say, each index column is either
+            // equal to the candidate column or is
+            // in the order-by columns.
+            for (ColumnRef cr : columns) {
+                Column col = cr.getColumn();
+                if (col != candidateColumn && !orderColumnsAsColumns.contains(col)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private boolean hasAOneRowResult()
