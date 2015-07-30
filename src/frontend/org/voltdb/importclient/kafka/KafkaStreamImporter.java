@@ -18,6 +18,7 @@ package org.voltdb.importclient.kafka;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -676,6 +677,21 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             }
                         } catch (Exception ex) {
                             error(ex, "Failed to fetch from %s", m_topicAndPartition);
+                            //See if its network error and find new leader for this partition.
+                            if (ex instanceof ClosedChannelException) {
+                                leaderBroker = findNewLeader();
+                                if (leaderBroker == null) {
+                                    //point to original leader which will fail and we fall back again here.
+                                    error(null, "Fetch Failed to find leader continue with old leader: %s", m_leader);
+                                    leaderBroker = m_leader;
+                                } else {
+                                    if (!leaderBroker.equals(m_leader)) {
+                                        info("Fetch Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
+                                    }
+                                }
+                                //find leader would sleep and backoff
+                                continue;
+                            }
                             fetchFailedCount = backoffSleep(fetchFailedCount);
                             continue;
                         }
