@@ -125,9 +125,8 @@ class SchemaPageTest extends TestBase {
 
     def "header help exists" () {
         when:
-        at DbMonitorPage
+        at SchemaPage
         then:
-        //page.header.checkShowHelp()
         waitFor(30) { page.header.help.isDisplayed() }
         int count = 0
         while(count<5) {
@@ -264,7 +263,26 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        page.header.checkIfHelpIsOpen()
+        waitFor(waitTime) { page.header.help.isDisplayed() }
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                interact {
+                    moveToElement(page.header.help)
+                }
+                waitFor(30) { page.header.showHelp.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already tried")
+            }
+        }
+
+        when:
+        page.header.showHelp.click()
+        then:
+        waitFor(waitTime) { page.header.popupClose.isDisplayed() }
+        waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }
 
     // FOOTER TESTS
