@@ -141,6 +141,11 @@ public class VoltCompiler {
     // identical to the original catalog that was used to create the autogen-ddl.sql file.
     public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
 
+    /// Set this to true to automatically retry a failed attempt to round-trip
+    /// a rebuild of a catalog from its canonical ddl. This gives a chance to
+    /// set breakpoints and step through a do-over of only the flawed catalogs.
+    public static boolean RETRY_FAILED_CATALOG_REBUILD_UNDER_DEBUG = false;
+
     String m_projectFileURL = null;
     private String m_currentFilename = NO_FILENAME;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
@@ -514,17 +519,61 @@ public class VoltCompiler {
         DatabaseType autoGenDatabase = getProjectDatabase(null);
         InMemoryJarfile autoGenJarOutput = new InMemoryJarfile();
         autoGenCompiler.m_currentFilename = AUTOGEN_DDL_FILE_NAME;
+        // This call is purposely replicated in retryFailedCatalogRebuildUnderDebug,
+        // where it provides an opportunity to set a breakpoint on a do-over when this
+        // mainline call produces a flawed catalog that fails the catalog diff.
+        // Keep the two calls in synch to allow debugging under the same exact conditions.
         Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase, null, null,
                 autogenReaderList, autoGenJarOutput);
-        FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
+        FilteredCatalogDiffEngine diffEng =
+                new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog, false);
         String diffCmds = diffEng.commands();
         if (diffCmds != null && !diffCmds.equals("")) {
-            VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed! " +
-                    "The offending diffcmds were: " + diffCmds);
+            // This retry is disabled by default to avoid confusing the unwary developer
+            // with a "pointless" replay of an apparently flawed catalog rebuild.
+            // Enable it via this flag to provide a chance to set an early breakpoint
+            // that is only triggered in hopeless cases.
+            if (RETRY_FAILED_CATALOG_REBUILD_UNDER_DEBUG) {
+                autoGenCatalog = replayFailedCatalogRebuildUnderDebug(
+                        autoGenCompiler, autogenReaderList, autoGenDatabase,
+                        autoGenJarOutput);
+            }
+            // Re-run a failed diff more verbosely as a pre-crash test diagnostic.
+            diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog, true);
+            diffCmds = diffEng.commands();
+            String crashAdvice = "Catalog Verification from Generated DDL failed! " +
+                    "VoltDB dev: Consider" +
+                    (RETRY_FAILED_CATALOG_REBUILD_UNDER_DEBUG ? "" :
+                        " setting VoltCompiler.RETRY_FAILED_CATALOG_REBUILD_UNDER_DEBUG = true and") +
+                    " setting a breakpoint in VoltCompiler.replayFailedCatalogRebuildUnderDebug" +
+                    " to debug a replay of the faulty catalog rebuild roundtrip. ";
+            VoltDB.crashLocalVoltDB(crashAdvice + "The offending diffcmds were: " + diffCmds);
         }
         else {
             Log.info("Catalog verification completed successfuly.");
         }
+    }
+
+    /** Take two steps back to retry and potentially debug a catalog rebuild
+     *  that generated an unintended change. This code is PURPOSELY redundant
+     *  with the mainline call in debugVerifyCatalog above.
+     *  Keep the two calls in synch and only redirect through this function
+     *  in the post-mortem replay after the other call created a flawed catalog.
+     */
+    private Catalog replayFailedCatalogRebuildUnderDebug(
+            VoltCompiler autoGenCompiler,
+            List<VoltCompilerReader> autogenReaderList,
+            DatabaseType autoGenDatabase, InMemoryJarfile autoGenJarOutput)
+    {
+        // Be sure to set RETRY_FAILED_CATALOG_REBUILD_UNDER_DEBUG = true to enable
+        // this last ditch retry before crashing.
+        // BREAKPOINT HERE!
+        // Then step IN to debug the failed rebuild -- or, just as likely, the canonical ddl.
+        // Or step OVER to debug just the catalog diff process, retried with verbose output --
+        // maybe it's just being too sensitive to immaterial changes?
+        Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase, null, null,
+                autogenReaderList, autoGenJarOutput);
+        return autoGenCatalog;
     }
 
     /**
