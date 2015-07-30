@@ -56,7 +56,7 @@ public class ImportHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private boolean m_stopped = false;
+    private volatile boolean m_stopped = false;
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
     private static final AtomicLong m_lock = new AtomicLong(0);
