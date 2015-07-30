@@ -192,7 +192,6 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        //page.header.checkShowHelp()
         waitFor(30) { page.header.help.isDisplayed() }
         int count = 0
         while(count<5) {
@@ -347,7 +346,6 @@ class DbMonitorTest extends TestBase {
         when:
         page.header.showHelp.click()
         then:
-        //waitFor(waitTime) { page.header.popupTitle.isDisplayed() }
         waitFor(waitTime) { page.header.popupClose.isDisplayed() }
         waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }

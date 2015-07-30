@@ -1938,9 +1938,8 @@ class AdminTest extends TestBase {
 
     def "header help exists" () {
 		when:
-		at DbMonitorPage
+		at AdminPage
 		then:
-		//page.header.checkShowHelp()
 		waitFor(30) { page.header.help.isDisplayed() }
 		int count = 0
 		while(count<5) {
@@ -2074,7 +2073,7 @@ class AdminTest extends TestBase {
 
     def "help popup existance" () {
 		when:
-		at DbMonitorPage
+		at AdminPage
 		then:
 		waitFor(waitTime) { page.header.help.isDisplayed() }
 		int count = 0
@@ -2094,7 +2093,6 @@ class AdminTest extends TestBase {
 		when:
 		page.header.showHelp.click()
 		then:
-		//waitFor(waitTime) { page.header.popupTitle.isDisplayed() }
 		waitFor(waitTime) { page.header.popupClose.isDisplayed() }
 		waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }
