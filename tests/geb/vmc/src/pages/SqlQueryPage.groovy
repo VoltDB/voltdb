@@ -48,8 +48,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         defaultStoredProcsHeader { storedProcs.find('.systemHeader').first().next('h3') }
         systemStoredProcs   { storedProcs.find('#systemProcedure').find('h3') }
         defaultStoredProcs  { storedProcs.find('#defaultProcedure').find('h3') }
-        userStoredProcsHeader {defaultStoredProcsHeader.next('h3') }
-        userStoredProcs { storedProcs.find('#userProcedure').find('h3') }
+        userStoredProcs { defaultStoredProcsHeader.nextAll('h3') }
         allStoredProcs  { storedProcs.find('h3') }
 
         queryStatus			{ $("th", text:"STATUS") }
@@ -212,7 +211,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def List<String> getUserStoredProcedures() {
         def storedProcs = []
         showStoredProcedures()
-        clickToDisplay(userStoredProcsHeader, userStoredProcs)
+        //clickToDisplay(userStoredProcsHeader, userStoredProcs)
         try {
             userStoredProcs.each {
                 scrollIntoView(it)
