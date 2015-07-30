@@ -1930,10 +1930,27 @@ class AdminTest extends TestBase {
     }
 
     def "header logout exists" () {
-        when:
+        when:'Check Security Enabled'
         at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        else if (page.overview.securityValue.text().equals("On"))
+        {
+            println("fail")
+            page.overview.securityValue.text().equals("On")
+            println("test" + page.overview.securityValue.text())
+
+
+            waitFor(waitTime) { header.logout.isDisplayed() }
+        }
+
+
+
+
     }
 
     def "header help exists" () {
@@ -1999,13 +2016,22 @@ class AdminTest extends TestBase {
     }
 
     def "header username check" () {
-        when:
+
+
+        when:'Check Security Enabled'
         at AdminPage
-        String username = page.getUsername()
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        waitFor(waitTime) {
-            header.usernameInHeader.isDisplayed()
-            header.usernameInHeader.text().equals(username)
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        else if (page.overview.securityValue.text().equals("On"))
+        {
+            waitFor(waitTime) {
+                header.usernameInHeader.isDisplayed()
+                header.usernameInHeader.text().equals(username)
+            }
         }
     }
 
