@@ -61,8 +61,8 @@ public class MatViewFallbackQueryXMLGenerator {
          * This function will turn the XML for materialized view definitions like:
          *     SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2;
          * into fallback query XMLs like:
-         *     SELECT min(v1) FROM ENG6511 WHERE d1=? AND d2=?;
-         *     SELECT max(v1) FROM ENG6511 WHERE d1=? AND d2=?;
+         *     SELECT min(v1) FROM ENG6511 WHERE d1=? AND d2=? AND abs(v1)>=?;
+         *     SELECT max(v1) FROM ENG6511 WHERE d1=? AND d2=? AND abs(v1)<=?;
          ********************************************************************************************************/
         List<VoltXMLElement> columns = VoltXMLElementHelper.getFirstChild(m_xml, "columns").children;
         List<VoltXMLElement> parameters = VoltXMLElementHelper.getFirstChild(m_xml, "parameters").children;

@@ -90,7 +90,7 @@ public:
 
     // Get the executors list for a given subplan. The default plan id = 0
     // represents the top level parent plan
-    const std::vector<AbstractExecutor*>& getExecutorList(int planId = 0);
+    std::vector<AbstractExecutor*>& getExecutorList(int planId = 0);
 
     void getRidOfSendExecutor(int planId = 0);
 

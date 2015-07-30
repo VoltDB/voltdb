@@ -176,7 +176,7 @@ void ExecutorVector::setupContext(ExecutorContext* executorContext)
 
 void ExecutorVector::resetLimitStats() { m_limits.resetPeakMemory(); }
 
-const std::vector<AbstractExecutor*>& ExecutorVector::getExecutorList(int planId) {
+std::vector<AbstractExecutor*>& ExecutorVector::getExecutorList(int planId) {
     assert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
     return *(m_subplanExecListMap.find(planId)->second);
 }

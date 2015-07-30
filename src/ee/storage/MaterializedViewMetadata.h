@@ -71,13 +71,12 @@ public:
         return m_fallbackExecutorVectors;
     }
 
-    void setFallbackExecutorVectors(catalog::CatalogMap<catalog::Statement> fallbackQueryStmts);
+    void setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
 
 private:
 
     void freeBackedTuples();
     void allocateBackedTuples();
-    void allocateMinMaxSearchKeyTuple();
 
     /** load a predicate from the catalog structure if it's there */
     static AbstractExpression* parsePredicate(catalog::MaterializedViewInfo *mvInfo);

@@ -61,7 +61,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     m_mvInfo = mvInfo;
 
     m_target->incrementRefcount();
-    srcTable->addMaterializedView(this);
+    m_srcTable->addMaterializedView(this);
 
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
@@ -82,9 +82,9 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     allocateBackedTuples();
 
     // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
-        TableTuple scannedTuple(srcTable->schema());
-        TableIterator &iterator = srcTable->iterator();
+    if (( ! m_srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
+        TableTuple scannedTuple(m_srcTable->schema());
+        TableIterator &iterator = m_srcTable->iterator();
         while (iterator.next(scannedTuple)) {
             processTupleInsert(scannedTuple, false);
         }
@@ -140,15 +140,16 @@ string hexDecodeToString(const string hexString) {
     return retval;
 }
 
-void MaterializedViewMetadata::setFallbackExecutorVectors(catalog::CatalogMap<catalog::Statement> fallbackQueryStmts) {
+void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts) {
     m_fallbackExecutorVectors.clear();
     VoltDBEngine* engine = ExecutorContext::getEngine();
-    BOOST_FOREACH (LabeledStatement labeledStatement, m_mvInfo->fallbackQueryStmts()) {
+    BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
         catalog::Statement *stmt = labeledStatement.second;
         const string b64plan = stmt->fragments().begin()->second->plannodetree();
         string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
         string explanation = hexDecodeToString(stmt->explainplan());
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+            cout << "Aggregation " << m_fallbackExecutorVectors.size() << endl;
             cout << explanation << endl;
         }
 
@@ -473,6 +474,8 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     int aggOffset = (int)m_groupByColumnCount + 1;
     int minMaxAggIdx = 0;
     // set values for the other columns
+    ExecutorContext* context = ExecutorContext::getExecutorContext();
+    NValueArray &params = *context->getParameterContainer();
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
         NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
@@ -494,8 +497,6 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
 
                     // build parameters.
-                    ExecutorContext* context = ExecutorContext::getExecutorContext();
-                    NValueArray &params = *context->getParameterContainer();
                     // the parameters are the groupby columns and the aggregation column.
                     vector<NValue> backups(m_groupByColumnCount + 1);
                     int colindex = 0;
@@ -506,26 +507,26 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     backups[colindex] = params[colindex];
                     params[colindex] = oldValue;
                     // executing the stored plan.
-                    const vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
-                    Table *retval = context->executeExecutors(executorList, 0);
-                    assert(retval);
+                    vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
+                    Table *tbl = context->executeExecutors(executorList, 0);
+                    assert(tbl);
                     // get the fallback value from the returned table.
-                    TableIterator iterator = retval->iterator();
-                    TableTuple tuple(retval->schema());
+                    TableIterator iterator = tbl->iterator();
+                    TableTuple tuple(tbl->schema());
                     if (iterator.next(tuple)) {
                         newValue = tuple.getNValue(0);
                     }
                     // For debug:
                     // if (context->m_siteId == 0) {
                     //     cout << "oldTuple: " << oldTuple.debugNoHeader() << endl;
-                    //     cout << "Return table: " << endl << retval->debug() << endl;
+                    //     cout << "Return table: " << endl << tbl->debug() << endl;
                     //     cout << "newValue: " << newValue.debug() << endl;
                     // }
                     // restore
-                    context->cleanupExecutorsForSubquery(executorList);
                     for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
                         params[colindex] = backups[colindex];
                     }
+                    context->cleanupExecutorsForSubquery(executorList);
                 }
                 break;
             default:
