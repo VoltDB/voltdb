@@ -453,7 +453,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         break;
                     }
                     final String msg = "Failed to get Offset Coordinator for " + m_topicAndPartition + " Code: %d";
-                    error(null, msg, metadataResponse.errorCode());
+                    //Rate limited warning.
+                    warn(null, msg, metadataResponse.errorCode());
+                    backoffSleep(i+1);
                 } catch (Exception e) {
                     // retry the query backoff and retry
                     error(e, "Failed to get Offset Coordinator for " + m_topicAndPartition);
@@ -681,7 +683,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         if (fetchResponse.hasError()) {
                             // Something went wrong!
                             short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
-                            error(null, "Failed to fetch messages for %s Code: %d", m_topicAndPartition, code);
+                            warn(null, "Failed to fetch messages for %s Code: %d", m_topicAndPartition, code);
                             fetchFailedCount = backoffSleep(fetchFailedCount);
                             if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                                 // We asked for an invalid offset. For simple case ask for the last element to reset

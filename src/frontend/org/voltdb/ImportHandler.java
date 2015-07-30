@@ -306,4 +306,8 @@ public class ImportHandler {
         rateLimitedLog(Level.ERROR, t, format, args);
     }
 
+    public void warn(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.WARN, t, format, args);
+    }
+
 }
