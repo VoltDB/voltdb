@@ -51,16 +51,19 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
+import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
 
 public class KafkaImportBenchmark {
 
+    static VoltLogger log = new VoltLogger("Benchmark");
+
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
-            "----------" + "----------" + "----------" + "----------" + "\n";
+            "----------" + "----------" + "----------" + "----------";
 
     // Statistics manager objects from the client
     static ClientStatsContext periodicStatsContext;
@@ -115,7 +118,7 @@ public class KafkaImportBenchmark {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            System.out.println("finished arg validate");
+            log.info("finished arg validate");
         }
     }
 
@@ -129,12 +132,12 @@ public class KafkaImportBenchmark {
         this.config = config;
         periodicStatsContext = client.createStatsContext();
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
+        log.info(HORIZONTAL_RULE);
+        log.info(" Command Line Configuration");
+        log.info(HORIZONTAL_RULE);
+        log.info(config.getConfigDumpString());
         if(config.latencyreport) {
-            System.out.println("NOTICE: Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
+            log.warn("Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
         }
     }
 
@@ -148,11 +151,11 @@ public class KafkaImportBenchmark {
     static void dbconnect(String servers) throws InterruptedException, Exception {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
-        System.out.println("Connecting to VoltDB Interface...");
+        log.info("Connecting to VoltDB Interface...");
         client = ClientFactory.createClient();
 
         for (String server: COMMA_SPLITTER.split(servers)) {
-            System.out.println("..." + server);
+            log.info("..." + server);
             client.createConnection(server);
         }
     }
@@ -162,7 +165,7 @@ public class KafkaImportBenchmark {
      * It calls printStatistics() every displayInterval seconds
      */
     public void schedulePeriodicStats() {
-        statsTimer = new Timer();
+        statsTimer = new Timer("periodicStats", true);
         TimerTask statsPrinting = new TimerTask() {
             @Override
             public void run() { printStatistics(); }
@@ -181,13 +184,10 @@ public class KafkaImportBenchmark {
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
         long thrup;
 
-        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         thrup = stats.getTxnThroughput();
-        System.out.printf("Throughput %d/s, ", thrup);
-        System.out.printf("Aborts/Failures %d/%d, ",
-                stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
-                stats.kPercentileLatencyAsDouble(0.95));
+        log.info(String.format("Throughput %d/s, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
+                    thrup, stats.getInvocationAborts(), stats.getInvocationErrors(),
+                    stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
     }
 
     /**
@@ -197,13 +197,13 @@ public class KafkaImportBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Setup & Initialization");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info("Setup & Initialization");
+        log.info(HORIZONTAL_RULE);
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Starting Benchmark");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info("Starting Benchmark");
+        log.info(HORIZONTAL_RULE);
 
         SecureRandom rnd = new SecureRandom();
         rnd.setSeed(System.identityHashCode(Thread.currentThread()));
@@ -211,7 +211,7 @@ public class KafkaImportBenchmark {
         try {
             // Run the benchmark loop for the requested warmup time
             // The throughput may be throttled depending on client configuration
-            System.out.println("Warming up...");
+            log.info("Warming up...");
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
                 long value = System.currentTimeMillis();
@@ -224,13 +224,13 @@ public class KafkaImportBenchmark {
             benchmarkStartTS = System.currentTimeMillis();
             schedulePeriodicStats();
 
-            System.out.println("starting data checker...");
+            log.info("Starting data checker...");
             checkTimer = matchChecks.checkTimer(5000, client);
 
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database
-            System.out.println("\nRunning benchmark...");
+            log.info("Running benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
                 long value = System.currentTimeMillis();
@@ -242,10 +242,10 @@ public class KafkaImportBenchmark {
             exportMon.waitForStreamedAllocatedMemoryZero();
             importMon.waitForStreamedAllocatedMemoryZero();
             exportProc.insertFinal(-1, -1);
-            System.out.println("Done waiting for import & export tables");
+            log.info("Done waiting for import & export tables");
         } finally {
             // cancel periodic stats printing
-            System.out.println("Cancel periodic stats");
+            log.info("Cancel periodic stats");
             statsTimer.cancel();
             finalInsertCount.addAndGet(icnt);
         }
@@ -276,6 +276,7 @@ public class KafkaImportBenchmark {
      * @see {@link VoterConfig}
      */
     public static void main(String[] args) throws Exception {
+        VoltLogger log = new VoltLogger("Benchmark.main");
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(KafkaImportBenchmark.class.getName(), args);
@@ -290,7 +291,7 @@ public class KafkaImportBenchmark {
         exportMon = new TableChangeMonitor(client, "StreamedTable", "KAFKAEXPORTTABLE1");
         importMon = new TableChangeMonitor(client, "PersistentTable", "KAFKAIMPORTTABLE1");
 
-        System.out.println("starting KafkaImportBenchmark...");
+        log.info("starting KafkaImportBenchmark...");
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
         runner.start();
@@ -298,7 +299,7 @@ public class KafkaImportBenchmark {
         // start watcher that compares mirror table which contains all
         // the export data with the import table that's rows back from Kafka.
         // Arg is interval to wait between checks
-        // System.out.println("starting data checker...");
+        // log.info("starting data checker...");
         // @SuppressWarnings("static-access")
         // Timer t = matchChecks.checkTimer(5000, client);
 
@@ -314,10 +315,10 @@ public class KafkaImportBenchmark {
         client.close();
 
         if (testResult == true) {
-            System.out.println("Test passed!");
+            log.info("Test passed!");
             System.exit(0);
         } else {
-            System.out.println("Test failed!");
+            log.info("Test failed!");
             System.exit(1);
         }
     }

@@ -27,8 +27,12 @@ import java.io.IOException;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
+import org.voltcore.logging.VoltLogger;
 
 public class TableChangeMonitor {
+
+    static VoltLogger log = new VoltLogger("Benchmark.tableChangeMonitor");
+
     Client client;
     String table = "";
     String type = "";
@@ -59,18 +63,20 @@ public class TableChangeMonitor {
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
-                System.out.println("Waited too long...");
-                System.out.println(stats);
+                log.info("Waited too long...");
+                log.info(stats);
                 break;
             }
             if (ctime - st > (3 * 60 * 1000)) {
-                System.out.println(stats);
+                log.info(stats);
                 st = System.currentTimeMillis();
             }
             long ts = 0;
             while (stats.advanceRow()) {
                 String ttable = stats.getString("TABLE_NAME");
-                String ttype = stats.getString("TABLE_TYPE");
+                //log.info("foo " + ttable);
+                String ttype = stats.getString(6); //("TABLE_TYPE");
+                //log.info(ttype);
                 Long tts = stats.getLong("TIMESTAMP");
                 //Get highest timestamp and watch it change
                 if (tts > ts) {
@@ -79,7 +85,7 @@ public class TableChangeMonitor {
                 if (type.equals(ttype) && table.equals(ttable)) {
                     if (stats.getLong("TUPLE_ALLOCATED_MEMORY") != 0) {
                         passedThisTime = false;
-                        System.out.println(ttable + ": Partition Not Zero.");
+                        log.info(ttable + ": Partition Not Zero.");
                         break;
                     }
                 }
@@ -94,12 +100,12 @@ public class TableChangeMonitor {
                     passed = true;
                     break;
                 }
-                System.out.println(table + " quiescing but not ready to declare victory.");
+                log.info(table + " quiescing but not ready to declare victory.");
             }
             Thread.sleep(5000);
         }
-        System.out.println(table + " status is: " + passed);
-        System.out.println(stats);
+        log.info(table + " status is: " + passed);
+        log.info(stats);
         return passed;
     }
 

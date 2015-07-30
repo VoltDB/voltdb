@@ -23,14 +23,16 @@
 package kafkaimporter.client.kafkaimporter;
 
 import org.voltdb.client.Client;
+import org.voltcore.logging.VoltLogger;
 
 public class FinalCheck {
+    static VoltLogger log = new VoltLogger("Benchmark.finalCheck");
     static boolean check(Client client) {
         long mirrorRows = MatchChecks.getMirrorTableRowCount(client);
         long importRows = MatchChecks.getImportTableRowCount(client);
 
-        System.out.println("Rows remaining in the Mirror Table: " + mirrorRows);
-        System.out.println("Rows remaining in the Import Table: " + importRows);
+        log.info("Rows remaining in the Mirror Table: " + mirrorRows);
+        log.info("Rows remaining in the Import Table: " + importRows);
         if (importRows != 0 || mirrorRows != 0) {
             return false;
         }

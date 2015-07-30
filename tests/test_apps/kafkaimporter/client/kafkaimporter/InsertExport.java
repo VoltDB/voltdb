@@ -27,9 +27,11 @@ import java.io.IOException;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltcore.logging.VoltLogger;
 
 
 public class InsertExport {
+    static VoltLogger log = new VoltLogger("Benchmark.insertExport");
     final Client m_client;
     final static String INSERT_PN = "InsertFinal";
     final static String EXPORT_PN = "InsertExport";
@@ -42,7 +44,7 @@ public class InsertExport {
         try {
             m_client.callProcedure(new InsertCallback(EXPORT_PN, key, value), EXPORT_PN, key, value);
         } catch (IOException e) {
-            System.out.println("Exception calling stored procedure InsertExport");
+            log.info("Exception calling stored procedure InsertExport");
             e.printStackTrace();
         }
     }
@@ -51,7 +53,7 @@ public class InsertExport {
         try {
             m_client.callProcedure(new InsertCallback(INSERT_PN, key, value), INSERT_PN, key, value);
         } catch (IOException e) {
-            System.out.println("Exception calling stored procedure InsertFinal");
+            log.info("Exception calling stored procedure InsertFinal");
             e.printStackTrace();
         }
     }
@@ -72,7 +74,7 @@ public class InsertExport {
                 throws Exception {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                 String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
-                System.err.println(msg);
+                log.error(msg);
             }
         }
 
