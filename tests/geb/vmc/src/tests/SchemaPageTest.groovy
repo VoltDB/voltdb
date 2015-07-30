@@ -1113,12 +1113,12 @@ class SchemaPageTest extends TestBase {
 		when: 'click procedure name'
 		page.procedureName.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
+		waitFor(waitTime) { page.ascending.isDisplayed() }
 
 		when: 'click procedure name'
 		page.procedureName.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
 
 	def "Procedures And SQL Tab:Check Ascending Descending in Parameters"() {
@@ -1130,12 +1130,12 @@ class SchemaPageTest extends TestBase {
 		when: 'click procedure name'
 		page.parameters.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
+		waitFor(waitTime) { page.ascending.isDisplayed() }
 
 		when: 'click procedure name'
 		page.parameters.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
 
 	def "Procedures And SQL Tab:Check Ascending Descending in Partitioning"() {
@@ -1147,12 +1147,12 @@ class SchemaPageTest extends TestBase {
 		when: 'click procedure name'
 		page.partitioning.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
+		waitFor(waitTime) { page.ascending.isDisplayed() }
 
 		when: 'click procedure name'
 		page.partitioning.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
 
 	def "Procedures And SQL Tab:Check Ascending Descending in RW"() {
@@ -1164,12 +1164,12 @@ class SchemaPageTest extends TestBase {
 		when: 'click procedure name'
 		page.rw.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
+		waitFor(waitTime) { page.ascending.isDisplayed() }
 
 		when: 'click procedure name'
 		page.rw.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
 
 	def "Procedures And SQL Tab:Check Ascending Descending in Access"() {
@@ -1181,12 +1181,12 @@ class SchemaPageTest extends TestBase {
 		when: 'click procedure name'
 		page.access.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
+		waitFor(waitTime) { page.ascending.isDisplayed() }
 
 		when: 'click procedure name'
 		page.access.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
 
 	def "Procedures And SQL Tab:Check Ascending Descending in Attributes"() {
@@ -1198,12 +1198,12 @@ class SchemaPageTest extends TestBase {
 		when: 'click procedure name'
 		page.attributes.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
+		waitFor(waitTime) { page.ascending.isDisplayed() }
 
 		when: 'click procedure name'
 		page.attributes.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
 
 	// DLL Source
