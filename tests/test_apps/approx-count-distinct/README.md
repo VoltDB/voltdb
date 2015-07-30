@@ -3,7 +3,8 @@ function `APPROX_COUNT_DISTINCT(col)` as compared with with
 `COUNT(DISTINCT col)`.  Typically the former will be faster and use
 less memory (especially in multi-partition queries where an exact
 answer requires the coordinator to do more work).  The approximate
-answer is usually within 1% of the exact answer.
+answer is usually within 1% of the exact answer, if the number of
+unique values is in the thousands or greater.
 
 In cases where computing an exact distinct cardinality would be
 prohibitive due to long latencies or hitting the temp table memory
