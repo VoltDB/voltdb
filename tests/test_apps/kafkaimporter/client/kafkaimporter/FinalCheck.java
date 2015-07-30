@@ -26,8 +26,8 @@ import org.voltdb.client.Client;
 import org.voltcore.logging.VoltLogger;
 
 public class FinalCheck {
+    static VoltLogger log = new VoltLogger("Benchmark.finalCheck");
     static boolean check(Client client) {
-        static VoltLogger log = new VoltLogger("Benchmark.finalCheck");
         long mirrorRows = MatchChecks.getMirrorTableRowCount(client);
         long importRows = MatchChecks.getImportTableRowCount(client);
 

@@ -136,7 +136,7 @@ public class KafkaImportBenchmark {
         log.info(HORIZONTAL_RULE);
         log.info(config.getConfigDumpString());
         if(config.latencyreport) {
-            log.warm("Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
+            log.warn("Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
         }
     }
 
@@ -183,13 +183,10 @@ public class KafkaImportBenchmark {
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
         long thrup;
 
-        log.info("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         thrup = stats.getTxnThroughput();
-        log.info("Throughput %d/s, ", thrup);
-        log.info("Aborts/Failures %d/%d, ",
-                stats.getInvocationAborts(), stats.getInvocationErrors());
-        log.info("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
-                stats.kPercentileLatencyAsDouble(0.95));
+        log.info(String.format("Throughput %d/s, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
+            thrup, stats.getInvocationAborts(), stats.getInvocationErrors(),
+            stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
     }
 
     /**
@@ -204,7 +201,7 @@ public class KafkaImportBenchmark {
         log.info(HORIZONTAL_RULE);
 
         log.info(HORIZONTAL_RULE);
-        log.info(" Starting Benchmark");
+        log.info("Starting Benchmark");
         log.info(HORIZONTAL_RULE);
 
         SecureRandom rnd = new SecureRandom();
@@ -226,13 +223,13 @@ public class KafkaImportBenchmark {
             benchmarkStartTS = System.currentTimeMillis();
             schedulePeriodicStats();
 
-            log.info("starting data checker...");
+            log.info("Starting data checker...");
             checkTimer = matchChecks.checkTimer(5000, client);
 
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database
-            log.info("\nRunning benchmark...");
+            log.info("Running benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
                 long value = System.currentTimeMillis();
