@@ -679,6 +679,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             error(ex, "Failed to fetch from %s", m_topicAndPartition);
                             //See if its network error and find new leader for this partition.
                             if (ex instanceof ClosedChannelException) {
+                                closeConsumer(consumer);
+                                consumer = null;
                                 leaderBroker = findNewLeader();
                                 if (leaderBroker == null) {
                                     //point to original leader which will fail and we fall back again here.
