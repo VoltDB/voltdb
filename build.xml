@@ -650,19 +650,19 @@ DISTRIBUTION
         <isset property="os.mac"/>
     </condition>
 
-    <!-- Call shell script that handles copying native libs so they can be packaged together -->
-    <exec dir='.' executable="/usr/bin/env" failonerror='true'>
-        <arg value='bash' />
-        <arg value='tools/copy-lib.sh'/>
-        <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
-        <arg value='${dist.version}' />
-    </exec>
-
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
             <include name="libvoltdb*" />
         </fileset>
     </copy>
+
+    <!-- Call shell script that handles copying native libs so they can be packaged together -->
+    <exec dir='.' executable="/usr/bin/env" failonerror='false'>
+        <arg value='bash' />
+        <arg value='tools/copy-lib.sh'/>
+        <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
+        <arg value='${dist.version}'/>
+    </exec>
 </target>
 
 <target name="call_strip_lib" unless="isDebug">
