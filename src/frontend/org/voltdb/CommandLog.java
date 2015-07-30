@@ -33,8 +33,7 @@ public interface CommandLog {
      *            The txnId of the truncation snapshot at the end of restore, or
      * @param partitionCount
      */
-    public abstract void init(
-                                 CatalogContext context,
+    public abstract void init(int logSize,
                                  long txnId,
                                  int partitionCount, String coreBinding,
                                  Map<Integer, Long> perPartitionTxnId);
@@ -46,8 +45,7 @@ public interface CommandLog {
      *            Long.MIN if there was none.
      * @param partitionCount
      */
-    public abstract void initForRejoin(
-                                          CatalogContext context,
+    public abstract void initForRejoin(int logSize,
                                           long txnId,
                                           int partitionCount, boolean isRejoin,
                                           String coreBinding, Map<Integer, Long> perPartitionTxnId);
