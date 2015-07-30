@@ -66,3 +66,5 @@ doc/tutorials/auction/csvloader_*.csv
 /tests/sqlcmd/scripts/**/*.outdiffs
 out
 bundles
+/target/generated-sources/antlr4
+/target/generated-sources/antlr4.touch
