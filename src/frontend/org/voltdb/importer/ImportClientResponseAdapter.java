@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ProcedureCallback;
@@ -81,10 +82,35 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             }
         }
 
+        public void drain(ClientResponse response) throws Exception {
+            discard();
+            if (m_cb != null) {
+                m_cb.clientCallback(response);
+            }
+        }
+
     }
 
     public long getPendingCount() {
         return m_pendingCallbacks.size();
+    }
+
+    //Similar to distributer drain.
+    public void drain() {
+        long sleep = 500;
+        do {
+            if (m_pendingCallbacks.isEmpty()) {
+                break;
+            }
+            /*
+             * Back off to spinning at five millis. Try and get drain to be a little
+             * more prompt. Spinning sucks!
+             */
+            LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
+            if (sleep < 5000) {
+                sleep += 500;
+            }
+        } while(true);
     }
 
     public boolean createTransaction(Procedure catProc, ProcedureCallback proccb, StoredProcedureInvocation task,
