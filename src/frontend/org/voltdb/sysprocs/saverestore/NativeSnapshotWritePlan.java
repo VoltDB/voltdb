@@ -152,12 +152,17 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         placePartitionedTasks(partitionedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
+        boolean isTruncationSnapshot = true;
+        if (jsData != null) {
+            isTruncationSnapshot = jsData.has("truncReqId");
+        }
+
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds,
                 remoteDCLastIds, context,
                 exportSequenceNumbers, drTupleStreamInfo, tracker, hashinatorData, timestamp,
                 newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
-                replicatedSnapshotTasks);
+                replicatedSnapshotTasks, isTruncationSnapshot);
     }
 
     private Callable<Boolean> createDeferredSetup(final String file_path,
@@ -175,7 +180,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final Table[] tables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,
                                                   final ArrayList<SnapshotTableTask> partitionedSnapshotTasks,
-                                                  final ArrayList<SnapshotTableTask> replicatedSnapshotTasks)
+                                                  final ArrayList<SnapshotTableTask> replicatedSnapshotTasks,
+                                                  final boolean isTruncationSnapshot)
     {
         return new Callable<Boolean>() {
             private final HashMap<Integer, SnapshotDataTarget> m_createdTargets = Maps.newHashMap();
@@ -202,14 +208,16 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     task.setTarget(target);
                 }
 
-                // Only sync the DR Log on Native Snapshots
-                SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(new Runnable() {
-                    @Override
-                    public void run()
-                    {
-                        context.forceAllBuffersToDiskForDRAndExport(false);
-                    }
-                });
+                if (isTruncationSnapshot) {
+                    // Only sync the DR Log on Native Snapshots
+                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(new Runnable() {
+                        @Override
+                        public void run()
+                        {
+                            context.forceAllBuffersToDiskForDRAndExport(false);
+                        }
+                    });
+                }
 
                 return true;
             }
