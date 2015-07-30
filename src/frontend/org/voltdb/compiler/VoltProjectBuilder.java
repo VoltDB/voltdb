@@ -54,6 +54,8 @@ import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType;
@@ -63,8 +65,10 @@ import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType.Memorylimit;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
@@ -72,9 +76,6 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ImportType;
-import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -283,6 +284,7 @@ public class VoltProjectBuilder {
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
+    private Integer m_rssLimit = null;
 
     private boolean m_useDDLSchema = false;
 
@@ -292,6 +294,11 @@ public class VoltProjectBuilder {
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
+        return this;
+    }
+
+    public VoltProjectBuilder setRssLimit(int limit) {
+        m_rssLimit = limit;
         return this;
     }
 
@@ -1010,6 +1017,11 @@ public class VoltProjectBuilder {
             SystemSettingsType.Query query = factory.createSystemSettingsTypeQuery();
             query.setTimeout(m_queryTimeout);
             systemSettingType.setQuery(query);
+        }
+        if (m_rssLimit != null) {
+            Memorylimit memoryLimit = factory.createSystemSettingsTypeMemorylimit();
+            memoryLimit.setSize(m_rssLimit);
+            systemSettingType.setMemorylimit(memoryLimit);
         }
 
         deployment.setSystemsettings(systemSettingType);

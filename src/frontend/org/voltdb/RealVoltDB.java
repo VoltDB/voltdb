@@ -147,8 +147,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
-    // interval between resource monitor runs in seconds
-    private static final int resourceMonitorInterval = Integer.getInteger("RESOURCE_MONITOR_INTERVAL", 60);
+    public static final String RESOURCE_MONITOR_INTERVAL = "RESOURCE_MONITOR_INTERVAL";
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
@@ -1342,6 +1341,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private void startResourceUsageMonitor() {
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
         if (resMonitor.hasResourceLimitsConfigured()) {
+            int resourceMonitorInterval = Integer.getInteger(RESOURCE_MONITOR_INTERVAL, 60);
             m_periodicWorks.add(scheduleWork(resMonitor, resourceMonitorInterval,
                     resourceMonitorInterval, TimeUnit.SECONDS));
         }

@@ -30,13 +30,13 @@ public class ResourceUsageMonitor implements Runnable
 {
     private static final VoltLogger m_logger = new VoltLogger("RESOURCE_MONITOR");
 
-    private int m_rssLimit;
+    private long m_rssLimit;
 
     public ResourceUsageMonitor(SystemSettingsType systemSettings)
     {
         if (systemSettings!=null && systemSettings.getMemorylimit()!=null) {
-            // configured value is in GB. Convert it to MB
-            m_rssLimit = systemSettings.getMemorylimit().getSize()*1024;
+            // configured value is in GB. Convert it to bytes
+            m_rssLimit = systemSettings.getMemorylimit().getSize()*1024*1024*1024;
         }
     }
 
