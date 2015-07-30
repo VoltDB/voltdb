@@ -11,6 +11,7 @@
 	<classpathentry kind="src" path="tests/testprocs"/>
 	<classpathentry kind="src" path="tests/hsqldb"/>
 	<classpathentry kind="src" path="tests/frontend"/>
+	<classpathentry kind="src" path="tools/sqlparser"/>
 	<classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
 	<classpathentry kind="lib" path="lib/commons-cli-1.2.jar"/>
 	<classpathentry kind="lib" path="lib/jline-2.10.jar"/>
