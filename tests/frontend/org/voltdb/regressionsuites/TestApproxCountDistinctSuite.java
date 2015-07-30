@@ -42,7 +42,6 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
             "ii",
             "si",
             "ti",
-            "ff",
             "dd",
             "ts"
     };
@@ -77,7 +76,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
             // it doesn't mess with the algorithm.
             if (i % 13 == 0) {
                 client.callProcedure(tbl + ".Insert", i,
-                        null, null, null, null, null, null, null);
+                        null, null, null, null, null, null);
             }
             else {
                 // Use a a Gaussian distribution (bell curve), to exercise the hyperloglog hash.
@@ -88,7 +87,6 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                         getNormalValue(r, 1000, Integer.MIN_VALUE, Integer.MAX_VALUE),
                         getNormalValue(r, 1000, Short.MIN_VALUE, Short.MAX_VALUE),
                         getNormalValue(r, 100, Byte.MIN_VALUE, Byte.MAX_VALUE),
-                        r.nextGaussian(), // float
                         getNormalDecimalValue(r, 1000000000), // decimal
                         new TimestampType(baseTs + getNormalValue(r, 10000, Short.MIN_VALUE, Short.MAX_VALUE)));
             }
@@ -139,12 +137,11 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         // In other tests, we can just verify that the error in the estimate
         // is reasonably bounded, by computing an exact answer.
         double expectedEstimates[] = {
-                859.613,
-                865.6926,
-                879.880,
-                246.4629,
-                997.5537,
-                1001.615,
+                878.8667,
+                871.7726,
+                872.7860,
+                244.4554,
+                1002.6306,
                 983.3405
         };
 
@@ -367,6 +364,10 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         verifyStmtFails(client,
                 "select approx_count_distinct(vb_inline) from unsupported_column_types;",
                 "incompatible data type in operation");
+
+        verifyStmtFails(client,
+                "select approx_count_distinct(ff) from unsupported_column_types;",
+                "incompatible data type in operation");
     }
 
     public TestApproxCountDistinctSuite(String name) {
@@ -385,7 +386,6 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 "ii integer, " +
                 "si smallint, " +
                 "ti tinyint, " +
-                "ff float, " +
                 "dd decimal, " +
                 "ts timestamp " +
                 ");" +
@@ -395,7 +395,6 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 "ii integer, " +
                 "si smallint, " +
                 "ti tinyint, " +
-                "ff float, " +
                 "dd decimal, " +
                 "ts timestamp " +
                 "); " +
@@ -405,6 +404,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 + "vc varchar(256),"
                 + "vb_inline varbinary(4), "
                 + "vc_inline varchar(4), "
+                + "ff float "
                 + ");";
         try {
             project.addLiteralSchema(literalSchema);

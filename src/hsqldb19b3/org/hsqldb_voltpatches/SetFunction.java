@@ -474,7 +474,6 @@ public class SetFunction implements Serializable {
                 case Types.SQL_SMALLINT :
                 case Types.SQL_INTEGER :
                 case Types.SQL_BIGINT :
-                case Types.SQL_DOUBLE :
                 case Types.SQL_DECIMAL :
                 case Types.SQL_TIMESTAMP :
                     return Type.SQL_DOUBLE;
