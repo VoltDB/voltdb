@@ -29,7 +29,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.types.ExpressionType;
 import static org.voltdb.types.ExpressionType.*;
-import org.voltdb.types.PlanNodeType;
 
 /**
  * Mostly here we're concerned that an APPROX_COUNT_DISTINCT aggregate function is
@@ -61,17 +60,6 @@ public class TestPlansApproxCountDistinct extends PlannerTestCase {
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-    }
-
-    // Find all the aggregate nodes in a fragment, whether they are hash, serial or partial.
-    private static List<AbstractPlanNode> findAllAggPlanNodes(AbstractPlanNode node) {
-        List<AbstractPlanNode> aggNodes = node.findAllNodesOfType(PlanNodeType.AGGREGATE);
-        List<AbstractPlanNode> hashAggNodes = node.findAllNodesOfType(PlanNodeType.HASHAGGREGATE);
-        List<AbstractPlanNode> partialAggNodes = node.findAllNodesOfType(PlanNodeType.PARTIALAGGREGATE);
-
-        aggNodes.addAll(hashAggNodes);
-        aggNodes.addAll(partialAggNodes);
-        return aggNodes;
     }
 
     private void assertAggPlanNodeContainsFunctions(AggregatePlanNode node, ExpressionType[] expectedAggFns) {

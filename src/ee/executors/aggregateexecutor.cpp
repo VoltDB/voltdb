@@ -367,8 +367,9 @@ public:
                && ValuePeeker::peekValueType(val) != VALUE_TYPE_VARBINARY
                && ValuePeeker::peekValueType(val) != VALUE_TYPE_DOUBLE);
 
-        int32_t valLength;
+        int32_t valLength = 0;
         const char* data = ValuePeeker::peekPointerToDataBytes(val, &valLength);
+        assert(valLength != 0);
 
         m_hyperLogLog.add(data, static_cast<uint32_t>(valLength));
     }

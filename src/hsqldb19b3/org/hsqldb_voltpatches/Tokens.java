@@ -52,6 +52,9 @@ public class Tokens {
     public static final String T_ALTER            = "ALTER";
     static final String        T_AND              = "AND";
     static final String        T_ANY              = "ANY";
+    // A VoltDB extension APPROX_COUNT_DISTINCT
+    static final String        T_APPROX_COUNT_DISTINCT = "APPROX_COUNT_DISTINCT";
+    // End of VoltDB extension
     static final String        T_ARE              = "ARE";
     static final String        T_ARRAY            = "ARRAY";
     public static final String T_AS               = "AS";
@@ -100,9 +103,6 @@ public class Tokens {
     static final String        T_CORR             = "CORR";
     static final String        T_CORRESPONDING    = "CORRESPONDING";
     static final String        T_COUNT            = "COUNT";
-    // A VoltDB extension APPROX_COUNT_DISTINCT
-    static final String        T_APPROX_COUNT_DISTINCT = "APPROX_COUNT_DISTINCT";
-    // End of VoltDB extension
     static final String        T_COVAR_POP        = "COVAR_POP";
     static final String        T_COVAR_SAMP       = "COVAR_SAMP";
     public static final String T_CREATE           = "CREATE";

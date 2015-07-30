@@ -478,6 +478,16 @@ public class SetFunction implements Serializable {
                 case Types.SQL_TIMESTAMP :
                     return Type.SQL_DOUBLE;
                 default:
+                    // We only support fixed-width types for this
+                    // aggregate function.
+                    //
+                    // FLOAT is not supported since this function
+                    // relies on different values having different bit
+                    // patterns, and the same values having being the
+                    // same.  Floating point numbers don't hold to
+                    // this---e.g., positive and negative zero.
+                    //
+                    // Incompatible data types in operation
                     throw Error.error(ErrorCode.X_42565);
                 }
             // End of VoltDB extension for APPROX_COUNT_DISTINCT

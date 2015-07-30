@@ -1534,9 +1534,7 @@ public class Expression {
         prototypes.put(OpTypes.MATCH_UNIQUE_FULL,    null); // not yet supported ExpressionLogical
         // aggregate functions
         prototypes.put(OpTypes.COUNT,         (new VoltXMLElement("aggregation")).withValue("optype", "count"));
-        // A VoltDB extension APPROX_COUNT_DISTINCT
         prototypes.put(OpTypes.APPROX_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "approx_count_distinct"));
-        // End of VoltDB extension
         prototypes.put(OpTypes.SUM,           (new VoltXMLElement("aggregation")).withValue("optype", "sum"));
         prototypes.put(OpTypes.MIN,           (new VoltXMLElement("aggregation")).withValue("optype", "min"));
         prototypes.put(OpTypes.MAX,           (new VoltXMLElement("aggregation")).withValue("optype", "max"));
@@ -1746,9 +1744,6 @@ public class Expression {
             return fn.voltAnnotateFunctionXML(exp);
 
         case OpTypes.COUNT:
-        // A VoltDB extension APPROX_COUNT_DISTINCT
-        case OpTypes.APPROX_COUNT_DISTINCT:
-        // End of VoltDB extension
         case OpTypes.SUM:
         case OpTypes.AVG:
             if (((ExpressionAggregate)this).isDistinctAggregate) {
