@@ -293,14 +293,14 @@ public class LoadTableLoader extends BenchmarkThread {
                                 = TheHashinator.valueToBytes(m_table.fetchRow(0).get(
                                                 m_partitionedColumnIndex, VoltType.BIGINT));
                         if (upsertHitMode != 0) {// for test upsert an existing row, insert it and then upsert same row again.
-                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 0, m_table);
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 1, m_table);
                         }
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, upsertMode, m_table);
+                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 1, m_table);
                     } else {
                         if (upsertHitMode != 0) {
-                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 0, m_table);
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 1, m_table);
                         }
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, upsertMode, m_table);
+                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 1, m_table);
                     }
                     //Ad if successfully queued but remove if proc fails.
                     if (success) {

@@ -372,13 +372,17 @@ public class Inits {
             catalog.execute(serializedCatalog);
             serializedCatalog = null;
 
+            String result = CatalogUtil.checkLicenseConstraint(catalog, m_rvdb.getLicenseApi());
+            if (result != null) {
+                VoltDB.crashLocalVoltDB(result);
+            }
+
             // note if this fails it will print an error first
             // This is where we compile real catalog and create runtime
             // catalog context. To validate deployment we compile and create
             // a starter context which uses a placeholder catalog.
-            String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
+            result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
-                hostLog.fatal(result);
                 VoltDB.crashLocalVoltDB(result);
             }
 
@@ -630,7 +634,7 @@ public class Inits {
         public void run() {
             // Let the Import system read its configuration from the catalog.
             try {
-                ImportManager.initialize(m_rvdb.m_catalogContext, m_rvdb.m_partitionsToSitesAtStartupForExportInit, m_rvdb.m_messenger);
+                ImportManager.initialize(m_rvdb.m_myHostId, m_rvdb.m_catalogContext, m_rvdb.m_messenger);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error setting up import", true, t);
             }

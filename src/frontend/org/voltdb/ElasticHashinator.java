@@ -28,7 +28,6 @@ import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.SortedMapDifference;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
 
@@ -66,6 +65,9 @@ public class ElasticHashinator extends TheHashinator {
      */
     private final long m_tokens;
     private final int m_tokenCount;
+
+    // Provide a hook for the GC
+    @SuppressWarnings("unused")
     private final Cleaner m_cleaner;
 
     private final Supplier<byte[]> m_configBytes;
@@ -667,6 +669,7 @@ public class ElasticHashinator extends TheHashinator {
             this.size = size;
         }
 
+        @Override
         public void run() {
             if (address == 0) {
                 return;

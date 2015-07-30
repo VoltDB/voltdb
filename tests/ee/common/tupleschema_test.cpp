@@ -26,6 +26,7 @@
 #include "harness.h"
 #include "common/TupleSchema.h"
 #include "common/TupleSchemaBuilder.h"
+#include "test_utils/ScopedTupleSchema.hpp"
 
 using voltdb::TupleSchema;
 using voltdb::ValueType;
@@ -39,36 +40,6 @@ class TupleSchemaTest : public Test
 {
 };
 
-// A class to automatically free TupleSchema instances, which cannot
-// be allocated on the stack due to variable-length data that follows
-// each instance.  Modeled after boost::scoped_ptr.
-class ScopedSchema {
-public:
-    ScopedSchema(TupleSchema* schema)
-        : m_schema(schema)
-    {
-    }
-
-    TupleSchema* get() {
-        return m_schema;
-    }
-
-    TupleSchema& operator*() {
-        return *m_schema;
-    }
-
-    TupleSchema* operator->() {
-        return m_schema;
-    }
-
-    ~ScopedSchema() {
-        TupleSchema::freeTupleSchema(m_schema);
-    }
-
-private:
-    TupleSchema* m_schema;
-};
-
 TEST_F(TupleSchemaTest, Basic)
 {
     voltdb::TupleSchemaBuilder builder(2);
@@ -79,7 +50,7 @@ TEST_F(TupleSchemaTest, Basic)
                              false, // do not allow nulls
                              true); // size is in bytes
 
-    ScopedSchema schema(builder.build());
+    ScopedTupleSchema schema(builder.build());
 
     ASSERT_NE(NULL, schema.get());
     ASSERT_EQ(2, schema->columnCount());
@@ -122,7 +93,7 @@ TEST_F(TupleSchemaTest, HiddenColumn)
 
     builder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
 
-    ScopedSchema schema(builder.build());
+    ScopedTupleSchema schema(builder.build());
 
     ASSERT_NE(NULL, schema.get());
     ASSERT_EQ(2, schema->columnCount());
@@ -135,6 +106,10 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     // 4 bytes for the integer
     // 8 bytes for the string pointer
     EXPECT_EQ(20, schema->tupleLength());
+
+    EXPECT_EQ(0, schema->getUninlinedObjectHiddenColumnCount());
+    EXPECT_EQ(12, schema->offsetOfHiddenColumns());
+    EXPECT_EQ(8, schema->lengthOfAllHiddenColumns());
 
     // Verify that the visible columns are as expected
     const TupleSchema::ColumnInfo *colInfo = schema->getColumnInfo(0);
@@ -175,7 +150,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
                              true,   // allow nulls
                              false); // length not in bytes
     builder.setColumnAtIndex(2, VALUE_TYPE_TIMESTAMP);
-    ScopedSchema schema1(builder.build());
+    ScopedTupleSchema schema1(builder.build());
 
     voltdb::TupleSchemaBuilder hiddenBuilder(3, 2); // 3 visible columns
     hiddenBuilder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
@@ -188,7 +163,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
     hiddenBuilder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
     hiddenBuilder.setHiddenColumnAtIndex(1, VALUE_TYPE_VARCHAR, 10);
 
-    ScopedSchema schema2(hiddenBuilder.build());
+    ScopedTupleSchema schema2(hiddenBuilder.build());
 
     ASSERT_NE(NULL, schema1.get());
     ASSERT_NE(NULL, schema2.get());
@@ -203,7 +178,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
     // Create another schema where the varchar column is longer (but
     // still uninlined)
     builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 128);
-    ScopedSchema schema3(builder.build());
+    ScopedTupleSchema schema3(builder.build());
 
     // Structural layout is the same
     EXPECT_TRUE(schema1->isCompatibleForMemcpy(schema3.get()));
@@ -218,7 +193,7 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
                                          VALUE_TYPE_BIGINT,
                                          8,
                                          false); // nulls not allowed
-    ScopedSchema schema4(hiddenBuilder.build());
+    ScopedTupleSchema schema4(hiddenBuilder.build());
 
     // Structural layout is the same
     EXPECT_TRUE(schema2->isCompatibleForMemcpy(schema4.get()));

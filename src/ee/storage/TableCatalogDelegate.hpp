@@ -73,7 +73,8 @@ class TableCatalogDelegate : public CatalogDelegate {
                                      voltdb::PersistentTable* existingTable,
                                      voltdb::PersistentTable* newTable);
 
-    static TupleSchema *createTupleSchema(catalog::Table const &catalogTable);
+    static TupleSchema *createTupleSchema(catalog::Database const &catalogDatabase,
+                                          catalog::Table const &catalogTable);
 
     static bool getIndexScheme(catalog::Table const &catalogTable,
                                catalog::Index const &catalogIndex,

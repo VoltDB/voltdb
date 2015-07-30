@@ -468,7 +468,8 @@ h2 {text-transform: uppercase}
     content += "<tr><td>Totals</td>%s</tr>\n</table>" % statistics["totals"]
     content += """
 <table border=0><tr><td>Key:</td></tr>
-<tr><td align=right bgcolor=#FF0000>Red</td><td>table elements indicate a test failure(s), due to a mismatch between VoltDB and HSqlDB results, or a crash.</td></tr>
+<tr><td align=right bgcolor=#FF0000>Red</td><td>table elements indicate a test failure(s), due to a mismatch between VoltDB and HSqlDB results, or a crash
+                                                   (or, an <i>extremely</i> slow test suite).</td></tr>
 <tr><td align=right bgcolor=#FFA500>Orange</td><td>table elements indicate a strong warning, for something that should be looked into (e.g. an NPE in VoltDB,
                                                    a pattern that generated no SQL queries, or a <i>very</i> slow test suite), but no test failures.</td></tr>
 <tr><td align=right bgcolor=#FFFF00>Yellow</td><td>table elements indicate a mild warning, for something you might want to improve (e.g. an NPE in HSqlDB,

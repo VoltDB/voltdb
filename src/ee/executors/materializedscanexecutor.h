@@ -41,7 +41,7 @@ namespace voltdb
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
-        bool p_execute();
+        bool p_execute(const NValueArray& params);
     };
 }
 

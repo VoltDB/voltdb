@@ -95,7 +95,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     return (true);
 }
 
-bool MaterializeExecutor::p_execute() {
+bool MaterializeExecutor::p_execute(const NValueArray &params) {
     assert (node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
     assert(node);
     assert (!node->isInline()); // inline projection's execute() should not be called
@@ -103,7 +103,6 @@ bool MaterializeExecutor::p_execute() {
     assert (output_table);
     assert (m_columnCount == (int)node->getOutputColumnNames().size());
 
-    const NValueArray& params = *ExecutorContext::getExecutorContext()->getParameterContainer();
     // batched insertion
     if (batched) {
         int paramcnt = engine->getUsedParamcnt();

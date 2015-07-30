@@ -69,7 +69,7 @@ class AbstractExecutor {
     bool init(VoltDBEngine*, TempTableLimits* limits);
 
     /** Invoke a plannode's associated executor */
-    bool execute();
+    bool execute(const NValueArray& params);
 
     /**
      * Returns the plannode that generated this executor.
@@ -116,7 +116,7 @@ class AbstractExecutor {
                         TempTableLimits* limits) = 0;
 
     /** Concrete executor classes impelmenet execution in p_execute() */
-    virtual bool p_execute() = 0;
+    virtual bool p_execute(const NValueArray& params) = 0;
 
     /**
      * Set up a multi-column temp output table for those executors that require one.
@@ -139,13 +139,13 @@ class AbstractExecutor {
 };
 
 
-inline bool AbstractExecutor::execute()
+inline bool AbstractExecutor::execute(const NValueArray& params)
 {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
 
     // run the executor
-    return p_execute();
+    return p_execute(params);
 }
 
 }

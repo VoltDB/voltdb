@@ -97,7 +97,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
 }
 
 
-bool NestLoopExecutor::p_execute() {
+bool NestLoopExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("executing NestLoop...");
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
@@ -149,7 +149,7 @@ bool NestLoopExecutor::p_execute() {
     int limit = -1;
     int offset = -1;
     if (limit_node) {
-        limit_node->getLimitAndOffsetByReference(limit, offset);
+        limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
     int outer_cols = outer_table->columnCount();
@@ -167,7 +167,7 @@ bool NestLoopExecutor::p_execute() {
     if (m_aggExec != NULL) {
         VOLT_TRACE("Init inline aggregate...");
         const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
-        join_tuple = m_aggExec->p_execute_init(&pmp, aggInputSchema, m_tmpOutputTable);
+        join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, m_tmpOutputTable);
     } else {
         join_tuple = m_tmpOutputTable->tempTuple();
     }

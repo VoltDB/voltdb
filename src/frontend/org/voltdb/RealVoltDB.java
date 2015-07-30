@@ -171,9 +171,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.4";
+    static final String m_defaultVersionString = "5.5";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.4\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.5\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -182,7 +182,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
-    private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
+    private AsyncCompilerAgent m_asyncCompilerAgent = null;
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
@@ -383,7 +383,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_messenger = null;
             m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
-            m_asyncCompilerAgent = new AsyncCompilerAgent();
+            m_asyncCompilerAgent = null;
             m_snapshotCompletionMonitor = null;
             m_catalogContext = null;
             m_partitionCountStats = null;
@@ -512,6 +512,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
                         "See previous log message for details.", false, null);
             }
+            m_asyncCompilerAgent = new AsyncCompilerAgent(m_licenseApi);
 
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
@@ -785,7 +786,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
 
             // Configure consumer-side DR if relevant
-            if (m_config.m_isEnterprise && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+            if (m_config.m_isEnterprise &&
+                    (m_config.m_replicationRole == ReplicationRole.REPLICA ||
+                     m_catalogContext.database.getIsactiveactivedred())) {
                 String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
                 byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
                 if (drProducerHost == null || drProducerHost.isEmpty()) {
@@ -2562,6 +2565,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // Start listening on the DR ports
             prepareReplication();
+
+            //Tell import processors that they can start ingesting data.
+            ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+
         }
 
         try {
@@ -2572,9 +2579,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
             VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
-
-        //Tell import processors that they can start ingesting data.
-        ImportManager.instance().readyForData(m_catalogContext, m_messenger);
 
         if (m_startMode != null) {
             m_mode = m_startMode;

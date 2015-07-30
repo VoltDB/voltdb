@@ -85,7 +85,7 @@ public:
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
-    bool p_execute();
+    bool p_execute(const NValueArray &params);
 
     IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;

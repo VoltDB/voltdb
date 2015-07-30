@@ -142,7 +142,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
-bool IndexScanExecutor::p_execute()
+bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
     assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
@@ -174,7 +174,7 @@ bool IndexScanExecutor::p_execute()
         if (m_projectionNode != NULL) {
             inputSchema = m_projectionNode->getOutputTable()->schema();
         }
-        temp_tuple = m_aggExec->p_execute_init(&pmp, inputSchema, m_outputTable);
+        temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable);
     } else {
         temp_tuple = m_outputTable->tempTuple();
     }
@@ -375,7 +375,7 @@ bool IndexScanExecutor::p_execute()
     int limit = -1;
     int offset = -1;
     if (limit_node != NULL) {
-        limit_node->getLimitAndOffsetByReference(limit, offset);
+        limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
     //

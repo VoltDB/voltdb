@@ -104,7 +104,7 @@ public class AsyncBenchmark {
     }
 
     // using insert for @Load*Table
-    static final byte upsertMode = byte (0);
+    static final byte upsertMode = (byte )0;
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE = "----------" + "----------"
             + "----------" + "----------" + "----------" + "----------"

@@ -17,22 +17,34 @@
 
 package org.voltdb.importer;
 
+import static org.voltcore.common.Constants.VOLT_TMP_DIR;
+
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.osgi.framework.BundleException;
+import org.osgi.framework.Constants;
+import org.osgi.framework.launch.Framework;
+import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.utils.CatalogUtil;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  *
  * @author akhanzode
  */
-public class ImportManager {
+public class ImportManager implements ChannelChangeCallback {
 
     /**
      * Processors also log using this facility.
@@ -46,6 +58,10 @@ public class ImportManager {
     private static ImportManager m_self;
     private final HostMessenger m_messenger;
 
+    private final Map<String, String> m_frameworkProps;
+    private final int m_myHostId;
+    private Framework m_framework;
+    private ChannelDistributer m_distributer;
     /**
      * Get the global instance of the ImportManager.
      * @return The global single instance of the ImportManager.
@@ -54,20 +70,57 @@ public class ImportManager {
         return m_self;
     }
 
-    protected ImportManager(HostMessenger messenger) {
+    protected ImportManager(int myHostId, HostMessenger messenger) throws IOException {
+        m_myHostId = myHostId;
         m_messenger = messenger;
+
+        String tmpFilePath = System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"));
+        //Create a directory in temp + username
+        File f = new File(tmpFilePath, System.getProperty("user.name"));
+        if (!f.exists() && !f.mkdirs()) {
+            throw new IOException("Failed to create required OSGI cache directory: " + f.getAbsolutePath());
+        }
+
+        if (!f.isDirectory() || !f.canRead() || !f.canWrite() || !f.canExecute()) {
+            throw new IOException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
+        }
+
+        m_frameworkProps = ImmutableMap.<String,String>builder()
+                .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
+                    + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0"
+                    + ",org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0")
+                .put("org.osgi.framework.storage.clean", "onFirstInit")
+                .put("felix.cache.rootdir", f.getAbsolutePath())
+                .put("felix.cache.locking", Boolean.FALSE.toString())
+                .build();
+
+    }
+
+    private void startOSGiFramework() throws BundleException {
+        if (m_distributer != null) return;
+
+        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
+        m_distributer.registerCallback("__IMPORT_MANAGER__", this);
+
+        FrameworkFactory frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
+        importLog.info("Framework properties are: " + m_frameworkProps);
+        m_framework = frameworkFactory.newFramework(m_frameworkProps);
+        m_framework.start();
     }
 
     /**
      * Create the singleton ImportManager and initialize.
-     * @param catalogContext
-     * @param partitions
+     * @param myHostId my host id in cluster
+     * @param catalogContext current catalog context
+     * @param messenger messenger to get to ZK
+     * @throws org.osgi.framework.BundleException
+     * @throws java.io.IOException
      */
-    public static synchronized void initialize(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) {
-        ImportManager em = new ImportManager(messenger);
+    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
+        ImportManager em = new ImportManager(myHostId, messenger);
 
         m_self = em;
-        em.create(catalogContext);
+        em.create(myHostId, catalogContext);
     }
 
     /**
@@ -75,13 +128,15 @@ public class ImportManager {
      * @param catalogContext
      * @param partitions
      */
-    private synchronized void create(CatalogContext catalogContext) {
+    private synchronized void create(int myHostId, CatalogContext catalogContext) {
         try {
-            if (catalogContext.getDeployment().getImport() == null) {
-                importLog.info("No importers specified skipping Streaming Import initialization.");
+            ImportType importElement = catalogContext.getDeployment().getImport();
+            if (importElement == null || importElement.getConfiguration().isEmpty()) {
                 return;
             }
-            ImportDataProcessor newProcessor = new ImportProcessor();
+            startOSGiFramework();
+
+            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
@@ -92,21 +147,37 @@ public class ImportManager {
     }
 
     public synchronized void shutdown() {
+        close();
+        if (m_distributer != null) {
+            m_distributer.shutdown();
+        }
+    }
+
+    public synchronized void close() {
         //If no processor set we dont have any import configuration
         if (m_processor.get() == null) {
             return;
         }
         m_processor.get().shutdown();
-        //Unset until it gets recreated.
+        //Unset until it gets started.
         m_processor.set(null);
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
-        //Shutdown and recreate.
-        m_self.shutdown();
-        assert(m_processor.get() == null);
-        m_self.create(catalogContext);
+    public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
+        m_self.create(m_myHostId, catalogContext);
         m_self.readyForData(catalogContext, messenger);
+    }
+
+    //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
+    public synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
+        //Shutdown and recreate.
+        m_self.close();
+        assert(m_processor.get() == null);
+        m_self.start(catalogContext, messenger);
+    }
+
+    public void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
+        restart(catalogContext, messenger);
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
@@ -118,5 +189,28 @@ public class ImportManager {
         m_processor.get().readyForData(catalogContext, messenger);
     }
 
+    @Override
+    public void onChange(ImporterChannelAssignment assignment) {
+        //We do nothing each importer will get notified with their assignments.
+    }
+
+    @Override
+    public void onClusterStateChange(VersionedOperationMode mode) {
+        switch (mode.getMode()) {
+            case PAUSED:
+                importLog.info("Cluster is paused shutting down all importers.");
+                close();
+                importLog.info("Cluster is paused all importers shutdown.");
+                break;
+            case RUNNING:
+                importLog.info("Cluster is resumed STARTING all importers.");
+                start(VoltDB.instance().getCatalogContext(), VoltDB.instance().getHostMessenger());
+                importLog.info("Cluster is resumed STARTED all importers.");
+                break;
+            default:
+                break;
+
+        }
+    }
 
 }

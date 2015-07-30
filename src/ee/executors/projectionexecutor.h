@@ -71,7 +71,7 @@ class ProjectionExecutor : public AbstractExecutor {
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
-        bool p_execute();
+        bool p_execute(const NValueArray &params);
 
     private:
         TempTable* output_table;
