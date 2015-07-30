@@ -588,6 +588,31 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }));
     }
 
+    private class SyncRunnable implements Runnable {
+        private final boolean m_nofsync;
+        SyncRunnable(final boolean nofsync) {
+            this.m_nofsync = nofsync;
+        }
+
+        @Override
+        public void run() {
+            try {
+                m_committedBuffers.sync(m_nofsync);
+            } catch (IOException e) {
+                exportLog.error("failed to sync export overflow", e);
+            }
+        }
+    }
+
+    public ListenableFuture<?> sync(final boolean nofsync) {
+        try {
+            return m_es.submit(new SyncRunnable(nofsync));
+        } catch (RejectedExecutionException e) {
+            exportLog.error("Error scheduling export buffer sync", e);
+        }
+        return null;
+    }
+
     public ListenableFuture<?> close() {
         return m_es.submit((new Runnable() {
             @Override
