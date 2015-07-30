@@ -355,23 +355,17 @@ public:
             return;
         }
 
-        ValueType vt = ValuePeeker::peekValueType(val);
-
-        if (vt == VALUE_TYPE_VARCHAR
-            || vt == VALUE_TYPE_VARBINARY
-            || vt == VALUE_TYPE_DOUBLE) {
-            // cannot (yet?) handle variable length types.  This
-            // should be enforced by the front end, so we don't
-            // actually expect this error.
-            //
-            // FLOATs are not handled due to the possibility of
-            // different bit patterns representing the same value
-            // (positive/negative zero, and [de-]normalized numbers).
-            // This is also enforced in the front end.
-            std::ostringstream oss;
-            oss << "Unexpected " << valueToString(vt) << " as argument to APPROX_COUNT_DISTINCT";
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, oss.str().c_str());
-        }
+        // Cannot (yet?) handle variable length types.  This should be
+        // enforced by the front end, so we don't actually expect this
+        // error.
+        //
+        // FLOATs are not handled due to the possibility of different
+        // bit patterns representing the same value (positive/negative
+        // zero, and [de-]normalized numbers).  This is also enforced
+        // in the front end.
+        assert(ValuePeeker::peekValueType(val) != VALUE_TYPE_VARCHAR
+               && ValuePeeker::peekValueType(val) != VALUE_TYPE_VARBINARY
+               && ValuePeeker::peekValueType(val) != VALUE_TYPE_DOUBLE);
 
         int32_t valLength;
         const char* data = ValuePeeker::peekPointerToDataBytes(val, &valLength);
