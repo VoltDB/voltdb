@@ -133,8 +133,9 @@
   </xs:simpleType>
 
   <xs:simpleType name="memoryLimitType">
-    <xs:restriction base="xs:int">
+    <xs:restriction base="xs:decimal">
       <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="1000"/>
     </xs:restriction>
   </xs:simpleType>
 

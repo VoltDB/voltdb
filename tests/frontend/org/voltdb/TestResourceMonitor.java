@@ -46,7 +46,7 @@ public class TestResourceMonitor extends TestCase
     {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         if (setRssLimit) {
-            builder.setRssLimit(1);
+            builder.setRssLimit(0.5);
         }
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("resourcemonitor.jar"), 1, 1, 0);
         assert(success);
@@ -104,7 +104,7 @@ public class TestResourceMonitor extends TestCase
         setUpServer(true);
 
         // Go above limit, wait for more than configured amt of time and verify server is paused
-        m_mockStatsProducer.m_rss = 1024*1024*1024;
+        m_mockStatsProducer.m_rss = 512*1024*1024;
         resumeAndWait(m_monitoringInterval+1);
         assertEquals(OperationMode.PAUSED, VoltDB.instance().getMode());
 
@@ -119,7 +119,7 @@ public class TestResourceMonitor extends TestCase
         setUpServer(true);
 
         // Go above limit, wait for more than configured amt of time and verify server is paused
-        m_mockStatsProducer.m_rss = 1024*1024*1024;
+        m_mockStatsProducer.m_rss = 512*1024*1024;
         resumeAndWait(m_monitoringInterval+1);
         assertEquals(OperationMode.PAUSED, VoltDB.instance().getMode());
 
