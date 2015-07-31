@@ -48,11 +48,13 @@ public class InsertExport extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
     public final SQLStmt exportInsert = new SQLStmt("INSERT INTO kafkaExportTable1 " + sqlSuffix);
     public final SQLStmt mirrorInsert = new SQLStmt("INSERT INTO kafkaMirrorTable1 " + sqlSuffix);
+    // public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable1 " + sqlSuffix);
 
     public long run(long key, long value)
     {
         voltQueueSQL(exportInsert, key, value);
         voltQueueSQL(mirrorInsert, key, value);
+        // voltQueueSQL(importInsert, key, value);
 
         // Execute queued statements
         voltExecuteSQL(true);
