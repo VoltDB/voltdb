@@ -28,6 +28,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.ProcedureInvocationType;
 
 /**
@@ -64,7 +65,7 @@ public class InternalConnectionHandler {
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
-    public boolean callProcedure(long backPressureTimeout, String proc, Object... fieldList) {
+    public boolean callProcedure(long backPressureTimeout, ProcedureCallback procCallback, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             m_logger.warn("Server is paused and is currently unavailable - please try again later.");
@@ -127,7 +128,7 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        boolean success = m_adapter.createTransaction(catProc, null, task, tcont, partition, nowNanos);
+        boolean success = m_adapter.createTransaction(catProc, procCallback, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();

@@ -24,6 +24,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -100,9 +101,13 @@ public class ImportHandler {
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
+        return callProcedure(ic, null, proc, fieldList);
+    }
+
+    public boolean callProcedure(ImportContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
         if (!m_stopped) {
             return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
-                    .callProcedure(ic.getBackpressureTimeout(), proc, fieldList);
+                    .callProcedure(ic.getBackpressureTimeout(), procCallback, proc, fieldList);
         } else {
             m_logger.warn("Importer is in stopped state. Cannot execute procedures");
             return false;
