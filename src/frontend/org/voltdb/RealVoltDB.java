@@ -1343,8 +1343,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private void startResourceUsageMonitor() {
-        if (resMonitorWork!=null) {
+        if (resMonitorWork != null) {
             resMonitorWork.cancel(false);
+            try {
+                resMonitorWork.get();
+            } catch(Exception e) { } // Ignore exceptions because we don't really care about the result.
             m_periodicWorks.remove(resMonitorWork);
         }
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());

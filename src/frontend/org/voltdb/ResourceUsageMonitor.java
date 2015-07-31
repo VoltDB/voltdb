@@ -28,7 +28,7 @@ import org.voltdb.utils.SystemStatsCollector.Datum;
  */
 public class ResourceUsageMonitor implements Runnable
 {
-    private static final VoltLogger m_logger = new VoltLogger("RESOURCE_MONITOR");
+    private static final VoltLogger m_logger = new VoltLogger("HOST");
 
     private long m_rssLimit;
 
@@ -36,7 +36,7 @@ public class ResourceUsageMonitor implements Runnable
     {
         if (systemSettings != null && systemSettings.getMemorylimit() != null) {
             // configured value is in GB. Convert it to bytes
-            double dblLimit = systemSettings.getMemorylimit().getSize().doubleValue()*1024*1024*1024;
+            double dblLimit = systemSettings.getMemorylimit().getSize().doubleValue()*1073741824;
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
     }
@@ -55,14 +55,14 @@ public class ResourceUsageMonitor implements Runnable
 
         Datum datum = SystemStatsCollector.getRecentSample();
         if (datum == null) { // this will be null if stats has not run yet
-            m_logger.debug("No stats are available from stats collector. Skipping resource check.");
+            m_logger.warn("No stats are available from stats collector. Skipping resource check.");
             return;
         }
 
         if (m_logger.isDebugEnabled()) {
             m_logger.debug("RSS=" + datum.rss + " Configured rss limit=" + m_rssLimit);
         }
-        if (datum.rss >= m_rssLimit && VoltDB.instance().getMode() == OperationMode.RUNNING) {
+        if (datum.rss >= m_rssLimit) {
             m_logger.warn(String.format("RSS %d is over configured limit value %d. Server will be paused.", datum.rss, m_rssLimit));
             VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(0, "@Pause");
         }
