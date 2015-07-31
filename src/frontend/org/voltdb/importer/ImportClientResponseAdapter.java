@@ -157,11 +157,13 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
-            int sz = ds.getSerializedSize();
-            buf = ByteBuffer.allocate(sz);
+            final int serializedSize = ds.getSerializedSize();
+            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) return;
+            buf = ByteBuffer.allocate(serializedSize);
             ds.serialize(buf);
             enqueue(buf);
-        } catch (IOException e) {
+        } catch (Exception e) {
+            e.printStackTrace();
             VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, e);
         }
     }
