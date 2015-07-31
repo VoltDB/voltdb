@@ -744,7 +744,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 // here. Since the initiators are not started yet, the cartographer still doesn't
                 // know about the new partitions at this point.
                 m_commandLog.initForRejoin(
-                        m_catalogContext,
+                        m_catalogContext.cluster.getLogconfig().get("log").getLogsize(),
                         Long.MIN_VALUE,
                         m_configuredNumberOfPartitions,
                         true,
@@ -2544,7 +2544,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId, m_cartographer.getPartitionCount(),
+            m_commandLog.init(m_catalogContext.cluster.getLogconfig().get("log").getLogsize(),
+                              txnId, m_cartographer.getPartitionCount(),
                               m_config.m_commandLogBinding,
                               perPartitionTxnIds);
             try {
