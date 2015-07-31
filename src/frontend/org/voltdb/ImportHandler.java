@@ -39,7 +39,7 @@ public class ImportHandler {
 
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private boolean m_stopped = false;
+    private volatile boolean m_stopped = false;
 
     final static long SUPPRESS_INTERVAL = 60;
 
@@ -75,6 +75,8 @@ public class ImportHandler {
             @Override
             public void run() {
                 try {
+                    //Drain the adapter so all calbacks are done
+                    VoltDB.instance().getClientInterface().getInternalConnectionHandler().drain();
                     m_importContext.stop();
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -97,14 +99,6 @@ public class ImportHandler {
         return VoltDB.instance().getClientInterface().getInternalConnectionHandler().hasTable(name);
     }
 
-    /*
-    public class NullCallback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-        }
-    }
-    */
-
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
         if (!m_stopped) {
             return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
@@ -113,7 +107,6 @@ public class ImportHandler {
             m_logger.warn("Importer is in stopped state. Cannot execute procedures");
             return false;
         }
-        //return callProcedure(ic, new NullCallback(), proc, fieldList);
     }
 
 
@@ -181,6 +174,10 @@ public class ImportHandler {
 
     public void error(Throwable t, String format, Object...args) {
         rateLimitedLog(Level.ERROR, t, format, args);
+    }
+
+    public void warn(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.WARN, t, format, args);
     }
 
 }

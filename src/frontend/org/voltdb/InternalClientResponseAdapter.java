@@ -24,7 +24,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
@@ -79,11 +81,28 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 m_cb.clientCallback(response);
             }
         }
-
     }
 
     public long getPendingCount() {
         return m_pendingCallbacks.size();
+    }
+
+    //Similar to distributer drain.
+    public void drain() {
+        long sleep = 500;
+        do {
+            if (m_pendingCallbacks.isEmpty()) {
+                break;
+            }
+            /*
+             * Back off to spinning at five millis. Try and get drain to be a little
+             * more prompt. Spinning sucks!
+             */
+            LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
+            if (sleep < 5000) {
+                sleep += 500;
+            }
+        } while(true);
     }
 
     public boolean createTransaction(Procedure catProc, ProcedureCallback proccb, StoredProcedureInvocation task,
@@ -130,11 +149,9 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
-            synchronized(this) {
-                int sz = ds.getSerializedSize();
-                buf = ByteBuffer.allocate(sz);
-                ds.serialize(buf);
-            }
+            int sz = ds.getSerializedSize();
+            buf = ByteBuffer.allocate(sz);
+            ds.serialize(buf);
             enqueue(buf);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("enqueue() in IClientResponseAdapter throw an exception", true, e);
