@@ -365,6 +365,9 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 "select approx_count_distinct(vb_inline) from unsupported_column_types;",
                 "incompatible data type in operation");
 
+        // FLOAT is not allowed because wierdnesses of the floating point type:
+        // NaN, positive and negative zero, [de]normalized numbers.
+
         verifyStmtFails(client,
                 "select approx_count_distinct(ff) from unsupported_column_types;",
                 "incompatible data type in operation");

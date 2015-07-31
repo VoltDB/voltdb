@@ -1606,6 +1606,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_ALTER, ALTER);
         reservedKeys.put(Tokens.T_AND, AND);
         reservedKeys.put(Tokens.T_ANY, ANY);
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        reservedKeys.put(Tokens.T_APPROX_COUNT_DISTINCT, APPROX_COUNT_DISTINCT);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_ARE, ARE);
         reservedKeys.put(Tokens.T_ARRAY, ARRAY);
         reservedKeys.put(Tokens.T_AS, AS);
@@ -1658,9 +1661,6 @@ public class Tokens {
         reservedKeys.put(Tokens.T_CORR, CORR);
         reservedKeys.put(Tokens.T_CORRESPONDING, CORRESPONDING);
         reservedKeys.put(Tokens.T_COUNT, COUNT);
-        // A VoltDB extension APPROX_COUNT_DISTINCT
-        reservedKeys.put(Tokens.T_APPROX_COUNT_DISTINCT, APPROX_COUNT_DISTINCT);
-        // End of VoltDB extension
         reservedKeys.put(Tokens.T_COVAR_POP, COVAR_POP);
         reservedKeys.put(Tokens.T_COVAR_SAMP, COVAR_SAMP);
         reservedKeys.put(Tokens.T_CREATE, CREATE);
