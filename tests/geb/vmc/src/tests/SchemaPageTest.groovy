@@ -993,12 +993,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
-
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
+		
 		when: 'click name'
 		page.name.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1014,6 +1022,10 @@ class SchemaPageTest extends TestBase {
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
+		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
 		}
 
 		when: 'click name'
@@ -1037,12 +1049,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.partitioning.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1059,12 +1079,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.columns.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1081,12 +1109,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.indexes.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1103,12 +1139,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.pkey.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1125,12 +1169,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.tuplelimit.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
