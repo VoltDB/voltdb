@@ -86,7 +86,7 @@ private:
      */
     int32_t m_tupleCount;
 
-    int32_t m_maxSerializedSize;
+    size_t m_maxSerializedSize;
 };
 }
 #endif //RECOVERY_PROTO_MESSAGE_BUILDER_
