@@ -149,6 +149,12 @@ public interface CommandLog {
     public abstract boolean isSynchronous();
 
     /**
+     * Can the SpScheduler offer the task for execution.
+     * @return true if it can, false if it has to wait until the task is made durable.
+     */
+    boolean canOfferTask();
+
+    /**
      * Assign DurabilityListener from each SpScheduler to commmand log
      */
     public abstract void registerDurabilityListener(DurabilityListener durabilityListener);

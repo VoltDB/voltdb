@@ -537,7 +537,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
-            if (!m_cl.isSynchronous()) {
+            if (m_cl.canOfferTask()) {
                 assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
@@ -836,7 +836,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
-            if (!m_cl.isSynchronous()) {
+            if (m_cl.canOfferTask()) {
                 assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {

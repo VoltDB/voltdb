@@ -88,6 +88,12 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
+    public boolean canOfferTask()
+    {
+        return true;
+    }
+
+    @Override
     public void registerDurabilityListener(DurabilityListener durabilityListener) {
     }
 }
