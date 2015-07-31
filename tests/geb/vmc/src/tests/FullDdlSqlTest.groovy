@@ -26,7 +26,7 @@ package vmcTest.tests
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-//import org.voltdb.fullddlfeatures.TestDDLFeatures
+import org.voltdb.fullddlfeatures.TestDDLFeatures
 ////import org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 import spock.lang.*
 import vmcTest.pages.SqlQueryPage
@@ -173,7 +173,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
 
         // Do validation that the (DDL) SQL commands worked, by running the
         // JUnit tests of the TestDDLFeatures class
-        //TestDDLFeatures tdf = new TestDDLFeatures();
+        TestDDLFeatures tdf = new TestDDLFeatures();
         tdf.startClient()
         Method[] methods = tdf.getClass().getMethods()
         for (Method method : methods) {
