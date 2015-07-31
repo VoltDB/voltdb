@@ -71,7 +71,7 @@ public class KafkaImportBenchmark {
     // validated command line configuration
     final Config config;
     // Timer for periodic stats printing
-    Timer statsTimer;
+    static Timer statsTimer;
     static Timer checkTimer;
     // Benchmark start time
     long benchmarkStartTS;
@@ -170,8 +170,8 @@ public class KafkaImportBenchmark {
             public void run() { printStatistics(); }
         };
         statsTimer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
+          config.displayinterval * 1000,
+          config.displayinterval * 1000);
     }
 
     /**
@@ -241,7 +241,7 @@ public class KafkaImportBenchmark {
             exportMon.waitForStreamedAllocatedMemoryZero();
             // importMon.waitForStreamedAllocatedMemoryZero();
             // exportProc.insertFinal(-1, -1);
-            log.info("Done waiting for import & export tables");
+            log.info("Done waiting for export table");
         } finally {
             // cancel periodic stats printing
             log.info("Cancel periodic stats");

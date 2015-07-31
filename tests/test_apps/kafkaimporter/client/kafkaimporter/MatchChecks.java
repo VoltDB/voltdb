@@ -68,7 +68,7 @@ public class MatchChecks {
             @Override
             public void run() {
                 mirrorRowCount = getMirrorTableRowCount(innerClient);
-                log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
+                //log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
                 log.info("checkTimer: Mirror table row count: " + mirrorRowCount);
                 if (mirrorRowCount == 0) { // indicates everything matched and mirror table empty
                     log.info("checkTimer: mirrorRowCount is 0. Stopping...");
@@ -90,7 +90,7 @@ public class MatchChecks {
         } catch (IOException | ProcCallException e) {
             e.printStackTrace();
         }
-        log.info("Mirror table row count: " + mirrorRowCount);
+        //log.info("Mirror table row count: " + mirrorRowCount);
         return mirrorRowCount;
     }
 
