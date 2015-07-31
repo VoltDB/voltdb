@@ -162,8 +162,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             buf = ByteBuffer.allocate(serializedSize);
             ds.serialize(buf);
             enqueue(buf);
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException e) {
             VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, e);
         }
     }
