@@ -227,45 +227,45 @@ class DbMonitorTest extends TestBase {
 
     // HEADER TAB TESTS
 
-//    def "header tab dbmonitor exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) {
-//            header.tabDBMonitor.isDisplayed()
-//            header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
-//        }
-//    }
-//
-//    def "header tab admin exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) {
-//            header.tabAdmin.isDisplayed()
-//            header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
-//        }
-//    }
-//
-//    def "header tab schema exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) {
-//            header.tabSchema.isDisplayed()
-//            header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
-//
-//        }
-//    }
-//
-//    def "header tab sql query exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { header.tabSQLQuery.isDisplayed()
-//            header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
-//        }
-//    }
+    def "header tab dbmonitor exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) {
+            header.tabDBMonitor.isDisplayed()
+            header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
+        }
+    }
+
+    def "header tab admin exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) {
+            header.tabAdmin.isDisplayed()
+            header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
+        }
+    }
+
+    def "header tab schema exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) {
+            header.tabSchema.isDisplayed()
+            header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
+
+        }
+    }
+
+    def "header tab sql query exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { header.tabSQLQuery.isDisplayed()
+            header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
+        }
+    }
 
     def "header username check" () {
         when: 'click the Admin link (if needed)'
@@ -325,32 +325,65 @@ class DbMonitorTest extends TestBase {
     // LOGOUT TEST
 
     def "logout button test close" ()  {
-        when:
-        at DbMonitorPage
-        then:
-        waitFor(30) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(30) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
-        }
-        header.popupClose.click()
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
 
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        when: 'click the DB Monitor link (if needed)'
+        page.openDbMonitorPage()
+        then:
+        at DbMonitorPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(30) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(30) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
     }
 
     def "logout button test cancel" ()  {
-        when:
-        at DbMonitorPage
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
         then:
-        waitFor(30) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(30) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
         }
-        header.logoutPopupCancelButton.click()
+        when: 'click the DB Monitor link (if needed)'
+        page.openDbMonitorPage()
+        then:
+        at DbMonitorPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(30) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(30) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.logoutPopupCancelButton.click()
+        }
     }
 
     // HELP POPUP TEST

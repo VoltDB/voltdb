@@ -91,7 +91,7 @@ class SchemaPageTest extends TestBase {
         return runningGenqa
     }
 
-  
+
       // HEADER TESTS
 
     def "header banner exists" () {
@@ -262,32 +262,65 @@ class SchemaPageTest extends TestBase {
     // LOGOUT TEST
 
     def "logout button test close" ()  {
-        when:
-        at SchemaPage
-        then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(waitTime) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
-        }
-        header.popupClose.click()
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
 
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        when: 'click the Schema Page link (if needed)'
+        page.openSchemaPage()
+        then:
+        at SchemaPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(waitTime) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(waitTime) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
     }
 
     def "logout button test cancel" ()  {
-        when:
-        at SchemaPage
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
         then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(waitTime) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
         }
-        header.logoutPopupCancelButton.click()
+        when: 'click the Schema Page link (if needed)'
+        page.openSchemaPage()
+        then:
+        at SchemaPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(waitTime) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(waitTime) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
     }
 
     // HELP POPUP TEST
@@ -960,12 +993,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
-
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
+		
 		when: 'click name'
 		page.name.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -981,6 +1022,10 @@ class SchemaPageTest extends TestBase {
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
+		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
 		}
 
 		when: 'click name'
@@ -1004,12 +1049,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.partitioning.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1026,12 +1079,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.columns.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1048,12 +1109,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.indexes.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1070,12 +1139,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.pkey.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
@@ -1092,12 +1169,20 @@ class SchemaPageTest extends TestBase {
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
 
 		when: 'click name'
 		page.tuplelimit.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
+		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
 		}
 		println()
 	}
