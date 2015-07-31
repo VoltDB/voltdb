@@ -66,7 +66,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             m_id = id;
         }
 
-        public synchronized void discard() {
+        public void discard() {
             if (m_cont != null) {
                 m_cont.discard();
                 m_cont = null;
@@ -157,11 +157,9 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
-            synchronized(this) {
-                int sz = ds.getSerializedSize();
-                buf = ByteBuffer.allocate(sz);
-                ds.serialize(buf);
-            }
+            int sz = ds.getSerializedSize();
+            buf = ByteBuffer.allocate(sz);
+            ds.serialize(buf);
             enqueue(buf);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, e);

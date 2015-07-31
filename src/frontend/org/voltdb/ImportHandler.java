@@ -227,10 +227,7 @@ public class ImportHandler {
         }
 
         boolean success;
-        //Synchronize this to create good handles across all ImportHandlers
-        synchronized(ImportHandler.m_lock) {
-            success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
-        }
+        success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
