@@ -317,7 +317,7 @@ public:
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
-    void serializeTo(voltdb::SerializeOutput &output);
+    void serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns = false);
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
@@ -815,13 +815,20 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 }
 
-inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
+inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns) {
     size_t start = output.reserveBytes(4);
 
     for (int j = 0; j < m_schema->columnCount(); ++j) {
         //int fieldStart = output.position();
         NValue value = getNValue(j);
         value.serializeTo(output);
+    }
+
+    if (includeHiddenColumns) {
+        for (int j = 0; j < m_schema->hiddenColumnCount(); ++j) {
+            NValue value = getHiddenNValue(j);
+            value.serializeTo(output);
+        }
     }
 
     // write the length of the tuple
