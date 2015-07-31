@@ -204,4 +204,8 @@ public enum ExpressionType {
     public String symbol() {
         return m_symbol;
     }
+
+    public boolean isAggregateExpression() {
+        return getExpressionClass() == AggregateExpression.class;
+    }
 }

@@ -380,6 +380,12 @@ public:
         return m_value;
     }
 
+    virtual void resetAgg()
+    {
+        hyperLogLog().clear();
+        Agg::resetAgg();
+    }
+
 protected:
     hll::HyperLogLog& hyperLogLog() {
         return m_hyperLogLog;

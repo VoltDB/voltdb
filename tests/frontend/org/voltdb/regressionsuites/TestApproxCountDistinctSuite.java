@@ -94,14 +94,27 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
     }
 
     private static void assertEstimateWithin(String col, long exact, double estimate, double maxError) {
-        double percentError = Math.abs(((exact - estimate) / exact) * 100.0);
+
+        double percentError;
+
+        if (exact != 0) {
+            percentError = Math.abs(((exact - estimate) / exact) * 100.0);
+        }
+        else if (estimate == 0.0) {
+            percentError = 0.0;
+        }
+        else {
+            percentError = Double.MAX_VALUE;
+        }
 
         /* Uncomment this if you are curious about how accurate the estimates are
         System.out.println(String.format("  %s: Percent error: %2.2f%% (Exact: %5d, Estimate: %4.2f)",
                 col, percentError, exact, estimate));
         // */
 
-        assertTrue("Estimate for distinct values in " + col,
+        assertTrue("Estimate for distinct values in " + col + ":\n"
+                + "estimate: " + estimate + ", exact: " + exact + "\n"
+                + "Percent error: " + percentError,
                 percentError < maxError);
     }
 
@@ -116,6 +129,8 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
      */
     private static void assertEstimatesAreWithin(String col, VoltTable exactTable, VoltTable estimateTable, double maxError) {
         final int whichCol = exactTable.getColumnCount() - 1;
+
+        assertEquals(exactTable.getRowCount(), estimateTable.getRowCount());
 
         while(estimateTable.advanceRow()) {
             assertTrue(exactTable.advanceRow());
@@ -342,6 +357,40 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 + "from (select %s %s ) as a_count, sum(distinct ii) from %s) as subq,"
                 + "  r "
                 + "group by subq.a_count");
+    }
+
+    public void testWithOtherClauses() throws Exception {
+        Client client = getClient();
+
+        fillTable(client, "p");
+        fillTable(client, "r");
+
+        // An ORDER BY query
+        compareEstimateAndExact(client, TABLE_NAMES, new String[] {"bi", "dd"},
+                "select pk, %s %s ) as cnt from %s group by pk order by cnt desc");
+
+        // ORDER BY with GROUP BY
+        compareEstimateAndExact(client, TABLE_NAMES,  new String[] {"bi", "dd"},
+                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt "
+                + "from %s "
+                + "group by lobits "
+                + "order by lobits");
+
+        // HAVING (all rows evaluate to true for HAVING clause)
+        compareEstimateAndExact(client, TABLE_NAMES,  new String[] {"bi", "dd"},
+                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt "
+                + "from %s "
+                + "group by lobits "
+                + "having approx_count_distinct(bi) between 225 and 275 "
+                + "order by lobits");
+
+        // HAVING (all rows evaluate to false for HAVING clause)
+        compareEstimateAndExact(client, TABLE_NAMES,  new String[] {"bi", "dd"},
+                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt "
+                + "from %s "
+                + "group by lobits "
+                + "having approx_count_distinct(bi) > 275 "
+                + "order by lobits");
     }
 
     public void testNegative() throws Exception {
