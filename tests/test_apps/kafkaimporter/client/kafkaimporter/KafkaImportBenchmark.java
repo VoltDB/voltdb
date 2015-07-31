@@ -46,12 +46,12 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
-import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -82,6 +82,8 @@ public class KafkaImportBenchmark {
     AtomicLong linesRead = new AtomicLong(0);
     AtomicLong rowsAdded = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
+
+	private static final int END_WAIT = 60000;	// wait for 60 seconds at the end
 
     static InsertExport exportProc;
     static TableChangeMonitor exportMon;
@@ -308,6 +310,9 @@ public class KafkaImportBenchmark {
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
         client.drain();
+        log.info("Wait " + END_WAIT + " seconds for import to settle.");
+        Thread.sleep(END_WAIT);
+
         boolean testResult = FinalCheck.check(client);
 
         checkTimer.cancel();

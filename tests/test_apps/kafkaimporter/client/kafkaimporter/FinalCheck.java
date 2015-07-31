@@ -22,8 +22,8 @@
  */
 package kafkaimporter.client.kafkaimporter;
 
-import org.voltdb.client.Client;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.client.Client;
 
 public class FinalCheck {
     static VoltLogger log = new VoltLogger("Benchmark.finalCheck");
@@ -31,6 +31,7 @@ public class FinalCheck {
         long mirrorRows = MatchChecks.getMirrorTableRowCount(client);
         long importRows = MatchChecks.getImportTableRowCount(client);
 
+        log.info("Total rows exported: " + KafkaImportBenchmark.finalInsertCount);
         log.info("Rows remaining in the Mirror Table: " + mirrorRows);
         log.info("Rows remaining in the Import Table: " + importRows);
         if (importRows != 0 || mirrorRows != 0) {
