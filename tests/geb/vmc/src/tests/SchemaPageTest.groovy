@@ -91,7 +91,7 @@ class SchemaPageTest extends TestBase {
         return runningGenqa
     }
 
-  
+
       // HEADER TESTS
 
     def "header banner exists" () {
@@ -262,32 +262,65 @@ class SchemaPageTest extends TestBase {
     // LOGOUT TEST
 
     def "logout button test close" ()  {
-        when:
-        at SchemaPage
-        then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(waitTime) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
-        }
-        header.popupClose.click()
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
 
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        when: 'click the Schema Page link (if needed)'
+        page.openSchemaPage()
+        then:
+        at SchemaPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(waitTime) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(waitTime) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
     }
 
     def "logout button test cancel" ()  {
-        when:
-        at SchemaPage
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
         then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(waitTime) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
         }
-        header.logoutPopupCancelButton.click()
+        when: 'click the Schema Page link (if needed)'
+        page.openSchemaPage()
+        then:
+        at SchemaPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(waitTime) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(waitTime) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
     }
 
     // HELP POPUP TEST
