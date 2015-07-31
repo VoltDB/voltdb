@@ -641,6 +641,7 @@ public class Benchmark {
             replicatedTruncater.start();
         }
 
+        /* TEMPORARY disable cappedcollection test until ENG-8733 is resolved -PR
         partitionedCapped = new CappedTableLoader(client, "capp", // more
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedCapped.start();
@@ -648,7 +649,7 @@ public class Benchmark {
             replicatedCapped = new CappedTableLoader(client, "capr", // more
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
             replicatedCapped.start();
-        }
+        }*/
 
         plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
