@@ -1198,40 +1198,12 @@ class SchemaPageTest extends TestBase {
 		when: 'click procedure name'
 		page.procedureName.click()
 		then: 'check ascending'
-        boolean result = false;
-        int count = 0
-        while(count<5) {
-            count++
-            try {
-                waitFor(waitTime) { page.ascending.isDisplayed() }
-                result = true;
-                break;
-            }catch (geb.waiting.WaitTimeoutException e) {
-                println("Already tried")
-            }
-        }
+        waitFor(waitTime) { page.ascending.isDisplayed() }
 
 		when: 'click procedure name'
 		page.procedureName.click()
 		then: 'check descending'
-        boolean result1= false;
-        int count1 = 0
-        while(count1<5) {
-            count1++
-            try {
-                waitFor(waitTime) { page.descending.isDisplayed() }
-                result1 = true;
-                break;
-            }catch (geb.waiting.WaitTimeoutException e) {
-                println("Already tried")
-            }
-        }
-
-        if(!(result && result1)){
-            assert false
-        } else{
-            assert true
-        }
+        waitFor(waitTime) { page.descending.isDisplayed() }
 	}
 
 	def "Procedures And SQL Tab:Check Ascending Descending in Parameters"() {
