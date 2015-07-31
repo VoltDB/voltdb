@@ -43,6 +43,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.export.ExportManager;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
@@ -214,10 +215,18 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                         @Override
                         public void run()
                         {
-                            context.forceAllBuffersToDiskForDRAndExport(false);
+                            context.forceAllDRNodeBuffersToDisk(false);
                         }
                     });
                 }
+                // Sync export buffer for all types of snapshot
+                SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        ExportManager.sync(false);
+                    }
+                });
 
                 return true;
             }
