@@ -89,7 +89,7 @@ public:
         size_t rawLength = value.length() / 2;
         unsigned char rawBuf[rawLength];
         hexDecodeToBinary(rawBuf, value.c_str());
-        return getTempBinaryValue(reinterpret_cast<const char*>(rawBuf), rawLength);
+        return getTempBinaryValue(reinterpret_cast<const char*>(rawBuf), static_cast<int32_t>(rawLength));
     }
 
     /// Constructs a varbinary value copied into temporary string
