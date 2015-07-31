@@ -35,7 +35,8 @@ public abstract class SavedTableConverter
 {
 
     public static Boolean needsConversion(VoltTable inputTable,
-                                          Table outputTableSchema) {
+                                          Table outputTableSchema,
+                                          boolean shouldPreserveDRHiddenColumn) {
         if (inputTable.getColumnCount() != outputTableSchema.getColumns().size()) {
             return true;
         }
@@ -45,6 +46,12 @@ public abstract class SavedTableConverter
             final Column column = outputTableSchema.getColumns().get(name);
 
             if (column == null) {
+                if (shouldPreserveDRHiddenColumn &&
+                        type == VoltType.BIGINT &&
+                        (ii == (inputTable.getColumnCount() - 1)) &&
+                        (ii == outputTableSchema.getColumns().size())) {
+                    return false;
+                }
                 return true;
             }
 

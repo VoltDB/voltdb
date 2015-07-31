@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DEFAULTTUPLESERIALIZER_H_
-#define DEFAULTTUPLESERIALIZER_H_
+#ifndef FULLTUPLESERIALIZER_H_
+#define FULLTUPLESERIALIZER_H_
 #include "common/TupleSerializer.h"
 #include "common/tabletuple.h"
 
@@ -24,7 +24,7 @@ namespace voltdb {
 class ReferenceSerializeOutput;
 class TupleSchema;
 
-class DefaultTupleSerializer : public TupleSerializer {
+class FullTupleSerializer : public TupleSerializer {
 public:
     /**
      * Serialize the provided tuple to the provide serialize output
@@ -36,8 +36,8 @@ public:
      */
     size_t getMaxSerializedTupleSize(const TupleSchema *schema);
 
-    virtual ~DefaultTupleSerializer() {}
+    virtual ~FullTupleSerializer() {}
 };
 }
 
-#endif /* DEFAULTTUPLESERIALIZER_H_ */
+#endif /* FULLTUPLESERIALIZER_H_ */

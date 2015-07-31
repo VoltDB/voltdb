@@ -1649,7 +1649,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
 
     if (!tableStreamTypeIsValid(streamType)) {
         // Failure
-        return -1;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     TupleOutputStreamProcessor outputStreams(nBuffers);
@@ -1657,7 +1657,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
         int offset = serializeIn.readInt();
         int length = serializeIn.readInt();
-        outputStreams.add(ptr + offset, length - offset);
+        outputStreams.add(ptr + offset, length);
     }
     retPositions.reserve(nBuffers);
 
@@ -1665,7 +1665,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // If a completed table is polled, return remaining==-1. The
     // Java engine will always poll a fully serialized table one more
     // time (it doesn't see the hasMore return code).
-    int64_t remaining = -1;
+    int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     PersistentTable *table = NULL;
 
     if (tableStreamTypeIsSnapshot(streamType)) {
@@ -1674,6 +1674,9 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
         table = findInMapOrNull(tableId, m_snapshottingTables);
+        if (table == NULL) {
+            return TABLE_STREAM_SERIALIZATION_ERROR;
+        }
 
         remaining = table->streamMore(outputStreams, streamType, retPositions);
         if (remaining <= 0) {
@@ -1683,9 +1686,10 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     }
     else if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
         Table* found = getTable(tableId);
-        if (!found) {
-            return -1;
+        if (found == NULL) {
+            return TABLE_STREAM_SERIALIZATION_ERROR;
         }
+
         PersistentTable * currentTable = dynamic_cast<PersistentTable*>(found);
         assert(currentTable != NULL);
         // The ongoing TABLE STREAM needs the original table from the first table truncate.
@@ -1705,10 +1709,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     }
     else {
         Table* found = getTable(tableId);
-        if (found) {
-            table = dynamic_cast<PersistentTable*>(found);
-            remaining = table->streamMore(outputStreams, streamType, retPositions);
+        if (found == NULL) {
+            return TABLE_STREAM_SERIALIZATION_ERROR;
         }
+
+        table = dynamic_cast<PersistentTable*>(found);
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
     }
 
     return remaining;

@@ -14,30 +14,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#ifndef DEFAULTTUPLESERIALIZER_H_
-#define DEFAULTTUPLESERIALIZER_H_
-#include "common/TupleSerializer.h"
-#include "common/tabletuple.h"
+#include "common/FullTupleSerializer.h"
+#include "common/serializeio.h"
+#include "common/TupleSchema.h"
 
 namespace voltdb {
-class ReferenceSerializeOutput;
-class TupleSchema;
-
-class DefaultTupleSerializer : public TupleSerializer {
-public:
-    /**
-     * Serialize the provided tuple to the provide serialize output
-     */
-    void serializeTo(TableTuple tuple, ReferenceSerializeOutput *out);
-
-    /**
-     * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
-     */
-    size_t getMaxSerializedTupleSize(const TupleSchema *schema);
-
-    virtual ~DefaultTupleSerializer() {}
-};
+/**
+ * Serialize the provided tuple to the provide serialize output
+ */
+void FullTupleSerializer::serializeTo(TableTuple tuple, ReferenceSerializeOutput *out) {
+    tuple.serializeTo(*out, true);
 }
 
-#endif /* DEFAULTTUPLESERIALIZER_H_ */
+/**
+ * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
+ */
+size_t FullTupleSerializer::getMaxSerializedTupleSize(const TupleSchema *schema) {
+    return schema->getMaxSerializedTupleSize(true);
+}
+}
