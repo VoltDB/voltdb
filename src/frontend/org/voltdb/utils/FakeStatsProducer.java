@@ -19,9 +19,9 @@ package org.voltdb.utils;
 
 
 /**
- *
+ * Interface used to inject fake server statistics information to SystemStatsCollector.
  */
-public interface MockStatsProducer {
+public interface FakeStatsProducer {
 
     /**
      * Returns the current system statistics.

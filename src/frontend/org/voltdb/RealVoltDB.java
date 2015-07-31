@@ -208,6 +208,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     GlobalServiceElector m_globalServiceElector = null;
     MpInitiator m_MPI = null;
     Map<Integer, Long> m_iv2InitiatorStartingTxnIds = new HashMap<Integer, Long>();
+    private ScheduledFuture<?> resMonitorWork;
 
 
     // Should the execution sites be started in recovery mode
@@ -1342,11 +1343,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private void startResourceUsageMonitor() {
+        if (resMonitorWork!=null) {
+            resMonitorWork.cancel(false);
+            m_periodicWorks.remove(resMonitorWork);
+        }
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
         if (resMonitor.hasResourceLimitsConfigured()) {
             int resourceMonitorInterval = Integer.getInteger(RESOURCE_MONITOR_INTERVAL, 60);
-            m_periodicWorks.add(scheduleWork(resMonitor, resourceMonitorInterval,
-                    resourceMonitorInterval, TimeUnit.SECONDS));
+            resMonitorWork = scheduleWork(resMonitor, resourceMonitorInterval, resourceMonitorInterval, TimeUnit.SECONDS);
+            m_periodicWorks.add(resMonitorWork);
         }
     }
 
@@ -2250,6 +2255,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {
                 logSystemSettingFromCatalogContext();
             }
+
+            // restart resource usage monitoring task
+            startResourceUsageMonitor();
 
             return Pair.of(m_catalogContext, csp);
         }

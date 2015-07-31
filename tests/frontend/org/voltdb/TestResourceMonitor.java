@@ -30,7 +30,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.MockStatsProducer;
+import org.voltdb.utils.FakeStatsProducer;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
@@ -64,7 +64,7 @@ public class TestResourceMonitor extends TestCase
         m_localServer.waitForInitialization();
 
         m_mockStatsProducer = new TestStatsProducer();
-        SystemStatsCollector.setMockStatsProducer(m_mockStatsProducer);
+        SystemStatsCollector.setFakeStatsProducer(m_mockStatsProducer);
 
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
         m_client = ClientFactory.createClient();
@@ -148,7 +148,7 @@ public class TestResourceMonitor extends TestCase
         }
     }
 
-    private static class TestStatsProducer implements MockStatsProducer
+    private static class TestStatsProducer implements FakeStatsProducer
     {
         volatile long m_rss;
 

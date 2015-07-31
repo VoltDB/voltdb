@@ -1747,32 +1747,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final CatalogContext catalogContext = m_catalogContext.get();
         final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
 
-        Procedure catProc = catalogContext.procedures.get(task.procName);
-        if (catProc == null) {
-            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(task.procName);
-        }
-
-        if (catProc == null) {
-            String proc = task.procName;
-            if (task.procName.equals("@AdHoc") || task.procName.equals("@AdHocSpForTest")) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            else if (task.procName.equals("@UpdateClasses")) {
-                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
-                // permissions and replication policy for @UAC, and we'll deal with the
-                // parameter validation stuff separately (the different name will
-                // skip the @UAC-specific policy)
-                proc = "@UpdateApplicationCatalog";
-            }
-            Config sysProc = SystemProcedureCatalog.listing.get(proc);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-        }
+        Procedure catProc = getProcedureFromName(task.procName, catalogContext);
 
         if (user == null) {
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
@@ -1800,8 +1775,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     new VoltTable[0], "Server is paused and is available in read-only mode - please try again later.",
                     task.clientHandle);
         }
-
-        final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
 
         ClientResponseImpl error = null;
         //Check permissions
@@ -1943,21 +1916,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         int partition = -1;
-        if (catProc.getSinglepartition()) {
-            // break out the Hashinator and calculate the appropriate partition
-            try {
-                partition =
-                        getPartitionForProcedure(
-                                ppi.index,
-                                ppi.type,
-                                task);
-            } catch (Exception e) {
-                // unable to hash to a site, return an error
-                return getMispartitionedErrorResponse(task, catProc, e);
-            }
+        try {
+            getPartitionForProcedure(catProc, task);
+        } catch (Exception e) {
+            // unable to hash to a site, return an error
+            return getMispartitionedErrorResponse(task, catProc, e);
         }
-        boolean success =
-                createTransaction(handler.connectionId(),
+        boolean success = createTransaction(handler.connectionId(),
                         task,
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
@@ -1976,6 +1941,37 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return null;
+    }
+
+    public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
+        Procedure catProc = catalogContext.procedures.get(procName);
+        if (catProc == null) {
+            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procName);
+        }
+
+        if (catProc == null) {
+            String proc = procName;
+            if (procName.equals("@AdHoc") || procName.equals("@AdHocSpForTest")) {
+                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
+                // configured differently for @AdHoc... variants this code will have to
+                // change in order to use the proper variant based on whether the work
+                // is single or multi partition and read-only or read-write.
+                proc = "@AdHoc_RW_MP";
+            }
+            else if (procName.equals("@UpdateClasses")) {
+                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
+                // permissions and replication policy for @UAC, and we'll deal with the
+                // parameter validation stuff separately (the different name will
+                // skip the @UAC-specific policy)
+                proc = "@UpdateApplicationCatalog";
+            }
+            Config sysProc = SystemProcedureCatalog.listing.get(proc);
+            if (sysProc != null) {
+                catProc = sysProc.asCatalogProcedure();
+            }
+        }
+
+        return catProc;
     }
 
     private boolean allowPauseModeExecution(ClientInputHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
@@ -2695,6 +2691,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_notifier.start();
     }
 
+    static int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) throws Exception {
+        final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)procedure.getAttachment();
+        if (procedure.getSinglepartition()) {
+            // break out the Hashinator and calculate the appropriate partition
+            return getPartitionForProcedure( ppi.index, ppi.type, task);
+        } else {
+            return -1;
+        }
+    }
     /**
      * Identify the partition for an execution site task.
      * @return The partition best set up to execute the procedure.

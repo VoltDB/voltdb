@@ -71,39 +71,25 @@ public class InternalConnectionHandler {
             m_failedCount.incrementAndGet();
             return false;
         }
-        Procedure catProc = VoltDB.instance().getCatalogContext().procedures.get(proc);
+        Procedure catProc = VoltDB.instance().getClientInterface().getProcedureFromName(proc, VoltDB.instance().getCatalogContext());
         if (catProc == null) {
-            catProc = VoltDB.instance().getCatalogContext().m_defaultProcs.checkForDefaultProcedure(proc);
-        }
-
-        if (catProc == null) {
-            if (proc.equals("@AdHoc")) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(proc);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-            if (catProc == null) {
-                m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
-                m_failedCount.incrementAndGet();
-                return false;
-            }
+            m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
+            m_failedCount.incrementAndGet();
+            return false;
         }
 
         int counter = 1;
         int maxSleepNano = 100000;
         long start = System.nanoTime();
+        long currNanos = start;
         while ((backPressureTimeout > 0) && (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS)) {
             try {
                 int nanos = 500 * counter++;
-                Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
-                //We have reached max timeout.
-                if (System.nanoTime() - start > backPressureTimeout) {
+                int sleepNanos = nanos > maxSleepNano ? maxSleepNano : nanos;
+                Thread.sleep(0, sleepNanos);
+                //estimate the new nanos based on time slept, instead of calling nanoTime in a loop
+                currNanos += sleepNanos;
+                if (currNanos > start + backPressureTimeout) {
                     return false;
                 }
             } catch (InterruptedException ex) { }
@@ -131,31 +117,28 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)catProc.getAttachment();
-
         int partition = -1;
-        if (catProc.getSinglepartition()) {
-            try {
-                partition = getPartitionForProcedure(ppi.index, ppi.type, task);
-            } catch (Exception e) {
-                m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
-                m_failedCount.incrementAndGet();
-                tcont.discard();
-                return false;
-            }
+        try {
+            partition = getPartitionForProcedure(catProc, task);
+        } catch (Exception e) {
+            m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
+            m_failedCount.incrementAndGet();
+            tcont.discard();
+            return false;
         }
 
-        boolean success;
-        //Synchronize this to create good handles across all ImportHandlers
-        synchronized(InternalConnectionHandler.class) {
-            success = m_adapter.createTransaction(catProc, null, task, tcont, partition, nowNanos);
-        }
+        boolean success = m_adapter.createTransaction(catProc, null, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
         } else {
             m_submitSuccessCount.incrementAndGet();
         }
+
         return success;
+    }
+
+    public void drain() {
+        m_adapter.drain();
     }
 }

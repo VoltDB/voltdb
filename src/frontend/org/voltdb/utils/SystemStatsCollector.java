@@ -43,7 +43,7 @@ public class SystemStatsCollector {
     private enum GetRSSMode { MACOSX_NATIVE, PROCFS, PS }
 
     // Used by tests only to set up fake system statistics numbers
-    private static MockStatsProducer testStatsProducer;
+    private static FakeStatsProducer testStatsProducer;
 
     static long starttime = System.currentTimeMillis();
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
@@ -517,8 +517,8 @@ public class SystemStatsCollector {
                 per, correct, repeat);
     }
 
-    public static void setMockStatsProducer(MockStatsProducer mockStatsProducer) {
-        testStatsProducer = mockStatsProducer;
+    public static void setFakeStatsProducer(FakeStatsProducer fakeStatsProducer) {
+        testStatsProducer = fakeStatsProducer;
     }
 
 }
