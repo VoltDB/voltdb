@@ -34,15 +34,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltdb.PostSnapshotTask;
-import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SnapshotDataFilter;
-import org.voltdb.SnapshotFormat;
-import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.SnapshotTableTask;
-import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.rejoin.StreamSnapshotAckReceiver;
@@ -138,6 +130,17 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
         for (final Table table : config.tables) {
             VoltTable schemaTable = CatalogUtil.getVoltTable(table);
+
+            if (context.getDatabase().getIsactiveactivedred() && table.getIsdred()) {
+                int columnCount = schemaTable.getColumnCount();
+                VoltTable.ColumnInfo[] augmentedSchema = new VoltTable.ColumnInfo[columnCount + 1];
+                for (int i = 0; i < columnCount; i++) {
+                    augmentedSchema[i] = new VoltTable.ColumnInfo(schemaTable.getColumnName(i), schemaTable.getColumnType(i));
+                }
+                augmentedSchema[columnCount] = new VoltTable.ColumnInfo("dr_clusterid_timestamp", VoltType.BIGINT);
+                schemaTable = new VoltTable(augmentedSchema);
+            }
+
             schemas.put(table.getRelativeIndex(), PrivateVoltTableFactory.getSchemaBytes(schemaTable));
         }
 
