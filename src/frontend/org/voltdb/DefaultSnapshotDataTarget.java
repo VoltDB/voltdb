@@ -48,6 +48,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.PosixAdvise;
+import org.voltdb.VoltTable.ColumnInfo;
 
 import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -148,6 +149,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final boolean isReplicated,
             final List<Integer> partitionIds,
             final VoltTable schemaTable,
+            final boolean addDRHiddenColumn,
             final long txnId,
             final long timestamp) throws IOException {
         this(
@@ -160,6 +162,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 isReplicated,
                 partitionIds,
                 schemaTable,
+                addDRHiddenColumn,
                 txnId,
                 timestamp,
                 new int[] { 0, 0, 0, 2 });
@@ -175,6 +178,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final boolean isReplicated,
             final List<Integer> partitionIds,
             final VoltTable schemaTable,
+            final boolean addDRHiddenColumn,
             final long txnId,
             final long timestamp,
             int version[]
@@ -236,7 +240,19 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b().putInt(container.b().remaining() - 4);
         container.b().position(0);
 
-        final byte schemaBytes[] = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
+        final byte schemaBytes[];
+        if (addDRHiddenColumn) {
+            int columnCount = schemaTable.getColumnCount();
+            ColumnInfo[] augmentedSchema = new ColumnInfo[columnCount + 1];
+            for (int i = 0; i < columnCount; i++) {
+                augmentedSchema[i] = new ColumnInfo(schemaTable.getColumnName(i), schemaTable.getColumnType(i));
+            }
+            augmentedSchema[columnCount] = new ColumnInfo("dr_clusterid_timestamp", VoltType.BIGINT);
+            schemaBytes = PrivateVoltTableFactory.getSchemaBytes(new VoltTable(augmentedSchema));
+        }
+        else {
+            schemaBytes = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
+        }
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaBytes.length);

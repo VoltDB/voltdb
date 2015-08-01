@@ -765,8 +765,10 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
     assert(m_schema);
     assert(m_data);
 
+    const int32_t columnCount  = m_schema->columnCount();
+    const int32_t hiddenColumnCount  = m_schema->hiddenColumnCount();
     tupleIn.readInt();
-    for (int j = 0; j < m_schema->columnCount(); ++j) {
+    for (int j = 0; j < columnCount; ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
 
         /**
@@ -781,6 +783,14 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
          * TableTuple. The memory allocation will be performed when
          * serializing to tuple storage.
          */
+        char *dataPtr = getWritableDataPtr(columnInfo);
+        NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
+                columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
+    }
+
+    for (int j = 0; j < hiddenColumnCount; ++j) {
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
+
         char *dataPtr = getWritableDataPtr(columnInfo);
         NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);

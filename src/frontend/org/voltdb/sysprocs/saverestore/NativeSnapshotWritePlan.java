@@ -222,6 +222,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
                             context.getHostId(), context.getCluster().getTypeName(),
                             context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
+                            context.getDatabase().getIsactiveactivedred(),
                             tracker, timestamp, numTables, snapshotRecord);
                     m_createdTargets.put(task.m_table.getRelativeIndex(), target);
                 }
@@ -238,6 +239,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                         String clusterName,
                                                         String databaseName,
                                                         int partitionCount,
+                                                        boolean isActiveActiveDRed,
                                                         SiteTracker tracker,
                                                         long timestamp,
                                                         AtomicInteger numTables,
@@ -262,6 +264,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 table.getIsreplicated(),
                 tracker.getPartitionsForHost(hostId),
                 CatalogUtil.getVoltTable(table),
+                (isActiveActiveDRed && table.getIsdred()),
                 txnId,
                 timestamp);
 
