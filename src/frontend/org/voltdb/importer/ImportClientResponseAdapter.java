@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ProcedureCallback;
@@ -50,6 +51,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final Map<Long, ImportCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, ImportCallback>());
+    private final ScheduledExecutorService m_es;
 
     private class ImportCallback implements Callback {
 
@@ -134,6 +136,9 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      */
     public ImportClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
+        ThreadFactory factory = CoreUtils.getThreadFactory(null, name, CoreUtils.SMALL_STACK_SIZE,
+                false, null);
+        m_es = new ScheduledThreadPoolExecutor(1, factory);
     }
 
     public long registerCallback(Callback c) {
@@ -169,14 +174,24 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public void enqueue(ByteBuffer b) {
-        ClientResponseImpl resp = new ClientResponseImpl();
+        final ClientResponseImpl resp = new ClientResponseImpl();
         try {
             b.position(4);
             resp.initFromBuffer(b);
 
-            Callback callback = m_callbacks.remove(resp.getClientHandle());
+            final Callback callback = m_callbacks.remove(resp.getClientHandle());
             if (callback != null) {
-                callback.handleResponse(resp);
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            callback.handleResponse(resp);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                });
+
             }
         }
         catch (Exception e)

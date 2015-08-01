@@ -38,26 +38,38 @@ import org.voltdb.client.ProcedureCallback;
 public class CheckData {
 
     static Queue<Pair<Long, Long>> m_queue;
+    static Queue<Pair<Long, Long>> m_delete_queue;
     Client m_client;
     private static final int VALUE = 1;
     private static final int KEY = 0;
 
     private static final String MY_SELECT_PROCEDURE = "IMPORTTABLE.select";
+    private static final String MY_DELETE_PROCEDURE = "IMPORTTABLE.delete";
 
-    public CheckData(Queue<Pair<Long, Long>> q, Client c) {
+    public CheckData(Queue<Pair<Long, Long>> q, Queue<Pair<Long, Long>> dq, Client c) {
         m_client = c;
         m_queue = q;
+        m_delete_queue = dq;
     }
 
     public void processQueue() {
-        while (m_queue.size() > 0) {
+        while (m_queue.size() > 0 || m_delete_queue.size() > 0) {
             Pair<Long, Long> p = m_queue.poll();
 
-            Long key = p.getFirst();
             try {
-                boolean ret = m_client.callProcedure(new SelectCallback(m_queue, p, key), MY_SELECT_PROCEDURE, key);
-                if (!ret) {
-                    System.out.println("Select call failed!");
+                if (p != null) {
+                    Long key = p.getFirst();
+                    boolean ret = m_client.callProcedure(new SelectCallback(m_queue, p, key), MY_SELECT_PROCEDURE, key);
+                    if (!ret) {
+                        System.out.println("Select call failed!");
+                    }
+                }
+                Pair<Long, Long> p2 = m_delete_queue.poll();
+                if (p2 != null) {
+                    boolean ret = m_client.callProcedure(new DeleteCallback(m_delete_queue, p2), MY_DELETE_PROCEDURE, p2.getFirst());
+                    if (!ret) {
+                        System.out.println("Delete call failed!");
+                    }
                 }
                 AsyncBenchmark.rowsChecked.incrementAndGet();
             } catch (NoConnectionsException e) {
@@ -101,6 +113,7 @@ public class CheckData {
             if (pair.size() == 2) {
                 key = pair.get(KEY);
                 value = pair.get(VALUE);
+                m_delete_queue.offer(m_pair);
             } else {
                 // push the tuple back onto the queue we can try again
                 m_queue.offer(m_pair);
@@ -131,6 +144,28 @@ public class CheckData {
             return m_pair;
         }
 
+    }
+
+    static class DeleteCallback implements ProcedureCallback {
+
+        Pair<Long, Long> m_pair;
+        Queue<Pair<Long, Long>> m_queue;
+
+        public DeleteCallback(Queue<Pair<Long, Long>> q, Pair<Long, Long> p) {
+            m_pair = p;
+            m_queue = q;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse response)
+                throws Exception {
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                System.out.println(response.getStatusString());
+                return;
+            }
+            m_queue.remove(m_pair);
+
+        }
     }
 
 }
