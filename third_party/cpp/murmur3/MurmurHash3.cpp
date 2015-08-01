@@ -1,3 +1,11 @@
+// This source file was originally from:
+//   https://github.com/PeterScott/murmur3
+//
+// We've changed it for use with VoltDB:
+//   - We changed the top-level functions defined below to return
+//     their hash by value, rather than accept a pointer to storage
+//     for the result
+
 //-----------------------------------------------------------------------------
 // MurmurHash3 was written by Austin Appleby, and is placed in the public
 // domain. The author hereby disclaims copyright to this source code.

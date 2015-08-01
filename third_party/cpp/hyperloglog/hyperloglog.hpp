@@ -1,3 +1,11 @@
+// This source file was originally from:
+//   https://github.com/hideo55/cpp-HyperLogLog
+//
+// We've changed it for use with VoltDB:
+//   - Murmur3 hash functions return hashes by value in our third
+//     party sources (rather than accept an output storage address),
+//     so we changed the calls to murmur3 functions in this code.
+
 #if !defined(HYPERLOGLOG_HPP)
 #define HYPERLOGLOG_HPP
 
