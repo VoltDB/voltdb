@@ -93,12 +93,13 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         }
     }
 
-    private static void assertEstimateWithin(String col, long exact, double estimate, double maxError) {
+    private static void assertEstimateWithin(String col, long exact, long estimate, double maxError) {
 
         double percentError;
 
         if (exact != 0) {
-            percentError = Math.abs(((exact - estimate) / exact) * 100.0);
+            double diff = Math.abs(exact - estimate);
+            percentError = diff / exact * 100.0;
         }
         else if (estimate == 0.0) {
             percentError = 0.0;
@@ -135,7 +136,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         while(estimateTable.advanceRow()) {
             assertTrue(exactTable.advanceRow());
 
-            assertEstimateWithin(col, exactTable.getLong(whichCol), estimateTable.getDouble(whichCol), maxError);
+            assertEstimateWithin(col, exactTable.getLong(whichCol), estimateTable.getLong(whichCol), maxError);
         }
 
         assertFalse(exactTable.advanceRow());
@@ -151,13 +152,13 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         //
         // In other tests, we can just verify that the error in the estimate
         // is reasonably bounded, by computing an exact answer.
-        double expectedEstimates[] = {
-                878.8667,
-                871.7726,
-                872.7860,
-                244.4554,
-                1002.6306,
-                983.3405
+        long expectedEstimates[] = {
+                879,
+                872,
+                873,
+                244,
+                1003,
+                983
         };
 
         // If there's zero values, then cardinality estimate should be 0.0.
@@ -169,7 +170,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 String approxStmt = String.format("select approx_count_distinct(%s) from %s", col, tbl);
                 VoltTable vt = client.callProcedure("@AdHoc", approxStmt).getResults()[0];
                 assertTrue(vt.advanceRow());
-                assertEquals(0.0, vt.getDouble(0));
+                assertEquals(0, vt.getLong(0));
                 assertFalse(vt.advanceRow());
             }
         }
@@ -187,9 +188,9 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
 
                 VoltTable vt = client.callProcedure("@AdHoc", approxStmt).getResults()[0];
                 assertTrue(vt.advanceRow());
-                double actualEstimate = vt.getDouble(0);
+                long actualEstimate = vt.getLong(0);
                 assertEquals("Actual estimate not expected for column " + col,
-                        expectedEstimates[colIdx], actualEstimate, 0.01);
+                        expectedEstimates[colIdx], actualEstimate);
                 assertFalse(vt.advanceRow());
 
                 // If we filter out the null values, the answer should be exactly the same
@@ -199,8 +200,8 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                         + "where %s is not null", col, tbl, col);
                 vt = client.callProcedure("@AdHoc", approxStmtNoNulls).getResults()[0];
                 assertTrue(vt.advanceRow());
-                double actualEstimateNoNulls = vt.getDouble(0);
-                assertEquals(actualEstimate, actualEstimateNoNulls, 0.0);
+                long actualEstimateNoNulls = vt.getLong(0);
+                assertEquals(actualEstimate, actualEstimateNoNulls);
                 assertFalse(vt.advanceRow());
 
                 // Compare with the exact distinct count

@@ -400,10 +400,10 @@ public class Benchmark {
 
         try(PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("bench_accuracy.dat", true)))) {
             long exactAnswer = result.getLong(2);
-            double approxAnswer = result.getDouble(0);
-            double percentError = Math.abs(exactAnswer - approxAnswer) / exactAnswer * 100.0;
+            long approxAnswer = result.getLong(0);
+            double percentError = Math.abs(exactAnswer - (double)approxAnswer) / exactAnswer * 100.0;
 
-            out.printf("\"%s\"        %d        %f      %f\n",
+            out.printf("\"%s\"        %d        %d      %f\n",
                     toHumanReadable(config.numTotalVals),
                     exactAnswer,
                     approxAnswer,

@@ -476,7 +476,7 @@ public class SetFunction implements Serializable {
                 case Types.SQL_BIGINT :
                 case Types.SQL_DECIMAL :
                 case Types.SQL_TIMESTAMP :
-                    return Type.SQL_DOUBLE;
+                    return Type.SQL_BIGINT;
                 default:
                     // We only support fixed-width types for this
                     // aggregate function.

@@ -46,7 +46,7 @@ public class DoCount extends VoltProcedure {
         VoltTable vt = voltExecuteSQL()[0];
         long approxMillis = System.currentTimeMillis() - startTime;
         vt.advanceRow();
-        double approxAnswer = vt.getDouble(0);
+        long approxAnswer = vt.getLong(0);
 
         for (int i = 0; i < 10; ++i) {
             voltQueueSQL(countExact);
@@ -64,7 +64,7 @@ public class DoCount extends VoltProcedure {
         long exactAnswer = vt.getLong(0);
 
         VoltTable.ColumnInfo[] cols = new VoltTable.ColumnInfo[] {
-                new VoltTable.ColumnInfo("approx answer", VoltType.FLOAT),
+                new VoltTable.ColumnInfo("approx answer", VoltType.BIGINT),
                 new VoltTable.ColumnInfo("approx elapsed millis", VoltType.FLOAT),
                 new VoltTable.ColumnInfo("exact answer", VoltType.BIGINT),
                 new VoltTable.ColumnInfo("exact elapsed millis", VoltType.FLOAT)

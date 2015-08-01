@@ -20,9 +20,19 @@ javac procedures/approxcountdistinct/*.java
 ls procedures/approxcountdistinct/*.class
 jar cf procs.jar -C procedures/ approxcountdistinct
 
+if [ ! -e procs.jar ]; then
+    echo "Error compiling procedures"
+    exit 1
+fi
+
 javac client/approxcountdistinct/*.java
 ls client/approxcountdistinct/*.class
 jar cf client.jar -C client/ approxcountdistinct
+
+if [ ! -e client.jar ]; then
+    echo "Error compiling client"
+    exit 1
+fi
 
 ls -l *.jar
 

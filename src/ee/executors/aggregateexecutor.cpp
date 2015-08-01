@@ -60,6 +60,7 @@
 #include "hyperloglog/hyperloglog.hpp" // for APPROX_COUNT_DISTINCT
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <set>
 #include <sstream>
@@ -376,7 +377,9 @@ public:
 
     virtual NValue finalize(ValueType type)
     {
-        m_value = ValueFactory::getDoubleValue(m_hyperLogLog.estimate());
+        double estimate = m_hyperLogLog.estimate();
+        estimate = ::round(estimate); // round to nearest integer
+        m_value = ValueFactory::getBigIntValue(static_cast<int64_t>(estimate));
         return m_value;
     }
 
