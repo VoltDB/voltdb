@@ -45,8 +45,11 @@ package org.voltdb.sqlparser.semantics;
 
 import static java.lang.String.format;
 
+import java.util.List;
+
 import org.assertj.core.api.AbstractAssert;
 import org.assertj.core.api.Condition;
+import org.assertj.core.api.Fail;
 import org.hsqldb_voltpatches.VoltXMLElement;
 
 /**
@@ -89,11 +92,16 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
         // check that actual VoltXMLElement we want to make assertions on is not null.
         isNotNull();
 
+        String value = actual.attributes.get(attributeName);
+        if (value == null) {
+            throw new AssertionError(format("\nExpected attribute named <%s>, but it was undefined.", attributeName));
+        }
         // we overrides the default error message with a more explicit one
-        String errorMessage = format("\nExpected attribute named <%s> to be:\n  <%s>\n but was:\n  <%s>", actual,
+        String errorMessage = format("\nExpected attribute named <%s> to be:\n  <%s>\n but was:\n  <%s>",
+                                     attributeName,
                                      attributeValue,
-                                     actual.attributes.get(attributeName));
-        if (!actual.attributes.get(attributeName).equals(attributeValue)) {
+                                     value);
+        if (!value.equals(attributeValue)) {
             throw new AssertionError(errorMessage);
         }
 
@@ -101,16 +109,49 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
         return this;
     }
 
+    @SuppressWarnings("unchecked")
     public VoltXMLElementAssert hasChildNamed(String childName,
                                               Condition<VoltXMLElement> ... conditions) {
         isNotNull();
-        VoltXMLElement child = actual.findChild(childName);
-        if (child == null) {
+        List<VoltXMLElement> children = actual.findChildren(childName);
+        if (children == null || children.size() == 0) {
             failWithMessage(String.format("Can't find child named: <%s>", childName));
         }
-        for (Condition<VoltXMLElement> cond : conditions) {
-            assertThat(actual).has(cond);
+        for (VoltXMLElement child : children) {
+            for (Condition<VoltXMLElement> cond : conditions) {
+                assertThat(child).has(cond);
+            }
         }
         return this;
+    }
+
+    @SafeVarargs
+    public static Condition<VoltXMLElement> withChildNamed(final String childName,
+                                                           final Condition<VoltXMLElement> ... conditions) {
+        return new Condition<VoltXMLElement>() {
+
+            @Override
+            public boolean matches(VoltXMLElement aParent) {
+                VoltXMLElement child = aParent.findChild(childName);
+                if (child == null) {
+                    Fail.fail(String.format("Can't find child named: <%s>", childName));
+                }
+                for (Condition<VoltXMLElement> cond : conditions) {
+                    assertThat(child).has(cond);
+                }
+                return true;
+            }
+        };
+    }
+
+    public static Condition<VoltXMLElement> withAttribute(final String aName, final String aValue) {
+        return new Condition<VoltXMLElement>() {
+
+            @Override
+            public boolean matches(VoltXMLElement arg0) {
+                assertThat(arg0).hasAttribute(aName, aValue);
+                return true;
+            }
+        };
     }
 }
