@@ -59,7 +59,6 @@ public class ImportHandler {
     private volatile boolean m_stopped = false;
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
-    private static final AtomicLong m_lock = new AtomicLong(0);
 
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
     final static long SUPPRESS_INTERVAL = 60;
@@ -227,10 +226,7 @@ public class ImportHandler {
         }
 
         boolean success;
-        //Synchronize this to create good handles across all ImportHandlers
-        synchronized(ImportHandler.m_lock) {
-            success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
-        }
+        success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
