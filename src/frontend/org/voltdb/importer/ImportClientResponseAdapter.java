@@ -136,7 +136,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      */
     public ImportClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
-        ThreadFactory factory = CoreUtils.getThreadFactory(null, name, CoreUtils.SMALL_STACK_SIZE,
+        ThreadFactory factory = CoreUtils.getThreadFactory(null, "ImportResponseHandler", CoreUtils.SMALL_STACK_SIZE,
                 false, null);
         m_es = new ScheduledThreadPoolExecutor(1, factory);
     }
