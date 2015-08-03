@@ -23,11 +23,15 @@
 
 package org.voltdb;
 
+import java.io.File;
+
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientUtils;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.FakeStatsProducer;
 import org.voltdb.utils.MiscUtils;
@@ -82,7 +86,7 @@ public class TestResourceMonitor extends TestCase
         setUpServer(false, true);
 
         // Wait for monitoring interval time and verify server is still in running mode
-        m_mockStatsProducer.m_rss = 2048*1024*1024;
+        m_mockStatsProducer.m_rss = 2048L*1024*1024;
         resumeAndWait(MONITORING_INTERVAL+1);
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
     }
@@ -93,7 +97,7 @@ public class TestResourceMonitor extends TestCase
         setUpServer(true, false);
 
         // Wait for monitoring interval time and verify server is still in running mode
-        m_mockStatsProducer.m_rss = 2048*1024*1024;
+        m_mockStatsProducer.m_rss = 2048L*1024*1024;
         resumeAndWait(ResourceUsageMonitor.DEFAULT_MONITORING_INTERVAL+1);
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
     }
@@ -138,6 +142,54 @@ public class TestResourceMonitor extends TestCase
         m_mockStatsProducer.m_rss = 1024*1024;
         resumeAndWait(MONITORING_INTERVAL+1);
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
+    }
+
+    public void testCatalogUpdate_PauseAfterUpdate() throws Exception
+    {
+        setUpServer(false, true); // set up server with no rss limit
+        m_mockStatsProducer.m_rss = 2048L*1024*1024;
+        resumeAndWait(MONITORING_INTERVAL+1);
+        assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
+
+        // update server with rss limit
+        String newDepFile = getDeploymentPathWithRss(1);
+        String depBytes = new String(ClientUtils.fileToBytes(new File(newDepFile)), Constants.UTF8ENCODING);
+        VoltTable[] results = m_client.callProcedure("@UpdateApplicationCatalog", null, depBytes).getResults();
+        assertTrue(results.length == 1);
+        Thread.sleep(5000); // wait to make sure new deployment file takes effect
+
+        resumeAndWait(MONITORING_INTERVAL+1);
+        assertEquals(OperationMode.PAUSED, VoltDB.instance().getMode());
+    }
+
+    public void testCatalogUpdate_ResumeAfterUpdate() throws Exception
+    {
+        setUpServer(true, true); // set up server with rss limit
+        m_mockStatsProducer.m_rss = 2048L*1024*1024;
+        resumeAndWait(MONITORING_INTERVAL+1);
+        assertEquals(OperationMode.PAUSED, VoltDB.instance().getMode());
+
+        // update server with rss limit
+        String newDepFile = getDeploymentPathWithRss(0);
+        String depBytes = new String(ClientUtils.fileToBytes(new File(newDepFile)), Constants.UTF8ENCODING);
+        VoltTable[] results = m_client.callProcedure("@UpdateApplicationCatalog", null, depBytes).getResults();
+        assertTrue(results.length == 1);
+        Thread.sleep(5000); // wait to make sure new deployment file takes effect
+
+        resumeAndWait(MONITORING_INTERVAL+1);
+        assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
+    }
+
+    private String getDeploymentPathWithRss(int rssLimit) throws Exception
+    {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.setRssLimit(rssLimit);
+        builder.setResourceCheckInterval(MONITORING_INTERVAL);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("updatedresourcemonitor.jar"), 1, 1, 0);
+        assert(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("updatedresourcemonitor.xml"));
+
+        return Configuration.getPathToCatalogForTest("updatedresourcemonitor.xml");
     }
 
     // time in seconds
