@@ -46,7 +46,6 @@ class AdminSecurityUserTest extends TestBase {
 	def "Add users in security"(){
         insideCount = 0
         loopStatus 				= false
-        int count 				= 0
         boolean created 		= false
 		String usernameOne 	= page.overview.getUsernameOneForSecurity()
 
@@ -61,35 +60,48 @@ class AdminSecurityUserTest extends TestBase {
         expect: 'at Admin Page'
         at AdminPage
 
-        if( created == false ) {
-            while (insideCount < numberOfTrials) {
-                insideCount ++
+        when:'Check Security Enabled'
+        at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        else if (page.overview.securityValue.text().equals("On"))
+        {
+            if( created == false ) {
+                while (insideCount < numberOfTrials) {
+                    insideCount ++
 
-                when: 'Security button is clicked'
-                page.overview.expandSecurity()
-                then: 'Security expand'
-                page.overview.checkIfSecurityIsExpanded()
+                    when: 'Security button is clicked'
+                    page.overview.expandSecurity()
+                    then: 'Security expand'
+                    page.overview.checkIfSecurityIsExpanded()
 
-                when: 'Security add button is clicked'
-                page.overview.openSecurityAdd()
-                then: 'Popup is displayed'
-                page.overview.checkSecurityAddOpen()
+                    when: 'Security add button is clicked'
+                    page.overview.openSecurityAdd()
+                    then: 'Popup is displayed'
+                    page.overview.checkSecurityAddOpen()
 
-                when: 'Username, Password and Role is given'
-                page.overview.enterUserCredentials(usernameOne, passwordOne, roleOne)
-                then:
-                if(overview.checkListForUsers(usernameOne) == true) {
-                    loopStatus = true
-                    created = true
-                    break
+                    when: 'Username, Password and Role is given'
+                    page.overview.enterUserCredentials(usernameOne, passwordOne, roleOne)
+                    then:
+                    if(overview.checkListForUsers(usernameOne) == true) {
+                        loopStatus = true
+                        created = true
+                        break
+                    }
+                }
+
+                if (loopStatus == false) {
+                    println("The username wasn't created in " + numberOfTrials + " trials")
+                    assert false
                 }
             }
-
-            if (loopStatus == false) {
-                println("The username wasn't created in " + numberOfTrials + " trials")
-                assert false
-            }
         }
+
+
     }
 
 
@@ -98,92 +110,94 @@ class AdminSecurityUserTest extends TestBase {
 
         String passwordOne	= page.overview.getPasswordOneForSecurity()
 
-
-
-        when: 'logout button is clicked and popup is displayed'
-        waitFor(waitTime) {
-            page.header.logout.click()
-            page.header.logoutPopupOkButton.isDisplayed()
+        when:'Check Security Enabled'
+        at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
         }
+        else if (page.overview.securityValue.text().equals("On"))
+        {
+            when: 'logout button is clicked and popup is displayed'
+            waitFor(waitTime) {
+                page.header.logout.click()
+                page.header.logoutPopupOkButton.isDisplayed()
+            }
 
-        then: 'logout is confirmed and popup is removed'
-        waitFor(waitTime) {
-            page.header.logoutPopupOkButton.click()
-            !page.header.logoutPopupOkButton.isDisplayed()
-        }
-        at LoginLogoutPage
+            then: 'logout is confirmed and popup is removed'
+            waitFor(waitTime) {
+                page.header.logoutPopupOkButton.click()
+                !page.header.logoutPopupOkButton.isDisplayed()
+            }
+            at LoginLogoutPage
 
-       // insideCount = 0
-        while(insideCount < numberOfTrials) {
-            try {
-                insideCount++
-                when: 'at Login Page'
-                at LoginLogoutPage
-                then: 'enter as the new user'
-                page.loginBoxuser1.value(usernameOne)
-                page.loginBoxuser2.value(passwordOne)
-                page.loginbtn.click()
-                at VoltDBManagementCenterPage
-                break
+            // insideCount = 0
+            while(insideCount < numberOfTrials) {
+                try {
+                    insideCount++
+                    when: 'at Login Page'
+                    at LoginLogoutPage
+                    then: 'enter as the new user'
+                    page.loginBoxuser1.value(usernameOne)
+                    page.loginBoxuser2.value(passwordOne)
+                    page.loginbtn.click()
+                    at VoltDBManagementCenterPage
+                    break
 
-            } catch (org.openqa.selenium.ElementNotVisibleException e) {
-                println("ElementNotVisibleException: Unable to Start the test")
-                println("Retrying")
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("ElementNotVisibleException: Unable to Start the test")
+                    println("Retrying")
+                }
             }
         }
-//        while(insideCount < numberOfTrials) {
-//            try {
-//                insideCount++
-//                when: 'at Login Page'
-//                at LoginLogoutPage
-//                then: 'enter as the admin'
-//                page.loginBoxuser1.value(username)
-//                page.loginBoxuser2.value(password)
-//                page.loginbtn.click()
-//                at VoltDBManagementCenterPage
-//
-//                break
-//            } catch (org.openqa.selenium.ElementNotVisibleException e) {
-//                println("ElementNotVisibleException: Unable to Start the test")
-//                println("Retrying")
-//            }
-//        }
     }
 
 
     def "LOGOUT as usernameOne and LOGIN as admin" (){
+        when:'Check Security Enabled'
+        at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        else if (page.overview.securityValue.text().equals("On")) {
+            when: 'logout button is clicked and popup is displayed'
+            waitFor(waitTime) {
+                page.header.logout.click()
 
-        // LOGOUT AND LOGIN AS admin
-					when: 'logout button is clicked and popup is displayed'
-					waitFor(waitTime) {
-						page.header.logout.click()
+            }
+            waitFor(10){page.header.logoutPopupOkButton.isDisplayed()}
+            then: 'logout is confirmed and popup is removed'
+            waitFor(waitTime) {
+                page.header.logoutPopupOkButton.click()
+                !page.header.logoutPopupOkButton.isDisplayed()
+            }
+            //to LoginLogoutPage
 
-					}
-waitFor(10){page.header.logoutPopupOkButton.isDisplayed()}
-					then: 'logout is confirmed and popup is removed'
-					waitFor(waitTime) {
-						page.header.logoutPopupOkButton.click()
-						!page.header.logoutPopupOkButton.isDisplayed()
-					}
-					//to LoginLogoutPage
+            while(insideCount < numberOfTrials) {
+                try {
+                    insideCount++
+                    when: 'at Login Page'
+                    at LoginLogoutPage
+                    then: 'enter as the admin'
+                    page.loginBoxuser1.value("admin")
+                    page.loginBoxuser2.value("voltdb")
+                    page.loginbtn.click()
+                    at VoltDBManagementCenterPage
 
-					while(insideCount < numberOfTrials) {
-						try {
-							insideCount++
-							when: 'at Login Page'
-							at LoginLogoutPage
-							then: 'enter as the admin'
-							page.loginBoxuser1.value("admin")
-							page.loginBoxuser2.value("voltdb")
-							page.loginbtn.click()
-							at VoltDBManagementCenterPage
+                    break
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("ElementNotVisibleException: Unable to Start the test")
+                    println("Retrying")
+                }
+            }
+        }
 
-							break
-						} catch (org.openqa.selenium.ElementNotVisibleException e) {
-							println("ElementNotVisibleException: Unable to Start the test")
-							println("Retrying")
-						}
-					}
+
 
     }
 
@@ -191,84 +205,106 @@ waitFor(10){page.header.logoutPopupOkButton.isDisplayed()}
     String usernameOne 	= page.overview.getUsernameOneForSecurity()
     String roleOne		= page.overview.getRoleOneForSecurity()
     String passwordOne	= page.overview.getPasswordOneForSecurity()
-    		//boolean createSameUser 	= false
+
     //				// TRY TO CREATE NEW USER WITH THE SAME username AS usernameOne
 
-				//if(createSameUser == false) {
-					when: 'Security button is clicked'
-					page.overview.expandSecurity()
-					then: 'Check if Security expanded or notes'
+        when:'Check Security Enabled'
+        at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        else if (page.overview.securityValue.text().equals("On")) {
+            when: 'Security button is clicked'
+            page.overview.expandSecurity()
+            then: 'Check if Security expanded or notes'
 
-                    try {
-                        waitFor(10){ page.overview.securityExpanded.isDisplayed()}
+            try {
+                waitFor(10) { page.overview.securityExpanded.isDisplayed() }
 
-                    } catch(geb.error.RequiredPageContentNotPresent e) {
+            } catch (geb.error.RequiredPageContentNotPresent e) {
 
-                    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
 
-                    }
-							//waitFor(20){ page.overview.checkIfSecurityIsExpanded()}
+            }
+            //waitFor(20){ page.overview.checkIfSecurityIsExpanded()}
 
-					when: 'Security add button is clicked'
-					page.overview.openSecurityAdd()
-					then: 'Popup is displayed'
-					page.overview.checkSecurityAddOpen()
+            when: 'Security add button is clicked'
+            page.overview.openSecurityAdd()
+            then: 'Popup is displayed'
+            page.overview.checkSecurityAddOpen()
 
-					when: 'Username, Password and Role is given'
-					page.overview.enterUserCredentials(usernameOne, passwordOne, roleOne)
-					then: 'Error message is displayed'
-					page.overview.userPopupSave.click()
-					waitFor(waitTime) {
-						page.overview.errorUsernameMessage.isDisplayed()
-						page.overview.errorUsernameMessage.text().equals("This username already exists.")
-					}
-					println("Duplicate username wasn't allowed with success")
-					page.overview.userPopupCancel.click()
-					//createSameUser = true
-				//}
-
+            when: 'Username, Password and Role is given'
+            page.overview.enterUserCredentials(usernameOne, passwordOne, roleOne)
+            then: 'Error message is displayed'
+            page.overview.userPopupSave.click()
+            waitFor(waitTime) {
+                page.overview.errorUsernameMessage.isDisplayed()
+                page.overview.errorUsernameMessage.text().equals("This username already exists.")
+            }
+            println("Duplicate username wasn't allowed with success")
+            page.overview.userPopupCancel.click()
+        }
     }
 
     def "EDIT THE USER usernameOne AND CHANGE IT TO usernameTwo"(){
+
+        String usernameTwo 	= page.overview.getUsernameTwoForSecurity()
+        String passwordTwo 	= page.overview.getPasswordTwoForSecurity()
+        String roleTwo		= page.overview.getRoleTwoForSecurity()
+
     				// EDIT THE USER usernameOne AND CHANGE IT TO usernameTwo
-    String usernameTwo 	= page.overview.getUsernameTwoForSecurity()
-    String passwordTwo 	= page.overview.getPasswordTwoForSecurity()
-    String roleTwo		= page.overview.getRoleTwoForSecurity()
 
-        when: 'Security button is clicked'
-        page.overview.expandSecurity()
-        then: 'Check if Security expanded or notes'
+        when:'Check Security Enabled'
+        at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        else if (page.overview.securityValue.text().equals("On")) {
+            when: 'Security button is clicked'
+            page.overview.expandSecurity()
+            then: 'Check if Security expanded or notes'
 
-        when: 'Click Edit User button'
-        page.overview.openEditUser()
-        then: 'Edit User popup is displayed'
-        //page.overview.checkSecurityEditOpen()
+            when: 'Click Edit User button'
+            page.overview.openEditUser()
+            then: 'Edit User popup is displayed'
+            //page.overview.checkSecurityEditOpen()
 
-        try {
-            waitFor(waitTime) {
-                page.overview.userPopupUsernameField.isDisplayed()
-                page.overview.userPopupPasswordField.isDisplayed()
-                page.overview.userPopupSave.isDisplayed()
+            try {
+                waitFor(waitTime) {
+                    page.overview.userPopupUsernameField.isDisplayed()
+                    page.overview.userPopupPasswordField.isDisplayed()
+                    page.overview.userPopupSave.isDisplayed()
+                }
+
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+
+            } catch(geb.waiting.WaitTimeoutException e) {
+
             }
 
-        } catch(geb.error.RequiredPageContentNotPresent e) {
+            when: 'Username, Password and Role is given'
+            page.overview.enterUserCredentials(usernameTwo, passwordTwo, roleTwo)
+            then:
+            if(overview.checkListForUsers(usernameTwo) == true) {
+                loopStatus = true
+            }
 
-        } catch(geb.waiting.WaitTimeoutException e) {
 
+            if (loopStatus == false) {
+                println("The username wasn't edited in " + numberOfTrials + " trials")
+                assert false
+            }
         }
 
-        when: 'Username, Password and Role is given'
-        page.overview.enterUserCredentials(usernameTwo, passwordTwo, roleTwo)
-        then:
-        if(overview.checkListForUsers(usernameTwo) == true) {
-            loopStatus = true
-        }
 
 
-    if (loopStatus == false) {
-        println("The username wasn't edited in " + numberOfTrials + " trials")
-        assert false
-    }
+
 }
 
 
@@ -277,22 +313,32 @@ waitFor(10){page.header.logoutPopupOkButton.isDisplayed()}
 
         				// DELETE THE USER
 
-        when: 'Security button is clicked'
-        page.overview.expandSecurity()
-        then: 'Check if Security expanded or notes'
-
-        when: 'Open Edit'
-        page.overview.openEditUserNext()
-        then: 'Edit User popup is displayed'
-        page.overview.checkSecurityEditOpen()
-
-        when: 'User was deleted'
-        page.overview.deleteUserSecurityPopup()
-        then: 'check for the user'
-        if(overview.checkListForUsers(usernameTwo) == false) {
-            println("deletion successful")
-            //loopStatus = true
+        when:'Check Security Enabled'
+        at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
         }
+        else if (page.overview.securityValue.text().equals("On")) {
+            when: 'Security button is clicked'
+            page.overview.expandSecurity()
+            then: 'Check if Security expanded or notes'
+
+            when: 'Open Edit'
+            page.overview.openEditUserNext()
+            then: 'Edit User popup is displayed'
+            page.overview.checkSecurityEditOpen()
+
+            when: 'User was deleted'
+            page.overview.deleteUserSecurityPopup()
+            then: 'check for the user'
+            if(overview.checkListForUsers(usernameTwo) == false) {
+                println("deletion successful")
+            }
+        }
+
 
 
     }
