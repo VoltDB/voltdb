@@ -72,9 +72,9 @@ public class ClientThread extends BenchmarkThread {
     final Random m_random = new Random();
     final Semaphore m_permits;
     public long m_cnt = 0;
-
+    public boolean m_synchronous;
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
-            boolean allowInProcAdhoc, float mpRatio)
+            boolean allowInProcAdhoc, float mpRatio, boolean isSync)
         throws Exception
     {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
@@ -84,6 +84,7 @@ public class ClientThread extends BenchmarkThread {
         m_processor = processor;
         m_txnsRun = txnsRun;
         m_permits = permits;
+        m_synchronous = isSync;
         log.info("ClientThread(CID=" + String.valueOf(cid) + ") " + m_type.toString());
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
@@ -159,6 +160,7 @@ public class ClientThread extends BenchmarkThread {
                         shouldRollback);
             } catch (Exception e) {
                 if (shouldRollback == 0) {
+		    System.out.println("last cnt: "+m_cnt);
                     log.warn("ClientThread threw after " + m_txnsRun.get() +
                             " calls while calling procedure: " + procName +
                             " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
@@ -167,7 +169,6 @@ public class ClientThread extends BenchmarkThread {
                 }
                 throw e;
             }
-
             // fake a proc call exception if we think one should be thrown
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 throw new UserProcCallException(response);
@@ -176,13 +177,13 @@ public class ClientThread extends BenchmarkThread {
             VoltTable[] results = response.getResults();
             
             VoltTable data = results[3];
-            long cnt = data.fetchRow(0).getLong("cnt");
-            
-            // check to see if the DB's last count matches with the last count reported by the server...
-            if (cnt < m_cnt)
-                Benchmark.hardStop("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+(cnt-1));
-            
-            m_cnt = cnt + 1;
+            if (m_synchronous) {
+                long cnt = data.fetchRow(0).getLong("cnt");
+                // check to see if the DB's last count matches with the last count reported by the server...
+                if (cnt < m_cnt)
+                    hardStop("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+cnt);
+                m_cnt = cnt + 1;
+            }
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {

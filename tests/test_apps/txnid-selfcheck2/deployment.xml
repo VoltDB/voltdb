@@ -5,7 +5,11 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-
+    <commandlog synchronous="true" />
+    <paths>
+        <commandlog path="/tmp/testlog/" />
+	<!-- <commandlogsnapshot path="/tmp/" /> -->
+    </paths>
     <export enabled="true" target="file">
         <configuration>
             <property name="type">csv</property>

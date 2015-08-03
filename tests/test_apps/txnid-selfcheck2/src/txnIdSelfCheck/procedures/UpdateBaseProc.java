@@ -112,6 +112,11 @@ public class UpdateBaseProc extends VoltProcedure {
         data = retval[3];
         validateCIDData(data, getClass().getName());
 
+        if (data.getRowCount() > 0) {
+	    VoltTableRow row = data.fetchRow(0);
+            if (row.getVarbinary("value").length == 0)
+                throw new VoltAbortException("Value column contained no data in UpdateBaseProc");
+	}
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
         }

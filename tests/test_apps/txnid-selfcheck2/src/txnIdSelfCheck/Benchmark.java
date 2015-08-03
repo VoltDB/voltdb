@@ -92,6 +92,8 @@ public class Benchmark {
     public static AtomicLong txnCount = new AtomicLong();
     private long txnCountAtLastCheck;
     private long lastProgressTimestamp = System.currentTimeMillis();
+    private VoltTable sysinfo;
+    private boolean isSynchronous = false;
 
     // For retry connections
     private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
@@ -529,6 +531,16 @@ public class Benchmark {
 
         // connect to one or more servers, loop until success
         connect();
+        
+        sysinfo = client.callProcedure("@SystemInformation", "deployment").getResults()[0];
+        while (sysinfo.advanceRow()) {
+            String property = sysinfo.getString(0);
+            if (property.equals("commandlogmode")) {
+                String value = sysinfo.getString(1);
+                if (value.equals("sync"))
+                    isSynchronous = true;
+            }
+        }
 
         // get partition count
         int partitionCount = 0;
@@ -643,7 +655,7 @@ public class Benchmark {
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
-                    config.allowinprocadhoc, config.mpratio);
+                    config.allowinprocadhoc, config.mpratio, isSynchronous);
             clientThread.start();
             clientThreads.add(clientThread);
         }
