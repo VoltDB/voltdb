@@ -62,6 +62,8 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType.Memorylimit;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
@@ -69,8 +71,6 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
-import org.voltdb.compiler.deploymentfile.SystemSettingsType.Memorylimit;
-import org.voltdb.compiler.deploymentfile.SystemSettingsType.Resourcecheckinterval;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
@@ -1154,18 +1154,29 @@ public class VoltProjectBuilder {
             systemSettingType.setQuery(query);
         }
         if (m_rssLimit != null) {
-            Memorylimit memoryLimit = factory.createSystemSettingsTypeMemorylimit();
+            ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
+            Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
             memoryLimit.setSize(new BigDecimal(m_rssLimit));
-            systemSettingType.setMemorylimit(memoryLimit);
+            monitorType.setMemorylimit(memoryLimit);
         }
 
         if (m_resourceCheckInterval != null) {
-            Resourcecheckinterval interval = factory.createSystemSettingsTypeResourcecheckinterval();
-            interval.setValue(m_resourceCheckInterval);
-            systemSettingType.setResourcecheckinterval(interval);
+            ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
+            monitorType.setFrequency(m_resourceCheckInterval);
         }
 
         return systemSettingType;
+    }
+
+    private ResourceMonitorType initializeResourceMonitorType(SystemSettingsType systemSettingType,
+            org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
+            ResourceMonitorType monitorType = systemSettingType.getResourcemonitor();
+            if (monitorType == null) {
+                monitorType = factory.createResourceMonitorType();
+                systemSettingType.setResourcemonitor(monitorType);
+            }
+
+            return monitorType;
     }
 
     public File getPathToVoltRoot() {

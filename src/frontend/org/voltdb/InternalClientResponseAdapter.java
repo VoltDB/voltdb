@@ -24,6 +24,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
@@ -31,6 +34,7 @@ import java.util.concurrent.locks.LockSupport;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.Procedure;
@@ -50,6 +54,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final Map<Long, InternalCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, InternalCallback>());
+    private final ScheduledExecutorService m_es;
 
     private class InternalCallback implements Callback {
 
@@ -66,7 +71,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             m_id = id;
         }
 
-        public synchronized void discard() {
+        public void discard() {
             if (m_cont != null) {
                 m_cont.discard();
                 m_cont = null;
@@ -126,6 +131,9 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
      */
     public InternalClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
+        ThreadFactory factory = CoreUtils.getThreadFactory(null, "ImportResponseHandler", CoreUtils.SMALL_STACK_SIZE,
+                false, null);
+        m_es = new ScheduledThreadPoolExecutor(1, factory);
     }
 
     public long registerCallback(Callback c) {
@@ -149,8 +157,9 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
-            int sz = ds.getSerializedSize();
-            buf = ByteBuffer.allocate(sz);
+            final int serializedSize = ds.getSerializedSize();
+            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) return;
+            buf = ByteBuffer.allocate(serializedSize);
             ds.serialize(buf);
             enqueue(buf);
         } catch (IOException e) {
@@ -160,14 +169,24 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public void enqueue(ByteBuffer b) {
-        ClientResponseImpl resp = new ClientResponseImpl();
+        final ClientResponseImpl resp = new ClientResponseImpl();
         try {
             b.position(4);
             resp.initFromBuffer(b);
 
-            Callback callback = m_callbacks.remove(resp.getClientHandle());
+            final Callback callback = m_callbacks.remove(resp.getClientHandle());
             if (callback != null) {
-                callback.handleResponse(resp);
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            callback.handleResponse(resp);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                });
+
             }
         }
         catch (Exception e)

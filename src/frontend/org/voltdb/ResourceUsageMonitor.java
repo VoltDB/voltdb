@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
@@ -36,21 +37,18 @@ public class ResourceUsageMonitor implements Runnable
 
     public ResourceUsageMonitor(SystemSettingsType systemSettings)
     {
-        if (systemSettings == null) {
+        if (systemSettings == null || systemSettings.getResourcemonitor() == null) {
             return;
         }
 
-        if (systemSettings.getMemorylimit() != null) {
+        ResourceMonitorType config = systemSettings.getResourcemonitor();
+        if (config.getMemorylimit() != null) {
             // configured value is in GB. Convert it to bytes
-            double dblLimit = systemSettings.getMemorylimit().getSize().doubleValue()*1073741824;
+            double dblLimit = config.getMemorylimit().getSize().doubleValue()*1073741824;
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
 
-        if (systemSettings.getResourcecheckinterval() != null) {
-            m_resourceCheckInterval = systemSettings.getResourcecheckinterval().getValue();
-        } else { // Use default value, if user did not specify anything.
-            m_resourceCheckInterval = DEFAULT_MONITORING_INTERVAL;
-        }
+        m_resourceCheckInterval = config.getFrequency();
     }
 
     public boolean hasResourceLimitsConfigured()

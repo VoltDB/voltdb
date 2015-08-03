@@ -76,7 +76,7 @@ class Overview extends Module {
 
 		// SECURITY EXPANSION
 		
-		securityExpanded			{ $(class:"labelCollapsed labelExpanded", text:"security") }
+		securityExpanded			{ $(class:"labelCollapsed labelExpanded", text:"Security") }
         securityUsername			{ $("th", text:"Username") }
 		securityRole				{ $("th", text:"Role") }
 		securityAdd					{ $("#addNewUserLink1") }

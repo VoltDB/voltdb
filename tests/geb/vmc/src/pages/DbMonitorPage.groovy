@@ -906,7 +906,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     /*
      *
      */
-    def String compareTime(String stringOne, String stringTwo) {
+    def String compareTime(String stringTwo, String stringOne) {
         int hourOne = changeToHour(stringOne)
         int hourTwo = changeToHour(stringTwo)
         int minuteOne = changeToMinute(stringOne)

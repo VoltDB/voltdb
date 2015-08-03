@@ -39,8 +39,10 @@ class SchemaPageProceduresAndSqlTab extends SchemaPage {
         access			{ $(class:"tablesorter-header-inner", text:"Access") }
         attributes		{ $(class:"tablesorter-header-inner", text:"Attributes") }
         
-        ascending		{ $(class:"tablesorter-icon icon-chevron-up") }
-        descending		{ $(class:"tablesorter-icon icon-chevron-down") }
+        //ascending		{ $(class:"tablesorter-icon icon-chevron-up") }
+        ascending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerAsc") }
+        //descending		{ $(class:"tablesorter-icon icon-chevron-down") }
+        descending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerDesc") }
         expandallproc 	{ $("#p > div > div.dataBlockContent > div > div > label", text:"Expand All")}
         expandedproc	{ $("#p > div > div.dataBlockContent > div")}
         documentationLink { $("#iconDoc") }
