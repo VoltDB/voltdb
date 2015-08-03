@@ -214,6 +214,9 @@ public class VoltDB {
         public String m_versionCompatibilityRegexOverrideForTest = null;
         public String m_buildStringOverrideForTest = null;
 
+        /** Placement group */
+        public String m_placementGroup = null;
+
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
@@ -466,6 +469,8 @@ public class VoltDB {
                 }
                 else if (arg.equalsIgnoreCase("buildstringoverride"))
                     m_buildStringOverrideForTest = args[++i].trim();
+                else if (arg.equalsIgnoreCase("placementgroup"))
+                    m_placementGroup = args[++i].trim();
                 else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
