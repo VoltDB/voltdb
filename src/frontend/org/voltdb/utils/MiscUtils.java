@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Deque;
 import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
@@ -723,6 +724,35 @@ public class MiscUtils {
         K firstKey = keys.get(0);
         while (valueIter.hasNext()) {
             result.put(firstKey, valueIter.next());
+        }
+
+        return result;
+    }
+
+    /**
+     * Aggregates the elements from each of the given deque. It takes one
+     * element from the head of each deque in each loop and put them into a
+     * single list. This method modifies the deques in-place.
+     * @param stuff
+     * @return
+     */
+    public static <K> List<K> zip(Collection<Deque<K>> stuff)
+    {
+        final List<K> result = Lists.newArrayList();
+
+        // merge the results
+        Iterator<Deque<K>> iter = stuff.iterator();
+        while (iter.hasNext()) {
+            final K next = iter.next().poll();
+            if (next != null) {
+                result.add(next);
+            } else {
+                iter.remove();
+            }
+
+            if (!iter.hasNext()) {
+                iter = stuff.iterator();
+            }
         }
 
         return result;

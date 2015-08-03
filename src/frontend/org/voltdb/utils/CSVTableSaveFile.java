@@ -114,8 +114,11 @@ public class CSVTableSaveFile {
                     Pair<Integer, byte[]> p = VoltTableUtil.toCSV( vt, m_delimiter, null, lastNumCharacters);
                     lastNumCharacters = p.getFirst();
                     byte csvBytes[] = p.getSecond();
-                    m_availableBytes.addAndGet(csvBytes.length);
-                    m_available.offer(csvBytes);
+                    // should not insert empty byte[] if not last ConverterThread
+                    if (csvBytes.length > 0) {
+                        m_availableBytes.addAndGet(csvBytes.length);
+                        m_available.offer(csvBytes);
+                    }
                 } finally {
                     c.discard();
                 }

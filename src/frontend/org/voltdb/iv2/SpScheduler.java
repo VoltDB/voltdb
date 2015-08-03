@@ -537,7 +537,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
-            if (durabilityBackpressureFuture != null) {
+            if (m_cl.canOfferTask()) {
+                assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
         } else {
@@ -835,7 +836,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
-            if (durabilityBackpressureFuture != null) {
+            if (m_cl.canOfferTask()) {
+                assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {
                 /* Getting here means that the task is the first fragment of an MP txn and

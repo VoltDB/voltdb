@@ -39,6 +39,7 @@ package kafkaimporter.db.procedures;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltcore.logging.VoltLogger;
 
 //@ProcInfo(
 //        partitionInfo = "ALL_VALUES1.rowid:0",

@@ -428,6 +428,10 @@ class ServerBundle(JavaBundle):
             cli.StringOption('-d', '--deployment', 'deployment',
                              'specify the location of the deployment file',
                              default = None))
+        verb.add_options(
+            cli.StringOption('-g', '--placement-group', 'placementgroup',
+                             'placement group',
+                             default = '0'))
         if self.default_host:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] (default HOST=localhost, PORT=3021)',
@@ -484,6 +488,8 @@ class ServerBundle(JavaBundle):
 
         if runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])
+        if runner.opts.placementgroup:
+            final_args.extend(['placementgroup', runner.opts.placementgroup])
         if runner.opts.host:
             final_args.extend(['host', runner.opts.host])
         else:

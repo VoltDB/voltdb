@@ -435,20 +435,27 @@ public class Inits {
 
         @Override
         public void run() {
+            final org.voltdb.catalog.CommandLog logConfig = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
+            assert logConfig != null;
 
-            boolean logEnabled = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
-
-            if (logEnabled) {
+            if (logConfig.getEnabled()) {
                 if (m_config.m_isEnterprise) {
                     try {
                         Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
                                                                    "Command logging", false);
                         if (loggerClass != null) {
-                            m_rvdb.m_commandLog = (CommandLog)loggerClass.newInstance();
+                            final Constructor<?> constructor = loggerClass.getConstructor(boolean.class,
+                                                                                          int.class,
+                                                                                          int.class,
+                                                                                          String.class,
+                                                                                          String.class);
+                            m_rvdb.m_commandLog = (CommandLog) constructor.newInstance(logConfig.getSynchronous(),
+                                                                                       logConfig.getFsyncinterval(),
+                                                                                       logConfig.getMaxtxns(),
+                                                                                       logConfig.getLogpath(),
+                                                                                       logConfig.getInternalsnapshotpath());
                         }
-                    } catch (InstantiationException e) {
-                        VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
-                    } catch (IllegalAccessException e) {
+                    } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
                     }
                 }
