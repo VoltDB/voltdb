@@ -483,7 +483,7 @@ public class SetFunction implements Serializable {
                     //
                     // FLOAT is not supported since this function
                     // relies on different values having different bit
-                    // patterns, and the same values having being the
+                    // patterns, and the same values being the
                     // same.  Floating point numbers don't hold to
                     // this---e.g., positive and negative zero.
                     //

@@ -10,9 +10,7 @@ In cases where computing an exact distinct cardinality would be
 prohibitive due to long latencies or hitting the temp table memory
 limit, APPROX_COUNT_DISTINCT is therefore a good alternative.
 
-To run this test, make sure that your `PATH` and `CLASSPATH`
-environment variables are set up to run Volt, and then execute this
-script:
+To run this test, execute this script:
 ```bash
 ./runall.sh
 ```

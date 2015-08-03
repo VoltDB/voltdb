@@ -66,11 +66,20 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         return new BigDecimal(String.format("%.12f", d));
     }
 
-    private static void fillTable(Client client, String tbl) throws Exception {
+    private void fillTable(Client client, String tbl) throws Exception {
         Random r = new Random(777);
 
         // Insert 1000 rows of data, and 84 (every 13th row) of nulls.
-        for (int i = 0; i < 1084; ++i) {
+        int numRows = 1084;
+        if (isValgrind()) {
+            // This test takes 20 minutes if we use 1000 rows in valgrind,
+            // so reduce the number of rows so it runs in a reasonable amount
+            // of time.
+            numRows = 109;
+        }
+
+        // Insert 1000 rows of data, and 84 (every 13th row) of nulls.
+        for (int i = 0; i < numRows; ++i) {
 
             // Every 13th row, insert null values, just to make sure
             // it doesn't mess with the algorithm.
@@ -93,7 +102,12 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         }
     }
 
-    private static void assertEstimateWithin(String col, long exact, long estimate, double maxError) {
+    private void assertEstimateWithin(String col, long exact, long estimate) {
+        double maxError = ALLOWED_PERCENT_ERROR;
+        if (isValgrind()) {
+            // in valgrind mode, table has fewer rows, to estimates are less accurate.
+            maxError *= 2.0;
+        }
 
         double percentError;
 
@@ -128,7 +142,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
      * @param estimateTable  -- table containing estimates
      * @param maxError       -- Maximum allowed error percentage
      */
-    private static void assertEstimatesAreWithin(String col, VoltTable exactTable, VoltTable estimateTable, double maxError) {
+    private void assertEstimatesAreWithin(String col, VoltTable exactTable, VoltTable estimateTable, double maxError) {
         final int whichCol = exactTable.getColumnCount() - 1;
 
         assertEquals(exactTable.getRowCount(), estimateTable.getRowCount());
@@ -136,7 +150,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         while(estimateTable.advanceRow()) {
             assertTrue(exactTable.advanceRow());
 
-            assertEstimateWithin(col, exactTable.getLong(whichCol), estimateTable.getLong(whichCol), maxError);
+            assertEstimateWithin(col, exactTable.getLong(whichCol), estimateTable.getLong(whichCol));
         }
 
         assertFalse(exactTable.advanceRow());
@@ -189,8 +203,12 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 VoltTable vt = client.callProcedure("@AdHoc", approxStmt).getResults()[0];
                 assertTrue(vt.advanceRow());
                 long actualEstimate = vt.getLong(0);
-                assertEquals("Actual estimate not expected for column " + col,
-                        expectedEstimates[colIdx], actualEstimate);
+                if (! isValgrind()) {
+                    // Hard-coded expected values are not valid for valgrind mode, which
+                    // uses fewer rows for brevity.
+                    assertEquals("Actual estimate not expected for column " + col,
+                            expectedEstimates[colIdx], actualEstimate);
+                }
                 assertFalse(vt.advanceRow());
 
                 // If we filter out the null values, the answer should be exactly the same
@@ -211,7 +229,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 assertTrue(vt.advanceRow());
                 long exact = vt.getLong(0);
 
-                assertEstimateWithin(col, exact, actualEstimate, ALLOWED_PERCENT_ERROR);
+                assertEstimateWithin(col, exact, actualEstimate);
 
                 assertFalse(vt.advanceRow());
             }
