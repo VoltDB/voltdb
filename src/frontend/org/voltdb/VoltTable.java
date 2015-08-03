@@ -142,6 +142,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     static final String JSON_DATA_KEY = "data";
     static final String JSON_STATUS_KEY = "status";
 
+    public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
+
     /**
      * <p>Object that represents the name and schema for a {@link VoltTable} column.
      * Primarily used to construct in the constructor {@link VoltTable#VoltTable(ColumnInfo...)}

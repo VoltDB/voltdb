@@ -22,10 +22,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.voltdb.ParameterConverter;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.VoltTypeException;
+
+import org.voltdb.*;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.utils.CatalogUtil;
@@ -40,18 +38,17 @@ public abstract class SavedTableConverter
         if (inputTable.getColumnCount() != outputTableSchema.getColumns().size()) {
             return true;
         }
+        if (shouldPreserveDRHiddenColumn &&
+            !inputTable.getColumnName(inputTable.getColumnCount() - 1).equalsIgnoreCase(VoltTable.DR_HIDDEN_COLUMN_NAME)) {
+            // passive DR table to active DR table, must be converted
+            return true;
+        }
         for (int ii = 0; ii < inputTable.getColumnCount(); ii++) {
             final String name = inputTable.getColumnName(ii);
             final VoltType type = inputTable.getColumnType(ii);
             final Column column = outputTableSchema.getColumns().get(name);
 
             if (column == null) {
-                if (shouldPreserveDRHiddenColumn &&
-                        type == VoltType.BIGINT &&
-                        (ii == (inputTable.getColumnCount() - 1)) &&
-                        (ii == outputTableSchema.getColumns().size())) {
-                    return false;
-                }
                 return true;
             }
 
@@ -67,11 +64,25 @@ public abstract class SavedTableConverter
     }
 
     public static VoltTable convertTable(VoltTable inputTable,
-                                         Table outputTableSchema)
+                                         Table outputTableSchema,
+                                         boolean shouldPreserveDRHiddenColumn)
     throws VoltTypeException
     {
         VoltTable new_table =
             CatalogUtil.getVoltTable(outputTableSchema);
+
+        // if the DR hidden column should be preserved in conversion, append it to the end of target schema
+        // TODO if a previous passive DR table is restored in active mode, do we provide default value to this
+        // TODO hidden column now or just fill with 0 and leave it to EE to fill this column if found
+        if (shouldPreserveDRHiddenColumn) {
+            int columnCount = new_table.getColumnCount();
+            VoltTable.ColumnInfo[] augmentedSchema = new VoltTable.ColumnInfo[columnCount + 1];
+            for (int i = 0; i < columnCount; i++) {
+                augmentedSchema[i] = new VoltTable.ColumnInfo(new_table.getColumnName(i), new_table.getColumnType(i));
+            }
+            augmentedSchema[columnCount] = new VoltTable.ColumnInfo(VoltTable.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+            new_table = new VoltTable(augmentedSchema);
+        }
 
         Map<Integer, Integer> column_copy_index_map =
             computeColumnCopyIndexMap(inputTable, new_table);
@@ -99,6 +110,16 @@ public abstract class SavedTableConverter
                     Column catalog_column =
                         outputTableSchema.getColumns().
                         get(new_table.getColumnName(i));
+                    // construct an artificial catalog column for dr hidden column
+                    if (shouldPreserveDRHiddenColumn && catalog_column == null) {
+                        catalog_column = new Column();
+                        catalog_column.setDefaulttype(VoltType.BIGINT.getValue());
+                        catalog_column.setDefaultvalue("0");
+                        catalog_column.setName(VoltTable.DR_HIDDEN_COLUMN_NAME);
+                        catalog_column.setInbytes(true);
+                        catalog_column.setSize(Long.SIZE / 8);
+                        catalog_column.setNullable(false);
+                    }
                     VoltType default_type =
                         VoltType.get((byte)catalog_column.getDefaulttype());
                     if (default_type != VoltType.INVALID)
@@ -110,8 +131,7 @@ public abstract class SavedTableConverter
                             coerced_values[i] =
                                 VoltTypeUtil.
                                 getObjectFromString(default_type,
-                                                    catalog_column.
-                                                    getDefaultvalue());
+                                                    catalog_column.getDefaultvalue());
                         }
                         catch (ParseException e)
                         {
