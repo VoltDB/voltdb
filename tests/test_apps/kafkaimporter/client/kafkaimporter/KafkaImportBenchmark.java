@@ -83,7 +83,7 @@ public class KafkaImportBenchmark {
     AtomicLong rowsAdded = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
-	private static final int END_WAIT = 60000;	// wait for 60 seconds at the end
+	private static final inEND_WAIT = 60;	// wait at the end
 
     static InsertExport exportProc;
     static TableChangeMonitor exportMon;
@@ -311,7 +311,7 @@ public class KafkaImportBenchmark {
         // not all the rows got to Kafka or not all the rows got imported back.
         client.drain();
         log.info("Wait " + END_WAIT + " seconds for import to settle.");
-        Thread.sleep(END_WAIT);
+        Thread.sleep(END_WAIT*1000);
 
         boolean testResult = FinalCheck.check(client);
 
