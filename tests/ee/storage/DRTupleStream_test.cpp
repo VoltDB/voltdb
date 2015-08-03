@@ -113,7 +113,7 @@ public:
         m_tuple->move(m_tupleMemory);
     }
 
-    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT, TableIndex* index = NULL, uint32_t indexCrc = 0)
+    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT, const std::pair<TableIndex*, int32_t>& index = defaultIndexPair)
     {
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
@@ -124,7 +124,7 @@ public:
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
         return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
-                               currentSpHandle, currentSpHandle, *m_tuple, type, index, indexCrc);
+                               currentSpHandle, currentSpHandle, *m_tuple, type, index);
     }
 
     virtual ~DRTupleStreamTest() {
@@ -141,7 +141,10 @@ protected:
     DummyTopend m_topend;
     boost::scoped_ptr<ExecutorContext> m_context;
     char tableHandle[20];
+
+    const static std::pair<TableIndex*, int32_t> defaultIndexPair;
 };
+const std::pair<TableIndex*, int32_t> DRTupleStreamTest::defaultIndexPair = std::make_pair((TableIndex*)NULL, -1);
 
 // Several of these cases were move to TestExportDataSource in Java
 // where some ExportTupleStream functionality now lives
@@ -259,7 +262,7 @@ TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
     for (int i = 1; i < 10; i++)
     {
         // first, send some delete records with an index
-        appendTuple(i-1, i, DR_RECORD_DELETE, index, indexCrc);
+        appendTuple(i-1, i, DR_RECORD_DELETE, std::make_pair(index, indexCrc));
         m_wrapper.endTransaction();
     }
     m_wrapper.periodicFlush(-1, addPartitionId(9));
@@ -654,6 +657,17 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     EXPECT_EQ(results->uso(), 0);
     // Txnid 11 move to a new buffer, so current buffer only contains txn 1~10
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+}
+
+TEST_F(DRTupleStreamTest, EnumHack)
+{
+    DRRecordType type = DR_RECORD_DELETE;
+    type = static_cast<DRRecordType>((int)type + 5);
+    EXPECT_EQ(DR_RECORD_DELETE_BY_INDEX, type);
+
+    type = DR_RECORD_UPDATE;
+    type = static_cast<DRRecordType>((int)type + 5);
+    EXPECT_EQ(DR_RECORD_UPDATE_BY_INDEX, type);
 }
 
 int main() {
