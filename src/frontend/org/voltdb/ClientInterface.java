@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -2122,7 +2123,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         int ihid = (Integer) params[0];
-        List<Integer> liveHids = VoltDB.instance().getHostMessenger().getLiveHostIds();
+        Set<Integer> liveHids = VoltDB.instance().getHostMessenger().getLiveHostIds();
         if (!liveHids.contains(ihid)) {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
