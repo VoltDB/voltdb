@@ -83,7 +83,8 @@ public class MatchChecks {
     protected static long getMirrorTableRowCount(Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        long mirrorRowCount = 0;
+        // long mirrorRowCount = 0;
+        return KafkaImportBenchmark.rowsAdded.get();
         try {
             VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
             mirrorRowCount = countQueryResult[0].asScalarLong();
