@@ -56,10 +56,9 @@ public class ImportHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private boolean m_stopped = false;
+    private volatile boolean m_stopped = false;
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
-    private static final AtomicLong m_lock = new AtomicLong(0);
 
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
     final static long SUPPRESS_INTERVAL = 60;
@@ -99,6 +98,8 @@ public class ImportHandler {
             @Override
             public void run() {
                 try {
+                    //Drain the adapter so all calbacks are done
+                    m_adapter.drain();
                     m_importContext.stop();
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -138,8 +139,11 @@ public class ImportHandler {
     }
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
+        if (m_stopped) {
+            return false;
+        }
         // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             m_logger.warn("Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
@@ -222,10 +226,7 @@ public class ImportHandler {
         }
 
         boolean success;
-        //Synchronize this to create good handles across all ImportHandlers
-        synchronized(ImportHandler.m_lock) {
-            success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
-        }
+        success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
@@ -299,6 +300,10 @@ public class ImportHandler {
 
     public void error(Throwable t, String format, Object...args) {
         rateLimitedLog(Level.ERROR, t, format, args);
+    }
+
+    public void warn(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.WARN, t, format, args);
     }
 
 }

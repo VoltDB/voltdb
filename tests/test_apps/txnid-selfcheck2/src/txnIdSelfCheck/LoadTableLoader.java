@@ -39,10 +39,8 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
@@ -193,18 +191,20 @@ public class LoadTableLoader extends BenchmarkThread {
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("LoadTableLoader ungracefully failed to copy from table " + m_tableName);
+                log.error("LoadTableLoader ungracefully failed to delete from table " + m_tableName);
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the loader
                 m_shouldContinue.set(false);
             }
             Benchmark.txnCount.incrementAndGet();
-            long cnt = clientResponse.getResults()[0].asScalarLong();
-            if (cnt != expected_delete) {
-                log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the loader
-                m_shouldContinue.set(false);
+            if (status == ClientResponse.SUCCESS) {
+                long cnt = clientResponse.getResults()[0].asScalarLong();
+                if (cnt != expected_delete) {
+                    log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt + " Expected: " + expected_delete);
+                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                    // stop the loader
+                    m_shouldContinue.set(false);
+                }
             }
         }
     }
@@ -239,7 +239,9 @@ public class LoadTableLoader extends BenchmarkThread {
                     cpDelQueue.drainTo(workList, 10);
                     if (workList.size() <= 0) {
                         Thread.sleep(2000);
+                        continue;
                     }
+                    log.debug("WorkList Size: " + workList.size());
                     CountDownLatch clatch = new CountDownLatch(workList.size());
                     for (Long lcid : workList) {
                         client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid);
@@ -271,6 +273,9 @@ public class LoadTableLoader extends BenchmarkThread {
 
         CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
         cdtask.start();
+        long p = 0;
+        List<Long> cidList = new ArrayList<Long>(batchSize);
+        List<Long> timeList = new ArrayList<Long>(batchSize);
         try {
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
@@ -280,27 +285,37 @@ public class LoadTableLoader extends BenchmarkThread {
 
                 CountDownLatch latch = new CountDownLatch(batchSize);
                 final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
+                cidList.clear();
+                timeList.clear();
 
-                // try to insert batchSize random rows
+                // try to insert/upsert batchSize random rows
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
                     m_permits.acquire();
-                    long p = Math.abs(r.nextLong());
-                    m_table.addRow(p, p, Calendar.getInstance().getTimeInMillis());
+                    //Increment p so that we always get new key.
+                    p++;
+                    long nanotime = System.nanoTime();
+                    m_table.addRow(p, p + nanotime, nanotime);
+                    cidList.add(p);
+                    timeList.add(nanotime);
                     boolean success = false;
                     if (!m_isMP) {
                         Object rpartitionParam
                                 = TheHashinator.valueToBytes(m_table.fetchRow(0).get(
                                                 m_partitionedColumnIndex, VoltType.BIGINT));
                         if (upsertHitMode != 0) {// for test upsert an existing row, insert it and then upsert same row again.
-                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 1, m_table);
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 0, m_table);
                         }
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 1, m_table);
+                        else {
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, upsertMode, m_table);
+                        }
                     } else {
                         if (upsertHitMode != 0) {
-                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 1, m_table);
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 0, m_table);
                         }
-                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, (byte) 1, m_table);
+                        else {
+                            success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, upsertMode, m_table);
+                        }
                     }
                     //Ad if successfully queued but remove if proc fails.
                     if (success) {
@@ -311,8 +326,36 @@ public class LoadTableLoader extends BenchmarkThread {
                         }
                     }
                 }
+
+                log.debug("Waiting for all inserts for @Load* done.");
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
+                log.debug("Done Waiting for all inserts for @Load* done.");
+
+                // try to upsert if want the collision
+                if (upsertHitMode != 0) {
+                    CountDownLatch upserHitLatch = new CountDownLatch(batchSize * upsertHitMode);
+                    for (int i = 0; i < batchSize; i++) {
+                        m_table.clearRowData();
+                        m_permits.acquire();
+                        m_table.addRow(cidList.get(i), cidList.get(i) + timeList.get(i), timeList.get(i));
+                        boolean success;
+                        if (!m_isMP) {
+                            Object rpartitionParam = TheHashinator.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.BIGINT));
+                            success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte )1, m_table);
+                        } else {
+                            success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, m_tableName, (byte )1, m_table);
+                        }
+                        if (!success) {
+                            log.error("Failed to invoke upsert for: " + cidList.get(i));
+                        }
+                    }
+                    log.debug("Waiting for all upsert for @Load* done.");
+                    //Wait for all additional upsert @Load{SP|MP}Done
+                    upserHitLatch.await();
+                    log.debug("Done Waiting for all upsert for @Load* done.");
+                }
+
                 cpDelQueue.addAll(lcpDelQueue);
                 long nextRowCount = 0;
                 try { nextRowCount = TxnId2Utils.getRowCount(client, m_tableName);

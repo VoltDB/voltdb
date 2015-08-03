@@ -86,7 +86,9 @@ class AdminExportEditTest extends TestBase {
         // Edit: Change the file type
 
         when: 'Edit button is displayed'
-        waitFor(10){page.overview.expandExport()}
+        if (page.overview.checkIfExportIsExpanded() == false)
+            page.overview.export.click()
+        println(page.overview.checkIfExportIsExpanded())
         waitFor(10) { page.overview.editExportConfiguration.isDisplayed()}
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
@@ -177,7 +179,10 @@ class AdminExportEditTest extends TestBase {
 
         //Edit: Change the file type to HTTP
         when: 'Expand export'
-       waitFor(10){ page.overview.expandExport()}
+
+        if (page.overview.checkIfExportIsExpanded() == false)
+            page.overview.export.click()
+        println(page.overview.checkIfExportIsExpanded())
         then: 'Display the created KAFKA'
       //  waitFor(10) { page.overview.kafkaName.isDisplayed()}
         when: 'Edit button is displayed'
@@ -244,7 +249,9 @@ class AdminExportEditTest extends TestBase {
 
                 when: 'Edit button is displayed'
 
-                waitFor(10){page.overview.expandExport()}
+                if (page.overview.checkIfExportIsExpanded() == false)
+                    page.overview.export.click()
+                println(page.overview.checkIfExportIsExpanded())
         waitFor(10) { page.overview.editExportConfiguration.isDisplayed()}
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
