@@ -206,6 +206,7 @@ public class TestClientInterface {
         builder.addLiteralSchema(schema);
         builder.addPartitionInfo("A", "i");
         builder.addStmtProcedure("hello", "select * from A where i = ?", "A.i: 0");
+        builder.addStmtProcedure("hellorw", "delete from A where i = ?", "A.i: 0");
 
         if (!builder.compile(cat.getAbsolutePath())) {
             throw new IOException();
@@ -536,24 +537,111 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testLoadSinglePartTable() throws Exception {
+    public void testLoadSinglePartTableInsert() throws Exception {
         VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
         table.addRow(1);
 
         byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
-        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", table);
-        readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true);
+        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 0, table);
+        StoredProcedureInvocation invocation =
+                readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true).getStoredProcedureInvocation();
+        assertEquals((byte) 0, invocation.getParameterAtIndex(2));
+    }
+
+    @Test
+    public void testLoadSinglePartTableUpsert() throws Exception {
+        VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
+        table.addRow(1);
+
+        byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
+        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 1, table);
+        StoredProcedureInvocation invocation =
+                readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true).getStoredProcedureInvocation();
+        assertEquals((byte) 1, invocation.getParameterAtIndex(2));
     }
 
     @Test
     public void testPausedMode() throws IOException {
+        runPausedMode(false);
+    }
+
+    @Test
+    public void testPausedModeAdmin() throws IOException {
+        when(m_handler.isAdmin()).thenReturn(true);
+        runPausedMode(true);
+        when(m_handler.isAdmin()).thenReturn(false);
+    }
+
+    private void runPausedMode(boolean isAdmin) throws IOException {
         // pause the node
         when(m_volt.getMode()).thenReturn(OperationMode.PAUSED);
+
+        // reads are allowed
         ByteBuffer msg = createMsg("hello", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNotNull(resp);
-        assertEquals(ClientResponse.SERVER_UNAVAILABLE, resp.getStatus());
-        assert(resp.getStatusString().startsWith("Server is paused"));
+        assertNull(resp);
+
+        // writes are not allowed
+        msg = createMsg("hellorw", "10");
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        if (isAdmin) {
+            assertNull(resp);
+        } else {
+            assertNotNull(resp);
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, resp.getStatus());
+            assert(resp.getStatusString().startsWith("Server is paused"));
+        }
+
+        when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
+    }
+
+    @Test
+    public void testPausedModeAdHoc() throws IOException {
+        runPausedModeAdHoc(false);
+    }
+
+    @Test
+    public void testPausedModeAdHocAdmin() throws IOException {
+        when(m_handler.isAdmin()).thenReturn(true);
+        runPausedModeAdHoc(true);
+        when(m_handler.isAdmin()).thenReturn(false);
+    }
+
+    private void runPausedModeAdHoc(boolean isAdmin) throws IOException {
+        // pause the node
+        when(m_volt.getMode()).thenReturn(OperationMode.PAUSED);
+
+        responses.clear();
+        String query = "select * from A";
+        ByteBuffer msg = createMsg("@AdHoc", query);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        // fake plan
+        AdHocPlannedStmtBatch plannedStmt =
+                AdHocPlannedStmtBatch.mockStatementBatch(0, query, null, new VoltType[] { }, null, -1, m_context.getCatalogHash());
+        plannedStmt.clientData = m_cxn;
+        m_ci.processFinishedCompilerWork(plannedStmt).run();
+        assertEquals(0, responses.size());
+
+        query = "insert into A values (10)";
+        msg = createMsg("@AdHoc", query);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        plannedStmt =
+                AdHocPlannedStmtBatch.mockStatementBatch(0, query, null, new VoltType[] { }, null, -1, m_context.getCatalogHash(), false, isAdmin);
+        plannedStmt.clientData = m_cxn;
+        m_ci.processFinishedCompilerWork(plannedStmt).run();
+        if (isAdmin) {
+            assertEquals(0, responses.size());
+        } else {
+            assertEquals(1, responses.size());
+            ByteBuffer buf = responses.remove();
+            resp = new ClientResponseImpl();
+            buf.position(4);
+            resp.initFromBuffer(buf);
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, resp.getStatus());
+        }
+
         when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
     }
 

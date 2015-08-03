@@ -45,3 +45,7 @@ SELECT * FROM @fromtables LHS39 @jointype JOIN @fromtables RHS ON  LHS39.@idcol 
 --- Three or more table outer join test
 SELECT *               FROM @fromtables LHS40 @jointype JOIN @fromtables MHS ON  LHS40.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS40.@numcol = RHS.@numcol
 SELECT @idcol, @numcol FROM @fromtables LHS41 @jointype JOIN @fromtables MHS ON  LHS41.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS41.@numcol = RHS.@numcol
+
+SELECT *               FROM @fromtables LHS42 @jointype JOIN @fromtables MHS ON  LHS42.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS42.@numcol _cmp 45;
+SELECT *               FROM @fromtables LHS43 @jointype JOIN @fromtables MHS ON  LHS43.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON MHS.@numcol _cmp 45;
+SELECT *               FROM @fromtables LHS44 @jointype JOIN @fromtables MHS ON  LHS44.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON RHS.@numcol _cmp 45;

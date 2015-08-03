@@ -60,7 +60,7 @@ public:
     ExportTupleStreamTest()
       : m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
                                       (NValueArray*)NULL, (VoltDBEngine*)NULL,
-                                    "localhost", 2, NULL, NULL))
+                                    "localhost", 2, NULL, NULL, 0))
     {
         srand(0);
 

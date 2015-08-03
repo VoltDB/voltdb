@@ -24,7 +24,6 @@ import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import static org.voltdb.TheHashinator.valueToBytes;
 
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;

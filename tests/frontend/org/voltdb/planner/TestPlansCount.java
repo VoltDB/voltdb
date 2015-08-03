@@ -476,7 +476,11 @@ public class TestPlansCount extends PlannerTestCase {
     public void testCountSubquery() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct RATIO) from (SELECT * FROM P1) a");
         checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT * from T1, (SELECT count(age) FROM T1) as subq");
+        checkIndexCounter(pn, false);
     }
+
     /**
      * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *

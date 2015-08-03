@@ -91,7 +91,8 @@ class SchemaPageTest extends TestBase {
         return runningGenqa
     }
 
-    // HEADER TESTS
+
+      // HEADER TESTS
 
     def "header banner exists" () {
         when:
@@ -115,18 +116,49 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
     }
 
+
     def "header logout exists" () {
-        when:
-        at SchemaPage
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
         then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+
+        when: 'click the Schema link (if needed)'
+        page.openSchemaPage()
+        then: 'should be on Schema page'
+        at SchemaPage
+        if(security=="On") {
+            waitFor(30) {  header.logout.isDisplayed() }
+        }
     }
 
     def "header help exists" () {
         when:
         at SchemaPage
         then:
-        waitFor(waitTime) { header.help.isDisplayed() }
+        waitFor(30) { page.header.help.isDisplayed() }
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                interact {
+                    moveToElement(page.header.help)
+                }
+                waitFor(30) { page.header.showHelp.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already tried")
+            }
+        }
     }
 
     // HEADER TAB TESTS
@@ -171,14 +203,29 @@ class SchemaPageTest extends TestBase {
         }
     }
 
+
     def "header username check" () {
-        when:
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        when: 'click the Schema Page link (if needed)'
+        page.openSchemaPage()
+        then:
         at SchemaPage
         String username = page.getUsername()
-        then:
-        waitFor(waitTime) {
-            header.usernameInHeader.isDisplayed()
-            header.usernameInHeader.text().equals(username)
+        if(security=="On") {
+            waitFor(30) {  header.usernameInHeader.isDisplayed()
+                header.usernameInHeader.text().equals(username) }
         }
     }
 
@@ -215,32 +262,65 @@ class SchemaPageTest extends TestBase {
     // LOGOUT TEST
 
     def "logout button test close" ()  {
-        when:
-        at SchemaPage
-        then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(waitTime) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
-        }
-        header.popupClose.click()
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
 
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        when: 'click the Schema Page link (if needed)'
+        page.openSchemaPage()
+        then:
+        at SchemaPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(waitTime) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(waitTime) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
     }
 
     def "logout button test cancel" ()  {
-        when:
-        at SchemaPage
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
         then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(waitTime) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
         }
-        header.logoutPopupCancelButton.click()
+        when: 'click the Schema Page link (if needed)'
+        page.openSchemaPage()
+        then:
+        at SchemaPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(waitTime) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(waitTime) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
     }
 
     // HELP POPUP TEST
@@ -248,16 +328,27 @@ class SchemaPageTest extends TestBase {
     def "help popup existance" () {
         when:
         at SchemaPage
-        waitFor(waitTime) { header.help.isDisplayed() }
-        header.help.click()
         then:
-        waitFor(waitTime) {
-            header.popupTitle.isDisplayed()
-            header.popupClose.isDisplayed()
-            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
+        waitFor(waitTime) { page.header.help.isDisplayed() }
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                interact {
+                    moveToElement(page.header.help)
+                }
+                waitFor(30) { page.header.showHelp.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already tried")
+            }
         }
 
-        header.popupClose.click()
+        when:
+        page.header.showHelp.click()
+        then:
+        waitFor(waitTime) { page.header.popupClose.isDisplayed() }
+        waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }
 
     // FOOTER TESTS
@@ -380,82 +471,9 @@ class SchemaPageTest extends TestBase {
         printAndCompare('DDL Source', DDL_SOURCE_FILE, isRunningGenqa(page), ddlExpectedSourceLines, ddlActualSourceLines)
     }
 
+
+
     // Overview Tab
-
-    def "Overview Tab:Check System Overview"() {
-        int count = 0
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if system overview present'
-        waitFor(waitTime) { page.checkSystemOverview() }
-        then: 'check if text is correct'
-        page.systemOverview.text().equals("System Overview")
-    }
-
-    def "Overview Tab:Check Mode"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if mode present'
-        waitFor(waitTime) { page.checkMode() }
-        then: 'check if text is correct'
-        page.mode.text().equals("Mode")
-    }
-
-    def "Overview Tab:Check VoltDB Version"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if voltDB version present'
-        waitFor(waitTime) { page.checkVoltDBVersion() }
-        then: 'check if text is correct'
-        page.voltDBVersion.text().equals("VoltDB Version")
-    }
-
-    def "Overview Tab:Check Buildstring"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if buildstring present'
-        waitFor(waitTime) { page.checkBuildstring() }
-        then: 'check if text is correct'
-        page.buildstring.text().equals("Buildstring")
-    }
-
-    def "Overview Tab:Check Cluster Composition"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if cluster composition present'
-        waitFor(waitTime) { page.checkClusterComposition() }
-        then: 'check if text is correct'
-        page.clusterComposition.text().equals("Cluster Composition")
-    }
-
-    def "Overview Tab:Check Running Since"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if running since present'
-        waitFor(waitTime) { page.checkRunningSince() }
-        then: 'check if text is correct'
-        page.runningSince.text().equals("Running Since")
-    }
-
-    //
 
     def "Overview Tab:Check Schema Overview"() {
         when: 'go to overview tab'
@@ -463,43 +481,43 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if schema overview present'
+        when: 'check if Schema Overview present'
         waitFor(waitTime) { page.checkSchemaOverview() }
         then: 'check if text is correct'
         page.schemaOverview.text().equals("Schema Overview")
     }
 
-    def "Overview Tab:Check Compiled by VoltDB Version"() {
+    def "Overview Tab:Check Generated by VoltDB Version"() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if compiled by present'
-        waitFor(waitTime) { page.checkCompiledBy() }
+        when: 'check if Generated by VoltDB Version present'
+        waitFor(waitTime) { page.checkVoltDbVersion() }
         then: 'check if text is correct'
-        page.compiledBy.text().equals("Generated by VoltDB Version")
+        page.voltDbVersion.text().equals("Generated by VoltDB Version")
     }
 
-    def "Overview Tab:Check Compiled on"() {
+    def "Overview Tab:Check Last Schema Update on"() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if compiled on present'
-        waitFor(waitTime) { page.checkCompiledOn() }
+        when: 'check if Last Schema Update on present'
+        waitFor(waitTime) { page.checkLastSchemaUpdate() }
         then: 'check if text is correct'
-        page.compiledOn.text().equals("Last Schema Update on")
+        page.lastSchemaUpdate.text().equals("Last Schema Update on")
     }
 
-    def "Overview Tab:Check Table Count"() {
+    def "Overview Tab:Check Table Count on"() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if table count present'
+        when: 'check if Table Count on present'
         waitFor(waitTime) { page.checkTableCount() }
         then: 'check if text is correct'
         page.tableCount.text().equals("Table Count")
@@ -511,7 +529,7 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if materialized view count present'
+        when: 'check if Materialized View Count present'
         waitFor(waitTime) { page.checkMaterializedViewCount() }
         then: 'check if text is correct'
         page.materializedViewCount.text().equals("Materialized View Count")
@@ -523,7 +541,7 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if index count present'
+        when: 'check if Index Count present'
         waitFor(waitTime) { page.checkIndexCount() }
         then: 'check if text is correct'
         page.indexCount.text().equals("Index Count")
@@ -535,7 +553,7 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if prodedure count present'
+        when: 'check if Procedure Count present'
         waitFor(waitTime) { page.checkProcedureCount() }
         then: 'check if text is correct'
         page.procedureCount.text().equals("Procedure Count")
@@ -547,147 +565,47 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if statement count present'
+        when: 'check if SQL Statement Count present'
         waitFor(waitTime) { page.checkSqlStatementCount() }
         then: 'check if text is correct'
         page.sqlStatementCount.text().equals("SQL Statement Count")
     }
 
-    def "Overview Tab:Check Mode Value"() {
+    // VALUES
+
+    def "Overview Tab:Check Generated by VoltDB Version Value"() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if mode value present'
-        waitFor(waitTime) { page.modeValue.isDisplayed() }
-        then: 'check if text is present'
-
-        if(!page.modeValue.text().equals("")) {
-            println("Overview Tab:Check Mode Value-PASS")
-        }
-        else {
-            println("Overview Tab:Check Mode Value-FAIL")
-            assert false
-        }
-        println()
-    }
-
-    def "Overview Tab:Check VoltDB Version Value"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if voltdb version value present'
+        when: 'check if Generated by VoltDB Version value present'
         waitFor(waitTime) { page.voltDBVersionValue.isDisplayed() }
         then: 'check if text is present'
-
         if(!page.voltDBVersionValue.text().equals("")) {
-            println("Overview Tab:Check VoltDB Version Value-PASS")
+            println("Overview Tab:Check Generated by VoltDB Version Value-PASS")
         }
         else {
-            println("Overview Tab:Check VoltDB Version Value-FAIL")
+            println("Overview Tab:Check Generated by VoltDB Version Value-FAIL")
             assert false
         }
         println()
     }
 
-    def "Overview Tab:Check Buildstring Value"() {
+    def "Overview Tab:Check Last Schema Update On Value"() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if buildstring value present'
-        waitFor(waitTime) { page.buildstringValue.isDisplayed() }
+        when: 'check if Last Schema Update On value present'
+        waitFor(waitTime) { page.lastSchemaUpdateValue.isDisplayed() }
         then: 'check if text is present'
-
-        if(!page.buildstringValue.text().equals("")) {
-            println("Overview Tab:Check Buildstring Value-PASS")
+        if(!page.lastSchemaUpdateValue.text().equals("")) {
+            println("Overview Tab:Check Last Schema Update On Value-PASS")
         }
         else {
-            println("Overview Tab:Check Buildstring Value-FAIL")
-            assert false
-        }
-        println()
-    }
-
-    def "Overview Tab:Check Cluster Composition Value"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if cluster composition value present'
-        waitFor(waitTime) { page.clusterCompositionValue.isDisplayed() }
-        then: 'check if text is present'
-
-        if(!page.clusterCompositionValue.text().equals("")) {
-            println("Overview Tab:Check Cluster Composition Value-PASS")
-        }
-        else {
-            println("Overview Tab:Check Cluster Composition Value-FAIL")
-            assert false
-        }
-        println()
-    }
-
-    def "Overview Tab:Check Running Since Value"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if running since value present'
-        waitFor(waitTime) { page.runningSinceValue.isDisplayed() }
-        then: 'check if text is present'
-
-        if(!page.runningSinceValue.text().equals("")) {
-            println("Overview Tab:Check Running Since Value-PASS")
-        }
-        else {
-            println("Overview Tab:Check Running Since Value-FAIL")
-            assert false
-        }
-        println()
-    }
-
-    def "Overview Tab:Check Compiled by VoltDB Version Value"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if compiled by voltdb version value present'
-        waitFor(waitTime) { page.compiledByValue.isDisplayed() }
-        then: 'check if text is present'
-
-        if(!page.compiledByValue.text().equals("")) {
-            println("Overview Tab:Check Compiled by VoltDB Version Value-PASS")
-        }
-        else {
-            println("Overview Tab:Check Compiled by VoltDB Version Value-FAIL")
-            assert false
-        }
-        println()
-    }
-
-    def "Overview Tab:Check Compiled on Value"() {
-        when: 'go to overview tab'
-        page.openSchemaPageOverviewTab()
-        then: 'at overview tab'
-        at SchemaPageOverviewTab
-
-        when: 'check if compiled on value present'
-        waitFor(waitTime) { page.compiledOnValue.isDisplayed() }
-        then: 'check if text is present'
-
-        if(!page.compiledOnValue.text().equals("")) {
-            println("Overview Tab:Check Compiled on Value-PASS")
-        }
-        else {
-            println("Overview Tab:Check Compiled on Value-FAIL")
+            println("Overview Tab:Check Last Schema Update On Value-FAIL")
             assert false
         }
         println()
@@ -699,10 +617,9 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if table count value present'
+        when: 'check if Table Count value present'
         waitFor(waitTime) { page.tableCountValue.isDisplayed() }
         then: 'check if text is present'
-
         if(!page.tableCountValue.text().equals("")) {
             println("Overview Tab:Check Table Count Value-PASS")
         }
@@ -719,10 +636,9 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if materialized view count value present'
+        when: 'check if Materialized View Count value present'
         waitFor(waitTime) { page.materializedViewCountValue.isDisplayed() }
         then: 'check if text is present'
-
         if(!page.materializedViewCountValue.text().equals("")) {
             println("Overview Tab:Check Materialized View Count Value-PASS")
         }
@@ -739,10 +655,9 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if index count value present'
+        when: 'check if Index Count value present'
         waitFor(waitTime) { page.indexCountValue.isDisplayed() }
         then: 'check if text is present'
-
         if(!page.indexCountValue.text().equals("")) {
             println("Overview Tab:Check Index Count Value-PASS")
         }
@@ -759,10 +674,9 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if procedure count value present'
+        when: 'check if Procedure Count value present'
         waitFor(waitTime) { page.procedureCountValue.isDisplayed() }
         then: 'check if text is present'
-
         if(!page.procedureCountValue.text().equals("")) {
             println("Overview Tab:Check Procedure Count Value-PASS")
         }
@@ -779,7 +693,7 @@ class SchemaPageTest extends TestBase {
         then: 'at overview tab'
         at SchemaPageOverviewTab
 
-        when: 'check if sql statement count value present'
+        when: 'check if SQL Statement Count value present'
         waitFor(waitTime) { page.sqlStatementCountValue.isDisplayed() }
         then: 'check if text is present'
         if(!page.sqlStatementCountValue.text().equals("")) {
@@ -1066,18 +980,22 @@ class SchemaPageTest extends TestBase {
     }
 
     // Schema Tab
-	
+
 	def "Schema Tab:Check Ascending Descending in Name"() {
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
 		then: 'at schema tab'
 		at SchemaPageSchemaTab
-		
+
 		when: 'click name'
 		page.name.click()
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
+		}
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
 		}
 		
 		when: 'click name'
@@ -1086,22 +1004,30 @@ class SchemaPageTest extends TestBase {
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
 		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
+		}
 		println()
 	}
-	
+
 	def "Schema Tab:Check Ascending Descending in Type"() {
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
 		then: 'at schema tab'
 		at SchemaPageSchemaTab
-		
+
 		when: 'click name'
 		page.type.click()
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
-		
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
+
 		when: 'click name'
 		page.type.click()
 		then: 'check descending'
@@ -1110,244 +1036,284 @@ class SchemaPageTest extends TestBase {
 		}
 		println()
 	}
-	
+
 	def "Schema Tab:Check Ascending Descending in Partitioning"() {
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
 		then: 'at schema tab'
 		at SchemaPageSchemaTab
-		
+
 		when: 'click name'
 		page.partitioning.click()
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
-		
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
+
 		when: 'click name'
 		page.partitioning.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
 		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
+		}
 		println()
 	}
-	
+
 	def "Schema Tab:Check Ascending Descending in Columns"() {
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
 		then: 'at schema tab'
 		at SchemaPageSchemaTab
-		
+
 		when: 'click name'
 		page.columns.click()
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
-		
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
+
 		when: 'click name'
 		page.columns.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
 		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
+		}
 		println()
 	}
-	
+
 	def "Schema Tab:Check Ascending Descending in Indexes"() {
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
 		then: 'at schema tab'
 		at SchemaPageSchemaTab
-		
+
 		when: 'click name'
 		page.indexes.click()
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
-		
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
+
 		when: 'click name'
 		page.indexes.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
 		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
+		}
 		println()
 	}
-	
+
 	def "Schema Tab:Check Ascending Descending in PKey"() {
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
 		then: 'at schema tab'
 		at SchemaPageSchemaTab
-		
+
 		when: 'click name'
 		page.pkey.click()
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
-		
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
+
 		when: 'click name'
 		page.pkey.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
 		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
+		}
 		println()
 	}
-	
+
 	def "Schema Tab:Check Ascending Descending in Tuple Limit"() {
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
 		then: 'at schema tab'
 		at SchemaPageSchemaTab
-		
+
 		when: 'click name'
 		page.tuplelimit.click()
 		then: 'check ascending'
 		if (page.ascending.isDisplayed()) {
 			println("Schema Tab:Ascending Success")
 		}
-		
+		else {
+		    println("Schema Tab:Ascending Success")
+		    assert false
+		}
+
 		when: 'click name'
 		page.tuplelimit.click()
 		then: 'check descending'
 		if(page.descending.isDisplayed()) {
 			println("Schema Tab:Descending Success")
 		}
+		else {
+		    println("Schema Tab:Descending Success")
+		    assert false
+		}
 		println()
 	}
-	
+
 	// Procedures and SQLData
-	
+
 	def "Procedures And SQL Tab:Check Ascending Descending in Procedure Name"() {
 		when: 'go to procedures and sql tab'
 		page.openSchemaPageProceduresAndSqlTab()
 		then: 'at procedures and sql tab'
 		at SchemaPageProceduresAndSqlTab
-		
+
 		when: 'click procedure name'
 		page.procedureName.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
-		
+        waitFor(waitTime) { page.ascending.isDisplayed() }
+
 		when: 'click procedure name'
 		page.procedureName.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+        waitFor(waitTime) { page.descending.isDisplayed() }
 	}
-	
+
 	def "Procedures And SQL Tab:Check Ascending Descending in Parameters"() {
 		when: 'go to procedures and sql tab'
 		page.openSchemaPageProceduresAndSqlTab()
 		then: 'at procedures and sql tab'
 		at SchemaPageProceduresAndSqlTab
-		
+
 		when: 'click procedure name'
 		page.parameters.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
-		
+		waitFor(waitTime) { page.ascending.isDisplayed() }
+
 		when: 'click procedure name'
 		page.parameters.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
-	
+
 	def "Procedures And SQL Tab:Check Ascending Descending in Partitioning"() {
 		when: 'go to procedures and sql tab'
 		page.openSchemaPageProceduresAndSqlTab()
 		then: 'at procedures and sql tab'
 		at SchemaPageProceduresAndSqlTab
-		
+
 		when: 'click procedure name'
 		page.partitioning.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
-		
+		waitFor(waitTime) { page.ascending.isDisplayed() }
+
 		when: 'click procedure name'
 		page.partitioning.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
-	
+
 	def "Procedures And SQL Tab:Check Ascending Descending in RW"() {
 		when: 'go to procedures and sql tab'
 		page.openSchemaPageProceduresAndSqlTab()
 		then: 'at procedures and sql tab'
 		at SchemaPageProceduresAndSqlTab
-		
+
 		when: 'click procedure name'
 		page.rw.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
-		
+		waitFor(waitTime) { page.ascending.isDisplayed() }
+
 		when: 'click procedure name'
 		page.rw.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
-	
+
 	def "Procedures And SQL Tab:Check Ascending Descending in Access"() {
 		when: 'go to procedures and sql tab'
 		page.openSchemaPageProceduresAndSqlTab()
 		then: 'at procedures and sql tab'
 		at SchemaPageProceduresAndSqlTab
-		
+
 		when: 'click procedure name'
 		page.access.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
-		
+		waitFor(waitTime) { page.ascending.isDisplayed() }
+
 		when: 'click procedure name'
 		page.access.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
-	
+
 	def "Procedures And SQL Tab:Check Ascending Descending in Attributes"() {
 		when: 'go to procedures and sql tab'
 		page.openSchemaPageProceduresAndSqlTab()
 		then: 'at procedures and sql tab'
 		at SchemaPageProceduresAndSqlTab
-		
+
 		when: 'click procedure name'
 		page.attributes.click()
 		then: 'check ascending'
-		page.ascending.isDisplayed()
-		
+		waitFor(waitTime) { page.ascending.isDisplayed() }
+
 		when: 'click procedure name'
 		page.attributes.click()
 		then: 'check descending'
-		page.descending.isDisplayed()
+		waitFor(waitTime) { page.descending.isDisplayed() }
 	}
-	
+
 	// DLL Source
-	
+
 	def "DDL Source Tab:Check Download Button"() {
 		when: 'go to ddl source tab'
 		page.openSchemaPageDdlSourceTab()
 		then: 'at ddl source tab'
 		at SchemaPageDdlSourceTab
-		
+
 		when: 'check if download button is present'
 		waitFor(waitTime) { page.downloadButton.isDisplayed() }
 		then: 'check if download button is correct'
 		page.downloadButton.text().equals("Download")
 	}
-	
+
 	def "DDL Source Tab:Check Content"() {
 		when: 'go to ddl source tab'
 		page.openSchemaPageDdlSourceTab()
 		then: 'at ddl source tab'
 		at SchemaPageDdlSourceTab
-		
+
 		waitFor(waitTime) { page.sourceText.isDisplayed() }
 	}
-	
+
 	// Cleanup
 
 
@@ -1574,7 +1540,7 @@ class SchemaPageTest extends TestBase {
         }
 
         page.loginIfNeeded()
-        
+
         when: 'click the Schema link (if needed)'
         page.openSqlQueryPage()
         then: 'should be on DB Monitor page'

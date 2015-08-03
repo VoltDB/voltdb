@@ -177,11 +177,14 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
 
         // test SP improvement warnings
         String absPattern = "abs\\s*\\(\\s*1\\s*\\)\\s*\\+\\s*1"; // Pattern for abs(1) + 1, with whitespace between tokens
-        assertEquals(4, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:0.*")); // StmtSPcandidates 1,2,3,4
-        assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*partitioninfo=BLAH\\.IVAL:0.*")); // 2, 3
-        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*" + absPattern + ".*partitioninfo=BLAH\\.IVAL:0.*")); // just 4
-        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*partitioninfo=BLAH\\.IVAL:1.*")); // just 5
-        assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:1.*")); // 5, 6
+        String pattern0 = "adding a \\'PARTITION ON TABLE BLAH COLUMN ON IVAL PARAMETER 0\\' .*";
+        String pattern1 = "adding a \\'PARTITION ON TABLE BLAH COLUMN ON IVAL PARAMETER 1\\' .*";
+
+        assertEquals(4, countLinesMatching(lines, ".*" + pattern0 + ".*")); // StmtSPcandidates 1,2,3,4
+        assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*" + pattern0)); // 2, 3
+        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*" + absPattern + ".*" + pattern0)); // just 4
+        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*" + pattern1)); // just 5
+        assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*" + pattern1)); // 5, 6
 
         assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 0 .*")); // ProcSPcandidate 1
         assertEquals(4, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*87654321.*")); // 2, 3, 5, 6

@@ -28,6 +28,7 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
+import org.voltdb.utils.VoltTypeUtil;
 
 /**
  * Given a SQL statements plan from HSQLDB, as our fake XML tree,
@@ -177,16 +178,28 @@ class ParameterizationInfo {
 
                 VoltXMLElement paramIndexNode = new VoltXMLElement("parameter");
                 paramIndexNode.attributes.put("index", String.valueOf(paramIndex));
-                String typeStr = node.attributes.get("valuetype");
-                paramIndexNode.attributes.put("valuetype", typeStr);
                 paramIndexNode.attributes.put("id", idStr);
                 paramsNode.children.add(paramIndexNode);
 
+                // handle parameter value type
+                String typeStr = node.attributes.get("valuetype");
+                VoltType vt = VoltType.typeFromString(typeStr);
+
                 String value = null;
-                if (VoltType.typeFromString(typeStr) != VoltType.NULL) {
+                if (vt != VoltType.NULL) {
                     value = node.attributes.get("value");
                 }
                 paramValues.add(value);
+
+                // If the type is NUMERIC from hsqldb, VoltDB has to decide its real type.
+                // It's either INTEGER or DECIMAL according to the SQL Standard.
+                // Thanks for Hsqldb 1.9, FLOAT literal values have been handled well with E sign.
+                if (vt == VoltType.NUMERIC) {
+                    vt = VoltTypeUtil.getNumericLiteralType(VoltType.BIGINT, value);
+                }
+
+                node.attributes.put("valuetype", vt.getName());
+                paramIndexNode.attributes.put("valuetype", vt.getName());
             }
 
             // Assume that all values, whether or not their ids have been seen before, can

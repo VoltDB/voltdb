@@ -27,7 +27,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -75,6 +74,8 @@ public class PerPartitionTable {
     final String m_procName;
     //Name of table
     final String m_tableName;
+    // Upsert Mode Flag
+    final byte m_upsert;
 
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
@@ -114,6 +115,7 @@ public class PerPartitionTable {
         m_partitionId = partitionId;
         m_isMP = isMP;
         m_procName = firstLoader.m_procName;
+        m_upsert = (byte) (firstLoader.m_upsert ? 1:0);
         m_partitionRowQueue = new LinkedBlockingQueue<VoltBulkLoaderRow>(minBatchTriggerSize*5);
         m_minBatchTriggerSize = minBatchTriggerSize;
         m_columnInfo = firstLoader.m_colInfo;
@@ -255,11 +257,11 @@ public class PerPartitionTable {
 
         try {
             if (m_isMP) {
-                m_clientImpl.callProcedure(callback, m_procName, m_tableName, toSend);
+                m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
             } else {
                 Object rpartitionParam = HashinatorLite.valueToBytes(toSend.fetchRow(0).get(
                         m_partitionedColumnIndex, m_partitionColumnType));
-                m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, toSend);
+                m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
             }
         } catch (IOException e) {
             final ClientResponse r = new ClientResponseImpl(

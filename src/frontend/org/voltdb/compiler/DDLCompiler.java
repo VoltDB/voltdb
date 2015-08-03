@@ -51,6 +51,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
@@ -58,6 +59,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -799,6 +801,36 @@ public class DDLCompiler {
             else {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "While configuring dr, table %s was not present in the catalog.", tableName));
+            }
+            return true;
+        }
+
+        statementMatcher = SQLParser.matchSetGlobalParam(statement);
+        if (statementMatcher.matches()) {
+            String name = statementMatcher.group(1).toUpperCase();
+            String value = statementMatcher.group(2).toUpperCase();
+            switch (name) {
+                case DatabaseConfiguration.DR_MODE_NAME:
+                    switch (value) {
+                        case DatabaseConfiguration.ACTIVE_ACTIVE: {
+                            db.setIsactiveactivedred(true);
+                        }
+                        break;
+                        case DatabaseConfiguration.ACTIVE_PASSIVE:
+                        case "DEFAULT": {
+                            db.setIsactiveactivedred(false);
+                        }
+                        break;
+                        default: {
+                            throw m_compiler.new VoltCompilerException(String.format(
+                                    "Invalid parameter value for %s. Candidate values are %s, %s/DEFAULT",
+                                    name, DatabaseConfiguration.ACTIVE_ACTIVE, DatabaseConfiguration.ACTIVE_PASSIVE));
+                        }
+                    }
+                    break;
+                default:
+                    throw m_compiler.new VoltCompilerException(String.format(
+                        "Unknown global parameter: %s. Candidate parameters are %s", name, DatabaseConfiguration.allNames));
             }
             return true;
         }
@@ -1603,29 +1635,6 @@ public class DDLCompiler {
         return true;
     }
 
-    /**
-     * This function will recursively find any function expression with ID functionId.
-     * If found, return true. Else, return false.
-     * @param expr
-     * @param functionId
-     * @return
-     */
-    public static boolean containsTimeSensitiveFunction(AbstractExpression expr, int functionId) {
-        if (expr == null || expr instanceof TupleValueExpression) {
-            return false;
-        }
-
-        List<AbstractExpression> functionsList = expr.findAllSubexpressionsOfClass(FunctionExpression.class);
-        for (AbstractExpression funcExpr: functionsList) {
-            assert(funcExpr instanceof FunctionExpression);
-            if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
@@ -1637,29 +1646,24 @@ public class DDLCompiler {
 
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
         dummy.setTable(table);
-
+        StringBuffer msg = new StringBuffer(String.format("Index \"%s\" ", name));
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         List<AbstractExpression> exprs = null;
         // "parse" the WHERE expression for partial index if any
         AbstractExpression predicate = null;
+        // Some expressions have special validation in indices.  We
+        // gather all these up into the list checkExpressions.  We
+        // will check them all at once.
+        List<AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<AbstractExpression>();
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
-
-                    // The expr cannnot contain a scalar subquery.
-                    if (!expr.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
-                        String msg = String.format("Index %s with subquery expression(s) is not supported.", name);
-                        throw this.m_compiler.new VoltCompilerException(msg);
-                    }
-                    if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
-                        String msg = String.format("Index %s cannot include the function NOW or CURRENT_TIMESTAMP.", name);
-                        throw this.m_compiler.new VoltCompilerException(msg);
-                    }
-
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
+                    // We will check this for validity later.
+                    checkExpressions.add(expr);
                     exprs.add(expr);
                 }
             } else if (subNode.name.equals("predicate")) {
@@ -1668,6 +1672,11 @@ public class DDLCompiler {
             }
         }
 
+        // Check all the subexpressions we gathered up.
+        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+            // The error message will be in the StringBuffer msg.
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
@@ -1690,8 +1699,8 @@ public class DDLCompiler {
                 }
                 // disallow columns from VARBINARYs
                 if (colType == VoltType.VARBINARY) {
-                    String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
-                    throw this.m_compiler.new VoltCompilerException(msg);
+                    String emsg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         } else {
@@ -1703,8 +1712,8 @@ public class DDLCompiler {
                 }
                 // disallow expressions of type VARBINARY
                 if (colType == VoltType.VARBINARY) {
-                    String msg = "VARBINARY expressions are not currently supported as index keys.";
-                    throw this.m_compiler.new VoltCompilerException(msg);
+                    String emsg = "VARBINARY expressions are not currently supported as index keys.";
+                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         }
@@ -1726,9 +1735,9 @@ public class DDLCompiler {
             // If the column type is not an integer, we cannot
             // make the index a hash.
             if (has_nonint_col) {
-                String msg = "Index " + name + " in table " + table.getTypeName() +
+                String emsg = "Index " + name + " in table " + table.getTypeName() +
                              " uses a non-hashable column " + nonint_col_name;
-                throw m_compiler.new VoltCompilerException(msg);
+                throw m_compiler.new VoltCompilerException(emsg);
             }
             index.setType(IndexType.HASH_TABLE.getValue());
         }
@@ -1795,9 +1804,9 @@ public class DDLCompiler {
                 // if the index is a user-named index...
                 if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
-                    String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
+                    String emsg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
-                    m_compiler.addWarn(msg);
+                    m_compiler.addWarn(emsg);
                 }
 
                 // drop the index and GTFO
@@ -1806,10 +1815,10 @@ public class DDLCompiler {
             }
         }
 
-        String msg = "Created index: " + name + " on table: " +
-                    table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
+        String smsg = "Created index: " + name + " on table: " +
+                   table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
 
-        m_compiler.addInfo(msg);
+        m_compiler.addInfo(smsg);
 
         indexMap.put(name, index);
     }
@@ -2082,19 +2091,23 @@ public class DDLCompiler {
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table
-            Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
-            pkIndex.setType(IndexType.BALANCED_TREE.getValue());
-            pkIndex.setUnique(true);
-            // add the group by columns from the src table
-            // assume index 1 throuh #grpByCols + 1 are the cols
-            for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
-                ColumnRef c = pkIndex.getColumns().add(String.valueOf(i));
-                c.setColumn(destColumnArray.get(i));
-                c.setIndex(i);
+            // After ENG-7872 is fixed if there is no group by column then we will not create any
+            // index or constraint in order to avoid error and crash.
+            if (stmt.m_groupByColumns.size() != 0) {
+                Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
+                pkIndex.setType(IndexType.BALANCED_TREE.getValue());
+                pkIndex.setUnique(true);
+                // add the group by columns from the src table
+                // assume index 1 throuh #grpByCols + 1 are the cols
+                for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                    ColumnRef c = pkIndex.getColumns().add(String.valueOf(i));
+                    c.setColumn(destColumnArray.get(i));
+                    c.setIndex(i);
+                }
+                Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
+                pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
+                pkConstraint.setIndex(pkIndex);
             }
-            Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
-            pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
-            pkConstraint.setIndex(pkIndex);
 
             // prepare info for aggregation columns.
             List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
@@ -2128,20 +2141,23 @@ public class DDLCompiler {
             }
 
             if (hasMinOrMaxAgg) {
-                // TODO: deal with minMaxAggs, i.e. if only one min/max agg, try to find the index
-                // with group by cols followed by this agg col; if multiple min/max aggs, decide
-                // what to do (probably the index on group by cols is the best choice)
-                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs);
-                if (found != null) {
-                    matviewinfo.setIndexforminmax(found.getTypeName());
-                } else {
-                    matviewinfo.setIndexforminmax("");
-                    m_compiler.addWarn("No index found to support min() / max() UPDATE and DELETE on Materialized View " +
+                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+                boolean needsWarning = false;
+                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                    IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                    if (found != null) {
+                        refFound.setName(found.getTypeName());
+                    } else {
+                        refFound.setName("");
+                        needsWarning = true;
+                    }
+                }
+                if (needsWarning) {
+                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
                             matviewinfo.getTypeName() +
                             ", and a sequential scan might be issued when current min / max value is updated / deleted.");
                 }
-            } else {
-                matviewinfo.setIndexforminmax("");
             }
 
             // parse out the aggregation columns into the dest table
@@ -2164,6 +2180,8 @@ public class DDLCompiler {
         }
     }
 
+    private enum MatViewIndexMatchingGroupby {GB_COL_IDX_COL, GB_COL_IDX_EXP,  GB_EXP_IDX_EXP}
+
     // if the materialized view has MIN / MAX, try to find an index defined on the source table
     // covering all group by cols / exprs to avoid expensive tablescan.
     // For now, the only acceptable index is defined exactly on the group by columns IN ORDER.
@@ -2173,43 +2191,29 @@ public class DDLCompiler {
     // in the EE in the future including:
     //   -- *indexes on the group keys listed out of order
     //   -- *indexes on the group keys as a prefix before other indexed values.
-    //   -- indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
+    //   -- (ENG-6511) indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
+    // This function is mostly re-written for the fix of ENG-6511. --yzhang
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
-            Table srcTable, List<AbstractExpression> groupbyExprs)
+            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression minMaxAggExpr)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
         StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
 
+        // Candidate index. If we can find an index covering both group-by columns and aggExpr (optimal) then we will
+        // return immediately.
+        // If the index found covers only group-by columns (sub-optimal), we will first cache it here.
+        Index candidate = null;
         for (Index index : allIndexes) {
-            boolean matchedAll = true;
-            // Match based on one of two algorithms depending on whether expressions are all simple columns.
-            if (groupbyExprs == null) {
-                String expressionjson = index.getExpressionsjson();
-                if ( ! expressionjson.isEmpty()) {
-                    continue;
-                }
-                List<ColumnRef> indexedColRefs =
-                        CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-                List<ColumnRef> groupbyColRefs =
-                        CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
-                if (indexedColRefs.size() != groupbyColRefs.size()) {
-                    continue;
-                }
+            // indexOptimalForMinMax == true if the index covered both the group-by columns and the min/max aggExpr.
+            boolean indexOptimalForMinMax = false;
+            // If minMaxAggExpr is not null, the diff can be zero or one.
+            // Otherwise, for a usable index, its number of columns must agree with that of the group-by columns.
+            final int diffAllowance = minMaxAggExpr == null ? 0 : 1;
 
-                for (int i = 0; i < indexedColRefs.size(); ++i) {
-                    int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
-                    int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
-                    if (groupbyColIndex != indexedColIndex) {
-                        matchedAll = false;
-                        break;
-                    }
-                }
-            } else {
-                String expressionjson = index.getExpressionsjson();
-                if (expressionjson.isEmpty()) {
-                    continue;
-                }
-                List<AbstractExpression> indexedExprs = null;
+            // Get all indexed exprs if there is any.
+            String expressionjson = index.getExpressionsjson();
+            List<AbstractExpression> indexedExprs = null;
+            if ( ! expressionjson.isEmpty() ) {
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {
@@ -2217,18 +2221,89 @@ public class DDLCompiler {
                     assert(false);
                     return null;
                 }
-                if (indexedExprs.size() != groupbyExprs.size()) {
-                    continue;
-                }
+            }
+            // Get source table columns.
+            List<Column> srcColumnArray = CatalogUtil.getSortedCatalogItems(srcTable.getColumns(), "index");
+            MatViewIndexMatchingGroupby matchingCase = null;
 
-                for (int i = 0; i < indexedExprs.size(); ++i) {
-                    if ( ! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
-                        matchedAll = false;
-                        break;
+            if (groupbyExprs == null) {
+                // This means group-by columns are all simple columns.
+                // It also means we can only access the group-by columns by colref.
+                List<ColumnRef> groupbyColRefs =
+                    CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
+                if (indexedExprs == null) {
+                    matchingCase = MatViewIndexMatchingGroupby.GB_COL_IDX_COL;
+
+                    // All the columns in the index are also simple columns, EASY! colref vs. colref
+                    List<ColumnRef> indexedColRefs =
+                        CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                    // The number of columns in index can never be less than that in the group-by column list.
+                    // If minMaxAggExpr == null, they must be equal (diffAllowance == 0)
+                    // Otherwise they may be equal (sub-optimal) or
+                    // indexedColRefs.size() == groupbyColRefs.size() + 1 (optimal, diffAllowance == 1)
+                    if (isInvalidIndexCandidate(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
+                        continue;
+                    }
+
+                    if (! isGroupbyMatchingIndex(matchingCase, groupbyColRefs, null, indexedColRefs, null, null)) {
+                        continue;
+                    }
+                    if (isValidIndexCandidateForMinMax(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
+                            continue;
+                        }
+                        indexOptimalForMinMax = true;
+                    }
+                }
+                else {
+                    matchingCase = MatViewIndexMatchingGroupby.GB_COL_IDX_EXP;
+                    // In this branch, group-by columns are simple columns, but the index contains complex columns.
+                    // So it's only safe to access the index columns from indexedExprs.
+                    // You can still get something from indexedColRefs, but they will be inaccurate.
+                    // e.g.: ONE index column (a+b) will get you TWO separate entries {a, b} in indexedColRefs.
+                    // In order to compare columns: for group-by columns: convert colref => col
+                    //                              for    index columns: convert    tve => col
+                    if (isInvalidIndexCandidate(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
+                        continue;
+                    }
+
+                    if (! isGroupbyMatchingIndex(matchingCase, groupbyColRefs, null, null, indexedExprs, srcColumnArray)) {
+                        continue;
+                    }
+                    if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
+                            continue;
+                        }
+                        indexOptimalForMinMax = true;
                     }
                 }
             }
-            if (matchedAll && !index.getPredicatejson().isEmpty()) {
+            else {
+                matchingCase = MatViewIndexMatchingGroupby.GB_EXP_IDX_EXP;
+                // This means group-by columns have complex columns.
+                // It's only safe to access the group-by columns from groupbyExprs.
+                // AND, indexedExprs must not be null in this case. (yeah!)
+                if ( indexedExprs == null ) {
+                    continue;
+                }
+                if (isInvalidIndexCandidate(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
+                    continue;
+                }
+
+                if (! isGroupbyMatchingIndex(matchingCase, null, groupbyExprs, null, indexedExprs, null)) {
+                    continue;
+                }
+
+                if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
+                    if (! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
+                        continue;
+                    }
+                    indexOptimalForMinMax = true;
+                }
+            }
+
+            // NOW index at least covered all group-by columns (sub-optimal candidate)
+            if (!index.getPredicatejson().isEmpty()) {
                 // Additional check for partial indexes to make sure matview WHERE clause
                 // covers the partial index predicate
                 List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
@@ -2245,15 +2320,115 @@ public class DDLCompiler {
                     assert(false);
                     return null;
                 }
-                matchedAll = SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs);
+                if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
+                    // partial index does not match MatView where clause, give up this index
+                    continue;
+                }
             }
-            if (matchedAll) {
+            // if the index already covered group by columns and the aggCol/aggExpr,
+            // it is already the best index we can get, return immediately.
+            if (indexOptimalForMinMax) {
                 return index;
             }
+            // otherwise wait to see if we can find something better!
+            candidate = index;
         }
-        return null;
+        return candidate;
     }
 
+    private static boolean isInvalidIndexCandidate(int idxSize, int gbSize, int diffAllowance) {
+        if ( idxSize < gbSize || idxSize > gbSize + diffAllowance ) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isGroupbyMatchingIndex(
+            MatViewIndexMatchingGroupby matchingCase,
+            List<ColumnRef> groupbyColRefs, List<AbstractExpression> groupbyExprs,
+            List<ColumnRef> indexedColRefs, List<AbstractExpression> indexedExprs,
+            List<Column> srcColumnArray) {
+        // Compare group-by columns/expressions for different cases
+        switch(matchingCase) {
+        case GB_COL_IDX_COL:
+            for (int i = 0; i < groupbyColRefs.size(); ++i) {
+                int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
+                int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
+                if (groupbyColIndex != indexedColIndex) {
+                    return false;
+                }
+            }
+            break;
+        case GB_COL_IDX_EXP:
+            for (int i = 0; i < groupbyColRefs.size(); ++i) {
+                AbstractExpression indexedExpr = indexedExprs.get(i);
+                if (! (indexedExpr instanceof TupleValueExpression)) {
+                    // Group-by columns are all simple columns, so indexedExpr must be tve.
+                    return false;
+                }
+                int indexedColIdx = ((TupleValueExpression)indexedExpr).getColumnIndex();
+                Column indexedColumn = srcColumnArray.get(indexedColIdx);
+                Column groupbyColumn = groupbyColRefs.get(i).getColumn();
+                if ( ! indexedColumn.equals(groupbyColumn) ) {
+                    return false;
+                }
+            }
+            break;
+        case GB_EXP_IDX_EXP:
+            for (int i = 0; i < groupbyExprs.size(); ++i) {
+                if (! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
+                   return false;
+                }
+            }
+            break;
+        default:
+            assert(false);
+            // invalid option
+            return false;
+        }
+
+        // group-by columns/expressions are matched with the corresponding index
+        return true;
+    }
+
+    private static boolean isValidIndexCandidateForMinMax(int idxSize, int gbSize, int diffAllowance) {
+        return diffAllowance == 1 && idxSize == gbSize + 1;
+    }
+
+    private static boolean isIndexOptimalForMinMax(
+            MatViewIndexMatchingGroupby matchingCase, AbstractExpression minMaxAggExpr,
+            List<ColumnRef> indexedColRefs, List<AbstractExpression> indexedExprs,
+            List<Column> srcColumnArray) {
+        // We have minMaxAggExpr and the index also has one extra column
+        switch(matchingCase) {
+        case GB_COL_IDX_COL:
+            if ( ! (minMaxAggExpr instanceof TupleValueExpression) ) {
+                // Here because the index columns are all simple columns (indexedExprs == null)
+                // so the minMaxAggExpr must be TupleValueExpression.
+                return false;
+            }
+            int aggSrcColIdx = ((TupleValueExpression)minMaxAggExpr).getColumnIndex();
+            Column aggSrcCol = srcColumnArray.get(aggSrcColIdx);
+            Column lastIndexCol = indexedColRefs.get(indexedColRefs.size() - 1).getColumn();
+            // Compare the two columns, if they are equal as well, then this is the optimal index! Congrats!
+            if (aggSrcCol.equals(lastIndexCol)) {
+                return true;
+            }
+            break;
+        case GB_COL_IDX_EXP:
+        case GB_EXP_IDX_EXP:
+            if (indexedExprs.get(indexedExprs.size()-1).equals(minMaxAggExpr)) {
+                return true;
+            }
+            break;
+        default:
+            assert(false);
+        }
+
+        // If the last part of the index does not match the MIN/MAX expression
+        // this is not the optimal index candidate for now
+        return false;
+    }
     /**
      * Build the abstract expression representing the partial index predicate.
      * Verify it satisfies the rules. Throw error messages otherwise.
@@ -2313,81 +2488,100 @@ public class DDLCompiler {
     private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
         int groupColCount = stmt.m_groupByColumns.size();
         int displayColCount = stmt.m_displayColumns.size();
-        String msg = "Materialized view \"" + viewName + "\" ";
-
-        if (stmt.hasSubquery()) {
-            msg += "with subquery sources is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.m_tableList.size() != 1) {
-            msg += "has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-            "Only one source table is allowed.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.orderByColumns().size() != 0) {
-            msg += "with ORDER BY clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.hasLimitOrOffset()) {
-            msg += "with LIMIT or OFFSET clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.m_having != null) {
-            msg += "with HAVING clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (displayColCount <= groupColCount) {
-            msg += "has too few columns.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
+        StringBuffer msg = new StringBuffer();
+        msg.append("Materialized view \"" + viewName + "\" ");
 
         List <AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
 
         int i;
+        // First, check the group by columns.  They are at
+        // the beginning of the display list.
         for (i = 0; i < groupColCount; i++) {
             ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
-
+            // The columns must be equal.
             if (!outcol.expression.equals(gbcol.expression)) {
-                msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
-                throw m_compiler.new VoltCompilerException(msg);
+                msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
+                throw m_compiler.new VoltCompilerException(msg.toString());
             }
             checkExpressions.add(outcol.expression);
         }
-
+        // Now, the display list must have a count(*).
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
-            msg += "is missing count(*) as the column after the group by columns, a materialized view requirement.";
-            throw m_compiler.new VoltCompilerException(msg);
+            msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
+            throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
+        // Finally, the display columns must have aggregate
+        // calls.  But these are not any aggregate calls. They
+        // must be count(), min(), max() or sum().
         for (i++; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
+            // Note that this expression does not catch all aggregates.
+            // An instance of count(*) here, or avg() would cause the
+            // exception.  We just required count(*) above, but a
+            // second one would fail.
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
-                msg += "must have non-group by columns aggregated by sum, count, min or max.";
-                throw m_compiler.new VoltCompilerException(msg);
+                msg.append("must have non-group by columns aggregated by sum, count, min or max.");
+                throw m_compiler.new VoltCompilerException(msg.toString());
             }
-            checkExpressions.add(outcol.expression);
+            // Don't push the expression, though.  Push the argument.
+            // We will check for aggregate calls and fail, and we don't
+            // want to fail on legal aggregate expressions.
+            if (outcol.expression.getLeft() != null) {
+                checkExpressions.add(outcol.expression.getLeft());
+            }
+            assert(outcol.expression.getRight() == null);
+            assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
 
-        // Check unsupported SQL functions like: NOW, CURRENT_TIMESTAMP
         AbstractExpression where = stmt.getSingleTableFilterExpression();
-        checkExpressions.add(where);
-
-        for (AbstractExpression expr: checkExpressions) {
-            if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId())) {
-                msg += "cannot include the function NOW or CURRENT_TIMESTAMP.";
-                throw m_compiler.new VoltCompilerException(msg);
-            }
+        if (where != null) {
+            checkExpressions.add(where);
         }
+
+        // Check all the subexpressions we gathered up.
+        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+            // The error message will be in the StringBuffer msg.
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        // Check some other materialized view specific things.
+        if (stmt.hasSubquery()) {
+            msg.append("with subquery sources is not supported.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (stmt.m_tableList.size() != 1) {
+            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
+                       "Only one source table is allowed.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (stmt.orderByColumns().size() != 0) {
+            msg.append("with ORDER BY clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (stmt.hasLimitOrOffset()) {
+            msg.append("with LIMIT or OFFSET clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (stmt.m_having != null) {
+            msg.append("with HAVING clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (displayColCount <= groupColCount) {
+            msg.append("has too few columns.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
      }
 
     void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,

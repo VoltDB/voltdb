@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -237,6 +238,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         // This is set to true when -p option us used.
         boolean useSuppliedProcedure = false;
 
+        @Option(desc = "Use upsert instead of insert", hasArg = false)
+        boolean update = false;
+
         /**
          * Validate command line options.
          */
@@ -265,6 +269,10 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             }
             if ((procedure != null) && (procedure.trim().length() > 0)) {
                 useSuppliedProcedure = true;
+            }
+            if ((useSuppliedProcedure) && (update)){
+                update = false;
+                exitWithMessageAndUsage("update is not applicable when stored procedure specified");
             }
             if ("".equals(jdbctable.trim())) {
                 jdbctable = table;
@@ -338,7 +346,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             if (config.useSuppliedProcedure) {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, errHandler);
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
             }
 
             //Created Source reader

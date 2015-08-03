@@ -31,7 +31,7 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
-import org.voltdb.NodeDRGateway;
+import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
@@ -75,7 +75,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway drGateway,
+                          ProducerDRGateway drGateway,
                           ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
@@ -166,7 +166,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
                     if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
-                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId);
+                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, Long.MIN_VALUE);
                     }
                 }
                 else {

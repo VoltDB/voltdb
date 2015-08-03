@@ -614,7 +614,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getNumericFunctions() throws SQLException
     {
         checkClosed();
-        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,EXP,FLOOR,POWER,SQRT";
+        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,EXP,FLOOR,LN,LOG,POWER,SQRT";
     }
 
     // Retrieves a description of the given table's primary key columns.
@@ -1203,10 +1203,44 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves whether this database supports the JDBC scalar function CONVERT for conversions between the JDBC types fromType and toType.
     @Override
-    public boolean supportsConvert(int fromType, int toType) throws SQLException
-    {
+    public boolean supportsConvert(int fromType, int toType) throws SQLException {
         checkClosed();
-        return false;
+        switch (fromType) {
+        /*
+         * ALL types can be converted to VARCHAR /VoltType.String
+         */
+        case java.sql.Types.VARCHAR:
+        case java.sql.Types.VARBINARY:
+        case java.sql.Types.TIMESTAMP:
+            switch (toType) {
+            case java.sql.Types.VARCHAR:
+                return true;
+
+            default:
+                return false;
+            }
+        case java.sql.Types.TINYINT:
+        case java.sql.Types.SMALLINT:
+        case java.sql.Types.INTEGER:
+        case java.sql.Types.BIGINT:
+        case java.sql.Types.FLOAT:
+        case java.sql.Types.DECIMAL:
+            switch (toType) {
+            case java.sql.Types.VARCHAR:
+            case java.sql.Types.TINYINT:
+            case java.sql.Types.SMALLINT:
+            case java.sql.Types.INTEGER:
+            case java.sql.Types.BIGINT:
+            case java.sql.Types.FLOAT:
+            case java.sql.Types.DECIMAL:
+                return true;
+
+            default:
+                return false;
+            }
+        default:
+            return false;
+        }
     }
 
     // Retrieves whether this database supports the ODBC Core SQL grammar.

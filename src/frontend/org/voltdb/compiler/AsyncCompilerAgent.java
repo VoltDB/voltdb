@@ -35,8 +35,10 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
@@ -55,9 +57,13 @@ public class AsyncCompilerAgent {
     // accept work via this mailbox
     Mailbox m_mailbox;
 
+    public AsyncCompilerAgent(LicenseApi licenseApi) {
+        m_helper = new AsyncCompilerAgentHelper(licenseApi);
+    }
+
     // The helper for catalog updates, back after its exclusive three year tour
     // of Europe, Scandinavia, and the sub-continent.
-    AsyncCompilerAgentHelper m_helper = new AsyncCompilerAgentHelper();
+    final AsyncCompilerAgentHelper m_helper;
 
     // do work in this executor service
     final ListeningExecutorService m_es =
@@ -258,12 +264,27 @@ public class AsyncCompilerAgent {
                 w.completionHandler.onCompletion(errResult);
                 return;
             }
+
+            if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Server is paused and is available in read-only mode - please try again later.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
             final CatalogChangeWork ccw = new CatalogChangeWork(w);
             dispatchCatalogChangeWork(ccw);
         }
     }
 
     void handleCatalogChangeWork(final CatalogChangeWork w) {
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+            AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Server is paused and is available in read-only mode - please try again later.");
+            w.completionHandler.onCompletion(errResult);
+            return;
+        }
         // We have an @UAC.  Is it okay to run it?
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
@@ -372,6 +393,8 @@ public class AsyncCompilerAgent {
             }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
+            } catch (AssertionError ae) {
+                errorMsgs.add("Assertion Error in Ad Hoc Planning: " + ae);
             }
         }
         String errorSummary = null;

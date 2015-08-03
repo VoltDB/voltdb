@@ -26,7 +26,7 @@ class AdminTest extends TestBase {
     static boolean revertAutosnapshots = false
     static boolean revertHeartTimeout = false
     static boolean revertQueryTimeout = false
-	
+
 	int count = 0
     def setup() { // called before each test
         count = 0
@@ -59,9 +59,9 @@ class AdminTest extends TestBase {
     def "check Directories title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -92,9 +92,9 @@ class AdminTest extends TestBase {
     def "check Root title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -125,9 +125,9 @@ class AdminTest extends TestBase {
     def "check Snapshot title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -158,9 +158,9 @@ class AdminTest extends TestBase {
     def "check Export Overflow title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -191,9 +191,9 @@ class AdminTest extends TestBase {
     def "check Command Logs title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -224,9 +224,9 @@ class AdminTest extends TestBase {
     def "check Command Log Snapshots title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -257,9 +257,9 @@ class AdminTest extends TestBase {
     def "check Root Value not empty"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -290,9 +290,9 @@ class AdminTest extends TestBase {
     def "check SnapShot Value not empty"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -323,9 +323,9 @@ class AdminTest extends TestBase {
     def "check Export Overflow Value not empty"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -356,9 +356,9 @@ class AdminTest extends TestBase {
     def "check Command Logs Value not empty"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -389,9 +389,9 @@ class AdminTest extends TestBase {
     def "check Log Snapshot Value not empty"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -424,9 +424,9 @@ class AdminTest extends TestBase {
     def "check title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -457,9 +457,9 @@ class AdminTest extends TestBase {
     def "check Site Per Host"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -490,9 +490,9 @@ class AdminTest extends TestBase {
     def "check K-safety"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -523,9 +523,9 @@ class AdminTest extends TestBase {
     def "check Partition Detection"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -556,9 +556,9 @@ class AdminTest extends TestBase {
     def "check Security"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -589,9 +589,9 @@ class AdminTest extends TestBase {
     def "check HTTP Access"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -622,9 +622,9 @@ class AdminTest extends TestBase {
     def "check Auto Snapshots"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -655,9 +655,9 @@ class AdminTest extends TestBase {
     def "check Command Logging"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -688,9 +688,9 @@ class AdminTest extends TestBase {
     def "check Export"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -721,9 +721,9 @@ class AdminTest extends TestBase {
     def "check Advanced"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -898,14 +898,26 @@ class AdminTest extends TestBase {
             page.overview.heartTimeoutPopupCancel.isDisplayed()
         }
 
-        when:
-        waitFor(waitTime) { page.overview.heartTimeoutPopupCancel.click() }
-        then:
-        waitFor(waitTime) {
-            page.overview.heartTimeoutEdit.isDisplayed()
-            !page.overview.heartTimeoutPopupOk.isDisplayed()
-            !page.overview.heartTimeoutPopupCancel.isDisplayed()
-        }
+		int count = 0
+		while(count<numberOfTrials) {
+			count++
+			println("Try")
+			try {
+				try {
+					page.overview.heartTimeoutPopupCancel.click()
+				} catch (org.openqa.selenium.ElementNotVisibleException e) {
+					println("PASS")
+					break
+				}
+				page.overview.heartTimeoutEdit.isDisplayed()
+				!page.overview.heartTimeoutPopupOk.isDisplayed()
+				!page.overview.heartTimeoutPopupCancel.isDisplayed()
+			} catch (org.openqa.selenium.ElementNotVisibleException e) {
+				println("Try 2")
+			} catch (org.openqa.selenium.StaleElementReferenceException e) {
+				println("Try sele")
+			}
+		}
     }
 
     def "Check click Heart Timeout edit and click Ok and then Ok"() {
@@ -1059,23 +1071,36 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.queryTimeoutField.value("10")
-        waitFor(waitTime) {
+		then:
+		waitFor(waitTime) {
             page.overview.queryTimeoutOk.click()
-        }
-        then:
-        waitFor(waitTime) {
             page.overview.queryTimeoutPopupOk.isDisplayed()
             page.overview.queryTimeoutPopupCancel.isDisplayed()
         }
 
-        when:
-        waitFor(waitTime) { page.overview.queryTimeoutPopupCancel.click() }
-        then:
-        waitFor(waitTime) {
-            page.overview.queryTimeoutEdit.isDisplayed()
-            !page.overview.queryTimeoutPopupOk.isDisplayed()
-            !page.overview.queryTimeoutPopupCancel.isDisplayed()
-        }
+		int count = 0
+		while(count<5) {
+			count++
+			try {
+				try {
+					page.overview.queryTimeoutPopupCancel.click()
+				} catch(org.openqa.selenium.ElementNotVisibleException e) {
+					if(count > 0) {
+						println("")
+						break
+					}
+				}
+
+				page.overview.queryTimeoutEdit.isDisplayed()
+				!page.overview.queryTimeoutPopupOk.isDisplayed()
+				!page.overview.queryTimeoutPopupCancel.isDisplayed()
+				println("")
+			}catch(org.openqa.selenium.ElementNotVisibleException f){
+				println("")
+			}catch(org.openqa.selenium.StaleElementReferenceException f){
+				println("")
+			}
+		}
     }
 
     def "Check click Query Timeout edit and click Ok and then Ok"() {
@@ -1163,7 +1188,7 @@ class AdminTest extends TestBase {
         at AdminPage
         page.securityEdit.isDisplayed()
         then:
-        waitFor(10){
+        waitFor(waitTime){
             page.securityEdit.click()
             page.securityEditOk.isDisplayed()
             page.securityEditCancel.isDisplayed()
@@ -1173,13 +1198,13 @@ class AdminTest extends TestBase {
      def "click security edit button and cancel"(){
         when:
         at AdminPage
-        waitFor(5) { page.securityEdit.isDisplayed()
+        waitFor(waitTime) { page.securityEdit.isDisplayed()
 
         }
 
         then:
 
-        waitFor(10) {
+        waitFor(waitTime) {
 
             page.securityEdit.click()
             page.securityEditOk.isDisplayed()
@@ -1199,17 +1224,17 @@ class AdminTest extends TestBase {
     def "click security edit button and cancel popup"(){
         when:
         at AdminPage
-        waitFor(5) { page.securityEdit.isDisplayed() }
+        waitFor(waitTime) { page.securityEdit.isDisplayed() }
         then:
 
-        waitFor(10) {
+        waitFor(waitTime) {
             page.securityEdit.click()
             page.securityEditOk.isDisplayed()
             page.securityEditCancel.isDisplayed()
         }
         page.securityEditOk.click()
         println("security edit ok clicked!")
-        waitFor(10) {
+        waitFor(waitTime) {
           //  page.securityPopup.isDisplayed()
             page.securityPopupOk.isDisplayed()
             page.securityPopupCancel.isDisplayed()
@@ -1229,10 +1254,10 @@ class AdminTest extends TestBase {
     def "click security edit button and ok and ok"(){
         when:
         at AdminPage
-        waitFor(5) { page.securityEdit.isDisplayed() }
+        waitFor(waitTime) { page.securityEdit.isDisplayed() }
         then:
 
-        waitFor(10) {
+        waitFor(waitTime) {
             page.securityEdit.click()
             page.securityEditOk.isDisplayed()
             page.securityEditCancel.isDisplayed()
@@ -1252,7 +1277,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10){ page.autoSnapshotsEdit.isDisplayed() }
+        waitFor(waitTime){ page.autoSnapshotsEdit.isDisplayed() }
         String string = page.autoSnapshotsEdit.text()
         !(string.equals(""))
     }
@@ -1262,7 +1287,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
         }
         page.autoSnapshotsEdit.click()
@@ -1289,7 +1314,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
         }
 
@@ -1321,7 +1346,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
         }
 
@@ -1330,7 +1355,7 @@ class AdminTest extends TestBase {
         String enabledDisabled = page.autoSnapshotsValue.text()
         println(enabledDisabled)
         then:
-        waitFor(10){
+        waitFor(waitTime){
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
@@ -1362,7 +1387,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
             page.autoSnapshotsValue.isDisplayed()
         }
@@ -1371,7 +1396,7 @@ class AdminTest extends TestBase {
         page.autoSnapshotsEdit.click()
         String string = page.autoSnapshotsValue.text()
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
@@ -1384,7 +1409,7 @@ class AdminTest extends TestBase {
         page.autoSnapshotsEditCancel.click()
         println("cancel clicked successfully")
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
         }
 
@@ -1415,9 +1440,9 @@ class AdminTest extends TestBase {
         initialFreq		= page.frequency.text()
         initialFreqUnit	= page.frequencyUnit.text()
         initialRetained	= page.retained.text()
-        
+
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
             page.autoSnapshotsValue.isDisplayed()
             initialFreq
@@ -1426,7 +1451,7 @@ class AdminTest extends TestBase {
         when:
         page.autoSnapshotsEdit.click()
         then:
-        waitFor(10) {
+        waitFor(waitTime) {
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
@@ -1463,16 +1488,23 @@ class AdminTest extends TestBase {
         }
 
         then:
+		int count = 0
+		while(count<numberOfTrials) {
+			count++
+			try {
+				waitFor(waitTime) {
+					page.filePrefix.text().equals(prefix)
+					page.frequency.text().equals(frequency)
+					page.frequencyUnit.text().equals(frequencyUnit)
+					page.retained.text().equals(retained)
+					page.filePrefix.isDisplayed()
+				}
+				break
+			} catch (geb.waiting.WaitTimeoutException e) {
+				println("Try")
+			}
+		}
 
-        waitFor(15){
-            page.filePrefix.text().equals(prefix)
-            page.frequency.text().equals(frequency)
-            page.frequencyUnit.text().equals(frequencyUnit)
-            page.retained.text().equals(retained)
-            page.filePrefix.isDisplayed()
-        }
-        
-       
     }
 
 
@@ -1482,9 +1514,9 @@ class AdminTest extends TestBase {
     def "check Network Interfaces title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1515,9 +1547,9 @@ class AdminTest extends TestBase {
     def "check Port Name title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1549,9 +1581,9 @@ class AdminTest extends TestBase {
     def "check Cluster Setting title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1582,9 +1614,9 @@ class AdminTest extends TestBase {
     def "check Server Setting title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1615,9 +1647,9 @@ class AdminTest extends TestBase {
     def "check Client Port title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1648,9 +1680,9 @@ class AdminTest extends TestBase {
     def "check Admin Port title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1681,10 +1713,10 @@ class AdminTest extends TestBase {
     def "check HTTP Port title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
-        
+
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1715,9 +1747,9 @@ class AdminTest extends TestBase {
     def "check Internal Port title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1748,9 +1780,9 @@ class AdminTest extends TestBase {
     def "check Zookeeper Port title"() {
         int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1781,9 +1813,9 @@ class AdminTest extends TestBase {
     def "check Replication Port title"() {
        	int count = 0
         testStatus = false
-        
+
        	expect: 'at Admin Page'
-        
+
         while(count<numberOfTrials) {
         	count ++
         	try {
@@ -1898,17 +1930,47 @@ class AdminTest extends TestBase {
     }
 
     def "header logout exists" () {
-        when:
+        when:'Check Security Enabled'
         at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        else if (page.overview.securityValue.text().equals("On"))
+        {
+            println("fail")
+            page.overview.securityValue.text().equals("On")
+            println("test" + page.overview.securityValue.text())
+
+
+            waitFor(waitTime) { header.logout.isDisplayed() }
+        }
+
+
+
+
     }
 
     def "header help exists" () {
-        when:
-        at AdminPage
-        then:
-        waitFor(waitTime) { header.help.isDisplayed() }
+		when:
+		at AdminPage
+		then:
+		waitFor(30) { page.header.help.isDisplayed() }
+		int count = 0
+		while(count<5) {
+			count++
+			try {
+				interact {
+					moveToElement(page.header.help)
+				}
+				waitFor(30) { page.header.showHelp.isDisplayed() }
+				break
+			} catch (geb.waiting.WaitTimeoutException e) {
+				println("Already tried")
+			}
+		}
     }
 
     // HEADER TAB TESTS
@@ -1954,13 +2016,22 @@ class AdminTest extends TestBase {
     }
 
     def "header username check" () {
-        when:
+
+
+        when:'Check Security Enabled'
         at AdminPage
-        String username = page.getUsername()
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        waitFor(waitTime) {
-            header.usernameInHeader.isDisplayed()
-            header.usernameInHeader.text().equals(username)
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        else if (page.overview.securityValue.text().equals("On"))
+        {
+            waitFor(waitTime) {
+                header.usernameInHeader.isDisplayed()
+                header.usernameInHeader.text().equals(username)
+            }
         }
     }
 
@@ -1996,49 +2067,75 @@ class AdminTest extends TestBase {
     // LOGOUT TEST
 
     def "logout button test close" ()  {
-        when:
+        when:'Check Security Enabled'
         at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(waitTime) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
         }
-        header.popupClose.click()
-
+        else if (page.overview.securityValue.text().equals("On"))
+        {
+            waitFor(waitTime) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(waitTime) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
     }
 
     def "logout button test cancel" ()  {
-        when:
+        when:'Check Security Enabled'
         at AdminPage
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        waitFor(waitTime) { header.logout.isDisplayed() }
-        header.logout.click()
-        waitFor(waitTime) {
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
         }
-        header.logoutPopupCancelButton.click()
+        else if (page.overview.securityValue.text().equals("On"))
+        {
+            waitFor(waitTime) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(waitTime) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.logoutPopupCancelButton.click()
+        }
     }
 
     // HELP POPUP TEST
 
     def "help popup existance" () {
-        when:
-        at AdminPage
-        waitFor(waitTime) { header.help.isDisplayed() }
-        header.help.click()
-        then:
-        waitFor(waitTime) {
-            header.popupTitle.isDisplayed()
-            header.popupClose.isDisplayed()
-            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
-        }
+		when:
+		at AdminPage
+		then:
+		waitFor(waitTime) { page.header.help.isDisplayed() }
+		int count = 0
+		while(count<5) {
+			count++
+			try {
+				interact {
+					moveToElement(page.header.help)
+				}
+				waitFor(30) { page.header.showHelp.isDisplayed() }
+				break
+			} catch (geb.waiting.WaitTimeoutException e) {
+				println("Already tried")
+			}
+		}
 
-        header.popupClose.click()
+		when:
+		page.header.showHelp.click()
+		then:
+		waitFor(waitTime) { page.header.popupClose.isDisplayed() }
+		waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }
 
     // FOOTER TESTS
@@ -2069,7 +2166,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
 
-        waitFor(5) { 	page.downloadconfigurationbutton.isDisplayed() }
+        waitFor(waitTime) { 	page.downloadconfigurationbutton.isDisplayed() }
         println("downloadbutton seen")
         then:
 
@@ -2099,36 +2196,216 @@ class AdminTest extends TestBase {
     }
 
     def "check pause cancel"(){
+        boolean result = false
+        int count = 0
         when:
         at AdminPage
-        waitFor(5){cluster.pausebutton.isDisplayed()}
-
+        try {
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }  
+            println("Resume button is displayed") 
+            result = false
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Resume button is not displayed")
+            result = true
+        }  
+          
+        if (result == false) {
+            println("Resume VMC")
+            
+            try {
+                page.cluster.resumebutton.click()
+                waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Resume confirmation was not found")
+                assert false
+            }  
+            
+            try {
+                page.cluster.resumeok.click()
+                waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Pause button was not found")
+                assert false
+            }
+        }
         then:
-        at AdminPage
-        cluster.pausebutton.click()
-        waitFor(5){cluster.pausecancel.isDisplayed()}
-
-        cluster.pausecancel.click()
-        println("cancel button clicked for pause testing")
-
+        println()
+        
+        when:
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.pausebutton.click()
+                waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.pausecancel.click()
+                waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        then:
+        println()
+        
+        when:
+        if (result == false) {
+            println("Pause VMC")
+            
+            try {
+                page.cluster.pausebutton.click()
+                waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Pause confirmation was not found")
+                assert false
+            }  
+            
+            try {
+                page.cluster.pauseok.click()
+                waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Resume button was not found")
+                assert false
+            }
+        }
+        then:
+        println()
+        
     }
 
     def "check pause and verify resume too"(){
+        boolean result = false
+        int count = 0
         when:
         at AdminPage
-        waitFor(5) { cluster.pausebutton.isDisplayed() }
+        try {
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }  
+            println("Resume button is displayed") 
+            result = false
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Resume button is not displayed")
+            result = true
+        }  
+          
+        if (result == false) {
+            println("Resume VMC")
+            
+            count = 0
+            while(count<numberOfTrials) {
+                try {
+                    count++
+                    page.cluster.resumebutton.click()
+                    waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Resume confirmation was not found")
+                    assert false
+                }  
+            }
+            
+            count = 0
+            while(count<numberOfTrials) {
+                try {
+                    count++
+                    page.cluster.resumeok.click()
+                    waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Pause button was not found")
+                    assert false
+                }
+            }
+        }
         then:
-
-        cluster.pausebutton.click()
-        waitFor{cluster.pauseok.isDisplayed()}
-        cluster.pauseok.click()
-        waitFor(4){cluster.resumebutton.isDisplayed()
-
-            cluster.resumebutton.click()}
-        waitFor(10) {
-            cluster.resumeok.isDisplayed()}
-        cluster.resumeok.click()
-        println("resume for ok has been clicked")
+        println()
+        
+        when:
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.pausebutton.click()
+                waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.pauseok.click()
+                waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.resumebutton.click()
+                waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.resumeok.click()
+                waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        then:
+        println()
+        
+        when:
+        if (result == false) {
+            println("Pause VMC")
+            
+            count = 0
+            while(count<numberOfTrials) { 
+                try {
+                    count++
+                    page.cluster.pausebutton.click()
+                    waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Pause confirmation was not found")
+                    assert false
+                }  
+            }
+            
+            count = 0
+            while(count<numberOfTrials) {
+                try {
+                    count++
+                    page.cluster.pauseok.click()
+                    waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Resume button was not found")
+                    assert false
+                }
+            }
+        }
+        then:
+        println()
     }
 
 
@@ -2136,10 +2413,10 @@ class AdminTest extends TestBase {
     def "when save and cancel popup"(){
         when:
         at AdminPage
-        waitFor(5) { cluster.savebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(5) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savecancel.click()
     }
@@ -2150,10 +2427,10 @@ class AdminTest extends TestBase {
         when:
 
         at AdminPage
-        waitFor(15) { cluster.savebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase())
         cluster.savedirectory.value(emptyPath)
         cluster.saveok.click()
@@ -2170,14 +2447,14 @@ class AdminTest extends TestBase {
         when:
 
         at AdminPage
-        waitFor(15) { cluster.savebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savedirectory.value(invalidPath)
         cluster.saveok.click()
-        waitFor(10){cluster.failedsaveok.isDisplayed()}
+        waitFor(waitTime){cluster.failedsaveok.isDisplayed()}
         cluster.failedsaveok.click()
         println("error location for saving verified")
 
@@ -2190,14 +2467,14 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        waitFor(15) { cluster.savebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savedirectory.value(validPath)
         cluster.saveok.click()
-        waitFor(15){cluster.savesuccessok.isDisplayed()}
+        waitFor(waitTime){cluster.savesuccessok.isDisplayed()}
         cluster.savesuccessok.click()
         println("save succeeded and clicked!!")
     }
@@ -2208,7 +2485,7 @@ class AdminTest extends TestBase {
         String validPath = page.getValidPath()
         when:
         at AdminPage
-        waitFor(20) {   cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) {   cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -2216,11 +2493,11 @@ class AdminTest extends TestBase {
         println("restore button clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
         cluster.restoredirectory.value(validPath)
         cluster.restoresearch.click()
-        waitFor(5){cluster.restorecancelbutton.isDisplayed()}
+        waitFor(waitTime){cluster.restorecancelbutton.isDisplayed()}
         cluster.restorecancelbutton.click()
     }
 
@@ -2228,7 +2505,7 @@ class AdminTest extends TestBase {
     def "when restore button clicked and close popup"(){
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -2236,7 +2513,7 @@ class AdminTest extends TestBase {
         println("restore clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
         cluster.restoreclosebutton.click()
 
@@ -2246,7 +2523,7 @@ class AdminTest extends TestBase {
         String invalidPath = page.getInvalidPath()
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -2254,15 +2531,15 @@ class AdminTest extends TestBase {
         println("restore clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
 
         // FOR UAT TESTING ENABLE BELOW CODE
-        //    waitFor(10){cluster.restoresearch.isDisplayed()
+        //    waitFor(waitTime){cluster.restoresearch.isDisplayed()
         //    cluster.restoredirectory.isDisplayed()}
         //     cluster.restoredirectory.value(invalidPath)
         //      cluster.restoresearch.click()
-        //   if(waitFor(10){cluster.restoreerrormsg.isDisplayed()}){
+        //   if(waitFor(waitTime){cluster.restoreerrormsg.isDisplayed()}){
         //       cluster.restoreerrormsg.text().toLowerCase().equals("Error: Failure getting snapshots.Path is not a directory".toLowerCase())
         //      println("error message for restore search verified!!")}
 
@@ -2271,19 +2548,19 @@ class AdminTest extends TestBase {
     def "when search button clicked in empty path of Restore"(){
         String emptyPath = page.getEmptyPath()
         when:
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
         // FOR UAT TESTING ENABLE BELOW CODE
-        //       waitFor(10){cluster.restoresearch.isDisplayed()
+        //       waitFor(waitTime){cluster.restoresearch.isDisplayed()
         //       cluster.restoredirectory.isDisplayed()}
         //       cluster.restoredirectory.value(emptyPath)
         //      cluster.restoresearch.click()
-        //      if(waitFor(10){cluster.emptysearchrestore.isDisplayed()}){
+        //      if(waitFor(waitTime){cluster.emptysearchrestore.isDisplayed()}){
         //          cluster.emptysearchrestore.text().toLowerCase().equals("Please enter a valid directory path.".toLowerCase())
         //      println("error message for empty restore search verified!!")}
     }
@@ -2293,7 +2570,7 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -2301,17 +2578,17 @@ class AdminTest extends TestBase {
         println("restore clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
 
         // FOR UAT TESTING ENABLE BELOW CODE
-        //   waitFor(10){cluster.buttonrestore.isDisplayed()}
+        //   waitFor(waitTime){cluster.buttonrestore.isDisplayed()}
         //  cluster.buttonrestore.click()
-        //  waitFor(10){cluster.restorepopupno.isDisplayed()
+        //  waitFor(waitTime){cluster.restorepopupno.isDisplayed()
         //               cluster.restorepopupyes.isDisplayed()}
         //  cluster.restorepopupno.click()
         //  println("No clicked for restore popup")
-        // waitFor(10){cluster.restorecancelbutton.isDisplayed()}
+        // waitFor(waitTime){cluster.restorecancelbutton.isDisplayed()}
         // cluster.restorecancelbutton.click()
 
     }
@@ -2321,7 +2598,7 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
+        waitFor(waitTime) { cluster.restorebutton.isDisplayed()
             cluster.restorestatus.isDisplayed()
             cluster.restorebutton.click()
         }
@@ -2329,17 +2606,17 @@ class AdminTest extends TestBase {
         println("restore clicked")
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
 
         // FOR UAT TESTING ENABLE BELOW CODE
-        //  waitFor(10){cluster.buttonrestore.isDisplayed()}
+        //  waitFor(waitTime){cluster.buttonrestore.isDisplayed()}
         //  cluster.buttonrestore.click()
-        //  waitFor(10){cluster.restorepopupno.isDisplayed()
+        //  waitFor(waitTime){cluster.restorepopupno.isDisplayed()
         //             cluster.restorepopupyes.isDisplayed()}
         //  cluster.restorepopupyes.click()
         //  println("Yes clicked for restore popup")
-        //  waitFor(10){cluster.savesuccessok.isDisplayed()}
+        //  waitFor(waitTime){cluster.savesuccessok.isDisplayed()}
         //  cluster.savesuccessok.click()
         // println("ok clicked and message displayed after restoring")
 
@@ -2376,31 +2653,34 @@ class AdminTest extends TestBase {
         at AdminPage
         page.serverbutton.isDisplayed()
         page.serverbutton.click()
+        then:
+        if (waitFor(waitTime) { page.mainservername.isDisplayed() && page.servername.isDisplayed() }) {
 
-        if (waitFor(10) { page.mainservername.isDisplayed() && page.servername.isDisplayed() }) {
-
-            println("server name is displayed as: " + page.mainservername.text().replaceAll("Stop", " "))
+            println("server name is displayed as: " + page.mainservername.text().replaceAll("Stop", "").replaceAll("Paused", ""))
             println("currently running server is : "+ page.servername.text())
         }
 
-
-        then:
-        if (waitFor(5) { page.serverstopbtndisable.isDisplayed() }) {
-            println("server stop button  displayed for disable mode")
+        try {
+            page.cluster.resumebutton.isDisplayed()
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+            waitFor(waitTime) {
+                page.serverstopbtndisable.isDisplayed()
+            }
         }
 
+
         //   enable below code FOR UAT TESTING
-        //     if( waitFor(5) { page.serverstopbtnenable.isDisplayed() }){
+        //     if( waitFor(waitTime) { page.serverstopbtnenable.isDisplayed() }){
         //    println("server stop button clicked for  enable mode")
         //    page.serverstopbtnenable.click()
-        //   waitFor(5) { page.serverstopcancel.isDisplayed() }
+        //   waitFor(waitTime) { page.serverstopcancel.isDisplayed() }
         //   page.serverstopok.isDisplayed()
         //   page.serverstopcancel.click()
         //    println("server cancel button clicked")}
     }
 
     // Overview Expansion
-	
+
 	def "HTTP Access Expand:Check Text"() {
     	when:
     	page.overview.httpAccess.click()
@@ -2410,7 +2690,7 @@ class AdminTest extends TestBase {
     		!page.overview.jsonApiStatus.text().equals("")
     	}
     }
-    
+
     def "Command Logging Expand:Check Text"() {
     	when:
     	page.overview.commandLogging.click()
@@ -2418,15 +2698,15 @@ class AdminTest extends TestBase {
     	waitFor(waitTime) {
     		page.overview.logFrequencyTime.text().equals("Log Frequency Time")
     		!page.overview.logFrequencyTimeValue.text().equals("")
-    		
+
     		page.overview.logFrequencyTransactions.text().equals("Log Frequency Transactions")
     		!page.overview.logFrequencyTransactionsValue.text().equals("")
-    		
+
     		page.overview.logSize.text().equals("Log Size")
     		!page.overview.logSizeValue.text().equals("")
     	}
     }
-    
+
     def "Advanced Expand:Check Text"() {
     	when:
     	page.overview.advanced.click()
@@ -2434,19 +2714,19 @@ class AdminTest extends TestBase {
     	waitFor(waitTime) {
     		page.overview.maxJavaHeap.text().equals("Max Java Heap")
     		!page.overview.maxJavaHeapValue.text().equals("")
-    		
+
     		page.overview.heartbeatTimeout.text().equals("Heartbeat Timeout")
     		!page.overview.heartbeatTimeoutValue.text().equals("")
-    		
+
     		page.overview.queryTimeout.text().equals("Query Timeout")
     		!page.overview.queryTimeoutValue.text().equals("")
-    		
+
     		page.overview.maxTempTableMemory.text().equals("Max Temp Table Memory")
     		!page.overview.maxTempTableMemoryValue.text().equals("")
-    		
+
     		page.overview.snapshotPriority.text().equals("Snapshot Priority")
     		!page.overview.snapshotPriorityValue.text().equals("")
-    		
+
     	}
     }
 
@@ -2479,7 +2759,7 @@ class AdminTest extends TestBase {
             when:
             page.autoSnapshotsEdit.click()
             then:
-            waitFor(10) {
+            waitFor(waitTime) {
                 page.autoSnapshotsEditCheckbox.isDisplayed()
                 page.autoSnapshotsEditOk.isDisplayed()
                 page.autoSnapshotsEditCancel.isDisplayed()
@@ -2517,7 +2797,7 @@ class AdminTest extends TestBase {
 
             then:
 
-            waitFor(15){
+            waitFor(waitTime){
                 page.filePrefix.text().equals(initialPrefix)
                 page.frequency.text().equals(initialFreq)
                 page.frequencyUnit.text().equals(initialFreqUnit)

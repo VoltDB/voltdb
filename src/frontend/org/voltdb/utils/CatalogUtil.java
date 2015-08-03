@@ -115,6 +115,7 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -124,8 +125,10 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+
 import java.net.URISyntaxException;
 import java.util.HashMap;
+
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
@@ -503,6 +506,19 @@ public abstract class CatalogUtil {
 
         // It's valid.
         return true;
+    }
+
+    public static String checkLicenseConstraint(Catalog catalog, LicenseApi licenseApi) {
+        String prefix = "Unable to use feature not included in license: ";
+        String errMsg = null;
+
+        if (catalog.getClusters().get("cluster").getDatabases().get("database").getIsactiveactivedred()) {
+            if (!licenseApi.isDrActiveActiveAllowed()) {
+                errMsg = prefix + "DR Active-Active replication";
+            }
+        }
+
+        return errMsg;
     }
 
     public static String compileDeployment(Catalog catalog, String deploymentURL,
@@ -1013,9 +1029,10 @@ public abstract class CatalogUtil {
         switch(exportConfiguration.getType()) {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
-            case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+            case KAFKA: exportClientClassName = "org.voltdb.exportclient.kafka.KafkaExportClient"; break;
             case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
+            case ELASTICSEARCH: exportClientClassName = "org.voltdb.exportclient.ElasticSearchHttpExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 exportClientClassName = exportConfiguration.getExportconnectorclass();
@@ -1122,11 +1139,18 @@ public abstract class CatalogUtil {
         }
         if (is == null) {
             try {
-                String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-                System.out.println("Module base is: " + rpath);
-                String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
-                is = new FileInputStream(new File(bpath));
-                importBundleUrl = "file:" + bpath;
+                String bundlelocation = System.getProperty("voltdbbundlelocation");
+                if (bundlelocation == null || bundlelocation.trim().length() == 0) {
+                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                    hostLog.info("Module base is: " + rpath + "/../bundles/");
+                    String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    importBundleUrl = "file:" + bpath;
+                } else {
+                    String bpath = bundlelocation + "/" + importBundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    importBundleUrl = "file:" + bpath;
+                }
             } catch (URISyntaxException | FileNotFoundException ex) {
                 is = null;
             }
@@ -1695,6 +1719,7 @@ public abstract class CatalogUtil {
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
+                cluster.setDrconsumerenabled(drConnection.isEnabled());
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
         }

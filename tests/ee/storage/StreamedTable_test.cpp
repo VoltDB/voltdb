@@ -59,7 +59,7 @@ public:
         NValueArray* noParams = NULL;
         VoltDBEngine* noEngine = NULL;
         m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool,
-                                        noParams, noEngine, "", 0, NULL, NULL);
+                                        noParams, noEngine, "", 0, NULL, NULL, 0);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;

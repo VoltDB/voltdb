@@ -28,7 +28,7 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -39,7 +39,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */
-public class PartitionDRGateway {
+public class PartitionDRGateway implements DurableUniqueIdListener {
     private static final VoltLogger log = new VoltLogger("DR");
 
     public enum DRRecordType {
@@ -59,7 +59,7 @@ public class PartitionDRGateway {
         }
     }
 
-    public static final Map<Integer, PartitionDRGateway> gateways = new NonBlockingHashMap<Integer, PartitionDRGateway>();
+    public static final Map<Integer, PartitionDRGateway> m_partitionDRGateways = new NonBlockingHashMap<>();
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -69,7 +69,7 @@ public class PartitionDRGateway {
      * @return Instance of PartitionDRGateway
      */
     public static PartitionDRGateway getInstance(int partitionId,
-                                                 NodeDRGateway nodeGateway,
+                                                 ProducerDRGateway producerGateway,
                                                  StartAction startAction)
     {
         final VoltDBInterface vdb = VoltDB.instance();
@@ -79,7 +79,7 @@ public class PartitionDRGateway {
         // if this is a primary cluster in a DR-enabled scenario
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToDR && nodeGateway != null) {
+        if (licensedToDR && producerGateway != null) {
             pdrg = tryToLoadProVersion();
         }
         if (pdrg == null) {
@@ -88,11 +88,11 @@ public class PartitionDRGateway {
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, nodeGateway, startAction);
+            pdrg.init(partitionId, producerGateway, startAction);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
-        gateways.put(partitionId,  pdrg);
+        m_partitionDRGateways.put(partitionId,  pdrg);
 
         return pdrg;
     }
@@ -112,7 +112,7 @@ public class PartitionDRGateway {
 
     // empty methods for community edition
     protected void init(int partitionId,
-                        NodeDRGateway gateway,
+                        ProducerDRGateway producerGateway,
                         StartAction startAction) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
                                           StoredProcedureInvocation spi,
@@ -125,6 +125,9 @@ public class PartitionDRGateway {
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
     }
+
+    @Override
+    public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
     private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
         @Override
@@ -151,7 +154,7 @@ public class PartitionDRGateway {
             AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
             buf.order(ByteOrder.LITTLE_ENDIAN);
             //Magic header space for Java for implementing zero copy stuff
-            buf.position(8 + 65 + (partitionId == MpInitiator.MP_INIT_PID ? 0 : 4));
+            buf.position(8 /* stream block header */ + 69 /* txn metadata padding */);
             while (buf.hasRemaining()) {
                 int startPosition = buf.position();
                 byte version = buf.get();
@@ -180,7 +183,7 @@ public class PartitionDRGateway {
                     }
                     buf.position(buf.position() + lengthPrefix);
                     checksum = buf.getInt();
-                    log.trace("Version " + version + " type " + recordType + "table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
+                    log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
                               (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
                     break;
                 }
@@ -227,9 +230,10 @@ public class PartitionDRGateway {
                 }
 
             }
+            buf.order(ByteOrder.BIG_ENDIAN);
         }
 
-        final PartitionDRGateway pdrg = gateways.get(partitionId);
+        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }

@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.concurrent.LinkedTransferQueue;
-import java.util.concurrent.TimeUnit;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StarvationTracker;

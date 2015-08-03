@@ -17,20 +17,29 @@
 
 package org.voltdb;
 
+import static org.voltdb.ClientInterface.getPartitionForProcedure;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
-import static org.voltdb.ClientInterface.getPartitionForProcedure;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
+
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.logging.Level;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -47,11 +56,12 @@ public class ImportHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private boolean m_stopped = false;
+    private volatile boolean m_stopped = false;
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
+    final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext, CatalogContext catContext) {
@@ -88,6 +98,8 @@ public class ImportHandler {
             @Override
             public void run() {
                 try {
+                    //Drain the adapter so all calbacks are done
+                    m_adapter.drain();
                     m_importContext.stop();
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -108,9 +120,30 @@ public class ImportHandler {
         return DBBPool.allocateDirectAndPool(sz);
     }
 
+    /**
+     * Returns true if a table with the given name exists in the server catalog.
+     */
+    public boolean hasTable(String name) {
+        Table table = m_catalogContext.tables.get(name);
+        return (table!=null);
+    }
+
+    public class NullCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+        }
+    }
+
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
+        return callProcedure(ic, new NullCallback(), proc, fieldList);
+    }
+
+    public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
+        if (m_stopped) {
+            return false;
+        }
         // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             m_logger.warn("Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
@@ -121,10 +154,24 @@ public class ImportHandler {
         }
 
         if (catProc == null) {
-            m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
-            m_failedCount.incrementAndGet();
-            return false;
+            if (proc.equals("@AdHoc")) {
+                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
+                // configured differently for @AdHoc... variants this code will have to
+                // change in order to use the proper variant based on whether the work
+                // is single or multi partition and read-only or read-write.
+                proc = "@AdHoc_RW_MP";
+            }
+            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(proc);
+            if (sysProc != null) {
+                catProc = sysProc.asCatalogProcedure();
+            }
+            if (catProc == null) {
+                m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
+                m_failedCount.incrementAndGet();
+                return false;
+            }
         }
+
         int counter = 1;
         int maxSleepNano = 100000;
         long start = System.nanoTime();
@@ -150,8 +197,8 @@ public class ImportHandler {
         final BBContainer tcont = getBuffer(sz);
         final ByteBuffer taskbuf = tcont.b();
         try {
-            taskbuf.put((byte )ProcedureInvocationType.ORIGINAL.getValue());
-            taskbuf.putInt((int )proc.length());
+            taskbuf.put(ProcedureInvocationType.ORIGINAL.getValue());
+            taskbuf.putInt(proc.length());
             taskbuf.put(proc.getBytes());
             taskbuf.putLong(m_adapter.connectionId());
             pset.flattenToBuffer(taskbuf);
@@ -179,10 +226,7 @@ public class ImportHandler {
         }
 
         boolean success;
-        //Synchronize this to create good handles across all ImportHandlers
-        synchronized(ImportHandler.class) {
-            success = m_adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
-        }
+        success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
@@ -190,6 +234,16 @@ public class ImportHandler {
             m_submitSuccessCount.incrementAndGet();
         }
         return success;
+    }
+
+    //Do rate limited logging for messages.
+    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
+                m_logger, level,
+                cause, format, args
+                );
     }
 
     /**
@@ -207,4 +261,49 @@ public class ImportHandler {
     public void error(String message) {
         m_logger.error(message);
     }
+
+    /**
+     * Log warn message
+     * @param message
+     */
+    public void warn(String message) {
+        m_logger.warn(message);
+    }
+
+    public boolean isDebugEnabled() {
+        return m_logger.isDebugEnabled();
+    }
+
+    public boolean isTraceEnabled() {
+        return m_logger.isTraceEnabled();
+    }
+
+    public boolean isInfoEnabled() {
+        return m_logger.isInfoEnabled();
+    }
+
+    /**
+     * Log debug message
+     * @param message
+     */
+    public void debug(String message) {
+        m_logger.debug(message);
+    }
+
+    /**
+     * Log error message
+     * @param message
+     */
+    public void error(String message, Throwable t) {
+        m_logger.error(message, t);
+    }
+
+    public void error(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.ERROR, t, format, args);
+    }
+
+    public void warn(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.WARN, t, format, args);
+    }
+
 }

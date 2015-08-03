@@ -580,10 +580,23 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // InnerPlan is an IndexScan. In this case the inner and inner-outer
                 // non-index join expressions (if any) are in the otherExpr. The former should stay as
                 // an IndexScanPlan predicate and the latter stay at the NLJ node as a join predicate
-                List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs);
-                joinClauses.addAll(innerAccessPath.otherExprs);
+                ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
+                // PLEASE do not update the "innerAccessPath.otherExprs", it may be reused
+                // for other path evaluation on the other outer side join.
+                List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs, otherExprs);
+                joinClauses.addAll(otherExprs);
                 AbstractExpression indexScanPredicate = ExpressionUtil.combine(innerExpr);
                 ((IndexScanPlanNode)innerPlan).setPredicate(indexScanPredicate);
+            }
+            else if (innerJoinNode instanceof BranchNode && joinNode.getJoinType() == JoinType.LEFT) {
+                // If the innerJoinNode is a LEAF node OR if the join type is an INNER join,
+                // the conditions that apply to the inner side
+                // have been applied as predicates to the inner scan node already.
+
+                // otherExpr of innerAccessPath comes from its parentNode's joinInnerList.
+                // For Outer join (LEFT ONLY at this point), it could mean a join predicate on the table of
+                // the inner node ONLY, that can not be pushed down.
+                joinClauses.addAll(innerAccessPath.otherExprs);
             }
             nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
 
@@ -632,21 +645,23 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * A method to filter out single TVE expressions.
+     * A method to filter out single-TVE expressions.
      *
-     * @param expr List of expressions.
-     * @return List of single TVE expressions from the input collection.
-     *         They are also removed from the input.
+     * @param expr List of single-TVE expressions.
+     * @param otherExprs List of multi-TVE expressions.
+     * @return List of single-TVE expressions from the input collection.
      */
-    private static List<AbstractExpression> filterSingleTVEExpressions(List<AbstractExpression> exprs) {
+    private static List<AbstractExpression> filterSingleTVEExpressions(List<AbstractExpression> exprs,
+            List<AbstractExpression> otherExprs) {
         List<AbstractExpression> singleTVEExprs = new ArrayList<AbstractExpression>();
         for (AbstractExpression expr : exprs) {
             List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
             if (tves.size() == 1) {
                 singleTVEExprs.add(expr);
+            } else {
+                otherExprs.add(expr);
             }
         }
-        exprs.removeAll(singleTVEExprs);
         return singleTVEExprs;
     }
 

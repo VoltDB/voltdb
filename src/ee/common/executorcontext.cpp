@@ -44,7 +44,8 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 std::string hostname,
                 CatalogId hostId,
                 DRTupleStream *drStream,
-                DRTupleStream *drReplicatedStream) :
+                DRTupleStream *drReplicatedStream,
+                CatalogId drClusterId) :
     m_topEnd(topend),
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
@@ -60,6 +61,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_partitionId(partitionId),
     m_hostname(hostname),
     m_hostId(hostId),
+    m_drClusterId(drClusterId),
     m_epoch(0) // set later
 {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);

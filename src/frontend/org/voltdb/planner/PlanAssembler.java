@@ -43,6 +43,8 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -224,6 +226,38 @@ public class PlanAssembler {
         return false;
     }
 
+    private boolean canPushDownDistinctAggregation(AggregateExpression aggExpr) {
+        assert(m_parsedSelect != null);
+        assert(aggExpr != null);
+        assert(aggExpr.isDistinct());
+
+        if ( aggExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ) {
+            return true;
+        }
+
+        AbstractExpression aggArg = aggExpr.getLeft();
+        // constant
+        if ( aggArg instanceof ConstantValueExpression || aggArg instanceof ParameterValueExpression) {
+            return true;
+        }
+        if ( ! (aggArg instanceof TupleValueExpression)) {
+            return false;
+        }
+        TupleValueExpression tve = (TupleValueExpression) aggArg;
+        StmtTableScan scanTable = m_parsedSelect.m_tableAliasMap.get(tve.getTableAlias());
+        // table alias may be from "VOLT_TEMP_TABLE".
+        if (scanTable == null || scanTable.getPartitioningColumns() == null) {
+            return false;
+        }
+        for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
+            if  (pcol != null && pcol.getColumnName().equals(tve.getColumnName()) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Clear any old state and get ready to plan a new plan. The next call to
      * getNextPlan() will return the first candidate plan for these parameters.
@@ -248,7 +282,10 @@ public class PlanAssembler {
                 // The execution engine expects to see the outer table on the left side only
                 // which means that RIGHT joins need to be converted to the LEFT ones
                 ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
-                simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
+
+                if (! m_parsedSelect.hasJoinOrder()) {
+                    simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
+                }
             }
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
@@ -508,7 +545,7 @@ public class PlanAssembler {
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan subqueryBestPlan = subqueryScan.getBestCostPlan();
-           if (subqueryBestPlan == null) {
+            if (subqueryBestPlan == null) {
                 throw new PlanningErrorException(m_recentErrorMsg);
             }
             orderIsDeterministic &= subqueryBestPlan.isOrderDeterministic();
@@ -771,10 +808,11 @@ public class PlanAssembler {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode) parentPlan;
             StmtTableScan tableScan = scanNode.getTableScan();
             if (tableScan instanceof StmtSubqueryScan) {
-                CompiledPlan betsCostPlan = ((StmtSubqueryScan)tableScan).getBestCostPlan();
-                assert (betsCostPlan != null);
-                AbstractPlanNode subQueryRoot = betsCostPlan.rootPlanGraph;
+                CompiledPlan bestCostPlan = ((StmtSubqueryScan)tableScan).getBestCostPlan();
+                assert (bestCostPlan != null);
+                AbstractPlanNode subQueryRoot = bestCostPlan.rootPlanGraph;
                 subQueryRoot.disconnectParents();
+                scanNode.clearChildren();
                 scanNode.addAndLinkChild(subQueryRoot);
             }
         } else {
@@ -1959,11 +1997,13 @@ public class PlanAssembler {
                          *
                          * If DISTINCT is specified, don't do push-down for
                          * count() and sum() when not group by partition column.
+                         * An exception is the aggregation arguments are the partition column (ENG-4980).
                          */
                         if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                             agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
                             agg_expression_type == ExpressionType.AGGREGATE_SUM) {
-                            if (is_distinct && !m_parsedSelect.hasPartitionColumnInGroupby()) {
+                            if ( is_distinct && ! (m_parsedSelect.hasPartitionColumnInGroupby() ||
+                                                   canPushDownDistinctAggregation((AggregateExpression)rootExpr) ) ) {
                                 topAggNode = null;
                             }
                             else {
@@ -1993,7 +2033,8 @@ public class PlanAssembler {
                             /*
                              * Input column of the top aggregate node is the output column of the push-down aggregate node
                              */
-                            topAggNode.addAggregate(top_expression_type, is_distinct, outputColumnIndex, tve);
+                            boolean topDistinctFalse = false;
+                            topAggNode.addAggregate(top_expression_type, topDistinctFalse, outputColumnIndex, tve);
                         }
                     }
                 }

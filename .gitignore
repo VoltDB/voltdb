@@ -17,9 +17,11 @@
 *runapp*.py
 *.log
 *.iml
-host*+0000.txt
-voltdb_crash*
 buildstring.txt
+host*+0000.txt
+license.xml
+voltdb_crash*
+bundles/
 obj/
 groovyout/
 debugoutput/
@@ -63,3 +65,4 @@ doc/tutorials/auction/csvloader_*.csv
 /src/frontend/org/voltcore/utils/.flagfile
 /tests/sqlcmd/scripts/**/*.outdiffs
 out
+bundles
