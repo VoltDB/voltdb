@@ -35,9 +35,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltcore.logging.VoltLogger;
 
 public class MatchChecks {
-
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
-
     final static String DELETE_ROWS = "DeleteRows";
 
     static class DeleteCallback implements ProcedureCallback {
@@ -70,7 +68,7 @@ public class MatchChecks {
             @Override
             public void run() {
                 mirrorRowCount = getMirrorTableRowCount(innerClient);
-                log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
+                //log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
                 log.info("checkTimer: Mirror table row count: " + mirrorRowCount);
                 if (mirrorRowCount == 0) { // indicates everything matched and mirror table empty
                     log.info("checkTimer: mirrorRowCount is 0. Stopping...");
@@ -92,7 +90,7 @@ public class MatchChecks {
         } catch (IOException | ProcCallException e) {
             e.printStackTrace();
         }
-        log.info("Mirror table row count: " + mirrorRowCount);
+        //log.info("Mirror table row count: " + mirrorRowCount);
         return mirrorRowCount;
     }
 
@@ -107,10 +105,10 @@ public class MatchChecks {
              System.exit(-1);
         }
 
-        log.info("Matched row count: " + results.getRowCount());
+        log.info("getRowCount(): " + results.getRowCount());
         while (results.advanceRow()) {
             long key = results.getLong(0);
-            // System.out.println("Key: " + key);
+            // log.info("Key: " + key);
             try {
                 client.callProcedure(new DeleteCallback(DELETE_ROWS, key), DELETE_ROWS, key);
             } catch (IOException e) {

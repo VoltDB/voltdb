@@ -21,13 +21,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 package kafkaimporter.client.kafkaimporter;
+import org.voltcore.logging.VoltLogger;
 
 import java.io.IOException;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltcore.logging.VoltLogger;
 
 
 public class InsertExport {
