@@ -80,7 +80,7 @@ public class KafkaImportBenchmark {
     static Client client;
     // Some thread safe counters for reporting
     AtomicLong linesRead = new AtomicLong(0);
-    AtomicLong rowsAdded = new AtomicLong(0);
+    static AtomicLong rowsAdded = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
     private static final int END_WAIT = 60; // wait at the end for import to settle after export completes
@@ -226,8 +226,8 @@ public class KafkaImportBenchmark {
             benchmarkStartTS = System.currentTimeMillis();
             schedulePeriodicStats();
 
-            log.info("Starting data checker...");
-            checkTimer = matchChecks.checkTimer(5000, client);
+            // log.info("Starting data checker...");
+            // checkTimer = MatchChecks.checkTimer(5000, client);
 
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
@@ -247,8 +247,8 @@ public class KafkaImportBenchmark {
             log.info("Done waiting for export table");
         } finally {
             // cancel periodic stats printing
-            log.info("Cancel periodic stats");
-            statsTimer.cancel();
+            // log.info("Cancel periodic stats");
+            // statsTimer.cancel();
             finalInsertCount.addAndGet(icnt);
         }
     }
@@ -310,10 +310,12 @@ public class KafkaImportBenchmark {
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
-        log.info("Wait " + END_WAIT + " seconds for import to settle.");
-        //Thread.sleep(END_WAIT*1000);
-        System.out.println("Waiting for mirror table to hit 0");
-        checkTimer.wait();
+        long count = 0;
+        do {
+        	count = MatchChecks.getMirrorTableRowCount(client);
+        	log.info("Mirror table count: " + count);
+        	Thread.sleep(END_WAIT*1000);
+        } while (count > 0);
 
         boolean testResult = FinalCheck.check(client);
 
