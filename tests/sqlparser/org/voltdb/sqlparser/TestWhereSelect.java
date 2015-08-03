@@ -68,24 +68,25 @@ import java.io.IOException;
 import org.junit.Test;
 import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
+import org.voltdb.sqlparser.syntax.SQLKind;
 import org.voltdb.sqlparser.syntax.SQLParserDriver;
 import org.voltdb.sqlparser.syntax.VoltSQLlistener;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 
 public class TestWhereSelect {
 
-        VoltSQLlistener newListener() {
-                CatalogAdapter catalog = new CatalogAdapter();
-                ParserFactory m_factory = new ParserFactory(catalog);
+    VoltSQLlistener newListener() {
+        CatalogAdapter catalog = new CatalogAdapter();
+        ParserFactory m_factory = new ParserFactory(catalog);
         VoltSQLlistener listener = new VoltSQLlistener(m_factory);
         return listener;
     }
 
-        @Test
+    @Test
     public void testDriver1() throws IOException {
-                System.out.println("Test 1");
+        System.out.println("Test 1");
         String ddl1 = "create table alpha ( id bigint, status bigint );select id from alpha;";
-        SQLParserDriver driver = new SQLParserDriver(ddl1,null);
+        SQLParserDriver driver = new SQLParserDriver(ddl1,null, SQLKind.DDL);
         VoltSQLlistener listener = newListener();
         driver.walk(listener);
         assertFalse(listener.hasErrors());
@@ -99,50 +100,50 @@ public class TestWhereSelect {
 
     @Test
     public void testDriver2() throws IOException {
-                System.out.println("Test 2");
+        System.out.println("Test 2");
         String ddl2 = "create table alpha ( id bigint, status smallint );create table beta (id integer, status integer);\n"
                         + "select beta.id, status from alpha as mumble,beta where id = 200 AND status < 200;"; // as in voltdb, alpha.id in projection and in where clause are errors.
         VoltSQLlistener listener = newListener();
-        SQLParserDriver driver = new SQLParserDriver(ddl2,listener);
+        SQLParserDriver driver = new SQLParserDriver(ddl2,listener, SQLKind.DDL);
         driver.walk(listener);
         assertFalse(listener.hasErrors());
     }
 
-        @Test
+    @Test
     public void testDriver3() throws IOException {
-                System.out.println("Test 3");
+        System.out.println("Test 3");
         String ddl3 = "create table alpha ( id bigint );create table beta (id bigint, local integer);\n"
                         + "select id from alpha, beta;select id from alpha,beta where beta.id < 250;";
-        SQLParserDriver driver = new SQLParserDriver(ddl3,null);
+        SQLParserDriver driver = new SQLParserDriver(ddl3,null, SQLKind.DDL);
         VoltSQLlistener listener = newListener();
         driver.walk(listener);
         assertFalse(listener.hasErrors());
     }
 
-        @Test
+    @Test
     public void testDriver4() throws IOException {
-                System.out.println("Test 4");
+        System.out.println("Test 4");
         String ddl4 = "create table alpha ( id bigint );create table beta (id bigint, local integer);\n"
                         + "select local, id from beta where local < 150;";
-        SQLParserDriver driver = new SQLParserDriver(ddl4,null);
+        SQLParserDriver driver = new SQLParserDriver(ddl4,null, SQLKind.DDL);
         VoltSQLlistener listener = newListener();
         driver.walk(listener);
         assertFalse(listener.hasErrors());
     }
 
-        @Test
+    @Test
     public void testDriver5() throws IOException {
-                System.out.println("Test 5");
+        System.out.println("Test 5");
         String ddl5 = "create table alpha ( id bigint );select id+id as alias from alpha where true = 10;";
-        SQLParserDriver driver = new SQLParserDriver(ddl5,null);
+        SQLParserDriver driver = new SQLParserDriver(ddl5, null, SQLKind.DDL);
         VoltSQLlistener listener = newListener();
         driver.walk(listener);
         assertFalse(listener.hasErrors());
     }
 
-        private CatalogAdapter getCatalogAdapter(VoltSQLlistener aListener) {
-            ICatalogAdapter catalog = aListener.getCatalogAdapter();
-            assert(catalog instanceof CatalogAdapter);
-            return (CatalogAdapter)catalog;
+    private CatalogAdapter getCatalogAdapter(VoltSQLlistener aListener) {
+        ICatalogAdapter catalog = aListener.getCatalogAdapter();
+        assert(catalog instanceof CatalogAdapter);
+        return (CatalogAdapter)catalog;
     }
 }

@@ -67,6 +67,7 @@ import java.io.IOException;
 import org.junit.Test;
 import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
+import org.voltdb.sqlparser.syntax.SQLKind;
 import org.voltdb.sqlparser.syntax.SQLParserDriver;
 import org.voltdb.sqlparser.syntax.VoltSQLlistener;
 
@@ -82,7 +83,7 @@ public class TestCreateTable {
         CatalogAdapter catalog = new CatalogAdapter();
         ParserFactory factory = new ParserFactory(catalog);
         VoltSQLlistener listener = new VoltSQLlistener(factory);
-        SQLParserDriver driver = new SQLParserDriver(ddl, null);
+        SQLParserDriver driver = new SQLParserDriver(ddl, null, SQLKind.DDL);
         driver.walk(listener);
         assertThat(catalog)
             .hasTableNamed("alpha",
@@ -94,7 +95,7 @@ public class TestCreateTable {
         CatalogAdapter catalog = new CatalogAdapter();
         ParserFactory factory = new ParserFactory(catalog);
         VoltSQLlistener listener = new VoltSQLlistener(factory);
-        SQLParserDriver driver = new SQLParserDriver(ddl, null);
+        SQLParserDriver driver = new SQLParserDriver(ddl, null, SQLKind.DDL);
         driver.walk(listener);
 
         assertThat(catalog)

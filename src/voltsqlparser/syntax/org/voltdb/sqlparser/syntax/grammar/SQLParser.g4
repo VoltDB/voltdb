@@ -5,8 +5,12 @@ grammar SQLParser;
 package org.voltdb.sqlparser.syntax.grammar;
 }
 
-ddl: 
-        ddl_statement | dql_statement
+data_query_list:
+        dql_statement ( ';' dql_statement )*  EOF
+    ;
+    
+data_definition_list: 
+        ddl_statement ( ';' ddl_statement )* EOF
     ;
     
 dql_statement:
@@ -80,12 +84,13 @@ relop:
         ;
 
 boolop: 
-                AND
+            AND
         |
             OR
         ;
 
 ddl_statement:
+    |
         create_table_statement
     |
         insert_statement

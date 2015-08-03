@@ -32,6 +32,7 @@ import org.hsqldb_voltpatches.result.Result;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
 import org.voltdb.sqlparser.semantics.symtab.Column;
+import org.voltdb.sqlparser.syntax.SQLKind;
 import org.voltdb.sqlparser.syntax.SQLParserDriver;
 
 /**
@@ -662,13 +663,13 @@ public class HSQLInterface {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
         VoltDDLListener listener = new VoltDDLListener(factory);
-        processSQLWithListener(sql, adapter, listener);
+        processSQLWithListener(sql, adapter, listener, SQLKind.DDL);
     }
 
-    private void processSQLWithListener(String sql, CatalogAdapter adapter, VoltDDLListener listener) throws HSQLParseException {
+    private void processSQLWithListener(String sql, CatalogAdapter adapter, VoltDDLListener listener, SQLKind aKind) throws HSQLParseException {
         SQLParserDriver driver;
         try {
-            driver = new SQLParserDriver(sql, listener);
+            driver = new SQLParserDriver(sql, listener, aKind);
         } catch (IOException e) {
             throw new HSQLParseException(e.getMessage());
         }
@@ -693,7 +694,7 @@ public class HSQLInterface {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
         VoltDDLListener listener = new VoltDDLListener(factory);
-        processSQLWithListener(aSQL, adapter, listener);
+        processSQLWithListener(aSQL, adapter, listener, SQLKind.DQL);
         return listener.getVoltXML();
     }
 

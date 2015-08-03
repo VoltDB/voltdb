@@ -75,12 +75,22 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
         return new VoltXMLElementAssert(actual);
     }
 
+    @SuppressWarnings("unchecked")
+    public VoltXMLElementAssert hasAllOf(Condition<VoltXMLElement> ... aConditions) {
+        isNotNull();
+        for (Condition<VoltXMLElement> cond : aConditions) {
+            if (!cond.matches(actual)) {
+                failWithMessage("Condition failed to match.  That's all we've got.\n");
+            }
+        }
+        return this;
+    }
     public VoltXMLElementAssert hasName(String name) {
         isNotNull();
         if (name == null) {
             failWithMessage("Expected null name");
         }
-        if (!name.equals(actual.getUniqueName())) {
+        if (!name.equals(actual.name)) {
             failWithMessage("Expected name to be:\n    <%s>\nnot:\n    <%s>",
                             name, actual.getUniqueName());
         }
@@ -113,14 +123,9 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
     public VoltXMLElementAssert hasChildNamed(String childName,
                                               Condition<VoltXMLElement> ... conditions) {
         isNotNull();
-        List<VoltXMLElement> children = actual.findChildren(childName);
-        if (children == null || children.size() == 0) {
-            failWithMessage(String.format("Can't find child named: <%s>", childName));
-        }
-        for (VoltXMLElement child : children) {
-            for (Condition<VoltXMLElement> cond : conditions) {
-                assertThat(child).has(cond);
-            }
+        VoltXMLElement child = findUniqueChildNamed(actual, childName);
+        for (Condition<VoltXMLElement> cond : conditions) {
+            assertThat(child).has(cond);
         }
         return this;
     }
@@ -132,7 +137,7 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
 
             @Override
             public boolean matches(VoltXMLElement aParent) {
-                VoltXMLElement child = aParent.findChild(childName);
+                VoltXMLElement child = findUniqueChildNamed(aParent, childName);
                 if (child == null) {
                     Fail.fail(String.format("Can't find child named: <%s>", childName));
                 }
@@ -141,6 +146,7 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
                 }
                 return true;
             }
+
         };
     }
 
@@ -153,5 +159,14 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
                 return true;
             }
         };
+    }
+
+    protected static VoltXMLElement findUniqueChildNamed(VoltXMLElement aParent,
+            String childName) {
+        List<VoltXMLElement> children = aParent.findChildren(childName);
+        if (children.size() != 1) {
+            Fail.fail(String.format("Expected a unique child named %s", childName));
+        }
+        return children.get(0);
     }
 }
