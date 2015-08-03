@@ -247,7 +247,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             for (int i = 0; i < columnCount; i++) {
                 augmentedSchema[i] = new ColumnInfo(schemaTable.getColumnName(i), schemaTable.getColumnType(i));
             }
-            augmentedSchema[columnCount] = new ColumnInfo("dr_clusterid_timestamp", VoltType.BIGINT);
+            augmentedSchema[columnCount] = new ColumnInfo(VoltTable.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
             schemaBytes = PrivateVoltTableFactory.getSchemaBytes(new VoltTable(augmentedSchema));
         }
         else {

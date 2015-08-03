@@ -137,7 +137,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                 for (int i = 0; i < columnCount; i++) {
                     augmentedSchema[i] = new VoltTable.ColumnInfo(schemaTable.getColumnName(i), schemaTable.getColumnType(i));
                 }
-                augmentedSchema[columnCount] = new VoltTable.ColumnInfo("dr_clusterid_timestamp", VoltType.BIGINT);
+                augmentedSchema[columnCount] = new VoltTable.ColumnInfo(VoltTable.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
                 schemaTable = new VoltTable(augmentedSchema);
             }
 
