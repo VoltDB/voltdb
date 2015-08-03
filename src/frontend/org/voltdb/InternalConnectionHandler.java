@@ -64,6 +64,10 @@ public class InternalConnectionHandler {
         return (table!=null);
     }
 
+    public boolean callProcedure(long backPressureTimeout, String proc, Object... fieldList) {
+        return callProcedure(backPressureTimeout, null, proc, fieldList);
+    }
+
     // Use backPressureTimeout value <= 0  for no back pressure timeout
     public boolean callProcedure(long backPressureTimeout, ProcedureCallback procCallback, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further

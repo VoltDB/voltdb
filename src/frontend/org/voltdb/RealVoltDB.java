@@ -61,7 +61,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -133,6 +132,7 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -148,7 +148,6 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
-    public static final String RESOURCE_MONITOR_INTERVAL = "RESOURCE_MONITOR_INTERVAL";
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
@@ -1352,13 +1351,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             resMonitorWork.cancel(false);
             try {
                 resMonitorWork.get();
-            } catch(Exception e) { } // Ignore exceptions because we don't really care about the result.
+            } catch(Exception e) { } // Ignore exceptions because we don't really care about the result here.
             m_periodicWorks.remove(resMonitorWork);
         }
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
         if (resMonitor.hasResourceLimitsConfigured()) {
-            int resourceMonitorInterval = Integer.getInteger(RESOURCE_MONITOR_INTERVAL, 60);
-            resMonitorWork = scheduleWork(resMonitor, resourceMonitorInterval, resourceMonitorInterval, TimeUnit.SECONDS);
+            resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
             m_periodicWorks.add(resMonitorWork);
         }
     }

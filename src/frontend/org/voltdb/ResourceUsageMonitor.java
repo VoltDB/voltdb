@@ -28,22 +28,39 @@ import org.voltdb.utils.SystemStatsCollector.Datum;
  */
 public class ResourceUsageMonitor implements Runnable
 {
+    public static final int DEFAULT_MONITORING_INTERVAL = 60;
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
     private long m_rssLimit;
+    private int m_resourceCheckInterval;
 
     public ResourceUsageMonitor(SystemSettingsType systemSettings)
     {
-        if (systemSettings != null && systemSettings.getMemorylimit() != null) {
+        if (systemSettings == null) {
+            return;
+        }
+
+        if (systemSettings.getMemorylimit() != null) {
             // configured value is in GB. Convert it to bytes
             double dblLimit = systemSettings.getMemorylimit().getSize().doubleValue()*1073741824;
             m_rssLimit = Double.valueOf(dblLimit).longValue();
+        }
+
+        if (systemSettings.getResourcecheckinterval() != null) {
+            m_resourceCheckInterval = systemSettings.getResourcecheckinterval().getValue();
+        } else { // Use default value, if user did not specify anything.
+            m_resourceCheckInterval = DEFAULT_MONITORING_INTERVAL;
         }
     }
 
     public boolean hasResourceLimitsConfigured()
     {
-        return (m_rssLimit > 0);
+        return (m_rssLimit > 0 && m_resourceCheckInterval > 0);
+    }
+
+    public int getResourceCheckInterval()
+    {
+        return m_resourceCheckInterval;
     }
 
     @Override

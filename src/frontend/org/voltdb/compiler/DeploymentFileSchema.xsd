@@ -168,7 +168,11 @@
                 <xs:attribute name="size" type="memoryLimitType" default="0"/>
             </xs:complexType>
         </xs:element>
-
+	<xs:element name="resourcecheckinterval" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="value" type="xs:int" default="0"/>
+            </xs:complexType>
+	</xs:element>
     </xs:all>
   </xs:complexType>
 
