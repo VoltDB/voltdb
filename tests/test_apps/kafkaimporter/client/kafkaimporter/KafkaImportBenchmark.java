@@ -46,12 +46,12 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
-import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -71,7 +71,7 @@ public class KafkaImportBenchmark {
     // validated command line configuration
     final Config config;
     // Timer for periodic stats printing
-    Timer statsTimer;
+    static Timer statsTimer;
     static Timer checkTimer;
     // Benchmark start time
     long benchmarkStartTS;
@@ -81,8 +81,10 @@ public class KafkaImportBenchmark {
     // Some thread safe counters for reporting
     AtomicLong linesRead = new AtomicLong(0);
     AtomicLong rowsAdded = new AtomicLong(0);
-    static final AtomicLong rowsChecked = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
+
+    private static final int END_WAIT = 60000; // wait for 60 seconds at the end
+
 
     static InsertExport exportProc;
     static TableChangeMonitor exportMon;
@@ -171,8 +173,8 @@ public class KafkaImportBenchmark {
             public void run() { printStatistics(); }
         };
         statsTimer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
+          config.displayinterval * 1000,
+          config.displayinterval * 1000);
     }
 
     /**
@@ -186,8 +188,8 @@ public class KafkaImportBenchmark {
 
         thrup = stats.getTxnThroughput();
         log.info(String.format("Throughput %d/s, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
-                    thrup, stats.getInvocationAborts(), stats.getInvocationErrors(),
-                    stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
+            thrup, stats.getInvocationAborts(), stats.getInvocationErrors(),
+            stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
     }
 
     /**
@@ -198,7 +200,7 @@ public class KafkaImportBenchmark {
      */
     public void runBenchmark() throws Exception {
         log.info(HORIZONTAL_RULE);
-        log.info("Setup & Initialization");
+        log.info(" Setup & Initialization");
         log.info(HORIZONTAL_RULE);
 
         log.info(HORIZONTAL_RULE);
@@ -215,7 +217,7 @@ public class KafkaImportBenchmark {
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
                 long value = System.currentTimeMillis();
-                long key = rnd.nextLong();
+                long key = icnt;
                 exportProc.insertExport(key, value);
                 icnt++;
             }
@@ -234,15 +236,15 @@ public class KafkaImportBenchmark {
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
                 long value = System.currentTimeMillis();
-                long key = rnd.nextLong();
+                long key = icnt;
                 exportProc.insertExport(key, value);
                 icnt++;
             }
             // check for export completion
             exportMon.waitForStreamedAllocatedMemoryZero();
-            importMon.waitForStreamedAllocatedMemoryZero();
-            exportProc.insertFinal(-1, -1);
-            log.info("Done waiting for import & export tables");
+            // importMon.waitForStreamedAllocatedMemoryZero();
+            // exportProc.insertFinal(-1, -1);
+            log.info("Done waiting for export table");
         } finally {
             // cancel periodic stats printing
             log.info("Cancel periodic stats");
@@ -308,10 +310,13 @@ public class KafkaImportBenchmark {
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
+        client.drain();
+        log.info("Wait " + END_WAIT + " seconds for import to settle.");
+        Thread.sleep(END_WAIT);
+
         boolean testResult = FinalCheck.check(client);
 
         checkTimer.cancel();
-        client.drain();
         client.close();
 
         if (testResult == true) {
