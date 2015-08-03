@@ -52,7 +52,7 @@ class AdminTest extends TestBase {
 			}
 		}
     }
-/*
+
 
     // DIRECTORIES
 
@@ -2194,7 +2194,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(waitTime) { cluster.promotebutton.isDisplayed() }
     }
-*/
+
     def "check pause cancel"(){
         boolean result = false
         int count = 0
@@ -2406,33 +2406,10 @@ class AdminTest extends TestBase {
         }
         then:
         println()
-        /*when:
-        at AdminPage
-        then:
-        waitFor{
-			cluster.pausebutton.click()
-			cluster.pauseok.isDisplayed()
-		}
-
-        waitFor(waitTime) {
-			cluster.pauseok.click()
-			cluster.resumebutton.isDisplayed()
-		}
-
-		waitFor(waitTime) {
-            cluster.resumebutton.click()
-            cluster.resumeok.isDisplayed()
-		}
-
-		waitFor(waitTime) {
-			cluster.resumeok.click()
-			cluster.pausebutton.isDisplayed()
-		}
-        println("resume for ok has been clicked")*/
     }
 
 
-/*
+
     def "when save and cancel popup"(){
         when:
         at AdminPage
@@ -2952,6 +2929,6 @@ class AdminTest extends TestBase {
             println("Replication port value in server setting is empty")}
         else{println("Replication port value in server setting is not empty, value:" +page.networkInterfaces.serversettingreplicationvalue.text())}
 
-    }*/
+    }
 
 }
