@@ -195,7 +195,7 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     @Override
-    public void onClusterStateChange(VersionedOperationMode mode) {
+    public synchronized void onClusterStateChange(VersionedOperationMode mode) {
         switch (mode.getMode()) {
             case PAUSED:
                 importLog.info("Cluster is paused shutting down all importers.");

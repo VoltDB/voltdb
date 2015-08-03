@@ -9,6 +9,7 @@ from fabric.utils import abort
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
+nativelibdir = "/libs/obj"  #  ~test/libs/... usually
 defaultlicensedays = 45 #default trial license length
 
 ################################################
@@ -226,6 +227,14 @@ def backupReleaseDir(releaseDir,archiveDir,version):
           % (archiveDir, version, timestamp, releaseDir))
 
 ################################################
+# REMOVE NATIVE LIBS FROM SHARED DIRECTORY
+################################################
+
+def rmNativeLibs():
+    # local("ls -l ~" + username + nativelibdir)
+    local("rm -rf ~" + username + nativelibdir)
+
+################################################
 # GET THE GIT TAGS OR SHAS TO BUILD FROM
 ################################################
 
@@ -260,6 +269,8 @@ if len(sys.argv) == 3:
     if voltdbTreeish != proTreeish:
         oneOff = True     #force oneoff when not same tag/branch
 
+rmNativeLibs()
+
 try:
     build_args = os.environ['VOLTDB_BUILD_ARGS']
 except:
@@ -278,8 +289,8 @@ CentosSSHInfo = getSSHInfoForHost("volt5f")
 MacSSHInfo = getSSHInfoForHost("voltmini")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
-try:
 # build kits on the mini
+try:
     with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
         versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
         buildCommunity()
@@ -314,20 +325,6 @@ try:
 
 except Exception as e:
     print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
-    build_errors=True
-
-try:
-# build kits on the mini
-    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
-        assert versionCentos == versionMac
-        buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-        buildPro()
-        buildRabbitMQExport(versionMac)
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
-except Exception as e:
-    print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
 # build debian kit
@@ -378,6 +375,9 @@ except Exception as e:
     build_errors=True
 
 computeChecksums(releaseDir)
+
+rmNativeLibs()      # cleanup imported native libs so not picked up unexpectedly by other builds
+
 exit (build_errors)
 #archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionCentos)
 #backupReleaseDir(releaseDir, archiveDir, versionCentos)

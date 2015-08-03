@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -304,7 +305,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 // Do scan work on all known live hosts
                 VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
-                List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                 for (int hostId : liveHosts) {
                     m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
                 }

@@ -142,6 +142,8 @@ public interface ImportContext {
      */
     public void warn(String message);
 
+    public void warn(Throwable t, String format, Object...args);
+
     /**
      * log debug message
      * @param message message to log to Volt server logging system.
