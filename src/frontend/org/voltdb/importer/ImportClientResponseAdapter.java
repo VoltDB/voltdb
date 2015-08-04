@@ -51,6 +51,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final Map<Long, ImportCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, ImportCallback>());
+    private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
     private final ScheduledExecutorService m_es;
 
     private class ImportCallback implements Callback {
@@ -115,18 +116,32 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         } while(true);
     }
 
-    public boolean createTransaction(Procedure catProc, ProcedureCallback proccb, StoredProcedureInvocation task,
-            DBBPool.BBContainer tcont, int partition, long nowNanos) {
-            ImportCallback cb = new ImportCallback(tcont, proccb);
-            long cbhandle = registerCallback(cb);
-            cb.setId(cbhandle);
-            task.setClientHandle(cbhandle);
-            m_pendingCallbacks.put(cbhandle, cb);
+    public boolean createTransaction(final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
+            final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
 
-            //Submmit the transaction.
-            return VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
-                    catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
-                    task.getSerializedSize(), nowNanos);
+        if (!m_partitionExecutor.containsKey(partition)) {
+            ThreadFactory factory = CoreUtils.getThreadFactory(null, "ImportHandlerExecutor",
+                    CoreUtils.SMALL_STACK_SIZE, false, null);
+            m_partitionExecutor.putIfAbsent(partition, new ScheduledThreadPoolExecutor(1, factory));
+        }
+        ExecutorService executor = m_partitionExecutor.get(partition);
+        executor.submit(new Runnable() {
+            @Override
+            public void run() {
+                final ImportCallback cb = new ImportCallback(tcont, proccb);
+                final long cbhandle = registerCallback(cb);
+                cb.setId(cbhandle);
+                task.setClientHandle(cbhandle);
+                m_pendingCallbacks.put(cbhandle, cb);
+
+                //Submit the transaction.
+                VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
+                        catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
+                        task.getSerializedSize(), nowNanos);
+            }
+        });
+
+        return true;
     }
 
     /**
