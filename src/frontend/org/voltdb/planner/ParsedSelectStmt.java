@@ -1825,8 +1825,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         // If we have a unique index, and all of the index expressions are in
-        // honorary orderby list, then all the columns of the index's table
-        // are on the honorary orderby list.  We have to do this in a
+        // honorary order-by list, then all the columns of the index's table
+        // are on the honorary order-by list.  We have to do this in a
         // second pass, because we need to calculate all the constant and
         // parameter references first.
         Set<Table> processedTables = new HashSet<Table>();
@@ -1857,28 +1857,40 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     if (indices == null) {
                         continue;
                     }
+                    // If one of the indices is completely covered
+                    // we will not have to process any other indices.
+                    // So, we remember this and early-out.
+                    boolean addedAllColumns = false;
                     for (Constraint constraint : indices) {
+                        if (addedAllColumns) {
+                            break;
+                        }
                         Index index = constraint.getIndex();
                         // Ignore non-unique indices.
-                        if (!index.getUnique()) {
+                        if (index.getUnique() == false) {
                             continue;
                         }
                         CatalogMap<ColumnRef> columns = index.getColumns();
-                        // If all the columns in this index are in the
+                        // If all the columns in this index are in the current
                         // honorary orderby list, then we can add all the
                         // columns in this table to the honorary orderby list.
                         boolean addAllColumns = true;
                         for (ColumnRef cr : columns) {
                             Column col = cr.getColumn();
-                            if (!orderByColumns.contains(col)) {
+                            if (orderByColumns.contains(col) == false) {
                                 addAllColumns = false;
                                 break;
                             }
                         }
                         if (addAllColumns) {
+                            // Don't forget to remember to forget the other indices.  (E. Presley, 1955)
+                            addedAllColumns = true;
                             for (Column addCol : table.getColumns()) {
                                 // We have to convert this to a TVE to add
-                                // it to the orderByExprs.
+                                // it to the orderByExprs.  We will use null
+                                // for the table and column aliases and -1
+                                // for the column index.  These will match
+                                // anything.
                                 TupleValueExpression ntve = new TupleValueExpression(tve.getTableName(),
                                                                                      addCol.getName(),
                                                                                      -1);
