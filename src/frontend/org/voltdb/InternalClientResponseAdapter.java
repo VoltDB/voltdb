@@ -23,6 +23,9 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -55,6 +58,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final Map<Long, InternalCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, InternalCallback>());
     private final ScheduledExecutorService m_es;
+    private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
 
     private class InternalCallback implements Callback {
 
@@ -110,18 +114,36 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         } while(true);
     }
 
-    public boolean createTransaction(Procedure catProc, ProcedureCallback proccb, StoredProcedureInvocation task,
-            DBBPool.BBContainer tcont, int partition, long nowNanos) {
-            InternalCallback cb = new InternalCallback(tcont, proccb);
-            long cbhandle = registerCallback(cb);
-            cb.setId(cbhandle);
-            task.setClientHandle(cbhandle);
-            m_pendingCallbacks.put(cbhandle, cb);
+    public boolean createTransaction(final Procedure catProc,
+            final ProcedureCallback proccb,
+            final StoredProcedureInvocation task,
+            final DBBPool.BBContainer tcont,
+            final int partition,
+            final long nowNanos) {
+        if (!m_partitionExecutor.containsKey(partition)) {
+            ThreadFactory factory = CoreUtils.getThreadFactory(null, "ImportHandlerExecutor",
+                    CoreUtils.SMALL_STACK_SIZE, false, null);
+            m_partitionExecutor.putIfAbsent(partition, new ScheduledThreadPoolExecutor(1, factory));
+        }
+        ExecutorService executor = m_partitionExecutor.get(partition);
+        executor.submit(new Runnable()
+        {
+            @Override
+            public void run() {
+                InternalCallback cb = new InternalCallback(tcont, proccb);
+                long cbhandle = registerCallback(cb);
+                cb.setId(cbhandle);
+                task.setClientHandle(cbhandle);
+                m_pendingCallbacks.put(cbhandle, cb);
 
-            //Submit the transaction.
-            return VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
-                    catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
-                    task.getSerializedSize(), nowNanos);
+                //Submit the transaction.
+                VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
+                        catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
+                        task.getSerializedSize(), nowNanos);
+            }
+        });
+
+        return true;
     }
 
     /**
@@ -158,7 +180,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         try {
             ByteBuffer buf = null;
             final int serializedSize = ds.getSerializedSize();
-            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) return;
             buf = ByteBuffer.allocate(serializedSize);
             ds.serialize(buf);
             enqueue(buf);
