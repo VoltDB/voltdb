@@ -30,7 +30,7 @@ class AdminTest extends TestBase {
 	int count = 0
     def setup() { // called before each test
         count = 0
-		
+
 		while(count<numberOfTrials) {
 			count ++
 			try {
@@ -44,7 +44,7 @@ class AdminTest extends TestBase {
 				page.openAdminPage()
 				then: 'should be on Admin page'
 				at AdminPage
-        
+
 				break
 			} catch (org.openqa.selenium.ElementNotVisibleException e) {
 				println("ElementNotVisibleException: Unable to Start the test")
@@ -830,19 +830,28 @@ class AdminTest extends TestBase {
         when:
         page.overview.export.click()
         then:
-
-        try {
-            waitFor(waitTime) { page.overview.exportNoConfigAvailable.isDisplayed() }
+        if(page.overview.exportNoConfigAvailable.isDisplayed())
+        {
             println(page.overview.exportNoConfigAvailable.text())
-        } catch(geb.error.RequiredPageContentNotPresent e ) {
-            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
-            println("The export configuration")
-            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
-        } catch (geb.waiting.WaitTimeoutException e ) {
-            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
-            println("The export configuration")
-            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
         }
+        else
+        {
+            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
+            println("The export configuration")
+        }
+
+//        try {
+//            waitFor(waitTime) { page.overview.exportNoConfigAvailable.isDisplayed() }
+//            println(page.overview.exportNoConfigAvailable.text())
+//        } catch(geb.error.RequiredPageContentNotPresent e ) {
+//            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
+//            println("The export configuration")
+//            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
+//        } catch (geb.waiting.WaitTimeoutException e ) {
+//            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
+//            println("The export configuration")
+//            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
+//        }
     }
 
     // overview: advanced expansion-Edits
@@ -1187,66 +1196,53 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        if(page.securityEdit.isDisplayed())
-        {
 
             then:
-            waitFor(waitTime){
-                page.securityEdit.click()
-                page.securityEditOk.isDisplayed()
-                page.securityEditCancel.isDisplayed()
-            }
-        }
-        else
-        {
-            then:
-            println("Security Edit has been disabled")
-        }
-        then:
-        println("PASS")
 
+                try {
+                    page.securityEdit.click()
+                            page.securityEditOk.isDisplayed()
+                            page.securityEditCancel.isDisplayed()
+                }
+                catch(geb.waiting.WaitTimeoutException e){
+                    println("Security Edit cannot be displayed")
+                }
+                catch(org.openqa.selenium.ElementNotVisibleException e)
+                {
+                    println("Security Edit cannot be displayed")
+                }
     }
 
     def "click security edit button and cancel"(){
         when:
         at AdminPage
-        if(waitFor(waitTime) {page.securityEdit.isDisplayed()}) {
-            then:
-
-            waitFor(waitTime) {
-
-                page.securityEdit.click()
-                page.securityEditOk.isDisplayed()
-                page.securityEditCancel.isDisplayed()
-            }
-
-
-            page.securityEditCancel.click()
-            println("security edit canceled!")
-            page.securityEdit.isDisplayed()
-        }
-        else
-        {
-            then:
-            println("Security Edit has been disabled")
-        }
         then:
-        println("PASS")
+
+       try {
+           page.securityEdit.click()
+           page.securityEditOk.isDisplayed()
+           page.securityEditCancel.isDisplayed()
+           page.securityEditCancel.click()
+           println("security edit canceled!")
+           page.securityEdit.isDisplayed()
+       }
+       catch(geb.waiting.WaitTimeoutException e){
+           println("Security Edit cannot be displayed")
+       }
+       catch(org.openqa.selenium.ElementNotVisibleException e)
+       {
+           println("Security Edit cannot be displayed")
+       }
     }
 
     def "click security edit button and cancel popup"(){
         when:
         at AdminPage
-
-
-        if(waitFor(waitTime) {page.securityEdit.isDisplayed()}) {
-            then:
-
-            waitFor(waitTime) {
-                page.securityEdit.click()
-                page.securityEditOk.isDisplayed()
-                page.securityEditCancel.isDisplayed()
-            }
+        then:
+        try {
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
             page.securityEditOk.click()
             println("security edit ok clicked!")
             waitFor(waitTime) {
@@ -1260,27 +1256,26 @@ class AdminTest extends TestBase {
 
             }
         }
-        else
-        {
-            then:
-            println("Security Edit has been disabled")
+        catch(geb.waiting.WaitTimeoutException e){
+            println("Security Edit cannot be displayed")
         }
-        then:
-        println("PASS")
+        catch(org.openqa.selenium.ElementNotVisibleException e)
+        {
+            println("Security Edit cannot be displayed")
+        }
     }
 
 
     def "click security edit button and ok and ok"(){
         when:
         at AdminPage
-        if(waitFor(waitTime) {page.securityEdit.isDisplayed()}) {
-            then:
 
-            waitFor(waitTime) {
-                page.securityEdit.click()
-                page.securityEditOk.isDisplayed()
-                page.securityEditCancel.isDisplayed()
-            }
+        then:
+
+        try {
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
             page.securityEditOk.click()
             println("security edit ok clicked!")
 
@@ -1290,12 +1285,14 @@ class AdminTest extends TestBase {
                 page.securityPopupOk.click()
             }
         }
-        else{
-            then:
-            println("Security Edit has been disabled")
+        catch(geb.waiting.WaitTimeoutException e){
+            println("Security Edit cannot be displayed")
         }
-        then:
-        println("PASS")
+        catch(org.openqa.selenium.ElementNotVisibleException e)
+        {
+            println("Security Edit cannot be displayed")
+        }
+
     }
 
 	// autosnapshot
@@ -2227,25 +2224,25 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         try {
-            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }  
-            println("Resume button is displayed") 
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+            println("Resume button is displayed")
             result = false
         } catch(geb.waiting.WaitTimeoutException e) {
             println("Resume button is not displayed")
             result = true
-        }  
-          
+        }
+
         if (result == false) {
             println("Resume VMC")
-            
+
             try {
                 page.cluster.resumebutton.click()
                 waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Error: Resume confirmation was not found")
                 assert false
-            }  
-            
+            }
+
             try {
                 page.cluster.resumeok.click()
                 waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
@@ -2256,7 +2253,7 @@ class AdminTest extends TestBase {
         }
         then:
         println()
-        
+
         when:
         count = 0
         while(count<numberOfTrials) {
@@ -2268,7 +2265,7 @@ class AdminTest extends TestBase {
             } catch(geb.waiting.WaitTimeoutException e) {
             }
         }
-        
+
         count = 0
         while(count<numberOfTrials) {
             count ++
@@ -2281,19 +2278,19 @@ class AdminTest extends TestBase {
         }
         then:
         println()
-        
+
         when:
         if (result == false) {
             println("Pause VMC")
-            
+
             try {
                 page.cluster.pausebutton.click()
                 waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Error: Pause confirmation was not found")
                 assert false
-            }  
-            
+            }
+
             try {
                 page.cluster.pauseok.click()
                 waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
@@ -2304,7 +2301,7 @@ class AdminTest extends TestBase {
         }
         then:
         println()
-        
+
     }
 
     def "check pause and verify resume too"(){
@@ -2313,17 +2310,17 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         try {
-            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }  
-            println("Resume button is displayed") 
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+            println("Resume button is displayed")
             result = false
         } catch(geb.waiting.WaitTimeoutException e) {
             println("Resume button is not displayed")
             result = true
-        }  
-          
+        }
+
         if (result == false) {
             println("Resume VMC")
-            
+
             count = 0
             while(count<numberOfTrials) {
                 try {
@@ -2334,9 +2331,9 @@ class AdminTest extends TestBase {
                 } catch(geb.waiting.WaitTimeoutException e) {
                     println("Error: Resume confirmation was not found")
                     assert false
-                }  
+                }
             }
-            
+
             count = 0
             while(count<numberOfTrials) {
                 try {
@@ -2352,7 +2349,7 @@ class AdminTest extends TestBase {
         }
         then:
         println()
-        
+
         when:
         count = 0
         while(count<numberOfTrials) {
@@ -2364,7 +2361,7 @@ class AdminTest extends TestBase {
             } catch(geb.waiting.WaitTimeoutException e) {
             }
         }
-        
+
         count = 0
         while(count<numberOfTrials) {
             count ++
@@ -2375,7 +2372,7 @@ class AdminTest extends TestBase {
             } catch(geb.waiting.WaitTimeoutException e) {
             }
         }
-        
+
         count = 0
         while(count<numberOfTrials) {
             count ++
@@ -2386,7 +2383,7 @@ class AdminTest extends TestBase {
             } catch(geb.waiting.WaitTimeoutException e) {
             }
         }
-        
+
         count = 0
         while(count<numberOfTrials) {
             count ++
@@ -2399,13 +2396,13 @@ class AdminTest extends TestBase {
         }
         then:
         println()
-        
+
         when:
         if (result == false) {
             println("Pause VMC")
-            
+
             count = 0
-            while(count<numberOfTrials) { 
+            while(count<numberOfTrials) {
                 try {
                     count++
                     page.cluster.pausebutton.click()
@@ -2414,9 +2411,9 @@ class AdminTest extends TestBase {
                 } catch(geb.waiting.WaitTimeoutException e) {
                     println("Error: Pause confirmation was not found")
                     assert false
-                }  
+                }
             }
-            
+
             count = 0
             while(count<numberOfTrials) {
                 try {
