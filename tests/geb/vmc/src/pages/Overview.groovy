@@ -36,7 +36,8 @@ class Overview extends Module {
         autoSnapshotsValue			{ $("#txtAutoSnapshot") }
         commandLoggingValue			{ $("#commandLogLabel") }
 
-        securityEdit				{ $("#securityEdit") }
+        securityEdit				{ $("#securityEdit", class:"edit")}
+
         securityEditCheckbox		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-6.hasSubLabel.parent.security td.securitytd div.icheckbox_square-aero.checked.customCheckbox ins.iCheck-helper") }
         securityEditOk				{ $("#btnEditSecurityOk") }
         securityEditCancel			{ $("#btnEditSecurityCancel") }
