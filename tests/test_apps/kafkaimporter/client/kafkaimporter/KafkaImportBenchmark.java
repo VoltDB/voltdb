@@ -151,12 +151,12 @@ public class KafkaImportBenchmark {
      * syntax (where :port is optional). Assumes 21212 if not specified otherwise.
      * @throws InterruptedException if anything bad happens with the threads.
      */
-     static void dbconnect(String servers) throws InterruptedException, Exception {
+     static void dbconnect(String servers, int ratelimit) throws InterruptedException, Exception {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
         log.info("Connecting to VoltDB Interface...");
         ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+        clientConfig.setMaxTransactionsPerSecond(ratelimit);
         client = ClientFactory.createClient(clientConfig);
 
         for (String server: COMMA_SPLITTER.split(servers)) {
@@ -272,7 +272,7 @@ public class KafkaImportBenchmark {
         config.parse(KafkaImportBenchmark.class.getName(), args);
 
         // connect to one or more servers, loop until success
-        dbconnect(config.servers);
+        dbconnect(config.servers, config.ratelimit);
 
         // instance handles inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(client);
@@ -285,14 +285,6 @@ public class KafkaImportBenchmark {
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
         runner.start();
-
-        // start watcher that compares mirror table which contains all
-        // the export data with the import table that's rows back from Kafka.
-        // Arg is interval to wait between checks
-        // log.info("starting data checker...");
-        // @SuppressWarnings("static-access")
-        // Timer t = matchChecks.checkTimer(5000, client);
-
         runner.join(); // writers are done
 
         // final check time since the import and export tables have quiesced.
