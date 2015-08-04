@@ -105,6 +105,7 @@ private:
 
     // Executor vectors to be executed when fallback on min/max value is needed (ENG-8641).
     std::vector< boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
+    std::vector<NValue> m_backups;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;

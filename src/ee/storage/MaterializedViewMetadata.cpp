@@ -98,6 +98,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
         initializeTupleHavingNoGroupBy();
     }
+    // Used to backup the parameters.
+    m_backups = vector<NValue>(m_groupByColumnCount + 1);
     VOLT_TRACE("Finish initialization...");
 }
 
@@ -498,13 +500,12 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
 
                     // build parameters.
                     // the parameters are the groupby columns and the aggregation column.
-                    vector<NValue> backups(m_groupByColumnCount + 1);
                     int colindex = 0;
                     for (; colindex < m_groupByColumnCount; colindex++) {
-                        backups[colindex] = params[colindex];
+                        m_backups[colindex] = params[colindex];
                         params[colindex] = m_existingTuple.getNValue(colindex);
                     }
-                    backups[colindex] = params[colindex];
+                    m_backups[colindex] = params[colindex];
                     params[colindex] = oldValue;
                     // executing the stored plan.
                     vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
@@ -524,7 +525,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                     // }
                     // restore
                     for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
-                        params[colindex] = backups[colindex];
+                        params[colindex] = m_backups[colindex];
                     }
                     context->cleanupExecutorsForSubquery(executorList);
                 }
