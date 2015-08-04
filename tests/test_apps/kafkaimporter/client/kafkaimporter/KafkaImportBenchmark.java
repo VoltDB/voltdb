@@ -52,6 +52,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.ClientConfig;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -83,7 +84,7 @@ public class KafkaImportBenchmark {
     static AtomicLong rowsAdded = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
-    private static final int END_WAIT = 60; // wait at the end for import to settle after export completes
+    private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
 
     static InsertExport exportProc;
@@ -103,8 +104,8 @@ public class KafkaImportBenchmark {
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 300;
 
-        @Option(desc = "Warmup duration in seconds.")
-        int warmup = 2;
+        @Option(desc = "Maximum TPS rate for benchmark.")
+        static int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to for database queuries")
         String servers = "localhost";
@@ -118,7 +119,7 @@ public class KafkaImportBenchmark {
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
+            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             log.info("finished arg validate");
         }
@@ -154,7 +155,10 @@ public class KafkaImportBenchmark {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
         log.info("Connecting to VoltDB Interface...");
-        client = ClientFactory.createClient();
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.setMaxTransactionsPerSecond(20000);
+        // clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+        client = ClientFactory.createClient(clientConfig);
 
         for (String server: COMMA_SPLITTER.split(servers)) {
             log.info("..." + server);
@@ -211,23 +215,9 @@ public class KafkaImportBenchmark {
         rnd.setSeed(System.identityHashCode(Thread.currentThread()));
         long icnt = 0;
         try {
-            // Run the benchmark loop for the requested warmup time
-            // The throughput may be throttled depending on client configuration
-            log.info("Warming up...");
-            final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-            while (warmupEndTime > System.currentTimeMillis()) {
-                long value = System.currentTimeMillis();
-                long key = icnt;
-                exportProc.insertExport(key, value);
-                icnt++;
-            }
-
             // print periodic statistics to the console
             benchmarkStartTS = System.currentTimeMillis();
             schedulePeriodicStats();
-
-            // log.info("Starting data checker...");
-            // checkTimer = MatchChecks.checkTimer(5000, client);
 
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
@@ -311,15 +301,18 @@ public class KafkaImportBenchmark {
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
         long count = 0;
+        long prev = 0;
         do {
         	count = MatchChecks.getMirrorTableRowCount(client);
         	log.info("Mirror table count: " + count);
+            if (prev != 0) {
+                log.info("Import rate: " + (prev-count)/END_WAIT + " tps");
+            }
         	Thread.sleep(END_WAIT*1000);
+            prev = count;
         } while (count > 0);
 
         boolean testResult = FinalCheck.check(client);
-
-        checkTimer.cancel();
         client.drain();
         client.close();
 
