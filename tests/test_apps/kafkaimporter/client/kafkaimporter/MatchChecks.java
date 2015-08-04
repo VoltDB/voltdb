@@ -32,8 +32,10 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltcore.logging.VoltLogger;
 
 public class MatchChecks {
+    static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
     final static String DELETE_ROWS = "DeleteRows";
 
     static class DeleteCallback implements ProcedureCallback {
@@ -52,13 +54,13 @@ public class MatchChecks {
             // report the error.
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                 String msg = String.format("%s k: %12d, callback fault: %s", proc, key, clientResponse.getStatusString());
-                System.err.println(msg);
+                log.error(msg);
               }
          }
     }
 
     protected static Timer checkTimer(long interval, Client client) {
-        final Timer timer = new Timer();
+        final Timer timer = new Timer("checkTimer", true);
         final Client innerClient = client;
         timer.scheduleAtFixedRate(new TimerTask() {
             private long mirrorRowCount = 0;
@@ -66,10 +68,10 @@ public class MatchChecks {
             @Override
             public void run() {
                 mirrorRowCount = getMirrorTableRowCount(innerClient);
-                System.out.println("\tDelete rows: " + findAndDeleteMatchingRows(innerClient));
-                System.out.println("\tMirror table row count: " + mirrorRowCount);
+                //log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
+                log.info("checkTimer: Mirror table row count: " + mirrorRowCount);
                 if (mirrorRowCount == 0) { // indicates everything matched and mirror table empty
-                    System.out.println("mirrorRowCount is 0. Stopping...");
+                    log.info("checkTimer: mirrorRowCount is 0. Stopping...");
                     timer.cancel();
                     timer.purge();
                 }
@@ -88,7 +90,7 @@ public class MatchChecks {
         } catch (IOException | ProcCallException e) {
             e.printStackTrace();
         }
-        System.out.println("Mirror table row count: " + mirrorRowCount);
+        //log.info("Mirror table row count: " + mirrorRowCount);
         return mirrorRowCount;
     }
 
@@ -103,10 +105,10 @@ public class MatchChecks {
              System.exit(-1);
         }
 
-        System.out.println("getRowCount(): " + results.getRowCount());
+        log.info("getRowCount(): " + results.getRowCount());
         while (results.advanceRow()) {
             long key = results.getLong(0);
-            // System.out.println("Key: " + key);
+            // log.info("Key: " + key);
             try {
                 client.callProcedure(new DeleteCallback(DELETE_ROWS, key), DELETE_ROWS, key);
             } catch (IOException e) {
@@ -126,7 +128,7 @@ public class MatchChecks {
         } catch (IOException | ProcCallException e) {
             e.printStackTrace();
         }
-        System.out.println("Import table row count: " + importRowCount);
+        log.info("Import table row count: " + importRowCount);
         return importRowCount;
     }
 }

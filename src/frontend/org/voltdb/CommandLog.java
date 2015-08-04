@@ -33,8 +33,7 @@ public interface CommandLog {
      *            The txnId of the truncation snapshot at the end of restore, or
      * @param partitionCount
      */
-    public abstract void init(
-                                 CatalogContext context,
+    public abstract void init(int logSize,
                                  long txnId,
                                  int partitionCount, String coreBinding,
                                  Map<Integer, Long> perPartitionTxnId);
@@ -46,8 +45,7 @@ public interface CommandLog {
      *            Long.MIN if there was none.
      * @param partitionCount
      */
-    public abstract void initForRejoin(
-                                          CatalogContext context,
+    public abstract void initForRejoin(int logSize,
                                           long txnId,
                                           int partitionCount, boolean isRejoin,
                                           String coreBinding, Map<Integer, Long> perPartitionTxnId);
@@ -120,6 +118,12 @@ public interface CommandLog {
          * triggered when the sync completes
          */
         public CompletionChecks startNewTaskList(int nextMaxRowCnt);
+
+        /**
+         * Process checks on the correct scheduler thread
+         * @param completionChecks
+         */
+        void processDurabilityChecks(CompletionChecks completionChecks);
     }
 
     /**
@@ -143,6 +147,12 @@ public interface CommandLog {
      * Does this logger do synchronous logging
      */
     public abstract boolean isSynchronous();
+
+    /**
+     * Can the SpScheduler offer the task for execution.
+     * @return true if it can, false if it has to wait until the task is made durable.
+     */
+    boolean canOfferTask();
 
     /**
      * Assign DurabilityListener from each SpScheduler to commmand log
