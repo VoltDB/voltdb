@@ -1184,92 +1184,118 @@ class AdminTest extends TestBase {
     // SECURITY
 
     def "click security button"(){
+
         when:
         at AdminPage
-        page.securityEdit.isDisplayed()
-        then:
-        waitFor(waitTime){
-            page.securityEdit.click()
-            page.securityEditOk.isDisplayed()
-            page.securityEditCancel.isDisplayed()
+        if(page.securityEdit.isDisplayed())
+        {
+
+            then:
+            waitFor(waitTime){
+                page.securityEdit.click()
+                page.securityEditOk.isDisplayed()
+                page.securityEditCancel.isDisplayed()
+            }
         }
+        else
+        {
+            then:
+            println("Security Edit has been disabled")
+        }
+        then:
+        println("PASS")
+
     }
 
-     def "click security edit button and cancel"(){
+    def "click security edit button and cancel"(){
         when:
         at AdminPage
-        waitFor(waitTime) { page.securityEdit.isDisplayed()
+        if(waitFor(waitTime) {page.securityEdit.isDisplayed()}) {
+            then:
 
+            waitFor(waitTime) {
+
+                page.securityEdit.click()
+                page.securityEditOk.isDisplayed()
+                page.securityEditCancel.isDisplayed()
+            }
+
+
+            page.securityEditCancel.click()
+            println("security edit canceled!")
+            page.securityEdit.isDisplayed()
         }
-
+        else
+        {
+            then:
+            println("Security Edit has been disabled")
+        }
         then:
-
-        waitFor(waitTime) {
-
-            page.securityEdit.click()
-            page.securityEditOk.isDisplayed()
-            page.securityEditCancel.isDisplayed()
-
-
-        }
-
-
-        page.securityEditCancel.click()
-        println("security edit canceled!")
-
-        page.securityEdit.isDisplayed()
-
+        println("PASS")
     }
 
     def "click security edit button and cancel popup"(){
         when:
         at AdminPage
-        waitFor(waitTime) { page.securityEdit.isDisplayed() }
+
+
+        if(waitFor(waitTime) {page.securityEdit.isDisplayed()}) {
+            then:
+
+            waitFor(waitTime) {
+                page.securityEdit.click()
+                page.securityEditOk.isDisplayed()
+                page.securityEditCancel.isDisplayed()
+            }
+            page.securityEditOk.click()
+            println("security edit ok clicked!")
+            waitFor(waitTime) {
+                //  page.securityPopup.isDisplayed()
+                page.securityPopupOk.isDisplayed()
+                page.securityPopupCancel.isDisplayed()
+                page.securityPopupCancel.click()
+                println("cancel clicked")
+                page.securityEdit.isDisplayed()
+
+
+            }
+        }
+        else
+        {
+            then:
+            println("Security Edit has been disabled")
+        }
         then:
-
-        waitFor(waitTime) {
-            page.securityEdit.click()
-            page.securityEditOk.isDisplayed()
-            page.securityEditCancel.isDisplayed()
-        }
-        page.securityEditOk.click()
-        println("security edit ok clicked!")
-        waitFor(waitTime) {
-          //  page.securityPopup.isDisplayed()
-            page.securityPopupOk.isDisplayed()
-            page.securityPopupCancel.isDisplayed()
-            page.securityPopupCancel.click()
-            println("cancel clicked")
-            page.securityEdit.isDisplayed()
-
-
-        }
-
-
-
-
+        println("PASS")
     }
 
 
     def "click security edit button and ok and ok"(){
         when:
         at AdminPage
-        waitFor(waitTime) { page.securityEdit.isDisplayed() }
+        if(waitFor(waitTime) {page.securityEdit.isDisplayed()}) {
+            then:
+
+            waitFor(waitTime) {
+                page.securityEdit.click()
+                page.securityEditOk.isDisplayed()
+                page.securityEditCancel.isDisplayed()
+            }
+            page.securityEditOk.click()
+            println("security edit ok clicked!")
+
+            waitFor(waitTime) {
+                page.securityPopupOk.isDisplayed()
+                page.securityPopupCancel.isDisplayed()
+                page.securityPopupOk.click()
+            }
+        }
+        else{
+            then:
+            println("Security Edit has been disabled")
+        }
         then:
-
-        waitFor(waitTime) {
-            page.securityEdit.click()
-            page.securityEditOk.isDisplayed()
-            page.securityEditCancel.isDisplayed()
-        }
-        page.securityEditOk.click()
-        println("security edit ok clicked!")
-
-        waitFor(waitTime) {
-            page.securityPopupOk.isDisplayed()
-            page.securityPopupCancel.isDisplayed()
-            page.securityPopupOk.click()
-        }
+        println("PASS")
     }
 
 	// autosnapshot
