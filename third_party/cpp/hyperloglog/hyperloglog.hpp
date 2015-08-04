@@ -1,6 +1,9 @@
 // This source file was originally from:
 //   https://github.com/hideo55/cpp-HyperLogLog
 //
+// The version here is from this commit in the GitHub repo:
+//   3ff431b5af84aa28a6390430bbc60c4678bec763
+//
 // We've changed it for use with VoltDB:
 //   - Murmur3 hash functions return hashes by value in our third
 //     party sources (rather than accept an output storage address),
