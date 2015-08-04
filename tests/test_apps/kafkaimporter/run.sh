@@ -40,7 +40,7 @@ CLIENTCLASSPATH=client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+# LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
@@ -90,28 +90,6 @@ function kafka() {
     voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST
 }
 
-#log4j importer
-function log4j() {
-    jars-ifneeded
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST"
-    echo
-    voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST
-}
-
-#all importer
-function all() {
-    jars-ifneeded
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment-all.xml -l $LICENSE -H $HOST"
-    echo
-    voltdb create -d deployment-all.xml -l $LICENSE -H $HOST
-}
-
 # load schema and procedures
 function init() {
     jars-ifneeded
@@ -157,11 +135,11 @@ function async-benchmark-help() {
 # Disable the comments to get latency report
 function async-benchmark() {
     jars-ifneeded
-    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java -classpath $CLIENTCLASSPATH \
         kafkaimporter.client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
         --ratelimit=20000 \
-        --duration=15 \
+        --duration=60 \
         --servers=localhost
 }
 
