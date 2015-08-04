@@ -470,6 +470,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
                 CONSTRAINT_TYPE_UNIQUE);
     }
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
