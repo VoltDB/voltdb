@@ -131,7 +131,8 @@ public class KafkaImportBenchmark {
      *
      * @param config Parsed & validated CLI options.
      */
-    public KafkaImportBenchmark() {
+    public KafkaImportBenchmark(Config config) {
+        this.config = config;
         periodicStatsContext = client.createStatsContext();
 
         log.info(HORIZONTAL_RULE);
@@ -157,7 +158,6 @@ public class KafkaImportBenchmark {
         log.info("Connecting to VoltDB Interface...");
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
-        // clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         client = ClientFactory.createClient(clientConfig);
 
         for (String server: COMMA_SPLITTER.split(servers)) {
@@ -283,7 +283,7 @@ public class KafkaImportBenchmark {
         importMon = new TableChangeMonitor(client, "PersistentTable", "KAFKAIMPORTTABLE1");
 
         log.info("starting KafkaImportBenchmark...");
-        KafkaImportBenchmark benchmark = new KafkaImportBenchmark();
+        KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
         runner.start();
 
