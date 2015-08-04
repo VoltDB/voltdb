@@ -151,7 +151,7 @@ public class KafkaImportBenchmark {
      * syntax (where :port is optional). Assumes 21212 if not specified otherwise.
      * @throws InterruptedException if anything bad happens with the threads.
      */
-	static void dbconnect(String servers) throws InterruptedException, Exception {
+     static void dbconnect(String servers) throws InterruptedException, Exception {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
         log.info("Connecting to VoltDB Interface...");
