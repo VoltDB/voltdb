@@ -70,6 +70,7 @@ public class AsyncBenchmark {
 
     // queue structure to hold data as it's written, so we can check it all get's into the database
     static Queue<Pair<Long,Long>> queue = new LinkedBlockingQueue<Pair<Long,Long>>();
+    static Queue<Pair<Long,Long>> dqueue = new LinkedBlockingQueue<Pair<Long,Long>>();
     static boolean importerDone = false;
 
     // validated command line configuration
@@ -379,7 +380,7 @@ public class AsyncBenchmark {
         // start checking the table that's being populated by the socket injester(s)
 
         System.out.println("Starting CheckData methods. Queue size: " + queue.size());
-        CheckData checkDB = new CheckData(queue, client);
+        CheckData checkDB = new CheckData(queue, dqueue, client);
         while (queue.size() == 0) {
             try {
                 Thread.sleep(1000);                 //1000 milliseconds is one second.

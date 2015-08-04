@@ -2196,44 +2196,216 @@ class AdminTest extends TestBase {
     }
 
     def "check pause cancel"(){
+        boolean result = false
+        int count = 0
         when:
         at AdminPage
-        waitFor(waitTime){cluster.pausebutton.isDisplayed()}
-
+        try {
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }  
+            println("Resume button is displayed") 
+            result = false
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Resume button is not displayed")
+            result = true
+        }  
+          
+        if (result == false) {
+            println("Resume VMC")
+            
+            try {
+                page.cluster.resumebutton.click()
+                waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Resume confirmation was not found")
+                assert false
+            }  
+            
+            try {
+                page.cluster.resumeok.click()
+                waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Pause button was not found")
+                assert false
+            }
+        }
         then:
-        at AdminPage
-        cluster.pausebutton.click()
-        waitFor(waitTime){cluster.pausecancel.isDisplayed()}
-
-        cluster.pausecancel.click()
-        println("cancel button clicked for pause testing")
-
+        println()
+        
+        when:
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.pausebutton.click()
+                waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.pausecancel.click()
+                waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        then:
+        println()
+        
+        when:
+        if (result == false) {
+            println("Pause VMC")
+            
+            try {
+                page.cluster.pausebutton.click()
+                waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Pause confirmation was not found")
+                assert false
+            }  
+            
+            try {
+                page.cluster.pauseok.click()
+                waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Resume button was not found")
+                assert false
+            }
+        }
+        then:
+        println()
+        
     }
 
     def "check pause and verify resume too"(){
+        boolean result = false
+        int count = 0
         when:
         at AdminPage
+        try {
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }  
+            println("Resume button is displayed") 
+            result = false
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Resume button is not displayed")
+            result = true
+        }  
+          
+        if (result == false) {
+            println("Resume VMC")
+            
+            count = 0
+            while(count<numberOfTrials) {
+                try {
+                    count++
+                    page.cluster.resumebutton.click()
+                    waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Resume confirmation was not found")
+                    assert false
+                }  
+            }
+            
+            count = 0
+            while(count<numberOfTrials) {
+                try {
+                    count++
+                    page.cluster.resumeok.click()
+                    waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Pause button was not found")
+                    assert false
+                }
+            }
+        }
         then:
-        waitFor{
-			cluster.pausebutton.click()
-			cluster.pauseok.isDisplayed()
-		}
-
-        waitFor(waitTime) {
-			cluster.pauseok.click()
-			cluster.resumebutton.isDisplayed()
-		}
-
-		waitFor(waitTime) {
-            cluster.resumebutton.click()
-            cluster.resumeok.isDisplayed()
-		}
-
-		waitFor(waitTime) {
-			cluster.resumeok.click()
-			cluster.pausebutton.isDisplayed()
-		}
-        println("resume for ok has been clicked")
+        println()
+        
+        when:
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.pausebutton.click()
+                waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.pauseok.click()
+                waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.resumebutton.click()
+                waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                page.cluster.resumeok.click()
+                waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        then:
+        println()
+        
+        when:
+        if (result == false) {
+            println("Pause VMC")
+            
+            count = 0
+            while(count<numberOfTrials) { 
+                try {
+                    count++
+                    page.cluster.pausebutton.click()
+                    waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Pause confirmation was not found")
+                    assert false
+                }  
+            }
+            
+            count = 0
+            while(count<numberOfTrials) {
+                try {
+                    count++
+                    page.cluster.pauseok.click()
+                    waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Resume button was not found")
+                    assert false
+                }
+            }
+        }
+        then:
+        println()
     }
 
 
