@@ -56,6 +56,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -218,6 +219,14 @@ public class MockVoltDB implements VoltDBInterface
         logConfig.setMaxtxns(maxTxns);
         logConfig.setLogpath(logPath);
         logConfig.setInternalsnapshotpath(snapshotPath);
+    }
+
+    public void configureSnapshotSchedulePath(String autoSnapshotPath) {
+        org.voltdb.catalog.SnapshotSchedule scheduleConfig = getDatabase().getSnapshotschedule().get("default");
+        if (scheduleConfig == null) {
+            scheduleConfig = getDatabase().getSnapshotschedule().add("default");
+        }
+        scheduleConfig.setPath(autoSnapshotPath);
     }
 
     public void addColumnToTable(String tableName, String columnName,
@@ -613,6 +622,13 @@ public class MockVoltDB implements VoltDBInterface
                 return false;
             }
 
+            public boolean isDrActiveActiveAllowed() {
+                // TestExecutionSite (and probably others)
+                // use MockVoltDB without requiring unique
+                // zmq ports for the DR replicator.
+                return false;
+            }
+
             @Override
             public boolean isCommandLoggingAllowed() {
                 return true;
@@ -660,6 +676,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ConsumerDRGateway getConsumerDRGateway() {
         return null;
+    }
+
+    @Override
+    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
     }
 
     @Override

@@ -166,6 +166,12 @@ public class Benchmark {
         @Option(desc = "Allow set ratio of mp to sp workload.")
         float mpratio = (float)0.20;
 
+        @Option(desc = "Allow set ratio of upsert to insert workload.")
+        float upsertratio = (float)0.50;
+
+        @Option(desc = "Allow set ratio of upsert against exist column.")
+        float upserthitratio = (float)0.20;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -181,6 +187,8 @@ public class Benchmark {
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
             if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
+            if (upsertratio < 0.0 || upsertratio > 1.0) exitWithMessageAndUsage("upsertratio must be between 0.0 and 1.0");
+            if (upserthitratio < 0.0 || upserthitratio > 1.0) exitWithMessageAndUsage("upserthitratio must be between 0.0 and 1.0");
         }
 
         @Override
@@ -508,6 +516,20 @@ public class Benchmark {
         }
     };
 
+    BigTableLoader partitionedLoader = null;
+    BigTableLoader replicatedLoader = null;
+    TruncateTableLoader partitionedTruncater = null;
+    TruncateTableLoader replicatedTruncater = null;
+    CappedTableLoader partitionedCapped = null;
+    CappedTableLoader replicatedCapped = null;
+    LoadTableLoader plt = null;
+    LoadTableLoader rlt = null;
+    ReadThread readThread = null;
+    AdHocMayhemThread adHocMayhemThread = null;
+    InvokeDroppedProcedureThread idpt = null;
+    DdlThread ddlt = null;
+    List<ClientThread> clientThreads = null;
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -628,7 +650,17 @@ public class Benchmark {
             //replicatedTruncater.start();
         }
 
-        LoadTableLoader plt = new LoadTableLoader(client, "loadp",
+        /* TEMPORARY disable cappedcollection test until ENG-8733 is resolved -PR
+        partitionedCapped = new CappedTableLoader(client, "capp", // more
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
+        partitionedCapped.start();
+        if (config.mpratio > 0.0) {
+            replicatedCapped = new CappedTableLoader(client, "capr", // more
+                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
+            replicatedCapped.start();
+        }*/
+
+        plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
         //plt.start(); 
         LoadTableLoader rlt = null;

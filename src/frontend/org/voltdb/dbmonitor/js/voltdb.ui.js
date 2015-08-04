@@ -754,10 +754,10 @@ var loadPage = function (serverName, portid) {
             $("#liCommandLogTables").show();
             var userPreference = getUserPreferences();
             if (userPreference["CommandLogStat"]) {
-                
+
                 $("#chartCommandLogging").show();
                 MonitorGraphUI.refreshGraphCmdLog();
-                
+
             }
             if (userPreference["CommandLogTables"]) {
                 $("#divCommandLog").show();
@@ -831,6 +831,7 @@ var loadPage = function (serverName, portid) {
                                     $('#liDrReplication').css('display', 'block');
                                     if (userPreference["DrReplicationRate"]) {
                                         $("#ChartDrReplicationRate").show();
+                                        MonitorGraphUI.refreshGraphDR();
                                     }
                                     refreshDrReplicaSection(graphView, currentTab);
                                     // $("#drSection").removeClass("drHeightBoth");
@@ -1242,6 +1243,7 @@ var loadPage = function (serverName, portid) {
             voltDbRenderer.GetSnapshotStatus(function (snapshotDetails) {
                 cmdLogDetails[getCurrentServer()].START_TIME = snapshotDetails[getCurrentServer()].START_TIME;
                 cmdLogDetails[getCurrentServer()].END_TIME = snapshotDetails[getCurrentServer()].END_TIME;
+                cmdLogDetails[getCurrentServer()].SNAPSHOTS = snapshotDetails[getCurrentServer()];
                 MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
             });
 

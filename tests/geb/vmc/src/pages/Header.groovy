@@ -23,11 +23,11 @@ class Header extends Module {
         tabSchema                 	{ $("#navSchema") }
         tabSQLQuery               	{ $("#navSqlQuery") }
         usernameInHeader            { $("#btnlogOut") }
-        logout                    	{ $(class:"user", title:"Log Out") }
+        logout                    	{ $("#logOut") }
         showHelp                 	{ $("#showMyHelp") }
         help                        { $("#userSection > li:nth-child(4) > div > ul > li > a") }
         popup                     	{ $(class:"popup_content10") }
-        popupTitle                	{ $(class:"overlay-title helpIcon ") }
+        popupTitle                	{ $(class:"overlay-title helpIcon ", text:"Help") }
         popupClose                	{ $(class:"popup_close") }
         logoutPopup               	{ $(class:"popup_content2") }
         logoutPopupTitle          	{ $(class:"overlay-title ") }

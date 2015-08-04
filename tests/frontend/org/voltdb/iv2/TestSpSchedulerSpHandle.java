@@ -23,11 +23,10 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,6 +40,7 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.CommandLog;
 import org.voltdb.ProcedureRunner;
@@ -50,6 +50,7 @@ import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.CompleteTransactionMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class TestSpSchedulerSpHandle extends TestCase
 {
@@ -89,9 +90,14 @@ public class TestSpSchedulerSpHandle extends TestCase
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
+        final CommandLog cl = mock(CommandLog.class);
+        doReturn(CoreUtils.COMPLETED_FUTURE).when(cl).log(any(Iv2InitiateTaskMessage.class), anyLong(), any(int[].class),
+                                                          any(CommandLog.DurabilityListener.class),
+                                                          any(TransactionTask.class));
+
         dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
         dut.setMailbox(mbox);
-        dut.setCommandLog(mock(CommandLog.class));
+        dut.setCommandLog(cl);
         dut.setLock(mbox);
     }
 

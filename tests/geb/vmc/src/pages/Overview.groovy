@@ -76,7 +76,7 @@ class Overview extends Module {
 
 		// SECURITY EXPANSION
 		
-		securityExpanded			{ $(class:"labelCollapsed labelExpanded", text:"security") }
+		securityExpanded			{ $(class:"labelCollapsed labelExpanded", text:"Security") }
         securityUsername			{ $("th", text:"Username") }
 		securityRole				{ $("th", text:"Role") }
 		securityAdd					{ $("#addNewUserLink1") }
@@ -143,11 +143,13 @@ class Overview extends Module {
         
         fileName                    { $(class:"labelCollapsed", text:fileTest) }
         jdbcName                    { $(class:"labelCollapsed", text:jdbcTest) }
-        kafkaName                   { $(class:"labelCollapsed", text:kafkaTest) }
+        kafkaName                   { $(class:"labelCollapsed").first() }
         httpName                    { $(class:"labelCollapsed", text:httpTest) }
         rabbitMqBrokerName          { $(class:"labelCollapsed", text:rabbitMqBrokerTest) }
         rabbitMqAmqpName            { $(class:"labelCollapsed", text:rabbitMqAmqpTest) }
         customName                  { $(class:"labelCollapsed", text:customTest) }
+
+        elasticSearchName           { $(class:"labelCollapsed", text:elasticSearchTest) }
         
         confirmyesbtn			    { $("#btnSaveConfigOk", text:"Yes") }
         
@@ -156,7 +158,13 @@ class Overview extends Module {
         newTextField                { $("#txtName1") }
         newValueField               { $("#txtValue1") }
         deleteFirstProperty         { $("#deleteFirstProperty") }
-            
+
+
+        // EXPORT POPUP: ELASTICSEARCH
+        endpointES                      { $("#txtEndpointES") }
+        endpointESValue                   { $("#txtEndpointESValue") }
+        errorEndpointESValue          { $("#errorEndpointESValue") }
+
         // EXPORT POPUP: FILE
         type                        { $("#txtFileType") }
         nonce                       { $("#txtnonce") }
@@ -241,6 +249,11 @@ class Overview extends Module {
         // error message
         errorMsgHeartbeat		{ $("#errorHeartbeatTimeout") }
         errorQuery				{ $("#errorQueryTimeout") }
+
+        //error message for Add Property
+
+        errorPropertyName1 {$("#errorName1")}
+        errorPropertyValue1 {$("#errorValue1")}
     }
     
     int numberOfTrials = 10
@@ -257,7 +270,8 @@ class Overview extends Module {
     String rabbitMqBrokerTest   = getRabbitmqBrokerTest()
     String rabbitMqAmqpTest     = getRabbitmqAmqpTest()
     String customTest           = getCustomTest()
-    
+    String elasticSearchTest             = getElasticSearchTest()
+
     def String getName() {
     	return "addUser(1,'" + getUsernameOneForSecurity() + "','" + getRoleOneForSecurity() + "');"
     }
@@ -269,7 +283,11 @@ class Overview extends Module {
     def String getFileTest() {
         return getFileTestName() + " (FILE)"
     }
-    
+
+    def String getElasticSearchTest() {
+        return getElasticSearchTestName() + " (ELASTICSEARCH)"
+    }
+
     def String getJdbcTest() {
         return getJdbcTestName() + " (JDBC)"
     }
@@ -655,6 +673,14 @@ class Overview extends Module {
         customTestName = br.readLine()
         return customTestName
     }
+
+    def String getElasticSearchTestName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+        String elasticSearchTestName
+        while((elasticSearchTestName = br.readLine()) != ("#elasticSearchTestName")) {}
+        elasticSearchTestName = br.readLine()
+        return elasticSearchTestName
+    }
     
     def void clickSave() {
         int count = 0
@@ -824,6 +850,14 @@ class Overview extends Module {
     	while((customConnectorClass = br.readLine()) != ("#customConnectorClass")) {}
         customConnectorClass = br.readLine()
         return customConnectorClass
+    }
+
+    def String getElasticSearchValueOne() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))
+        String elasticSearchValue
+        while((elasticSearchValue = br.readLine()) != ("#endpointValue")) {}
+        elasticSearchValue = br.readLine()
+        return elasticSearchValue
     }
     
     

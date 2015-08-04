@@ -24,7 +24,6 @@
             this.ready = false;
             this.procedureCommands = {};
             this.authorization = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
-            this.procedure = '';
 
             this.getQueue = function () {
                 return (new iQueue(this));
@@ -36,15 +35,12 @@
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
                 var param = '';
-                if (DbConnection.procedure != '@AdHoc') {
-                    param = credentials.join('&') + '&jsonp=?';
-                } else {
-                    param = credentials.join('&');
-                }
+                param = credentials.join('&') + '&jsonp=?';
+
                 return param;
             };
 
-            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails) {
+            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails, isPostRequest) {
                 var s = [];
                 if (!(shortApiCallDetails != null && shortApiCallDetails != null)) {
                     if (!this.procedures.hasOwnProperty(procedure)) {
@@ -111,12 +107,11 @@
                 if (this.admin)
                     s[s.length] = 'admin=true';
                 var paramSet = '';
-                if (DbConnection.procedure != '@AdHoc') {
+                if (!isPostRequest) {
                     paramSet = s.join('&') + '&jsonp=?';
                 } else {
                     paramSet = s.join('&');
                 }
-
 
                 if (VoltDBCore.shortApiCredentials == "" && VoltDBCore.isLoginVerified) {
                     var credentials = [];
@@ -136,7 +131,6 @@
             };
 
             this.CallExecute = function (procedure, parameters, callback, shortApiCallDetails) {
-                DbConnection.procedure = procedure;
                 var uri;
                 if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
@@ -151,7 +145,7 @@
                 if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote') {
                     params = this.BuildParamSetForClusterState(procedure);
                 } else {
-                    params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                    params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, false);
                 }
                 if (typeof (params) == 'string') {
                     var headerLength = params.replace(/'/g, "%27").length;
@@ -173,7 +167,6 @@
             };
 
             this.CallExecuteUpdate = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery) {
-                DbConnection.procedure = procedure;
                 var uri;
                 if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
@@ -205,7 +198,7 @@
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
 
-                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, true);
                     if (typeof (params) == 'string') {
                         if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                             var ah = null;
@@ -423,11 +416,8 @@
             if (this.Admin)
                 s[s.length] = 'admin=true';
             var paramSet = '';
-            if (DbConnection.procedure != '@AdHoc') {
-                paramSet = s.join('&') + '&jsonp=?';
-            } else {
-                paramSet = s.join('&');
-            }
+            paramSet = s.join('&') + '&jsonp=?';
+
             return paramSet;
         };
 

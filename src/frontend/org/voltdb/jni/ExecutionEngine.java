@@ -97,6 +97,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * for logging "long running query" messages */
     private static long INITIAL_LOG_DURATION = 1000; // in milliseconds,
                                                      // not final to allow unit testing
+    private static final long LONG_OP_THRESHOLD = 10000;
+    private static int TIME_OUT_MILLIS = 0; // No time out
+
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
     private boolean m_readOnly;
@@ -119,6 +122,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Has the database changed any state since the last reset of dirty status? */
     public boolean getDirtyStatus() {
         return m_dirty;
+    }
+
+    public void setTimeoutLatency(int newLatency) {
+        TIME_OUT_MILLIS = newLatency;
+    }
+
+    public int getTimeoutLatency() {
+        return TIME_OUT_MILLIS;
     }
 
     /** Utility method to verify return code and throw as required */
@@ -326,17 +337,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         else {
             return null;
         }
-    }
-
-    static final long LONG_OP_THRESHOLD = 10000;
-    private static int TIME_OUT_MILLIS = 0; // No time out
-
-    public void setTimeoutLatency(int newLatency) {
-        TIME_OUT_MILLIS = newLatency;
-    }
-
-    public int getTimeoutLatency() {
-        return TIME_OUT_MILLIS;
     }
 
     public long fragmentProgressUpdate(int indexFromFragmentTask,
@@ -741,6 +741,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             byte hostname[],
+            int drClusterId,
             long tempTableMemory,
             boolean createDrReplicatedStream,
             int compactionThreshold);

@@ -17,6 +17,7 @@
 
 package org.voltdb.importer;
 
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.isNull;
 import static com.google_voltpatches.common.base.Predicates.not;
@@ -27,7 +28,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -35,7 +38,6 @@ import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -66,6 +68,8 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.OperationMode;
+import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Optional;
@@ -77,6 +81,12 @@ import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.collect.TreeMultimap;
+import com.google_voltpatches.common.eventbus.AsyncEventBus;
+import com.google_voltpatches.common.eventbus.DeadEvent;
+import com.google_voltpatches.common.eventbus.EventBus;
+import com.google_voltpatches.common.eventbus.Subscribe;
+import com.google_voltpatches.common.eventbus.SubscriberExceptionContext;
+import com.google_voltpatches.common.eventbus.SubscriberExceptionHandler;
 
 /**
  *  An importer channel distributer that uses zookeeper to coordinate how importer channels are
@@ -86,7 +96,7 @@ import com.google_voltpatches.common.collect.TreeMultimap;
  *  channels in their respective /import/host/[host-name] nodes. When a node leaves the mesh
  *  its assigned channels are redistributed among the surviving nodes
  */
-public class ChannelDistributer {
+public class ChannelDistributer implements ChannelChangeCallback {
 
     private final static VoltLogger LOG = new VoltLogger("IMPORT");
 
@@ -101,9 +111,9 @@ public class ChannelDistributer {
 
     static final byte[] EMPTY_ARRAY = "[]".getBytes(StandardCharsets.UTF_8);
 
-    static void mkdirs(ZooKeeper zk, String zkNode) {
+    static void mkdirs(ZooKeeper zk, String zkNode, byte[] content) {
         try {
-            ZKUtil.asyncMkdirs(zk, zkNode, EMPTY_ARRAY).get();
+            ZKUtil.asyncMkdirs(zk, zkNode, content).get();
         } catch (NodeExistsException itIsOk) {
         } catch (InterruptedException | KeeperException e) {
             String msg = "Unable to create zk directory: " + zkNode;
@@ -163,7 +173,7 @@ public class ChannelDistributer {
             lock.acquire();
             lock.release();
         } catch (InterruptedException ex) {
-            throw loggedDistributerException(ex, "iterruped while waiting for a semaphare");
+            throw loggedDistributerException(ex, "interruped while waiting for a semaphare");
         }
     }
 
@@ -225,17 +235,32 @@ public class ChannelDistributer {
         return sb.toString();
     }
 
+    final static SubscriberExceptionHandler eventBusFaultHandler = new SubscriberExceptionHandler() {
+        @Override
+        public void handleException(Throwable exception, SubscriberExceptionContext context) {
+            loggedDistributerException(
+                    exception,
+                    "fault during callback dispatch for event %s",
+                    context.getEvent()
+                    );
+        }
+    };
+
     private final ExecutorService m_es;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
     private final ZooKeeper m_zk;
     private final String m_hostId;
     private final String m_candidate;
-    private final BlockingDeque<ChannelAssignment> m_assignq;
+    private final Deque<ImporterChannelAssignment> m_undispatched;
+    private final EventBus m_eb;
+    private final ExecutorService m_buses;
 
     volatile boolean m_isLeader = false;
-    volatile SpecsRef m_specs = new SpecsRef();
-    volatile HostsRef m_hosts = new HostsRef();
-    volatile ChannelsRef m_channels = new ChannelsRef();
+    final SpecsRef m_specs = new SpecsRef();
+    final HostsRef m_hosts = new HostsRef();
+    final ChannelsRef m_channels = new ChannelsRef();
+    final CallbacksRef m_callbacks = new CallbacksRef();
+    final AtomicStampedReference<OperationMode> m_mode;
 
     /**
      * Initialize a distributer within importer channel distribution mesh by performing the
@@ -251,20 +276,28 @@ public class ChannelDistributer {
      * @param hostId
      * @param queue
      */
-    public ChannelDistributer(ZooKeeper zk, String hostId, BlockingDeque<ChannelAssignment> queue) {
+    public ChannelDistributer(ZooKeeper zk, String hostId) {
         Preconditions.checkArgument(
                 hostId != null && !hostId.trim().isEmpty(),
                 "hostId is null or empty"
                 );
         m_hostId = hostId;
         m_zk = Preconditions.checkNotNull(zk, "zookeeper is null");
-        m_assignq = Preconditions.checkNotNull(queue, "assignment queue is null");
         m_es = CoreUtils.getCachedSingleThreadExecutor("Import Channel Distributer for Host " + hostId, 15000);
+        m_buses = CoreUtils.getCachedSingleThreadExecutor(
+                "Import Channel Distributer Event Bus Dispatcher for Host " + hostId, 15000
+                );
+        m_eb = new AsyncEventBus(m_buses, eventBusFaultHandler);
+        m_eb.register(this);
+        m_mode = new AtomicStampedReference<>(OperationMode.RUNNING, 0);
+        m_undispatched = new LinkedList<>();
 
         // Prime directory structure if needed
-        mkdirs(zk, HOST_DN);
-        mkdirs(zk, MASTER_DN);
+        mkdirs(zk, VoltZK.operationMode, OperationMode.RUNNING.getBytes());
+        mkdirs(zk, HOST_DN, EMPTY_ARRAY);
+        mkdirs(zk, MASTER_DN, EMPTY_ARRAY);
 
+        GetOperationMode opMode = new GetOperationMode(VoltZK.operationMode);
         MonitorHostNodes monitor = new MonitorHostNodes(HOST_DN);
         CreateNode createHostNode = new CreateNode(
                 joinZKPath(HOST_DN, hostId),
@@ -276,11 +309,12 @@ public class ChannelDistributer {
                 );
         ElectLeader elector = new ElectLeader(MASTER_DN, electionCandidate);
 
-        monitor.getChildren();
         createHostNode.getNode();
         elector.elect();
 
         m_candidate = electionCandidate.getNode();
+        opMode.getMode();
+        monitor.getChildren();
         // monitor the master list
         new GetChannels(MASTER_DN).getChannels();
     }
@@ -289,14 +323,20 @@ public class ChannelDistributer {
         return m_hostId;
     }
 
+    public VersionedOperationMode getOperationMode() {
+        return new VersionedOperationMode(m_mode);
+    }
+
     /**
      * Register channels for the given importer. If they match to what is already registered
-     * then nothing is done
+     * then nothing is done. Before registering channels, you need to register a callback
+     * handler for channel assignments {@link #registerCallback(String, Object)}
      *
      * @param importer importer designation
      * @param uris list of channel URIs
      */
     public void registerChannels(String importer, Set<URI> uris) {
+        NavigableSet<String> registered = m_callbacks.getReference().navigableKeySet();
         Preconditions.checkArgument(
                 importer != null && !importer.trim().isEmpty(),
                 "importer is null or empty"
@@ -304,7 +344,11 @@ public class ChannelDistributer {
         Preconditions.checkArgument(uris != null, "uris set is null");
         Preconditions.checkArgument(
                 !FluentIterable.from(uris).anyMatch(isNull()),
-                "uris set %s contains null elements",uris
+                "uris set %s contains null elements", uris
+                );
+        Preconditions.checkState(
+                registered.contains(importer),
+                "no callbacks registered for %s", importer
                 );
 
         Predicate<ChannelSpec> forImporter = ChannelSpec.importerIs(importer);
@@ -349,12 +393,60 @@ public class ChannelDistributer {
     }
 
     /**
+     * Registers a (@link ChannelChangeCallback} for the given importer.
+     * @param importer
+     * @param callback a (@link ChannelChangeCallback}
+     */
+    public void registerCallback(String importer, ChannelChangeCallback callback) {
+        Preconditions.checkArgument(
+                importer != null && !importer.trim().isEmpty(),
+                "importer is null or empty"
+                );
+        callback = checkNotNull(callback, "callback is null");
+
+        if (m_done.get()) return;
+
+        int [] stamp = new int[]{0};
+        NavigableMap<String,ChannelChangeCallback> prev = null;
+        NavigableMap<String,ChannelChangeCallback> next = null;
+        ImmutableSortedMap.Builder<String,ChannelChangeCallback> mbldr = null;
+
+        synchronized (m_undispatched) {
+            do {
+                prev = m_callbacks.get(stamp);
+                mbldr = ImmutableSortedMap.naturalOrder();
+                mbldr.putAll(Maps.filterKeys(prev, not(equalTo(importer))));
+                mbldr.put(importer, callback);
+                next = mbldr.build();
+            } while (!m_callbacks.compareAndSet(prev, next, stamp[0], stamp[0]+1));
+
+            NavigableSet<String> registered = next.navigableKeySet();
+
+            Iterator<ImporterChannelAssignment> itr = m_undispatched.iterator();
+            while (itr.hasNext()) {
+                final ImporterChannelAssignment assignment = itr.next();
+                if (registered.contains(assignment.getImporter())) {
+                    final ChannelChangeCallback dispatch = next.get(assignment.getImporter());
+                    m_buses.submit(new DistributerRunnable() {
+                        @Override
+                        public void susceptibleRun() throws Exception {
+                            dispatch.onChange(assignment);
+                        }
+                    });
+                    itr.remove();
+                }
+            }
+        }
+    }
+
+    /**
      * Sets the done flag, shuts down its executor thread, and deletes its own host
      * and candidate nodes
      */
     public void shutdown() {
         if (m_done.compareAndSet(false, true)) {
             m_es.shutdown();
+            m_buses.shutdown();
             DeleteNode deleteHost = new DeleteNode(joinZKPath(HOST_DN, m_hostId));
             DeleteNode deleteCandidate = new DeleteNode(m_candidate);
             try {
@@ -362,8 +454,68 @@ public class ChannelDistributer {
             } catch (InterruptedException e) {
                 throw loggedDistributerException(e, "interrupted while waiting for executor termination");
             }
+            try {
+                m_buses.awaitTermination(365, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                throw loggedDistributerException(e, "interrupted while waiting for executor termination");
+            }
             deleteHost.onComplete();
             deleteCandidate.onComplete();
+        }
+    }
+
+    /**
+     * Keeps assignments for unregistered importers
+     * @param e
+     */
+    @Subscribe
+    public void undispatched(DeadEvent e) {
+        if (!m_done.get() && e.getEvent() instanceof ImporterChannelAssignment) {
+            ImporterChannelAssignment assignment = (ImporterChannelAssignment)e.getEvent();
+
+            synchronized (m_undispatched) {
+                NavigableSet<String> registered = m_callbacks.getReference().navigableKeySet();
+                if (registered.contains(assignment.getImporter())) {
+                    m_eb.post(assignment);
+                } else {
+                    m_undispatched.add(assignment);
+                }
+            }
+        }
+    }
+
+    @Override
+    @Subscribe
+    public void onChange(ImporterChannelAssignment assignment) {
+        ChannelChangeCallback cb = m_callbacks.getReference().get(assignment.getImporter());
+        if (cb != null && !m_done.get()) try {
+            cb.onChange(assignment);
+        } catch (Exception callbackException) {
+            throw loggedDistributerException(
+                    callbackException,
+                    "failed to invoke the onChange() calback for importer %s",
+                    assignment.getImporter()
+                    );
+        } else synchronized(m_undispatched) {
+            m_undispatched.add(assignment);
+        }
+    }
+
+    @Override
+    @Subscribe
+    public void onClusterStateChange(VersionedOperationMode mode) {
+        Optional<DistributerException> fault = Optional.absent();
+        for (Map.Entry<String, ChannelChangeCallback> e: m_callbacks.getReference().entrySet()) try {
+            if (!m_done.get()) e.getValue().onClusterStateChange(mode);
+        } catch (Exception callbackException) {
+            fault = Optional.of(loggedDistributerException(
+                    callbackException,
+                    "failed to invoke the onClusterStateChange() calback for importer %s",
+                    e.getKey()
+                    ));
+        }
+        if (fault.isPresent()) {
+            throw fault.get();
         }
     }
 
@@ -404,6 +556,10 @@ public class ChannelDistributer {
 
         @Override
         public void susceptibleRun() throws Exception {
+            if (m_mode.getReference() == OperationMode.INITIALIZING) {
+                return;
+            }
+
             NavigableSet<ChannelSpec> assigned = specs.navigableKeySet();
             Set<ChannelSpec> added   = Sets.difference(channels, assigned);
             Set<ChannelSpec> removed = Sets.difference(assigned, channels);
@@ -794,12 +950,12 @@ public class ChannelDistributer {
             Code code = Code.get(rc);
             if (code == Code.OK) {
                 this.stat = Optional.of(stat);
-                this.data = Optional.of(data != null ? data : EMPTY_ARRAY);
-            } else if (code == Code.NONODE || code == Code.SESSIONEXPIRED) {
+                this.data = Optional.of(data != null && data.length > 0 ? data : EMPTY_ARRAY);
+            } else if (code == Code.NONODE || code == Code.SESSIONEXPIRED || m_done.get()) {
                 // keep the fault but don't log it
                 KeeperException e = KeeperException.create(code);
                 fault = Optional.of(new DistributerException(path + " went away", e));
-            } else if (!m_done.get()) {
+            } else {
                 fault = checkCode(code, "unable to read data in %s", path);
             }
         }
@@ -836,8 +992,7 @@ public class ChannelDistributer {
      *
      */
     class GetHostChannels extends GetData {
-        Optional<DistributerException> fault = Optional.absent();
-        Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
+        volatile Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
 
         final String host;
         final Predicate<Map.Entry<ChannelSpec,String>> thisHost;
@@ -901,10 +1056,8 @@ public class ChannelDistributer {
                     ChannelAssignment assignment = new ChannelAssignment(
                             oldspecs, nodespecs.get(), stat.getVersion()
                             );
-                    if (assignment.hasChanges() && !m_assignq.offer(assignment)) {
-                        fault = Optional.of(
-                                loggedDistributerException(null, "failed to offer channel assignments")
-                                );
+                    for (ImporterChannelAssignment cassigns: assignment.getImporterChannelAssignments()) {
+                        m_eb.post(cassigns);
                     }
                     if (!assignment.getRemoved().isEmpty()) {
                         LOG.info("(" + m_hostId + ") removing the following channel assingments: " + assignment.getRemoved());
@@ -936,28 +1089,28 @@ public class ChannelDistributer {
      */
     class GetChannels extends GetData {
 
-        Optional<DistributerException> fault = Optional.absent();
-        Optional<NavigableSet<ChannelSpec>> channels = Optional.absent();
+        volatile Optional<NavigableSet<ChannelSpec>> channels = Optional.absent();
 
         public GetChannels(String path) {
             super(path);
         }
 
         @Override
-        public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
+        public void processResult(int rc, String path, Object ctx, byte[] nodeData, Stat stat) {
             try {
-                internalProcessResults(rc, path, ctx, data, stat);
+                internalProcessResults(rc, path, ctx, nodeData, stat);
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
                 try {
-                    channels = Optional.of(asChannelSet(data));
+                    channels = Optional.of(asChannelSet(data.get()));
                 } catch (IllegalArgumentException|JSONException e) {
                     fault = Optional.of(
                             loggedDistributerException(e, "failed to parse json in %s", path)
                             );
                     return;
                 }
+
                 int [] stamp = new int[]{0};
                 NavigableSet<ChannelSpec> oldspecs = m_channels.get(stamp);
                 if (stamp[0] >= stat.getVersion()) {
@@ -982,8 +1135,76 @@ public class ChannelDistributer {
 
         NavigableSet<ChannelSpec> getChannels() {
             acquireAndRelease(lock);
-            if (fault.isPresent()) throw fault.get();
+            if (fault.isPresent()) {
+                throw fault.get();
+            }
             return channels.get();
+        }
+    }
+
+    /**
+     * An extension of {@link GetData} that monitors the content of the cluster
+     * operational mode
+     */
+    class GetOperationMode extends GetData {
+        volatile Optional<VersionedOperationMode> opmode = Optional.absent();
+
+        GetOperationMode(String path) {
+            super(path);
+        }
+
+        @Override
+        public void processResult(int rc, String path, Object ctx, byte[] nodeData, Stat stat) {
+            try {
+                internalProcessResults(rc, path, ctx, nodeData, stat);
+                if (Code.get(rc) != Code.OK) {
+                    return;
+                }
+                OperationMode next = OperationMode.RUNNING;
+                if (nodeData != null && nodeData.length > 0) try {
+                    next = OperationMode.valueOf(nodeData);
+                } catch (IllegalArgumentException e) {
+                    fault = Optional.of(loggedDistributerException(
+                            e, "unable to decode content in operation node: \"%s\"",
+                            new String(nodeData, StandardCharsets.UTF_8)
+                            ));
+                    return;
+                }
+                opmode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
+
+                int [] stamp = new int[]{0};
+                OperationMode prev = m_mode.get(stamp);
+                if (stamp[0] > stat.getVersion()) {
+                    opmode = Optional.of(new VersionedOperationMode(prev, stamp[0]));
+                    return;
+                }
+                if (!m_mode.compareAndSet(prev, next, stamp[0], stat.getVersion())) {
+                    return;
+                }
+                if (m_isLeader && !m_done.get() && next == OperationMode.RUNNING) {
+                    m_es.submit(new AssignChannels());
+                }
+                m_eb.post(opmode.get());
+
+            } finally {
+                lock.release();
+            }
+        }
+
+        @Override
+        public void susceptibleRun() throws Exception {
+            new GetOperationMode(path);
+        }
+
+        VersionedOperationMode getMode() {
+            acquireAndRelease(lock);
+            if (fault.isPresent()) {
+                throw fault.get();
+            }
+            if (!opmode.isPresent()) {
+                throw new DistributerException("failed to mirror cluster operation mode");
+            }
+            return opmode.get();
         }
     }
 
@@ -1040,7 +1261,7 @@ public class ChannelDistributer {
                         next = Maps.filterEntries(prev, not(inRemoved));
                     } while (!m_specs.compareAndSet(prev, next, sstamp[0], sstamp[0]+1));
 
-                    LOG.info("(" + m_hostId + ") hosts " + removed + " no longer servicing importer channels");
+                    LOG.info("(" + m_hostId + ") host(s) " + removed + " no longer servicing importer channels");
 
                     if (m_isLeader && !m_done.get()) {
                         m_es.submit(new AssignChannels());
@@ -1108,6 +1329,24 @@ public class ChannelDistributer {
         }
     }
 
+    // a form of type alias
+    final static class CallbacksRef
+        extends AtomicStampedReference<NavigableMap<String,ChannelChangeCallback>> {
+
+        static final NavigableMap<String,ChannelChangeCallback> EMTPY_MAP =
+                ImmutableSortedMap.of();
+
+        public CallbacksRef(
+                NavigableMap<String,ChannelChangeCallback> initialRef,
+                int initialStamp) {
+            super(initialRef, initialStamp);
+        }
+
+        public CallbacksRef() {
+            this(EMTPY_MAP,0);
+        }
+    }
+
     static <K> Predicate<Map.Entry<K, String>> hostValueIs(final String s, Class<K> clazz) {
         return new Predicate<Map.Entry<K,String>>() {
             @Override
@@ -1141,4 +1380,22 @@ public class ChannelDistributer {
             return new File(path).getName();
         }
     };
+
+    public final static Predicate<ImporterChannelAssignment> importerIs(final String importer) {
+        return new Predicate<ImporterChannelAssignment>() {
+            @Override
+            public boolean apply(ImporterChannelAssignment assignment) {
+                return importer.equals(assignment.getImporter());
+            }
+        };
+    }
+
+    public final static Predicate<ImporterChannelAssignment> importerIn(final Set<String> importers) {
+        return new Predicate<ImporterChannelAssignment>() {
+            @Override
+            public boolean apply(ImporterChannelAssignment assignment) {
+                return importers.contains(assignment.getImporter());
+            }
+        };
+    }
 }

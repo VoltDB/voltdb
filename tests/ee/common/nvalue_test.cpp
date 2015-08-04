@@ -88,7 +88,7 @@ public:
         m_testPool.reset(testPool);
         ExecutorContext *newExec = new ExecutorContext(0, 0, NULL, NULL, testPool,
                                                        (NValueArray*)NULL, (VoltDBEngine*)NULL,
-                                                       "", 0, NULL, NULL);
+                                                       "", 0, NULL, NULL, 0);
         m_executorContext.reset(newExec);
         return m_executorContext.get();
     }

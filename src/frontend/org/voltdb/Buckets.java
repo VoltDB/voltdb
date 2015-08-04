@@ -19,7 +19,6 @@ package org.voltdb;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Sets;
-import com.google_voltpatches.common.collect.TreeMultimap;
 
 import java.util.*;
 

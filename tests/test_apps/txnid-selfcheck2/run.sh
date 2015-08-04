@@ -82,12 +82,12 @@ function client() {
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function benchmark-help() {
+function aysnc-benchmark-help() {
     srccompile
     java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
 }
 
-function benchmark() {
+function async-benchmark() {
     srccompile
     java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
