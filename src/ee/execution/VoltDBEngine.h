@@ -88,7 +88,7 @@ class AbstractPlanNode;
 class CatalogDelegate;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
-class ExecutorVector; // Locally defined in VoltDBEngine.cpp
+class ExecutorVector;
 class PersistentTable;
 class RecoveryProtoMsg;
 class Table;

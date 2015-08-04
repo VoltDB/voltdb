@@ -176,11 +176,11 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX", "3", "200.0", "9");
     }
 
-    private void insertENG6511(Client client, Integer pid, Integer d1, Integer d2, Integer v1, Integer v2) throws IOException, ProcCallException
+    private void insertENG8641(Client client, Integer pid, Integer d1, Integer d2, Integer v1, Integer v2) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
 
-        results = client.callProcedure("ENG6511.insert", pid, d1, d2, v1, v2).getResults();
+        results = client.callProcedure("ENG8641.insert", pid, d1, d2, v1, v2).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
     }
@@ -202,82 +202,82 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
     }
 
-    private void verifyENG6511(Client client) throws IOException, ProcCallException
+    private void verifyENG8641(Client client) throws IOException, ProcCallException
     {
         VoltTable[] vresult = null;
         VoltTable[] tresult = null;
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511 ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG8641 ORDER BY d1, d2;").getResults();
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG8641 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
         assertTableContentEquals(vresult, tresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expL ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults();
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG8641expL ORDER BY d1, d2;").getResults();
+        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG8641 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults();
         assertTableContentEquals(vresult, tresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expR ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG8641expR ORDER BY d1, d2;").getResults();
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG8641 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
         assertTableContentEquals(vresult, tresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults();
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG8641expLR ORDER BY d1, d2;").getResults();
+        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG8641 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults();
         assertTableContentEquals(vresult, tresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511C ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG8641C ORDER BY d1, d2;").getResults();
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG8641 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
         assertTableContentEquals(vresult, tresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511TwoIndexes ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(v2) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG8641TwoIndexes ORDER BY d1, d2;").getResults();
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(v2) AS vmax FROM ENG8641 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
         assertTableContentEquals(vresult, tresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511NoGroup ORDER BY 1, 2, 3;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG6511 ORDER BY 1, 2, 3;").getResults();
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG8641NoGroup ORDER BY 1, 2, 3;").getResults();
+        tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG8641 ORDER BY 1, 2, 3;").getResults();
         assertTableContentEquals(vresult, tresult);
     }
 
-    private void runAndVerifyENG6511(Client client, String query) throws IOException, ProcCallException
+    private void runAndVerifyENG8641(Client client, String query) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
         results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(1, results.length);
-        verifyENG6511(client);
+        verifyENG8641(client);
     }
 
     // Test the correctness of min/max when choosing an index on both group-by columns and aggregation column/exprs.
-    private void subtestENG6511SinglePartition() throws IOException, ProcCallException
+    private void subtestENG8641SinglePartition() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
 
-        insertENG6511(client, 1, 1, 3, 70, -46);
-        insertENG6511(client, 1, 1, 3, 70, 46);
-        insertENG6511(client, 1, 1, 3, 12, 66);
-        insertENG6511(client, 1, 1, 3, 9, 70);
-        insertENG6511(client, 1, 1, 3, 256, 412);
+        insertENG8641(client, 1, 1, 3, 70, -46);
+        insertENG8641(client, 1, 1, 3, 70, 46);
+        insertENG8641(client, 1, 1, 3, 12, 66);
+        insertENG8641(client, 1, 1, 3, 9, 70);
+        insertENG8641(client, 1, 1, 3, 256, 412);
 
-        insertENG6511(client, 1, 1, 4, 17, 218);
-        insertENG6511(client, 1, 1, 4, 25, 28);
-        insertENG6511(client, 1, 1, 4, 48, 65);
-        insertENG6511(client, 1, 1, 4, -48, 70);
+        insertENG8641(client, 1, 1, 4, 17, 218);
+        insertENG8641(client, 1, 1, 4, 25, 28);
+        insertENG8641(client, 1, 1, 4, 48, 65);
+        insertENG8641(client, 1, 1, 4, -48, 70);
 
-        insertENG6511(client, 1, 2, 5, -71, 75);
-        insertENG6511(client, 1, 2, 5, -4, 5);
-        insertENG6511(client, 1, 2, 5, 64, 16);
-        insertENG6511(client, 1, 2, 5, null, 91);
+        insertENG8641(client, 1, 2, 5, -71, 75);
+        insertENG8641(client, 1, 2, 5, -4, 5);
+        insertENG8641(client, 1, 2, 5, 64, 16);
+        insertENG8641(client, 1, 2, 5, null, 91);
 
-        insertENG6511(client, 1, 2, 6, -9, 85);
-        insertENG6511(client, 1, 2, 6, 38, 43);
-        insertENG6511(client, 1, 2, 6, 21, -51);
-        insertENG6511(client, 1, 2, 6, null, 17);
-        verifyENG6511(client);
+        insertENG8641(client, 1, 2, 6, -9, 85);
+        insertENG8641(client, 1, 2, 6, 38, 43);
+        insertENG8641(client, 1, 2, 6, 21, -51);
+        insertENG8641(client, 1, 2, 6, null, 17);
+        verifyENG8641(client);
 
-        runAndVerifyENG6511(client, "UPDATE ENG6511 SET v2=120 WHERE v2=17;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v2=-51;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v1=-71;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v1=48;");
-        runAndVerifyENG6511(client, "UPDATE ENG6511 SET v1=NULL WHERE v1=256;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE d1=2 AND d2=5 AND v1 IS NOT NULL;");
+        runAndVerifyENG8641(client, "UPDATE ENG8641 SET v2=120 WHERE v2=17;");
+        runAndVerifyENG8641(client, "DELETE FROM ENG8641 WHERE v2=-51;");
+        runAndVerifyENG8641(client, "DELETE FROM ENG8641 WHERE v1=-71;");
+        runAndVerifyENG8641(client, "DELETE FROM ENG8641 WHERE v1=48;");
+        runAndVerifyENG8641(client, "UPDATE ENG8641 SET v1=NULL WHERE v1=256;");
+        runAndVerifyENG8641(client, "DELETE FROM ENG8641 WHERE d1=2 AND d2=5 AND v1 IS NOT NULL;");
     }
 
     public void testSinglePartition() throws IOException, ProcCallException
@@ -292,7 +292,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         subtestIndexMinMaxSinglePartitionWithPredicate();
         subtestNullMinMaxSinglePartition();
         subtestENG7872SinglePartition();
-        subtestENG6511SinglePartition();
+        subtestENG8641SinglePartition();
     }
 
 
@@ -961,39 +961,39 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     // Test the correctness of min/max when choosing an index on both group-by columns and aggregation column/exprs.
-    private void subtestENG6511MP() throws IOException, ProcCallException
+    private void subtestENG8641MP() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
 
-        insertENG6511(client, 1, 1, 3, 70, -46);
-        insertENG6511(client, 1, 1, 3, 70, 46);
-        insertENG6511(client, 1, 1, 3, 12, 66);
-        insertENG6511(client, 2, 1, 3, 9, 70);
-        insertENG6511(client, 2, 1, 3, 256, 412);
+        insertENG8641(client, 1, 1, 3, 70, -46);
+        insertENG8641(client, 1, 1, 3, 70, 46);
+        insertENG8641(client, 1, 1, 3, 12, 66);
+        insertENG8641(client, 2, 1, 3, 9, 70);
+        insertENG8641(client, 2, 1, 3, 256, 412);
 
-        insertENG6511(client, 1, 1, 4, 17, 218);
-        insertENG6511(client, 1, 1, 4, 25, 28);
-        insertENG6511(client, 2, 1, 4, 48, 65);
-        insertENG6511(client, 2, 1, 4, -48, 70);
+        insertENG8641(client, 1, 1, 4, 17, 218);
+        insertENG8641(client, 1, 1, 4, 25, 28);
+        insertENG8641(client, 2, 1, 4, 48, 65);
+        insertENG8641(client, 2, 1, 4, -48, 70);
 
-        insertENG6511(client, 1, 2, 5, -71, 75);
-        insertENG6511(client, 1, 2, 5, -4, 5);
-        insertENG6511(client, 2, 2, 5, 64, 16);
-        insertENG6511(client, 2, 2, 5, null, 91);
+        insertENG8641(client, 1, 2, 5, -71, 75);
+        insertENG8641(client, 1, 2, 5, -4, 5);
+        insertENG8641(client, 2, 2, 5, 64, 16);
+        insertENG8641(client, 2, 2, 5, null, 91);
 
-        insertENG6511(client, 1, 2, 6, -9, 85);
-        insertENG6511(client, 1, 2, 6, 38, 43);
-        insertENG6511(client, 2, 2, 6, 21, -51);
-        insertENG6511(client, 2, 2, 6, null, 17);
-        verifyENG6511(client);
+        insertENG8641(client, 1, 2, 6, -9, 85);
+        insertENG8641(client, 1, 2, 6, 38, 43);
+        insertENG8641(client, 2, 2, 6, 21, -51);
+        insertENG8641(client, 2, 2, 6, null, 17);
+        verifyENG8641(client);
 
-        runAndVerifyENG6511(client, "UPDATE ENG6511 SET v2=120 WHERE v2=17;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v2=-51;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v1=-71;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v1=48;");
-        runAndVerifyENG6511(client, "UPDATE ENG6511 SET v1=NULL WHERE v1=256;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE d1=2 AND d2=5 AND v1 IS NOT NULL;");
+        runAndVerifyENG8641(client, "UPDATE ENG8641 SET v2=120 WHERE v2=17;");
+        runAndVerifyENG8641(client, "DELETE FROM ENG8641 WHERE v2=-51;");
+        runAndVerifyENG8641(client, "DELETE FROM ENG8641 WHERE v1=-71;");
+        runAndVerifyENG8641(client, "DELETE FROM ENG8641 WHERE v1=48;");
+        runAndVerifyENG8641(client, "UPDATE ENG8641 SET v1=NULL WHERE v1=256;");
+        runAndVerifyENG8641(client, "DELETE FROM ENG8641 WHERE d1=2 AND d2=5 AND v1 IS NOT NULL;");
     }
 
     public void testMPAndRegressions() throws IOException, ProcCallException
@@ -1005,7 +1005,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         subtestIndexed();
         subtestMinMaxMultiPartition();
         subtestENG7872MP();
-        subtestENG6511MP();
+        subtestENG8641MP();
     }
 
     private void subtestMultiPartitionSimple() throws IOException, ProcCallException

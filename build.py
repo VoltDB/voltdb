@@ -174,7 +174,6 @@ CTX.INPUT['catalog'] = """
  constraintref.cpp
  database.cpp
  index.cpp
- indexref.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp
@@ -218,6 +217,7 @@ CTX.INPUT['execution'] = """
  FragmentManager.cpp
  JNITopend.cpp
  VoltDBEngine.cpp
+ ExecutorVector.cpp
 """
 
 CTX.INPUT['executors'] = """

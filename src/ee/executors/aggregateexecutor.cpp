@@ -909,22 +909,23 @@ bool AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         return false;
     }
 
-    TableTuple& nextGroupByKeyTuple = swapWithInprogressGroupByKeyTuple();
+    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
+    if (m_groupByExpressions.size() > 0) {
+        swapWithInprogressGroupByKeyTuple();
+        initGroupByKeyTuple(nextTuple);
+        for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
+            if (nextGroupByKeyTuple.getNValue(ii).compare(m_inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
+                VOLT_TRACE("new group!");
+                // Output old row.
+                if (insertOutputTuple(m_aggregateRow)) {
+                    m_pmp->countdownProgress();
+                }
+                m_aggregateRow->resetAggs();
 
-    initGroupByKeyTuple(nextTuple);
-
-    for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
-        if (nextGroupByKeyTuple.getNValue(ii).compare(m_inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
-            VOLT_TRACE("new group!");
-            // Output old row.
-            if (insertOutputTuple(m_aggregateRow)) {
-                m_pmp->countdownProgress();
+                // record the new group scanned tuple
+                m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
+                break;
             }
-            m_aggregateRow->resetAggs();
-
-            // record the new group scanned tuple
-            m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
-            break;
         }
     }
 
