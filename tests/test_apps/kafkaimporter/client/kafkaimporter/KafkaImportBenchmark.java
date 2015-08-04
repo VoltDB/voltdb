@@ -152,7 +152,7 @@ public class KafkaImportBenchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     @SuppressWarnings("static-access")
-	static void dbconnect(String servers) throws InterruptedException, Exception {
+    static void dbconnect(String servers) throws InterruptedException, Exception {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
         log.info("Connecting to VoltDB Interface...");
@@ -302,12 +302,12 @@ public class KafkaImportBenchmark {
         long count = 0;
         long prev = 0;
         do {
-        	count = MatchChecks.getMirrorTableRowCount(client);
-        	log.info("Mirror table count: " + count);
+            count = MatchChecks.getMirrorTableRowCount(client);
+            log.info("Mirror table count: " + count);
             if (prev != 0) {
                 log.info("Import rate: " + (prev-count)/END_WAIT + " tps");
             }
-        	Thread.sleep(END_WAIT*1000);
+            Thread.sleep(END_WAIT*1000);
             prev = count;
         } while (count > 0);
 
