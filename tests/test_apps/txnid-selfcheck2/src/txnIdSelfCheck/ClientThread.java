@@ -177,13 +177,6 @@ public class ClientThread extends BenchmarkThread {
             VoltTable[] results = response.getResults();
             
             VoltTable data = results[3];
-            if (m_synchronous) {
-                long cnt = data.fetchRow(0).getLong("cnt");
-                // check to see if the DB's last count matches with the last count reported by the server...
-                if (cnt < m_cnt)
-                    hardStop("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+cnt);
-                m_cnt = cnt + 1;
-            }
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
@@ -191,7 +184,14 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-            try {
+	    if (m_synchronous) {
+                long cnt = data.fetchRow(0).getLong("cnt");
+                // check to see if the DB's last count matches with the last count reported by the server..
+                if (cnt < m_cnt)
+                    hardStop("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+cnt);
+		 m_cnt = cnt + 1;
+	    }
+	    try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }
             catch (VoltAbortException vae) {
