@@ -49,10 +49,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
-import org.voltdb.client.ClientConfig;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -70,7 +70,7 @@ public class KafkaImportBenchmark {
     static ClientStatsContext periodicStatsContext;
 
     // validated command line configuration
-    final Config config;
+    static Config config;
     // Timer for periodic stats printing
     static Timer statsTimer;
     static Timer checkTimer;
@@ -131,8 +131,7 @@ public class KafkaImportBenchmark {
      *
      * @param config Parsed & validated CLI options.
      */
-    public KafkaImportBenchmark(Config config) {
-        this.config = config;
+    public KafkaImportBenchmark() {
         periodicStatsContext = client.createStatsContext();
 
         log.info(HORIZONTAL_RULE);
@@ -151,12 +150,13 @@ public class KafkaImportBenchmark {
      * syntax (where :port is optional). Assumes 21212 if not specified otherwise.
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    static void dbconnect(String servers) throws InterruptedException, Exception {
+    @SuppressWarnings("static-access")
+	static void dbconnect(String servers) throws InterruptedException, Exception {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
         log.info("Connecting to VoltDB Interface...");
         ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setMaxTransactionsPerSecond(20000);
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         // clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         client = ClientFactory.createClient(clientConfig);
 
@@ -187,7 +187,6 @@ public class KafkaImportBenchmark {
      */
     public synchronized void printStatistics() {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
         long thrup;
 
         thrup = stats.getTxnThroughput();
@@ -284,7 +283,7 @@ public class KafkaImportBenchmark {
         importMon = new TableChangeMonitor(client, "PersistentTable", "KAFKAIMPORTTABLE1");
 
         log.info("starting KafkaImportBenchmark...");
-        KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
+        KafkaImportBenchmark benchmark = new KafkaImportBenchmark();
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
         runner.start();
 
