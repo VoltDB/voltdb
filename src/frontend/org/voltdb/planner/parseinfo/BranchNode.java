@@ -31,6 +31,9 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.JoinType;
 
+/**
+ * A BranchNode is an interior node of a join tree.
+ */
 public class BranchNode extends JoinNode {
     // Join type
     private JoinType m_joinType;

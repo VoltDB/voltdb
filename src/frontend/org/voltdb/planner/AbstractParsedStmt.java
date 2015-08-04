@@ -952,8 +952,8 @@ public abstract class AbstractParsedStmt {
         Table table = null;
         if (subqueryElement == null) {
             table = getTableFromDB(tableName);
-            m_tableList.add(table);
             assert(table != null);
+            m_tableList.add(table);
             tableScan = addTableToStmtCache(table, tableAlias);
         } else {
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);

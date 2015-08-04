@@ -403,4 +403,23 @@ public class TupleValueExpression extends AbstractValueExpression {
         return columnName;
     }
 
+    private String chooseTwoNames(String name, String alias) {
+        if (name != null) {
+            if (alias != null && !name.equals(alias)) {
+                return String.format("%s AS %s", name, alias);
+            } else {
+                return name;
+            }
+        } else if (alias != null) {
+            return String.format ("<> AS %s", alias);
+        } else {
+            return "<none>";
+        }
+    }
+
+    protected String getNodeNameForToString() {
+        return String.format("%s.%s",
+                             chooseTwoNames(m_tableName, m_tableAlias),
+                             chooseTwoNames(m_columnName, m_columnAlias));
+    }
 }

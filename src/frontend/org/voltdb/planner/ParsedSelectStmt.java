@@ -1731,14 +1731,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 for (ParsedColInfo orderByCol : orderColumns) {
                     orderByExprs.add(orderByCol.expression);
                 }
+                addHonoraryOrderByExpressions(orderByExprs, candidateColumns);
             }
             if (orderByExprs.contains(candidateExpr)) {
                 continue;
             }
-            // TODO: Here is where we fail ENG-8645.
             if (candidateExpr instanceof TupleValueExpression) {
                 // Simple column references can only be exactly equal to but not "based on" an ORDER BY.
-                return orderByColumnsDetermineOneColumn((TupleValueExpression)candidateExpr, orderColumns);
+                return false;
             }
 
             if (candidateExprHardCases == null) {
@@ -1804,71 +1804,91 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return result;
     }
 
-    /**
-     * Given that the columns in orderColumns are ordered,
-     * is there a constraint on the table of candidateColumn
-     * which forces it to be ordered?
-     *
-     * @param candidateColumnExpr
-     * @param orderColumns
-     * @return
-     */
-    private boolean orderByColumnsDetermineOneColumn(
-            TupleValueExpression candidateColumnExpr, List<ParsedColInfo> orderColumns) {
-        /*
-         * Find a Table for this expression.
-         */
-        String tableName = candidateColumnExpr.getTableName();
-        if (tableName == null) {
-            return false;
-        }
-        Table table = getTableFromDB(tableName);
-        if (table == null) {
-            return false;
-        }
-        CatalogMap<Constraint> indices = table.getConstraints();
-        if (indices == null) {
-            return false;
-        }
-        String candidateColumnName = candidateColumnExpr.getColumnName();
-        if (candidateColumnName == null) {
-            return false;
-        }
-        Column candidateColumn = table.getColumns().get(candidateColumnName);
-        if (candidateColumn == null) {
-            return false;
-        }
-        // Gather up the order columns as columns for
-        // testing membership below.
-        Set<Column> orderColumnsAsColumns = new HashSet<Column>();
-        for (ParsedColInfo colInfo : orderColumns) {
-            Column col = table.getColumns().get(colInfo.columnName);
-            // If we can't get this column by name, then
-            // give up.  Nothing else will make us happy.
-            if (col == null) {
-                return false;
-            } else {
-                orderColumnsAsColumns.add(col);
-            }
-        }
-        for (Constraint constraint : indices) {
-            Index index = constraint.getIndex();
-            CatalogMap<ColumnRef> columns = index.getColumns();
-            // The query is made deterministic by this
-            // constraint and order-by clause iff the
-            // order-by and candidate columns are a
-            // superset of the index columns.  That is
-            // to say, each index column is either
-            // equal to the candidate column or is
-            // in the order-by columns.
-            for (ColumnRef cr : columns) {
-                Column col = cr.getColumn();
-                if (col != candidateColumn && !orderColumnsAsColumns.contains(col)) {
-                    return false;
+    private void addHonoraryOrderByExpressions(
+            HashSet<AbstractExpression> orderByExprs,
+            List<ParsedColInfo> candidateColumns) {
+        HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
+        // If a TVE is equal to a parameter or a constant, it can only be a single
+        // value.  So, it is an honorary order by expression for this purpose.
+        for (ParsedColInfo colInfo : candidateColumns) {
+            AbstractExpression colExpr = colInfo.expression;
+            if (colExpr instanceof TupleValueExpression) {
+                Set<AbstractExpression> tveEquivs = valueEquivalence.get(colExpr);
+                if (tveEquivs != null) {
+                    for (AbstractExpression expr : tveEquivs) {
+                        if (expr instanceof ParameterValueExpression
+                                || expr instanceof ConstantValueExpression) {
+                            orderByExprs.add(colExpr);
+                        }
+                    }
                 }
             }
         }
-        return true;
+        // If we have a unique index, and all of the index expressions are in
+        // honorary orderby list, then all the columns of the index's table
+        // are on the honorary orderby list.  We have to do this in a
+        // second pass, because we need to calculate all the constant and
+        // parameter references first.
+        Set<Table> processedTables = new HashSet<Table>();
+        // Indices have columns, but the order by list has expressions.
+        // Extract the columns from the order by list.
+        Set<Column> orderByColumns = new HashSet<Column>();
+        for (AbstractExpression expr : orderByExprs) {
+            if (expr instanceof TupleValueExpression) {
+                TupleValueExpression tve = (TupleValueExpression) expr;
+                if (tve.getTableName() != null && tve.getColumnName() != null) {
+                    Table table = getTableFromDB(tve.getTableName());
+                    Column col = table.getColumns().get(tve.getColumnName());
+                    orderByColumns.add(col);
+                }
+            }
+        }
+        for (ParsedColInfo colInfo : candidateColumns) {
+            AbstractExpression expr = colInfo.expression;
+            if (expr instanceof TupleValueExpression) {
+                TupleValueExpression tve = (TupleValueExpression) expr;
+                if (tve.getTableName() != null) {
+                    Table table = getTableFromDB(tve.getTableName());
+                    if (processedTables.contains(table)) {
+                        continue;
+                    }
+                    processedTables.add(table);
+                    CatalogMap<Constraint> indices = table.getConstraints();
+                    if (indices == null) {
+                        continue;
+                    }
+                    for (Constraint constraint : indices) {
+                        Index index = constraint.getIndex();
+                        // Ignore non-unique indices.
+                        if (!index.getUnique()) {
+                            continue;
+                        }
+                        CatalogMap<ColumnRef> columns = index.getColumns();
+                        // If all the columns in this index are in the
+                        // honorary orderby list, then we can add all the
+                        // columns in this table to the honorary orderby list.
+                        boolean addAllColumns = true;
+                        for (ColumnRef cr : columns) {
+                            Column col = cr.getColumn();
+                            if (!orderByColumns.contains(col)) {
+                                addAllColumns = false;
+                                break;
+                            }
+                        }
+                        if (addAllColumns) {
+                            for (Column addCol : table.getColumns()) {
+                                // We have to convert this to a TVE to add
+                                // it to the orderByExprs.
+                                TupleValueExpression ntve = new TupleValueExpression(tve.getTableName(),
+                                                                                     addCol.getName(),
+                                                                                     -1);
+                                orderByExprs.add(ntve);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private boolean hasAOneRowResult()
