@@ -422,6 +422,12 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     //
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
+    // should not set if restoring snapshot by processLoadedTuple(), so move it outside insertTupleCommon()
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, target);
+    }
+
     try {
         insertTupleCommon(source, target, fallible);
     } catch (ConstraintFailureException &e) {
@@ -463,10 +469,6 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         throw ConstraintFailureException(this, source, TableTuple(),
                 CONSTRAINT_TYPE_UNIQUE);
     }
-
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn())
-        setDRTimestampForTuple(ec, target);
 
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
@@ -608,8 +610,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn())
+    if (hasDRTimestampColumn()) {
         setDRTimestampForTuple(ec, sourceTupleWithNewValues);
+    }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
