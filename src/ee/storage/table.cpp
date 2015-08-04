@@ -472,11 +472,12 @@ void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
     }
 
     // Check if the column count matches what the temp table is expecting
-    if (colcount != m_schema->columnCount()) {
+    int16_t expectedColumnCount = static_cast<int16_t>(m_schema->columnCount() + m_schema->hiddenColumnCount());
+    if (colcount != expectedColumnCount) {
         std::stringstream message(std::stringstream::in
                                   | std::stringstream::out);
         message << "Column count mismatch. Expecting "
-                << m_schema->columnCount()
+                << expectedColumnCount
                 << ", but " << colcount << " given" << std::endl;
         message << "Expecting the following columns:" << std::endl;
         message << debug() << std::endl;
