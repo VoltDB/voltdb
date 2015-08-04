@@ -105,7 +105,7 @@ public class KafkaImportBenchmark {
         int duration = 300;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
-        static int ratelimit = Integer.MAX_VALUE;
+        int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to for database queuries")
         String servers = "localhost";
@@ -151,8 +151,7 @@ public class KafkaImportBenchmark {
      * syntax (where :port is optional). Assumes 21212 if not specified otherwise.
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    @SuppressWarnings("static-access")
-    static void dbconnect(String servers) throws InterruptedException, Exception {
+	static void dbconnect(String servers) throws InterruptedException, Exception {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
         log.info("Connecting to VoltDB Interface...");
