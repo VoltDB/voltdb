@@ -83,7 +83,7 @@ public class KafkaImportBenchmark {
     AtomicLong rowsAdded = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
-    private static final int END_WAIT = 60000; // wait for 60 seconds at the end
+    private static final int END_WAIT = 60; // wait at the end for import to settle after export completes
 
 
     static InsertExport exportProc;
@@ -310,13 +310,15 @@ public class KafkaImportBenchmark {
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
-        client.drain();
         log.info("Wait " + END_WAIT + " seconds for import to settle.");
-        Thread.sleep(END_WAIT);
+        //Thread.sleep(END_WAIT*1000);
+        System.out.println("Waiting for mirror table to hit 0");
+        checkTimer.wait();
 
         boolean testResult = FinalCheck.check(client);
 
         checkTimer.cancel();
+        client.drain();
         client.close();
 
         if (testResult == true) {
