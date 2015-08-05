@@ -87,6 +87,25 @@ public abstract class SavedTableConverter
         Map<Integer, Integer> column_copy_index_map =
             computeColumnCopyIndexMap(inputTable, new_table);
 
+        // if original table does not have hidden column present, we need to add
+        boolean addDRHiddenColumn = shouldPreserveDRHiddenColumn &&
+                !column_copy_index_map.containsKey(new_table.getColumnCount() - 1);
+        Column catalogColumnForHiddenColumn = null;
+        if (addDRHiddenColumn) {
+            catalogColumnForHiddenColumn = new Column();
+            catalogColumnForHiddenColumn.setDefaulttype(VoltType.BIGINT.getValue());
+            catalogColumnForHiddenColumn.setDefaultvalue("0");
+            catalogColumnForHiddenColumn.setName(VoltTable.DR_HIDDEN_COLUMN_NAME);
+            catalogColumnForHiddenColumn.setInbytes(true);
+            catalogColumnForHiddenColumn.setSize(Long.SIZE / 8);
+            catalogColumnForHiddenColumn.setNullable(false);
+
+            // in this DR passive to active transition scenario, we may take advantage of
+            // status code in VoltTable to tell EE to change the value of these tuples from
+            // 0 to DRTimestamp calculated from uniqueId from this snapshot restore transaction
+            //new_table.setStatusCode(UNINITIALIZED_DR_TIMESTAMP_STATUS_CODE);
+        }
+
         // Copy all the old tuples into the new table
         while (inputTable.advanceRow())
         {
@@ -112,13 +131,7 @@ public abstract class SavedTableConverter
                         get(new_table.getColumnName(i));
                     // construct an artificial catalog column for dr hidden column
                     if (shouldPreserveDRHiddenColumn && catalog_column == null) {
-                        catalog_column = new Column();
-                        catalog_column.setDefaulttype(VoltType.BIGINT.getValue());
-                        catalog_column.setDefaultvalue("0");
-                        catalog_column.setName(VoltTable.DR_HIDDEN_COLUMN_NAME);
-                        catalog_column.setInbytes(true);
-                        catalog_column.setSize(Long.SIZE / 8);
-                        catalog_column.setNullable(false);
+                        catalog_column = catalogColumnForHiddenColumn;
                     }
                     VoltType default_type =
                         VoltType.get((byte)catalog_column.getDefaulttype());
