@@ -93,12 +93,12 @@ public abstract class SavedTableConverter
         Column catalogColumnForHiddenColumn = null;
         if (addDRHiddenColumn) {
             catalogColumnForHiddenColumn = new Column();
-            catalogColumnForHiddenColumn.setDefaulttype(VoltType.BIGINT.getValue());
-            catalogColumnForHiddenColumn.setDefaultvalue("0");
+            //catalogColumnForHiddenColumn.setDefaulttype(VoltType.BIGINT.getValue());
+            //catalogColumnForHiddenColumn.setDefaultvalue("0");
             catalogColumnForHiddenColumn.setName(VoltTable.DR_HIDDEN_COLUMN_NAME);
             catalogColumnForHiddenColumn.setInbytes(true);
             catalogColumnForHiddenColumn.setSize(Long.SIZE / 8);
-            catalogColumnForHiddenColumn.setNullable(false);
+            catalogColumnForHiddenColumn.setNullable(true);
 
             // in this DR passive to active transition scenario, we may take advantage of
             // status code in VoltTable to tell EE to change the value of these tuples from

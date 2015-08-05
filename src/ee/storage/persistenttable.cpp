@@ -423,8 +423,8 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
     // should not set if restoring snapshot by processLoadedTuple(), so move it outside insertTupleCommon()
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
     if (hasDRTimestampColumn()) {
+        ExecutorContext *ec = ExecutorContext::getExecutorContext();
         setDRTimestampForTuple(ec, target);
     }
 
@@ -1156,6 +1156,13 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
     try {
+        // if the value passed from fronted is NULL, it means it's not yet initialized,
+        // so fill it with current DR timestamp
+        if (hasDRTimestampColumn() && tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
+            ExecutorContext *ec = ExecutorContext::getExecutorContext();
+            setDRTimestampForTuple(ec, tuple);
+        }
+
         insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
