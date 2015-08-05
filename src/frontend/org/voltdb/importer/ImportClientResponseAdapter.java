@@ -17,7 +17,6 @@
 
 package org.voltdb.importer;
 
-import com.google.gwt.thirdparty.guava.common.base.Throwables;
 import org.voltdb.*;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
@@ -212,7 +211,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                         final Callback callback = m_callbacks.remove(resp.getClientHandle());
                         callback.handleResponse(resp);
                     } catch (Exception ex) {
-                        Throwables.propagate(ex);
+                        m_logger.error("Failed to process callback.", ex);
                     }
                 }
             });
