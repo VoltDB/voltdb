@@ -55,6 +55,7 @@ const int COLUMN_COUNT = 5;
 // 4 checksum bytes
 // total: 39
 const int MAGIC_TUPLE_SIZE = 39;
+const int MAGIC_BEGIN_TRANSACTION_SIZE = 22;
 const int MAGIC_TRANSACTION_SIZE = 36;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // More magic: assume we've indexed on precisely one of those integer
@@ -654,6 +655,43 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     EXPECT_EQ(results->uso(), 0);
     // Txnid 11 move to a new buffer, so current buffer only contains txn 1~10
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+}
+
+/**
+ * Validate the case where:
+ * 1. beginTxn overruns the current buffer boundary
+ * 2. The data for the new txn is larger than the default buffer size
+ */
+TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
+    int tuples_to_fill = (BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
+    for (int i = 0; i < tuples_to_fill; i++) {
+        appendTuple(1, 2);
+    }
+    m_wrapper.endTransaction();
+    ASSERT_TRUE(m_wrapper.m_currBlock);
+    ASSERT_TRUE(m_wrapper.m_currBlock->remaining() < MAGIC_BEGIN_TRANSACTION_SIZE);
+
+    appendTuple(2, 3);
+
+    m_wrapper.periodicFlush(-1, addPartitionId(2));
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    m_topend.blocks.pop_front();
+    m_topend.receivedDRBuffer = false;
+
+    for (int i = 1; i < tuples_to_fill; i++) {
+        appendTuple(2, 3);
+    }
+    ASSERT_TRUE(m_wrapper.m_currBlock->remaining() < MAGIC_TUPLE_SIZE);
+
+    appendTuple(2, 3);
+    m_wrapper.endTransaction();
+
+    m_wrapper.periodicFlush(-1, addPartitionId(3));
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE * tuples_to_fill);
+    EXPECT_EQ(results->offset(),MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE * (tuples_to_fill + 1));
 }
 
 int main() {
