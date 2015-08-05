@@ -6,7 +6,7 @@ echo "# are in millisenconds." >> bench_perf.dat
 echo "#rows        count(distinct ...)    approx_count_distinct(...)" >> bench_perf.dat
 
 echo "# This file contains a record of exact and estimated cardinality for" > bench_accuracy.dat
-echo "# tables of barying sizes.  The fourth column is the percentage that" >> bench_accuracy.dat
+echo "# tables of varying sizes.  The fourth column is the percentage that" >> bench_accuracy.dat
 echo "# the estimate was off by."  >> bench_accuracy.dat
 echo "# (0.05 means that the estimate was off by 0.05%.)"  >> bench_accuracy.dat
 echo "#rows        exact cardinality    approx cardinality    percent change" >> bench_accuracy.dat
