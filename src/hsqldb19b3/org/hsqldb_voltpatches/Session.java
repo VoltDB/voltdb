@@ -2346,4 +2346,19 @@ public class Session implements SessionInterface {
         hsqlExpressionNodeIdsToVoltNodeIds.clear();
     }
     // End of VoltDB extension
+    // A VoltDB extension to simplify how HSQL compiles VoltDB statement
+    public static enum CompileMode {
+        FOR_VOLTDB_PLANNING,
+        FOR_HSQL_EXECUTION
+    }
+
+    private static CompileMode compileMode = CompileMode.FOR_VOLTDB_PLANNING;
+
+    public static void setCompileMode(CompileMode newMode) {
+        compileMode = newMode;
+    }
+    public static CompileMode getCompileMode() {
+        return compileMode;
+    }
+    // End of VoltDB extension
 }

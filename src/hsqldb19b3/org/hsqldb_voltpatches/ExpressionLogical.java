@@ -1962,6 +1962,11 @@ public class ExpressionLogical extends Expression {
     }
 
     Expression getIndexableExpression(RangeVariable rangeVar) {
+        // A VoltDB extension to keep HSQL from selecting indexes
+        if (Session.getCompileMode() == Session.CompileMode.FOR_VOLTDB_PLANNING) {
+            return null;
+        }
+        // End of VoltDB extension
 
         switch (opType) {
 

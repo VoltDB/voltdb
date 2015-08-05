@@ -30,6 +30,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hsqldb_voltpatches.Session;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.exceptions.ConstraintFailureException;
@@ -334,7 +335,15 @@ public class HsqlBackend {
         }
         sqlOut.append(sql, lastIndex, sql.length());
 
-        return runDML(sqlOut.toString());
+        VoltTable tableResult = null;
+        try {
+            Session.setCompileMode(Session.CompileMode.FOR_HSQL_EXECUTION);
+            tableResult = runDML(sqlOut.toString());
+        }
+        finally {
+            Session.setCompileMode(Session.CompileMode.FOR_VOLTDB_PLANNING);
+        }
+        return tableResult;
     }
 
     private static String sqlEscape(String input) {
