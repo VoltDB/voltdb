@@ -380,7 +380,7 @@
       <xs:simpleType>
         <xs:restriction base="xs:string">
           <!-- Only the most basic validation that this could possibly be a hostname -->
-          <xs:minLength value="1"/>
+          <xs:minLength value="0"/>
           <xs:pattern value="[a-zA-Z0-9\-\.]*(:[0-9]*)?"/>
         </xs:restriction>
       </xs:simpleType>
