@@ -14,6 +14,7 @@ create table ttree_with_key (
   c bigint not null,
   d bigint not null,
   e bigint not null,
+  id bigint not null,
   primary key (a, b, c)
 );
 

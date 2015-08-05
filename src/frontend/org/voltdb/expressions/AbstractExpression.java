@@ -294,12 +294,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * can chime in if they have a notion to.  See TupleValueExpression,
      * for example.
      */
-    protected String getNodeNameForToString() {
+    protected String getExpressionNodeNameForToString() {
         return null;
     }
 
     private void toStringHelper(String linePrefix, StringBuilder sb) {
-        String nodeName = getNodeNameForToString();
+        String nodeName = getExpressionNodeNameForToString();
         String header = this.getClass().getSimpleName() + ((nodeName == null) ? "" : (": " + nodeName)) + "[" + getExpressionType().toString() + "] : ";
         if (m_valueType != null) {
             header += m_valueType.toSQLString();

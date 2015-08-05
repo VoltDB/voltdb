@@ -417,7 +417,8 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
     }
 
-    protected String getNodeNameForToString() {
+    @Override
+    protected String getExpressionNodeNameForToString() {
         return String.format("%s.%s",
                              chooseTwoNames(m_tableName, m_tableAlias),
                              chooseTwoNames(m_columnName, m_columnAlias));
