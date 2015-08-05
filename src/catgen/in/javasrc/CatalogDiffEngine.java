@@ -830,7 +830,7 @@ public class CatalogDiffEngine {
         if (prevType instanceof Database) {
             if(field.equalsIgnoreCase("isActiveActiveDRed")) {
                 List<String[]> retval = new ArrayList<>();
-                for (Table t : ((Database) suspect).getTables()) {
+                for (Table t : ((Database) prevType).getTables()) {
                     if (t.getIsdred()) {
                         String[] entry = new String[2];
                         entry[0] = t.getTypeName();

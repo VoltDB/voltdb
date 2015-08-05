@@ -37,9 +37,11 @@ import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AsyncCompilerAgent;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
@@ -697,6 +699,58 @@ public class TestAdHocQueries extends AdHocQueryTester {
         finally {
             env.tearDown();
         }
+    }
+
+    @Test
+    public void testAdHocDDLBatches() throws Exception {
+        DeploymentBuilder DDLBatchDeployment = new DeploymentBuilder(2, 1, 0);
+        DDLBatchDeployment.setUseDDLSchema(true);
+        DDLBatchDeployment.setEnableCommandLogging(false);
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddlbatch.xml");
+        DDLBatchDeployment.writeXML(pathToDeployment);
+
+        String setDRActive = "SET DR=ACTIVE;\n";
+        String baseTableSchema =
+                "CREATE TABLE customer (customerid BIGINT NOT NULL, firstname VARCHAR(20) NOT NULL, lastname VARCHAR(20) NOT NULL);\n";
+        String dropTable =
+                "DROP TABLE customer;\n";
+        String partitionClause = "PARTITION TABLE customer ON COLUMN customerid;\n";
+        String drClause = "DR TABLE customer;\n";
+
+        VoltDB.Configuration activeConfig =
+                new VoltDB.Configuration(
+                        new String[] {"create",
+                                      "license", "../pro/tests/frontend/org/voltdb/valid_dr_active_subscription.xml",
+                                      "deployment", pathToDeployment});
+
+        Client client;
+        ServerThread server;
+
+        server = new ServerThread(activeConfig);
+
+        server.run();
+        server.waitForInitialization();
+
+        client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        ClientResponse response = client.callProcedure("@AdHoc", baseTableSchema + partitionClause + drClause);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        response = client.callProcedure("@AdHoc", dropTable);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        response = client.callProcedure("@AdHoc", setDRActive + baseTableSchema + partitionClause + drClause);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        client.close();
+        client = null;
+
+        server.shutdown();
+        server.join();
+        server = null;
+
+        new File(pathToDeployment).delete();
     }
 
     @Test
