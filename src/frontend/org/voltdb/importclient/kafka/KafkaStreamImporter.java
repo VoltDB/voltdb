@@ -353,7 +353,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final int m_consumerSocketTimeout;
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
-        private final AtomicLong m_committedOffset = new AtomicLong(-1);
         private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
@@ -518,102 +517,22 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
             private final long m_offset;
             private final long m_nextOffset;
-            private final TopicAndPartition m_topicAndPartition;
             private final AtomicLong m_cbcnt;
 
-            public TopicPartitionInvocationCallback(long offset, long noffset, TopicAndPartition tAndP, AtomicLong cbcnt) {
+            public TopicPartitionInvocationCallback(long offset, long noffset, AtomicLong cbcnt) {
                 m_offset = offset;
                 m_nextOffset = noffset;
-                m_topicAndPartition = tAndP;
                 m_cbcnt = cbcnt;
-            }
-
-            public boolean commitOffset(long offset) {
-
-                final int correlationId = m_topicAndPartition.partition();
-                final short version = 1;
-
-                OffsetAndMetadata offsetMetdata = new OffsetAndMetadata(offset, "commitRequest", ErrorMapping.NoError());
-                Map<TopicAndPartition, OffsetAndMetadata> reqMap = new HashMap<TopicAndPartition, OffsetAndMetadata>();
-                reqMap.put(m_topicAndPartition, offsetMetdata);
-                OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(m_groupId, reqMap, correlationId, CLIENT_ID, version);
-                OffsetCommitResponse offsetCommitResponse = null;
-                try {
-                    SimpleConsumer consumer = m_offsetManager.get();
-                    if (consumer == null) {
-                        getOffsetCoordinator();
-                        consumer = m_offsetManager.get();
-                    }
-                    if (consumer != null) {
-                        offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                        final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-                        if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
-                            info("Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
-                            getOffsetCoordinator();
-                            consumer = m_offsetManager.get();
-                            if (consumer != null) {
-                                offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                            }
-                        }
-                    } else {
-                        error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
-                        return false;
-                    }
-                } catch (Exception e) {
-                    error(e, "Failed to commit Offset for " + m_topicAndPartition);
-                    return false;
-                }
-                final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-                if (code != ErrorMapping.NoError()) {
-                    final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: %d";
-                    error(null, msg, code);
-                    return false;
-                }
-                return true;
-            }
-
-            private void commitAndSaveOffset(long currentNext) {
-                try {
-                    long commit;
-                    synchronized(m_seenOffset) {
-                        if (!m_seenOffset.isEmpty()) {
-                            m_seenOffset.add(currentNext);
-                            //From first find the last continuous offset and commit that.
-                            commit = m_seenOffset.first();
-                            while (m_seenOffset.contains(++commit)) {
-                                m_seenOffset.remove(commit);
-                            }
-                        } else {
-                           commit =  currentNext;
-                        }
-                    }
-
-                    //Highest commit we have seen after me will be committed.
-                    if (commitOffset(commit)) {
-                        if (isDebugEnabled()) {
-                            debug("Committed offset " + commit + " for " + m_topicAndPartition);
-                        }
-                        m_committedOffset.set(commit);
-                    }
-                    //If this happens we will come back again on next callback.
-                } catch (Exception ex) {
-                    error(ex, "Failed to commit and save offset %d", currentNext);
-                }
             }
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                try {
-                    //We should never get here with no pending offsets.
-                    assert(!m_pendingOffsets.isEmpty());
-                    m_cbcnt.incrementAndGet();
-                    m_pendingOffsets.remove(m_offset);
-                    commitAndSaveOffset(m_nextOffset);
-
-                } catch (Throwable t) {
-                    // Should never get here
-                  t.printStackTrace();
-                }
+                //We should never get here with no pending offsets.
+                assert(!m_pendingOffsets.isEmpty());
+                m_cbcnt.incrementAndGet();
+                m_pendingOffsets.remove(m_offset);
+                //This is what we commit to
+                m_seenOffset.add(m_nextOffset);
             }
 
         }
@@ -731,7 +650,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),"UTF-8");
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition, cbcnt);
+                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), cbcnt);
                         m_pendingOffsets.add(currentOffset);
                         if (!callProcedure(cb, invocation)) {
                             if (isDebugEnabled()) {
@@ -760,6 +679,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         } catch (InterruptedException ie) {
                         }
                     }
+                    commitOffset();
                 }
                 //Drain will make sure there is nothing in pending.
                 info("Partition fecher stopped for " + m_topicAndPartition
@@ -769,10 +689,61 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             } catch (Exception ex) {
                 error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
+                commitOffset();
                 closeConsumer(consumer);
                 consumer = null;
                 closeConsumer(m_offsetManager.getAndSet(null));
             }
+        }
+
+        public boolean commitOffset() {
+
+            if (m_seenOffset.isEmpty())
+                return false;
+            long offset = m_seenOffset.last();
+            final int correlationId = m_topicAndPartition.partition();
+            final short version = 1;
+
+            OffsetAndMetadata offsetMetdata = new OffsetAndMetadata(offset, "commitRequest", ErrorMapping.NoError());
+            Map<TopicAndPartition, OffsetAndMetadata> reqMap = new HashMap<TopicAndPartition, OffsetAndMetadata>();
+            reqMap.put(m_topicAndPartition, offsetMetdata);
+            OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(m_groupId, reqMap, correlationId, CLIENT_ID, version);
+            OffsetCommitResponse offsetCommitResponse = null;
+            try {
+                SimpleConsumer consumer = m_offsetManager.get();
+                if (consumer == null) {
+                    getOffsetCoordinator();
+                    consumer = m_offsetManager.get();
+                }
+                if (consumer != null) {
+                    offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                    final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+                    if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
+                        info("Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
+                        getOffsetCoordinator();
+                        consumer = m_offsetManager.get();
+                        if (consumer != null) {
+                            offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                        }
+                    }
+                } else {
+                    error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                    return false;
+                }
+            } catch (Exception e) {
+                error(e, "Failed to commit Offset for " + m_topicAndPartition);
+                return false;
+            }
+            final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+            if (code != ErrorMapping.NoError()) {
+                final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: %d";
+                error(null, msg, code);
+                return false;
+            }
+            synchronized(m_seenOffset) {
+                m_seenOffset.clear();
+            }
+            return true;
         }
 
     }

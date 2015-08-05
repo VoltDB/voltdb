@@ -60,7 +60,7 @@ public class ImportHandler {
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 1000);
+    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 400);
     final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
@@ -82,6 +82,7 @@ public class ImportHandler {
             public void run() {
                 m_logger.info("Importer ready importing data for: " + m_importContext.getName());
                 try {
+                    m_adapter.start();
                     m_importContext.readyForData();
                 } catch (Throwable t) {
                     m_logger.error("ImportContext stopped with following exception", t);
@@ -98,8 +99,8 @@ public class ImportHandler {
             @Override
             public void run() {
                 try {
-                    //Drain the adapter so all calbacks are done
-                    m_adapter.drain();
+                    //Stop and Drain the adapter so all calbacks are done
+                    m_adapter.stop();
                     m_importContext.stop();
                 } catch (Exception ex) {
                     ex.printStackTrace();
