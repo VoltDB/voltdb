@@ -1046,7 +1046,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggreateFeature(sql, false,
                 -1, -1,
                 -1, -1,
-                false, false);
+                false, false, false);
     }
 
     private void checkMVNoFix_NoAgg(
@@ -1054,7 +1054,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             boolean aggPushdown, boolean aggInline) {
 
         checkMVReaggreateFeature(sql, false, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                -1, -1, aggPushdown, aggInline);
+                -1, -1, aggPushdown, aggInline, false);
 
     }
 
@@ -1155,17 +1155,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         String[] tbs = {"V_P1", "V_P1_ABS"};
         for (String tb: tbs) {
-            checkMVFix_reAgg("SELECT * FROM " + tb, 2, 3);
-            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1", 2, 3);
-            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1, V_B1", 2, 3);
-            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_SUM_D1", 2, 3);
-            checkMVFix_reAgg("SELECT * FROM " + tb + " limit 1", 2, 3);
-            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1, V_B1 limit 1", 2, 3);
-            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb, 2, 1);
-            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1", 2, 1);
-            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_d1", 2, 2);
-            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " limit 1", 2, 1);
-            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1 limit 1", 2, 1);
+            checkMVFix_reAgg("SELECT * FROM " + tb, 2, 3, false);
+            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1", 2, 3, true);
+            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1, V_B1", 2, 3, true);
+            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_SUM_D1", 2, 3, false);
+            checkMVFix_reAgg("SELECT * FROM " + tb + " limit 1", 2, 3, false);
+            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1, V_B1 limit 1", 2, 3, true);
+            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb, 2, 1, false);
+            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1", 2, 1, false);
+            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_d1", 2, 2, false);
+            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " limit 1", 2, 1, false);
+            checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1 limit 1", 2, 1, false);
         }
     }
 
@@ -1543,12 +1543,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     private void checkMVFix_reAgg(
             String sql,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode, boolean mergeReceive) {
 
         checkMVReaggreateFeature(sql, true,
                 -1, -1,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, false);
+                false, false, mergeReceive);
     }
 
     private void checkMVFix_TopAgg_ReAgg(
@@ -1559,7 +1559,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggreateFeature(sql, true,
                 numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, false);
+                false, false, false);
     }
 
     // topNode, reAggNode
@@ -1567,12 +1567,54 @@ public class TestPlansGroupBy extends PlannerTestCase {
             String sql, boolean needFix,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            boolean aggPushdown, boolean aggInline) {
+            boolean aggPushdown, boolean aggInline, boolean mergeReceive) {
 
         pns = compileToFragments(sql);
-        checkMVReaggregateFeature(needFix, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
+        if (mergeReceive) {
+            checkMVReaggregateFeatureMergeReceive(needFix,
+                    numGroupbyOfReaggNode, numAggsOfReaggNode,
+                    aggPushdown, aggInline);
+        } else {
+            checkMVReaggregateFeature(needFix, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
                 aggPushdown, aggInline);
+        }
+    }
+
+    // topNode, reAggNode
+    private void checkMVReaggregateFeatureMergeReceive(
+            boolean needFix,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode,
+            boolean aggPushdown, boolean aggInline) {
+
+        assertTrue(pns.size() == 2);
+        AbstractPlanNode p = pns.get(0);
+        assertTrue(p instanceof SendPlanNode);
+        p = p.getChild(0);
+
+        if (p instanceof ProjectionPlanNode) {
+            p = p.getChild(0);
+        }
+
+        AbstractPlanNode receiveNode = (p instanceof ProjectionPlanNode) ? p.getChild(0) : p;
+        assertNotNull(receiveNode);
+
+        AggregatePlanNode reAggNode = null;
+
+        if (needFix) {
+            reAggNode = AggregatePlanNode.getInlineAggregationNode(receiveNode);
+            assertNotNull(reAggNode);
+
+            assertEquals(numGroupbyOfReaggNode, reAggNode.getGroupByExpressionsSize());
+            assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypesSize());
+        }
+
+        p = pns.get(1);
+        assertTrue(p instanceof SendPlanNode);
+        p = p.getChild(0);
+
+        assertTrue(p instanceof AbstractScanPlanNode);
+
     }
 
     // topNode, reAggNode
