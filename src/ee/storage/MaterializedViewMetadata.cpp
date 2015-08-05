@@ -26,6 +26,8 @@
 #include "catalog/columnref.h"
 #include "catalog/column.h"
 #include "catalog/table.h"
+#include "catalog/planfragment.h"
+#include "catalog/statement.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "expressions/constantvalueexpression.h"
@@ -33,9 +35,15 @@
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
+#include "execution/VoltDBEngine.h"
+#include "execution/ExecutorVector.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
 
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
+typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
+
+using namespace std;
 namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
@@ -45,8 +53,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     , m_filterPredicate(parsePredicate(mvInfo))
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
-    , m_minMaxSearchKeyBackingStore(NULL)
-    , m_minMaxSearchKeyBackingStoreSize(0)
     , m_aggColumnCount(parseAggregation(mvInfo))
 {
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
@@ -55,7 +61,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     m_mvInfo = mvInfo;
 
     m_target->incrementRefcount();
-    srcTable->addMaterializedView(this);
+    m_srcTable->addMaterializedView(this);
 
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
@@ -70,15 +76,15 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
         }
     }
 
-    // handle index for min / max support
-    setIndexForMinMax(mvInfo->indexForMinMax());
+    // set up fallback query executors for min/max recalculation (ENG-8641)
+    setFallbackExecutorVectors(mvInfo->fallbackQueryStmts());
 
     allocateBackedTuples();
 
     // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
-        TableTuple scannedTuple(srcTable->schema());
-        TableIterator &iterator = srcTable->iterator();
+    if (( ! m_srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
+        TableTuple scannedTuple(m_srcTable->schema());
+        TableIterator &iterator = m_srcTable->iterator();
         while (iterator.next(scannedTuple)) {
             processTupleInsert(scannedTuple, false);
         }
@@ -92,6 +98,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
         initializeTupleHavingNoGroupBy();
     }
+    // Used to backup the parameters.
+    m_backups = vector<NValue>(m_groupByColumnCount + 1);
     VOLT_TRACE("Finish initialization...");
 }
 
@@ -123,28 +131,35 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     oldTarget->decrementRefcount();
 }
 
-void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax)
-{
-    std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
-    m_indexForMinMax.clear();
-    for (catalog::CatalogMap<catalog::IndexRef>::field_map_iter idxIterator = indexForMinOrMax.begin();
-         idxIterator != indexForMinOrMax.end(); idxIterator++) {
-        catalog::IndexRef *idx = idxIterator->second;
-        if (idx->name().compare("") == 0) {
-            // The min/max column doesn't have a supporting index.
-            m_indexForMinMax.push_back(NULL);
-        }
-        else {
-            // The min/max column has a supporting index.
-            for (int i = 0; i < candidates.size(); ++i) {
-                if (idx->name().compare(candidates[i]->getName()) == 0) {
-                    m_indexForMinMax.push_back(candidates[i]);
-                    break;
-                }
-            } // end for
-        }
+string hexDecodeToString(const string hexString) {
+    size_t len = hexString.length();
+    string retval;
+    for(int i=0; i<len; i+=2) {
+        string byte = hexString.substr(i,2);
+        char chr = (char) (int)strtol(byte.c_str(), NULL, 16);
+        retval.push_back(chr);
     }
-    allocateMinMaxSearchKeyTuple();
+    return retval;
+}
+
+void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts) {
+    m_fallbackExecutorVectors.clear();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
+        catalog::Statement *stmt = labeledStatement.second;
+        const string b64plan = stmt->fragments().begin()->second->plannodetree();
+        string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
+        string explanation = hexDecodeToString(stmt->explainplan());
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+            cout << "Aggregation " << m_fallbackExecutorVectors.size() << endl;
+            cout << explanation << endl;
+        }
+
+        boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
+        // We don't need the send executor.
+        execVec->getRidOfSendExecutor();
+        m_fallbackExecutorVectors.push_back(execVec);
+    }
 }
 
 void MaterializedViewMetadata::freeBackedTuples()
@@ -152,31 +167,6 @@ void MaterializedViewMetadata::freeBackedTuples()
     delete[] m_searchKeyBackingStore;
     delete[] m_updatedTupleBackingStore;
     delete[] m_emptyTupleBackingStore;
-    delete[] m_minMaxSearchKeyBackingStore;
-}
-
-void MaterializedViewMetadata::allocateMinMaxSearchKeyTuple()
-{
-    size_t minMaxSearchKeyBackingStoreSize = 0;
-    BOOST_FOREACH(TableIndex *index, m_indexForMinMax) {
-        // Because there might be a lot of indexes, find the largest space they may consume
-        // so that they can all share one space and use different schemas. (ENG-8512)
-        if ( minMaxIndexIncludesAggCol(index) &&
-                index->getKeySchema()->tupleLength() + 1 > minMaxSearchKeyBackingStoreSize) {
-             minMaxSearchKeyBackingStoreSize = index->getKeySchema()->tupleLength() + 1;
-        }
-    }
-    if (minMaxSearchKeyBackingStoreSize == m_minMaxSearchKeyBackingStoreSize) {
-        return;
-    }
-    m_minMaxSearchKeyBackingStoreSize = minMaxSearchKeyBackingStoreSize;
-    delete[] m_minMaxSearchKeyBackingStore;
-    m_minMaxSearchKeyBackingStore = NULL;
-    // If the minMaxIndex contains agg cols, need to allocate a searchKeyTuple and backing store for it. (ENG-6511)
-    if ( m_minMaxSearchKeyBackingStoreSize > 0 ) {
-        m_minMaxSearchKeyBackingStore = new char[m_minMaxSearchKeyBackingStoreSize];
-        memset(m_minMaxSearchKeyBackingStore, 0, m_minMaxSearchKeyBackingStoreSize);
-    }
 }
 
 void MaterializedViewMetadata::allocateBackedTuples()
@@ -318,162 +308,6 @@ inline NValue MaterializedViewMetadata::getAggInputFromSrcTuple(int aggIndex, co
     }
 }
 
-NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
-                                                                const NValue &existingValue,
-                                                                const NValue &initialNull,
-                                                                int negate_for_min,
-                                                                int aggIndex,
-                                                                int minMaxAggIdx)
-{
-    AbstractExpression *aggExpr = NULL;
-    int srcColIdx = -1;
-    if (m_aggExprs.size() != 0) {
-        aggExpr = m_aggExprs[aggIndex];
-    } else {
-        srcColIdx = m_aggColIndexes[aggIndex];
-    }
-    NValue newVal = initialNull;
-    TableIndex *selectedIndex = m_indexForMinMax[minMaxAggIdx];
-    IndexCursor minMaxCursor(selectedIndex->getTupleSchema());
-
-    // Search for the min / max fallback value. use indexs differently according to their types.
-    // (Does the index include min / max aggCol? - ENG-6511)
-    if ( minMaxIndexIncludesAggCol(selectedIndex) ) {
-        // Assemble the m_minMaxSearchKeyTuple with
-        // group-by column values and the old min/max value.
-        m_minMaxSearchKeyTuple = TableTuple(selectedIndex->getKeySchema());
-        m_minMaxSearchKeyTuple.move(m_minMaxSearchKeyBackingStore);
-        for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-            NValue value = getGroupByValueFromSrcTuple(colindex, oldTuple);
-            m_minMaxSearchKeyTuple.setNValue(colindex, value);
-        }
-        NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
-        m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
-        TableTuple tuple;
-        // Search for the new min/max value and keep it in tuple.
-        if (negate_for_min == -1) {
-            // min()
-            selectedIndex->moveToKeyOrGreater(&m_minMaxSearchKeyTuple, minMaxCursor);
-        }
-        else {
-            // max()
-            selectedIndex->moveToGreaterThanKey(&m_minMaxSearchKeyTuple, minMaxCursor);
-            selectedIndex->moveToPriorEntry(minMaxCursor);
-        }
-        while ( ! (tuple = selectedIndex->nextValue(minMaxCursor)).isNullTuple() ) {
-            // If the cursor already moved out of the target group range, exit the loop.
-            for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-                NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
-                if ( value.compare(m_searchKeyValue[colindex]) != 0 ) {
-                    return initialNull;
-                }
-            }
-            // skip the oldTuple and apply post filter
-            if (tuple.equals(oldTuple) ||
-                (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
-                continue;
-            }
-            NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
-            if (current.isNull()) {
-                return initialNull;
-            }
-            newVal = current;
-            break;
-        }
-    }
-    else {
-        // Use sub-optimal index (only group-by columns).
-        selectedIndex->moveToKey(&m_searchKeyTuple, minMaxCursor);
-        VOLT_TRACE("Starting to scan tuples using index %s\n", selectedIndex->debug().c_str());
-        TableTuple tuple;
-        while (!(tuple = selectedIndex->nextValueAtKey(minMaxCursor)).isNullTuple()) {
-            // skip the oldTuple and apply post filter
-            if (tuple.equals(oldTuple) ||
-                (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
-                continue;
-            }
-            VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
-            NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
-            if (current.isNull()) {
-                continue;
-            }
-            if (current.compare(existingValue) == 0) {
-                newVal = current;
-                VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
-                break;
-            }
-            VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
-            if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
-                newVal = current;
-                VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
-            }
-        }
-    }
-    return newVal;
-}
-
-NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
-                                                                   const NValue &existingValue,
-                                                                   const NValue &initialNull,
-                                                                   int negate_for_min,
-                                                                   int aggIndex)
-{
-    AbstractExpression *aggExpr = NULL;
-    int srcColIdx = -1;
-    if (m_aggExprs.size() != 0) {
-        aggExpr = m_aggExprs[aggIndex];
-    } else {
-        srcColIdx = m_aggColIndexes[aggIndex];
-    }
-    NValue newVal = initialNull;
-    // loop through tuples to find the MIN / MAX
-    bool skippedOne = false;
-    TableTuple tuple(m_srcTable->schema());
-    TableIterator &iterator = m_srcTable->iterator();
-    VOLT_TRACE("Starting iteration on: %s\n", m_srcTable->debug().c_str());
-    while (iterator.next(tuple)) {
-        // apply post filter
-        VOLT_TRACE("Checking tuple: %s\n", tuple.debugNoHeader().c_str());
-        if (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue()) {
-            continue;
-        }
-        VOLT_TRACE("passed 1\n");
-        int comparison = 0;
-        for (int idx = 0; idx < m_groupByColumnCount; idx++) {
-            NValue foundKey = getGroupByValueFromSrcTuple(idx, tuple);
-            comparison = m_searchKeyValue[idx].compare(foundKey);
-            if (comparison != 0) {
-                break;
-            }
-        }
-        if (comparison != 0) {
-            continue;
-        }
-        VOLT_TRACE("passed 2\n");
-        NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
-        if (current.isNull()) {
-            continue;
-        }
-        if (current.compare(existingValue) == 0) {
-            if (!skippedOne) {
-                VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
-                skippedOne = true;
-                continue;
-            }
-            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
-            newVal = current;
-            break;
-        }
-        VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
-        if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
-            newVal = current;
-            VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
-        }
-    }
-    VOLT_TRACE("\tFinal: new best %s\n", newVal.debug().c_str());
-    return newVal;
-}
-
 void MaterializedViewMetadata::initializeTupleHavingNoGroupBy()
 {
     // clear the tuple that will be built to insert or overwrite
@@ -592,6 +426,13 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
 
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
 {
+    // For debug:
+    // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+    //     cout << "================== processTupleDelete ==================" << endl;
+    //     cout << "oldTuple: " << endl << oldTuple.debugNoHeader() << endl;
+    //     cout << "srcTable: " << endl << m_srcTable->debug() << endl;
+    //     cout << "========================================================" << endl;
+    // }
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && !m_filterPredicate->eval(&oldTuple, NULL).isTrue())
         return;
@@ -635,12 +476,13 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     int aggOffset = (int)m_groupByColumnCount + 1;
     int minMaxAggIdx = 0;
     // set values for the other columns
+    ExecutorContext* context = ExecutorContext::getExecutorContext();
+    NValueArray &params = *context->getParameterContainer();
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
         NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
         NValue newValue = existingValue;
         if ( ! oldValue.isNull()) {
-            int reversedForMin = 1; // initially assume that agg is not MIN.
             switch(m_aggTypes[aggIndex]) {
             case EXPRESSION_TYPE_AGGREGATE_SUM:
                 newValue = existingValue.op_subtract(oldValue);
@@ -649,23 +491,43 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 newValue = oldValue.isNull() ? existingValue : existingValue.op_decrement();
                 break;
             case EXPRESSION_TYPE_AGGREGATE_MIN:
-                reversedForMin = -1; // fall through...
+                // fall through...
                 /* no break */
             case EXPRESSION_TYPE_AGGREGATE_MAX:
                 if (oldValue.compare(existingValue) == 0) {
                     // re-calculate MIN / MAX
                     newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
 
-                    // indexscan if an index is available, otherwise tablescan
-                    if (m_indexForMinMax[minMaxAggIdx]) {
-                        newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
-                                                                  reversedForMin, aggIndex, minMaxAggIdx);
-                    } else {
-                        VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
-                        newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
-                                                                     reversedForMin, aggIndex);
-                        VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
+                    // build parameters.
+                    // the parameters are the groupby columns and the aggregation column.
+                    int colindex = 0;
+                    for (; colindex < m_groupByColumnCount; colindex++) {
+                        m_backups[colindex] = params[colindex];
+                        params[colindex] = m_existingTuple.getNValue(colindex);
                     }
+                    m_backups[colindex] = params[colindex];
+                    params[colindex] = oldValue;
+                    // executing the stored plan.
+                    vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
+                    Table *tbl = context->executeExecutors(executorList, 0);
+                    assert(tbl);
+                    // get the fallback value from the returned table.
+                    TableIterator iterator = tbl->iterator();
+                    TableTuple tuple(tbl->schema());
+                    if (iterator.next(tuple)) {
+                        newValue = tuple.getNValue(0);
+                    }
+                    // For debug:
+                    // if (context->m_siteId == 0) {
+                    //     cout << "oldTuple: " << oldTuple.debugNoHeader() << endl;
+                    //     cout << "Return table: " << endl << tbl->debug() << endl;
+                    //     cout << "newValue: " << newValue.debug() << endl;
+                    // }
+                    // restore
+                    for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
+                        params[colindex] = m_backups[colindex];
+                    }
+                    context->cleanupExecutorsForSubquery(executorList);
                 }
                 break;
             default:

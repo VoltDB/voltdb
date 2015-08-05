@@ -24,13 +24,13 @@
 #include "common/tabletuple.h"
 #include "indexes/tableindex.h"
 #include "catalog/materializedviewinfo.h"
-#include "catalog/indexref.h"
 
 namespace voltdb {
 
 class AbstractExpression;
 class PersistentTable;
 class TableIndex;
+class ExecutorVector;
 
 /**
  * Manage the inserts, deletes and updates for a materialized view table based on changes to
@@ -59,26 +59,24 @@ public:
     void initializeTupleHavingNoGroupBy();
 
     PersistentTable * targetTable() const { return m_target; }
-    const std::vector<TableIndex *> & indexForMinMax() const { return m_indexForMinMax; }
 
     void setTargetTable(PersistentTable * target);
-    void setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax);
 
     catalog::MaterializedViewInfo* getMaterializedViewInfo() {
         return m_mvInfo;
     }
 
-    // See if the index is just built on group by columns or it also includes min/max agg (ENG-6511)
-    bool minMaxIndexIncludesAggCol(TableIndex * index)
-    {
-        if ( ! index ) { return false; }
-        return index->getColumnIndices().size() == m_groupByColumnCount + 1;
+    // Returns the fallback executor vectors
+    std::vector< boost::shared_ptr<ExecutorVector> > getFallbackExecutorVectors() {
+        return m_fallbackExecutorVectors;
     }
+
+    void setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
+
 private:
 
     void freeBackedTuples();
     void allocateBackedTuples();
-    void allocateMinMaxSearchKeyTuple();
 
     /** load a predicate from the catalog structure if it's there */
     static AbstractExpression* parsePredicate(catalog::MaterializedViewInfo *mvInfo);
@@ -94,19 +92,6 @@ private:
      */
     bool findExistingTuple(const TableTuple &oldTuple);
 
-    NValue findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
-                                          const NValue &existingValue,
-                                          const NValue &initialNull,
-                                          int negate_for_min,
-                                          int aggIndex,
-                                          int minMaxAggIdx);
-
-    NValue findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
-                                             const NValue &existingValue,
-                                             const NValue &initialNull,
-                                             int negate_for_min,
-                                             int aggIndex);
-
     // the source persistent table
     PersistentTable *m_srcTable;
     // the materialized view table
@@ -118,8 +103,9 @@ private:
     // are the same as the group by in the view query
     TableIndex *m_index;
 
-    // the index on srcTable which can be used to maintain min/max
-    std::vector<TableIndex *> m_indexForMinMax;
+    // Executor vectors to be executed when fallback on min/max value is needed (ENG-8641).
+    std::vector< boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
+    std::vector<NValue> m_backups;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
@@ -143,10 +129,6 @@ private:
     TableTuple m_searchKeyTuple;
     // storage to hold the value for the search key
     char *m_searchKeyBackingStore;
-
-    TableTuple m_minMaxSearchKeyTuple;
-    char *m_minMaxSearchKeyBackingStore;
-    size_t m_minMaxSearchKeyBackingStoreSize;
 
     // which columns in the source table
 

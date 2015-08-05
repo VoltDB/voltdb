@@ -517,26 +517,6 @@ public class MaterializedViewBenchmark {
             System.out.println("Warming up...");
             for (int i=0; i<config.warmup; i++){
                 client.callProcedure(new NullCallback(),
-                                     "ids_insert",
-                                     i,
-                                     i,
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMatView_insert",
-                                     i,
-                                     i,
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMinMatView_insert",
-                                     i,
-                                     i,
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMinMatViewOpt_insert",
-                                     i,
-                                     i,
-                                     i);
-                client.callProcedure(new NullCallback(),
                                      "idsWith4MinMatView_insert",
                                      i,
                                      i,
@@ -549,18 +529,6 @@ public class MaterializedViewBenchmark {
             }
             client.drain();
             for (int i=0; i<config.warmup; i++){
-                client.callProcedure(new NullCallback(),
-                                     "ids_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMatView_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMinMatView_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMinMatViewOpt_delete",
-                                     i);
                 client.callProcedure(new NullCallback(),
                                      "idsWith4MinMatView_delete",
                                      i);
@@ -577,17 +545,6 @@ public class MaterializedViewBenchmark {
         }
 
         System.out.println("\nRunning benchmark...\n");
-        runHalf("matView", fw);
-        System.out.print(HORIZONTAL_RULE);
-        runHalf("noMatView", fw);
-        System.out.print(HORIZONTAL_RULE);
-
-        // reset class variables so that diff is not written to the csv file
-        insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
-        runHalf("minMatView", fw);
-        System.out.print(HORIZONTAL_RULE);
-        runHalf("minMatViewOpt", fw);
-        System.out.print(HORIZONTAL_RULE);
 
         insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
         runHalf("4MinMatView", fw);

@@ -220,7 +220,7 @@ public:
         return (spacer + "ComparisonExpression\n");
     }
 
-private:
+protected:
     AbstractExpression *m_left;
     AbstractExpression *m_right;
 };
@@ -233,6 +233,38 @@ public:
                                          AbstractExpression *right)
         : ComparisonExpression<C>(type, left, right)
     {}
+
+    inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const
+    {
+        VOLT_TRACE("eval %s. left %s, right %s. ret=%s",
+                   OP::op_name(),
+                   typeid(*(m_left)).name(),
+                   typeid(*(m_right)).name(),
+                   traceEval(tuple1, tuple2));
+
+        assert(m_left != NULL);
+        assert(m_right != NULL);
+
+        NValue lnv = ((L*)this->m_left)->L::eval(tuple1, tuple2);
+        if (lnv.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        }
+
+        NValue rnv = ((R*)this->m_right)->R::eval(tuple1, tuple2);
+        if (rnv.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        }
+
+        // comparisons with null or NaN are always false
+        // [This code is commented out because doing the right thing breaks voltdb atm.
+        // We need to re-enable after we can verify that all plans in all configs give the
+        // same answer.]
+        /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
+            return NValue::getFalse();
+        }*/
+
+        return C::compare_withoutNull(lnv, rnv);
+    }
 };
 
 }
