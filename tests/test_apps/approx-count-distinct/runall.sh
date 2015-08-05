@@ -1,10 +1,15 @@
 #!/bin/bash
 
-rm bench_perf.dat
-rm bench_accuracy.dat
+echo "# This file contains a record of execution times for computing exact" > bench_perf.dat
+echo "# and estimated cardinality on tables of varying sizes.  Time units" >> bench_perf.dat
+echo "# are in millisenconds." >> bench_perf.dat
+echo "#rows        count(distinct ...)    approx_count_distinct(...)" >> bench_perf.dat
 
-echo "#rows/uniqe_vals  time exact (ms)    time approx (ms)" > bench_perf.dat
-echo "#rows/uniqe_vals  exact cardinality    approx cardinality" > bench_accuracy.dat
+echo "# This file contains a record of exact and estimated cardinality for" > bench_accuracy.dat
+echo "# tables of barying sizes.  The fourth column is the percentage that" >> bench_accuracy.dat
+echo "# the estimate was off by."  >> bench_accuracy.dat
+echo "# (0.05 means that the estimate was off by 0.05%.)"  >> bench_accuracy.dat
+echo "#rows        exact cardinality    approx cardinality    percent change" >> bench_accuracy.dat
 
 ./run.sh 32000 16000
 ./run.sh 64000 32000
@@ -19,3 +24,12 @@ if [ "$gnuplot" != "" ]; then
     gnuplot bench_perf.gpl
     gnuplot bench_accuracy.gpl
 fi
+
+echo
+echo "### bench_perf.dat ###"
+cat bench_perf.dat
+echo
+
+echo "### bench_accuracy.dat ###"
+cat bench_accuracy.dat
+echo
