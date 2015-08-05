@@ -528,7 +528,7 @@ public abstract class CatalogSchemaTools {
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
                 if (db.getIsactiveactivedred()) {
-                    sb.append("set " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n");
+                    sb.append(String.format("SET %s=%s;\n", DatabaseConfiguration.DR_MODE_NAME, DatabaseConfiguration.ACTIVE_ACTIVE));
                 }
                 toSchema(sb, importLines);
 

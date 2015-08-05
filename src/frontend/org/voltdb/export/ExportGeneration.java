@@ -784,6 +784,24 @@ public class ExportGeneration {
         return m_drainedSources.get() == m_numSources;
     }
 
+    public void sync(final boolean nofsync) {
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
+        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : dataSources.values()) {
+                ListenableFuture<?> syncFuture = source.sync(nofsync);
+                if (syncFuture != null)
+                    tasks.add(syncFuture);
+            }
+        }
+
+        try {
+            if (!tasks.isEmpty())
+                Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            exportLog.error("Unexpected exception syncing export data during snapshot save.", e);
+        }
+    }
+
     public void close() {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {

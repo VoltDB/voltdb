@@ -25,6 +25,7 @@ package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
+import java.util.Random;
 
 public class CopyLoadPartitionedSP extends CopyLoadPartitionedBase {
 

@@ -519,6 +519,8 @@ public class Benchmark {
     BigTableLoader replicatedLoader = null;
     TruncateTableLoader partitionedTruncater = null;
     TruncateTableLoader replicatedTruncater = null;
+    CappedTableLoader partitionedCapped = null;
+    CappedTableLoader replicatedCapped = null;
     LoadTableLoader plt = null;
     LoadTableLoader rlt = null;
     ReadThread readThread = null;
@@ -638,6 +640,16 @@ public class Benchmark {
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
             replicatedTruncater.start();
         }
+
+        /* TEMPORARY disable cappedcollection test until ENG-8733 is resolved -PR
+        partitionedCapped = new CappedTableLoader(client, "capp", // more
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
+        partitionedCapped.start();
+        if (config.mpratio > 0.0) {
+            replicatedCapped = new CappedTableLoader(client, "capr", // more
+                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
+            replicatedCapped.start();
+        }*/
 
         plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);

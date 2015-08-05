@@ -207,7 +207,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     @Override
                     public void run()
                     {
-                        context.forceAllDRNodeBuffersToDisk(false);
+                        context.forceAllBuffersToDiskForDRAndExport(false);
                     }
                 });
 

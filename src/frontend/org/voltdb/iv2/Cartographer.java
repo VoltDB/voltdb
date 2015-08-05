@@ -470,7 +470,7 @@ public class Cartographer extends StatsSource
     }
 
     //Check partition replicas.
-    public synchronized boolean isClusterSafeIfNodeDies(final List<Integer> liveHids, final int hid) {
+    public synchronized boolean isClusterSafeIfNodeDies(final Set<Integer> liveHids, final int hid) {
         try {
             return m_es.submit(new Callable<Boolean>() {
                 @Override

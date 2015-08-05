@@ -38,7 +38,6 @@ static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exce
 }
 #endif
 
-
 SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
     m_exceptionType(exceptionType), m_message(message)
 {

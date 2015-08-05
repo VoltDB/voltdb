@@ -179,6 +179,20 @@ template<> inline NValue NValue::callUnary<FUNC_EXP>() const {
 }
 
 
+/** implement the SQL LOG/LN function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_LN>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double resultDouble = std::log(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function LN");
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);

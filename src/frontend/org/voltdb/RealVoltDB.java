@@ -61,6 +61,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -182,7 +183,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
-    private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
+    private AsyncCompilerAgent m_asyncCompilerAgent = null;
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
@@ -383,7 +384,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_messenger = null;
             m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
-            m_asyncCompilerAgent = new AsyncCompilerAgent();
+            m_asyncCompilerAgent = null;
             m_snapshotCompletionMonitor = null;
             m_catalogContext = null;
             m_partitionCountStats = null;
@@ -471,9 +472,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
+            Map<Integer, String> hostGroups = null;
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (!isRejoin && !m_joining) {
-                m_messenger.waitForGroupJoin(numberOfNodes);
+                hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
@@ -512,6 +514,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
                         "See previous log message for details.", false, null);
             }
+            m_asyncCompilerAgent = new AsyncCompilerAgent(m_licenseApi);
 
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
@@ -570,7 +573,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
+            JSONObject topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Integer>();
             try {
                 // IV2 mailbox stuff
@@ -742,7 +745,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 // here. Since the initiators are not started yet, the cartographer still doesn't
                 // know about the new partitions at this point.
                 m_commandLog.initForRejoin(
-                        m_catalogContext,
+                        m_catalogContext.cluster.getLogconfig().get("log").getLogsize(),
                         Long.MIN_VALUE,
                         m_configuredNumberOfPartitions,
                         true,
@@ -785,10 +788,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
 
             // Configure consumer-side DR if relevant
-            if (m_config.m_isEnterprise && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+            if (m_config.m_isEnterprise &&
+                    (m_config.m_replicationRole == ReplicationRole.REPLICA ||
+                     m_catalogContext.database.getIsactiveactivedred())) {
                 String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
                 byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
-                if (drProducerHost == null || drProducerHost.isEmpty()) {
+                if (m_catalogContext.cluster.getDrconsumerenabled() &&
+                        (drProducerHost == null || drProducerHost.isEmpty())) {
                     VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
                 }
                 try {
@@ -1212,7 +1218,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(StartAction startAction, JoinCoordinator joinCoordinator)
+    private JSONObject getTopology(StartAction startAction, Map<Integer, String> hostGroups,
+                                   JoinCoordinator joinCoordinator)
     {
         JSONObject topo = null;
         if (startAction == StartAction.JOIN) {
@@ -1227,7 +1234,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (!clusterConfig.validate()) {
                 VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
             }
-            topo = registerClusterConfig(clusterConfig);
+            topo = registerClusterConfig(clusterConfig, hostGroups);
         }
         else {
             Stat stat = new Stat();
@@ -1257,14 +1264,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return initiators;
     }
 
-    private JSONObject registerClusterConfig(ClusterConfig config)
+    private JSONObject registerClusterConfig(ClusterConfig config, Map<Integer, String> hostGroups)
     {
         // First, race to write the topology to ZK using Highlander rules
         // (In the end, there can be only one)
         JSONObject topo = null;
         try
         {
-            topo = config.getTopology(m_messenger.getLiveHostIds());
+            final Set<Integer> liveHostIds = m_messenger.getLiveHostIds();
+            Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
+            topo = config.getTopology(hostGroups);
             byte[] payload = topo.toString(4).getBytes("UTF-8");
             m_messenger.getZK().create(VoltZK.topology, payload,
                     Ids.OPEN_ACL_UNSAFE,
@@ -1647,6 +1656,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         org.voltcore.messaging.HostMessenger.Config hmconfig;
 
         hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
+        if (m_config.m_placementGroup != null) {
+            hmconfig.group = m_config.m_placementGroup;
+        }
         hmconfig.internalPort = m_config.m_internalPort;
         if (m_config.m_internalPortInterface != null && m_config.m_internalPortInterface.trim().length() > 0) {
             hmconfig.internalInterface = m_config.m_internalPortInterface.trim();
@@ -2519,7 +2531,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId, m_cartographer.getPartitionCount(),
+            m_commandLog.init(m_catalogContext.cluster.getLogconfig().get("log").getLogsize(),
+                              txnId, m_cartographer.getPartitionCount(),
                               m_config.m_commandLogBinding,
                               perPartitionTxnIds);
             try {
