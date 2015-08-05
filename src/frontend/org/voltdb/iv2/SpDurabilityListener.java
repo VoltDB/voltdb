@@ -61,11 +61,11 @@ class SpDurabilityListener implements DurabilityListener {
 
         @Override
         public void addTask(TransactionTask task) {
-            if (task.m_txnState.isSinglePartition()) {
-                m_lastSpUniqueId = task.m_txnState.uniqueId;
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(task.m_txnState.uniqueId) == MpInitiator.MP_INIT_PID) {
+                m_lastMpUniqueId = task.m_txnState.uniqueId;
             }
             else {
-                m_lastMpUniqueId = task.m_txnState.uniqueId;
+                m_lastSpUniqueId = task.m_txnState.uniqueId;
             }
         }
 

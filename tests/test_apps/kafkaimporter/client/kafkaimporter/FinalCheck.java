@@ -24,6 +24,8 @@ package kafkaimporter.client.kafkaimporter;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.Client;
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.client.Client;
 
 public class FinalCheck {
     static VoltLogger log = new VoltLogger("Benchmark.finalCheck");
