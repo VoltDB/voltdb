@@ -60,7 +60,7 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         textIndex			{ $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
         textTotal			{ $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(5) > td:nth-child(1) > b") }
 
-        tablenamePresent	{ $(class:"table-view-name") }
+        tablenamePresent	(required: false) { $(class:"table-view-name", text:tablenameOne) }
 
         searchName			{ $("#sizetable > thead > tr.tablesorter-filter-row > td:nth-child(1) > input") }
         documentationLink 	{ $("#iconDoc") }
@@ -74,5 +74,7 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         sizeTab.displayed
         sizeTab.attr('class') == 'active'
     }
+    
+    String tablenameOne = getTablename()
 
 }

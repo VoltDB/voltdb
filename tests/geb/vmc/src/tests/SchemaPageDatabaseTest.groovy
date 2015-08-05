@@ -57,6 +57,15 @@ class SchemaPageDatabaseTest extends TestBase {
         at SchemaPage
     }
     
+    def "check" () {
+        when: 'go to size worksheet tab'
+        page.openSchemaPageSizeWorksheetTab()
+        then: 'at size worksheet tab'
+        at SchemaPageSizeWorksheetTab
+        
+        println(page.getTablename())
+    }
+    
     def "Size Worksheet Tab:Add table, search and delete"() {
         boolean result = false
         
@@ -127,8 +136,8 @@ class SchemaPageDatabaseTest extends TestBase {
 
         when: 'tablename is searched'
         page.refreshbutton.click()
-        waitFor(30) { page.searchName.isDisplayed() }
-        page.searchName.value(tablename)
+        //waitFor(30) { page.searchName.isDisplayed() }
+        //page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(30) { page.tablenamePresent.isDisplayed() }
 
@@ -154,8 +163,8 @@ class SchemaPageDatabaseTest extends TestBase {
 
         when: 'tablename is searched'
         page.refreshbutton.click()
-        waitFor(30) { page.searchName.isDisplayed() }
-        page.searchName.value(tablename)
+        //waitFor(30) { page.searchName.isDisplayed() }
+        //page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(30) { !page.tablenamePresent.isDisplayed() }
 
@@ -195,7 +204,7 @@ class SchemaPageDatabaseTest extends TestBase {
         then:
         println()
     }
-	
+	/*
 	def "Schema Tab:Add table, search and delete"() {
 		boolean result = false
 		
@@ -266,8 +275,8 @@ class SchemaPageDatabaseTest extends TestBase {
 		
 		when: 'tablename is searched'
 		page.refreshbutton.click()
-		waitFor(30) { page.searchName.isDisplayed() }
-		page.searchName.value(tablename)
+		//waitFor(30) { page.searchName.isDisplayed() }
+		//page.searchName.value(tablename)
 		then: 'at least one table is present'
 		waitFor(30) { page.requiredId.isDisplayed() }
 		
@@ -293,8 +302,8 @@ class SchemaPageDatabaseTest extends TestBase {
 		
 		when: 'tablename is searched'
 		page.refreshbutton.click()
-		waitFor(30) { page.searchName.isDisplayed() }
-		page.searchName.value(tablename)
+		//waitFor(30) { page.searchName.isDisplayed() }
+		//page.searchName.value(tablename)
 		then: 'at least one table is present'
 		
 		try {
@@ -332,7 +341,7 @@ class SchemaPageDatabaseTest extends TestBase {
         }
         then:
         println()
-	}
+	}*/
 	
     def cleanup() {
 		if (!(page instanceof VoltDBManagementCenterPage)) {
