@@ -27,12 +27,12 @@ import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltcore.logging.VoltLogger;
 
 public class MatchChecks {
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
@@ -84,6 +84,7 @@ public class MatchChecks {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
         long mirrorRowCount = 0;
+
         try {
             VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
             mirrorRowCount = countQueryResult[0].asScalarLong();

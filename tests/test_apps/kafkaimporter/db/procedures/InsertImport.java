@@ -48,7 +48,7 @@ public class InsertImport extends VoltProcedure {
     public long run(long key, long value)
     {
 
-        voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key);
+        voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key, value);
         long deletedCount = voltExecuteSQL()[0].asScalarLong();
 
         if (deletedCount > 0) {

@@ -44,6 +44,19 @@ LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
+# wait for backgrounded server to start up
+function wait_for_startup() {
+    until echo "exec @SystemInformation, OVERVIEW;" | sqlcmd > /dev/null 2>&1
+    do
+        sleep 2
+        echo " ... Waiting for VoltDB to start"
+        if [[ $SECONDS -gt 60 ]]
+        then
+            echo "Exiting.  VoltDB did not startup within 60 seconds" 1>&2; exit 1;
+        fi
+    done
+}
+
 ## ---
 
 
@@ -89,7 +102,7 @@ if (($? != 0)); then
 fi
 
 voltdb create &
-sleep 5
+wait_for_startup
 
 sqlcmd < ddl.sql
 
