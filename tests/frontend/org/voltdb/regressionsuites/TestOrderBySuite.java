@@ -26,11 +26,10 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
-import java.util.Random;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
@@ -810,48 +809,151 @@ public class TestOrderBySuite extends RegressionSuite {
     {
         Client client = getClient();
         client.callProcedure("Truncate01");
-        List<Integer> ids = new ArrayList<Integer>();
-        Random rand = new Random();
-        int size = 100;
-        for (int i = 0; i < size; ++i) {
-            int val = rand.nextInt();
-            ids.add(val);
-            client.callProcedure("InsertO1", val,val,"dummy","dummy");
-        }
-        Collections.sort(ids);
-        int max = ids.get(ids.size() - 1);
-        int maxOffset3 = ids.get(ids.size() - 4);
+        client.callProcedure("Truncate03");
+        client.callProcedure("InsertO1", 5, 5,"dummy","dummy");
+        client.callProcedure("InsertO1", 1, 5,"dummy1","dummy");
+        client.callProcedure("InsertO1", 4, 2,"dummy","dummy");
+        client.callProcedure("InsertO1", 3, 1,"dummy","dummy");
+        client.callProcedure("InsertO1", 2, 7,"dummy","dummy");
+        client.callProcedure("InsertO1", 6, 7,"dummy1","dummy");
+        client.callProcedure("InsertO1", 7, 8,"dummy","dummy");
+
+        client.callProcedure("InsertO3", 1, 1, 7, 7);
+        client.callProcedure("InsertO3", 2, 2, 7, 7);
+        client.callProcedure("InsertO3", 3, 3, 8, 8);
+        client.callProcedure("InsertO3", 4, 4, 1, 1);
+        client.callProcedure("InsertO3", 10, 10, 10, 10);
 
         // Partitions Result sets are ordered by index. No LIMIT/OFFEST
         VoltTable vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM O1 ORDER BY PKEY DESC").getResults()[0];
-        assertEquals(size, vt.getRowCount());
-        vt.advanceRow();
-        assertEquals(max, vt.getLong(0));
+        long[][] expected = new long[][] {{7}, {6}, {5}, {4}, {3}, {2}, {1}};
+        validateTableOfLongs(vt, expected);
         vt = client.callProcedure("@Explain", "SELECT PKEY FROM O1 ORDER BY PKEY DESC").getResults()[0];
-        System.out.println(vt.toString());
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // Partitions Result sets are ordered by index with LIMIT/OFFSET
         vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3 OFFSET 3").getResults()[0];
-        assertEquals(3, vt.getRowCount());
-        vt.advanceRow();
-        assertEquals(maxOffset3, vt.getLong(0));
+        expected = new long[][] {{4}, {3}, {2}};
+        validateTableOfLongs(vt, expected);
 
-        // Partitions Result sets are unordered. No LIMIT/OFFSET
-        vt = client.callProcedure("@AdHoc", "SELECT A_INT FROM O1 ORDER BY A_INT DESC").getResults()[0];
-        assertEquals(size, vt.getRowCount());
-        vt.advanceRow();
-        assertEquals(max, vt.getLong(0));
-        vt = client.callProcedure("@Explain", "SELECT A_INT FROM O1 ORDER BY A_INT DESC").getResults()[0];
-        System.out.println(vt.toString());
-        assertTrue(!vt.toString().contains("MERGE RECEIVE"));
+        // IDX_O1_A_INT_PKEY index provides the right order for the coordinator. Merge Receive
+        vt = client.callProcedure("@AdHoc", "SELECT A_INT, PKEY from O1 ORDER BY A_INT DESC, PKEY DESC LIMIT 3").getResults()[0];
+        expected = new long[][] {{8,7}, {7,6}, {7,2}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain", "SELECT A_INT, PKEY from O1 ORDER BY A_INT DESC, PKEY DESC LIMIT 3").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
-        // Partitions Result sets are unordered with LIMIT/OFFSET
-        vt = client.callProcedure("@AdHoc", "SELECT A_INT FROM O1 ORDER BY A_INT DESC  LIMIT 3 OFFSET 3").getResults()[0];
-        assertEquals(3, vt.getRowCount());
-        vt.advanceRow();
-        assertEquals(maxOffset3, vt.getLong(0));
+        // NLIJ with index outer table scan
+        vt = client.callProcedure("@AdHoc", "select O1.A_INT from O1, O3 where O1.A_INT = O3.I3 order by O1.A_INT").getResults()[0];
+        expected = new long[][] {{1}, {7}, {7}, {7}, {7}, {8}};
+        vt = client.callProcedure("@Explain", "select O1.A_INT from O1, O3 where O1.A_INT = O3.I3 order by O1.A_INT limit 3").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
+    }
+
+    private void subtestOrderByMP_Agg() throws Exception
+    {
+        Client client = getClient();
+        client.callProcedure("TruncateP");
+        client.callProcedure("TruncateP1");
+        client.callProcedure("@AdHoc", "insert into P values(1, 11, 1, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(1, 1, 2, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(3, 6, 2, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(4, 6, 1, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(5, 11, 2, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(7, 1, 4, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(7, 6, 1, 1)");
+
+        // Merge Receive with Serial aggregation
+        //            select indexed_non_partition_key, max(col)
+        //            from partitioned
+        //            group by indexed_non_partition_key
+        //            order by indexed_non_partition_key;"
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1").getResults()[0];
+        long[][] expected = new long[][] {{1, 4}, {6, 2}, {11, 2}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain",
+                "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        // Merge Receive with Partial aggregation
+        //            select indexed_non_partition_key, col, max(col)
+        //            from partitioned
+        //            group by indexed_non_partition_key, col
+        //            order by indexed_non_partition_key;"
+        vt = client.callProcedure("@AdHoc",
+                "select P_D1, P_D3, max(P_D2) from P group by P_D1, P_D3 order by P_D1").getResults()[0];
+        expected = new long[][] {{1, 1, 4}, {6, 1, 2}, {11, 1, 2}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain",
+                "select P_D1, P_D3, max(P_D2) from P group by P_D1, P_D3 order by P_D1").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        // No aggregation at coordinator
+        //          select indexed_partition_key, max(col)
+        //          from partitioned
+        //          group by indexed_partition_key
+        //          order by indexed_partition_key;"
+        vt = client.callProcedure("@AdHoc",
+                "select max(P_D2), P_D0 from P group by P_D0  order by P_D0").getResults()[0];
+        expected = new long[][] {{2, 1}, {2, 3}, {1, 4}, {2, 5}, {4, 7}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain",
+                "select max(P_D2), P_D0 from P group by P_D0  order by P_D0").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        // No aggregation at coordinator
+        //          select indexed_non_partition_key, max(col)
+        //          from partitioned
+        //          group by indexed_non_partition_key, indexed_partition_key
+        //          order by indexed_partition_key;"
+        vt = client.callProcedure("@AdHoc",
+                "select max(P_D2), P_D1, P_D0 from P group by P_D1, P_D0 order by P_D0  limit 3 offset 2").getResults()[0];
+        expected = new long[][] {{2, 6, 3}, {1, 6, 4}, {2, 11,5}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain",
+                "select max(P_D2), P_D1 from P group by P_D1, P_D0 order by P_D0  limit 3 offset 2").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        // Merge Receive with Serial aggregation
+        //            select indexed_non_partition_key1, indexed_non_partition_key2, max(col)
+        //            from partitioned
+        //            group by indexed_non_partition_key1, indexed_non_partition_key2
+        //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
+        vt = client.callProcedure("@AdHoc",
+                "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2 limit 2").getResults()[0];
+        expected = new long[][] {{1, 1, 7}, {1, 2, 5}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain",
+                "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2 limit 2").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        // Merge Receive without aggregation at coordinator
+        //            select indexed_non_partition_key1, indexed_non_partition_key2, col, max(col)
+        //            from partitioned
+        //            group by indexed_non_partition_key1, indexed_non_partition_key2, col
+        //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
+        vt = client.callProcedure("@AdHoc",
+                "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2").getResults()[0];
+        expected = new long[][] {{1, 1}, {1, 1}, {1, 1}, {1, 2}, {1, 2}, {1, 2}, {1, 4}};
+        assertEquals(expected.length, vt.getRowCount());
+        for(int i = 0; i < expected.length; ++i) {
+            VoltTableRow row = vt.fetchRow(i);
+            assertEquals(expected[i][0], row.getLong("P_D3"));
+            assertEquals(expected[i][1], row.getLong("P_D2"));
+        }
+        vt = client.callProcedure("@Explain",
+                "select P_D3, P_D3, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT V_P_D1 FROM V_P order by V_P_D1").getResults()[0];
+        expected = new long[][] {{1}, {1}, {6}, {6}, {11}, {11}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain",
+                "SELECT V_P_D1 FROM V_P order by V_P_D1").getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
     }
 
     public void testAll()
@@ -871,6 +973,7 @@ public class TestOrderBySuite extends RegressionSuite {
         subtestEng5021();
         subtestPartialIndex();
         subtestOrderByMP();
+        subtestOrderByMP_Agg();
     }
 
     //

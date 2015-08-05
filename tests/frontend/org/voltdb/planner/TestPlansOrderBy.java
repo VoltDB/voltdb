@@ -311,17 +311,72 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderByMP() {
-      {
-      // P_D1 index provides the right order for the coordinator. Merge Receive
-      List<AbstractPlanNode> frags =  compileToFragments(
-              "select P_D1, P_D1 + 1 from P order by P_D1");
-      assertEquals(2, frags.size());
-      AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-      validateMergeReceive(pn, false, new int[] {0});
-  }
-
         {
-            // P_D1 index provides the right order for the coordinator. Merge Receive
+            // P_D1_IDX index provides the right order for the coordinator. Merge Receive
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1, P_D1 + 1 from P order by P_D1");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateMergeReceive(pn, false, new int[] {0});
+        }
+        {
+            // P_D1_IDX index sort direction is INVALID. Partition output is not ordered. ORDER BY
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1, P_D1 + 1 from P where P_D1 > 3 order by P_D1, P_D2");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // P_D2 column is not covered by P_D1_IDX index. ORDER BY
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P where P_D1 > 1 order by P_D1, P_D2");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // P_D32_IDX index provides the right order for the coordinator. Merge Receive
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P order by P_D3 DESC, P_D2 DESC");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateMergeReceive(pn, false, new int[] {2, 1});
+        }
+        {
+            // Column sort order mismatch
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P order by P_D3 ASC, P_D2 DESC");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // Column order mismatch
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P order by P_D2 ASC, P_D3 ASC");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // Sort order does not match
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P order by P_D3 DESC, P_D2");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // P_D1 column is not covered by the P_D32_IDX
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P where P_D3 > 1 order by P_D3 DESC, P_D1");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // P_D1_IDX index provides the right order for the coordinator. Merge Receive
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1 from P order by P_D1");
             assertEquals(2, frags.size());
@@ -329,7 +384,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
             validateMergeReceive(pn, false, new int[] {0});
         }
         {
-            // P_D1 index provides the right order for the coordinator. Merge Receive with LIMIT
+            // P_D1_IDX index provides the right order for the coordinator. Merge Receive with LIMIT
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1 from P order by P_D1 limit 3");
             assertEquals(2, frags.size());
@@ -347,12 +402,45 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
         {
             // Partitions results are ordered by the pushed down ORDER BY.
-            // Coordinator Order by with LIMIT
+            // Merge Receive with Order By and with LIMIT
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1, P_D2  from P order by P_D2 limit 3");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             validateMergeReceive(pn, true, new int[] {1});
+        }
+        {
+            // NLIJ with seq outer table scan.(T) ORDER BY
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P, T where P.P_D1 = T.T_D2 order by P.P_D1");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // NLIJ with index outer table scan (PK). ORDER BY column P.P_D1 is from a different table
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by P.P_D1");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // NLIJ with index outer table scan (PK). ORDER BY column T.T_D1 is not the first index column
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by T.T_D1");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // NLIJ with index outer table scan (PK). ORDER BY column T.T_D0 is the first the first index column
+            // Merge RECEIVE
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by T.T_D0 limit 3");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateMergeReceive(pn, true, new int[] {0});
         }
     }
 
@@ -362,6 +450,12 @@ public class TestPlansOrderBy extends PlannerTestCase {
             List<AbstractPlanNode> frags =  compileToFragments("Select * from V_P1 ORDER BY V_G1, V_G2");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             validateAggregatedMergeReceive(pn, true, false, false, false);
+        }
+        {
+            // Two aggregates at the coordinator. ORDER BY
+            List<AbstractPlanNode> frags =  compileToFragments("Select V_G1, sum(V_CNT), max(v_sum_age) from V_P1_ABS GROUP BY V_G1 ORDER BY V_G1");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
             // Merge Receive with Serial aggregation
@@ -456,61 +550,48 @@ public class TestPlansOrderBy extends PlannerTestCase {
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             validateAggregatedMergeReceive(pn, false, false, false, false);
         }
+        {
+            // The Index Scan (P_D32_IDX) does not cover P_D1 column from the ORDER BY
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1, P_D3, max (P_D0) from p where P_D3 = 0 group by P_D1, P_D3 order by P_D3, P_D1;");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // ORDER BY column P_D1 is not covered by the P_D32_IDX index
+            //            select indexed_non_partition_key1, non_indexed_non_partition_col2, max(col)
+            //            from partitioned
+            //            group by indexed_non_partition_key1, non_indexed_non_partition_col2
+            //            order by indexed_non_partition_key1, non_indexed_non_partition_col2;"
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D3, P_D1");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // Merge Receive with Serial aggregation
+            //            select indexed_non_partition_key1, indexed_non_partition_key2, max(col)
+            //            from partitioned
+            //            group by indexed_non_partition_key1, indexed_non_partition_key2
+            //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateAggregatedMergeReceive(pn, true, false, false, false);
+        }
+        {
+            // Merge Receive without aggregation at coordinator
+            //            select indexed_non_partition_key1, indexed_non_partition_key2, col, max(col)
+            //            from partitioned
+            //            group by indexed_non_partition_key1, indexed_non_partition_key2, col
+            //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D3, P_D2, P_D0, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateAggregatedMergeReceive(pn, false, false, false, false);
+        }
     }
 
-//    public void test () {
-//// need partial aggr, hash aggr including wrong INVALID order or
-//// non overlapping group by and order by
-//// neeed WHERE by index clause as well
-//// need NLIJ examples
-//// distinct???
-//// top hash, serial, partial
-////      {
-////      //          select non_indexed_non_partition, max(col)
-////      //          from partitioned
-////      //          group by non_indexed_non_partition
-////      //          order by non_indexed_non_partition;"
-////      List<AbstractPlanNode> frags =  compileToFragments(
-////              "select P_D1, max(P_D2) from P where P_D1 > 2 group by P_D1 order by P_D1 limit 3");
-//////      List<AbstractPlanNode> frags =  compileToFragments(
-//////              "select P_D1, max(P_D2) from P  group by P_D1 order by P_D1 limit 3");
-////      AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-////      assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
-////  }
-//        // projection in between the aggregation and order by at coordinator
-////        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
-//        List<AbstractPlanNode> frags =  compileToFragments(
-//// serial
-////                "select P_D1, sum(P_D1), sum(P_D1)+1 from P group by P_D1 order by P_D1 limit 2");
-//// partial
-////              "select P_D1, P_d2, sum(P_D1), sum(P_D1)+1 from P group by P_D1, P_D2 order by P_D1 limit 2");
-//// top hash need to be test
-//                "select P_D1, sum(P_D1), sum(P_D1)+1 from P group by P_D1 order by sum(P_D1)+1 limit 2");
-////    "select P_D1, sum(P_D1) from P group by P_D1 order by P_D1 limit 2");
-////    "select P_D1, P_D1+1 from P  order by P_D1 limit 2");
-//
-//
-//        //      List<AbstractPlanNode> frags =  compileToFragments(
-////      "select P1_D1, max(P1_D0) from P1  group by p1_d1 order by P1_D1 desc");
-//    }
-
-    // TEST DESC and
-    // multi column index first GROUP BY column is first index column
-    // second GROUP BY column is not indexed
-//    public void test() {
-////        List<AbstractPlanNode> frags =  compileToFragments(
-////                "Select V_G1, V_sum_rent, sum(V_CNT) " +
-////                        "from V_P2 group by V_G1, V_sum_rent " +
-////                        "order by V_G1, V_sum_rent"
-////                );
-//        List<AbstractPlanNode> frags =  compileToFragments(
-//                "select P_D1, P_D2+1, max (P_D0) from p where P_D1 > 0 and P_D2+1 > 0 group by P_D1, P_D2+1 order by P_D1, P_D2+1;"
-////                "select P_D1, P_D2, max (P_D0) from p where P_D1 > 0 group by P_D1, P_D2 order by P_D2, P_D1 DESC;"
-////                "select P_D3, max (P_D0) from p where P_D3 > 0 group by P_D3 order by P_D3 DESC, P_D1 DESC;"
-////                "select P_D1, P_D3, max (P_D0) from p group by P_D1, P_D3 order by P_D1, P_D3;"
-//         );
-//        frags.get(0);
-//    }
     private void validateMergeReceive(AbstractPlanNode pn, boolean hasLimit, int[] sortColumnIdx) {
         assertEquals(PlanNodeType.RECEIVE, pn.getPlanNodeType());
         ReceivePlanNode rpn = (ReceivePlanNode) pn;

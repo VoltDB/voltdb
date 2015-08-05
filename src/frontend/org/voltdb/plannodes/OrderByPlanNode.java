@@ -104,6 +104,10 @@ public class OrderByPlanNode extends AbstractPlanNode {
         return m_sortExpressions;
     }
 
+    public List<SortDirectionType> getSortDirections() {
+        return m_sortDirections;
+    }
+
     @Override
     public void resolveColumnIndexes()
     {
@@ -211,7 +215,20 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public boolean isOutputOrdered() {
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.size() == sortDirections.size());
+        assert (m_sortExpressions.size() == m_sortDirections.size());
+        if (sortExpressions.size() != m_sortExpressions.size()) {
+            return false;
+        }
+        for(int idx = 0; idx < m_sortExpressions.size(); ++idx) {
+            if (sortDirections.get(idx) != m_sortDirections.get(idx)) {
+                return false;
+            }
+            if (m_sortExpressions.get(idx).bindingToIndexedExpression(sortExpressions.get(idx)) == null) {
+                return false;
+            }
+        }
         return true;
     }
 }

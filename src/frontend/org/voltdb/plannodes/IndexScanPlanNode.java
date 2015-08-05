@@ -326,13 +326,68 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public boolean isOutputOrdered() {
-        // Index Scan output is ordered if either its scan direction is set to ASC or DSC
-        // or it has inline SERIAL or PARTIAL aggregation. In the latter case,
-        // the aggregate preserves the output order
-        return getSortDirection() != SortDirectionType.INVALID ||
-                getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
-                        getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE) != null;
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.size() == sortDirections.size());
+        // The output is unordered if there is an inline hash aggregate
+        AbstractPlanNode agg = AggregatePlanNode.getInlineAggregationNode(this);
+        if (agg != null && agg.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
+            return false;
+        }
+
+        // Verify that all sortDirections match
+        for(SortDirectionType sortDirection : sortDirections) {
+            if (sortDirection != getSortDirection()) {
+                return false;
+            }
+        }
+        // Verify that all sort expressions are covered by the consecutive index expressions
+        // starting from the first one
+        List<AbstractExpression> indexedExprs = new ArrayList<AbstractExpression>();
+        List<ColumnRef> indexedColRefs = new ArrayList<ColumnRef>();
+        List<Integer> indexedColIds = new ArrayList<Integer>();
+        CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
+                indexedExprs, indexedColRefs, indexedColIds);
+        int indexExprCount = (indexedExprs.isEmpty()) ? indexedColRefs.size() : indexedExprs.size();
+        if (indexExprCount < sortExpressions.size()) {
+            // Not enough index expressions to cover all of the sort expressions
+            return false;
+        }
+        for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
+            AbstractExpression sortExpression = sortExpressions.get(idxToCover);
+            boolean covered = false;
+            if (!indexedExprs.isEmpty()) {
+                covered = isSortExpressionCovered(sortExpression, indexedExprs, idxToCover);
+            } else {
+                covered = isSortExpressionCovered(sortExpression, indexedColRefs, idxToCover, getTableScan());
+            }
+            if (!covered) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<AbstractExpression> indexedExprs,
+            int idxToCover) {
+        assert(idxToCover < indexedExprs.size());
+        AbstractExpression indexExpression = indexedExprs.get(idxToCover);
+        return sortExpression.bindingToIndexedExpression(indexExpression) != null;
+    }
+
+    private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<ColumnRef> indexedColRefs,
+            int idxToCover, StmtTableScan tableScan) {
+        assert(idxToCover < indexedColRefs.size());
+        TupleValueExpression tve = null;
+        if (sortExpression instanceof TupleValueExpression) {
+            tve = (TupleValueExpression) sortExpression;
+        }
+        if (tve != null && tableScan.getTableAlias().equals(tve.getTableAlias())) {
+            ColumnRef indexColumn = indexedColRefs.get(idxToCover);
+            if (indexColumn.getColumn().getTypeName().equals(tve.getColumnName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

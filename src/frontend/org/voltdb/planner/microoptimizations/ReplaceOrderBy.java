@@ -20,6 +20,7 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -72,20 +73,13 @@ public class ReplaceOrderBy extends MicroOptimization {
 
     /** For MP queries, the coordinator's OrderBy node can be replaced with
      * a specialized Receive node that merges individual partitions results
-     * into a final result set. The preconditions for that are:
-     *  - partition result set is sorted in the order matching the ORDER BY order
-     *  - no aggregation at the coordinator node
-     *  If optimization is possible the returned plan needs to be reconnected with the parent
+     * into a final result set if the partitions result set is sorted
+     * in the order matching the ORDER BY order
      *
      * @param orderbyNode - ORDER BY node to optimize
      * @return optimized plan
      */
     AbstractPlanNode applyOptimization(OrderByPlanNode orderbyNode) {
-        // For MP queries, the coordinator's OrderBy node can be replaced with
-        // a specialized Receive node that merges individual partitions results
-        // into a final result set. The preconditions for that are:
-        //  - partition result set is sorted in the order matching the ORDER BY order
-        //  - no aggregation at the coordinator node
         List<AbstractPlanNode> receives = orderbyNode.findAllNodesOfType(PlanNodeType.RECEIVE);
         if (receives.isEmpty()) {
             return orderbyNode;
@@ -93,16 +87,16 @@ public class ReplaceOrderBy extends MicroOptimization {
         assert(receives.size() == 1);
 
         ReceivePlanNode receive = (ReceivePlanNode)receives.get(0);
-        // Make sure that this receive node belongs to the same coordinator fragment as
-        // the ORDER BY does. Alternatively, it could belong to a distributed subquery.
+        // Make sure that this receive node belongs to the same coordinator fragment that
+        // the ORDER BY node does. Alternatively, it could belong to a distributed subquery.
         // Walk up the tree starting at the receive node until we hit either a scan node
         // (distributed subquery) or the original order by node (distributed order by)
         // Collect all nodes that are currently in between ORDER BY and RECEIVE nodes
         // If the optimization is possible, they will be converted to inline nodes of
         // the MERGE RECEIVE node. The expected node types are:
-        // LIMIT, AGGREGATE/PARTIALAGGREGATE/HASHAGGREGATE
+        //      LIMIT, AGGREGATE/PARTIALAGGREGATE/HASHAGGREGATE
         // The HASHAGGREGATE must be convertible to AGGREGATE or PARTIALAGGREGATE for optimization
-        // to be applicable. The Projection node sitting on top of the Aggregation is not supported yet.
+        // to be applicable.
         Map<PlanNodeType, AbstractPlanNode> inlineCandidates = new HashMap<PlanNodeType, AbstractPlanNode>();
         AbstractPlanNode inlineCandidate = receive.getParent(0);
         inlineCandidates.put(orderbyNode.getPlanNodeType(), orderbyNode);
@@ -112,34 +106,37 @@ public class ReplaceOrderBy extends MicroOptimization {
                 return orderbyNode;
             }
             PlanNodeType nodeType = inlineCandidate.getPlanNodeType();
+            // Can't handle more than one aggregation
+            if (inlineCandidate instanceof AggregatePlanNode &&
+                    (inlineCandidates.containsKey(PlanNodeType.AGGREGATE) || inlineCandidates.containsKey(PlanNodeType.PARTIALAGGREGATE))) {
+                return orderbyNode;
+            }
             if (nodeType == PlanNodeType.HASHAGGREGATE) {
                 AbstractPlanNode newAggr = convertToSerialAggregation(inlineCandidate, orderbyNode);
                 if (newAggr.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
                     return orderbyNode;
                 }
                 inlineCandidates.put(newAggr.getPlanNodeType(), newAggr);
-                assert(inlineCandidate.getParentCount() ==1);
-                inlineCandidate = inlineCandidate.getParent(0);
             } else if ((nodeType == PlanNodeType.AGGREGATE || nodeType == PlanNodeType.PARTIALAGGREGATE
                     || nodeType == PlanNodeType.LIMIT) && !inlineCandidates.containsKey(nodeType)) {
                 inlineCandidates.put(nodeType, inlineCandidate);
-                assert(inlineCandidate.getParentCount() ==1);
-                inlineCandidate = inlineCandidate.getParent(0);
             } else {
-                // Don't know how to handle this node or there is already node
-                // of this type. Aborting the optimization
+                // Don't know how to handle this node
                 return orderbyNode;
             }
+            // move up one node
+            assert(inlineCandidate.getParentCount() == 1);
+            inlineCandidate = inlineCandidate.getParent(0);
         }
 
         assert(receive.getChildCount() == 1);
-        assert(receive.getChild(0).getChildCount() == 1);
-        AbstractPlanNode partitionRoot = receive.getChild(0).getChild(0);
-        if (!partitionRoot.isOutputOrdered()) {
+        AbstractPlanNode partitionRoot = receive.getChild(0);
+        if (!partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
             // Partition results are not ordered
             return orderbyNode;
         }
 
+        // At this point we confirmed that the optimization is applicable.
         // Short circuit the current ORDER BY parent (if such exists) and the RECIEVE node
         // that becomes MERGE RECEIVE. All in-between nodes will be inlined
         assert (orderbyNode.getParentCount() <= 1);
@@ -172,6 +169,7 @@ public class ReplaceOrderBy extends MicroOptimization {
         }
         if (aggrNode != null) {
             if (limitNode != null) {
+                // Inline LIMIT with aggregate
                 aggrNode.addInlinePlanNode(limitNode);
             }
             receive.addInlinePlanNode(aggrNode);
@@ -188,32 +186,49 @@ public class ReplaceOrderBy extends MicroOptimization {
         return rootNode;
     }
 
-    //@TODO need to be rewritten similar to the SubPlanAssembler.determineIndexOrdering
-    // or PlanAssembler.calculateGroupbyColumnsCovered
+    /**
+     * The Hash aggregate can be converted to a Serial or Partial aggregate if
+     *   - all GROUP BY and ORDER BY expressions bind to each other - Serial Aggregate
+     *   - a subset of the GROUP BY expressions covers all of the ORDER BY  - Partial
+     *   - anything else - remains a Hash Aggregate
+     * @param aggregateNode
+     * @param orderbyNode
+     * @return new aggregate node if the conversion is possible or the original hash aggregate otherwise
+     */
     AbstractPlanNode convertToSerialAggregation(AbstractPlanNode aggregateNode, OrderByPlanNode orderbyNode) {
         assert(aggregateNode instanceof HashAggregatePlanNode);
         HashAggregatePlanNode hashAggr = (HashAggregatePlanNode) aggregateNode;
-        Set<AbstractExpression> groupbys = new HashSet<AbstractExpression>(hashAggr.getGroupByExpressions());
-        Set<AbstractExpression> orderbys = new HashSet<AbstractExpression>(orderbyNode.getSortExpressions());
-        boolean result = groupbys.removeAll(orderbys);
-        if (!result) {
-            // GROUP BY and ORDER BY don't have common expressions - HASH aggregation
-            return aggregateNode;
-        } else if (groupbys.isEmpty()) {
-            // All GROUP BY expressions are also ORDER BY - Serial aggregation
-            return AggregatePlanNode.convertToSerialAggregatePlanNode(hashAggr);
-        } else {
-            // Partial aggregation
-            List<Integer> coveredGroupByColumns = new ArrayList<Integer>();
+        List<AbstractExpression> groupbys = new ArrayList<AbstractExpression>(hashAggr.getGroupByExpressions());
+        List<AbstractExpression> orderbys = new ArrayList<AbstractExpression>(orderbyNode.getSortExpressions());
+        Set<Integer> coveredGroupByColumns = new HashSet<Integer>();
+
+        Iterator<AbstractExpression> orderbyIt = orderbys.iterator();
+        while (orderbyIt.hasNext()) {
+            AbstractExpression orderby = orderbyIt.next();
             int idx = 0;
-            for (AbstractExpression groupByExpr : hashAggr.getGroupByExpressions()) {
-                if (!groupbys.contains(groupByExpr)) {
-                    // This groupByExpr is covered by the ORDER BY
-                    coveredGroupByColumns.add(idx);
+            for (AbstractExpression groupby : groupbys) {
+                if (!coveredGroupByColumns.contains(idx)) {
+                    // This groupby expression is not bind to any orderby yet
+                    if (orderby.bindingToIndexedExpression(groupby) != null) {
+                        orderbyIt.remove();
+                        coveredGroupByColumns.add(idx);
+                        break;
+                    }
                 }
                 ++idx;
             }
-            return AggregatePlanNode.convertToPartialAggregatePlanNode(hashAggr, coveredGroupByColumns);
+        }
+        if (orderbys.isEmpty() && groupbys.size() == coveredGroupByColumns.size()) {
+            // All GROUP BY expressions are also ORDER BY - Serial aggregation
+            return AggregatePlanNode.convertToSerialAggregatePlanNode(hashAggr);
+        } else if (orderbys.isEmpty() && !coveredGroupByColumns.isEmpty() ) {
+            // Partial aggregation
+            List<Integer> coveredGroupByColumnList = new ArrayList<Integer>();
+            coveredGroupByColumnList.addAll(coveredGroupByColumns);
+            return AggregatePlanNode.convertToPartialAggregatePlanNode(hashAggr, coveredGroupByColumnList);
+        } else {
+            return aggregateNode;
         }
     }
+
 }
