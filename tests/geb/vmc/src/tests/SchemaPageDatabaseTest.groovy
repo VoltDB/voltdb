@@ -57,15 +57,6 @@ class SchemaPageDatabaseTest extends TestBase {
         at SchemaPage
     }
     
-    def "check" () {
-        when: 'go to size worksheet tab'
-        page.openSchemaPageSizeWorksheetTab()
-        then: 'at size worksheet tab'
-        at SchemaPageSizeWorksheetTab
-        
-        println(page.getTablename())
-    }
-    
     def "Size Worksheet Tab:Add table, search and delete"() {
         boolean result = false
         
@@ -204,7 +195,7 @@ class SchemaPageDatabaseTest extends TestBase {
         then:
         println()
     }
-	/*
+	
 	def "Schema Tab:Add table, search and delete"() {
 		boolean result = false
 		
@@ -341,7 +332,7 @@ class SchemaPageDatabaseTest extends TestBase {
         }
         then:
         println()
-	}*/
+	}
 	
     def cleanup() {
 		if (!(page instanceof VoltDBManagementCenterPage)) {
