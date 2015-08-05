@@ -33,16 +33,23 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ProcedureCallback;
 
 /**
- * A very simple adapter for import handler that deserializes bytes into client responses. It calls
+ * A very simple adapter for import handler that deserializes bytes into client responses.
+ * For each partition it creates a single thread executor to sequence per partition transaction submission.
+ * Responses are also written on a single thread executor to avoid bottlenecking on callback doing heavy work.
+ * It calls
  * crashLocalVoltDB() if the deserialization fails, which should only happen if there's a bug.
  */
 public class ImportClientResponseAdapter implements Connection, WriteStream {
+
+    private static final VoltLogger m_logger = new VoltLogger("IMPORT");
+
     public static interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
     }
@@ -52,17 +59,19 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final Map<Long, ImportCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, ImportCallback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService m_es;
+    private final ExecutorService m_es;
 
-    private class ImportCallback implements Callback {
+    private static class ImportCallback implements Callback {
 
         private DBBPool.BBContainer m_cont;
         private long m_id;
         private final ProcedureCallback m_cb;
+        private final Map<Long, ImportCallback> m_pendingCb;
 
-        public ImportCallback(final DBBPool.BBContainer cont, ProcedureCallback cb) {
+        public ImportCallback(final DBBPool.BBContainer cont, Map<Long, ImportCallback> pendingcb, ProcedureCallback cb) {
             m_cont = cont;
             m_cb = cb;
+            m_pendingCb = pendingcb;
         }
 
         public void setId(long id) {
@@ -79,7 +88,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         @Override
         public void handleResponse(ClientResponse response) throws Exception {
             discard();
-            m_pendingCallbacks.remove(m_id);
+            m_pendingCb.remove(m_id);
             if (m_cb != null) {
                 m_cb.clientCallback(response);
             }
@@ -120,26 +129,29 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
 
         if (!m_partitionExecutor.containsKey(partition)) {
-            ThreadFactory factory = CoreUtils.getThreadFactory(null, "ImportHandlerExecutor",
-                    CoreUtils.SMALL_STACK_SIZE, false, null);
-            m_partitionExecutor.putIfAbsent(partition, new ScheduledThreadPoolExecutor(1, factory));
+            m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("ImportHandlerExecutor - " + partition));
         }
         ExecutorService executor = m_partitionExecutor.get(partition);
-        executor.submit(new Runnable() {
-            @Override
-            public void run() {
-                final ImportCallback cb = new ImportCallback(tcont, proccb);
-                final long cbhandle = registerCallback(cb);
-                cb.setId(cbhandle);
-                task.setClientHandle(cbhandle);
-                m_pendingCallbacks.put(cbhandle, cb);
+        try {
+            executor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    final ImportCallback cb = new ImportCallback(tcont, m_pendingCallbacks, proccb);
+                    final long cbhandle = registerCallback(cb);
+                    cb.setId(cbhandle);
+                    task.setClientHandle(cbhandle);
+                    m_pendingCallbacks.put(cbhandle, cb);
 
-                //Submit the transaction.
-                VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
-                        catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
-                        task.getSerializedSize(), nowNanos);
-            }
-        });
+                    //Submit the transaction.
+                    VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
+                            catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
+                            task.getSerializedSize(), nowNanos);
+                }
+            });
+        } catch (RejectedExecutionException ex) {
+            m_logger.error("Failed to submit transaction to the partition queue.", ex);
+            return false;
+        }
 
         return true;
     }
@@ -151,9 +163,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      */
     public ImportClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
-        ThreadFactory factory = CoreUtils.getThreadFactory(null, "ImportResponseHandler", CoreUtils.SMALL_STACK_SIZE,
-                false, null);
-        m_es = new ScheduledThreadPoolExecutor(1, factory);
+        m_es = CoreUtils.getSingleThreadExecutor("ImportResponseHandler");
     }
 
     public long registerCallback(Callback c) {
@@ -196,16 +206,20 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
             final Callback callback = m_callbacks.remove(resp.getClientHandle());
             if (callback != null) {
-                m_es.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            callback.handleResponse(resp);
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
+                try {
+                    m_es.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                callback.handleResponse(resp);
+                            } catch (Exception ex) {
+                                ex.printStackTrace();
+                            }
                         }
-                    }
-                });
+                    });
+                } catch (RejectedExecutionException ex) {
+                    m_logger.error("Failed to submit callback to the response processing queue.", ex);
+                }
 
             }
         }

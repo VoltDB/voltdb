@@ -82,8 +82,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //Procedure to be invoked with params.
     private String m_procedure;
     //backpressure sleep milli seconds 100ms by default.
-    private int m_backpressureSleepMs = 100;
-    private volatile boolean m_hasBackPressure = false;
+    private int m_backpressureSleepMs = 200;
 
     //List of topics form comma seperated list.
     private List<String> m_topicList;
@@ -794,7 +793,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         for (TopicPartitionFetcher fetcher : m_fetchers.values()) {
             fetcher.hasBackPressure(flag);
         }
-        m_hasBackPressure = flag;
     }
 
     //On getting this event kick off ready
