@@ -188,7 +188,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         try {
             ByteBuffer buf = null;
             final int serializedSize = ds.getSerializedSize();
-            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) return;
             buf = ByteBuffer.allocate(serializedSize);
             ds.serialize(buf);
             enqueue(buf);
