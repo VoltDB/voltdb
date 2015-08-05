@@ -165,9 +165,4 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         return collected;
     }
 
-    @Override
-    public boolean isOutputOrdered() {
-        return getSortDirection() != SortDirectionType.INVALID;
-    }
-
 }
