@@ -47,6 +47,7 @@ import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
 
@@ -307,23 +308,21 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Does the output is ordered by an index sort direction or ORDER BY expressions.
-     * The default implementation delegates the question to its children. Any node
-     * with more than one children needs to provide its own implementation.
+     * Does the output is sorted according to the order implied by the (expression, sort order) pairs.
+     * The default implementation delegates the question to its child if there is only one child.
+     *
+     *@param sortExpressions list of ordering columns expressions
+     *@param sortDirections list of corresponding sort orders
      *
      * @return TRUE if the node's output table is ordered. FALSE otherwise
      */
-    public boolean isOutputOrdered () {
-        assert(m_children != null);
-        if (m_children.size() > 1) {
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.size() == sortDirections.size());
+        if (m_children.size() == 1) {
+            return m_children.get(0).isOutputOrdered(sortExpressions, sortDirections);
+        } else {
             return false;
         }
-        for (AbstractPlanNode child : m_children) {
-            if (! child.isOutputOrdered()) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**

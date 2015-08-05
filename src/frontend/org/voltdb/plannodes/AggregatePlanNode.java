@@ -35,6 +35,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class AggregatePlanNode extends AbstractPlanNode {
 
@@ -539,8 +540,16 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public boolean isOutputOrdered() {
-        return (getPlanNodeType() == PlanNodeType.HASHAGGREGATE) ? false : true;
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        if (getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
+            return false;
+        } else {
+            // the order for Serial and Partial aggregates is determined by the order
+            // of the keys from the child node
+            assert(getChildCount() == 1);
+            AbstractPlanNode child = getChild(0);
+            return child.isOutputOrdered(sortExpressions, sortDirections);
+        }
     }
 
     /**

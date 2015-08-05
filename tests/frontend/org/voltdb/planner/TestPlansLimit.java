@@ -29,6 +29,7 @@ import java.util.List;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -167,7 +168,7 @@ public class TestPlansLimit extends PlannerTestCase {
         // no push down for aggregate nodes
         //@TODO LIMIT node is inline with aggragate
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
-        checkInlineLimitWithOrderby(pns, true, true);
+        checkInlineLimitWithOrderby(pns, true);
 
         pns = compileToFragments("select A1 from T1 order by A1 limit 1");
         checkInlineLimitAndOrderbyWithReceive(pns, true);
@@ -177,28 +178,36 @@ public class TestPlansLimit extends PlannerTestCase {
 
         // no push down
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
-        checkInlineLimitWithOrderby(pns, false, false);
+        checkInlineLimitWithOrderby(pns, false);
 
         // Replicated table
         pns = compileToFragments("select A1 from R1 order by A1 limit 1");
-        checkInlineLimitWithOrderby(pns, false, false);
+        checkInlineLimitWithOrderby(pns, false);
     }
 
 
-    private void checkInlineLimitWithOrderby(List<AbstractPlanNode> pns, boolean pushdown, boolean mergereceive) {
+    private void checkInlineLimitWithOrderby(List<AbstractPlanNode> pns, boolean pushdown) {
         AbstractPlanNode p;
 
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
         p = p.getChild(0);
-        if (!mergereceive) {
-            assertTrue(p instanceof OrderByPlanNode);
-        } else {
-            assertTrue(p instanceof ReceivePlanNode);
+        boolean mergereceive = false;
+        if (p instanceof ReceivePlanNode) {
             assertTrue(((ReceivePlanNode)p).isMergeReceive());
             assertNotNull(p.getInlinePlanNode(PlanNodeType.ORDERBY));
+            mergereceive = true;
+        } else {
+            assertTrue(p instanceof OrderByPlanNode);
         }
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        if (mergereceive) {
+            AbstractPlanNode aggr = AggregatePlanNode.getInlineAggregationNode(p);
+            if (aggr != null) {
+                assertNotNull(aggr.getInlinePlanNode(PlanNodeType.LIMIT));
+            }
+        } else {
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        }
 
         if (pushdown) {
             assertEquals(2, pns.size());

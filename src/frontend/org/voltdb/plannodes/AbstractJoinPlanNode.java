@@ -271,13 +271,17 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public boolean isOutputOrdered() {
-        // Index Scan output is ordered if either its scan direction is set to ASC or DSC
-        // or it has inline SERIAL or PARTIAL aggregation. In the latter case,
-        // the aggregate preserves the output order
-        return getSortDirection() != SortDirectionType.INVALID ||
-                getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
-                        getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE) != null;
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        AbstractPlanNode outerTable = m_children.get(0);
+        AbstractPlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
+        if (aggrNode != null && aggrNode.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
+            return false;
+        }
+        if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN || outerTable instanceof AbstractJoinPlanNode) {
+            return outerTable.isOutputOrdered(sortExpressions, sortDirections);
+        } else {
+            return false;
+        }
     }
 
     // TODO: need to extend the sort direction for join from one table to the other table if possible

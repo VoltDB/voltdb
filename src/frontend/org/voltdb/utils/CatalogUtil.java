@@ -121,6 +121,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -2127,5 +2128,32 @@ public abstract class CatalogUtil {
 
         assert (map.size() == 1);
         return map.iterator().next().getSqltext();
+    }
+
+    /**
+     * Given an index return its expressions or list of indexed columns
+     *
+     * @param index  Catalog Index
+     * @param tableScan table
+     * @param indexedExprs   index expressions. This list remains empty if the index is just on simple columns.
+     * @param indexedColRefs indexed columns. This list remains empty if indexedExprs is in use.
+     * @param indexedColIds indexed columns ids. This list remains empty if indexedExprs is in use.
+     */
+    public static void getCatalogIndexExpressions(Index index, StmtTableScan tableScan,
+            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs, List<Integer> indexedColIds) {
+        String exprsjson = index.getExpressionsjson();
+        if (exprsjson.isEmpty()) {
+            indexedColRefs.addAll(CatalogUtil.getSortedCatalogItems(index.getColumns(), "index"));
+            for (ColumnRef cr : indexedColRefs) {
+                indexedColIds.add(cr.getColumn().getIndex());
+            }
+        } else {
+            try {
+                indexedExprs.addAll(AbstractExpression.fromJSONArrayString(exprsjson, tableScan));
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+        }
     }
 }

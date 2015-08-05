@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import org.json_voltpatches.JSONArray;
@@ -25,9 +26,11 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class ReceivePlanNode extends AbstractPlanNode {
 
@@ -198,11 +201,14 @@ public class ReceivePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public boolean isOutputOrdered() {
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
         if (isMergeReceive()) {
-            return true;
+            AbstractPlanNode orderBy = getInlinePlanNode(PlanNodeType.ORDERBY);
+            assert(orderBy != null);
+            return orderBy.isOutputOrdered(sortExpressions, sortDirections);
         } else {
-            return super.isOutputOrdered();
+            // MP output is unordered
+            return false;
         }
     }
 
