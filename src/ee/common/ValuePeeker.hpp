@@ -131,6 +131,29 @@ public:
     static inline int64_t peekAsRawInt64(const NValue value) {
         return value.castAsBigIntAndGetValue();
     }
+
+    /// Given an NValue, return a pointer to its data bytes.  Also return
+    /// The length of the data bytes via output parameter.
+    ///
+    /// Assumes that value is not null!!
+    static inline const char* peekPointerToDataBytes(const NValue &value, int32_t *length) {
+        ValueType vt = value.getValueType();
+        switch (vt) {
+        case VALUE_TYPE_TINYINT:
+        case VALUE_TYPE_SMALLINT:
+        case VALUE_TYPE_INTEGER:
+        case VALUE_TYPE_BIGINT:
+        case VALUE_TYPE_TIMESTAMP:
+        case VALUE_TYPE_DECIMAL:
+        case VALUE_TYPE_BOOLEAN:
+            *length = static_cast<int32_t>(NValue::getTupleStorageSize(vt));
+            return value.m_data;
+
+        default:
+            assert(false);
+            return NULL;
+        }
+    }
 };
 }
 

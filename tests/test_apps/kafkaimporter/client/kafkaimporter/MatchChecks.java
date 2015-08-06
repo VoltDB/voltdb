@@ -27,17 +27,15 @@ import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltcore.logging.VoltLogger;
 
 public class MatchChecks {
-
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
-
     final static String DELETE_ROWS = "DeleteRows";
 
     static class DeleteCallback implements ProcedureCallback {
@@ -70,7 +68,7 @@ public class MatchChecks {
             @Override
             public void run() {
                 mirrorRowCount = getMirrorTableRowCount(innerClient);
-                log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
+                //log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
                 log.info("checkTimer: Mirror table row count: " + mirrorRowCount);
                 if (mirrorRowCount == 0) { // indicates everything matched and mirror table empty
                     log.info("checkTimer: mirrorRowCount is 0. Stopping...");
@@ -86,13 +84,14 @@ public class MatchChecks {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
         long mirrorRowCount = 0;
+
         try {
             VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
             mirrorRowCount = countQueryResult[0].asScalarLong();
         } catch (IOException | ProcCallException e) {
             e.printStackTrace();
         }
-        log.info("Mirror table row count: " + mirrorRowCount);
+        //log.info("Mirror table row count: " + mirrorRowCount);
         return mirrorRowCount;
     }
 
@@ -107,10 +106,10 @@ public class MatchChecks {
              System.exit(-1);
         }
 
-        log.info("Matched row count: " + results.getRowCount());
+        log.info("getRowCount(): " + results.getRowCount());
         while (results.advanceRow()) {
             long key = results.getLong(0);
-            // System.out.println("Key: " + key);
+            // log.info("Key: " + key);
             try {
                 client.callProcedure(new DeleteCallback(DELETE_ROWS, key), DELETE_ROWS, key);
             } catch (IOException e) {

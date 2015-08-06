@@ -53,6 +53,8 @@ public class TestSnapshotConverter extends SaveRestoreBase
     public void testSnapshotConverter() throws NoConnectionsException, IOException, ProcCallException
     {
         if (!MiscUtils.isPro()) { return; } // not supported in community
+        if (isValgrind()) return;
+
         Client client = getClient();
         int expectedLines = 10;
         Random r = new Random(Calendar.getInstance().getTimeInMillis());
