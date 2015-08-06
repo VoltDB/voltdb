@@ -223,7 +223,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                         if (resp.getStatus() != ClientResponse.SUCCESS) {
                             String fmt = "Importer stored procedure failed: %s Error: %s";
                             rateLimitedLog(Level.ERROR, null, fmt, callback.getProcedureName(),
-                                    (resp.getAppStatusString() == null ? "No App Status" : resp.getAppStatusString()));
+                                    (resp.getStatusString() == null ? "No Status" : resp.getStatusString()));
                         }
                         callback.handleResponse(resp);
                     } catch (Exception ex) {
