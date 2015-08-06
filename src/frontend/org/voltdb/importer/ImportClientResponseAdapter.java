@@ -33,9 +33,12 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ProcedureCallback;
 
@@ -52,6 +55,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
+        public String getProcedureName();
     }
 
     private final long m_connectionId;
@@ -66,11 +70,13 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         private DBBPool.BBContainer m_cont;
         private final long m_id;
         private final ProcedureCallback m_cb;
+        private final String m_procedure;
 
-        public ImportCallback(final DBBPool.BBContainer cont, ProcedureCallback cb, long id) {
+        public ImportCallback(final DBBPool.BBContainer cont, String proc, ProcedureCallback cb, long id) {
             m_cont = cont;
             m_cb = cb;
             m_id = id;
+            m_procedure = proc;
         }
 
         public void discard() {
@@ -86,6 +92,11 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             if (m_cb != null) {
                 m_cb.clientCallback(response);
             }
+        }
+
+        @Override
+        public String getProcedureName() {
+            return m_procedure;
         }
     }
 
@@ -126,7 +137,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         }
     }
 
-    public boolean createTransaction(final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
+    public boolean createTransaction(final String procName, final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
             final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
 
         if (m_stopped) {
@@ -143,7 +154,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                 public void run() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final ImportCallback cb = new ImportCallback(tcont, proccb, handle);
+                    final ImportCallback cb = new ImportCallback(tcont, procName, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
@@ -209,6 +220,11 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                         b.position(4);
                         resp.initFromBuffer(b);
                         final Callback callback = m_callbacks.remove(resp.getClientHandle());
+                        if (resp.getStatus() != ClientResponse.SUCCESS) {
+                            String fmt = "Importer stored procedure failed: %s Error: %s";
+                            rateLimitedLog(Level.ERROR, null, fmt, callback.getProcedureName(),
+                                    (resp.getAppStatusString() == null ? "No App Status" : resp.getAppStatusString()));
+                        }
                         callback.handleResponse(resp);
                     } catch (Exception ex) {
                         m_logger.error("Failed to process callback.", ex);
@@ -228,6 +244,16 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         } else {
             throw new UnsupportedOperationException("Buffer chains not supported in Import invocation adapter");
         }
+    }
+
+    //Do rate limited logging for messages.
+    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                ImportHandler.SUPPRESS_INTERVAL, TimeUnit.SECONDS,
+                m_logger, level,
+                cause, format, args
+                );
     }
 
     @Override
