@@ -952,8 +952,8 @@ public abstract class AbstractParsedStmt {
         Table table = null;
         if (subqueryElement == null) {
             table = getTableFromDB(tableName);
-            m_tableList.add(table);
             assert(table != null);
+            m_tableList.add(table);
             tableScan = addTableToStmtCache(table, tableAlias);
         } else {
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
@@ -1385,16 +1385,27 @@ public abstract class AbstractParsedStmt {
         // the result is deterministic.
         // This holds regardless of whether the associated index is actually used in the selected plan,
         // so this check is plan-independent.
+        //
+        // baseTableAliases associates table aliases with the order by
+        // expressions which reference them.  Presumably by using
+        // table aliases we will map table scans to expressions rather
+        // than tables to expressions, and not confuse ourselves with
+        // different instances of the same table in self joins.
         HashMap<String, List<AbstractExpression> > baseTableAliases =
                 new HashMap<String, List<AbstractExpression> >();
         for (ParsedColInfo col : orderByColumns()) {
             AbstractExpression expr = col.expression;
             List<AbstractExpression> baseTVEs = expr.findBaseTVEs();
+            // This check is not actually right.  The statement:
+            //    select id from alpha order by alpha.x + alpha.y;
+            // is not table spanning, nor is it constant.  But the
+            // set of base TVEs will have two elements.
             if (baseTVEs.size() != 1) {
                 // Table-spanning ORDER BYs -- like ORDER BY A.X + B.Y are not helpful.
                 // Neither are (nonsense) constant (table-less) expressions.
                 continue;
             }
+            // I'm not sure what this comment means.  - Bill W. 2015.08.06.
             // This loops exactly once.
             AbstractExpression baseTVE = baseTVEs.get(0);
             String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();

@@ -178,7 +178,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     private boolean orderByColumnsDetermineAllDisplayColumns(List<AbstractExpression> nonOrdered)
     {
-        return ParsedSelectStmt.orderByColumnsDetermineAllDisplayColumns(getLeftmostSelectStmt().displayColumns(), m_orderColumns, nonOrdered);
+        ParsedSelectStmt selectStmt = getLeftmostSelectStmt();
+        return selectStmt.orderByColumnsDetermineAllDisplayColumns(selectStmt.displayColumns(), m_orderColumns, nonOrdered);
     }
 
     @Override
