@@ -827,18 +827,41 @@ class AdminTest extends TestBase {
     // export expansion
 
     def "Overview:Export-Expand and check configurations"() {
-        when:
-        page.overview.export.click()
-        then:
-        if(waitFor(waitTime) {page.overview.exportNoConfigAvailable.isDisplayed()})
-        {
-            println(waitFor(waitTime){ page.overview.exportNoConfigAvailable.text()})
+        int count = 0
+        testStatus = false
+
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                page.overview.export.click()
+                then:
+                if(waitFor(waitTime) {page.overview.exportNoConfigAvailable.isDisplayed()})
+                {
+                    println(page.overview.exportNoConfigAvailable.text())
+                }
+                else
+                {
+                    waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
+                    println("The export configuration")
+                }
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
         }
-        else
-        {
-            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
-            println("The export configuration")
+        if(testStatus == true) {
+            println("PASS")
         }
+        else {
+            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+            assert false
+        }
+
+
 
 //        try {
 //            waitFor(waitTime) { page.overview.exportNoConfigAvailable.isDisplayed() }
