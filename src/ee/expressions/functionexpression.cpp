@@ -339,6 +339,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
+        case FUNC_LN:
+            ret = new UnaryFunctionExpression<FUNC_LN>((*arguments)[0]);
+            break;
         default:
             return NULL;
         }
@@ -363,6 +366,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_LEFT:
             ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
+            break;
+        case FUNC_MOD:
+            ret = new GeneralFunctionExpression<FUNC_MOD>(*arguments);
             break;
         case FUNC_OVERLAY_CHAR:
             ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);

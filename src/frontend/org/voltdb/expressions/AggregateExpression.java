@@ -67,11 +67,17 @@ public class AggregateExpression extends AbstractExpression {
         switch (type) {
         case AGGREGATE_COUNT:
         case AGGREGATE_COUNT_STAR:
+        case AGGREGATE_APPROX_COUNT_DISTINCT:
+        case AGGREGATE_HYPERLOGLOGS_TO_CARD:
             //
             // Always an integer
             //
             m_valueType = VoltType.BIGINT;
             m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+            break;
+        case AGGREGATE_VALS_TO_HYPERLOGLOG:
+            m_valueType = VoltType.VARBINARY;
+            m_valueSize = 65537;
             break;
         case AGGREGATE_AVG:
         case AGGREGATE_MAX:

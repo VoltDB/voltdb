@@ -146,6 +146,65 @@ public class TestCSVLoader {
     }
 
     @Test
+    public void testNoQuotes() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--noquotechar",
+                "--escape=\\",
+                "--skip=1",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime,
+                "2,2,2,222222,second,3.30,NULL,"+currentTime,
+                //unclosed quote below should work
+                "1 ,1,1,11111111,fir\"st,1.10,1.11,"+currentTime,
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 2;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testNoQuotesSpecialSeparator() throws Exception
+    {
+        // Separator is Ctrl-A. Don't know how to make it visible in eclipse.
+        String[] myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=",
+                "--noquotechar",
+                "--escape=\\",
+                "--skip=1",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "1 1111111111first1.101.11"+currentTime,
+                "222222222second3.30NULL"+currentTime,
+                //unclosed quote below should work
+                "1 1111111111fir\"st1.101.11"+currentTime,
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 2;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
     public void testCommon() throws Exception
     {
         String []myOptions = {
@@ -307,6 +366,84 @@ public class TestCSVLoader {
         };
         int invalidLineCnt = 7;
         int validLineCnt = 10;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
+    //Test using Upsert instead of insert.
+    // In the same batch, upsert allows lines with same primary key
+    @Test
+    public void testUpsertSameBatch() throws Exception {
+        String[] myOptions = {
+            "-f" + path_csv,
+            "--reportdir=" + reportDir,
+            "--maxerrors=50",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=0",
+            "--limitrows=100",
+            "--update",
+            "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String[] myData = {
+                "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+                "2,2,2,222222,second,3.30,NULL," + currentTime,
+                "3,3,3,333333, third ,NULL, 3.33," + currentTime,
+                "2,4,4,444444, NULL ,4.40 ,4.44," + currentTime,         // this should not fail,
+                "2,5,5,5555555,  \"abcde\"g, 5.50, 5.55," + currentTime, // this should not fail,
+                                                                         // and should exist in the table
+                "1,6,NULL,666666, sixth, 6.60, 6.66," + currentTime      // this should not fail,
+                                                                         // and should exist in the table
+        };
+
+        String[] myValidTableData = {
+                "3,3,3,333333, third ,NULL, 3.33," + currentTime,
+                "2,5,5,5555555,  \"abcde\"g, 5.50, 5.55," + currentTime,
+                "1,6,NULL,666666, sixth, 6.60, 6.66," + currentTime
+        };
+
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length;
+        int validUpsertLineCnt = 3;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt, validUpsertLineCnt, myValidTableData);
+    }
+
+    //Test using Upsert instead of insert.
+    // load same csv file is allowed in upsertMode
+    @Test
+    public void testUpsertIdempotent() throws Exception {
+        String[] myOptions = {
+            "-f" + path_csv,
+            "--reportdir=" + reportDir,
+            "--maxerrors=50",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=0",
+            "--limitrows=100",
+            "--update",
+            "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String[] myData = {
+                "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+                "2,2,2,222222,second,3.30,NULL," + currentTime,
+                "3,3,3,333333, third ,NULL, 3.33," + currentTime,
+        };
+
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+
+        // call again is Ok
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
     }
 
@@ -853,6 +990,11 @@ public class TestCSVLoader {
 
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
             int validLineCnt) throws Exception {
+        test_Interface(my_options, my_data, invalidLineCnt, validLineCnt, 0, new String[0]);
+    }
+
+    public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
+            int validLineCnt, int validLineUpsertCnt, String[] validData) throws Exception {
         try{
             BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
             for (String aMy_data : my_data) {
@@ -902,10 +1044,33 @@ public class TestCSVLoader {
         }
         csvreport.close();
         System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
-        assertEquals(lineCount, rowct);
+        assertEquals(lineCount-validLineUpsertCnt,  rowct);
         //assert validLineCnt specified equals the successfully inserted lineCount
         assertEquals(validLineCnt, lineCount);
         assertEquals(invalidLineCnt, invalidlinecnt);
-    }
 
+        // validate upsert the correct data
+        if (validData != null && validData.length > 0) {
+            tearDown();
+            setup();
+            try{
+                BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
+                for (String aMy_data : validData) {
+                    out_csv.write(aMy_data + "\n");
+                }
+                out_csv.flush();
+                out_csv.close();
+            }
+            catch( Exception e) {
+                e.printStackTrace();
+            }
+
+            CSVLoader.testMode = true;
+            CSVLoader.main( my_options );
+
+            VoltTable validMod;
+            validMod = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+            assertTrue(modCount.hasSameContents(validMod));
+        }
+    }
 }

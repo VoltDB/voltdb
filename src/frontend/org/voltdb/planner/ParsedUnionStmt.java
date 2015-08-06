@@ -19,8 +19,10 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -33,6 +35,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.planner.ParsedSelectStmt.LimitOffset;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.types.ExpressionType;
 
@@ -93,6 +96,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         // Parse ORDER BY
         if (orderbyElement != null) {
             parseOrderColumns(orderbyElement);
+            placeTVEsForOrderby();
         }
 
         // prepare the limit plan node if it needs one.
@@ -121,6 +125,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 // Assign every child a unique ID
                 childStmt.m_stmtId = AbstractParsedStmt.NEXT_STMT_ID++;
                 childStmt.m_parentStmt = m_parentStmt;
+                childStmt.setParentAsUnionClause();
 
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 childStmt = new ParsedUnionStmt(m_paramValues, m_db);
@@ -137,6 +142,10 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             m_children.add(childStmt);
             // Add statement's tables to the consolidated list
             m_tableList.addAll(childStmt.m_tableList);
+
+            // m_tableAliasListAsJoinOrder is not interesting for UNION
+            // m_tableAliasMap may have same alias table from different children
+            addStmtTablesFromChildren(childStmt.m_tableAliasMap);
         }
     }
 
@@ -188,6 +197,25 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
     }
 
+    private void addStmtTablesFromChildren(HashMap<String, StmtTableScan> tableAliasMap) {
+        for (String alias: tableAliasMap.keySet()) {
+            StmtTableScan tableScan = tableAliasMap.get(alias);
+
+            if (m_tableAliasMap.get(alias) == null) {
+                m_tableAliasMap.put(alias, tableScan);
+            } else {
+                // if there is a duplicate table alias in the map,
+                // find a new unique name for the key
+                // the value in the map are more interesting
+                alias += "_" + System.currentTimeMillis();
+                HashMap<String, StmtTableScan> duplicates = new HashMap<String, StmtTableScan>();
+                duplicates.put(alias, tableScan);
+
+                addStmtTablesFromChildren(duplicates);
+            }
+        }
+    }
+
     /**
      * This is a stripped down version of the ParsedSelectStmt.parseOrderColumn. Since the SET ops
      * are not allowed to have aggregate expressions (HAVING, GROUP BY) (except the individual SELECTS)
@@ -210,6 +238,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
         AbstractExpression order_exp = order_col.expression;
         assert(order_exp != null);
+
         // Mark the order by column if it is in displayColumns
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column
@@ -360,5 +389,25 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         }
         return retval;
+    }
+
+    private void placeTVEsForOrderby () {
+        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
+        Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <Integer, ParsedColInfo>();
+
+        int orderByIndex = 0;
+        ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();
+        for (ParsedColInfo col : leftmostSelectChild.m_displayColumns) {
+            displayIndexMap.put(col.expression, orderByIndex);
+            assert(col.alias != null);
+            displayIndexToColumnMap.put(orderByIndex, col);
+            orderByIndex++;
+        }
+
+        // place the TVEs from Display columns in the ORDER BY expression
+        for (ParsedColInfo orderCol : m_orderColumns) {
+            AbstractExpression expr = orderCol.expression.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
+            orderCol.expression = expr;
+        }
     }
 }

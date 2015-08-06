@@ -32,8 +32,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses. It calls
@@ -41,27 +44,31 @@ import org.voltdb.catalog.Procedure;
  */
 public class ImportClientResponseAdapter implements Connection, WriteStream {
     public static interface Callback {
-        public void handleResponse(ClientResponse response);
+        public void handleResponse(ClientResponse response) throws Exception;
     }
 
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final Map<Long, ImportCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, ImportCallback>());
+    private final ScheduledExecutorService m_es;
 
     private class ImportCallback implements Callback {
 
         private DBBPool.BBContainer m_cont;
         private long m_id;
-        public ImportCallback(final DBBPool.BBContainer cont) {
+        private final ProcedureCallback m_cb;
+
+        public ImportCallback(final DBBPool.BBContainer cont, ProcedureCallback cb) {
             m_cont = cont;
+            m_cb = cb;
         }
 
         public void setId(long id) {
             m_id = id;
         }
 
-        public synchronized void discard() {
+        public void discard() {
             if (m_cont != null) {
                 m_cont.discard();
                 m_cont = null;
@@ -69,9 +76,19 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         }
 
         @Override
-        public void handleResponse(ClientResponse response) {
+        public void handleResponse(ClientResponse response) throws Exception {
             discard();
             m_pendingCallbacks.remove(m_id);
+            if (m_cb != null) {
+                m_cb.clientCallback(response);
+            }
+        }
+
+        public void drain(ClientResponse response) throws Exception {
+            discard();
+            if (m_cb != null) {
+                m_cb.clientCallback(response);
+            }
         }
 
     }
@@ -80,9 +97,27 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         return m_pendingCallbacks.size();
     }
 
-    public boolean createTransaction(Procedure catProc, StoredProcedureInvocation task,
+    //Similar to distributer drain.
+    public void drain() {
+        long sleep = 500;
+        do {
+            if (m_pendingCallbacks.isEmpty()) {
+                break;
+            }
+            /*
+             * Back off to spinning at five millis. Try and get drain to be a little
+             * more prompt. Spinning sucks!
+             */
+            LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
+            if (sleep < 5000) {
+                sleep += 500;
+            }
+        } while(true);
+    }
+
+    public boolean createTransaction(Procedure catProc, ProcedureCallback proccb, StoredProcedureInvocation task,
             DBBPool.BBContainer tcont, int partition, long nowNanos) {
-            ImportCallback cb = new ImportCallback(tcont);
+            ImportCallback cb = new ImportCallback(tcont, proccb);
             long cbhandle = registerCallback(cb);
             cb.setId(cbhandle);
             task.setClientHandle(cbhandle);
@@ -101,6 +136,9 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      */
     public ImportClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
+        ThreadFactory factory = CoreUtils.getThreadFactory(null, "ImportResponseHandler", CoreUtils.SMALL_STACK_SIZE,
+                false, null);
+        m_es = new ScheduledThreadPoolExecutor(1, factory);
     }
 
     public long registerCallback(Callback c) {
@@ -124,11 +162,10 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
-            synchronized(this) {
-                int sz = ds.getSerializedSize();
-                buf = ByteBuffer.allocate(sz);
-                ds.serialize(buf);
-            }
+            final int serializedSize = ds.getSerializedSize();
+            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) return;
+            buf = ByteBuffer.allocate(serializedSize);
+            ds.serialize(buf);
             enqueue(buf);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, e);
@@ -137,17 +174,27 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public void enqueue(ByteBuffer b) {
-        ClientResponseImpl resp = new ClientResponseImpl();
+        final ClientResponseImpl resp = new ClientResponseImpl();
         try {
             b.position(4);
             resp.initFromBuffer(b);
 
-            Callback callback = m_callbacks.remove(resp.getClientHandle());
+            final Callback callback = m_callbacks.remove(resp.getClientHandle());
             if (callback != null) {
-                callback.handleResponse(resp);
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            callback.handleResponse(resp);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                });
+
             }
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             throw new RuntimeException("Unable to deserialize ClientResponse in ImportClientResponseAdapter", e);
         }

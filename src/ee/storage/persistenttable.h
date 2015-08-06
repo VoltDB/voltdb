@@ -203,6 +203,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // default iterator
     TableIterator m_iter;
 
+ protected:
+
+    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
+
   public:
     virtual ~PersistentTable();
 
@@ -392,7 +396,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleLimit;
     }
 
+    /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
+
+    /** Returns true if there is a hidden column in this table for the
+        DR timestamp (used to resolve active/active conflicts) */
+    bool hasDRTimestampColumn() const { return m_drTimestampColumnIndex != -1; }
+
+    /** Returns the index of the DR timestamp column (relative to the
+        hidden columns for the table).  If there's no DR timestamp
+        column, returns -1. */
+    int getDRTimestampColumnIndex() const { return m_drTimestampColumnIndex; }
 
     // for test purpose
     void setDR(bool flag) { m_drEnabled = flag; }
@@ -575,6 +589,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         }
     }
 
+    void setDRTimestampForTuple(ExecutorContext* ec, TableTuple &tuple);
+
     void computeSmallestUniqueIndex();
 
     // CONSTRAINTS
@@ -641,6 +657,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     bool m_noAvailableUniqueIndex;
     TableIndex* m_smallestUniqueIndex;
     uint32_t m_smallestUniqueIndexCrc;
+    int m_drTimestampColumnIndex;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

@@ -28,7 +28,6 @@ import java.util.Set;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.JoinType;
 
 public class BranchNode extends JoinNode {
@@ -134,13 +133,14 @@ public class BranchNode extends JoinNode {
         // without even considering the inner table). Testing the outer-only conditions
         // COULD be considered as an optimal first step to processing each outer tuple
         // 2. The INNER-only join conditions apply to the inner tuples (even prior to considering any outer tuple).
-        // if true for a given inner tuple, the condition has no effect, if false,
-        // it prevents the inner tuple from matching ANY outer tuple,
+        // if true for a given inner tuple, the condition has no effect,
+        // if false, it prevents the inner tuple from matching ANY outer tuple,
         // In case of multi-tables join, they could be pushed down to a child node if this node is a join itself
         // 3. The two-sided expressions that get evaluated on each combination of outer and inner tuple
         // and either accept or reject that particular combination.
         // 4. The TVE expressions where neither inner nor outer tables are involved. This is not possible
-        // for the currently supported two table joins but could change if number of tables > 2
+        // for the currently supported two table joins but could change if number of tables > 2.
+        // Constant Value Expression may fall into this category.
         classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
                 m_joinInnerList, m_joinInnerOuterList, noneList);
 

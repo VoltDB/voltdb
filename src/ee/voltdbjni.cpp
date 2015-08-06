@@ -263,6 +263,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint partitionId,
     jint hostId,
     jbyteArray hostname,
+    jint drClusterId,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
     jint compactionThreshold)
@@ -289,6 +290,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    partitionId,
                                    hostId,
                                    hostString,
+                                   drClusterId,
                                    tempTableMemory,
                                    createDrReplicatedStream,
                                    static_cast<int32_t>(compactionThreshold));
@@ -1027,6 +1029,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
         try {
             voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
             jlong tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in);
+            env->ReleaseByteArrayElements(serialized_buffers, bytes, JNI_ABORT);
             return tuplesRemaining;
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());

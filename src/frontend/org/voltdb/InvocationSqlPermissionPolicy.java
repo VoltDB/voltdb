@@ -20,7 +20,6 @@ package org.voltdb;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.InvocationPermissionPolicy.PolicyResult;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Permission;
 import org.voltdb.utils.LogKeys;

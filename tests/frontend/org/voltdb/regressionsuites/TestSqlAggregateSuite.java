@@ -409,6 +409,33 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         }
     }
 
+    // Test case for ENG-4980
+    public void testCountDistinctPartitionColumn() throws IOException, ProcCallException
+    {
+        String[] aggs = {"count", "sum", "min", "max"};
+        long[] expected_results = {5,
+                                   0 + 1 + 2 + 3 + 4,
+                                   0,
+                                   4};
+        Client client = getClient();
+        for (int i = 0; i < ROWS; ++i)
+        {
+            int value = i / 2;
+            String query = "INSERT INTO ENG4980 VALUES (" + value + ", " + value + ");";
+            System.out.println(query);
+            client.callProcedure("@AdHoc", query);
+        }
+        for (int i = 0; i < aggs.length; ++i)
+        {
+            String query = String.format("select %s(distinct pid) from ENG4980",
+                                         aggs[i]);
+            System.out.println(query);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+            results[0].advanceRow();
+            assertEquals(expected_results[i], results[0].getLong(0));
+        }
+    }
+
     // ENG-3645 crashed on an aggregates memory management issue.
     public void testEng3645() throws IOException, ProcCallException {
         Client client = getClient();

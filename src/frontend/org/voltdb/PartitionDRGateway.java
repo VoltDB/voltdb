@@ -28,7 +28,7 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -39,7 +39,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */
-public class PartitionDRGateway {
+public class PartitionDRGateway implements DurableUniqueIdListener {
     private static final VoltLogger log = new VoltLogger("DR");
 
     public enum DRRecordType {
@@ -126,6 +126,9 @@ public class PartitionDRGateway {
         cont.discard();
     }
 
+    @Override
+    public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
+
     private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
         @Override
         protected AtomicLong initialValue() {
@@ -151,7 +154,7 @@ public class PartitionDRGateway {
             AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
             buf.order(ByteOrder.LITTLE_ENDIAN);
             //Magic header space for Java for implementing zero copy stuff
-            buf.position(8 + 65 + (partitionId == MpInitiator.MP_INIT_PID ? 0 : 4));
+            buf.position(8 /* stream block header */ + 69 /* txn metadata padding */);
             while (buf.hasRemaining()) {
                 int startPosition = buf.position();
                 byte version = buf.get();
@@ -180,7 +183,7 @@ public class PartitionDRGateway {
                     }
                     buf.position(buf.position() + lengthPrefix);
                     checksum = buf.getInt();
-                    log.trace("Version " + version + " type " + recordType + "table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
+                    log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
                               (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
                     break;
                 }
@@ -227,6 +230,7 @@ public class PartitionDRGateway {
                 }
 
             }
+            buf.order(ByteOrder.BIG_ENDIAN);
         }
 
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);

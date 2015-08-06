@@ -16,10 +16,11 @@
  */
 package org.voltdb;
 
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -32,8 +33,7 @@ public interface CommandLog {
      *            The txnId of the truncation snapshot at the end of restore, or
      * @param partitionCount
      */
-    public abstract void init(
-                                 CatalogContext context,
+    public abstract void init(int logSize,
                                  long txnId,
                                  int partitionCount, String coreBinding,
                                  Map<Integer, Long> perPartitionTxnId);
@@ -45,8 +45,7 @@ public interface CommandLog {
      *            Long.MIN if there was none.
      * @param partitionCount
      */
-    public abstract void initForRejoin(
-                                          CatalogContext context,
+    public abstract void initForRejoin(int logSize,
                                           long txnId,
                                           int partitionCount, boolean isRejoin,
                                           String coreBinding, Map<Integer, Long> perPartitionTxnId);
@@ -68,7 +67,7 @@ public interface CommandLog {
             long spHandle,
             int[] involvedPartitions,
             DurabilityListener listener,
-            Object durabilityHandle);
+            TransactionTask durabilityHandle);
 
     public abstract void shutdown() throws InterruptedException;
 
@@ -78,8 +77,53 @@ public interface CommandLog {
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
+    interface CompletionChecks {
+        public CompletionChecks startNewCheckList(int startSize);
+
+        public void addTask(TransactionTask task);
+
+        public int getTaskListSize();
+
+        public void processChecks();
+    }
+
     public interface DurabilityListener {
-        public void onDurability(ArrayList<Object> durableThings);
+        /**
+         * Assign the listener that we will send SP and MP UniqueId durability notifications to
+         */
+        public void setUniqueIdListener(DurableUniqueIdListener listener);
+
+        /**
+         * Called from Scheduler to set up how all future completion checks will be handled
+         */
+        public void createFirstCompletionCheck(boolean isSyncLogging, boolean commandLoggingEnabled);
+
+        /**
+         * Determines if a completionCheck has already been allocated.
+         */
+        public boolean completionCheckInitialized();
+
+        /**
+         * Called from CommandLog to assign a new task to be tracked by the DurabilityListener
+         */
+        public void addTransaction(TransactionTask pendingTask);
+
+        /**
+         * Used by CommandLog to calculate the next task list size
+         */
+        public int getNumberOfTasks();
+
+        /**
+         * Used by CommandLog to crate a new CompletionCheck so the last CompletionCheck can be
+         * triggered when the sync completes
+         */
+        public CompletionChecks startNewTaskList(int nextMaxRowCnt);
+
+        /**
+         * Process checks on the correct scheduler thread
+         * @param completionChecks
+         */
+        void processDurabilityChecks(CompletionChecks completionChecks);
     }
 
     /**
@@ -98,4 +142,20 @@ public interface CommandLog {
      * Implementation should populate the stats based on column name to index mapping
      */
     public void populateCommandLogStats(Map<String, Integer> columnNameToIndex, Object[] rowValues);
+
+    /**
+     * Does this logger do synchronous logging
+     */
+    public abstract boolean isSynchronous();
+
+    /**
+     * Can the SpScheduler offer the task for execution.
+     * @return true if it can, false if it has to wait until the task is made durable.
+     */
+    boolean canOfferTask();
+
+    /**
+     * Assign DurabilityListener from each SpScheduler to commmand log
+     */
+    public abstract void registerDurabilityListener(DurabilityListener durabilityListener);
 }

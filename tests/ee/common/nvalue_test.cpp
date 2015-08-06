@@ -88,7 +88,7 @@ public:
         m_testPool.reset(testPool);
         ExecutorContext *newExec = new ExecutorContext(0, 0, NULL, NULL, testPool,
                                                        (NValueArray*)NULL, (VoltDBEngine*)NULL,
-                                                       "", 0, NULL, NULL);
+                                                       "", 0, NULL, NULL, 0);
         m_executorContext.reset(newExec);
         return m_executorContext.get();
     }
@@ -247,6 +247,83 @@ TEST_F(NValueTest, DeserializeDecimal)
     ASSERT_EQ(value, TTInt(static_cast<int64_t>(-12340000000000)));
     ASSERT_EQ(str, "-12.340000000000");
 
+    // Test to see that we round down appropriately.
+    deserDecValidator("0.8999999999994");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt((uint64_t)899999999999), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
+
+    // Test to see that we round up appropriately.
+    deserDecValidator("0.8999999999995");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt((uint64_t)900000000000), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
+
+    // Test to see that we round from the fractional
+    // part to a zero decimal part.
+    deserDecValidator("0.9999999999995");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt(1), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
+
+    // Test to see that we round from the fractional
+    // part to a non-zero decimal part.
+    deserDecValidator("99.9999999999995");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt(100), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
+
+    // Test to see that we round from the fractional
+    // part to a non-zero decimal part.
+    deserDecValidator("98.9999999999999");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt(99), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
+
+    // Test to see that we round down appropriately with a signed number.
+    deserDecValidator("-0.8999999999994");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    TTInt sfrac = ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor);
+    TTInt sexpFrac("-899999999999");
+    ASSERT_EQ(sexpFrac, sfrac);
+
+    // Test to see that we round up appropriately with a signed number
+    deserDecValidator("-0.8999999999995");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt(0), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt("-900000000000"), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
+
+    // Test to see that we round from the fractional
+    // part to a zero decimal part with a signed number.
+    deserDecValidator("-0.9999999999995");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt("-1"), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt("0"), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
+
+    // Test to see that we round from the fractional
+    // part to a non-zero decimal part.
+    deserDecValidator("-99.9999999999995");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt("-100"), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt("0"), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
+
+    // Test to see that we round from the fractional
+    // part to a non-zero decimal part.
+    deserDecValidator("-98.9999999999999");
+    ASSERT_FALSE(nv.isNull());
+    ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_EQ(TTInt("-99"), ValuePeeker::peekDecimal(nv)/TTInt(NValue::kMaxScaleFactor));
+    ASSERT_EQ(TTInt("0"), ValuePeeker::peekDecimal(nv) % TTInt(NValue::kMaxScaleFactor));
     // illegal deserializations
     try {
         // too few digits
@@ -294,6 +371,21 @@ TEST_F(NValueTest, DeserializeDecimal)
         ASSERT_EQ(0,1);
     }
     catch (SerializableEEException &e) {
+    }
+
+    try {
+        // This will round to a number which has
+        // 39 digits of precision, which is invalid.
+        nv = ValueFactory::getDecimalValueFromString("99999999999999999999999999.9999999999995999999");
+    } catch (SerializableEEException &e) {
+
+    }
+    try {
+        // This will round to a number which has
+        // 39 digits of precision, which is invalid.
+        nv = ValueFactory::getDecimalValueFromString("-99999999999999999999999999.9999999999995");
+    } catch (SerializableEEException &e) {
+
     }
 }
 

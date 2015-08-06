@@ -31,8 +31,8 @@ package org.voltdb.catalog;
  */
 public class FilteredCatalogDiffEngine extends CatalogDiffEngine {
 
-    public FilteredCatalogDiffEngine(Catalog prev, Catalog next) {
-        super(prev, next);
+    public FilteredCatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose) {
+        super(prev, next, forceVerbose);
     }
 
     /**

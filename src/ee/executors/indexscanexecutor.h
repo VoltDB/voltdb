@@ -48,6 +48,7 @@
 
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+#include "executors/OptimizedProjector.hpp"
 
 #include "boost/shared_array.hpp"
 
@@ -72,7 +73,7 @@ class IndexScanExecutor : public AbstractExecutor
 public:
     IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
         : AbstractExecutor(engine, abstractNode)
-        , m_projectionExpressions(NULL)
+        , m_projector()
         , m_searchKeyBackingStore(NULL)
         , m_aggExec(NULL)
     {}
@@ -87,13 +88,11 @@ private:
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
     IndexScanPlanNode *m_node;
-    int m_numOfColumns;
     int m_numOfSearchkeys;
 
     // Inline Projection
     ProjectionPlanNode* m_projectionNode;
-    int* m_projectionAllTupleArray; // projection_all_tuple_array_ptr[]
-    AbstractExpression** m_projectionExpressions;
+    OptimizedProjector m_projector;
 
     // Search key
     AbstractExpression** m_searchKeyArray;

@@ -88,7 +88,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         // List of all 'genqa' tables should include the 'genqa' test tables
         GENQA_ALL_TABLES.addAll(GENQA_TEST_TABLES)
         // Move contents of the various files into memory
-        fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file, '#', false)) }
+        fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file, '#', false, (file == sqlQueriesFile ? '}' : ''))) }
     }
 
     def setup() { // called before each test
@@ -547,6 +547,9 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         debugPrint "\nquery         : " + query
         debugPrint "expect status : " + expectedResponse.status
         debugPrint "expect result : " + expectedResponse.result
+        if (expectedResponse.error != null) {
+            debugPrint "expect error  : " + expectedResponse.error
+        }
         debugPrint "\nactual results: " + page.getQueryResults()
         debugPrint "last result   : " + qResult
 
@@ -562,13 +565,52 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         debugPrint "actual status : " + status
         debugPrint "query duration: " + duration
         if (duration == null || duration.isEmpty()) {
-            println "WARNING: query duration '" + duration + "', for test '" +
+            println "\nWARNING: query duration '" + duration + "', for test '" +
                     sqlQueriesTestName + "' is null or empty!"
         }
 
-        then: 'check the error status, and query result'
+        and: 'for a non-matching result, check if it is just a trim issue, and print details'
+        if (expectedResponse.result != qResult) {
+            println "\nWARNING: query result does not match expected, for column(s):"
+            boolean allDiffsCausedByTrim = true
+            def expCols = expectedResponse.result.keySet()
+            def actCols = qResult.keySet()
+            for (String col: expCols) {
+                def expCol = expectedResponse.result.get(col)
+                def actCol = qResult.get(col)
+                if (!expCol.equals(actCol)) {
+                    println "  expected " + col + ": '" + expCol + "'"
+                    println "  actual   " + col + ": '" + actCol + "'"
+                    for (int i=0; i < expCol.size(); i++) {
+                        if (actCol != null && expCol[i].trim().equals(actCol[i])) {
+                            expCol[i] = actCol[i]
+                        } else {
+                            allDiffsCausedByTrim = false
+                        }
+                    }
+                }
+            }
+            // Check for any columns that occur in the actual, but not expected, results
+            for (String col: actCols) {
+                def expCol = expectedResponse.result.get(col)
+                if (expCol == null) {
+                    println "  expected " + col + ": '" + expCol + "'"
+                    println "  actual   " + col + ": '" + qResult.get(col) + "'"
+                    allDiffsCausedByTrim = false
+                }
+            }
+            if (allDiffsCausedByTrim) {
+                println "All these differences appear to be caused by Selenium calling trim() on the " +
+                        "column values, so this test (" + sqlQueriesTestName + ") will likely pass."
+            } else {
+                println "There are real differences here, so this test (" + sqlQueriesTestName + ") will fail."
+            }
+        }
+
+        then: 'check the query result, error status, and error message (if any)'
         expectedResponse.result == qResult
         expectedResponse.status == status
+        expectedResponse.error == null || (error != null && error.contains(expectedResponse.error))
 
         cleanup: 'delete all rows from the tables'
         runQuery(page, 'delete from partitioned_table;\ndelete from replicated_table')
@@ -788,278 +830,4 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         page.runQuery()
 
     }
-
-
-// for tables
-/*
-    def "Check created table by refreshing in SQL QUERY tab and Schema tab"() {
-
-        when: 'click the SQL Query link (if needed)'
-        openSqlQueryPage()
-        then: 'should be on SQL Query page'
-        at SqlQueryPage
-
-        String checkQuery = page.getQueryToCreateTable()
-
-        when: 'set create query in the box'
-        page.setQueryText(checkQuery)
-        then: 'run the query'
-        page.runQuery()
-
-
-        try {
-            waitFor(10) {
-                page.cancelpopupquery.isDisplayed()
-                page.okpopupquery.click()
-
-            }
-
-        } catch (geb.error.RequiredPageContentNotPresent e) {
-            println("pop up won't occurr due to already in running state")
-
-
-        } catch (geb.waiting.WaitTimeoutException e) {
-
-
-            println("already in admin port state")
-
-        }
-
-        waitFor(5){page.refreshquery.isDisplayed()}
-        page.refreshquery.click()
-        println("refresh button clicked and created table shown in SQLQuery tab!!")
-
-
-        // In Schema Page Schema Tab
-        when: 'click the Schema (page) link'
-        page.openSchemaPage()
-        then: 'should be on Schema page'
-        at SchemaPage
-
-        when: 'go to schema tab'
-        page.openSchemaPageSchemaTab()
-        then: 'at schema tab'
-        at SchemaPageSchemaTab
-        waitFor(5){page.refreshtableschema.isDisplayed()}
-        page.refreshtableschema.click()
-        println("refresh button clicked and created table shown in schema page of schema tab")
-
-
-        // In Schema page DDL Source tab
-        when: 'go to DDL source tab'
-        page.openSchemaPageDdlSourceTab()
-        then: 'at DDL source tab'
-        at SchemaPageDdlSourceTab
-
-        waitFor(5){page.refreshddl.isDisplayed()}
-        page.refreshddl.click()
-        println("refresh button clicked and created table shown in Schema page of DDL source tab")
-
-        // In Size and Worksheet tab
-        when: 'go to size worksheet tab'
-        page.openSchemaPageSizeWorksheetTab()
-        then: 'at size worksheet tab'
-        at SchemaPageSizeWorksheetTab
-
-        waitFor(5){page.refreshtableworksheet.isDisplayed()}
-        page.refreshtableworksheet.click()
-        println("refresh button clicked and created table shown in schema page of Size and worksheet tab")
-
-
-        when: 'click the SQL Query link (if needed)'
-        openSqlQueryPage()
-        then: 'should be on SQL Query page'
-        at SqlQueryPage
-
-
-        String createQuery = page.getQueryToCreateTable()
-        String deleteQuery = page.getQueryToDeleteTable()
-        String tablename =  page.getTablename()
-
-        when: 'set delete query in the box'
-        page.setQueryText(deleteQuery)
-        then: 'run the query'
-        page.runQuery()
-        waitFor(5){page.refreshquery.isDisplayed()}
-        page.refreshquery.click()
-        println("created table deleted!! in SQL Query tab")
-
-
-        // In Schema Page Schema Tab for checking deleted table
-        when: 'click the Schema (page) link'
-        page.openSchemaPage()
-        then: 'should be on Schema page'
-        at SchemaPage
-
-        when: 'go to schema tab'
-        page.openSchemaPageSchemaTab()
-        then: 'at schema tab'
-        at SchemaPageSchemaTab
-        waitFor(5){page.refreshtableschema.isDisplayed()}
-        page.refreshtableschema.click()
-        println("refresh button clicked and created table deleted in schema tab")
-
-        // In Schema page DDL Source tab for checking deleted table
-        when: 'go to DDL source tab'
-        page.openSchemaPageDdlSourceTab()
-        then: 'at DDL source tab'
-        at SchemaPageDdlSourceTab
-
-        waitFor(5){page.refreshddl.isDisplayed()}
-        page.refreshddl.click()
-        println("refresh button clicked and created table deleted in Schema page of DDL source tab")
-
-        // In Size and Worksheet tab for checking deleted table
-        when: 'go to size worksheet tab'
-        page.openSchemaPageSizeWorksheetTab()
-        then: 'at size worksheet tab'
-        at SchemaPageSizeWorksheetTab
-
-        waitFor(5){page.refreshtableworksheet.isDisplayed()}
-        page.refreshtableworksheet.click()
-        println("refresh button clicked and created table deleted in schema page of Size and worksheet tab")
-
-    }
-
-// for views
-
-    def "Check created views by refreshing in SQL QUERY tab and Schema tab"() {
-
-        when: 'click the SQL Query link (if needed)'
-        openSqlQueryPage()
-        then: 'should be on SQL Query page'
-        at SqlQueryPage
-
-        String checkQuery = page.getQueryToCreateView()
-
-        when: 'set create query in the box'
-        page.setQueryText(checkQuery)
-        then: 'run the query'
-        page.runQuery()
-
-
-        try {
-            waitFor(10) {
-                page.cancelpopupquery.isDisplayed()
-                page.okpopupquery.click()
-
-            }
-
-        } catch (geb.error.RequiredPageContentNotPresent e) {
-            println("pop up won't occurr due to already in running state")
-
-
-        } catch (geb.waiting.WaitTimeoutException e) {
-
-
-            println("already in admin port state")
-
-        }
-
-
-
-        waitFor(5){page.refreshquery.isDisplayed()}
-        page.refreshquery.click()
-        try {
-            waitFor(15){page.checkview.isDisplayed()}
-            page.checkview.click()}
-        catch (geb.error.RequiredPageContentNotPresent e) {println("element not found")}
-        catch (geb.waiting.WaitTimeoutException e){println("waiting timeout")}
-        println("views that is created has been displayed!!")
-
-        // In Schema Page Schema Tab
-        when: 'click the Schema (page) link'
-        page.openSchemaPage()
-        then: 'should be on Schema page'
-        at SchemaPage
-
-        when: 'go to schema tab'
-        page.openSchemaPageSchemaTab()
-        then: 'at schema tab'
-        at SchemaPageSchemaTab
-        waitFor(5){page.refreshtableschema.isDisplayed()}
-        page.refreshtableschema.click()
-        println("refresh button clicked and created views shown in schema page of schema tab")
-
-
-        // In Schema page DDL Source tab
-        when: 'go to DDL source tab'
-        page.openSchemaPageDdlSourceTab()
-        then: 'at DDL source tab'
-        at SchemaPageDdlSourceTab
-
-        waitFor(5){page.refreshddl.isDisplayed()}
-        page.refreshddl.click()
-        println("refresh button clicked and created views shown in Schema page of DDL source tab")
-
-        // In Size and Worksheet tab
-        when: 'go to size worksheet tab'
-        page.openSchemaPageSizeWorksheetTab()
-        then: 'at size worksheet tab'
-        at SchemaPageSizeWorksheetTab
-
-        waitFor(5){page.refreshtableworksheet.isDisplayed()}
-        page.refreshtableworksheet.click()
-        println("refresh button clicked and created views shown in schema page of Size and worksheet tab")
-
-
-        when: 'click the SQL Query link (if needed)'
-        openSqlQueryPage()
-        then: 'should be on SQL Query page'
-        at SqlQueryPage
-
-
-        String createQuery = page.getQueryToCreateView()
-        String deleteQuery = page.getQueryToDeleteView()
-        String tablename =  page.getTablename()
-
-        when: 'set delete query in the box'
-        page.setQueryText(deleteQuery)
-        then: 'run the query'
-        page.runQuery()
-
-        waitFor(5){page.refreshquery.isDisplayed()}
-        page.refreshquery.click()
-        waitFor(10){page.checkview.isDisplayed()}
-        page.checkview.click()
-        println("created views has been deleted!! in SQL Query tab")
-
-
-        // In Schema Page Schema Tab for checking deleted table
-        when: 'click the Schema (page) link'
-        page.openSchemaPage()
-        then: 'should be on Schema page'
-        at SchemaPage
-
-        when: 'go to schema tab'
-        page.openSchemaPageSchemaTab()
-        then: 'at schema tab'
-        at SchemaPageSchemaTab
-        waitFor(5){page.refreshtableschema.isDisplayed()}
-        page.refreshtableschema.click()
-        println("refresh button clicked and created views deleted in schema tab")
-
-        // In Schema page DDL Source tab for checking deleted table
-        when: 'go to DDL source tab'
-        page.openSchemaPageDdlSourceTab()
-        then: 'at DDL source tab'
-        at SchemaPageDdlSourceTab
-
-        waitFor(5){page.refreshddl.isDisplayed()}
-        page.refreshddl.click()
-        println("refresh button clicked and created views deleted in Schema page of DDL source tab")
-
-        // In Size and Worksheet tab for checking deleted table
-        when: 'go to size worksheet tab'
-        page.openSchemaPageSizeWorksheetTab()
-        then: 'at size worksheet tab'
-        at SchemaPageSizeWorksheetTab
-
-        waitFor(5){page.refreshtableworksheet.isDisplayed()}
-        page.refreshtableworksheet.click()
-        println("refresh button clicked and created views deleted in schema page of Size and worksheet tab")
-
-    }
-*/
-
 }

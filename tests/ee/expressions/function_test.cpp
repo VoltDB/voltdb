@@ -85,7 +85,8 @@ struct FunctionTest : public Test {
                                   "localhost",
                                   0,
                                   (DRTupleStream *)0,
-                                  (DRTupleStream *)0) {}
+                                  (DRTupleStream *)0,
+                                  0) {}
         /**
          * A template for calling unary function call expressions.  For any C++
          * type T, define the function "NValue getSomeValue(T val)" to
@@ -228,6 +229,29 @@ TEST_F(FunctionTest, BinTest) {
                       0);
             expectedz[(BIGINT_SIZE-1) - idx] = '1';
     }
+}
+
+TEST_F(FunctionTest, NaturalLogTest) {
+    ASSERT_EQ(testUnary(FUNC_LN, 1, 0),
+              0);
+
+    bool sawExecption = false;
+    try {
+        testUnary(FUNC_LN, -1, 0);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+
+    sawExecption = false;
+    try {
+        testUnary(FUNC_LN, 0, 0);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg, "Invalid result value (-inf)", strlen(errMsg)) >= 0)? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
 }
 
 TEST_F(FunctionTest, HexTest) {

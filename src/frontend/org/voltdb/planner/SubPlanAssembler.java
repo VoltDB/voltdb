@@ -1335,7 +1335,7 @@ public abstract class SubPlanAssembler {
         assert(path != null);
 
         AbstractPlanNode scanNode = null;
-        // if no path is a sequential scan, call a subroutine for that
+        // if no index, it is a sequential scan
         if (path.index == null) {
             scanNode = getScanAccessPlanForTable(tableScan, path.otherExprs);
         } else {

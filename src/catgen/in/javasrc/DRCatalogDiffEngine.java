@@ -21,6 +21,8 @@
 
 package org.voltdb.catalog;
 
+import java.util.List;
+
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.utils.Pair;
 import org.voltdb.common.Constants;
@@ -43,6 +45,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     public static Pair<Long, String> serializeCatalogCommandsForDr(Catalog catalog) {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         StringBuilder sb = new StringBuilder();
+        db.writeCommandForField(sb, "isActiveActiveDRed", true);
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
@@ -87,6 +90,14 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             if ("estimatedtuplecount".equals(field)) {
                 return null;
             }
+        } else if (suspect instanceof Database) {
+            if ("isActiveActiveDRed".equalsIgnoreCase(field)) {
+                return "Incompatible DR modes between two clusters";
+            }
+            if ("schema".equalsIgnoreCase(field) ||
+                "securityprovider".equalsIgnoreCase(field)) {
+                return null;
+            }
         } else if (suspect instanceof Column) {
             if ("defaultvalue".equals(field) ||
                 "defaulttype".equals(field) ||
@@ -123,7 +134,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     }
 
     @Override
-    public String[] checkModifyIfTableIsEmptyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
+    public List<String[]> checkModifyIfTableIsEmptyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
         return null;
     }
 }

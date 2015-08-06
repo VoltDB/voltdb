@@ -262,11 +262,11 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
          extendBufferChain(m_defaultCapacity);
      }
 
-     m_currBlock->recordLastBeginTxnOffset();
-
      if (m_currBlock->remaining() < BEGIN_RECORD_SIZE) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
+
+     m_currBlock->recordLastBeginTxnOffset();
 
      if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
          m_currBlock->lastDRSequenceNumber() != (sequenceNumber - 1)) {
