@@ -45,6 +45,14 @@ CREATE TABLE kafkaexporttable1
 PARTITION TABLE kafkaexporttable1 ON COLUMN KEY;
 EXPORT TABLE kafkaexporttable1;
 
+CREATE TABLE importcounts
+    (
+                    KEY BIGINT NOT NULL,
+                    TOTAL_ROWS_DELETED BIGINT NOT NULL
+    );
+
+PARTITION TABLE importcounts on COLUMN KEY;
+
 -- Stored procedures
 LOAD classes sp.jar;
 

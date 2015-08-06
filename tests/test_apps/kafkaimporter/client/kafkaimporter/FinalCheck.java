@@ -34,8 +34,8 @@ public class FinalCheck {
         long importRows = MatchChecks.getImportTableRowCount(client);
 
         log.info("Total rows exported: " + KafkaImportBenchmark.finalInsertCount);
-        log.info("Rows remaining in the Mirror Table: " + mirrorRows);
-        log.info("Rows remaining in the Import Table: " + importRows);
+        log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorRows);
+        log.info("Unmatched Rows received from Kafka to Import Table: " + importRows);
         if (importRows != 0 || mirrorRows != 0) {
             return false;
         }

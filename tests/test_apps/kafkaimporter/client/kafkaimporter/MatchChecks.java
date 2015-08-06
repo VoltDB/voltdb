@@ -24,8 +24,6 @@
 package kafkaimporter.client.kafkaimporter;
 
 import java.io.IOException;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
@@ -33,6 +31,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+
 
 public class MatchChecks {
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
@@ -59,27 +58,6 @@ public class MatchChecks {
          }
     }
 
-    protected static Timer checkTimer(long interval, Client client) {
-        final Timer timer = new Timer("checkTimer", true);
-        final Client innerClient = client;
-        timer.scheduleAtFixedRate(new TimerTask() {
-            private long mirrorRowCount = 0;
-
-            @Override
-            public void run() {
-                mirrorRowCount = getMirrorTableRowCount(innerClient);
-                //log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
-                log.info("checkTimer: Mirror table row count: " + mirrorRowCount);
-                if (mirrorRowCount == 0) { // indicates everything matched and mirror table empty
-                    log.info("checkTimer: mirrorRowCount is 0. Stopping...");
-                    timer.cancel();
-                    timer.purge();
-                }
-            }
-        }, 0, interval);
-        return timer;
-    }
-
     protected static long getMirrorTableRowCount(Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
@@ -88,11 +66,28 @@ public class MatchChecks {
         try {
             VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
             mirrorRowCount = countQueryResult[0].asScalarLong();
-        } catch (IOException | ProcCallException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            log.error("Exception from callProcedure", e);
+            System.exit(-1);
         }
-        //log.info("Mirror table row count: " + mirrorRowCount);
         return mirrorRowCount;
+    }
+
+    protected static long getImportRowCount(Client client) {
+        // get the count of rows imported
+        long importRowCount = 0;
+
+        try {
+            VoltTable[] countQueryResult = client.callProcedure("@AdHoc", "select sum(TOTAL_ROWS_DELETED) from importcounts order by 1;").getResults();
+            VoltTable data = countQueryResult[0];
+            long nrows = data.getRowCount();
+            if (nrows > 0)
+                importRowCount = data.asScalarLong();
+        } catch (Exception e) {
+            log.error("Exception from callProcedure", e);
+            System.exit(-1);
+        }
+        return importRowCount;
     }
 
     protected static long findAndDeleteMatchingRows(Client client) {
@@ -102,8 +97,8 @@ public class MatchChecks {
         try {
             results = client.callProcedure("MatchRows").getResults()[0];
         } catch (Exception e) {
-             e.printStackTrace();
-             System.exit(-1);
+            log.error("Exception from callProcedure", e);
+            System.exit(-1);
         }
 
         log.info("getRowCount(): " + results.getRowCount());
@@ -112,8 +107,9 @@ public class MatchChecks {
             // log.info("Key: " + key);
             try {
                 client.callProcedure(new DeleteCallback(DELETE_ROWS, key), DELETE_ROWS, key);
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                log.error("Exception from callProcedure", e);
+                System.exit(-1);
             }
             rows++;
         }
@@ -126,10 +122,11 @@ public class MatchChecks {
         try {
             VoltTable[] countQueryResult = client.callProcedure("CountImport").getResults();
             importRowCount = countQueryResult[0].asScalarLong();
-        } catch (IOException | ProcCallException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            log.error("Exception from callProcedure", e);
+            System.exit(-1);
         }
-        log.info("Import table row count: " + importRowCount);
+        log.info("Unmatched Import row count: " + importRowCount);
         return importRowCount;
     }
 }
