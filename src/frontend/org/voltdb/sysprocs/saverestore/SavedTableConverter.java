@@ -93,17 +93,14 @@ public abstract class SavedTableConverter
         Column catalogColumnForHiddenColumn = null;
         if (addDRHiddenColumn) {
             catalogColumnForHiddenColumn = new Column();
-            //catalogColumnForHiddenColumn.setDefaulttype(VoltType.BIGINT.getValue());
-            //catalogColumnForHiddenColumn.setDefaultvalue("0");
             catalogColumnForHiddenColumn.setName(VoltTable.DR_HIDDEN_COLUMN_NAME);
-            catalogColumnForHiddenColumn.setInbytes(true);
+            catalogColumnForHiddenColumn.setType(VoltType.BIGINT.getValue());
             catalogColumnForHiddenColumn.setSize(Long.SIZE / 8);
+            catalogColumnForHiddenColumn.setInbytes(false);
+            // small hack here to let logic below fill VoltType.NULL_BIGINT in for the hidden column
+            // actually this column is not nullable in EE, but it will be set to correct value before
+            // insert(restore) to the corresponding table
             catalogColumnForHiddenColumn.setNullable(true);
-
-            // in this DR passive to active transition scenario, we may take advantage of
-            // status code in VoltTable to tell EE to change the value of these tuples from
-            // 0 to DRTimestamp calculated from uniqueId from this snapshot restore transaction
-            //new_table.setStatusCode(UNINITIALIZED_DR_TIMESTAMP_STATUS_CODE);
         }
 
         // Copy all the old tuples into the new table
