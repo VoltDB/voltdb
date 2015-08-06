@@ -399,13 +399,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         }
                     }
                 } catch (Exception e) {
-                    error(e, "Error in finding leader for " + m_topicAndPartition);
+                    error(e, "Error in finding leader for %s", m_topicAndPartition);
                 } finally {
                     closeConsumer(consumer);
                 }
             }
             if (returnMetaData == null) {
-                error(null, "Failed to find Leader for " + m_topicAndPartition);
+                error(null, "Failed to find Leader for %s", m_topicAndPartition);
             }
             return returnMetaData;
         }
@@ -431,7 +431,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
             }
             //Unable to find return null for recheck.
-            error(null, "Failed to find new leader for " + m_topicAndPartition);
+            error(null, "Failed to find new leader for %s", m_topicAndPartition);
             return null;
         }
 
