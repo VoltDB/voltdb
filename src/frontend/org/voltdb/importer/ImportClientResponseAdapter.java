@@ -33,38 +33,43 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ProcedureCallback;
 
 /**
- * A very simple adapter for import handler that deserializes bytes into client responses. It calls
+ * A very simple adapter for import handler that deserializes bytes into client responses.
+ * For each partition it creates a single thread executor to sequence per partition transaction submission.
+ * Responses are also written on a single thread executor to avoid bottlenecking on callback doing heavy work.
+ * It calls
  * crashLocalVoltDB() if the deserialization fails, which should only happen if there's a bug.
  */
 public class ImportClientResponseAdapter implements Connection, WriteStream {
-    public static interface Callback {
+
+    private static final VoltLogger m_logger = new VoltLogger("IMPORT");
+
+    public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
     }
 
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
-    private final Map<Long, ImportCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, ImportCallback>());
-    private final ScheduledExecutorService m_es;
+    private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
+    private final ExecutorService m_es;
+    private volatile boolean m_stopped = false;
 
     private class ImportCallback implements Callback {
 
         private DBBPool.BBContainer m_cont;
-        private long m_id;
+        private final long m_id;
         private final ProcedureCallback m_cb;
 
-        public ImportCallback(final DBBPool.BBContainer cont, ProcedureCallback cb) {
+        public ImportCallback(final DBBPool.BBContainer cont, ProcedureCallback cb, long id) {
             m_cont = cont;
             m_cb = cb;
-        }
-
-        public void setId(long id) {
             m_id = id;
         }
 
@@ -78,55 +83,81 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         @Override
         public void handleResponse(ClientResponse response) throws Exception {
             discard();
-            m_pendingCallbacks.remove(m_id);
             if (m_cb != null) {
                 m_cb.clientCallback(response);
             }
         }
-
-        public void drain(ClientResponse response) throws Exception {
-            discard();
-            if (m_cb != null) {
-                m_cb.clientCallback(response);
-            }
-        }
-
     }
 
     public long getPendingCount() {
-        return m_pendingCallbacks.size();
+        return m_callbacks.size();
     }
 
-    //Similar to distributer drain.
-    public void drain() {
-        long sleep = 500;
-        do {
-            if (m_pendingCallbacks.isEmpty()) {
-                break;
-            }
-            /*
-             * Back off to spinning at five millis. Try and get drain to be a little
-             * more prompt. Spinning sucks!
-             */
-            LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
-            if (sleep < 5000) {
-                sleep += 500;
-            }
-        } while(true);
+    public void start() {
+        m_stopped = false;
     }
 
-    public boolean createTransaction(Procedure catProc, ProcedureCallback proccb, StoredProcedureInvocation task,
-            DBBPool.BBContainer tcont, int partition, long nowNanos) {
-            ImportCallback cb = new ImportCallback(tcont, proccb);
-            long cbhandle = registerCallback(cb);
-            cb.setId(cbhandle);
-            task.setClientHandle(cbhandle);
-            m_pendingCallbacks.put(cbhandle, cb);
+    //Submit a stop to the end of the queue.
+    public void stop() {
+        m_stopped = true;
+        try {
+            m_es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    long sleep = 500;
+                    do {
+                        if (m_callbacks.isEmpty()) {
+                            break;
+                        }
+                        /*
+                         * Back off to spinning at five millis. Try and get drain to be a little
+                         * more prompt. Spinning sucks!
+                         */
+                        LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
+                        if (sleep < 5000) {
+                            sleep += 500;
+                        }
+                    } while(true);
 
-            //Submmit the transaction.
-            return VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
-                    catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
-                    task.getSerializedSize(), nowNanos);
+                }
+            });
+        } catch (RejectedExecutionException ex) {
+            m_logger.error("Failed to submit ImportClientResponseAdapter stop() to the response processing queue.", ex);
+        }
+    }
+
+    public boolean createTransaction(final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
+            final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
+
+        if (m_stopped) {
+            return false;
+        }
+
+        if (!m_partitionExecutor.containsKey(partition)) {
+            m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("ImportHandlerExecutor - " + partition));
+        }
+        ExecutorService executor = m_partitionExecutor.get(partition);
+        try {
+            executor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    final long handle = nextHandle();
+                    task.setClientHandle(handle);
+                    final ImportCallback cb = new ImportCallback(tcont, proccb, handle);
+                    m_callbacks.put(handle, cb);
+
+                    //Submit the transaction.
+                    VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
+                            catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
+                            task.getSerializedSize(), nowNanos);
+                }
+            });
+        } catch (RejectedExecutionException ex) {
+            m_logger.error("Failed to submit transaction to the partition queue.", ex);
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -136,15 +167,11 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      */
     public ImportClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
-        ThreadFactory factory = CoreUtils.getThreadFactory(null, "ImportResponseHandler", CoreUtils.SMALL_STACK_SIZE,
-                false, null);
-        m_es = new ScheduledThreadPoolExecutor(1, factory);
+        m_es = CoreUtils.getSingleThreadExecutor("ImportResponseHandler");
     }
 
-    public long registerCallback(Callback c) {
-        final long handle = m_handles.incrementAndGet();
-        m_callbacks.put( handle, c);
-        return handle;
+    public long nextHandle() {
+        return m_handles.incrementAndGet();
     }
 
     @Override
@@ -163,7 +190,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         try {
             ByteBuffer buf = null;
             final int serializedSize = ds.getSerializedSize();
-            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) return;
             buf = ByteBuffer.allocate(serializedSize);
             ds.serialize(buf);
             enqueue(buf);
@@ -173,30 +199,24 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public void enqueue(ByteBuffer b) {
-        final ClientResponseImpl resp = new ClientResponseImpl();
+    public void enqueue(final ByteBuffer b) {
         try {
-            b.position(4);
-            resp.initFromBuffer(b);
-
-            final Callback callback = m_callbacks.remove(resp.getClientHandle());
-            if (callback != null) {
-                m_es.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            callback.handleResponse(resp);
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
+            m_es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        final ClientResponseImpl resp = new ClientResponseImpl();
+                        b.position(4);
+                        resp.initFromBuffer(b);
+                        final Callback callback = m_callbacks.remove(resp.getClientHandle());
+                        callback.handleResponse(resp);
+                    } catch (Exception ex) {
+                        m_logger.error("Failed to process callback.", ex);
                     }
-                });
-
-            }
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException("Unable to deserialize ClientResponse in ImportClientResponseAdapter", e);
+                }
+            });
+        } catch (RejectedExecutionException ex) {
+            m_logger.error("Failed to submit callback to the response processing queue.", ex);
         }
     }
 
