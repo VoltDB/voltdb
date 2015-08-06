@@ -30,7 +30,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         mainservername			    {$("#serverListWrapperAdmin")}
 
         serverresumebuttonmain		{$(class:"shutdown", text:"Resume")}
-        serverstopbtndisable   		{$(class:"disableServer", text:"Stop") }
+        serverstopbtndisable   		{$(class:"disableServer").find(".stopDisable") }
         serverstopbtnenable			{$(class:"shutdown", text:"Stop")}
 
         serverstopbuttonmain		{$("#stopServer_voltdbserver", text:"Paused")}

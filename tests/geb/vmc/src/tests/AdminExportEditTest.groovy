@@ -8,27 +8,27 @@ import geb.Page.*
 class AdminExportEditTest extends TestBase {
 
     def setup() { // called before each test
-		int count = 0
-		
-		while(count<numberOfTrials) {
-		    count ++
-			try {
-		        setup: 'Open VMC page'
-				to VoltDBManagementCenterPage
-				expect: 'to be on VMC page'
-				at VoltDBManagementCenterPage
+        int count = 0
 
-				when: 'click the Admin link (if needed)'
-				page.openAdminPage()
-				then: 'should be on Admin page'
-				at AdminPage
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                setup: 'Open VMC page'
+                to VoltDBManagementCenterPage
+                expect: 'to be on VMC page'
+                at VoltDBManagementCenterPage
 
-				break
-			} catch (org.openqa.selenium.ElementNotVisibleException e) {
-				println("ElementNotVisibleException: Unable to Start the test")
-				println("Retrying")
-			}
-		}
+                when: 'click the Admin link (if needed)'
+                page.openAdminPage()
+                then: 'should be on Admin page'
+                at AdminPage
+
+                break
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException: Unable to Start the test")
+                println("Retrying")
+            }
+        }
     }
 
     def "Add configuration in an Export Configuration"() {
@@ -46,38 +46,38 @@ class AdminExportEditTest extends TestBase {
         page.overview.metadatabroker.isDisplayed()
 
 
-	    when: 'Provide values for add configuration'
-	    page.overview.stream.value("kafkaTest")
-	    page.overview.metadatabrokerValue.value("metadataValue")
-	    then: 'Click Save'
+        when: 'Provide values for add configuration'
+        page.overview.stream.value("kafkaTest")
+        page.overview.metadatabrokerValue.value("metadataValue")
+        then: 'Click Save'
         page.overview.clickSave()
-	    when: 'Expand export'
+        when: 'Expand export'
+        page.overview.export.isDisplayed()
+        page.overview.expandExport()
+        then: 'Display the created KAFKA'
+        waitFor(10) { page.overview.kafkaName.isDisplayed()}
+        println("Configuration created")
 
-	    page.overview.expandExport()
-	    then: 'Display the created KAFKA'
-    waitFor(10) { page.overview.kafkaName.isDisplayed()}
-	    println("Configuration created")
-	    
-	    // Edit: Add Configuration
-	    
-	    when: 'Edit button is displayed'
-	    waitFor(10){ page.overview.editExportConfiguration.isDisplayed()}
+        // Edit: Add Configuration
+
+        when: 'Edit button is displayed'
+        waitFor(10){ page.overview.editExportConfiguration.isDisplayed()}
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
-        
+
         when: 'Add property is clicked'
         waitFor(10) { page.overview.addProperty.click()}
         then: 'New text and value fields are displayed'
         page.overview.newTextField.isDisplayed()
         page.overview.newValueField.isDisplayed()
-         page.overview.deleteFirstProperty.isDisplayed()
-        
+        page.overview.deleteFirstProperty.isDisplayed()
+
         when: 'Provide values for text and value fields'
         page.overview.newTextField.value("value1")
         page.overview.newValueField.value("value2")
         then: 'Click Save'
         page.overview.clickSave()
-        
+
 
     }
 
@@ -86,9 +86,7 @@ class AdminExportEditTest extends TestBase {
         // Edit: Change the file type
 
         when: 'Edit button is displayed'
-        if (page.overview.checkIfExportIsExpanded() == false)
-            page.overview.export.click()
-        println(page.overview.checkIfExportIsExpanded())
+        page.overview.expandExport()
         waitFor(10) { page.overview.editExportConfiguration.isDisplayed()}
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
@@ -154,12 +152,12 @@ class AdminExportEditTest extends TestBase {
         page.overview.editExportConfiguration.click()
 
         when: 'Check all the properties'
- waitFor(10){       page.overview.addProperty.isDisplayed()}
+        waitFor(10){       page.overview.addProperty.isDisplayed()
         page.overview.save.isDisplayed()
-        page.overview.cancel.isDisplayed()
+        page.overview.cancel.isDisplayed()}
 
         then: 'Check for previous changes'
-        waitFor(10) { page.overview.metadatabrokerValue.value().equals("metadataValue") }
+        waitFor(waitTime) { page.overview.metadatabrokerValue.value().equals("metadataValue") }
 
 
         when: 'Change to ELASTICSEARCH'
@@ -179,12 +177,9 @@ class AdminExportEditTest extends TestBase {
 
         //Edit: Change the file type to HTTP
         when: 'Expand export'
-
-        if (page.overview.checkIfExportIsExpanded() == false)
-            page.overview.export.click()
-        println(page.overview.checkIfExportIsExpanded())
+        page.overview.expandExport()
         then: 'Display the created KAFKA'
-      //  waitFor(10) { page.overview.kafkaName.isDisplayed()}
+        //  waitFor(10) { page.overview.kafkaName.isDisplayed()}
         when: 'Edit button is displayed'
 
         waitFor(10) { page.overview.editExportConfiguration.isDisplayed() }
@@ -197,7 +192,7 @@ class AdminExportEditTest extends TestBase {
         page.overview.cancel.isDisplayed()
 
         then: 'Check for previous changes'
-       // page.overview.endpointESValue.value().equals("endpointValue")
+        // page.overview.endpointESValue.value().equals("endpointValue")
 
 
         when: 'Change to HTTP'
@@ -211,7 +206,7 @@ class AdminExportEditTest extends TestBase {
         page.overview.clickSave()
 
 
-       // Edit: Change the file type to RABBITMQ
+        // Edit: Change the file type to RABBITMQ
 
         when: 'Expand export'
         page.overview.expandExport()
@@ -230,7 +225,7 @@ class AdminExportEditTest extends TestBase {
 
         then: 'Check for previous changes'
 
-         page.overview.endpointValue.value().equals("endValue")
+        page.overview.endpointValue.value().equals("endValue")
 
 
         when: 'Change to RABBITMQ'
@@ -247,11 +242,9 @@ class AdminExportEditTest extends TestBase {
 
     def "Delete Export Configuration"(){
 
-                when: 'Edit button is displayed'
-
-                if (page.overview.checkIfExportIsExpanded() == false)
-                    page.overview.export.click()
-                println(page.overview.checkIfExportIsExpanded())
+        when: 'Edit button is displayed'
+        page.overview.export.isDisplayed()
+        page.overview.expandExport()
         waitFor(10) { page.overview.editExportConfiguration.isDisplayed()}
         then: 'Click edit button'
         page.overview.editExportConfiguration.click()
