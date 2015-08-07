@@ -81,6 +81,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private String m_groupId;
     //Procedure to be invoked with params.
     private String m_procedure;
+    //backpressure sleep milli seconds 100ms by default.
+    private int m_backpressureSleepMs = 200;
+
     //List of topics form comma seperated list.
     private List<String> m_topicList;
     //List of brokers.
@@ -330,6 +333,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //These are defaults picked up from kafka we save them so that they are passed around.
         m_fetchSize = Integer.parseInt(m_properties.getProperty("fetch.message.max.bytes", "65536"));
         m_consumerSocketTimeout = Integer.parseInt(m_properties.getProperty("socket.timeout.ms", "30000"));
+        m_backpressureSleepMs = Integer.parseInt(m_properties.getProperty("backpressure.sleep.ms", "50"));
     }
 
     //Per topic per partition that we are responsible for.
@@ -342,16 +346,15 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //coordinator for offset management.
         private HostAndPort m_coordinator;
         private boolean m_shutdown = false;
+        private volatile boolean m_hasBackPressure = false;
         private final int m_fetchSize;
         //Available brokers.
         private final List<HostAndPort> m_brokers;
         private final int m_consumerSocketTimeout;
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
-        private final AtomicLong m_committedOffset = new AtomicLong(-1);
         private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
-        private final int m_perTopicPendingLimit = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private final TopicAndPartition m_topicAndPartition;
 
@@ -367,6 +370,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
         public final URI getUrl() {
             return m_url;
+        }
+
+        public void hasBackPressure(boolean flag) {
+            m_hasBackPressure = flag;
         }
 
         //Find leader for the topic+partition.
@@ -510,116 +517,22 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
             private final long m_offset;
             private final long m_nextOffset;
-            private final TopicAndPartition m_topicAndPartition;
             private final AtomicLong m_cbcnt;
 
-            public TopicPartitionInvocationCallback(long offset, long noffset, TopicAndPartition tAndP, AtomicLong cbcnt) {
+            public TopicPartitionInvocationCallback(long offset, long noffset, AtomicLong cbcnt) {
                 m_offset = offset;
                 m_nextOffset = noffset;
-                m_topicAndPartition = tAndP;
                 m_cbcnt = cbcnt;
-            }
-
-            public boolean commitOffset(long offset) {
-
-                final int correlationId = m_topicAndPartition.partition();
-                final short version = 1;
-
-                OffsetAndMetadata offsetMetdata = new OffsetAndMetadata(offset, "commitRequest", ErrorMapping.NoError());
-                Map<TopicAndPartition, OffsetAndMetadata> reqMap = new HashMap<TopicAndPartition, OffsetAndMetadata>();
-                reqMap.put(m_topicAndPartition, offsetMetdata);
-                OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(m_groupId, reqMap, correlationId, CLIENT_ID, version);
-                OffsetCommitResponse offsetCommitResponse = null;
-                try {
-                    SimpleConsumer consumer = m_offsetManager.get();
-                    if (consumer == null) {
-                        getOffsetCoordinator();
-                        consumer = m_offsetManager.get();
-                    }
-                    if (consumer != null) {
-                        offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                        final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-                        if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
-                            info("Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
-                            getOffsetCoordinator();
-                            consumer = m_offsetManager.get();
-                            if (consumer != null) {
-                                offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                            }
-                        }
-                    } else {
-                        error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
-                        return false;
-                    }
-                } catch (Exception e) {
-                    error(e, "Failed to commit Offset for " + m_topicAndPartition);
-                    return false;
-                }
-                final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-                if (code != ErrorMapping.NoError()) {
-                    final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: %d";
-                    error(null, msg, code);
-                    return false;
-                }
-                return true;
-            }
-
-            private void commitAndSaveOffset(long currentNext) {
-                try {
-                    //If we have too many commit last and clean up
-                    if (m_seenOffset.size() >= m_perTopicPendingLimit) {
-                        //Last possible commit point.
-                        long commit = m_seenOffset.last();
-                        if (commitOffset(commit)) {
-                            debug("Committed offset " + commit + " for " + m_topicAndPartition);
-                            m_currentOffset.set(commit);
-                        }
-                        synchronized(m_seenOffset) {
-                            m_seenOffset.clear();
-                        }
-                        info("Seen offset commit list is too big. Size " + m_perTopicPendingLimit + " Commiting highest offset and clean.");
-                        return;
-                    }
-                    long commit;
-                    synchronized(m_seenOffset) {
-                        if (!m_seenOffset.isEmpty()) {
-                            m_seenOffset.add(currentNext);
-                            //From first find the last continuous offset and commit that.
-                            commit = m_seenOffset.first();
-                            while (m_seenOffset.contains(++commit)) {
-                                m_seenOffset.remove(commit);
-                            }
-                        } else {
-                           commit =  currentNext;
-                        }
-                    }
-
-                    //Highest commit we have seen after me will be committed.
-                    if (commitOffset(commit)) {
-                        if (isDebugEnabled()) {
-                            debug("Committed offset " + commit + " for " + m_topicAndPartition);
-                        }
-                        m_committedOffset.set(commit);
-                    }
-                    //If this happens we will come back again on next callback.
-                } catch (Exception ex) {
-                    error(ex, "Failed to commit and save offset %d", currentNext);
-                }
             }
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                try {
-                    //We should never get here with no pending offsets.
-                    assert(!m_pendingOffsets.isEmpty());
-                    m_cbcnt.incrementAndGet();
-                    m_pendingOffsets.remove(m_offset);
-                    commitAndSaveOffset(m_nextOffset);
-
-                } catch (Throwable t) {
-                    // Should never get here
-                  t.printStackTrace();
-                }
+                //We should never get here with no pending offsets.
+                assert(!m_pendingOffsets.isEmpty());
+                m_cbcnt.incrementAndGet();
+                m_pendingOffsets.remove(m_offset);
+                //This is what we commit to
+                m_seenOffset.add(m_nextOffset);
             }
 
         }
@@ -643,7 +556,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             try {
                 //Startwith the starting leader.
                 HostAndPort leaderBroker = m_leader;
-                int fetchFailedCount = 1;
+                int sleepCounter = 1;
                 while (!m_shutdown) {
                     if (consumer == null) {
                         consumer = new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
@@ -653,118 +566,120 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         getOffsetCoordinator();
                         m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
                         if (m_currentOffset.get() < 0) {
-                            fetchFailedCount = backoffSleep(fetchFailedCount);
+                            sleepCounter = backoffSleep(sleepCounter);
                             info("Latest offset not found for " + m_topicAndPartition + " using earliest offset.");
                             //No latest time available so get earliest known for this consumer group.
                             m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.EarliestTime()));
                         }
+                        sleepCounter = backoffSleep(sleepCounter);
                         info("Starting offset for " + m_topicAndPartition + " is set to: " + m_currentOffset.get());
                         continue;
                     }
                     long currentFetchCount = 0;
                     //Build fetch request of we have a valid offset and not too many are pending.
-                    if (m_pendingOffsets.size() < m_perTopicPendingLimit) {
-                        FetchRequest req = new FetchRequestBuilder().clientId(CLIENT_ID)
-                                .addFetch(m_topicAndPartition.topic(),
-                                        m_topicAndPartition.partition(), m_currentOffset.get(), m_fetchSize)
-                                .build();
-                        FetchResponse fetchResponse = null;
-                        try {
-                            fetchResponse = consumer.fetch(req);
-                            if (fetchResponse == null) {
-                                fetchFailedCount = backoffSleep(fetchFailedCount);
-                                continue;
-                            }
-                        } catch (Exception ex) {
-                            error(ex, "Failed to fetch from %s", m_topicAndPartition);
-                            //See if its network error and find new leader for this partition.
-                            if (ex instanceof ClosedChannelException) {
-                                closeConsumer(consumer);
-                                consumer = null;
-                                leaderBroker = findNewLeader();
-                                if (leaderBroker == null) {
-                                    //point to original leader which will fail and we fall back again here.
-                                    error(null, "Fetch Failed to find leader continue with old leader: %s", m_leader);
-                                    leaderBroker = m_leader;
-                                } else {
-                                    if (!leaderBroker.equals(m_leader)) {
-                                        info("Fetch Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
-                                    }
-                                }
-                                //find leader would sleep and backoff
-                                continue;
-                            }
-                            fetchFailedCount = backoffSleep(fetchFailedCount);
+                    FetchRequest req = new FetchRequestBuilder().clientId(CLIENT_ID)
+                            .addFetch(m_topicAndPartition.topic(),
+                                    m_topicAndPartition.partition(), m_currentOffset.get(), m_fetchSize)
+                            .build();
+                    FetchResponse fetchResponse = null;
+                    try {
+                        fetchResponse = consumer.fetch(req);
+                        if (fetchResponse == null) {
+                            sleepCounter = backoffSleep(sleepCounter);
                             continue;
                         }
-
-                        if (fetchResponse.hasError()) {
-                            // Something went wrong!
-                            short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
-                            warn(null, "Failed to fetch messages for %s Code: %d", m_topicAndPartition, code);
-                            fetchFailedCount = backoffSleep(fetchFailedCount);
-                            if (code == ErrorMapping.OffsetOutOfRangeCode()) {
-                                // We asked for an invalid offset. For simple case ask for the last element to reset
-                                info("Invalid offset requested for " + m_topicAndPartition);
-                                getOffsetCoordinator();
-                                m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
-                                continue;
-                            }
+                    } catch (Exception ex) {
+                        error(ex, "Failed to fetch from %s", m_topicAndPartition);
+                        //See if its network error and find new leader for this partition.
+                        if (ex instanceof ClosedChannelException) {
                             closeConsumer(consumer);
                             consumer = null;
                             leaderBroker = findNewLeader();
                             if (leaderBroker == null) {
                                 //point to original leader which will fail and we fall back again here.
-                                error(null, "Failed to find leader continue with old leader: %s", m_leader);
+                                error(null, "Fetch Failed to find leader continue with old leader: %s", m_leader);
                                 leaderBroker = m_leader;
                             } else {
                                 if (!leaderBroker.equals(m_leader)) {
-                                    info("Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
+                                    info("Fetch Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
                                 }
                             }
+                            //find leader would sleep and backoff
                             continue;
                         }
-                        fetchFailedCount = 1;
-                        for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
-                            long currentOffset = messageAndOffset.offset();
-                            //if currentOffset is less means we have already pushed it and also check pending queue.
-                            if (currentOffset < m_currentOffset.get()) {
-                                continue;
-                            }
-                            ByteBuffer payload = messageAndOffset.message().payload();
+                        sleepCounter = backoffSleep(sleepCounter);
+                        continue;
+                    }
 
-                            currentFetchCount++;
-                            String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),"UTF-8");
-                            CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                            TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), m_topicAndPartition, cbcnt);
-                            m_pendingOffsets.add(currentOffset);
-                            if (!callProcedure(cb, invocation)) {
-                                if (isDebugEnabled()) {
-                                    debug("Failed to process Invocation possibly bad data: " + line);
-                                }
-                                synchronized(m_seenOffset) {
-                                    //Make this failed offset known to seen offsets so committer can push ahead.
-                                    m_seenOffset.add(messageAndOffset.nextOffset());
-                                }
-                                m_pendingOffsets.remove(currentOffset);
+                    if (fetchResponse.hasError()) {
+                        // Something went wrong!
+                        short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
+                        warn(null, "Failed to fetch messages for %s Code: %d", m_topicAndPartition, code);
+                        sleepCounter = backoffSleep(sleepCounter);
+                        if (code == ErrorMapping.OffsetOutOfRangeCode()) {
+                            // We asked for an invalid offset. For simple case ask for the last element to reset
+                            info("Invalid offset requested for " + m_topicAndPartition);
+                            getOffsetCoordinator();
+                            m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
+                            continue;
+                        }
+                        closeConsumer(consumer);
+                        consumer = null;
+                        leaderBroker = findNewLeader();
+                        if (leaderBroker == null) {
+                            //point to original leader which will fail and we fall back again here.
+                            error(null, "Failed to find leader continue with old leader: %s", m_leader);
+                            leaderBroker = m_leader;
+                        } else {
+                            if (!leaderBroker.equals(m_leader)) {
+                                info("Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
                             }
-                            submitCount++;
-                            m_currentOffset.set(messageAndOffset.nextOffset());
-                            if (m_shutdown) {
-                                break;
+                        }
+                        continue;
+                    }
+                    sleepCounter = 1;
+                    for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
+                        //You may be catchin up so dont sleep.
+                        currentFetchCount++;
+                        long currentOffset = messageAndOffset.offset();
+                        //if currentOffset is less means we have already pushed it and also check pending queue.
+                        if (currentOffset < m_currentOffset.get()) {
+                            continue;
+                        }
+                        ByteBuffer payload = messageAndOffset.message().payload();
+
+                        String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),"UTF-8");
+                        CSVInvocation invocation = new CSVInvocation(m_procedure, line);
+                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), cbcnt);
+                        m_pendingOffsets.add(currentOffset);
+                        if (!callProcedure(cb, invocation)) {
+                            if (isDebugEnabled()) {
+                                debug("Failed to process Invocation possibly bad data: " + line);
                             }
+                            synchronized(m_seenOffset) {
+                                //Make this failed offset known to seen offsets so committer can push ahead.
+                                m_seenOffset.add(messageAndOffset.nextOffset());
+                            }
+                            m_pendingOffsets.remove(currentOffset);
+                        }
+                        submitCount++;
+                        m_currentOffset.set(messageAndOffset.nextOffset());
+                        if (m_shutdown) {
+                            break;
                         }
                     }
                     if (m_shutdown) {
                         break;
                     }
 
-                    if (currentFetchCount == 0) {
+                    //wait to fetch more if we are in backpressure or read nothing last time.
+                    if (currentFetchCount == 0 || m_hasBackPressure) {
                         try {
-                            Thread.sleep(1000);
+                            Thread.sleep(m_backpressureSleepMs);
                         } catch (InterruptedException ie) {
                         }
                     }
+                    commitOffset();
                 }
                 //Drain will make sure there is nothing in pending.
                 info("Partition fecher stopped for " + m_topicAndPartition
@@ -774,10 +689,61 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             } catch (Exception ex) {
                 error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
+                commitOffset();
                 closeConsumer(consumer);
                 consumer = null;
                 closeConsumer(m_offsetManager.getAndSet(null));
             }
+        }
+
+        public boolean commitOffset() {
+
+            if (m_seenOffset.isEmpty())
+                return false;
+            long offset = m_seenOffset.last();
+            final int correlationId = m_topicAndPartition.partition();
+            final short version = 1;
+
+            OffsetAndMetadata offsetMetdata = new OffsetAndMetadata(offset, "commitRequest", ErrorMapping.NoError());
+            Map<TopicAndPartition, OffsetAndMetadata> reqMap = new HashMap<TopicAndPartition, OffsetAndMetadata>();
+            reqMap.put(m_topicAndPartition, offsetMetdata);
+            OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(m_groupId, reqMap, correlationId, CLIENT_ID, version);
+            OffsetCommitResponse offsetCommitResponse = null;
+            try {
+                SimpleConsumer consumer = m_offsetManager.get();
+                if (consumer == null) {
+                    getOffsetCoordinator();
+                    consumer = m_offsetManager.get();
+                }
+                if (consumer != null) {
+                    offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                    final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+                    if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
+                        info("Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
+                        getOffsetCoordinator();
+                        consumer = m_offsetManager.get();
+                        if (consumer != null) {
+                            offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                        }
+                    }
+                } else {
+                    error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                    return false;
+                }
+            } catch (Exception e) {
+                error(e, "Failed to commit Offset for " + m_topicAndPartition);
+                return false;
+            }
+            final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+            if (code != ErrorMapping.NoError()) {
+                final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: %d";
+                error(null, msg, code);
+                return false;
+            }
+            synchronized(m_seenOffset) {
+                m_seenOffset.clear();
+            }
+            return true;
         }
 
     }
@@ -789,6 +755,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             }
         } catch (Exception e) {
             error("Failed to close consumer connection.", e);
+        }
+    }
+
+    @Override
+    public void hasBackPressure(boolean flag) {
+        if (m_stopping) return;
+        for (TopicPartitionFetcher fetcher : m_fetchers.values()) {
+            fetcher.hasBackPressure(flag);
         }
     }
 
