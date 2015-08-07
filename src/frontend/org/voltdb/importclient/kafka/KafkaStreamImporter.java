@@ -16,9 +16,13 @@
  */
 package org.voltdb.importclient.kafka;
 
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
+
+import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,6 +53,8 @@ import kafka.javaapi.ConsumerMetadataResponse;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetCommitRequest;
 import kafka.javaapi.OffsetCommitResponse;
+import kafka.javaapi.OffsetFetchRequest;
+import kafka.javaapi.OffsetFetchResponse;
 import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
@@ -62,6 +68,7 @@ import org.osgi.framework.BundleContext;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 import org.voltdb.importer.ImporterChannelAssignment;
@@ -74,6 +81,11 @@ import org.voltdb.importer.VersionedOperationMode;
  * @author akhanzode
  */
 public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
+
+    private final static PartitionOffsetRequestInfo LATEST_OFFSET =
+            new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1);
+    private final static PartitionOffsetRequestInfo EARLIEST_OFFSET =
+            new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.EarliestTime(), 1);
 
     //Properties for the importer
     private Properties m_properties;
@@ -191,7 +203,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //For all topics connect and get metadata.
         Set<URI> availableResources = new TreeSet<URI>();
         for (String topic : m_topicList) {
-            TopicMetadataRequest req = new TopicMetadataRequest(Collections.singletonList(topic));
+            TopicMetadataRequest req = new TopicMetadataRequest(singletonList(topic));
             kafka.javaapi.TopicMetadataResponse resp = null;
             try {
                 resp = consumer.send(req);
@@ -216,12 +228,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             for (TopicMetadata item : metaData) {
                 for (PartitionMetadata part : item.partitionsMetadata()) {
                     partitions.add(part.partitionId());
-                    for (kafka.cluster.Broker replica : part.replicas()) {
-                        String leaderKey = topic + "-" + part.partitionId();
-                        m_topicPartitionLeader.put(leaderKey, new HostAndPort(replica.host(), replica.port()));
-                        URI uri = URI.create("kafka:/" + topic + "/partition/" + part.partitionId());
-                        availableResources.add(uri);
-                    }
+                    URI uri = URI.create("kafka:/" + topic + "/partition/" + part.partitionId());
+                    availableResources.add(uri);
+                    String leaderKey = topic + "-" + part.partitionId();
+                    Broker leader = part.leader();
+                    m_topicPartitionLeader.put(leaderKey, new HostAndPort(leader.host(), leader.port()));
                 }
             }
         }
@@ -342,7 +353,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //URL for this fetcher.
         private final URI m_url;
         //Leafer for fetching data
-        private final HostAndPort m_leader;
+        private HostAndPort m_leader;
         //coordinator for offset management.
         private HostAndPort m_coordinator;
         private boolean m_shutdown = false;
@@ -356,6 +367,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
+        private SimpleConsumer m_consumer = null;
         private final TopicAndPartition m_topicAndPartition;
 
         public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String topic, int partition, HostAndPort leader, int fetchSize, int consumerSocketTimeout) {
@@ -385,7 +397,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 try {
                     consumer = new SimpleConsumer(broker.getHost(), broker.getPort(), m_consumerSocketTimeout, m_fetchSize, "findLeader");
 
-                    List<String> topics = Collections.singletonList(m_topicAndPartition.topic());
+                    List<String> topics = singletonList(m_topicAndPartition.topic());
                     TopicMetadataRequest req = new TopicMetadataRequest(topics);
                     kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
 
@@ -441,75 +453,148 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
 
         public void getOffsetCoordinator() {
-            BlockingChannel channel = null;
+            KafkaStreamImporterException probeException = null;
             int correlationId = 0;
-            for (int i = 0; i < 3; i++) {
-                try {
-                    //Note: This can go to any broker which is fine.
-                    channel = new BlockingChannel(m_coordinator.getHost(), m_coordinator.getPort(),
-                            BlockingChannel.UseDefaultBufferSize(), BlockingChannel.UseDefaultBufferSize(), m_consumerSocketTimeout);
-                    channel.connect();
-                    channel.send(new ConsumerMetadataRequest(m_groupId, ConsumerMetadataRequest.CurrentVersion(), correlationId++, CLIENT_ID));
-                    ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
 
-                    if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
-                        Broker offsetManager = metadataResponse.coordinator();
-                        m_coordinator = new HostAndPort(offsetManager.host(), offsetManager.port());
-                        SimpleConsumer consumer = m_offsetManager.getAndSet(new SimpleConsumer(m_coordinator.getHost(), m_coordinator.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID) );
-                        closeConsumer(consumer);
-                        consumer = null;
-                        break;
-                    }
-                    final String msg = "Failed to get Offset Coordinator for " + m_topicAndPartition + " Code: %d";
-                    //Rate limited warning.
-                    warn(null, msg, metadataResponse.errorCode());
-                    backoffSleep(i+1);
-                } catch (Exception e) {
-                    // retry the query backoff and retry
-                    error(e, "Failed to get Offset Coordinator for " + m_topicAndPartition);
-                    backoffSleep(i+1);
-                } finally {
-                    if (channel != null) {
-                        channel.disconnect();
-                    }
-                }
-            }
-            info("Coordinator for " + m_topicAndPartition + " consumer is: " + m_coordinator);
-        }
-
-        public long getLastOffset(long whichTime) {
-            if (m_offsetManager.get() == null) {
-                return -1;
-            }
-            SimpleConsumer consumer = m_offsetManager.get();
-            try {
-                Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
-                requestInfo.put(m_topicAndPartition, new PartitionOffsetRequestInfo(whichTime, 1));
-                kafka.javaapi.OffsetRequest request = new kafka.javaapi.OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(), CLIENT_ID);
-                OffsetResponse response = consumer.getOffsetsBefore(request);
-
-                if (response.hasError()) {
-                    short code = response.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
-                    if (code == ErrorMapping.NotLeaderForPartitionCode() || code == ErrorMapping.UnknownTopicOrPartitionCode()) {
-                        HostAndPort leaderBroker = findNewLeader();
-                        if (leaderBroker != null) {
-                            info("Found new leader for " + m_topicAndPartition + " Coordinator will be updated.");
-                            SimpleConsumer oconsumer = m_offsetManager.getAndSet(new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID) );
-                            closeConsumer(oconsumer);
-                            oconsumer = null;
-                            m_coordinator = leaderBroker;
+            for (int attempts = 0; attempts < 3; ++attempts) {
+                for (HostAndPort hp: m_brokerList) {
+                    BlockingChannel channel = null;
+                    try {
+                        channel = new BlockingChannel(hp.getHost(), hp.getPort(),
+                                BlockingChannel.UseDefaultBufferSize(), BlockingChannel.UseDefaultBufferSize(), m_consumerSocketTimeout);
+                        channel.connect();
+                        channel.send(new ConsumerMetadataRequest(m_groupId, ConsumerMetadataRequest.CurrentVersion(), correlationId++, CLIENT_ID));
+                        ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
+                        if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
+                            Broker offsetManager = metadataResponse.coordinator();
+                            m_coordinator = new HostAndPort(offsetManager.host(), offsetManager.port());
+                            SimpleConsumer consumer = m_offsetManager.getAndSet(
+                                    new SimpleConsumer(
+                                            m_coordinator.getHost(),
+                                            m_coordinator.getPort(),
+                                            m_consumerSocketTimeout,
+                                            m_fetchSize, CLIENT_ID
+                                            ));
+                            info("Offset Coordinator for " + m_topicAndPartition + " is " + offsetManager);
+                            closeConsumer(consumer);
+                            probeException = null;
+                            consumer = null;
+                            break;
+                        }
+                        probeException = new KafkaStreamImporterException("Failed to get Offset Coordinator for %s",
+                                ErrorMapping.exceptionFor(metadataResponse.errorCode()), m_topicAndPartition
+                                );
+                    } catch (Exception e) {
+                        probeException = new KafkaStreamImporterException(
+                                "Failed to get Offset Coordinator for %s", e, m_topicAndPartition
+                                );
+                    } finally {
+                        if (channel != null) {
+                            channel.disconnect();
                         }
                     }
-                    info("Error fetching Offset Data from Broker " + m_topicAndPartition.toString() +
-                            " Reason: " + response.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition()) );
-                    return -1;
                 }
-                long[] offsets = response.offsets(m_topicAndPartition.topic(), m_topicAndPartition.partition());
-                return offsets[0];
-            } catch (Exception ex) {
-                error(ex, "Failed to get last Offset for " + m_topicAndPartition);
+                if (probeException != null) {
+                    error(probeException, "Failed to query all brokers for the offeset coordinator for " + m_topicAndPartition);
+                }
+                backoffSleep(attempts+1);
             }
-            return -1;
+        }
+
+        private OffsetResponse getTopicOffset(PartitionOffsetRequestInfo pori) {
+            final int partition = m_topicAndPartition.partition();
+            final String topic = m_topicAndPartition.topic();
+
+            kafka.javaapi.OffsetRequest earlyRq = new kafka.javaapi.OffsetRequest(
+                    singletonMap(m_topicAndPartition, pori),
+                    kafka.api.OffsetRequest.CurrentVersion(), CLIENT_ID
+                    );
+            OffsetResponse response = null;
+            Throwable fault = null;
+
+            for (int attempts = 0; attempts < 3; ++attempts) try {
+                response = m_consumer.getOffsetsBefore(earlyRq);
+                if (response.hasError()) {
+                    short code = response.errorCode(topic, partition);
+                    fault = ErrorMapping.exceptionFor(code);
+                    resetLeader();
+                } else {
+                    return response;
+                }
+            } catch (Exception e) {
+                if (e instanceof IOException) {
+                    resetLeader();
+                }
+                fault = e;
+            }
+            if (fault != null) {
+                error(fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+                response = null;
+            }
+            return response;
+        }
+
+        private OffsetFetchResponse getClientTopicOffset() {
+            final short version = 1;
+            final OffsetFetchRequest rq = new OffsetFetchRequest(
+                    m_groupId, singletonList(m_topicAndPartition), version, 1, CLIENT_ID
+                    );
+            OffsetFetchResponse rsp = null;
+            Throwable fault = null;
+
+            for (int attempts = 0; attempts < 3; ++attempts) try {
+                rsp = m_offsetManager.get().fetchOffsets(rq);
+                short code = rsp.offsets().get(m_topicAndPartition).error();
+                if (code != ErrorMapping.NoError()) {
+                    fault = ErrorMapping.exceptionFor(code);
+                    if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
+                        getOffsetCoordinator();
+                    } else if (code == ErrorMapping.UnknownTopicOrPartitionCode()) {
+                        fault = null;
+                        break;
+                    }
+                } else {
+                    fault = null;
+                    break;
+                }
+            } catch (Exception e) {
+                if (e instanceof IOException) {
+                    getOffsetCoordinator();
+                }
+                fault = e;
+            }
+            if (fault != null) {
+                error(fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+                rsp = null;
+            }
+            return rsp;
+        }
+
+        public long getLastOffset() {
+
+            final int partition = m_topicAndPartition.partition();
+            final String topic = m_topicAndPartition.topic();
+
+            OffsetResponse response = getTopicOffset(EARLIEST_OFFSET);
+            if (response == null) return -1L;
+
+            long earliest = response.offsets(topic, partition)[0];
+
+            response = getTopicOffset(LATEST_OFFSET);
+            if (response == null) return -1L;
+
+            long latest = response.offsets(topic, partition)[0];
+            if (latest == earliest) return latest;
+
+            OffsetFetchResponse ofr = getClientTopicOffset();
+            if (ofr == null) return earliest;
+
+            long current = ofr.offsets().get(m_topicAndPartition).offset();
+            if (current < earliest) return earliest;
+
+            if (current < latest) return current;
+
+            return latest;
         }
 
         //Callback for each invocation we have submitted.
@@ -547,33 +632,51 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             return fetchFailedCount;
         }
 
+        private void resetLeader() {
+            HostAndPort leaderBroker = m_leader;
+
+            closeConsumer(m_consumer);
+            m_consumer = null;
+            leaderBroker = findNewLeader();
+            if (leaderBroker == null) {
+                //point to original leader which will fail and we fall back again here.
+                error(null, "Fetch Failed to find leader continue with old leader: %s", m_leader);
+                leaderBroker = m_leader;
+            } else {
+                if (!leaderBroker.equals(m_leader)) {
+                    info("Fetch Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
+                    m_leader = leaderBroker;
+                }
+            }
+            m_consumer = new SimpleConsumer(
+                    leaderBroker.getHost(), leaderBroker.getPort(),
+                    m_consumerSocketTimeout, m_fetchSize, CLIENT_ID
+                    );
+        }
+
         @Override
         public void run() {
-            SimpleConsumer consumer = null;
             info("Starting partition fetcher for " + m_topicAndPartition);
             long submitCount = 0;
             AtomicLong cbcnt = new AtomicLong(0);
             try {
                 //Startwith the starting leader.
-                HostAndPort leaderBroker = m_leader;
+                resetLeader();
+
                 int sleepCounter = 1;
                 while (!m_shutdown) {
-                    if (consumer == null) {
-                        consumer = new SimpleConsumer(leaderBroker.getHost(), leaderBroker.getPort(), m_consumerSocketTimeout, m_fetchSize, CLIENT_ID);
-                    }
                     //If we dont know the offset get it backoff if we fail.
                     if (m_currentOffset.get() < 0) {
                         getOffsetCoordinator();
-                        m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
+                        long lastOffset = getLastOffset();
+                        m_currentOffset.set(lastOffset);
                         if (m_currentOffset.get() < 0) {
                             sleepCounter = backoffSleep(sleepCounter);
                             info("Latest offset not found for " + m_topicAndPartition + " using earliest offset.");
                             //No latest time available so get earliest known for this consumer group.
-                            m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.EarliestTime()));
+                            // m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.EarliestTime()));
+                            continue;
                         }
-                        sleepCounter = backoffSleep(sleepCounter);
-                        info("Starting offset for " + m_topicAndPartition + " is set to: " + m_currentOffset.get());
-                        continue;
                     }
                     long currentFetchCount = 0;
                     //Build fetch request of we have a valid offset and not too many are pending.
@@ -583,7 +686,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             .build();
                     FetchResponse fetchResponse = null;
                     try {
-                        fetchResponse = consumer.fetch(req);
+                        fetchResponse = m_consumer.fetch(req);
                         if (fetchResponse == null) {
                             sleepCounter = backoffSleep(sleepCounter);
                             continue;
@@ -591,20 +694,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     } catch (Exception ex) {
                         error(ex, "Failed to fetch from %s", m_topicAndPartition);
                         //See if its network error and find new leader for this partition.
-                        if (ex instanceof ClosedChannelException) {
-                            closeConsumer(consumer);
-                            consumer = null;
-                            leaderBroker = findNewLeader();
-                            if (leaderBroker == null) {
-                                //point to original leader which will fail and we fall back again here.
-                                error(null, "Fetch Failed to find leader continue with old leader: %s", m_leader);
-                                leaderBroker = m_leader;
-                            } else {
-                                if (!leaderBroker.equals(m_leader)) {
-                                    info("Fetch Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
-                                }
-                            }
-                            //find leader would sleep and backoff
+                        if (ex instanceof IOException) {
+                            resetLeader();
+                            //find leader in resetLeader would sleep and backoff
                             continue;
                         }
                         sleepCounter = backoffSleep(sleepCounter);
@@ -614,27 +706,16 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     if (fetchResponse.hasError()) {
                         // Something went wrong!
                         short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
-                        warn(null, "Failed to fetch messages for %s Code: %d", m_topicAndPartition, code);
+                        warn(ErrorMapping.exceptionFor(code), "Failed to fetch messages for %s", m_topicAndPartition);
                         sleepCounter = backoffSleep(sleepCounter);
                         if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                             // We asked for an invalid offset. For simple case ask for the last element to reset
                             info("Invalid offset requested for " + m_topicAndPartition);
                             getOffsetCoordinator();
-                            m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.LatestTime()));
+                            m_currentOffset.set(-1L);
                             continue;
                         }
-                        closeConsumer(consumer);
-                        consumer = null;
-                        leaderBroker = findNewLeader();
-                        if (leaderBroker == null) {
-                            //point to original leader which will fail and we fall back again here.
-                            error(null, "Failed to find leader continue with old leader: %s", m_leader);
-                            leaderBroker = m_leader;
-                        } else {
-                            if (!leaderBroker.equals(m_leader)) {
-                                info("Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
-                            }
-                        }
+                        resetLeader();
                         continue;
                     }
                     sleepCounter = 1;
@@ -648,7 +729,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         }
                         ByteBuffer payload = messageAndOffset.message().payload();
 
-                        String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),"UTF-8");
+                        String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), cbcnt);
                         m_pendingOffsets.add(currentOffset);
@@ -690,8 +771,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
                 commitOffset();
-                closeConsumer(consumer);
-                consumer = null;
+                closeConsumer(m_consumer);
+                m_consumer = null;
                 closeConsumer(m_offsetManager.getAndSet(null));
             }
         }
@@ -725,6 +806,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         if (consumer != null) {
                             offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
                         }
+                    }
+                    if ((Short)offsetCommitResponse.errors().get(m_topicAndPartition) == ErrorMapping.NoError()){
+                        info("[STEBUG] " + "Committed offset " + offset + " for " + m_topicAndPartition);
                     }
                 } else {
                     error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
@@ -782,7 +866,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         for (URI nuri : assignment.getAdded()) {
             Map<String, List<Integer>> topicMap = new HashMap<String, List<Integer>>();
             for (String topic : m_topicList) {
-                topicMap.put(topic, Collections.singletonList(0));
+                topicMap.put(topic, singletonList(0));
             }
             for (String topic : m_topicList) {
                 List<Integer> topicPartitions = m_topicPartitions.get(topic);
@@ -836,6 +920,28 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         } catch (Exception ex) {
             error("Kafka Importer finished with exeception ", ex);
         }
+    }
+
+    public class KafkaStreamImporterException extends ImportBaseException
+    {
+        private static final long serialVersionUID = 7668280657393399984L;
+
+        public KafkaStreamImporterException() {
+        }
+
+        public KafkaStreamImporterException(String format, Object... args) {
+            super(format, args);
+        }
+
+        public KafkaStreamImporterException(Throwable cause) {
+            super(cause);
+        }
+
+        public KafkaStreamImporterException(String format, Throwable cause,
+                Object... args) {
+            super(format, cause, args);
+        }
+
     }
 
 }
