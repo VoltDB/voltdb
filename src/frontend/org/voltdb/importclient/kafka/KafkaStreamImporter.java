@@ -364,6 +364,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final int m_consumerSocketTimeout;
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
+        private long m_lastCommittedOffset = -1;
         private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
@@ -675,6 +676,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             info("No valid offset found for " + m_topicAndPartition);
                             continue;
                         }
+                        info("Starting offset for " + m_topicAndPartition + " is " + m_currentOffset.get());
                     }
                     long currentFetchCount = 0;
                     //Build fetch request of we have a valid offset and not too many are pending.
@@ -780,47 +782,51 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             if (m_seenOffset.isEmpty())
                 return false;
             long offset = m_seenOffset.last();
+            SortedSet<Long> removeSet = m_seenOffset.subSet(m_seenOffset.first(), offset);
             final int correlationId = m_topicAndPartition.partition();
             final short version = 1;
 
-            OffsetAndMetadata offsetMetdata = new OffsetAndMetadata(offset, "commitRequest", ErrorMapping.NoError());
-            Map<TopicAndPartition, OffsetAndMetadata> reqMap = new HashMap<TopicAndPartition, OffsetAndMetadata>();
-            reqMap.put(m_topicAndPartition, offsetMetdata);
-            OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(m_groupId, reqMap, correlationId, CLIENT_ID, version);
-            OffsetCommitResponse offsetCommitResponse = null;
-            try {
-                SimpleConsumer consumer = m_offsetManager.get();
-                if (consumer == null) {
-                    getOffsetCoordinator();
-                    consumer = m_offsetManager.get();
-                }
-                if (consumer != null) {
-                    offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                    final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-                    if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
-                        info("Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
+            if (m_lastCommittedOffset != offset) {
+                OffsetAndMetadata offsetMetdata = new OffsetAndMetadata(offset, "commitRequest", ErrorMapping.NoError());
+                Map<TopicAndPartition, OffsetAndMetadata> reqMap = new HashMap<TopicAndPartition, OffsetAndMetadata>();
+                reqMap.put(m_topicAndPartition, offsetMetdata);
+                OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(m_groupId, reqMap, correlationId, CLIENT_ID, version);
+                OffsetCommitResponse offsetCommitResponse = null;
+                try {
+                    SimpleConsumer consumer = m_offsetManager.get();
+                    if (consumer == null) {
                         getOffsetCoordinator();
                         consumer = m_offsetManager.get();
-                        if (consumer != null) {
-                            offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                        }
                     }
-                } else {
-                    error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                    if (consumer != null) {
+                        offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                        final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+                        if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
+                            info("Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
+                            getOffsetCoordinator();
+                            consumer = m_offsetManager.get();
+                            if (consumer != null) {
+                                offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
+                            }
+                        }
+                    } else {
+                        error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                        return false;
+                    }
+                } catch (Exception e) {
+                    error(e, "Failed to commit Offset for " + m_topicAndPartition);
                     return false;
                 }
-            } catch (Exception e) {
-                error(e, "Failed to commit Offset for " + m_topicAndPartition);
-                return false;
+                final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+                if (code != ErrorMapping.NoError()) {
+                    final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: %d";
+                    error(null, msg, code);
+                    return false;
+                }
             }
-            final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-            if (code != ErrorMapping.NoError()) {
-                final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: %d";
-                error(null, msg, code);
-                return false;
-            }
+            m_lastCommittedOffset = offset;
             synchronized(m_seenOffset) {
-                m_seenOffset.clear();
+                removeSet.clear();
             }
             return true;
         }
