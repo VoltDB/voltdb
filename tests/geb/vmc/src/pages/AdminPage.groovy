@@ -35,6 +35,10 @@ class AdminPage extends VoltDBManagementCenterPage {
 
         serverstopbuttonmain		{$("#stopServer_voltdbserver", text:"Paused")}
 
+        shutdownServerPause         {$(class:"shutdownServerPause").first()}
+
+        shutdownServerStop          {$(class:"shutdownServer").first()}
+
         servernamelist1			    {$("#serverListWrapperAdmin > table > tbody > tr.activeHostMonitoring > td.configLabel > a")}
         servernamelist2			    {$("#serverListWrapperAdmin > table > tbody > tr:nth-child(2) > td.configLabel > a")}
         servernamelist3			    {$("#serverListWrapperAdmin > table > tbody > tr:nth-child(3) > td.configLabel > a")}
