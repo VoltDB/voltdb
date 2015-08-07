@@ -246,10 +246,12 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             //      SELECT MIN(X) FROM T WHERE [other prefix filters] X < / <= ? or
             // other filters will be checked later
             AbstractExpression lastEndExpr = exprs.get(numberOfExprs - 1);
+            List<AbstractExpression> lastEndExprBindings = aggExpr.bindingToIndexedExpression(lastEndExpr.getLeft());
             if ((lastEndExpr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN ||
                  lastEndExpr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO)
-                    && lastEndExpr.getLeft().equals(aggExpr)) {
-                exprs.remove(lastEndExpr);
+                    && lastEndExprBindings != null) {
+                exprs.remove(lastEndExpr); 
+                ispn.getBindings().addAll(lastEndExprBindings);
             }
         }
 
