@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -38,6 +39,7 @@ import org.voltdb.client.ProcedureInvocationType;
  */
 public class InternalConnectionHandler {
 
+    public final static long SUPPRESS_INTERVAL = 60;
     private static final VoltLogger m_logger = new VoltLogger("InternalConnectionHandler");
 
     // Atomically allows the catalog reference to change between access
@@ -45,7 +47,7 @@ public class InternalConnectionHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final InternalClientResponseAdapter m_adapter;
 
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTIONS", 5000);
+    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTIONS", 400);
 
     public InternalConnectionHandler(InternalClientResponseAdapter adapter) {
         m_adapter = adapter;
@@ -64,21 +66,22 @@ public class InternalConnectionHandler {
         return (table!=null);
     }
 
-    public boolean callProcedure(long backPressureTimeout, String proc, Object... fieldList) {
-        return callProcedure(backPressureTimeout, null, proc, fieldList);
+    public boolean callProcedure(String caller, long backPressureTimeout, String proc, Object... fieldList) {
+        return callProcedure(caller, backPressureTimeout, null, proc, fieldList);
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
-    public boolean callProcedure(long backPressureTimeout, ProcedureCallback procCallback, String proc, Object... fieldList) {
+    public boolean callProcedure(String caller, long backPressureTimeout, ProcedureCallback procCallback, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
-            m_logger.warn("Server is paused and is currently unavailable - please try again later.");
+            rateLimitedWarn(null, "Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
         }
         Procedure catProc = VoltDB.instance().getClientInterface().getProcedureFromName(proc, VoltDB.instance().getCatalogContext());
         if (catProc == null) {
-            m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
+            String fmt = "Cannot invoke procedure %s from streaming interface $s. Procedure not found.";
+            rateLimitedError(null, fmt, proc, caller);
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -126,13 +129,14 @@ public class InternalConnectionHandler {
         try {
             partition = getPartitionForProcedure(catProc, task);
         } catch (Exception e) {
-            m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
+            String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
+            rateLimitedError(null, fmt, proc, caller);
             m_failedCount.incrementAndGet();
             tcont.discard();
             return false;
         }
 
-        boolean success = m_adapter.createTransaction(catProc, procCallback, task, tcont, partition, nowNanos);
+        boolean success = m_adapter.createTransaction(proc, catProc, procCallback, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
@@ -143,7 +147,19 @@ public class InternalConnectionHandler {
         return success;
     }
 
-    public void drain() {
-        m_adapter.drain();
+    public void stop() {
+        m_adapter.stop();
+    }
+
+    public void start() {
+        m_adapter.start();
+    }
+
+    private void rateLimitedError(Throwable t, String format, Object...args) {
+        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, t, format, args);
+    }
+
+    private void rateLimitedWarn(Throwable t, String format, Object...args) {
+        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, t, format, args);
     }
 }

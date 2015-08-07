@@ -907,6 +907,44 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
+     * A predicate class for searching expression trees,
+     * to be used with hasAnySubexpressionWithPredicate, below.
+     */
+    public static interface SubexprFinderPredicate {
+        boolean matches(AbstractExpression expr);
+    }
+
+    /**
+     * Searches the expression tree rooted at this for nodes for which "pred"
+     * evaluates to true.
+     * @param pred  Predicate object instantiated by caller
+     * @return      true if the predicate ever returns true, false otherwise
+     */
+    public boolean hasAnySubexpressionWithPredicate(SubexprFinderPredicate pred) {
+        if (pred.matches(this)) {
+            return true;
+        }
+
+        if (m_left != null && m_left.hasAnySubexpressionWithPredicate(pred)) {
+            return true;
+        }
+
+        if (m_right != null && m_right.hasAnySubexpressionWithPredicate(pred)) {
+            return true;
+        }
+
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                if (argument.hasAnySubexpressionWithPredicate(pred)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Convenience method for determining whether an Expression object should have a child
      * Expression on its RIGHT side. The follow types of Expressions do not need a right child:
      *      OPERATOR_NOT

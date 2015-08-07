@@ -22,8 +22,6 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.ImportContext;
 
@@ -42,7 +40,7 @@ public class ImportHandler {
     private final ImportContext m_importContext;
     private volatile boolean m_stopped = false;
 
-    final static long SUPPRESS_INTERVAL = 60;
+    public final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext) {
@@ -60,6 +58,7 @@ public class ImportHandler {
             public void run() {
                 m_logger.info("Importer ready importing data for: " + m_importContext.getName());
                 try {
+                    VoltDB.instance().getClientInterface().getInternalConnectionHandler().start();
                     m_importContext.readyForData();
                 } catch (Throwable t) {
                     m_logger.error("ImportContext stopped with following exception", t);
@@ -76,8 +75,8 @@ public class ImportHandler {
             @Override
             public void run() {
                 try {
-                    //Drain the adapter so all calbacks are done
-                    VoltDB.instance().getClientInterface().getInternalConnectionHandler().drain();
+                    //Stop and Drain the adapter so all calbacks are done
+                    VoltDB.instance().getClientInterface().getInternalConnectionHandler().stop();
                     m_importContext.stop();
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -107,23 +106,13 @@ public class ImportHandler {
     public boolean callProcedure(ImportContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
         if (!m_stopped) {
             return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
-                    .callProcedure(ic.getBackpressureTimeout(), procCallback, proc, fieldList);
+                    .callProcedure(ic.getName(), ic.getBackpressureTimeout(), procCallback, proc, fieldList);
         } else {
             m_logger.warn("Importer is in stopped state. Cannot execute procedures");
             return false;
         }
     }
 
-
-    //Do rate limited logging for messages.
-    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
-        RateLimitedLogger.tryLogForMessage(
-                EstTime.currentTimeMillis(),
-                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
-                m_logger, level,
-                cause, format, args
-                );
-    }
 
     /**
      * Log info message
@@ -177,12 +166,12 @@ public class ImportHandler {
         m_logger.error(message, t);
     }
 
-    public void error(Throwable t, String format, Object...args) {
-        rateLimitedLog(Level.ERROR, t, format, args);
+    public void rateLimitedError(Throwable t, String format, Object...args) {
+        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, t, format, args);
     }
 
-    public void warn(Throwable t, String format, Object...args) {
-        rateLimitedLog(Level.WARN, t, format, args);
+    public void rateLimitedWarn(Throwable t, String format, Object...args) {
+        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, t, format, args);
     }
 
 }

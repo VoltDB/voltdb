@@ -79,6 +79,8 @@ public interface ImportContext {
      */
     public long getBackpressureTimeout();
 
+    public void hasBackPressure(boolean flag);
+
     /**
      * This is the real handler dont need to call or extend anything
      * @param handler

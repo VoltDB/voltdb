@@ -32,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.types.PlanNodeType;
 
 public class PlannerTestCase extends TestCase {
 
@@ -203,6 +204,21 @@ public class PlannerTestCase extends TestCase {
         }
         assertTrue(pns.get(0) != null);
         return pns.get(0);
+    }
+
+    /**
+     *  Find all the aggregate nodes in a fragment, whether they are hash, serial or partial.
+     * @param fragment     Fragment to search for aggregate plan nodes
+     * @return a list of all the nodes we found
+     */
+    protected static List<AbstractPlanNode> findAllAggPlanNodes(AbstractPlanNode fragment) {
+        List<AbstractPlanNode> aggNodes = fragment.findAllNodesOfType(PlanNodeType.AGGREGATE);
+        List<AbstractPlanNode> hashAggNodes = fragment.findAllNodesOfType(PlanNodeType.HASHAGGREGATE);
+        List<AbstractPlanNode> partialAggNodes = fragment.findAllNodesOfType(PlanNodeType.PARTIALAGGREGATE);
+
+        aggNodes.addAll(hashAggNodes);
+        aggNodes.addAll(partialAggNodes);
+        return aggNodes;
     }
 
 
