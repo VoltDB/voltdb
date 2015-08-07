@@ -24,6 +24,7 @@
 package kafkaimporter.client.kafkaimporter;
 
 import java.io.IOException;
+import java.lang.InterruptedException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
@@ -31,6 +32,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.NoConnectionsException;
 
 
 public class MatchChecks {
@@ -73,6 +75,33 @@ public class MatchChecks {
         return mirrorRowCount;
     }
 
+    protected static long getExportRowCount(Client client) {
+        // get the count of rows imported
+        long exportRowCount = 0;
+
+        while (true) {
+            try {
+                ClientResponse response = client.callProcedure("@AdHoc", "select sum(TOTAL_ROWS_EXPORTED) from exportcounts order by 1;");
+                if (response.getStatus() != ClientResponse.SUCCESS) {
+                    log.warn("command failed: " + response.getStatusString());
+                    continue;
+                }
+                VoltTable[] countQueryResult = response.getResults();
+                VoltTable data = countQueryResult[0];
+                long nrows = data.getRowCount();
+                if (nrows > 0)
+                    exportRowCount = data.asScalarLong();
+                break;
+            } catch (NoConnectionsException e) {
+                try { Thread.sleep(3); } catch (InterruptedException ex) { }
+            } catch (Exception e) {
+                log.error("Exception from callProcedure", e);
+                System.exit(-1);
+            }
+        }
+        return exportRowCount;
+    }
+
     protected static long getImportRowCount(Client client) {
         // get the count of rows imported
         long importRowCount = 0;
@@ -85,7 +114,6 @@ public class MatchChecks {
                 importRowCount = data.asScalarLong();
         } catch (Exception e) {
             log.error("Exception from callProcedure", e);
-            System.exit(-1);
         }
         return importRowCount;
     }
@@ -104,7 +132,6 @@ public class MatchChecks {
         log.info("getRowCount(): " + results.getRowCount());
         while (results.advanceRow()) {
             long key = results.getLong(0);
-            // log.info("Key: " + key);
             try {
                 client.callProcedure(new DeleteCallback(DELETE_ROWS, key), DELETE_ROWS, key);
             } catch (Exception e) {
@@ -126,7 +153,6 @@ public class MatchChecks {
             log.error("Exception from callProcedure", e);
             System.exit(-1);
         }
-        log.info("Unmatched Import row count: " + importRowCount);
         return importRowCount;
     }
 }

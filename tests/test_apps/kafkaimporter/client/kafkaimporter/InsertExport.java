@@ -23,12 +23,14 @@
 package kafkaimporter.client.kafkaimporter;
 import org.voltcore.logging.VoltLogger;
 
+import java.lang.InterruptedException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.io.IOException;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.NoConnectionsException;
 
 
 public class InsertExport {
@@ -47,9 +49,13 @@ public class InsertExport {
     public void insertExport(long key, long value) {
         try {
             m_client.callProcedure(new InsertCallback(EXPORT_PN, key, value), EXPORT_PN, key, value);
+        } catch (NoConnectionsException e) {
+            log.warn("NoConnectionsException calling stored procedure InsertExport");
+            try {
+                Thread.sleep(3);
+            } catch (InterruptedException ex) { }
         } catch (Exception e) {
-            log.info("Exception calling stored procedure InsertExport", e);
-            System.exit(-1);
+            log.warn("Exception calling stored procedure InsertExport", e);
         }
     }
 
@@ -78,7 +84,7 @@ public class InsertExport {
                 throws Exception {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                 String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
-                log.error(msg);
+                log.warn(msg);
             } else {
                 m_rowsAdded.incrementAndGet();
             }
