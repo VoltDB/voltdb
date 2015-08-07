@@ -15,14 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.importer;
-
-import org.voltdb.*;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.client.ClientResponse;
+package org.voltdb;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -30,27 +23,36 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses.
  * For each partition it creates a single thread executor to sequence per partition transaction submission.
  * Responses are also written on a single thread executor to avoid bottlenecking on callback doing heavy work.
- * It calls
- * crashLocalVoltDB() if the deserialization fails, which should only happen if there's a bug.
+ * It calls crashLocalVoltDB() if the deserialization fails, which should only happen if there's a bug.
  */
-public class ImportClientResponseAdapter implements Connection, WriteStream {
-
+public class InternalClientResponseAdapter implements Connection, WriteStream {
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
 
     public interface Callback {
@@ -61,18 +63,19 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
-    private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
     private final ExecutorService m_es;
+    private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
     private volatile boolean m_stopped = false;
 
-    private class ImportCallback implements Callback {
+    private class InternalCallback implements Callback {
 
         private DBBPool.BBContainer m_cont;
+        @SuppressWarnings("unused")
         private final long m_id;
         private final ProcedureCallback m_cb;
         private final String m_procedure;
 
-        public ImportCallback(final DBBPool.BBContainer cont, String proc, ProcedureCallback cb, long id) {
+        public InternalCallback(final DBBPool.BBContainer cont, String proc, ProcedureCallback cb, long id) {
             m_cont = cont;
             m_cb = cb;
             m_id = id;
@@ -137,8 +140,12 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         }
     }
 
-    public boolean createTransaction(final String procName, final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
-            final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
+    public boolean createTransaction(final String procName,
+            final Procedure catProc,
+            final ProcedureCallback proccb,
+            final StoredProcedureInvocation task,
+            final DBBPool.BBContainer tcont,
+            final int partition, final long nowNanos) {
 
         if (m_stopped) {
             return false;
@@ -154,7 +161,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                 public void run() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final ImportCallback cb = new ImportCallback(tcont, procName, proccb, handle);
+                    final InternalCallback cb = new InternalCallback(tcont, procName, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
@@ -176,7 +183,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      *                        node.
      * @param name            Human readable name identifying the adapter, will stand in for hostname
      */
-    public ImportClientResponseAdapter(long connectionId, String name) {
+    public InternalClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
         m_es = CoreUtils.getSingleThreadExecutor("ImportResponseHandler");
     }
@@ -205,7 +212,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             ds.serialize(buf);
             enqueue(buf);
         } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, e);
+            VoltDB.crashLocalVoltDB("enqueue() in IClientResponseAdapter throw an exception", true, e);
         }
     }
 
@@ -242,7 +249,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         if (b.length == 1) {
             enqueue(b[0]);
         } else {
-            throw new UnsupportedOperationException("Buffer chains not supported in Import invocation adapter");
+            throw new UnsupportedOperationException("Buffer chains not supported in internal invocation adapter");
         }
     }
 
@@ -298,12 +305,12 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public String getHostnameAndIPAndPort() {
-        return "ImportAdapter";
+        return "InternalAdapter";
     }
 
     @Override
     public String getHostnameOrIP() {
-        return "ImportAdapter";
+        return "InternalAdapter";
     }
 
     @Override

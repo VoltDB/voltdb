@@ -23,6 +23,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
@@ -30,16 +33,13 @@ import org.osgi.framework.ServiceReference;
 import org.osgi.framework.launch.Framework;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ImportHandler;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import org.voltcore.utils.CoreUtils;
 
 public class ImportProcessor implements ImportDataProcessor {
 
@@ -156,7 +156,7 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 for (BundleWrapper bw : m_bundles.values()) {
                     try {
-                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, catContext);
+                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy);
                         //Set the internal handler
                         bw.setHandler(importHandler);
                         if (!bw.m_handlerProxy.isRunEveryWhere()) {
