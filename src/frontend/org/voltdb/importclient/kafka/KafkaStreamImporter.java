@@ -456,7 +456,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             KafkaStreamImporterException probeException = null;
             int correlationId = 0;
 
-            for (int attempts = 0; attempts < 3; ++attempts) {
+            OUTER: for (int attempts = 0; attempts < 3; ++attempts) {
                 for (HostAndPort hp: m_brokerList) {
                     BlockingChannel channel = null;
                     try {
@@ -479,7 +479,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             closeConsumer(consumer);
                             probeException = null;
                             consumer = null;
-                            break;
+                            break OUTER;
                         }
                         probeException = new KafkaStreamImporterException("Failed to get Offset Coordinator for %s",
                                 ErrorMapping.exceptionFor(metadataResponse.errorCode()), m_topicAndPartition
@@ -665,16 +665,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                 int sleepCounter = 1;
                 while (!m_shutdown) {
-                    //If we dont know the offset get it backoff if we fail.
                     if (m_currentOffset.get() < 0) {
                         getOffsetCoordinator();
                         long lastOffset = getLastOffset();
                         m_currentOffset.set(lastOffset);
                         if (m_currentOffset.get() < 0) {
+                            //If we dont know the offset get it backoff if we fail.
                             sleepCounter = backoffSleep(sleepCounter);
-                            info("Latest offset not found for " + m_topicAndPartition + " using earliest offset.");
-                            //No latest time available so get earliest known for this consumer group.
-                            // m_currentOffset.set(getLastOffset(kafka.api.OffsetRequest.EarliestTime()));
+                            info("No valid offset found for " + m_topicAndPartition);
                             continue;
                         }
                     }
@@ -806,9 +804,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         if (consumer != null) {
                             offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
                         }
-                    }
-                    if ((Short)offsetCommitResponse.errors().get(m_topicAndPartition) == ErrorMapping.NoError()){
-                        info("[STEBUG] " + "Committed offset " + offset + " for " + m_topicAndPartition);
                     }
                 } else {
                     error("Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
