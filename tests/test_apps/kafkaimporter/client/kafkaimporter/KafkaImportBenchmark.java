@@ -317,8 +317,9 @@ public class KafkaImportBenchmark {
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
         runner.start();
         runner.join(); // writers are done
-        long exportCount = MatchChecks.getExportRowCount(client);
-        log.info("Export phase complete, " + exportCount + " rows exported, waiting for import to drain...");
+
+        long exportRowCount = MatchChecks.getExportRowCount(client);
+        log.info("Export phase complete, " + exportRowCount + " rows exported, waiting for import to drain...");
 
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
@@ -326,19 +327,24 @@ public class KafkaImportBenchmark {
         long count = 0;
         do {
             Thread.sleep(END_WAIT * 1000);
-        } while (p.size() < 2 || p.get(p.size() - 1) < rowsAdded.get() && p.get(p.size() - 1) < p.get(p.size() - 2));
+        } while (p.size() < 2 || p.get(p.size() - 1) < exportRowCount && p.get(p.size() - 1) < p.get(p.size() - 2));
 
-        boolean testResult = FinalCheck.check(client);
+        long mirrorRows = MatchChecks.getMirrorTableRowCount(client);
+        long importRows = MatchChecks.getImportTableRowCount(client);
+        long importRowCount = MatchChecks.getImportRowCount(client);
 
+        log.info("Total rows exported: " + finalInsertCount);
+        log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorRows);
+        log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
 
-        if (p.get(p.size() - 1) < rowsAdded.get()) {
-            log.error("Import failed to receive/drain..., failing test");
+        boolean testResult = true;
+        if (mirrorRows != 0) {
+            log.error("Rows are missing from the import stream, failing test");
             testResult = false;
         }
 
-        long importRowCount = MatchChecks.getImportRowCount(client);
-        if (importRowCount != rowsAdded.get()) {
-            log.error("Export count '" + rowsAdded.get() + "' does not match import row count '" + importRowCount + "' test fails.");
+        if (importRowCount < exportRowCount) {
+            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRowCount + "' test fails.");
             testResult = false;
         }
 
