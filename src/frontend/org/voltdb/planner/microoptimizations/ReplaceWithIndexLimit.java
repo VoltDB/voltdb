@@ -286,20 +286,14 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             ispn.addInlinePlanNode(lpn);
 
             // ENG-1565: For SELECT MAX(X) FROM T WHERE X > / >= ?, turn the pre-filter to post filter.
-            // There are two choices:
-            // AggregatePlanNode                AggregatePlanNode
-            //  |__ IndexScanPlanNode       =>      |__FilterPlanNode
-            //                                              |__IndexScanPlanNode with no filter
-            //                                                      |__LimitPlanNode
-            //                          OR
+            // The current approach is:
             // AggregatePlanNode                AggregatePlanNode with filter
             //  |__ IndexScanPlanNode       =>      |__IndexScanPlanNode with no filter
             //                                              |__LimitPlanNode
-            // For now, we take the second approach.
             if (sortDirection == SortDirectionType.DESC &&
                     !ispn.getSearchKeyExpressions().isEmpty() &&
                     exprs.isEmpty() &&
-                    ExpressionUtil.uncombine(ispn.getInitialExpression()).isEmpty()) {
+                    ispn.getInitialExpression() == null ) {
                 AbstractExpression newPredicate = new ComparisonExpression();
                 if (ispn.getLookupType() == IndexLookupType.GT)
                     newPredicate.setExpressionType(ExpressionType.COMPARE_GREATERTHAN);
