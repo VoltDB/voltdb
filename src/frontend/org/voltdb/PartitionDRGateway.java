@@ -59,7 +59,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     }
 
-    private static Object m_gatewayInitLock = new Object();
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
     /**
      * Load the full subclass if it should, otherwise load the
@@ -93,13 +92,13 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
 
-        synchronized (m_gatewayInitLock) {
-            assert !m_partitionDRGateways.containsKey(partitionId);
-            ImmutableMap.Builder<Integer, PartitionDRGateway> builder = ImmutableMap.builder();
-            builder.putAll(m_partitionDRGateways);
-            builder.put(partitionId, pdrg);
-            m_partitionDRGateways = builder.build();
-        }
+        // Regarding apparent lack of thread safety: this is called serially
+        // while looping over the SPIs during database initialization
+        assert !m_partitionDRGateways.containsKey(partitionId);
+        ImmutableMap.Builder<Integer, PartitionDRGateway> builder = ImmutableMap.builder();
+        builder.putAll(m_partitionDRGateways);
+        builder.put(partitionId, pdrg);
+        m_partitionDRGateways = builder.build();
 
         return pdrg;
     }
