@@ -83,8 +83,11 @@ public class InsertExport {
         public void clientCallback(ClientResponse clientResponse)
                 throws Exception {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
-                log.warn(msg);
+                if (!clientResponse.getStatusString().contains("Server is paused and is available in read-only mode") &&
+                        !clientResponse.getStatusString().contains("was lost before a response was received")) {
+                    String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
+                    log.warn(msg);
+                }
             } else {
                 m_rowsAdded.incrementAndGet();
             }

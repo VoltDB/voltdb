@@ -339,7 +339,7 @@ public class KafkaImportBenchmark {
 
         boolean testResult = true;
         if (mirrorRows != 0) {
-            log.error("Rows are missing from the import stream, failing test");
+            log.error(mirrorRows + " Rows are missing from the import stream, failing test");
             testResult = false;
         }
 
