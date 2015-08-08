@@ -63,7 +63,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
     private final ExecutorService m_es;
-    private volatile boolean m_stopped = false;
 
     private class ImportCallback implements Callback {
 
@@ -105,44 +104,10 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     }
 
     public void start() {
-        m_stopped = false;
-    }
-
-    //Submit a stop to the end of the queue.
-    public void stop() {
-        m_stopped = true;
-        try {
-            m_es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    long sleep = 500;
-                    do {
-                        if (m_callbacks.isEmpty()) {
-                            break;
-                        }
-                        /*
-                         * Back off to spinning at five millis. Try and get drain to be a little
-                         * more prompt. Spinning sucks!
-                         */
-                        LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
-                        if (sleep < 5000) {
-                            sleep += 500;
-                        }
-                    } while(true);
-
-                }
-            });
-        } catch (RejectedExecutionException ex) {
-            m_logger.error("Failed to submit ImportClientResponseAdapter stop() to the response processing queue.", ex);
-        }
     }
 
     public boolean createTransaction(final String procName, final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
             final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
-
-        if (m_stopped) {
-            return false;
-        }
 
         if (!m_partitionExecutor.containsKey(partition)) {
             m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("ImportHandlerExecutor - " + partition));

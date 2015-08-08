@@ -762,11 +762,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                     commitOffset();
                 }
-                //Drain will make sure there is nothing in pending.
-                info("Partition fecher stopped for " + m_topicAndPartition
-                        + " Last commit point is: " + m_currentOffset.get()
-                        + " Callback Rcvd: " + cbcnt.get()
-                        + " Submitted: " + submitCount);
             } catch (Exception ex) {
                 error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
@@ -775,6 +770,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 m_consumer = null;
                 closeConsumer(m_offsetManager.getAndSet(null));
             }
+            info("Partition fecher stopped for " + m_topicAndPartition
+                    + " Last commit point is: " + m_lastCommittedOffset
+                    + " Callback Rcvd: " + cbcnt.get()
+                    + " Submitted: " + submitCount);
         }
 
         public boolean commitOffset() {

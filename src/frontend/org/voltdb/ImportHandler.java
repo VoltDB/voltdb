@@ -35,6 +35,7 @@ import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import java.util.concurrent.ExecutionException;
 import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
@@ -94,20 +95,25 @@ public class ImportHandler {
 
     public void stop() {
         m_stopped = true;
-        m_es.submit(new Runnable() {
+        try {
+            m_es.submit(new Runnable() {
 
-            @Override
-            public void run() {
-                try {
-                    //Stop and Drain the adapter so all calbacks are done
-                    m_adapter.stop();
-                    m_importContext.stop();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                @Override
+                public void run() {
+                    try {
+                        //Stop the context first so no more work is submitted.
+                        m_importContext.stop();
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                    m_logger.info("Importer stopped: " + m_importContext.getName());
                 }
-                m_logger.info("Importer stopped: " + m_importContext.getName());
-            }
-        });
+            }).get();
+        } catch (InterruptedException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        } catch (ExecutionException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        }
         try {
             m_es.shutdown();
             m_es.awaitTermination(1, TimeUnit.DAYS);
