@@ -496,7 +496,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                 }
                 if (probeException != null) {
-                    error(probeException, "Failed to query all brokers for the offeset coordinator for " + m_topicAndPartition);
+                    warn(probeException, "Failed to query all brokers for the offeset coordinator for " + m_topicAndPartition);
                 }
                 backoffSleep(attempts+1);
             }
