@@ -75,29 +75,6 @@ public class MatchChecks {
         return mirrorRowCount;
     }
 
-    /*
-    protected static ClientResponse runAdHocQuery(Client client, String query) {
-        // get the count of rows imported
-        ClientResponse response = null;
-        int retryCount = 10;
-        while (retryCount-- > 0) {
-            try {
-                response = client.callProcedure("@AdHoc", query);
-                if (response.getStatus() == ClientResponse.SUCCESS)
-                    return response;
-                log.warn("adhoc query failed, retrying: " + response.getStatusString());
-                continue;
-            } catch (NoConnectionsException e) {
-                try { Thread.sleep(3); } catch (InterruptedException ex) { }
-            } catch (Exception e) {
-                log.error("Unexpected Exception from AdHoc query callProcedure", e);
-                System.exit(-1);
-            }
-        }
-        log.error("adhoc query failed, retrying: " + response.getStatusString());
-        System.exit(-1);
-    }*/
-
     static ClientResponse doAdHoc(Client client, String query) {
         /* a very similar method is used in txnid2::txnidutils, try to keep them in sync */
         Boolean sleep = false;
