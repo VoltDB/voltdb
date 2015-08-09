@@ -357,6 +357,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //coordinator for offset management.
         private HostAndPort m_coordinator;
         private boolean m_shutdown = false;
+        private volatile boolean m_dead = false;
         private volatile boolean m_hasBackPressure = false;
         private final int m_fetchSize;
         //Available brokers.
@@ -365,7 +366,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
         private long m_lastCommittedOffset = -1;
-        private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private SimpleConsumer m_consumer = null;
@@ -601,24 +601,25 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //Callback for each invocation we have submitted.
         private class TopicPartitionInvocationCallback implements ProcedureCallback {
 
-            private final long m_offset;
             private final long m_nextOffset;
             private final AtomicLong m_cbcnt;
+            private final TopicPartitionFetcher m_fetcher;
 
-            public TopicPartitionInvocationCallback(long offset, long noffset, AtomicLong cbcnt) {
-                m_offset = offset;
+            public TopicPartitionInvocationCallback(TopicPartitionFetcher fetcher, long noffset, AtomicLong cbcnt) {
+                m_fetcher = fetcher;
                 m_nextOffset = noffset;
                 m_cbcnt = cbcnt;
             }
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                //We should never get here with no pending offsets.
-                assert(!m_pendingOffsets.isEmpty());
                 m_cbcnt.incrementAndGet();
-                m_pendingOffsets.remove(m_offset);
-                //This is what we commit to
-                m_seenOffset.add(m_nextOffset);
+                if (!m_fetcher.m_dead) {
+                    //This is what we commit to
+                    m_seenOffset.add(m_nextOffset);
+                } else {
+                    warn(null, "Callback came after fetcher is dead. Starting offset may be earlier than expected.");
+                }
             }
 
         }
@@ -731,8 +732,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), cbcnt);
-                        m_pendingOffsets.add(currentOffset);
+                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(this, messageAndOffset.nextOffset(), cbcnt);
                         if (!callProcedure(cb, invocation)) {
                             if (isDebugEnabled()) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
@@ -741,7 +741,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 //Make this failed offset known to seen offsets so committer can push ahead.
                                 m_seenOffset.add(messageAndOffset.nextOffset());
                             }
-                            m_pendingOffsets.remove(currentOffset);
                         }
                         submitCount++;
                         m_currentOffset.set(messageAndOffset.nextOffset());
@@ -770,6 +769,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 m_consumer = null;
                 closeConsumer(m_offsetManager.getAndSet(null));
             }
+            m_dead = true;
             info("Partition fecher stopped for " + m_topicAndPartition
                     + " Last commit point is: " + m_lastCommittedOffset
                     + " Callback Rcvd: " + cbcnt.get()
