@@ -83,7 +83,6 @@ public class ImportHandler {
             public void run() {
                 m_logger.info("Importer ready importing data for: " + m_importContext.getName());
                 try {
-                    m_adapter.start();
                     m_importContext.readyForData();
                 } catch (Throwable t) {
                     m_logger.error("ImportContext stopped with following exception", t);

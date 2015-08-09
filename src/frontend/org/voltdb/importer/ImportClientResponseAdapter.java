@@ -103,9 +103,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         return m_callbacks.size();
     }
 
-    public void start() {
-    }
-
     public boolean createTransaction(final String procName, final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
             final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
 
