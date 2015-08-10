@@ -35,6 +35,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -883,8 +884,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
                         TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, assignedKey, topic, partition,
                                 hap, m_fetchSize, m_consumerSocketTimeout);
-                        m_fetchers.put(assignedKey.toString(), fetcher);
-                        m_es.submit(fetcher);
+                        try {
+                            m_es.submit(fetcher);
+                            m_fetchers.put(assignedKey.toString(), fetcher);
+                        } catch (RejectedExecutionException ex) {
+                            warn(ex, "Failed to submit Topic Partition fetcher. We must be shutting down.");
+                        }
                         info("KafkaImporter is fetching for resource: " + nuri);
                     }
                 }
