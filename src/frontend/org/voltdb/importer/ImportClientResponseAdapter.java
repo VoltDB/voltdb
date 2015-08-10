@@ -17,29 +17,38 @@
 
 package org.voltdb.importer;
 
-import org.voltdb.*;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.client.ClientResponse;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.ClientInterface;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.ImportHandler;
+import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
 /**
@@ -137,6 +146,11 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         }
     }
 
+    // enables easier mocking
+    ClientInterface getClientInterface() {
+        return VoltDB.instance().getClientInterface();
+    }
+
     public boolean createTransaction(final String procName, final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
             final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
 
@@ -152,13 +166,15 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
+                    if (m_stopped) return;
+
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
                     final ImportCallback cb = new ImportCallback(tcont, procName, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
-                    VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
+                    getClientInterface().createTransaction(connectionId(), task,
                             catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
                             task.getSerializedSize(), nowNanos);
                 }

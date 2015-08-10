@@ -25,13 +25,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -348,6 +346,29 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     }
 
     //Per topic per partition that we are responsible for.
+    //Callback for each invocation we have submitted.
+    private final static class TopicPartitionInvocationCallback implements ProcedureCallback {
+
+        private final long m_offset;
+        private final AtomicLong m_cbcnt;
+        private final Gap m_tracker;
+
+        public TopicPartitionInvocationCallback(long offset, AtomicLong cbcnt, final Gap tracker) {
+            m_offset = offset;
+            m_cbcnt = cbcnt;
+            m_tracker = tracker;
+            m_tracker.submit(m_offset);
+        }
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            //We should never get here with no pending offsets.
+            m_cbcnt.incrementAndGet();
+            m_tracker.commit(m_offset);
+        }
+
+    }
+
     private class TopicPartitionFetcher implements Runnable {
 
         //URL for this fetcher.
@@ -365,11 +386,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
         private long m_lastCommittedOffset = -1;
-        private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
-        private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private SimpleConsumer m_consumer = null;
         private final TopicAndPartition m_topicAndPartition;
+        private final Gap m_gapTracker = new Gap(8192);
 
         public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String topic, int partition, HostAndPort leader, int fetchSize, int consumerSocketTimeout) {
             m_url = uri;
@@ -598,31 +618,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             return latest;
         }
 
-        //Callback for each invocation we have submitted.
-        private class TopicPartitionInvocationCallback implements ProcedureCallback {
-
-            private final long m_offset;
-            private final long m_nextOffset;
-            private final AtomicLong m_cbcnt;
-
-            public TopicPartitionInvocationCallback(long offset, long noffset, AtomicLong cbcnt) {
-                m_offset = offset;
-                m_nextOffset = noffset;
-                m_cbcnt = cbcnt;
-            }
-
-            @Override
-            public void clientCallback(ClientResponse response) throws Exception {
-                //We should never get here with no pending offsets.
-                assert(!m_pendingOffsets.isEmpty());
-                m_cbcnt.incrementAndGet();
-                m_pendingOffsets.remove(m_offset);
-                //This is what we commit to
-                m_seenOffset.add(m_nextOffset);
-            }
-
-        }
-
         //Sleep with backoff.
         private int backoffSleep(int fetchFailedCount) {
             try {
@@ -669,6 +664,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     if (m_currentOffset.get() < 0) {
                         getOffsetCoordinator();
                         long lastOffset = getLastOffset();
+
+                        m_gapTracker.resetTo(lastOffset);
+                        m_lastCommittedOffset = lastOffset;
+
                         m_currentOffset.set(lastOffset);
                         if (m_currentOffset.get() < 0) {
                             //If we dont know the offset get it backoff if we fail.
@@ -731,17 +730,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), cbcnt);
-                        m_pendingOffsets.add(currentOffset);
+                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(messageAndOffset.nextOffset(), cbcnt, m_gapTracker);
                         if (!callProcedure(cb, invocation)) {
                             if (isDebugEnabled()) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
                             }
-                            synchronized(m_seenOffset) {
-                                //Make this failed offset known to seen offsets so committer can push ahead.
-                                m_seenOffset.add(messageAndOffset.nextOffset());
-                            }
-                            m_pendingOffsets.remove(currentOffset);
+                            m_gapTracker.commit(currentOffset);
                         }
                         submitCount++;
                         m_currentOffset.set(messageAndOffset.nextOffset());
@@ -764,7 +758,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
                 //Drain will make sure there is nothing in pending.
                 info("Partition fecher stopped for " + m_topicAndPartition
-                        + " Last commit point is: " + m_currentOffset.get()
+                        + " Last commit point is: " + m_lastCommittedOffset
                         + " Callback Rcvd: " + cbcnt.get()
                         + " Submitted: " + submitCount);
             } catch (Exception ex) {
@@ -778,19 +772,19 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
 
         public boolean commitOffset() {
-
-            if (m_seenOffset.isEmpty())
-                return false;
-            long offset = m_seenOffset.last();
-            SortedSet<Long> removeSet = m_seenOffset.subSet(m_seenOffset.first(), offset);
             final int correlationId = m_topicAndPartition.partition();
             final short version = 1;
 
-            if (m_lastCommittedOffset != offset) {
-                OffsetAndMetadata offsetMetdata = new OffsetAndMetadata(offset, "commitRequest", ErrorMapping.NoError());
-                Map<TopicAndPartition, OffsetAndMetadata> reqMap = new HashMap<TopicAndPartition, OffsetAndMetadata>();
-                reqMap.put(m_topicAndPartition, offsetMetdata);
-                OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(m_groupId, reqMap, correlationId, CLIENT_ID, version);
+            final long safe = m_gapTracker.commit(-1L);
+            if (safe > m_lastCommittedOffset) {
+
+                OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(
+                        m_groupId,
+                        singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", ErrorMapping.NoError())),
+                        correlationId,
+                        CLIENT_ID,
+                        version
+                        );
                 OffsetCommitResponse offsetCommitResponse = null;
                 try {
                     SimpleConsumer consumer = m_offsetManager.get();
@@ -819,15 +813,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
                 final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
                 if (code != ErrorMapping.NoError()) {
-                    final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition + " Code: %d";
-                    error(null, msg, code);
+                    final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition;
+                    error(ErrorMapping.exceptionFor(code), msg);
                     return false;
                 }
+                m_lastCommittedOffset = safe;
             }
-            m_lastCommittedOffset = offset;
-            synchronized(m_seenOffset) {
-                removeSet.clear();
-            }
+
             return true;
         }
 
