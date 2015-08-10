@@ -61,7 +61,6 @@ public class ImportHandler {
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 400);
     public final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
@@ -180,7 +179,14 @@ public class ImportHandler {
         }
 
         //Indicate backpressure or not.
-        m_importContext.hasBackPressure(m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS);
+        boolean b = m_adapter.hasBackPressure();
+        m_importContext.hasBackPressure(b);
+        if (b) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ex) {
+            }
+        }
 
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
@@ -221,7 +227,7 @@ public class ImportHandler {
         }
 
         boolean success;
-        success = m_adapter.createTransaction(proc, catProc, cb, task, tcont, partition, nowNanos);
+        success = m_adapter.createTransaction(m_importContext, proc, catProc, cb, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();

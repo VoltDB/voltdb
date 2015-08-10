@@ -93,8 +93,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private String m_groupId;
     //Procedure to be invoked with params.
     private String m_procedure;
-    //backpressure sleep milli seconds 100ms by default.
-    private int m_backpressureSleepMs = 200;
+    //backpressure sleep milli seconds 1000ms by default.
+    private int m_backpressureSleepMs = 1000;
 
     //List of topics form comma seperated list.
     private List<String> m_topicList;
