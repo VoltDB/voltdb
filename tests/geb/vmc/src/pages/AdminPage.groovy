@@ -220,6 +220,28 @@ class AdminPage extends VoltDBManagementCenterPage {
         autoSnapshotsPopupOk		{ $(id:"btnSaveSnapshot", text:"Ok") }
         autoSnapshotsPopupCancel	{ $("html body div.popup_cont div.popup div.popup_content div.overlay-btns a#btnPopupAutoSnapshotCancel.btn.btn-gray") }
 
+        //Database Replication Section
+        divDrWrapper                { $("#divDrWrapperAdmin")}
+        DrTitle				        { $(class:"drAdminHeaderLeft",text:"Database Replication (DR)") }
+        drMode                      { $("#drMode") }
+        drId    			        { $(class:"configLabel", text:"ID") }
+        drIdValue       			{ $("#drId") }
+        master  			        { $(class:"configLabel", text:"Master") }
+        masterValue                 { $("#txtDrMaster")}
+        replicSource                { $("#replicaSource")}
+        replica 			        { $(class:"configLabel", text:contains("Replica")) }
+        replicaSourceValue           { $("#txtDrReplica") }
+        drTables                    { $(class:"configLabel", text:"DR Tables") }
+        btnListDrTables             { $("#lstDrTbl")}
+        drTableListOk          		{ $(id:"A2", text:"Ok") }
+        drTableList                 { $("#drTableBody") }
+        drMasterEdit                { $("#drMasterEdit") }
+        btnEditDrMasterOk           { $("#btnEditDrMasterOk") }
+        btnEditDrMasterCancel       { $("#btnEditDrMasterCancel") }
+        btnSaveDrMaster             { $("#btnSaveDrMaster") }
+        btnPopupDrMasterCancel      { $("#btnPopupDrMasterCancel") }
+        drTablePopup                { $(class:"overlay-title icon-alert", text:"DR Tables") }
+
     }
     static at = {
         adminTab.displayed
@@ -387,5 +409,16 @@ class AdminPage extends VoltDBManagementCenterPage {
         return streamNxt
     }
 
+    def boolean CheckIfDREnabled(){
+        boolean result = false
+        try{
+            waitFor(30){divDrWrapper.isDisplayed() }
+            println("DR section is displayed.")
+            result = true
+        } catch(geb.waiting.WaitTimeoutException e){
+            println("DR section is not displayed")
+        }
+        return result;
+    }
 
 }
