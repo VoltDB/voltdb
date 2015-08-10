@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.base.Throwables;
 import static org.voltdb.ClientInterface.getPartitionForProcedure;
 
 import java.io.IOException;
@@ -35,6 +36,7 @@ import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import java.util.concurrent.ExecutionException;
 import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
@@ -56,12 +58,10 @@ public class ImportHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private volatile boolean m_stopped = false;
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 400);
-    public final static long SUPPRESS_INTERVAL = 60;
+    public final static long SUPPRESS_INTERVAL = 120;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext, CatalogContext catContext) {
@@ -82,7 +82,6 @@ public class ImportHandler {
             public void run() {
                 m_logger.info("Importer ready importing data for: " + m_importContext.getName());
                 try {
-                    m_adapter.start();
                     m_importContext.readyForData();
                 } catch (Throwable t) {
                     m_logger.error("ImportContext stopped with following exception", t);
@@ -93,21 +92,25 @@ public class ImportHandler {
     }
 
     public void stop() {
-        m_stopped = true;
-        m_es.submit(new Runnable() {
+        try {
+            m_es.submit(new Runnable() {
 
-            @Override
-            public void run() {
-                try {
-                    //Stop and Drain the adapter so all calbacks are done
-                    m_adapter.stop();
-                    m_importContext.stop();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                @Override
+                public void run() {
+                    try {
+                        //Stop the context first so no more work is submitted.
+                        m_importContext.stop();
+                    } catch (Exception ex) {
+                        Throwables.propagate(ex);
+                    }
+                    m_logger.info("Importer stopped: " + m_importContext.getName());
                 }
-                m_logger.info("Importer stopped: " + m_importContext.getName());
-            }
-        });
+            }).get();
+        } catch (InterruptedException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        } catch (ExecutionException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        }
         try {
             m_es.shutdown();
             m_es.awaitTermination(1, TimeUnit.DAYS);
@@ -140,9 +143,6 @@ public class ImportHandler {
     }
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
-        if (m_stopped) {
-            return false;
-        }
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             warn(null, "Server is paused and is currently unavailable - please try again later.");
@@ -175,7 +175,14 @@ public class ImportHandler {
         }
 
         //Indicate backpressure or not.
-        m_importContext.hasBackPressure(m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS);
+        boolean b = m_adapter.hasBackPressure();
+        m_importContext.hasBackPressure(b);
+        if (b) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ex) {
+            }
+        }
 
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
@@ -216,7 +223,7 @@ public class ImportHandler {
         }
 
         boolean success;
-        success = m_adapter.createTransaction(proc, catProc, cb, task, tcont, partition, nowNanos);
+        success = m_adapter.createTransaction(m_importContext, proc, catProc, cb, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
