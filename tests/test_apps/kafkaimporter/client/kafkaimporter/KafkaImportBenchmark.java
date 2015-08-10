@@ -89,7 +89,7 @@ public class KafkaImportBenchmark {
 
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
-    static List<Integer> p = new ArrayList<Integer>();
+    static List<Integer> importProgress = new ArrayList<Integer>();
 
     static InsertExport exportProc;
     static TableChangeMonitor exportMon;
@@ -213,11 +213,11 @@ public class KafkaImportBenchmark {
             @Override
             public void run() {
                 long count = MatchChecks.getImportRowCount(client);
-                p.add((int) count);
-                if (p.size() > 1) {
-                    log.info("Import Throughput " + (count - p.get(p.size() - 2)) / period + "/s, Total Rows: " + count);
+                importProgress.add((int) count);
+                log.info(importProgress.toString());
+                if (importProgress.size() > 1) {
+                    log.info("Import Throughput " + (count - importProgress.get(importProgress.size() - 2)) / period + "/s, Total Rows: " + count);
                 }
-                //log.info(p.toString());
             }
         },
             config.displayinterval * 1000,
@@ -327,7 +327,11 @@ public class KafkaImportBenchmark {
         long count = 0;
         do {
             Thread.sleep(END_WAIT * 1000);
-        } while (p.size() < 2 || p.get(p.size() - 1) < exportRowCount && p.get(p.size() - 1) < p.get(p.size() - 2));
+            // importProgress is an array of sampled counts of the importedcounts table, showing importProgressress of import
+            // samples are recorded by the checkTimer thread
+        } while (importProgress.size() < 4 || importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-2) ||
+                    importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
+                    importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
 
         long mirrorRows = MatchChecks.getMirrorTableRowCount(client);
         long importRows = MatchChecks.getImportTableRowCount(client);
