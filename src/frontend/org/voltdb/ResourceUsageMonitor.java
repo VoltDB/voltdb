@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.utils.SystemStatsCollector;
@@ -34,25 +35,29 @@ public class ResourceUsageMonitor implements Runnable
 
     private long m_rssLimit;
     private int m_resourceCheckInterval;
+    private DiskResourceChecker m_diskLimitConfig;
 
-    public ResourceUsageMonitor(SystemSettingsType systemSettings)
+    public ResourceUsageMonitor(SystemSettingsType systemSettings, PathsType pathsConfig)
     {
         if (systemSettings == null || systemSettings.getResourcemonitor() == null) {
             return;
         }
 
         ResourceMonitorType config = systemSettings.getResourcemonitor();
+        m_resourceCheckInterval = config.getFrequency();
+
         if (config.getMemorylimit() != null) {
             // configured value is in GB. Convert it to bytes
             double dblLimit = config.getMemorylimit().getSize().doubleValue()*1073741824;
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
 
-        m_resourceCheckInterval = config.getFrequency();
+        m_diskLimitConfig = new DiskResourceChecker(systemSettings, pathsConfig);
     }
 
     public boolean hasResourceLimitsConfigured()
     {
+        //TODO: fix this
         return (m_rssLimit > 0 && m_resourceCheckInterval > 0);
     }
 
