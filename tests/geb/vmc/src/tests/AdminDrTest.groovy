@@ -71,12 +71,6 @@ class AdminDrTest extends TestBase {
                 try {
                     when:
                         waitFor(waitTime){
-                            page.drIdValue.isDisplayed()
-                            !page.drIdValue.text().equals("")
-                        }
-                        println("DR id has proper value")
-
-                        waitFor(waitTime){
                             page.masterValue.isDisplayed()
                             !page.masterValue.text().equals("")
                         }
@@ -130,4 +124,29 @@ class AdminDrTest extends TestBase {
         }
     }
 
+    def "Check if replica value is off for master and on for replica"(){
+        when:
+        at AdminPage
+        then:
+        boolean result = page.CheckIfDREnabled();
+        if(result){
+            if(drMode.text().toLowerCase() == "replica" || drMode.text().toLowerCase() == "both"){
+                if(replicaSourceValue.text().toLowerCase() == "on"){
+                    println("Replica value is on when DR mode is either replica or both")
+                } else {
+                    println(replicaSourceValue.text())
+                    assert false
+                }
+            }else if(drMode.text().toLowerCase() == "master"){
+                if(replicaSourceValue.text().toLowerCase() == "off"){
+                    println("Replica value is off when DR mode is master")
+                } else {
+                    println(replicaSourceValue.text())
+                    assert false
+                }
+            }
+        } else {
+            println("DR is not enabled. DR should be enable to check if replica value is off for master and on for replica")
+        }
+    }
 }
