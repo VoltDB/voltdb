@@ -313,18 +313,22 @@ public class TestRepairLog
     @Test
     public void testPerformance()
     {
+        // Create a dummy log to hold some stuff so that the Java heap is
+        // as used as the loaded test below.
+        RepairLog notCare = new RepairLog();
+        notCare.deliver(truncInitMsg(Long.MIN_VALUE, 0));
+        for (int i = 0; i < 40000; i++) {
+            notCare.deliver(truncCompleteMsg(Long.MIN_VALUE, i));
+        }
+
         RepairLog dut = new RepairLog();
         // First, add and truncate SP transactions with no MPs
-        dut.deliver(truncInitMsg(Long.MIN_VALUE, 0));
-        long start = System.currentTimeMillis();
-        for (int i = 0; i < 100000; i++)
-        {
-            VoltMessage msg = truncInitMsg(i, i + 1);
-            dut.deliver(msg);
-        }
-        long end = System.currentTimeMillis();
-        long duration1 = end - start;
+        final long duration1 = runSpPerf(dut);
         System.out.println("Time to deliver 100,000 SPs: " + duration1);
+
+        // Get rid of the dummy memory holder and GC it.
+        notCare = null;
+        System.gc();
 
         // Now, add 40000 MP messages and then see how long it takes to do the SPs
         dut = new RepairLog();
@@ -332,15 +336,10 @@ public class TestRepairLog
         for (int i = 0; i < 40000; i++) {
             dut.deliver(truncCompleteMsg(Long.MIN_VALUE, i));
         }
-        start = System.currentTimeMillis();
-        for (int i = 0; i < 100000; i++)
-        {
-            VoltMessage msg = truncInitMsg(i, i + 1);
-            dut.deliver(msg);
-        }
-        end = System.currentTimeMillis();
-        long duration2 = end - start;
+
+        final long duration2 = runSpPerf(dut);
         System.out.println("Time to deliver 100,000 SPs: " + duration2);
+
         // rough check, verify that the two don't differ by more than 20%
         if (duration2 > duration1) {
             long delta = Math.abs(duration2 - duration1);
@@ -349,6 +348,17 @@ public class TestRepairLog
                     (deltaPercent * 100) + "%.",
                     deltaPercent < .20);
         }
+    }
+
+    private long runSpPerf(RepairLog dut)
+    {
+        dut.deliver(truncInitMsg(Long.MIN_VALUE, 0));
+        final long start = System.currentTimeMillis();
+        for (int i = 0; i < 100000; i++)
+        {
+            dut.deliver(truncInitMsg(i, i + 1));
+        }
+        return System.currentTimeMillis() - start;
     }
 
     @Test
