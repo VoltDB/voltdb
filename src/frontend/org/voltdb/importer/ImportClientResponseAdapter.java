@@ -126,6 +126,10 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         return (m_callbacks.size() > (m_partitionExecutor.size() * MAX_PENDING_TRANSACTIONS_PER_PARTITION));
     }
 
+    public ClientInterface getClientInterface() {
+        return VoltDB.instance().getClientInterface();
+    }
+
     public boolean createTransaction(final ImportContext context, final String procName, final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
             final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
 
@@ -147,7 +151,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
-                    boolean bval = VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
+                    boolean bval = getClientInterface().createTransaction(connectionId(), task,
                             catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
                             task.getSerializedSize(), nowNanos);
                     if (!bval) {
@@ -236,9 +240,10 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                             rateLimitedLog(Level.ERROR, null, fmt, callback.getProcedureName(), resp.getStatusString());
                         }
                         callback.handleResponse(resp);
-                        m_callbacks.remove(resp.getClientHandle());
                     } catch (Exception ex) {
                         m_logger.error("Failed to process callback.", ex);
+                    } finally {
+                        m_callbacks.remove(resp.getClientHandle());
                     }
                 }
             });
