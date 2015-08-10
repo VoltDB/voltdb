@@ -1957,6 +1957,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         sc.get();
                     } catch (Throwable t) {}
                 }
+
+                //Shutdown import processors.
+                ImportManager.instance().shutdown();
+
                 m_periodicWorks.clear();
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
@@ -2001,9 +2005,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 if (m_configLogger != null) {
                     m_configLogger.join();
                 }
-
-                //Shutdown import processors.
-                ImportManager.instance().shutdown();
 
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
