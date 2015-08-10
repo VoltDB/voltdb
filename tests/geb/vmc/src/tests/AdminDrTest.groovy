@@ -134,12 +134,14 @@ class AdminDrTest extends TestBase {
                 if(replicaSourceValue.text().toLowerCase() == "on"){
                     println("Replica value is on when DR mode is either replica or both")
                 } else {
+                    println(replicaSourceValue.text())
                     assert false
                 }
             }else if(drMode.text().toLowerCase() == "master"){
                 if(replicaSourceValue.text().toLowerCase() == "off"){
                     println("Replica value is off when DR mode is master")
                 } else {
+                    println(replicaSourceValue.text())
                     assert false
                 }
             }
