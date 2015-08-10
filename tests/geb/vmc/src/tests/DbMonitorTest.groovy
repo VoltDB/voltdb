@@ -1458,18 +1458,21 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        printsln("FAIL: Date of Max is less than that of date of Min for same month")
 		        assert false
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -1520,8 +1523,11 @@ class DbMonitorTest extends TestBase {
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
 
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -1530,7 +1536,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -1755,8 +1761,11 @@ class DbMonitorTest extends TestBase {
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
 
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
@@ -1765,7 +1774,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -1815,9 +1824,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
+		
+		int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
 
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -1826,7 +1838,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2051,8 +2063,11 @@ class DbMonitorTest extends TestBase {
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
 
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
@@ -2061,7 +2076,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2111,9 +2126,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -2122,7 +2140,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2350,9 +2368,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
@@ -2361,7 +2382,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2420,9 +2441,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -2431,7 +2455,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2849,9 +2873,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
@@ -2860,7 +2887,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2910,10 +2937,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
 
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -2922,7 +2951,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
