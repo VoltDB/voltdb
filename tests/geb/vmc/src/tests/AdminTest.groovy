@@ -829,6 +829,7 @@ class AdminTest extends TestBase {
     def "Overview:Export-Expand and check configurations"() {
 
         when:
+
         int count = 0
         testStatus = false
 then:
@@ -838,13 +839,13 @@ then:
                 when:
                 page.overview.export.click()
                 then:
-                if(waitFor(waitTime) {page.overview.exportNoConfigAvailable.isDisplayed()})
+                if(waitFor(20) {page.overview.exportNoConfigAvailable.isDisplayed()})
                 {
                     println(page.overview.exportNoConfigAvailable.text())
                 }
                 else
                 {
-                    waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
+                    waitFor(20) { page.overview.exportConfig.isDisplayed() }
                     println("The export configuration")
                 }
                 testStatus = true
@@ -2727,21 +2728,21 @@ then:
             println("server name is displayed as: " + page.mainservername.text().replaceAll("Stop", "").replaceAll("Paused", ""))
             println("currently running server is : "+ page.servername.text())
         }
-try {
+        try {
 
-    if (!page.cluster.resumebutton.displayed) {
-        if (page.shutdownServerStop.displayed) {
-            println("Servers are stopped")
+            if (!page.cluster.resumebutton.displayed) {
+                if (page.shutdownServerStop.displayed) {
+                    println("Servers are stopped")
+                }
+            }
         }
-    }
-}
-    catch(geb.error.RequiredPageContentNotPresent e)
-            {
+        catch(geb.error.RequiredPageContentNotPresent e)
+        {
             println("Resume button is not displayed")
-}
+        }
 
-            try {
-          if ( page.cluster.resumebutton.displayed ) {
+        try {
+            if ( page.cluster.resumebutton.displayed ) {
                 if (page.shutdownServerPause.displayed) {
                     println("Servers are paused!!!")
                 }
@@ -2750,7 +2751,7 @@ try {
         }
         catch(geb.error.RequiredPageContentNotPresent e)
         {
-        println("Resume button is displayed")
+            println("Resume button is displayed")
         }
     }
 
