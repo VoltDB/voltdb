@@ -130,18 +130,21 @@ class AdminDrTest extends TestBase {
         then:
         boolean result = page.CheckIfDREnabled();
         if(result){
-            if(drMode.text().toLowerCase() == "replica" || drMode.text().toLowerCase() == "both"){
-                if(replicaSourceValue.text().toLowerCase() == "on"){
+            waitFor(waitTime){ page.drMode.isDisplayed() }
+            if(page.drMode.text().toLowerCase() == "replica" || page.drMode.text().toLowerCase() == "both"){
+                waitFor(waitTime){ page.replicaSourceValue.isDisplayed() }
+                if(page.replicaSourceValue.text().toLowerCase() == "on"){
                     println("Replica value is on when DR mode is either replica or both")
                 } else {
-                    println(replicaSourceValue.text())
+                    println(page.replicaSourceValue.text())
                     assert false
                 }
-            }else if(drMode.text().toLowerCase() == "master"){
-                if(replicaSourceValue.text().toLowerCase() == "off"){
+            }else if(page.drMode.text().toLowerCase() == "master"){
+                waitFor(waitTime){ page.replicaSourceValue.isDisplayed() }
+                if(page.replicaSourceValue.text().toLowerCase() == "off"){
                     println("Replica value is off when DR mode is master")
                 } else {
-                    println(replicaSourceValue.text())
+                    println("Replica value is " + page.replicaSourceValue.text())
                     assert false
                 }
             }
