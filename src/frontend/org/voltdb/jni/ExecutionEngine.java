@@ -462,8 +462,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         // track cache misses
         m_cacheMisses++;
         // estimate the cache size by the number of misses
-        m_eeCacheSize = m_eeCacheSize + 1;
-        m_eeCacheSize = Math.min(m_eeCacheSize, EE_PLAN_CACHE_SIZE);
+        if (m_eeCacheSize < EE_PLAN_CACHE_SIZE) {
+            m_eeCacheSize++;
+        }
         // get the plan for realz
         return ActivePlanRepository.planForFragmentId(fragmentId);
     }
