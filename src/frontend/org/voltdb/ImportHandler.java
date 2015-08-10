@@ -57,7 +57,6 @@ public class ImportHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private volatile boolean m_stopped = false;
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
@@ -92,7 +91,6 @@ public class ImportHandler {
     }
 
     public void stop() {
-        m_stopped = true;
         try {
             m_es.submit(new Runnable() {
 
@@ -144,9 +142,6 @@ public class ImportHandler {
     }
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
-        if (m_stopped) {
-            return false;
-        }
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             warn(null, "Server is paused and is currently unavailable - please try again later.");
