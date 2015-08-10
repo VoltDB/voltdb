@@ -1,0 +1,30 @@
+# To compile and jar the SP:
+  javac -cp "./:/home/pshaw/voltdb/voltdb/*" -d ./obj db/procedures/InsertExport.java
+  jar cvf sp.jar -C obj socketimporter/db/procedures/InsertExport.class 
+
+# To run the DB:
+ voltdb create -d deployment-export-kafka.xml 
+
+# To compile and create client jar:
+  javac -cp ":/home/pshaw/voltdb/voltdb/*" client/socketimporter/KafkaImportBenchmark.java client/socketimporter/InsertExport.java 
+  cd ../; jar cvf socketimporter/client.jar socketimporter/client/socketimporter/KafkaImportBenchmark*.class socketimporter/client/socketimporter/InsertExport*.class; cd socketimporter
+
+# To run:
+java -cp  :/home/pshaw/voltdb/voltdb/voltdb-5.4.jar:/home/pshaw/voltdb/lib/avro-1.7.7.jar:/home/pshaw/voltdb/lib/commons-cli-1.2.jar:/home/pshaw/voltdb/lib/commons-codec-1.6.jar:/home/pshaw/voltdb/lib/commons-lang3-3.0.jar:/home/pshaw/voltdb/lib/commons-logging-1.1.3.jar:/home/pshaw/voltdb/lib/felix.jar:/home/pshaw/voltdb/lib/groovy-all-2.1.7-indy.jar:/home/pshaw/voltdb/lib/httpasyncclient-4.0.1.jar:/home/pshaw/voltdb/lib/httpclient-4.3.2.jar:/home/pshaw/voltdb/lib/httpcore-4.3.2.jar:/home/pshaw/voltdb/lib/httpcore-nio-4.3.2.jar:/home/pshaw/voltdb/lib/jackson-core-asl-1.9.13.jar:/home/pshaw/voltdb/lib/jackson-mapper-asl-1.9.13.jar:/home/pshaw/voltdb/lib/jetty-continuation-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jetty-http-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jetty-io-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jetty-server-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jetty-util-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jline-2.10.jar:/home/pshaw/voltdb/lib/jna.jar:/home/pshaw/voltdb/lib/jsch-0.1.51.jar:/home/pshaw/voltdb/lib/kafka-clients-0.8.2.1.jar:/home/pshaw/voltdb/lib/log4j-1.2.16.jar:/home/pshaw/voltdb/lib/lz4-1.2.0.jar:/home/pshaw/voltdb/lib/metrics-core-2.2.0.jar:/home/pshaw/voltdb/lib/protobuf-java-2.5.0.jar:/home/pshaw/voltdb/lib/scala-library.jar:/home/pshaw/voltdb/lib/servlet-api-2.5.jar:/home/pshaw/voltdb/lib/slf4j-api-1.6.2.jar:/home/pshaw/voltdb/lib/slf4j-nop-1.6.2.jar:/home/pshaw/voltdb/lib/snappy-java-1.1.1.7.jar:/home/pshaw/voltdb/lib/super-csv-2.1.0.jar:/home/pshaw/voltdb/lib/tomcat-jdbc.jar:/home/pshaw/voltdb/lib/tomcat-juli.jar:/home/pshaw/voltdb/lib/extension/exportbenchmark-export.jar:/home/pshaw/voltdb/lib/extension/exportbenchmark.jar:client.jar socketimporter.client.socketimporter.KafkaImportBenchmark 
+
+# obsolete  java -cp ".:/home/pshaw/voltdb/voltdb/*:client.jar:/home/pshaw/voltdb/lib/commons-cli-1.2.jar" socketimporter.client.socketimporter.KafkaImportBenchmark
+
+# To run MatchCheck:
+cd ~/workspace/voltdb/tests/test_apps/socketimporter
+java -cp  :/home/pshaw/voltdb/voltdb/voltdb-5.4.jar:/home/pshaw/voltdb/lib/avro-1.7.7.jar:/home/pshaw/voltdb/lib/commons-cli-1.2.jar:/home/pshaw/voltdb/lib/commons-codec-1.6.jar:/home/pshaw/voltdb/lib/commons-lang3-3.0.jar:/home/pshaw/voltdb/lib/commons-logging-1.1.3.jar:/home/pshaw/voltdb/lib/felix.jar:/home/pshaw/voltdb/lib/groovy-all-2.1.7-indy.jar:/home/pshaw/voltdb/lib/httpasyncclient-4.0.1.jar:/home/pshaw/voltdb/lib/httpclient-4.3.2.jar:/home/pshaw/voltdb/lib/httpcore-4.3.2.jar:/home/pshaw/voltdb/lib/httpcore-nio-4.3.2.jar:/home/pshaw/voltdb/lib/jackson-core-asl-1.9.13.jar:/home/pshaw/voltdb/lib/jackson-mapper-asl-1.9.13.jar:/home/pshaw/voltdb/lib/jetty-continuation-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jetty-http-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jetty-io-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jetty-server-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jetty-util-7.6.1.v20120215.jar:/home/pshaw/voltdb/lib/jline-2.10.jar:/home/pshaw/voltdb/lib/jna.jar:/home/pshaw/voltdb/lib/jsch-0.1.51.jar:/home/pshaw/voltdb/lib/kafka-clients-0.8.2.1.jar:/home/pshaw/voltdb/lib/log4j-1.2.16.jar:/home/pshaw/voltdb/lib/lz4-1.2.0.jar:/home/pshaw/voltdb/lib/metrics-core-2.2.0.jar:/home/pshaw/voltdb/lib/protobuf-java-2.5.0.jar:/home/pshaw/voltdb/lib/scala-library.jar:/home/pshaw/voltdb/lib/servlet-api-2.5.jar:/home/pshaw/voltdb/lib/slf4j-api-1.6.2.jar:/home/pshaw/voltdb/lib/slf4j-nop-1.6.2.jar:/home/pshaw/voltdb/lib/snappy-java-1.1.1.7.jar:/home/pshaw/voltdb/lib/super-csv-2.1.0.jar:/home/pshaw/voltdb/lib/tomcat-jdbc.jar:/home/pshaw/voltdb/lib/tomcat-juli.jar:/home/pshaw/voltdb/lib/extension/exportbenchmark-export.jar:/home/pshaw/voltdb/lib/extension/exportbenchmark.jar:client.jar socketimporter.client.socketimporter.MatchChecks
+Connecting to VoltDB Interface...
+...localhost
+log4j:WARN No appenders could be found for logger (DBBPOOL).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+Mirror table row count: 0
+Loop countdown: 20
+getRowCount(): 0
+    Delete rows: 0
+    Mirror table row count: 0
+
