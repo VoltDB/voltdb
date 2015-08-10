@@ -51,7 +51,7 @@ import org.voltdb.client.ProcedureCallback;
 public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
-    public static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 100);
+    public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
 
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
@@ -122,7 +122,8 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     }
 
     public boolean hasBackPressure() {
-        return (m_callbacks.size() > MAX_PENDING_TRANSACTIONS);
+        // 500 default per partition.
+        return (m_callbacks.size() > (m_partitionExecutor.size() * MAX_PENDING_TRANSACTIONS_PER_PARTITION));
     }
 
     public boolean createTransaction(final ImportContext context, final String procName, final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,

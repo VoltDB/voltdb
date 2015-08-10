@@ -94,7 +94,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //Procedure to be invoked with params.
     private String m_procedure;
     //backpressure sleep milli seconds 1000ms by default.
-    private int m_backpressureSleepMs = 1000;
+    private int m_backpressureSleepMs = 500;
 
     //List of topics form comma seperated list.
     private List<String> m_topicList;
@@ -344,7 +344,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //These are defaults picked up from kafka we save them so that they are passed around.
         m_fetchSize = Integer.parseInt(m_properties.getProperty("fetch.message.max.bytes", "65536"));
         m_consumerSocketTimeout = Integer.parseInt(m_properties.getProperty("socket.timeout.ms", "30000"));
-        m_backpressureSleepMs = Integer.parseInt(m_properties.getProperty("backpressure.sleep.ms", "50"));
+        m_backpressureSleepMs = Integer.parseInt(m_properties.getProperty("backpressure.sleep.ms", "1"));
     }
 
     //Per topic per partition that we are responsible for.
