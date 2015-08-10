@@ -23,7 +23,6 @@
 
 package vmcTest.tests
 
-
 import vmcTest.pages.*
 import java.io.*;
 import java.util.Date;
@@ -698,7 +697,6 @@ class DbMonitorTest extends TestBase {
         page.partitionIdleTimeDisplayed()
     }
 
-
     def "click display preferences remove Cluster Latency and again add Cluster Latency"() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
@@ -840,8 +838,6 @@ class DbMonitorTest extends TestBase {
         page.partitionIdleTimeDisplayed()
     }
 
-
-
     def "click display preferences remove Stored Procedures and again add Stored Procedures"() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
@@ -944,7 +940,6 @@ class DbMonitorTest extends TestBase {
         page.dataTablesDisplayed()
     }
 
-
     def "Add a table in Tables and check it"() {
 
         String createQuery = page.getQueryToCreateTable()
@@ -1011,7 +1006,6 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-
     def "check if Row Count is clickable"() {
         String before = ""
 		String after  = ""
@@ -1037,7 +1031,6 @@ class DbMonitorTest extends TestBase {
 			else
 				assert false
     }
-
 
     def "check if Max Rows is clickable"() {
         String before = ""
@@ -1196,7 +1189,6 @@ class DbMonitorTest extends TestBase {
 			else
 				assert false
     }
-
 
     def "check if Min Latency is clickable"() {
         String before = ""
@@ -1369,7 +1361,6 @@ class DbMonitorTest extends TestBase {
 			waitFor(40,20) { !page.alertCount.isDisplayed() }
 	}
 
-
     // server search
     def "check server search on dbmonitor matched"(){
 
@@ -1387,7 +1378,6 @@ class DbMonitorTest extends TestBase {
         println("server searched matched")
     }
 
-
     def "check server search on dbmonitor not matched"(){
 
         when:'clicked server button'
@@ -1403,7 +1393,6 @@ class DbMonitorTest extends TestBase {
         page.clusterserverbutton.click()
         println("server searched unmatched")
     }
-
 
     def "check server title on dbmonitor"(){
         when:
@@ -1461,7 +1450,8 @@ class DbMonitorTest extends TestBase {
         
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
-        
+        println(intDateMax)
+        println(intDateMin)
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
@@ -1588,7 +1578,6 @@ class DbMonitorTest extends TestBase {
 		    assert false
 		}
     }
-
 
     def "check max value in server cpu minutes"(){
         int count = 0
@@ -1890,7 +1879,6 @@ class DbMonitorTest extends TestBase {
 		    assert false
 		}
     }
-
 
     def "check max value in server ram minutes"(){
         int count = 0
@@ -2941,6 +2929,9 @@ class DbMonitorTest extends TestBase {
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
+        println(intDateMax)
+        println(intDateMin)
+
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
@@ -3048,5 +3039,98 @@ class DbMonitorTest extends TestBase {
 
         page.runQuery()
     }
+    
+    // Command Log Statistics
+    def "Verify min value in Command Log Statistics days"(){
+        expect: 'at DbMonitorPage'
+        at DbMonitorPage
+        
+        when:
+        println("Test Start: Verify min value in Command Log Statistics days")
+        int count = 0
+        
+        while(count<numberOfTrials) {
+            try {
+                waitFor(waitTime) { page.commandLogStatistics.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        if(page.commandLogStatistics.isDisplayed()) {
+            // This loop is used to gain time.
+            count = 0
+            while(count<numberOfTrials) {
+                count++
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Seconds")
+                page.chooseGraphView("Days")
+                if(graphView.text().equals("")) {
+                    break
+                }
+		    }
+		    count = 0
+		    String stringMax = ""
+		    String stringMin = ""
+
+		    while(count<numberOfTrials) {
+		        count++
+		        try {
+		            waitFor(waitTime) {
+		                page.commandLogStatisticsMax.isDisplayed()
+		            }
+		            stringMax = page.commandLogStatisticsMax.text()
+		            stringMin = page.commandLogStatisticsMin.text()
+
+		            println(stringMax)
+		            println(stringMin)
+
+		            if(stringMax.length()<10 || stringMax.length()<10) {
+		                println("Not fixed")
+		                continue
+		            }
+
+		            break
+		        } catch(geb.waiting.WaitTimeoutException e) {
+		            println("WaitTimeoutException")
+		        }
+		    }
+
+		    String monthMax = page.changeToMonth(stringMax)
+		    String monthMin = page.changeToMonth(stringMin)
+
+		    String dateMax = page.changeToDate(stringMax)
+		    String dateMin = page.changeToDate(stringMin)
+            
+            int intDateMax = Integer.parseInt(dateMax)
+            int intDateMin = Integer.parseInt(dateMin)
+            
+		    if(monthMax.equals(monthMin)) {
+		        if(intDateMax > intDateMin) {
+		            println("The minimum value is " + stringMin + " and the time is in Days")
+		        }
+		        else {
+		            println("FAIL: Date of Max is less than that of date of Min for same month")
+		            assert false
+		        }
+		    }
+		    else {
+		        if (intDateMax < intDateMin) {
+		            println("Success")
+		        }
+		        else {
+		            println("FAIL: Date of Max is more than that of date of Min for new month")
+		            assert false
+		        }
+		    }
+		}
+		else {
+		    println("The Command Log Statistics graph is not visible")
+		    println("Test End: Verify min value in Command Log Statistics days")
+		}
+		then:
+		println()
+    }
+
+    // end of Command Log Statistics
 
 }
