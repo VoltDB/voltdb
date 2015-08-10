@@ -60,8 +60,8 @@ public class ImportHandler {
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
-    final static long SUPPRESS_INTERVAL = 60;
+    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 400);
+    public final static long SUPPRESS_INTERVAL = 60;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext, CatalogContext catContext) {
@@ -82,6 +82,7 @@ public class ImportHandler {
             public void run() {
                 m_logger.info("Importer ready importing data for: " + m_importContext.getName());
                 try {
+                    m_adapter.start();
                     m_importContext.readyForData();
                 } catch (Throwable t) {
                     m_logger.error("ImportContext stopped with following exception", t);
@@ -98,8 +99,8 @@ public class ImportHandler {
             @Override
             public void run() {
                 try {
-                    //Drain the adapter so all calbacks are done
-                    m_adapter.drain();
+                    //Stop and Drain the adapter so all calbacks are done
+                    m_adapter.stop();
                     m_importContext.stop();
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -144,7 +145,7 @@ public class ImportHandler {
         }
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
-            m_logger.warn("Server is paused and is currently unavailable - please try again later.");
+            warn(null, "Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -166,28 +167,16 @@ public class ImportHandler {
                 catProc = sysProc.asCatalogProcedure();
             }
             if (catProc == null) {
-                m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
+                String fmt = "Can not invoke procedure %s from streaming interface %s procedure not found.";
+                error(null, fmt, proc, ic.getName());
                 m_failedCount.incrementAndGet();
                 return false;
             }
         }
 
-        int counter = 1;
-        int maxSleepNano = 100000;
-        long start = System.nanoTime();
-        while (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS) {
-            try {
-                int nanos = 500 * counter++;
-                Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
-                if (m_stopped) {
-                    return false;
-                }
-                //We have reached max timeout.
-                if (System.nanoTime() - start > ic.getBackpressureTimeout()) {
-                    return false;
-                }
-            } catch (InterruptedException ex) { }
-        }
+        //Indicate backpressure or not.
+        m_importContext.hasBackPressure(m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS);
+
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
@@ -218,7 +207,8 @@ public class ImportHandler {
             try {
                 partition = getPartitionForProcedure(ppi.index, ppi.type, task);
             } catch (Exception e) {
-                m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
+                String fmt = "Can not invoke procedure %s from streaming interface %s partition not found.";
+                error(null, fmt, proc, ic.getName());
                 m_failedCount.incrementAndGet();
                 tcont.discard();
                 return false;
@@ -226,7 +216,7 @@ public class ImportHandler {
         }
 
         boolean success;
-        success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
+        success = m_adapter.createTransaction(proc, catProc, cb, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();

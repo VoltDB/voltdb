@@ -32,11 +32,9 @@ public class CopyLoadPartitionedMP extends CopyLoadPartitionedBase {
     private final SQLStmt selectStmt = new SQLStmt("SELECT cid,txnid,rowid from loadmp WHERE cid=? ORDER BY cid LIMIT 1;");
     private final SQLStmt insertStmt = new SQLStmt("INSERT INTO  cploadmp VALUES (?, ?, ?);");
     private final SQLStmt insertIntoStmt = new SQLStmt("INSERT INTO cploadmp SELECT cid,txnid,rowid FROM loadmp WHERE cid=? ORDER BY cid;");
-    private Random r = new Random();
 
-    public VoltTable[] run(long cid) {
-        boolean useSelect = r.nextInt(2) == 0 ? false : true;
-        if (useSelect)
+    public VoltTable[] run(long cid, int useSelect) {
+        if (useSelect == 0)
             return doWork(selectStmt, insertStmt, cid);
         return doWork(null, insertIntoStmt, cid);
     }
