@@ -670,6 +670,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 while (!m_shutdown) {
                     if (m_currentOffset.get() < 0) {
                         getOffsetCoordinator();
+                        if (m_offsetManager.get() == null) {
+                            sleepCounter = backoffSleep(sleepCounter);
+                            continue;
+                        }
                         long lastOffset = getLastOffset();
                         m_currentOffset.set(lastOffset);
                         if (m_currentOffset.get() < 0) {
