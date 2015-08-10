@@ -34,7 +34,7 @@ public class InsertExport {
     static VoltLogger log = new VoltLogger("Benchmark.insertExport");
     final Client m_client;
     final static String INSERT_PN = "InsertFinal";
-    final static String EXPORT_PN = "InsertExport";
+    final static String EXPORT_PN = "InsertExport2";
 
     public InsertExport(Client client) {
         m_client = client;

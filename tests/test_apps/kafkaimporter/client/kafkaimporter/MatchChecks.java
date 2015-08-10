@@ -86,7 +86,7 @@ public class MatchChecks {
         long mirrorRowCount = 0;
 
         try {
-            VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
+            VoltTable[] countQueryResult = client.callProcedure("CountMirror2").getResults();
             mirrorRowCount = countQueryResult[0].asScalarLong();
         } catch (IOException | ProcCallException e) {
             e.printStackTrace();

@@ -32,6 +32,7 @@
 
 package kafkaimporter.db.procedures;
 
+import org.voltdb.types.TimestampType;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
@@ -45,7 +46,7 @@ public class InsertImport extends VoltProcedure {
     public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable1 " + sqlSuffix);
     public final SQLStmt deleteMirrorRow = new SQLStmt("DELETE FROM kafkamirrortable1 WHERE key = ? and value = ?");
 
-    public long run(long key, long value)
+    public long run(long key, long value, TimestampType insert_time)
     {
 
         voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key, value);
