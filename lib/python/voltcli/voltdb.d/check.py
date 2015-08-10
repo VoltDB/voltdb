@@ -42,17 +42,11 @@ osRelease=""
 osReleaseTest=""
 
 def detectOSRelease():
-    if isHostMAC():
-        osName= "Mac OS X"
-        # support for macosx 10.7 11.0.0 and greater
-        osRelease = os.popen("sw_vers -productVersion | tr -d '\n'").read()
-        output['OS'] = ["PASS", osName]
-        output['OS release'] = ["PASS", osRelease]
-    elif isHostLINUX():
+    if isHostLINUX():
         osName = "Linux"
         output['OS'] = ["PASS", osName]
         # support for specific ubuntu centos
-        osRelease = os.popen("lsb_release -d | tr -s '\t' ' ' | cut -d' ' -f2- | tr -d '\n'").read()
+        osRelease = subprocess.Popen("lsb_release -d | tr -s '\t' ' ' | cut -d' ' -f2- | tr -d '\n'", stdout=subprocess.PIPE, shell=True).stdout.read()
         release = re.search("\s\d+(\.\d+)*\s", osRelease).group(0).strip()
         if "centos" in osRelease.lower():
             if float(release) >= 6.3:
@@ -72,41 +66,30 @@ def detectOSRelease():
         else:
             output['OS release'] = ["WARN", "Unsupported release: " + osRelease]
     else:
-        osName=["WARN", "Supported platforms are MAC or Linux based"]
+        osName=["WARN", "Only supports Linux based platforms"]
         osRelease = ["WARN","Support distributions are Ubuntu 10.04/12.04/14.04 and RedHat/CentOS 6.3 or later"]
 
 def detectHostname():
-    output['Hostname'] = ["", os.popen("hostname | tr -d '\n'").read()]
+    output['Hostname'] = ["", subprocess.Popen("hostname | tr -d '\n'", stdout=subprocess.PIPE, shell=True).stdout.read()]
 
 def detectThreadCount():
-    if isHostMAC():
-        output['ThreadCount'] = [" ", os.popen("sysctl -a | grep 'cpu.thread_count' | cut -d' ' -f2 | tr -d '\n'").read()]
-    elif isHostLINUX():
-        output['ThreadCount'] = [" ", os.popen("cat /proc/cpuinfo | grep -c processor | tr -d '\n'").read()]
-    else:
-        output['ThreadCount'] = ["FAIL", "Unsupport platform detected"]
+    output['ThreadCount'] = [" ", subprocess.Popen("cat /proc/cpuinfo | grep -c processor | tr -d '\n'", stdout=subprocess.PIPE, shell=True).stdout.read()]
 
 def detect64bitOS():
-    if os.system("which uname >/dev/null 2>&1") == 0 and os.popen("uname -a | grep -c 'x86_64'").read() > 0:
+    if os.system("which uname >/dev/null 2>&1") == 0 and subprocess.Popen("uname -a | grep -c 'x86_64'", stdout=subprocess.PIPE, shell=True).stdout.read() > 0:
     #if os.system("uname -a | grep 'x86_64'"):
-        output['64 bit'] = ["PASS", os.popen("uname -a | tr -d '\n'").read()]
+        output['64 bit'] = ["PASS", subprocess.Popen("uname -a | tr -d '\n'", stdout=subprocess.PIPE, shell=True).stdout.read()]
     else:
         output['64 bit'] = ["FAIL", "64-bit Linux-based operating system is required to run VoltDB"]      
 
 def detectMemory():
-    if isHostMAC():
-        hostMemory = os.popen("sysctl hw.memsize | cut -d' ' -f2").read() 
-    elif isHostLINUX():
-        hostMemory = os.popen("free | grep 'Mem' | tr -s ' ' | cut -d' ' -f2 ").read()
-    else:
-        output['Memory'] = ["FAIL", "Unsupported platform detected"]
-        return
+    hostMemory = subprocess.Popen("free | grep 'Mem' | tr -s ' ' | cut -d' ' -f2 ", stdout=subprocess.PIPE, shell=True).stdout.read()
     if int(hostMemory) >= 4194304:
         output['Memory'] = ["PASS", str(hostMemory).rstrip('\n')]
     else:
         output['Memory'] = ["WARN", "Recommended memory is at least 4194304 kB but was " + str(hostMemory).rstrip('\n') + " kB"]
     if int(hostMemory) >= 67108864:
-        memMaxMap = os.popen("cat /proc/sys/vm/max_map_count | tr -d '\n'").read()
+        memMaxMap = subprocess.Popen("cat /proc/sys/vm/max_map_count | tr -d '\n'", stdout=subprocess.PIPE, shell=True).stdout.read()
         if int(memMaxMap) >= 1048576:
             output['MemoryMapCount'] = ["PASS", "Virtual memory max map count is " + memMaxMap]
         else:
@@ -115,7 +98,7 @@ def detectMemory():
     
 
 def detectNTP():
-    numOfRunningNTP = os.popen("ps -ef | grep 'ntpd ' | grep -cv grep | tr -d '\n'").read()
+    numOfRunningNTP = subprocess.Popen("ps -ef | grep 'ntpd ' | grep -cv grep | tr -d '\n'", stdout=subprocess.PIPE, shell=True).stdout.read()
     returnCodeForNTPD = os.system("which ntpd >/dev/null 2>&1")
     if numOfRunningNTP == '1':
         output['NTP'] = ["PASS", "NTP is installed and running"]
@@ -129,8 +112,8 @@ def detectNTP():
         output['NTP'] = ["WARN", "More then one NTP service is running"]
 
 def detectJavaVersion():
-    javaVersion = os.popen("java -version 2>&1 | grep 'java '").read()
-    javacVersion = os.popen("javac -version 2>&1").read()
+    javaVersion = subprocess.Popen("java -version 2>&1 | grep 'java '", stdout=subprocess.PIPE, shell=True).stdout.read()
+    javacVersion = subprocess.Popen("javac -version 2>&1", stdout=subprocess.PIPE, shell=True).stdout.read()
     if '1.7.' in javaVersion or '1.8.' in javaVersion:
         if '1.7.' in javacVersion:
             output['Java'] = ["PASS", javaVersion.strip() + ' ' + javacVersion.strip()]
@@ -148,7 +131,7 @@ def detectPythonVersion():
             for name in ('python2.7', 'python2.6'):
                 path = os.path.join(dir, name)
                 if os.path.exists(path):
-                    pythonVersion = os.popen(path + " --version").read()
+                    pythonVersion = subprocess.Popen(path + " --version", stdout=subprocess.PIPE, shell=True).stdout.read()
                     output['Python'] = ["PASS", pythonVersion]
                     return
         output['Python'] = ["FAIL", "VoltDB requires Python 2.6 or newer."]
@@ -169,7 +152,7 @@ def detectTransparentHugePages():
         output['TransparentHugePage'] = ["FAIL", "Following transparent huge pages set to always: " + enableTHP[:-2]]
         
 def detectSwapoff():
-    swaponFiles = os.popen("cat /proc/swaps").read().split('\n')[1:-1]
+    swaponFiles = subprocess.Popen("cat /proc/swaps", stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')[1:-1]
     if len(swaponFiles) == 0:
         output['Swapoff'] = ["PASS", "Swap is off"]
     else:
@@ -180,38 +163,32 @@ def detectSwapoff():
         output['Swapoff'] = ["WARN", "Swap is enabled for the filenames: " + ' '.join(swaponOut)]
 
 def detectSwappiness():
-    swappiness = os.popen("cat /proc/sys/vm/swappiness | tr -d '\n'").read()
+    swappiness = subprocess.Popen("cat /proc/sys/vm/swappiness | tr -d '\n'", stdout=subprocess.PIPE, shell=True).stdout.read()
     if int(swappiness) == 0:
         output['Swappiness'] = ["PASS", "Swappiness is set to 0"]
     else:
         output['Swappiness'] = ["WARN", "Swappiness is set to " + swappiness]
         
 def detectMemoryOvercommit():
-    memOvercommit = os.popen("cat /proc/sys/vm/overcommit_memory | tr -d '\n'").read()
+    memOvercommit = subprocess.Popen("cat /proc/sys/vm/overcommit_memory | tr -d '\n'", stdout=subprocess.PIPE, shell=True).stdout.read()
     if int(memOvercommit) == 1:
         output['MemoryOvercommit'] = ["PASS", "Virtual memory overcommit is enabled"]
     else:
         output['MemoryOvercommit'] = ["WARN", "Virtual memory overcommit is disabled"]
 
 def detectSegmentationOffload():
-    tokenDevs = os.popen("ip link | grep -B 1 ether").read().split('\n')[:-1][0::2]
+    tokenDevs = subprocess.Popen("ip link | grep -B 1 ether", stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')[:-1][0::2]
     for x in tokenDevs:
         dev = x.split(':')[1].strip()
         offload = "ethtool --show-offload " + dev
-        if os.popen(offload + " | grep 'tcp-segmentation-offload:'").read().split()[1] == "off":
+        if subprocess.Popen(offload + " | grep 'tcp-segmentation-offload:'", stdout=subprocess.PIPE, shell=True).stdout.read().split()[1] == "off":
             output['TCPSegOffload_'+dev] = ["PASS", "TCP segmentation offload for " + dev + " is disabled"]
         else:
             output['TCPSegOffload_'+dev] = ["WARN", "TCP segmentation offload is recommended to be disabled, but is currently enabled for " + dev]
-        if os.popen(offload + " | grep 'generic-receive-offload:'").read().split()[1] == "off":
+        if subprocess.Popen(offload + " | grep 'generic-receive-offload:'", stdout=subprocess.PIPE, shell=True).stdout.read().split()[1] == "off":
             output['GenRecOffload_'+dev] = ["PASS", "Generic receive offload for " + dev + " is disabled"]
         else:
             output['GenRecOffload_'+dev] = ["WARN", "Generic receive offload is recommended to be disabled, but is currently enabled for " + dev]
-
-def isHostMAC():
-    if platform.system() == 'Darwin':
-        return True
-    else:
-        return False
 
 def isHostLINUX():
     if platform.system() == 'Linux':
