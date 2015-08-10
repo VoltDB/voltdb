@@ -162,7 +162,6 @@
 
     <!-- Specific Excluded pro tests -->
     <exclude name="**/TestCommandLogServer.class" />
-    <exclude name="**/TestCommandLog.class"/>
     <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
     <exclude name="**/TestExportBase.class"/>
     <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
