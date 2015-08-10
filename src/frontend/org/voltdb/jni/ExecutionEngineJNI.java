@@ -390,9 +390,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table, txnId,
-                                              spHandle, uniqueId, lastCommittedSpHandle, returnUniqueViolations, shouldDRStream,
-                                              undoToken);
+        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
+                                              txnId, spHandle, lastCommittedSpHandle, uniqueId,
+                                              returnUniqueViolations, shouldDRStream, undoToken);
         checkErrorCode(errorCode);
 
         try {
