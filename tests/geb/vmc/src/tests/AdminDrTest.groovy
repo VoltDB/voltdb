@@ -70,11 +70,11 @@ class AdminDrTest extends TestBase {
                 count ++
                 try {
                     when:
-                        waitFor(waitTime){
-                            page.drIdValue.isDisplayed()
-                            !page.drIdValue.text().equals("")
-                        }
-                        println("DR id has proper value")
+//                        waitFor(waitTime){
+//                            page.drIdValue.isDisplayed()
+//                            !page.drIdValue.text().equals("")
+//                        }
+//                        println("DR id has proper value")
 
                         waitFor(waitTime){
                             page.masterValue.isDisplayed()
