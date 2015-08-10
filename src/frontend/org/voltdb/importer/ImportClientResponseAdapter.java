@@ -140,7 +140,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                     context.hasBackPressure(hasBackPressure());
                     submitTransaction();
                 }
-                public synchronized boolean submitTransaction() {
+                public boolean submitTransaction() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
                     final ImportCallback cb = new ImportCallback(context, tcont, procName, partition, proccb, handle);
@@ -229,7 +229,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                     handle();
                 }
 
-                public synchronized void handle() {
+                public void handle() {
                     try {
                         if (resp.getStatus() != ClientResponse.SUCCESS) {
                             String fmt = "Importer stored procedure failed: %s Error: %s";

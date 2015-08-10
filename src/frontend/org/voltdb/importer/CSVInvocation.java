@@ -46,9 +46,9 @@ public class CSVInvocation implements Invocation {
         Object list[] = m_parser.parseLine(m_line);
         if (list != null) {
             for (int i = 0; i < list.length; i++) {
-                if (list[i].equals("NULL")
-                        || list[i].equals(Constants.CSV_NULL)
-                        || list[i].equals(Constants.QUOTED_CSV_NULL)) {
+                if ("NULL".equals(list[i])
+                        || Constants.CSV_NULL.equals(list[i])
+                        || Constants.QUOTED_CSV_NULL.equals(list[i])) {
                     list[i] = null;
                 }
             }
