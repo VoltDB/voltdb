@@ -45,7 +45,9 @@ package org.voltdb.sqlparser.semantics;
 
 import static java.lang.String.format;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.assertj.core.api.AbstractAssert;
 import org.assertj.core.api.Condition;
@@ -57,6 +59,18 @@ import org.hsqldb_voltpatches.VoltXMLElement;
  */
 public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, VoltXMLElement> {
 
+    public static class IDTable {
+        Set<Integer> m_ids = new HashSet<Integer>();
+        public Boolean addId(String aID) {
+            Integer id = Integer.parseInt(aID);
+            if (m_ids.contains(id)) {
+                return false;
+            } else {
+                m_ids.add(id);
+                return true;
+            }
+        }
+    }
     /**
      * Creates a new </code>{@link VoltXMLElementAssert}</code> to make assertions on actual VoltXMLElement.
      * @param actual the VoltXMLElement we want to make assertions on.
@@ -161,7 +175,23 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
         };
     }
 
-    protected static VoltXMLElement findUniqueChildNamed(VoltXMLElement aParent,
+    public static Condition<VoltXMLElement> withIdAttribute(final IDTable aIDs) {
+        return new Condition<VoltXMLElement>() {
+
+            @Override
+            public boolean matches(VoltXMLElement arg0) {
+                String idValue = arg0.attributes.get("id");
+                if (idValue == null) {
+                    Fail.fail("Expected an \"id\" attribute");
+                } else if (aIDs.addId(idValue) == false) {
+                    Fail.fail(String.format("Duplicate \"id\" value: \"%s\"", idValue));
+                }
+                return true;
+            }
+        };
+    }
+
+        protected static VoltXMLElement findUniqueChildNamed(VoltXMLElement aParent,
             String childName) {
         List<VoltXMLElement> children = aParent.findChildren(childName);
         if (children.size() != 1) {

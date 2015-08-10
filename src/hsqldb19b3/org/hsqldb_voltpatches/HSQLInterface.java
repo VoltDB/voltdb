@@ -663,10 +663,10 @@ public class HSQLInterface {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
         VoltDDLListener listener = new VoltDDLListener(factory);
-        processSQLWithListener(sql, adapter, listener, SQLKind.DDL);
+        processSQLWithListener(sql, listener, SQLKind.DDL);
     }
 
-    private void processSQLWithListener(String sql, CatalogAdapter adapter, VoltDDLListener listener, SQLKind aKind) throws HSQLParseException {
+    private void processSQLWithListener(String sql, VoltDDLListener listener, SQLKind aKind) throws HSQLParseException {
         SQLParserDriver driver;
         try {
             driver = new SQLParserDriver(sql, listener, aKind);
@@ -694,7 +694,7 @@ public class HSQLInterface {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
         VoltDDLListener listener = new VoltDDLListener(factory);
-        processSQLWithListener(aSQL, adapter, listener, SQLKind.DQL);
+        processSQLWithListener(aSQL, listener, SQLKind.DQL);
         return listener.getVoltXML();
     }
 

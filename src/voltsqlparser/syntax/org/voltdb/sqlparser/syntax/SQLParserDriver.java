@@ -26,7 +26,6 @@ import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
-import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserLexer;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserListener;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser;

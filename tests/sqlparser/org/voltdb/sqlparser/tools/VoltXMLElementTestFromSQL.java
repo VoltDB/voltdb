@@ -50,6 +50,8 @@ import java.io.IOError;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -62,7 +64,7 @@ public class VoltXMLElementTestFromSQL {
     String m_sqlSourceFolder = "~/src/voltdb/tests/sqlparser";
     String m_fullyQualifiedClassName = null;
     String m_className = null;
-    StringBuffer m_ddl = null;
+    List<String> m_ddl = new ArrayList<String>();
     private PrintStream m_outputStream = null;
     String m_packageName = null;
 
@@ -141,19 +143,21 @@ public class VoltXMLElementTestFromSQL {
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         if (haveSchema()) {
             try {
-                hif.processDDLStatementsUsingVoltSQLParser(getSchema(), null);
+                for (String ddl : m_ddl) {
+                    hif.runDDLCommand(ddl);
+                }
             } catch (HSQLParseException ex) {
                 System.err.printf("DDL Did not compile: %s\n", ex.getMessage());
                 System.exit(100);
             }
         }
         VoltXMLElement elem = null;
-        writePrefix(m_packageName, m_className, getSchema());
+        writePrefix();
         for (int testIdx = 0; testIdx < m_sqlString.size(); testIdx += 1) {
             String sql = m_sqlString.get(testIdx);
             String testName = m_testNames.get(testIdx);
             try {
-                elem = hif.getVoltXMLFromDQLUsingVoltSQLParser(sql, null);
+                elem = hif.getXMLCompiledStatement(sql);
                 writeMeat(sql, testName, elem);
             } catch (HSQLParseException ex) {
                 System.err.printf("Can't parse sql:\n   \"%s\":\nError:  %s\n",
@@ -206,74 +210,74 @@ public class VoltXMLElementTestFromSQL {
         System.out.printf(usageMessage, aProgramName, aProgramName, aProgramName);
     }
 
-    private void writePrefix(String aPackageName, String aClassName, String aSchema) {
+    private void writePrefix() {
         String prefixFmt =
-	    ""
-	    + "/* This file is part of VoltDB.\n"
-	    + " * Copyright (C) 2008-2015 VoltDB Inc.\n"
-	    + " *\n"
-	    + " * This file contains original code and/or modifications of original code.\n"
-	    + " * Any modifications made by VoltDB Inc. are licensed under the following\n"
-	    + " * terms and conditions:\n"
-	    + " *\n"
-	    + " * Permission is hereby granted, free of charge, to any person obtaining\n"
-	    + " * a copy of this software and associated documentation files (the\n"
-	    + " * \"Software\"), to deal in the Software without restriction, including\n"
-	    + " * without limitation the rights to use, copy, modify, merge, publish,\n"
-	    + " * distribute, sublicense, and/or sell copies of the Software, and to\n"
-	    + " * permit persons to whom the Software is furnished to do so, subject to\n"
-	    + " * the following conditions:\n"
-	    + " *\n"
-	    + " * The above copyright notice and this permission notice shall be\n"
-	    + " * included in all copies or substantial portions of the Software.\n"
-	    + " *\n"
-	    + " * THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\n"
-	    + " * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\n"
-	    + " * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\n"
-	    + " * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR\n"
-	    + " * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,\n"
-	    + " * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR\n"
-	    + " * OTHER DEALINGS IN THE SOFTWARE.\n"
-	    + " */\n"
-	    + "/**\n"
-	    + " * Licensed to the Apache Software Foundation (ASF) under one or more\n"
-	    + " * contributor license agreements. See the NOTICE file distributed with this\n"
-	    + " * work for additional information regarding copyright ownership. The ASF\n"
-	    + " * licenses this file to you under the Apache License, Version 2.0 (the\n"
-	    + " * \"License\"); you may not use this file except in compliance with the License.\n"
-	    + " * You may obtain a copy of the License at\n"
-	    + " *\n"
-	    + " * http://www.apache.org/licenses/LICENSE-2.0\n"
-	    + " *\n"
-	    + " * Unless required by applicable law or agreed to in writing, software\n"
-	    + " * distributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT\n"
-	    + " * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the\n"
-	    + " * License for the specific language governing permissions and limitations under\n"
-	    + " * the License.\n"
-	    + " */\n"
-	    + "package %s;\n"
-	    + "\n"
-	    + "import org.hsqldb_voltpatches.VoltXMLElement;\n"
-	    + "import org.hsqldb_voltpatches.HSQLInterface;\n"
-	    + "import org.junit.Before;\n"
-	    + "import org.junit.Test;\n"
-	    + "\n"
-	    + "import static org.voltdb.sqlparser.semantics.VoltXMLElementAssert.*;\n"
-	    + "\n"
-	    + "public class %s {\n"
-	    + ""
-	    + "    HSQLInterface m_HSQLInterface = null;\n"
-	    + "    String        m_schema = null;\n"
-	    + "    public %s() {\n"
-	    + "        m_HSQLInterface = HSQLInterface.loadHsqldb();\n"
-	    + (haveSchema() ? "" : "        String m_schema = \"%s\";\n")
-	    + (haveSchema() ? "" : "        try {\n")
-	    + (haveSchema() ? "" : "            m_HSQLInterface.processDDLStatementsUsingVoltSQLParser(m_schema, null);\n")
-	    + (haveSchema() ? "" : "        } catch (Exception ex) {\n")
-	    + (haveSchema() ? "" : "            System.err.printf(\"Error parsing ddl: %%s\\n\", ex.getMessage());\n")
-	    + (haveSchema() ? "" : "        }\n")
-	    + "    }\n";
-        m_outputStream.printf(prefixFmt, aPackageName, aClassName, aClassName, aSchema);
+            ""
+            + "/* This file is part of VoltDB.\n"
+            + " * Copyright (C) 2008-2015 VoltDB Inc.\n"
+            + " *\n"
+            + " * This file contains original code and/or modifications of original code.\n"
+            + " * Any modifications made by VoltDB Inc. are licensed under the following\n"
+            + " * terms and conditions:\n"
+            + " *\n"
+            + " * Permission is hereby granted, free of charge, to any person obtaining\n"
+            + " * a copy of this software and associated documentation files (the\n"
+            + " * \"Software\"), to deal in the Software without restriction, including\n"
+            + " * without limitation the rights to use, copy, modify, merge, publish,\n"
+            + " * distribute, sublicense, and/or sell copies of the Software, and to\n"
+            + " * permit persons to whom the Software is furnished to do so, subject to\n"
+            + " * the following conditions:\n"
+            + " *\n"
+            + " * The above copyright notice and this permission notice shall be\n"
+            + " * included in all copies or substantial portions of the Software.\n"
+            + " *\n"
+            + " * THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\n"
+            + " * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\n"
+            + " * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\n"
+            + " * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR\n"
+            + " * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,\n"
+            + " * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR\n"
+            + " * OTHER DEALINGS IN THE SOFTWARE.\n"
+            + " */\n"
+            + "/**\n"
+            + " * Licensed to the Apache Software Foundation (ASF) under one or more\n"
+            + " * contributor license agreements. See the NOTICE file distributed with this\n"
+            + " * work for additional information regarding copyright ownership. The ASF\n"
+            + " * licenses this file to you under the Apache License, Version 2.0 (the\n"
+            + " * \"License\"); you may not use this file except in compliance with the License.\n"
+            + " * You may obtain a copy of the License at\n"
+            + " *\n"
+            + " * http://www.apache.org/licenses/LICENSE-2.0\n"
+            + " *\n"
+            + " * Unless required by applicable law or agreed to in writing, software\n"
+            + " * distributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT\n"
+            + " * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the\n"
+            + " * License for the specific language governing permissions and limitations under\n"
+            + " * the License.\n"
+            + " */\n"
+            + "package %s;\n"
+            + "\n"
+            + "import org.hsqldb_voltpatches.VoltXMLElement;\n"
+            + "import org.hsqldb_voltpatches.HSQLInterface;\n"
+            + "import org.junit.Before;\n"
+            + "import org.junit.Test;\n"
+            + "\n"
+            + "import static org.voltdb.sqlparser.semantics.VoltXMLElementAssert.*;\n"
+            + "\n"
+            + "public class %s {\n"
+            + ""
+            + "    HSQLInterface m_HSQLInterface = null;\n"
+            + "    String        m_schema = null;\n"
+            + "    public %s() {\n"
+            + "        m_HSQLInterface = HSQLInterface.loadHsqldb();\n"
+            + (!haveSchema() ? "" : "        String m_schema = \"%s\";\n")
+            + (!haveSchema() ? "" : "        try {\n")
+            + (!haveSchema() ? "" : "            m_HSQLInterface.processDDLStatementsUsingVoltSQLParser(m_schema, null);\n")
+            + (!haveSchema() ? "" : "        } catch (Exception ex) {\n")
+            + (!haveSchema() ? "" : "            System.err.printf(\"Error parsing ddl: %%s\\n\", ex.getMessage());\n")
+            + (!haveSchema() ? "" : "        }\n")
+            + "    }\n";
+        m_outputStream.printf(prefixFmt, m_packageName, m_className, m_className, getSchema());
     }
 
     private void writeMeat(String aSql, String aTestName, VoltXMLElement aElem) {
@@ -283,6 +287,7 @@ public class VoltXMLElementTestFromSQL {
         sb.append("    @Test\n");
         sb.append(String.format("    public void %s() throws Exception {\n", aTestName));
         sb.append(String.format("        String sql    = \"%s\";\n", aSql));
+        sb.append("        IDTable idTable = new IDTable();\n");
         sb.append("        VoltXMLElement element = m_HSQLInterface.getVoltXMLFromDQLUsingVoltSQLParser(sql, null);\n");
         sb.append("        assertThat(element)\n");
         sb.append(String.format("            .hasName(\"%s\")\n", aElem.name));
@@ -318,8 +323,16 @@ public class VoltXMLElementTestFromSQL {
             String value = aHSQLThinksItShouldBe.attributes.get(key);
             aSb.append(aEOL);
             aEOL = ",";
+            String attrTest;
+
+            if ("id".equals(key)) {
+                attrTest = "withIdAttribute(idTable)";
+            } else {
+                attrTest = String.format("withAttribute(\"%s\", \"%s\")",
+                                         key, value);
+            }
             indentStr(aSb, aIndent, true, false)
-              .append(String.format("withAttribute(\"%s\", \"%s\")", key, value));
+              .append(attrTest);
         }
         for (VoltXMLElement child : aHSQLThinksItShouldBe.children) {
             aSb.append(aEOL);
@@ -337,23 +350,22 @@ public class VoltXMLElementTestFromSQL {
     }
 
     private boolean haveSchema() {
-        return m_ddl != null;
-    }
-
-    private String getSchema() {
-        if (haveSchema()) {
-            return m_ddl.toString();
-        } else {
-            return "";
-        }
+        return m_ddl.size() > 0;
     }
 
     private void addToSchema(String aSchemaStatement) {
-        if (m_ddl == null) {
-            m_ddl = new StringBuffer();
-        }
-        m_ddl.append(";").append(aSchemaStatement);
+        List<String> stmts = Arrays.asList(aSchemaStatement.split(";"));
+        m_ddl.addAll(stmts);
     }
 
-
+    private String getSchema() {
+        StringBuffer sb = new StringBuffer();
+        String sep = "";
+        for (String ddlStmt : m_ddl) {
+            sb.append(sep)
+              .append(ddlStmt);
+            sep = ";";
+        }
+        return sb.toString();
+    }
 }
