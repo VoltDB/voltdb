@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.base.Throwables;
 import static org.voltdb.ClientInterface.getPartitionForProcedure;
 
 import java.io.IOException;
@@ -100,7 +101,7 @@ public class ImportHandler {
                         //Stop the context first so no more work is submitted.
                         m_importContext.stop();
                     } catch (Exception ex) {
-                        ex.printStackTrace();
+                        Throwables.propagate(ex);
                     }
                     m_logger.info("Importer stopped: " + m_importContext.getName());
                 }

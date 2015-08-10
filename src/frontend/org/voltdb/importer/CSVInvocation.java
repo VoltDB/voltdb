@@ -19,6 +19,7 @@ package org.voltdb.importer;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import java.io.IOException;
+import org.voltdb.common.Constants;
 
 /**
  *
@@ -42,7 +43,17 @@ public class CSVInvocation implements Invocation {
 
     @Override
     public Object[] getParams() throws IOException {
-        return m_parser.parseLine(m_line);
+        Object list[] = m_parser.parseLine(m_line);
+        if (list != null) {
+            for (int i = 0; i < list.length; i++) {
+                if (list[i].equals("NULL")
+                        || list[i].equals(Constants.CSV_NULL)
+                        || list[i].equals(Constants.QUOTED_CSV_NULL)) {
+                    list[i] = null;
+                }
+            }
+        }
+        return list;
     }
 
 }
