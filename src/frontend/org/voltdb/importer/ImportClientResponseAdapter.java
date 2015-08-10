@@ -257,7 +257,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     }
 
     //Do rate limited logging for messages.
-    private synchronized void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
+    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
         RateLimitedLogger.tryLogForMessage(
                 EstTime.currentTimeMillis(),
                 ImportHandler.SUPPRESS_INTERVAL, TimeUnit.SECONDS,

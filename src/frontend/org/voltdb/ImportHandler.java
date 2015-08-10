@@ -61,7 +61,7 @@ public class ImportHandler {
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
-    public final static long SUPPRESS_INTERVAL = 60;
+    public final static long SUPPRESS_INTERVAL = 120;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext, CatalogContext catContext) {
