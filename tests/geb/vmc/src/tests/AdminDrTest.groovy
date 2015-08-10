@@ -62,25 +62,49 @@ class AdminDrTest extends TestBase {
         when:
         at AdminPage
         then:
+        int count = 0
+        boolean testStatus = false
         boolean result = page.CheckIfDREnabled();
         if(result){
-            waitFor(waitTime){
-                page.drIdValue.isDisplayed()
-                !page.drIdValue.text().equals("")
-            }
-            println("DR id has proper value")
+            while(count<numberOfTrials) {
+                count ++
+                try {
+                    when:
+                        waitFor(waitTime){
+                            page.drIdValue.isDisplayed()
+                            !page.drIdValue.text().equals("")
+                        }
+                        println("DR id has proper value")
 
-            waitFor(waitTime){
-                page.masterValue.isDisplayed()
-                !page.masterValue.text().equals("")
-            }
-            println("DR master has proper value")
+                        waitFor(waitTime){
+                            page.masterValue.isDisplayed()
+                            !page.masterValue.text().equals("")
+                        }
+                        println("DR master has proper value")
 
-            waitFor(waitTime){
-                page.replicaSourceValue.isDisplayed()
-                !page.replicaSourceValue.text().equals("")
+                        waitFor(waitTime){
+                            page.replicaSourceValue.isDisplayed()
+                            !page.replicaSourceValue.text().equals("")
+                        }
+                        println("Replica source has proper value")
+                    then:
+                    testStatus = true
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("RETRYING: WaitTimeoutException occured")
+                } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                    println("RETRYING: StaleElementReferenceException occured")
+                }
             }
-            println("Replica source has proper value")
+            if(testStatus == true) {
+                println("Successfully checked the values of DR id, master, and replica Source.")
+            }
+            else {
+                println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+                assert false
+            }
+            println()
+
         }else{
             println("DR is not enabled. DR should be enable to check values of DR Id, master and replica source.")
         }
