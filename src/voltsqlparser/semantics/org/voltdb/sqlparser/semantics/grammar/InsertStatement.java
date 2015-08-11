@@ -89,6 +89,7 @@ public class InsertStatement implements IInsertStatement, IDQLStatement {
                 m_colVals.add(aColVals.get(idx));
                 colNames.remove(cn.getColName());
             }
+            idx += 1;
         }
         /*
          * Sweep up all the ones which were not given

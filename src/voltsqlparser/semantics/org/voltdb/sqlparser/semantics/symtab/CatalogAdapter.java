@@ -42,12 +42,12 @@ public class CatalogAdapter implements ICatalogAdapter {
 
     // insert all tables from catalog into table array?
 
-    public void addTable (ITable aTable) {
-        assert(aTable instanceof Table);
-        Table table = (Table)aTable;
-        String name = table.getName();
-        tables.put(name, table);
-        }
+     public void addTable (ITable aTable) {
+         assert(aTable instanceof Table);
+         Table table = (Table)aTable;
+         String name = table.getName();
+         tables.put(name, table);
+     }
 
    /**
     * Fetch a table by name.
@@ -55,16 +55,12 @@ public class CatalogAdapter implements ICatalogAdapter {
     * @param tablename
     * @return
     */
-        public Table getTableByName(String tablename) {
-            return tables.get(tablename);
-        }
+    public Table getTableByName(String tablename) {
+        return tables.get(tablename);
+    }
 
-        public void printTables() {
-                tables.toString();
-        }
-
-        public Set<String> getTableNames() {
-            return tables.keySet();
-        }
+    public Set<String> getTableNames() {
+        return tables.keySet();
+    }
 
 }

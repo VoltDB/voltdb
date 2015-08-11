@@ -65,6 +65,11 @@ public class HSQLInterface {
      * This is the VoltDB Sql Parser catalog.
      */
     private CatalogAdapter m_catalogAdapter = new CatalogAdapter();
+
+    public final CatalogAdapter getCatalogAdapter() {
+        return m_catalogAdapter;
+    }
+
     /**
      * The spacer to use for nested XML elements
      */
@@ -353,7 +358,7 @@ public class HSQLInterface {
             // clean up sql-in expressions
             fixupInStatementExpressions(xml);
         } else {
-            xml = getVoltXMLFromDQLUsingVoltSQLParser(sql, null);
+            xml = getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         }
         if (m_logger.isDebugEnabled()) {
             m_logger.debug("\nSQL: " + sql + "\n");
@@ -373,6 +378,14 @@ public class HSQLInterface {
         return xml;
     }
 
+    /**
+     * Fetch a VoltXMLElement from the catalog.  This is clearly misplaced.
+     * It should be a VoltSQLInterface class somehow, but it's not.
+     *
+     * @param aTableName
+     * @param aAdapter
+     * @return
+     */
     public VoltXMLElement getVoltCatalogXML(String aTableName, CatalogAdapter aAdapter) {
         VoltXMLElement xml = new VoltXMLElement(XML_SCHEMA_NAME);
         CatalogAdapter adapter = aAdapter;
@@ -685,16 +698,17 @@ public class HSQLInterface {
      * null, use the HSQLInterface's CatalogAdapter, which is the one
      * representing the current database.  Note that this *does not*
      * update the CatalogAdapter.  This is just a DQL statement.
-     *
+     * @param aKind TODO
      * @param sql
+     *
      * @return
      * @throws HSQLParseException
      */
-    public VoltXMLElement getVoltXMLFromDQLUsingVoltSQLParser(String aSQL, CatalogAdapter aAdapter) throws HSQLParseException {
+    public VoltXMLElement getVoltXMLFromSQLUsingVoltSQLParser(String aSQL, CatalogAdapter aAdapter, SQLKind aKind) throws HSQLParseException {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
         VoltDDLListener listener = new VoltDDLListener(factory);
-        processSQLWithListener(aSQL, listener, SQLKind.DQL);
+        processSQLWithListener(aSQL, listener, aKind);
         return listener.getVoltXML();
     }
 

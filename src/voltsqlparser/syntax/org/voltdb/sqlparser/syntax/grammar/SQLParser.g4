@@ -12,6 +12,10 @@ data_query_list:
 data_definition_list: 
         ddl_statement ( ';' ddl_statement )* EOF
     ;
+
+data_manipulation_list:
+        dml_statement ( ';' dml_statement )* EOF
+    ;
     
 dql_statement:
         select_statement
@@ -92,7 +96,9 @@ boolop:
 ddl_statement:
     |
         create_table_statement
-    |
+    ;
+    
+dml_statement:
         insert_statement
     ;
 

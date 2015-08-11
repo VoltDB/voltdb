@@ -21,6 +21,13 @@ public class VoltDDLListener extends VoltSQLlistener {
         super(aFactory);
     }
 
+    /**
+     * Figure out what kind of statement this is and
+     * calculate the VoltXMLElement for it.  This needs to be moved
+     * someplace else, probably to the factory object.
+     *
+     * @return
+     */
     public VoltXMLElement getVoltXML() {
         IInsertStatement istat = getInsertStatement();
         if (istat != null) {
@@ -33,6 +40,13 @@ public class VoltDDLListener extends VoltSQLlistener {
         return null;
     }
 
+    /**
+     * Calculate the VoltXMLElement for an insert statement.  This
+     * probably needs to be moved to the factory object.
+     *
+     * @param aInsertStatement
+     * @return
+     */
     private VoltXMLElement getVoltXML(IInsertStatement aInsertStatement) {
         assert(aInsertStatement instanceof InsertStatement);
         InsertStatement insertStatement = (InsertStatement)aInsertStatement;

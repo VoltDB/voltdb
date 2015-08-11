@@ -73,8 +73,10 @@ public class SQLParserDriver {
             parser.addErrorListener(errorListener);
         }
         switch (aKind) {
-            case DDL:
             case DML:
+                m_tree = parser.data_manipulation_list();
+                break;
+            case DDL:
                 m_tree = parser.data_definition_list();
                 break;
             case DQL:
