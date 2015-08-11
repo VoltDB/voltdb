@@ -167,4 +167,118 @@ class AdminDrTest extends TestBase {
             println("DR is not enabled. DR should be enable to check if DR mode is present.")
         }
     }
+
+    def "Check whether Ok and cancel button are displayed when Master Edit button is clicked"(){
+        when:
+        at AdminPage
+        then:
+        boolean result = page.CheckIfDREnabled();
+        if(result){
+            try {
+                page.drMasterEdit.isDisplayed()
+                page.drMasterEdit.click()
+                page.btnEditDrMasterOk.isDisplayed()
+                page.btnEditDrMasterCancel.isDisplayed()
+                println("Ok and cancel button are displayed when Master Edit button is clicked")
+            }
+            catch(geb.waiting.WaitTimeoutException e){
+                println("Master Edit cannot be displayed")
+            }
+            catch(org.openqa.selenium.ElementNotVisibleException e)
+            {
+                println("Master Edit cannot be displayed")
+            }
+        } else {
+            println("DR is not enabled. DR should be enable to check master edit.")
+        }
+    }
+
+    def "Check cancel edit button for master edit. Click Master edit button and then cancel"(){
+        when:
+        at AdminPage
+        then:
+        boolean result = page.CheckIfDREnabled();
+        if(result){
+            try {
+                page.drMasterEdit.click()
+                page.btnEditDrMasterOk.isDisplayed()
+                page.btnEditDrMasterCancel.isDisplayed()
+                page.btnEditDrMasterCancel.click()
+                println("Master edit canceled!")
+                page.drMasterEdit.isDisplayed()
+            }
+            catch(geb.waiting.WaitTimeoutException e){
+                println("Master Edit cannot be displayed")
+            }
+            catch(org.openqa.selenium.ElementNotVisibleException e)
+            {
+                println("Master Edit cannot be displayed")
+            }
+        } else {
+            println("DR is not enabled. DR should be enable to check master edit.")
+        }
+    }
+
+    def "Check cancel button on edit master popup. Click Master edit button and ok, then cancel button on popup"(){
+        when:
+        at AdminPage
+        then:
+        boolean result = page.CheckIfDREnabled();
+        if(result){
+            try {
+                page.drMasterEdit.click()
+                page.btnEditDrMasterOk.isDisplayed()
+                page.btnEditDrMasterCancel.isDisplayed()
+                page.btnEditDrMasterOk.click()
+                println("master edit ok clicked!")
+                waitFor(waitTime) {
+                    page.btnSaveDrMaster.isDisplayed()
+                    page.btnPopupDrMasterCancel.isDisplayed()
+                    page.btnPopupDrMasterCancel.click()
+                    println("cancel clicked")
+                    page.drMasterEdit.isDisplayed()
+                }
+            }
+            catch(geb.waiting.WaitTimeoutException e){
+                println("Master Edit cannot be displayed")
+            }
+            catch(org.openqa.selenium.ElementNotVisibleException e)
+            {
+                println("Master Edit cannot be displayed")
+            }
+        } else {
+            println("DR is not enabled. DR should be enable to check master edit.")
+        }
+    }
+
+    def "Check ok button on edit master popup.Click master edit button and then ok button on popup"(){
+        when:
+        at AdminPage
+        then:
+        boolean result = page.CheckIfDREnabled();
+        if(result){
+            try {
+                page.drMasterEdit.click()
+                page.btnEditDrMasterOk.isDisplayed()
+                page.btnEditDrMasterCancel.isDisplayed()
+                page.btnEditDrMasterOk.click()
+                println("master edit ok clicked!")
+                waitFor(waitTime) {
+                    page.btnSaveDrMaster.isDisplayed()
+                    page.btnPopupDrMasterCancel.isDisplayed()
+                    page.btnSaveDrMaster.click()
+                    println("ok clicked")
+                }
+            }
+            catch(geb.waiting.WaitTimeoutException e){
+                println("Master Edit cannot be displayed")
+            }
+            catch(org.openqa.selenium.ElementNotVisibleException e)
+            {
+                println("Master Edit cannot be displayed")
+            }
+        } else {
+            println("DR is not enabled. DR should be enable to check master edit.")
+        }
+    }
 }
