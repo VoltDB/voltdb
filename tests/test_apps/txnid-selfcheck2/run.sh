@@ -93,7 +93,7 @@ function async-benchmark() {
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=120 \
-        --servers=volt13i \
+        --servers=volt13i,volt13j,volt13l \
         --threads=20 \
         --threadoffset=0 \
         --minvaluesize=1024 \

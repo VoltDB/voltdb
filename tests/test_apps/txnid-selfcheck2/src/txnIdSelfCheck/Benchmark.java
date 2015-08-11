@@ -24,6 +24,7 @@
 package txnIdSelfCheck;
 
 import java.text.SimpleDateFormat;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -67,6 +68,7 @@ public class Benchmark {
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------";
+    final DecimalFormat twoDForm = new DecimalFormat("#.##");
 
     // validated command line configuration
     final Config config;
@@ -515,6 +517,18 @@ public class Benchmark {
         System.exit(-1);
         }
     };
+    
+    private void printClientStats() {
+        int least = ClientThread.leastMissingCmds;
+        log.info("Starting stats output for client threads.  \n"
+                + "Total Clients ---------------------------------- : "+ClientThread.numTotalClients+"\n"
+                + "Total Clients Missing Transactions ------------- : "+ClientThread.numClientsMissingCmds+"\n"
+                + "Max Missing Transactions For One Client -------- : "+ClientThread.maxMissingCmds+"\n"
+                + "Min Missing Transactions For One Client -------- : "+(least == Short.MAX_VALUE ? 0 : least)+"\n"
+                + "Total Missing Transactions For All Clients ----- : "+ClientThread.totalMissingCmds+"\n"
+                + "Avg Missing Transactions Per Client Missing Data : "+(least == Short.MAX_VALUE ? "n/a" : 
+                    Double.valueOf(twoDForm.format((double) ClientThread.totalMissingCmds/ClientThread.numClientsMissingCmds))));
+    }
 
     BigTableLoader partitionedLoader = null;
     BigTableLoader replicatedLoader = null;
@@ -650,7 +664,7 @@ public class Benchmark {
             //replicatedTruncater.start();
         }
 
-        /* TEMPORARY disable cappedcollection test until ENG-8733 is resolved -PR
+        /* TEMPORARY disable cappedcollection test until ENG-8733 is resolved -PR */
         partitionedCapped = new CappedTableLoader(client, "capp", // more
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedCapped.start();
@@ -658,7 +672,7 @@ public class Benchmark {
             replicatedCapped = new CappedTableLoader(client, "capr", // more
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
             replicatedCapped.start();
-        }*/
+        }
 
         plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
@@ -688,18 +702,41 @@ public class Benchmark {
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
                     config.allowinprocadhoc, config.mpratio, isSynchronous);
-            clientThread.start();
-            clientThreads.add(clientThread);
+            if (ClientThread.m_connected) {
+		clientThread.start();
+                clientThreads.add(clientThread);
+	    }
         }
         log.info("All threads started...");
+
+        Thread clientStats = new Thread( new Runnable() {
+            public void run() {
+                log.info("Starting client stats thread");
+		try {
+                    Thread.sleep(5000);
+                    while (ClientThread.currActiveClients > 0) {
+                        Thread.sleep(1000);
+                    }
+		    if (ClientThread.numClientsMissingCmds > 0)
+                        printClientStats();
+                } catch (Exception e) {}
+            }
+        });
+        clientStats.start();
 
         // subtract time spent initializing threads and starting them
         long rt = (1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS);
         if (rt > 0) {
-            Thread.sleep(rt);
+            Thread.sleep(5000); // These lines just for testing purposes. 
+            while (ClientThread.currActiveClients > 0) { // This could be done with a countdown latch. 
+                Thread.sleep(1000);
+            }
+            //Thread.sleep(rt);
         }
-
-        log.info("Duration completed shutting down...");
+	if (ClientThread.currActiveClients <= 0)
+		log.info("Client threads all died, shutting down....");
+	else 
+        	log.info("Duration completed shutting down...");
 
         // check if loaders are done or still working
         int lpcc = partitionedLoader.getPercentLoadComplete();
@@ -779,6 +816,10 @@ public class Benchmark {
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");
+        if (ClientThread.numClientsMissingCmds > 0)
+            printClientStats();
+        else 
+            log.info("No clients were missing transactions, so client stats were not printed. ");
         System.exit(exitcode);
     }
 

@@ -5,7 +5,7 @@
         <jsonapi enabled="true" />
     </httpd>
     <paths>
-        <commandlog path="/tmp/testlog/" />
+	    <commandlog path="/mnt/raid0-4hda-7k/testpwrfail/" />
 	<!-- <commandlogsnapshot path="/tmp/" /> -->
     </paths>
     <export enabled="true" target="file">

@@ -72,7 +72,16 @@ public class ClientThread extends BenchmarkThread {
     final Random m_random = new Random();
     final Semaphore m_permits;
     public long m_cnt = 0;
-    public boolean m_synchronous;
+    public static boolean m_connected = true;
+    
+    public static boolean m_synchronous;
+    public static byte currActiveClients = 0;
+    public static short numClientsMissingCmds = 0;
+    public static short numTotalClients = 0;
+    public static short maxMissingCmds = 0;
+    public static short totalMissingCmds = 0;
+    public static short leastMissingCmds = Short.MAX_VALUE;
+    
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
             boolean allowInProcAdhoc, float mpRatio, boolean isSync)
         throws Exception
@@ -84,7 +93,10 @@ public class ClientThread extends BenchmarkThread {
         m_processor = processor;
         m_txnsRun = txnsRun;
         m_permits = permits;
+        m_connected = true;
         m_synchronous = isSync;
+        numTotalClients += 1;
+        currActiveClients += 1;
         log.info("ClientThread(CID=" + String.valueOf(cid) + ") " + m_type.toString());
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
@@ -160,14 +172,16 @@ public class ClientThread extends BenchmarkThread {
                         shouldRollback);
             } catch (Exception e) {
                 if (shouldRollback == 0) {
-		    System.out.println("last cnt: "+m_cnt);
+                    if (m_connected) { // is this part ever found besides disconnecting?
+                        m_connected = false;
+                    }
                     log.warn("ClientThread threw after " + m_txnsRun.get() +
                             " calls while calling procedure: " + procName +
                             " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
                             ", payload: " + payload +
                             ", shouldRollback: " + shouldRollback);
                 }
-                throw e;
+                throw e; // Nothing makes it past this, right? 
             }
             // fake a proc call exception if we think one should be thrown
             if (response.getStatus() != ClientResponse.SUCCESS) {
@@ -184,19 +198,32 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-	    if (m_synchronous) {
+	    if (true /*m_synchronous*/) {
+                if (!m_connected) {
+                    m_shouldContinue.set(false);
+                }
                 long cnt = data.fetchRow(0).getLong("cnt");
-                // check to see if the DB's last count matches with the last count reported by the server..
-                if (cnt < m_cnt)
-                    hardStop("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"+cnt);
-		 m_cnt = cnt + 1;
-	    }
+                // check to see if the DB's last count matches with the last count reported by the server...
+                short dif = (short) (m_cnt-cnt);
+                if (dif > 0) {
+                    numClientsMissingCmds += 1;
+                    if (maxMissingCmds < dif) maxMissingCmds = dif;
+                    if (leastMissingCmds > dif) leastMissingCmds = dif;
+                    totalMissingCmds += dif;
+                    m_shouldContinue.set(false);
+                    log.error("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"
+                        +cnt+" dif: "+ dif);
+                }
+                m_cnt = cnt + 1;
+            }
 	    try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }
             catch (VoltAbortException vae) {
                 log.error("validateCIDData failed on: " + procName + ", shouldRollback: " +
                         shouldRollback + " data: " + data);
+                currActiveClients -= 1;
+                System.out.println("hi");
                 throw vae;
             }
         }
@@ -251,6 +278,7 @@ public class ClientThread extends BenchmarkThread {
                 runOne();
             }
             catch (NoConnectionsException e) {
+                m_connected = false;
                 log.error("ClientThread got NoConnectionsException on proc call. Will sleep.");
                 // take a breather to avoid slamming the log (stay paused if no connections)
                 do {
@@ -280,5 +308,7 @@ public class ClientThread extends BenchmarkThread {
                 hardStop("ClientThread had a non proc-call exception", e);
             }
         }
+        System.out.println("A client is dying!");
+        currActiveClients -= 1;
     }
 }

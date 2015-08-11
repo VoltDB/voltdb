@@ -89,9 +89,9 @@ function benchmark() {
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=99999 \
-        --servers=volt13i \
-        --threads=40 \
-	--threadoffset=80 \
+        --servers=volt10a \
+        --threads=20 \
+	--threadoffset=40 \
         --minvaluesize=1024000 \
         --maxvaluesize=1024000 \
         --entropy=127 \
