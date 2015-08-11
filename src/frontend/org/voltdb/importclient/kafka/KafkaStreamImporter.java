@@ -901,14 +901,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
 
         //For removed shutdown the fetchers if all are removed the importer will be closed/shutdown?
-        for (URI r : assignment.getRemoved()) {
-            TopicPartitionFetcher fetcher = m_fetchers.get(r.toString());
-            if (fetcher != null) {
-                fetcher.shutdown();
-                info("KafkaImporter is NOT fetching for resource: " + r);
-                m_fetchers.remove(r.toString());
-            }
-        }
+//        for (URI r : assignment.getRemoved()) {
+//            TopicPartitionFetcher fetcher = m_fetchers.get(r.toString());
+//            if (fetcher != null) {
+//                fetcher.shutdown();
+//                info("KafkaImporter is NOT fetching for resource: " + r);
+//                m_fetchers.remove(r.toString());
+//            }
+//        }
     }
 
     // TODO: implement
