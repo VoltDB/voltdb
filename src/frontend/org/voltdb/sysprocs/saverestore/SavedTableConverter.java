@@ -39,7 +39,7 @@ public abstract class SavedTableConverter
             return true;
         }
         if (shouldPreserveDRHiddenColumn &&
-            !inputTable.getColumnName(inputTable.getColumnCount() - 1).equalsIgnoreCase(VoltTable.DR_HIDDEN_COLUMN_NAME)) {
+            !inputTable.getColumnName(inputTable.getColumnCount() - 1).equalsIgnoreCase(CatalogUtil.DR_HIDDEN_COLUMN_NAME)) {
             // passive DR table to active DR table, must be converted
             return true;
         }
@@ -68,20 +68,13 @@ public abstract class SavedTableConverter
                                          boolean shouldPreserveDRHiddenColumn)
     throws VoltTypeException
     {
-        VoltTable new_table =
-            CatalogUtil.getVoltTable(outputTableSchema);
+        VoltTable new_table;
 
-        // if the DR hidden column should be preserved in conversion, append it to the end of target schema
-        // TODO if a previous passive DR table is restored in active mode, do we provide default value to this
-        // TODO hidden column now or just fill with 0 and leave it to EE to fill this column if found
         if (shouldPreserveDRHiddenColumn) {
-            int columnCount = new_table.getColumnCount();
-            VoltTable.ColumnInfo[] augmentedSchema = new VoltTable.ColumnInfo[columnCount + 1];
-            for (int i = 0; i < columnCount; i++) {
-                augmentedSchema[i] = new VoltTable.ColumnInfo(new_table.getColumnName(i), new_table.getColumnType(i));
-            }
-            augmentedSchema[columnCount] = new VoltTable.ColumnInfo(VoltTable.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
-            new_table = new VoltTable(augmentedSchema);
+            // if the DR hidden column should be preserved in conversion, append it to the end of target schema
+            new_table = CatalogUtil.getVoltTable(outputTableSchema, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+        } else {
+            new_table = CatalogUtil.getVoltTable(outputTableSchema);
         }
 
         Map<Integer, Integer> column_copy_index_map =
@@ -93,9 +86,9 @@ public abstract class SavedTableConverter
         Column catalogColumnForHiddenColumn = null;
         if (addDRHiddenColumn) {
             catalogColumnForHiddenColumn = new Column();
-            catalogColumnForHiddenColumn.setName(VoltTable.DR_HIDDEN_COLUMN_NAME);
+            catalogColumnForHiddenColumn.setName(CatalogUtil.DR_HIDDEN_COLUMN_NAME);
             catalogColumnForHiddenColumn.setType(VoltType.BIGINT.getValue());
-            catalogColumnForHiddenColumn.setSize(Long.SIZE / 8);
+            catalogColumnForHiddenColumn.setSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
             catalogColumnForHiddenColumn.setInbytes(false);
             // small hack here to let logic below fill VoltType.NULL_BIGINT in for the hidden column
             // actually this column is not nullable in EE, but it will be set to correct value before

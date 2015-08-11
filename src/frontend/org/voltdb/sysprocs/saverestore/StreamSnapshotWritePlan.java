@@ -129,16 +129,12 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // table schemas for all the tables we'll snapshot on this partition
         Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
         for (final Table table : config.tables) {
-            VoltTable schemaTable = CatalogUtil.getVoltTable(table);
-
+            VoltTable schemaTable;
             if (context.getDatabase().getIsactiveactivedred() && table.getIsdred()) {
-                int columnCount = schemaTable.getColumnCount();
-                VoltTable.ColumnInfo[] augmentedSchema = new VoltTable.ColumnInfo[columnCount + 1];
-                for (int i = 0; i < columnCount; i++) {
-                    augmentedSchema[i] = new VoltTable.ColumnInfo(schemaTable.getColumnName(i), schemaTable.getColumnType(i));
-                }
-                augmentedSchema[columnCount] = new VoltTable.ColumnInfo(VoltTable.DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
-                schemaTable = new VoltTable(augmentedSchema);
+                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+            }
+            else {
+                schemaTable = CatalogUtil.getVoltTable(table);
             }
 
             schemas.put(table.getRelativeIndex(), PrivateVoltTableFactory.getSchemaBytes(schemaTable));

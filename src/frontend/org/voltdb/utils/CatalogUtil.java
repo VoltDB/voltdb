@@ -147,6 +147,11 @@ public abstract class CatalogUtil {
     public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
     public static final String SIGNATURE_DELIMITER = ",";
 
+    public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
+
+    public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+
     private static JAXBContext m_jc;
     private static Schema m_schema;
     static {
@@ -279,7 +284,7 @@ public abstract class CatalogUtil {
 
     /**
      *
-     * @param catalogTable
+     * @param catalogTable a catalog table providing the schema
      * @return An empty table with the same schema as a given catalog table.
      */
     public static VoltTable getVoltTable(Table catalogTable) {
@@ -290,6 +295,28 @@ public abstract class CatalogUtil {
         int i = 0;
         for (Column catCol : catalogColumns) {
             columns[i++] = new VoltTable.ColumnInfo(catCol.getTypeName(), VoltType.get((byte)catCol.getType()));
+        }
+
+        return new VoltTable(columns);
+    }
+
+    /**
+     *
+     * @param catalogTable a catalog table providing the schema
+     * @param hiddenColumnInfos variable-length ColumnInfo objects for hidden columns
+     * @return An empty table with the same schema as a given catalog table.
+     */
+    public static VoltTable getVoltTable(Table catalogTable, VoltTable.ColumnInfo... hiddenColumns) {
+        List<Column> catalogColumns = CatalogUtil.getSortedCatalogItems(catalogTable.getColumns(), "index");
+
+        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[catalogColumns.size() + hiddenColumns.length];
+
+        int i = 0;
+        for (Column catCol : catalogColumns) {
+            columns[i++] = new VoltTable.ColumnInfo(catCol.getTypeName(), VoltType.get((byte)catCol.getType()));
+        }
+        for (VoltTable.ColumnInfo hiddenColumnInfo : hiddenColumns) {
+            columns[i++] = hiddenColumnInfo;
         }
 
         return new VoltTable(columns);

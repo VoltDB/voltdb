@@ -255,18 +255,32 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 SnapshotFormat.NATIVE,
                 hostId);
 
-        sdt = new DefaultSnapshotDataTarget(saveFilePath,
-                hostId,
-                clusterName,
-                databaseName,
-                table.getTypeName(),
-                partitionCount,
-                table.getIsreplicated(),
-                tracker.getPartitionsForHost(hostId),
-                CatalogUtil.getVoltTable(table),
-                (isActiveActiveDRed && table.getIsdred()),
-                txnId,
-                timestamp);
+        if (isActiveActiveDRed && table.getIsdred()) {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO),
+                    txnId,
+                    timestamp);
+        }
+        else {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table),
+                    txnId,
+                    timestamp);
+        }
 
         m_targets.add(sdt);
         final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);
