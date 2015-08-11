@@ -43,6 +43,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
+    private long m_maxSeenLocalSpUniqueId;
     private long m_maxSeenBinaryLogSequenceNumber;
     private long m_maxSeenBinaryLogUniqueId;
 
@@ -119,6 +120,7 @@ public class SpPromoteAlgo implements RepairAlgo
 
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
+        m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
         m_maxSeenBinaryLogSequenceNumber = Long.MIN_VALUE;
         m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
     }
@@ -178,8 +180,14 @@ public class SpPromoteAlgo implements RepairAlgo
             if (response.getHandle() != Long.MAX_VALUE) {
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
             }
-            m_maxSeenBinaryLogSequenceNumber = Math.max(m_maxSeenBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
-            m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, response.getBinaryLogUniqueId());
+            if (response.getSequence() == 0) {
+                // The first Repair Log message contains the maximum values needed by DR for promotion
+                assert response.getLocalDrUniqueId() == Long.MIN_VALUE ||
+                        UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalDrUniqueId()) !=  MpInitiator.MP_INIT_PID;
+                m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, response.getLocalDrUniqueId());
+                m_maxSeenBinaryLogSequenceNumber = Math.max(m_maxSeenBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
+                m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, response.getBinaryLogUniqueId());
+            }
 
             if (response.getPayload() != null) {
                 m_repairLogUnion.add(response);
@@ -246,6 +254,7 @@ public class SpPromoteAlgo implements RepairAlgo
 
         m_promotionResult.set(new RepairResult(
                 m_maxSeenTxnId,
+                m_maxSeenLocalSpUniqueId,
                 m_maxSeenBinaryLogSequenceNumber,
                 m_maxSeenBinaryLogUniqueId));
     }
