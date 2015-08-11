@@ -40,6 +40,7 @@ import org.voltdb.utils.SystemStatsCollector.Datum;
 
 public class TestResourceMonitor extends TestCase
 {
+    private static final int DEFAULT_MONITORING_INTERVAL=60;
     private static final int MONITORING_INTERVAL = 2;
 
     private ServerThread m_localServer;
@@ -98,7 +99,7 @@ public class TestResourceMonitor extends TestCase
 
         // Wait for monitoring interval time and verify server is still in running mode
         m_mockStatsProducer.m_rss = 2048L*1024*1024;
-        resumeAndWait(ResourceUsageMonitor.DEFAULT_MONITORING_INTERVAL+1);
+        resumeAndWait(DEFAULT_MONITORING_INTERVAL+1);
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
     }
 

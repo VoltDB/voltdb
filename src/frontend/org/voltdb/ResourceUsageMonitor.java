@@ -30,7 +30,6 @@ import org.voltdb.utils.SystemStatsCollector.Datum;
  */
 public class ResourceUsageMonitor implements Runnable
 {
-    public static final int DEFAULT_MONITORING_INTERVAL = 60;
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
     private long m_rssLimit;
@@ -57,8 +56,8 @@ public class ResourceUsageMonitor implements Runnable
 
     public boolean hasResourceLimitsConfigured()
     {
-        //TODO: fix this
-        return (m_rssLimit > 0 && m_resourceCheckInterval > 0);
+        return ((m_rssLimit > 0 || m_diskLimitConfig.hasLimitsConfigured())
+                && m_resourceCheckInterval > 0);
     }
 
     public int getResourceCheckInterval()
@@ -73,18 +72,29 @@ public class ResourceUsageMonitor implements Runnable
             return;
         }
 
+        if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
+            m_logger.warn("Pausing the server");
+            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure("ResourceUsageMonitor", 0, "@Pause");
+        }
+    }
+
+    private boolean isOverMemoryLimit()
+    {
         Datum datum = SystemStatsCollector.getRecentSample();
         if (datum == null) { // this will be null if stats has not run yet
             m_logger.warn("No stats are available from stats collector. Skipping resource check.");
-            return;
+            return false;
         }
 
         if (m_logger.isDebugEnabled()) {
             m_logger.debug("RSS=" + datum.rss + " Configured rss limit=" + m_rssLimit);
         }
         if (datum.rss >= m_rssLimit) {
-            m_logger.warn(String.format("RSS %d is over configured limit value %d. Server will be paused.", datum.rss, m_rssLimit));
-            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure("ResourceUsageMonitor", 0, "@Pause");
+            m_logger.warn(String.format("RSS %d is over configured limit value %d.", datum.rss, m_rssLimit));
+            return true;
+        } else {
+            return false;
         }
     }
+
 }
