@@ -152,4 +152,19 @@ class AdminDrTest extends TestBase {
             println("DR is not enabled. DR should be enable to check if replica value is off for master and on for replica")
         }
     }
+
+    def "Check DR mode"(){
+        expect: "DR mode is present and is either Master, Replica or Both"
+        boolean result = page.CheckIfDREnabled();
+        if(result){
+            waitFor(waitTime){ page.drMode.isDisplayed() }
+            if(page.drMode.text().toLowerCase() == 'replica' || page.drMode.text().toLowerCase() == 'master' || page.drMode.text().toLowerCase() == 'both'){
+                println("DR mode is displayed properly");
+            } else{
+                assert false;
+            }
+        }else{
+            println("DR is not enabled. DR should be enable to check if DR mode is present.")
+        }
+    }
 }
