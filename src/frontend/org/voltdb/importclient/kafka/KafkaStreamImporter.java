@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
@@ -353,11 +354,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final long m_offset;
         private final AtomicLong m_cbcnt;
         private final Gap m_tracker;
+        private final AtomicBoolean m_dontCommit;
 
-        public TopicPartitionInvocationCallback(long offset, AtomicLong cbcnt, final Gap tracker) {
+        public TopicPartitionInvocationCallback(long offset, AtomicLong cbcnt, final Gap tracker, AtomicBoolean dontCommit) {
             m_offset = offset;
             m_cbcnt = cbcnt;
             m_tracker = tracker;
+            m_dontCommit = dontCommit;
             m_tracker.submit(m_offset);
         }
 
@@ -365,7 +368,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         public void clientCallback(ClientResponse response) throws Exception {
             //We should never get here with no pending offsets.
             m_cbcnt.incrementAndGet();
-            m_tracker.commit(m_offset);
+            if (!m_dontCommit.get()) {
+                m_tracker.commit(m_offset);
+            }
         }
 
     }
@@ -379,7 +384,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //coordinator for offset management.
         private HostAndPort m_coordinator;
         private boolean m_shutdown = false;
-        private volatile boolean m_dead = false;
+        private final AtomicBoolean m_dead = new AtomicBoolean(false);
         private volatile boolean m_hasBackPressure = false;
         private final int m_fetchSize;
         //Available brokers.
@@ -736,7 +741,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(messageAndOffset.nextOffset(), cbcnt, m_gapTracker);
+                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
+                                messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead
+                                );
                         if (!callProcedure(cb, invocation)) {
                             if (isDebugEnabled()) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
@@ -770,7 +777,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 m_consumer = null;
                 closeConsumer(m_offsetManager.getAndSet(null));
             }
-            m_dead = true;
+            m_dead.compareAndSet(false, true);
             info("Partition fecher stopped for " + m_topicAndPartition
                     + " Last commit point is: " + m_lastCommittedOffset
                     + " Callback Rcvd: " + cbcnt.get()
