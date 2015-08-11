@@ -307,6 +307,8 @@ class AdminDrTest extends TestBase {
         String enabledDisabledEdited = page.masterValue.text()
         println(enabledDisabledEdited)
 
+        waitFor(waitTime){ page.drMode.isDisplayed()}
+        String drState = page.drMode.text()
         if ( enabledDisabled.toLowerCase() == "on" ) {
             assert enabledDisabledEdited.toLowerCase().equals("off")
         }
@@ -314,5 +316,19 @@ class AdminDrTest extends TestBase {
             assert enabledDisabledEdited.toLowerCase().equals("on")
         }
 
+        when: 'click the DB Monitor link (if needed)'
+        page.openDbMonitorPage()
+        then: 'should be on DB Monitor page'
+        at DbMonitorPage
+
+        if((drState.toLowerCase() == 'master' || drState.toLowerCase() == 'both')){
+            if(enabledDisabledEdited.toLowerCase().equals("off")){
+                !waitFor(waitTime){ page.divDrReplication.isDisplayed() }
+                !waitFor(waitTime){ page.drMasterSection.isDisplayed() }
+            } else {
+                waitFor(waitTime){ page.divDrReplication.isDisplayed() }
+                waitFor(waitTime){ page.drMasterSection.isDisplayed() }
+            }
+        }
     }
 }
