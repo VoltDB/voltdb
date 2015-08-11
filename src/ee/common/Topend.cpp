@@ -59,11 +59,12 @@ namespace voltdb {
         receivedExportBuffer = true;
     }
 
-    void DummyTopend::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
+    int64_t DummyTopend::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
         receivedDRBuffer = true;
         partitionIds.push(partitionId);
         blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
+        return -1;
     }
 
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}

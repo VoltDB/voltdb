@@ -32,6 +32,7 @@ class TableIndex;
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
 const int MAGIC_DR_TRANSACTION_PADDING = 69;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
+const int TRUNCATE_TABLE_ROW_EQUIVALENCE = 100;
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
@@ -96,6 +97,8 @@ private:
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
     bool m_opened;
+    int64_t m_rowTarget;
+    uint32_t m_txnRowCount;
 };
 
 class MockDRTupleStream : public DRTupleStream {

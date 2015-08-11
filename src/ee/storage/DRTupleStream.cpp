@@ -44,7 +44,9 @@ DRTupleStream::DRTupleStream()
     : TupleStreamBase(MAGIC_DR_TRANSACTION_PADDING),
       m_enabled(true),
       m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
-      m_opened(false)
+      m_opened(false),
+      m_rowTarget(-1),
+      m_txnRowCount(0)
 {}
 
 void DRTupleStream::setSecondaryCapacity(size_t capacity) {
@@ -113,6 +115,9 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
 
     // update uso.
     m_uso += io.position();
+
+    // update row count
+    m_txnRowCount += TRUNCATE_TABLE_ROW_EQUIVALENCE;
 
     return startingUso;
 }
@@ -222,6 +227,9 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     m_uso += io.position();
 
+    // update row count
+    m_txnRowCount++;
+
 //    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
@@ -247,12 +255,16 @@ DRTupleStream::computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &ro
 // consider the transaction being rolled back as open.
 void DRTupleStream::rollbackTo(size_t mark) {
     m_opened = false;
+    m_txnRowCount = 0;
     TupleStreamBase::rollbackTo(mark);
 }
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
-    ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+    int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+    if (rowTarget >= 0) {
+        m_rowTarget = rowTarget;
+    }
 }
 
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
@@ -342,12 +354,19 @@ void DRTupleStream::endTransaction() {
      m_uso += io.position();
 
      m_opened = false;
+
+    uint32_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
+    if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
+        extendBufferChain(0);
+    }
+    m_txnRowCount = 0;
 }
 
 // If partial transaction is going to span multiple buffer, first time move it to
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
 bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
+    // Hack:
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
