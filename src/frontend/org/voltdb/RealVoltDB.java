@@ -1187,6 +1187,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         private void logCatalogAndDeployment() {
             File voltDbRoot = CatalogUtil.getVoltDbRoot(m_catalogContext.getDeployment().getPaths());
             String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
+            new File(pathToConfigInfoDir).mkdirs();
 
             try {
                 m_catalogContext.writeCatalogJarToFile(pathToConfigInfoDir, "catalog.jar");
