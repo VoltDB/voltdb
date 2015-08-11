@@ -1181,6 +1181,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (!m_mode.compareAndSet(prev, next, stamp[0], stat.getVersion())) {
                     return;
                 }
+                if (prev == next) {
+                    return;
+                }
                 if (m_isLeader && !m_done.get() && next == OperationMode.RUNNING) {
                     m_es.submit(new AssignChannels());
                 }
