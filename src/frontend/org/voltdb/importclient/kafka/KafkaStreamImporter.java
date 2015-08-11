@@ -35,6 +35,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -73,6 +74,7 @@ import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 import org.voltdb.importer.ImporterChannelAssignment;
+import org.voltdb.importer.Invocation;
 import org.voltdb.importer.VersionedOperationMode;
 
 /**
@@ -119,6 +121,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //topic partition leader
     private final Map<String, HostAndPort> m_topicPartitionLeader = new HashMap<String, HostAndPort>();
     private final Map<String, TopicPartitionFetcher> m_fetchers = new HashMap<String, TopicPartitionFetcher>();
+    private final LinkedBlockingQueue<TopicPartitionFetcher.TopicPartitionInvocationCallback> m_resubmitInvocation = new LinkedBlockingQueue<TopicPartitionFetcher.TopicPartitionInvocationCallback>();
 
     private ExecutorService m_es = null;
 
@@ -605,16 +608,34 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             private final long m_nextOffset;
             private final AtomicLong m_cbcnt;
             private final TopicPartitionFetcher m_fetcher;
+            private Invocation m_invocation;
 
-            public TopicPartitionInvocationCallback(TopicPartitionFetcher fetcher, long noffset, AtomicLong cbcnt) {
+            public TopicPartitionInvocationCallback(TopicPartitionFetcher fetcher, Invocation invocation, long noffset, AtomicLong cbcnt) {
                 m_fetcher = fetcher;
                 m_nextOffset = noffset;
                 m_cbcnt = cbcnt;
+                m_invocation = invocation;
+            }
+
+            public Invocation getInvocation() {
+                return m_invocation;
+            }
+            public void setInvocation(Invocation invocation) {
+                m_invocation = invocation;
+            }
+            public long getNextOffset() {
+                return m_nextOffset;
             }
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
                 m_cbcnt.incrementAndGet();
+                //We dont know lets submit again
+                if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN && getInvocation() != null) {
+                    m_resubmitInvocation.offer(this);
+                    //This is not considered seen
+                    return;
+                }
                 if (!m_fetcher.m_dead) {
                     //This is what we commit to
                     m_seenOffset.add(m_nextOffset);
@@ -668,6 +689,26 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                 int sleepCounter = 1;
                 while (!m_shutdown) {
+                    if (m_resubmitInvocation.peek() != null) {
+                        ArrayList<TopicPartitionInvocationCallback>pendingQueue = new ArrayList<TopicPartitionInvocationCallback>();
+                        m_resubmitInvocation.drainTo(pendingQueue);
+                        info("Pending transaction queue is: " + pendingQueue + " Resubmitting...");
+                        for (TopicPartitionInvocationCallback cb : pendingQueue) {
+                            Invocation invocation = cb.getInvocation();
+                            //So that we resubmit only once.
+                            cb.setInvocation(null);
+                            if (!callProcedure(cb, invocation)) {
+                                if (isDebugEnabled()) {
+                                    debug("Failed to process Invocation possibly bad data: " + invocation);
+                                }
+                                synchronized(m_seenOffset) {
+                                    //Make this failed offset known to seen offsets so committer can push ahead.
+                                    m_seenOffset.add(cb.getNextOffset());
+                                }
+                            }
+                            submitCount++;
+                        }
+                    }
                     if (m_currentOffset.get() < 0) {
                         getOffsetCoordinator();
                         if (m_offsetManager.get() == null) {
@@ -737,7 +778,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(this, messageAndOffset.nextOffset(), cbcnt);
+                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(this, invocation, messageAndOffset.nextOffset(), cbcnt);
                         if (!callProcedure(cb, invocation)) {
                             if (isDebugEnabled()) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
