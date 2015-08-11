@@ -27,7 +27,7 @@ import org.voltdb.utils.SystemStatsCollector.Datum;
  * Used to periodically check if the server's resource utilization is above the configured limits
  * and pause the server.
  */
-public class ResourceUsageMonitor implements Runnable
+public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
 {
     public static final int DEFAULT_MONITORING_INTERVAL = 60;
     private static final VoltLogger m_logger = new VoltLogger("HOST");
@@ -79,7 +79,19 @@ public class ResourceUsageMonitor implements Runnable
         }
         if (datum.rss >= m_rssLimit) {
             m_logger.warn(String.format("RSS %d is over configured limit value %d. Server will be paused.", datum.rss, m_rssLimit));
-            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure("ResourceUsageMonitor", 0, "@Pause");
+            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(this, 0, "@Pause");
         }
+    }
+
+    @Override
+    public String getName()
+    {
+        return "ResourceUsageMonitor";
+    }
+
+    @Override
+    public void setBackPressure(boolean hasBackPressure)
+    {
+        // nothing to do here.
     }
 }

@@ -2990,7 +2990,7 @@ function loadAdminPage() {
 
             if (result == "") {
                 result += '<tr class="propertyLast subLabelRow">' +
-                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
+                        '<td width="67%" class="configLabel" colspan="3" id="noConfigExport">No configuration available.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
             }

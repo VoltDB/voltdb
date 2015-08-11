@@ -91,6 +91,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
             Object params[] = invocation.getParams();
             return (Boolean )m_callProcMethod.invoke(m_handler, this, invocation.getProcedure(), params);
         } catch (Exception ex) {
+            ex.printStackTrace();
             return false;
         }
     }

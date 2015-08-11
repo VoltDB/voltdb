@@ -100,7 +100,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
     }
 
     @Override
-    public void hasBackPressure(boolean flag) {
+    public void setBackPressure(boolean flag) {
         for (ClientConnectionHandler fetcher : m_clients) {
             fetcher.hasBackPressure(flag);
         }

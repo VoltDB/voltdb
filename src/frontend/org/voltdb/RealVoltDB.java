@@ -1187,6 +1187,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         private void logCatalogAndDeployment() {
             File voltDbRoot = CatalogUtil.getVoltDbRoot(m_catalogContext.getDeployment().getPaths());
             String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
+            new File(pathToConfigInfoDir).mkdirs();
 
             try {
                 m_catalogContext.writeCatalogJarToFile(pathToConfigInfoDir, "catalog.jar");
@@ -1973,6 +1974,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         sc.get();
                     } catch (Throwable t) {}
                 }
+
+                //Shutdown import processors.
+                ImportManager.instance().shutdown();
+
                 m_periodicWorks.clear();
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
@@ -2017,9 +2022,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 if (m_configLogger != null) {
                     m_configLogger.join();
                 }
-
-                //Shutdown import processors.
-                ImportManager.instance().shutdown();
 
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();

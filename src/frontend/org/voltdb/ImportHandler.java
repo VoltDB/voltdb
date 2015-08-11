@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
@@ -25,6 +26,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.ImportContext;
 
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 /**
@@ -38,9 +40,8 @@ public class ImportHandler {
 
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private volatile boolean m_stopped = false;
 
-    public final static long SUPPRESS_INTERVAL = 60;
+    public final static long SUPPRESS_INTERVAL = 120;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext) {
@@ -58,7 +59,6 @@ public class ImportHandler {
             public void run() {
                 m_logger.info("Importer ready importing data for: " + m_importContext.getName());
                 try {
-                    VoltDB.instance().getClientInterface().getInternalConnectionHandler().start();
                     m_importContext.readyForData();
                 } catch (Throwable t) {
                     m_logger.error("ImportContext stopped with following exception", t);
@@ -69,21 +69,25 @@ public class ImportHandler {
     }
 
     public void stop() {
-        m_stopped = true;
-        m_es.submit(new Runnable() {
+        try {
+            m_es.submit(new Runnable() {
 
-            @Override
-            public void run() {
-                try {
-                    //Stop and Drain the adapter so all calbacks are done
-                    VoltDB.instance().getClientInterface().getInternalConnectionHandler().stop();
-                    m_importContext.stop();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                @Override
+                public void run() {
+                    try {
+                        //Stop the context first so no more work is submitted.
+                        m_importContext.stop();
+                    } catch (Exception ex) {
+                        Throwables.propagate(ex);
+                    }
+                    m_logger.info("Importer stopped: " + m_importContext.getName());
                 }
-                m_logger.info("Importer stopped: " + m_importContext.getName());
-            }
-        });
+            }).get();
+        } catch (InterruptedException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        } catch (ExecutionException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        }
         try {
             m_es.shutdown();
             m_es.awaitTermination(1, TimeUnit.DAYS);
@@ -104,13 +108,12 @@ public class ImportHandler {
     }
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
-        if (!m_stopped) {
-            return VoltDB.instance().getClientInterface().getInternalConnectionHandler()
-                    .callProcedure(ic.getName(), ic.getBackpressureTimeout(), procCallback, proc, fieldList);
-        } else {
-            m_logger.warn("Importer is in stopped state. Cannot execute procedures");
-            return false;
-        }
+        return getInternalConnectionHandler()
+                .callProcedure(ic, ic.getBackpressureTimeout(), procCallback, proc, fieldList);
+    }
+
+    private InternalConnectionHandler getInternalConnectionHandler() {
+        return VoltDB.instance().getClientInterface().getInternalConnectionHandler();
     }
 
 
