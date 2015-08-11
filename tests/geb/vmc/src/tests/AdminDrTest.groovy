@@ -323,11 +323,9 @@ class AdminDrTest extends TestBase {
 
         if((drState.toLowerCase() == 'master' || drState.toLowerCase() == 'both')){
             if(enabledDisabledEdited.toLowerCase().equals("off")){
-                !page.divDrReplication.isDisplayed()
                 !page.drMasterSection.isDisplayed()
             } else {
-                page.divDrReplication.isDisplayed()
-                page.drMasterSection.isDisplayed() 
+                page.drMasterSection.isDisplayed()
             }
         }
     }
