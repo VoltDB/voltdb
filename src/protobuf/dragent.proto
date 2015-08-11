@@ -10,6 +10,7 @@ message UUID {
 message Ack {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
+    repeated fixed64 latencyNanos = 3 [packed=true];
 }
 
 message SnapshotReq {
