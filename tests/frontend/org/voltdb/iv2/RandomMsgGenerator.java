@@ -65,6 +65,7 @@ public class RandomMsgGenerator
         ParameterSet ps = mock(ParameterSet.class);
         when(ps.toArray()).thenReturn(new Object[] {null, 0l, 0l, Long.MIN_VALUE, null});
         when(spi.getParams()).thenReturn(ps);
+        when(spi.getOriginalTxnId()).thenReturn((long)-1);
         Iv2InitiateTaskMessage msg =
             new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, !isMp, spi,
                     0l, 0l, false);
