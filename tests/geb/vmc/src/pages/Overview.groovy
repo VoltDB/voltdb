@@ -125,7 +125,7 @@ class Overview extends Module {
         exportExpanded              { $(class:"labelCollapsed labelExpanded", text:"Export") }
         exportTablesText            { $(class:"configLabel", text:"Export Tables") }
         listOfExport                { $("#lstExportTbl") }
-        exportNoConfigAvailable     { $(class:"configLabel", text:"No configuration available.") }
+        exportNoConfigAvailable     { $("#noConfigExport") }
         exportConfiguration         { $("#exportConfiguration") }
         exportConfig                { $(class:"configLabel expoStream", title:"Click to expand/collapse", number) }
         
