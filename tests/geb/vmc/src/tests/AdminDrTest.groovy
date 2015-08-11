@@ -323,11 +323,11 @@ class AdminDrTest extends TestBase {
 
         if((drState.toLowerCase() == 'master' || drState.toLowerCase() == 'both')){
             if(enabledDisabledEdited.toLowerCase().equals("off")){
-                !waitFor(waitTime){ page.divDrReplication.isDisplayed() }
-                !waitFor(waitTime){ page.drMasterSection.isDisplayed() }
+                !page.divDrReplication.isDisplayed()
+                !page.drMasterSection.isDisplayed()
             } else {
-                waitFor(waitTime){ page.divDrReplication.isDisplayed() }
-                waitFor(waitTime){ page.drMasterSection.isDisplayed() }
+                page.divDrReplication.isDisplayed()
+                page.drMasterSection.isDisplayed() 
             }
         }
     }

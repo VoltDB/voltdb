@@ -167,6 +167,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         header          		        { module Header }
         footer          		        { module Footer }
+
+        //Database Replication
+        divDrReplication                { $("#divDrReplication") }
+        drMasterSection                 { $("#drMasterSection") }
     }
 
     static at = {
