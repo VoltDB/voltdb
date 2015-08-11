@@ -281,4 +281,38 @@ class AdminDrTest extends TestBase {
             println("DR is not enabled. DR should be enable to check master edit.")
         }
     }
+
+    def "Click master edit and click checkbox to on/off master and then save value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(waitTime) {
+            page.drMasterEdit.isDisplayed()
+        }
+
+        when:
+        page.drMasterEdit.click()
+        String enabledDisabled = page.masterValue.text()
+        println(enabledDisabled)
+        then:
+        waitFor(waitTime){
+            page.chkDrMaster.isDisplayed()
+            page.btnEditDrMasterOk.isDisplayed()
+            page.btnEditDrMasterCancel.isDisplayed()
+        }
+
+        when:
+        page.chkDrMaster.click()
+        then:
+        String enabledDisabledEdited = page.masterValue.text()
+        println(enabledDisabledEdited)
+
+        if ( enabledDisabled.toLowerCase() == "on" ) {
+            assert enabledDisabledEdited.toLowerCase().equals("off")
+        }
+        else if ( enabledDisabled.toLowerCase() == "off" ) {
+            assert enabledDisabledEdited.toLowerCase().equals("on")
+        }
+
+    }
 }
