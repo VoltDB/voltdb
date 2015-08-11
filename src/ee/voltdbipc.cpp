@@ -108,7 +108,7 @@ public:
 
     bool execute(struct ipc_command *cmd);
 
-    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
     /**
      * Log a statement on behalf of the IPC log proxy at the specified log level
@@ -1545,10 +1545,11 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     }
 }
 
-void VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
+int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
     }
+    return -1;
 }
 
 void *eethread(void *ptr) {

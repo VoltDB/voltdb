@@ -366,7 +366,6 @@ void DRTupleStream::endTransaction() {
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
 bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
-    // Hack:
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();

@@ -150,7 +150,7 @@ namespace voltdb
             m_rowCountForDR += rowsToCommit;
             return m_rowCountForDR;
         }
-        
+
         uint32_t rowCountForDR() const {
             return m_rowCountForDR;
         }
