@@ -66,12 +66,12 @@ public class InternalConnectionHandler {
         return (table!=null);
     }
 
-    public boolean callProcedure(String caller, long backPressureTimeout, String proc, Object... fieldList) {
+    public boolean callProcedure(InternalConnectionContext caller, long backPressureTimeout, String proc, Object... fieldList) {
         return callProcedure(caller, backPressureTimeout, null, proc, fieldList);
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
-    public boolean callProcedure(String caller, long backPressureTimeout, ProcedureCallback procCallback, String proc, Object... fieldList) {
+    public boolean callProcedure(InternalConnectionContext caller, long backPressureTimeout, ProcedureCallback procCallback, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             rateLimitedWarn(null, "Server is paused and is currently unavailable - please try again later.");
@@ -86,22 +86,16 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        int counter = 1;
-        int maxSleepNano = 100000;
-        long start = System.nanoTime();
-        long currNanos = start;
-        while ((backPressureTimeout > 0) && (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS)) {
+      //Indicate backpressure or not.
+        boolean b = m_adapter.hasBackPressure();
+        caller.setBackPressure(b);
+        if (b) {
             try {
-                int nanos = 500 * counter++;
-                int sleepNanos = nanos > maxSleepNano ? maxSleepNano : nanos;
-                Thread.sleep(0, sleepNanos);
-                //estimate the new nanos based on time slept, instead of calling nanoTime in a loop
-                currNanos += sleepNanos;
-                if (currNanos > start + backPressureTimeout) {
-                    return false;
-                }
-            } catch (InterruptedException ex) { }
+                Thread.sleep(100);
+            } catch (InterruptedException ex) {
+            }
         }
+
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
@@ -136,7 +130,7 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        boolean success = m_adapter.createTransaction(proc, catProc, procCallback, task, tcont, partition, nowNanos);
+        boolean success = m_adapter.createTransaction(caller, proc, catProc, procCallback, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
@@ -147,12 +141,8 @@ public class InternalConnectionHandler {
         return success;
     }
 
-    public void stop() {
-        m_adapter.stop();
-    }
-
-    public void start() {
-        m_adapter.start();
+    public boolean hasBackPressure() {
+        return m_adapter.hasBackPressure();
     }
 
     private void rateLimitedError(Throwable t, String format, Object...args) {

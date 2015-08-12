@@ -2,6 +2,9 @@
 drop table t if exists;
 Command succeeded.
 
+drop table t2 if exists;
+Command succeeded.
+
 create table t ( c integer, d varchar(4) );
 Command succeeded.
 

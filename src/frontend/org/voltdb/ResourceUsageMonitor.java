@@ -28,7 +28,7 @@ import org.voltdb.utils.SystemStatsCollector.Datum;
  * Used to periodically check if the server's resource utilization is above the configured limits
  * and pause the server.
  */
-public class ResourceUsageMonitor implements Runnable
+public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
 {
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
@@ -96,5 +96,4 @@ public class ResourceUsageMonitor implements Runnable
             return false;
         }
     }
-
 }

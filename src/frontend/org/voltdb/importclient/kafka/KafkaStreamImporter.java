@@ -35,6 +35,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -93,8 +94,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private String m_groupId;
     //Procedure to be invoked with params.
     private String m_procedure;
-    //backpressure sleep milli seconds 100ms by default.
-    private int m_backpressureSleepMs = 200;
+    //backpressure sleep milli seconds 1000ms by default.
+    private int m_backpressureSleepMs = 500;
 
     //List of topics form comma seperated list.
     private List<String> m_topicList;
@@ -344,7 +345,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //These are defaults picked up from kafka we save them so that they are passed around.
         m_fetchSize = Integer.parseInt(m_properties.getProperty("fetch.message.max.bytes", "65536"));
         m_consumerSocketTimeout = Integer.parseInt(m_properties.getProperty("socket.timeout.ms", "30000"));
-        m_backpressureSleepMs = Integer.parseInt(m_properties.getProperty("backpressure.sleep.ms", "50"));
+        m_backpressureSleepMs = Integer.parseInt(m_properties.getProperty("backpressure.sleep.ms", "1"));
     }
 
     //Per topic per partition that we are responsible for.
@@ -357,6 +358,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //coordinator for offset management.
         private HostAndPort m_coordinator;
         private boolean m_shutdown = false;
+        private volatile boolean m_dead = false;
         private volatile boolean m_hasBackPressure = false;
         private final int m_fetchSize;
         //Available brokers.
@@ -365,7 +367,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //Start with invalid so consumer will fetch it.
         private final AtomicLong m_currentOffset = new AtomicLong(-1);
         private long m_lastCommittedOffset = -1;
-        private final SortedSet<Long> m_pendingOffsets = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final SortedSet<Long> m_seenOffset = Collections.synchronizedSortedSet(new TreeSet<Long>());
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private SimpleConsumer m_consumer = null;
@@ -496,7 +497,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                 }
                 if (probeException != null) {
-                    error(probeException, "Failed to query all brokers for the offeset coordinator for " + m_topicAndPartition);
+                    warn(probeException, "Failed to query all brokers for the offeset coordinator for " + m_topicAndPartition);
                 }
                 backoffSleep(attempts+1);
             }
@@ -601,24 +602,25 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         //Callback for each invocation we have submitted.
         private class TopicPartitionInvocationCallback implements ProcedureCallback {
 
-            private final long m_offset;
             private final long m_nextOffset;
             private final AtomicLong m_cbcnt;
+            private final TopicPartitionFetcher m_fetcher;
 
-            public TopicPartitionInvocationCallback(long offset, long noffset, AtomicLong cbcnt) {
-                m_offset = offset;
+            public TopicPartitionInvocationCallback(TopicPartitionFetcher fetcher, long noffset, AtomicLong cbcnt) {
+                m_fetcher = fetcher;
                 m_nextOffset = noffset;
                 m_cbcnt = cbcnt;
             }
 
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
-                //We should never get here with no pending offsets.
-                assert(!m_pendingOffsets.isEmpty());
                 m_cbcnt.incrementAndGet();
-                m_pendingOffsets.remove(m_offset);
-                //This is what we commit to
-                m_seenOffset.add(m_nextOffset);
+                if (!m_fetcher.m_dead) {
+                    //This is what we commit to
+                    m_seenOffset.add(m_nextOffset);
+                } else {
+                    warn(null, "Callback came after fetcher is dead. Starting offset may be earlier than expected.");
+                }
             }
 
         }
@@ -668,6 +670,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 while (!m_shutdown) {
                     if (m_currentOffset.get() < 0) {
                         getOffsetCoordinator();
+                        if (m_offsetManager.get() == null) {
+                            sleepCounter = backoffSleep(sleepCounter);
+                            continue;
+                        }
                         long lastOffset = getLastOffset();
                         m_currentOffset.set(lastOffset);
                         if (m_currentOffset.get() < 0) {
@@ -731,8 +737,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(currentOffset, messageAndOffset.nextOffset(), cbcnt);
-                        m_pendingOffsets.add(currentOffset);
+                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(this, messageAndOffset.nextOffset(), cbcnt);
                         if (!callProcedure(cb, invocation)) {
                             if (isDebugEnabled()) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
@@ -741,7 +746,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                                 //Make this failed offset known to seen offsets so committer can push ahead.
                                 m_seenOffset.add(messageAndOffset.nextOffset());
                             }
-                            m_pendingOffsets.remove(currentOffset);
                         }
                         submitCount++;
                         m_currentOffset.set(messageAndOffset.nextOffset());
@@ -762,11 +766,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                     commitOffset();
                 }
-                //Drain will make sure there is nothing in pending.
-                info("Partition fecher stopped for " + m_topicAndPartition
-                        + " Last commit point is: " + m_currentOffset.get()
-                        + " Callback Rcvd: " + cbcnt.get()
-                        + " Submitted: " + submitCount);
             } catch (Exception ex) {
                 error("Failed to start topic partition fetcher for " + m_topicAndPartition, ex);
             } finally {
@@ -775,6 +774,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 m_consumer = null;
                 closeConsumer(m_offsetManager.getAndSet(null));
             }
+            m_dead = true;
+            info("Partition fecher stopped for " + m_topicAndPartition
+                    + " Last commit point is: " + m_lastCommittedOffset
+                    + " Callback Rcvd: " + cbcnt.get()
+                    + " Submitted: " + submitCount);
         }
 
         public boolean commitOffset() {
@@ -844,7 +848,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     }
 
     @Override
-    public void hasBackPressure(boolean flag) {
+    public void setBackPressure(boolean flag) {
         if (m_stopping) return;
         for (TopicPartitionFetcher fetcher : m_fetchers.values()) {
             fetcher.hasBackPressure(flag);
@@ -884,8 +888,12 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
                         TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList, assignedKey, topic, partition,
                                 hap, m_fetchSize, m_consumerSocketTimeout);
-                        m_fetchers.put(assignedKey.toString(), fetcher);
-                        m_es.submit(fetcher);
+                        try {
+                            m_es.submit(fetcher);
+                            m_fetchers.put(assignedKey.toString(), fetcher);
+                        } catch (RejectedExecutionException ex) {
+                            warn(ex, "Failed to submit Topic Partition fetcher. We must be shutting down.");
+                        }
                         info("KafkaImporter is fetching for resource: " + nuri);
                     }
                 }

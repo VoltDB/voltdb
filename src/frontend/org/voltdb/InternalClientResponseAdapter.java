@@ -30,7 +30,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.LockSupport;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -54,18 +53,19 @@ import org.voltdb.client.ProcedureCallback;
  */
 public class InternalClientResponseAdapter implements Connection, WriteStream {
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
+    public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
 
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
         public String getProcedureName();
+        public int getPartitionId();
+        public InternalConnectionContext getInternalContext();
     }
 
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
-    private final ExecutorService m_es;
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
-    private volatile boolean m_stopped = false;
 
     private class InternalCallback implements Callback {
 
@@ -74,12 +74,16 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         private final long m_id;
         private final ProcedureCallback m_cb;
         private final String m_procedure;
+        private final int m_partition;
+        private final InternalConnectionContext m_context;
 
-        public InternalCallback(final DBBPool.BBContainer cont, String proc, ProcedureCallback cb, long id) {
+        public InternalCallback(final InternalConnectionContext context, final DBBPool.BBContainer cont, String proc, int partition, ProcedureCallback cb, long id) {
+            m_context = context;
             m_cont = cont;
             m_cb = cb;
             m_id = id;
             m_procedure = proc;
+            m_partition = partition;
         }
 
         public void discard() {
@@ -91,9 +95,12 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
         @Override
         public void handleResponse(ClientResponse response) throws Exception {
-            discard();
-            if (m_cb != null) {
-                m_cb.clientCallback(response);
+            try {
+                if (m_cb != null) {
+                    m_cb.clientCallback(response);
+                }
+            } finally {
+                discard();
             }
         }
 
@@ -101,55 +108,38 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         public String getProcedureName() {
             return m_procedure;
         }
+
+        @Override
+        public int getPartitionId() {
+            return m_partition;
+        }
+
+        @Override
+        public InternalConnectionContext getInternalContext() {
+            return m_context;
+        }
     }
 
     public long getPendingCount() {
         return m_callbacks.size();
     }
 
-    public void start() {
-        m_stopped = false;
+    public boolean hasBackPressure() {
+        // 500 default per partition.
+        return (m_callbacks.size() > (m_partitionExecutor.size() * MAX_PENDING_TRANSACTIONS_PER_PARTITION));
     }
 
-    //Submit a stop to the end of the queue.
-    public void stop() {
-        m_stopped = true;
-        try {
-            m_es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    long sleep = 500;
-                    do {
-                        if (m_callbacks.isEmpty()) {
-                            break;
-                        }
-                        /*
-                         * Back off to spinning at five millis. Try and get drain to be a little
-                         * more prompt. Spinning sucks!
-                         */
-                        LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
-                        if (sleep < 5000) {
-                            sleep += 500;
-                        }
-                    } while(true);
-
-                }
-            });
-        } catch (RejectedExecutionException ex) {
-            m_logger.error("Failed to submit ImportClientResponseAdapter stop() to the response processing queue.", ex);
-        }
+    public ClientInterface getClientInterface() {
+        return VoltDB.instance().getClientInterface();
     }
 
-    public boolean createTransaction(final String procName,
+    public boolean createTransaction(final InternalConnectionContext context,
+            final String procName,
             final Procedure catProc,
             final ProcedureCallback proccb,
             final StoredProcedureInvocation task,
             final DBBPool.BBContainer tcont,
             final int partition, final long nowNanos) {
-
-        if (m_stopped) {
-            return false;
-        }
 
         if (!m_partitionExecutor.containsKey(partition)) {
             m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("ImportHandlerExecutor - " + partition));
@@ -159,15 +149,25 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
+                    context.setBackPressure(hasBackPressure());
+                    submitTransaction();
+                }
+                public boolean submitTransaction() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final InternalCallback cb = new InternalCallback(tcont, procName, proccb, handle);
+                    final InternalCallback cb = new InternalCallback(context, tcont, procName, partition, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
-                    VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
+                    boolean bval = getClientInterface().createTransaction(connectionId(), task,
                             catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
                             task.getSerializedSize(), nowNanos);
+                    if (!bval) {
+                        m_logger.error("Failed to submit transaction.");
+                        cb.discard();
+                        m_callbacks.remove(handle);
+                    }
+                    return bval;
                 }
             });
         } catch (RejectedExecutionException ex) {
@@ -185,7 +185,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
      */
     public InternalClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
-        m_es = CoreUtils.getSingleThreadExecutor("ImportResponseHandler");
     }
 
     public long nextHandle() {
@@ -207,9 +206,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
-            final int serializedSize = ds.getSerializedSize();
-            buf = ByteBuffer.allocate(serializedSize);
-            ds.serialize(buf);
+            synchronized(this) {
+                final int serializedSize = ds.getSerializedSize();
+                buf = ByteBuffer.allocate(serializedSize);
+                ds.serialize(buf);
+            }
             enqueue(buf);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("enqueue() in IClientResponseAdapter throw an exception", true, e);
@@ -218,23 +219,39 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public void enqueue(final ByteBuffer b) {
+
+        final ClientResponseImpl resp = new ClientResponseImpl();
+        b.position(4);
         try {
-            m_es.submit(new Runnable() {
+            resp.initFromBuffer(b);
+        } catch (IOException ex) {
+            VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, ex);
+        }
+        final Callback callback = m_callbacks.get(resp.getClientHandle());
+        if (!m_partitionExecutor.containsKey(callback.getPartitionId())) {
+            m_logger.error("Invalid partition response recieved for sending importer response.");
+            return;
+        }
+        ExecutorService executor = m_partitionExecutor.get(callback.getPartitionId());
+        try {
+            executor.submit(new Runnable() {
                 @Override
                 public void run() {
+                    callback.getInternalContext().setBackPressure(hasBackPressure());
+                    handle();
+                }
+
+                public void handle() {
                     try {
-                        final ClientResponseImpl resp = new ClientResponseImpl();
-                        b.position(4);
-                        resp.initFromBuffer(b);
-                        final Callback callback = m_callbacks.remove(resp.getClientHandle());
                         if (resp.getStatus() != ClientResponse.SUCCESS) {
                             String fmt = "Importer stored procedure failed: %s Error: %s";
-                            rateLimitedLog(Level.ERROR, null, fmt, callback.getProcedureName(),
-                                    (resp.getStatusString() == null ? "No Status" : resp.getStatusString()));
+                            rateLimitedLog(Level.ERROR, null, fmt, callback.getProcedureName(), resp.getStatusString());
                         }
                         callback.handleResponse(resp);
                     } catch (Exception ex) {
                         m_logger.error("Failed to process callback.", ex);
+                    } finally {
+                        m_callbacks.remove(resp.getClientHandle());
                     }
                 }
             });
