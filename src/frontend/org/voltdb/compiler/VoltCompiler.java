@@ -1166,6 +1166,9 @@ public class VoltCompiler {
             }
         }
 
+        // When A/A is enabled, create an export table for every DR table to log possible conflicts
+        ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs);
+
         ddlcompiler.compileToCatalog(db);
 
         // Actually parse and handle all the partitions
