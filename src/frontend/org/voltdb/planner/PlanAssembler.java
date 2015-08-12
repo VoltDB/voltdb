@@ -303,13 +303,6 @@ public class PlanAssembler {
             return;
         }
 
-        // @TODO
-        // Need to use StmtTableScan instead
-        // check that no modification happens to views
-        if (tableListIncludesView(parsedStmt.m_tableList)) {
-            throw new PlanningErrorException("Illegal to modify a materialized view.");
-        }
-
         m_partitioning.setIsDML();
 
         // Check that only multi-partition writes are made to replicated tables.
