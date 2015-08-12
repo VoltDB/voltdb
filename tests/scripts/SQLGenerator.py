@@ -803,7 +803,7 @@ class Template:
 
 
 class SQLGenerator:
-    def __init__(self, catalog, template, subversion_generation, ascii_only = False):
+    def __init__(self, catalog, template, subversion_generation, ascii_only):
         StringValueGenerator.set_ascii_only(ascii_only)
         self.__subversion_generation = subversion_generation
         # Reset the counters
