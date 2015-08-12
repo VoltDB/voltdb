@@ -1081,6 +1081,7 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             // but still need to update the index used for min/max
             currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
             // Fallback executor vectors must be set after indexForMinMax
+            currView->setBuildUpExecutorVector(targetMvInfo->buildUpQueryStmt());
             currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
             return;
         }
@@ -1093,6 +1094,7 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             currView->setTargetTable(target);
             currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
             // Fallback executor vectors must be set after indexForMinMax
+            currView->setBuildUpExecutorVector(targetMvInfo->buildUpQueryStmt());
             currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
             return;
         }
