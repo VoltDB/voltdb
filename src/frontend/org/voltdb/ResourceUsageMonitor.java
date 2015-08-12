@@ -24,6 +24,7 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
+
 /**
  * Used to periodically check if the server's resource utilization is above the configured limits
  * and pause the server.
@@ -74,12 +75,16 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
 
         if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
             m_logger.warn("Pausing the server");
-            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure("ResourceUsageMonitor", 0, "@Pause");
+            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(this, 0, "@Pause");
         }
     }
 
     private boolean isOverMemoryLimit()
     {
+        if (m_rssLimit<=0) {
+            return false;
+        }
+
         Datum datum = SystemStatsCollector.getRecentSample();
         if (datum == null) { // this will be null if stats has not run yet
             m_logger.warn("No stats are available from stats collector. Skipping resource check.");
@@ -95,5 +100,17 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         } else {
             return false;
         }
+    }
+
+    @Override
+    public String getName()
+    {
+        return "ResourceUsageMonitor";
+    }
+
+    @Override
+    public void setBackPressure(boolean hasBackPressure)
+    {
+        // nothing to do here.
     }
 }

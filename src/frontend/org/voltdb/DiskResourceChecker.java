@@ -40,6 +40,7 @@ public class DiskResourceChecker
 {
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
+    static FileCheckForTest s_testFileCheck;
     private final Map<FeatureNameType, FeatureDiskLimitConfig> m_configuredLimits = new HashMap<>();
 
     public DiskResourceChecker(SystemSettingsType systemSettings, PathsType pathsConfig)
@@ -145,13 +146,14 @@ public class DiskResourceChecker
 
     private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold)
     {
-        if (!filePath.canWrite()) {
+        boolean canWrite = (s_testFileCheck==null) ? filePath.canWrite() : s_testFileCheck.canWrite(filePath);
+        if (!canWrite) {
             m_logger.rateLimitedLog(60, Level.WARN, null, "Invalid or readonly file path " + filePath);
             return false;
         }
 
-        long total = filePath.getTotalSpace();
-        long usable = filePath.getUsableSpace();
+        long total = (s_testFileCheck==null) ? filePath.getTotalSpace() : s_testFileCheck.getTotalSpace(filePath);
+        long usable = (s_testFileCheck==null) ? filePath.getUsableSpace() : s_testFileCheck.getUsableSpace(filePath);
         long calculatedThreshold = Math.round(sizeThreshold*1073741824);
         if (percThreshold > 0) {
             calculatedThreshold = Math.round(total*percThreshold/100.0);
