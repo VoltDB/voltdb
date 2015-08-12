@@ -31,8 +31,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -72,6 +74,7 @@ import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 import org.voltdb.importer.ImporterChannelAssignment;
+import org.voltdb.importer.Invocation;
 import org.voltdb.importer.VersionedOperationMode;
 
 /**
@@ -118,6 +121,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //topic partition leader
     private final Map<String, HostAndPort> m_topicPartitionLeader = new HashMap<String, HostAndPort>();
     private final Map<String, TopicPartitionFetcher> m_fetchers = new HashMap<String, TopicPartitionFetcher>();
+    private final BlockingQueue<TopicPartitionInvocationCallback> m_resubmitInvocation = new LinkedBlockingQueue<TopicPartitionInvocationCallback>();
 
     private ExecutorService m_es = null;
 
@@ -355,24 +359,48 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final AtomicLong m_cbcnt;
         private final Gap m_tracker;
         private final AtomicBoolean m_dontCommit;
+        private Invocation m_invocation;
+        private final BlockingQueue<TopicPartitionInvocationCallback> m_resubmitQueue;
 
-        public TopicPartitionInvocationCallback(long offset, AtomicLong cbcnt, final Gap tracker, AtomicBoolean dontCommit) {
+        public TopicPartitionInvocationCallback(
+                long offset,
+                final AtomicLong cbcnt,
+                final Gap tracker,
+                final AtomicBoolean dontCommit,
+                final Invocation invocation,
+                final BlockingQueue<TopicPartitionInvocationCallback> resubmitQueue
+         ) {
             m_offset = offset;
             m_cbcnt = cbcnt;
             m_tracker = tracker;
             m_dontCommit = dontCommit;
             m_tracker.submit(m_offset);
+            m_invocation = invocation;
+            m_resubmitQueue = resubmitQueue;
         }
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            //We should never get here with no pending offsets.
+
             m_cbcnt.incrementAndGet();
+            //We dont know lets submit again
+            if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN && getInvocation() != null) {
+                m_resubmitQueue.offer(this);
+                //This is not considered seen
+                return;
+            }
             if (!m_dontCommit.get()) {
                 m_tracker.commit(m_offset);
             }
         }
 
+        public Invocation getInvocation() {
+            return m_invocation;
+        }
+
+        public void setInvocation(Invocation invocation) {
+            m_invocation = invocation;
+        }
     }
 
     private class TopicPartitionFetcher implements Runnable {
@@ -657,6 +685,27 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     );
         }
 
+        public int submitBouncedTransactions() {
+            int submitCount = 0;
+            if (m_resubmitInvocation.peek() != null) {
+                ArrayList<TopicPartitionInvocationCallback>pendingQueue = new ArrayList<TopicPartitionInvocationCallback>();
+                m_resubmitInvocation.drainTo(pendingQueue);
+                info("Pending transaction queue is: " + pendingQueue + " Resubmitting...");
+                for (TopicPartitionInvocationCallback cb : pendingQueue) {
+                    Invocation invocation = cb.getInvocation();
+                    //So that we resubmit only once.
+                    cb.setInvocation(null);
+                    if (!callProcedure(cb, invocation)) {
+                        if (isDebugEnabled()) {
+                            debug("Failed to process Invocation possibly bad data: " + invocation);
+                        }
+                    }
+                    submitCount++;
+                }
+            }
+            return submitCount;
+        }
+
         @Override
         public void run() {
             info("Starting partition fetcher for " + m_topicAndPartition);
@@ -742,7 +791,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
-                                messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead
+                                messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
+                                invocation, m_resubmitInvocation
                                 );
                         if (!callProcedure(cb, invocation)) {
                             if (isDebugEnabled()) {
@@ -756,6 +806,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             break;
                         }
                     }
+                    //Submit any bounced transactions. We only submit once if it bounces again tough luck.
+                    submitCount += submitBouncedTransactions();
                     if (m_shutdown) {
                         break;
                     }
@@ -900,7 +952,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 }
             }
         }
-
         //For removed shutdown the fetchers if all are removed the importer will be closed/shutdown?
         for (URI r : assignment.getRemoved()) {
             TopicPartitionFetcher fetcher = m_fetchers.get(r.toString());
