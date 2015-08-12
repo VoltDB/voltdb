@@ -77,22 +77,4 @@ public class TypeAssert extends AbstractAssert<TypeAssert, Type> {
         }
         return this;
     }
-
-    public TypeAssert hasMaxSize(int aMaxSize) {
-        isNotNull();
-        if (actual.getMaxSize() != aMaxSize) {
-            failWithMessage("Expected type name <%s> to have max size %d not %d",
-                            actual.getName(), aMaxSize, actual.getMaxSize());
-        }
-        return this;
-    }
-
-    public TypeAssert hasNominalSize(int aNominalSize) {
-        isNotNull();
-        if (actual.getNominalSize() != aNominalSize) {
-            failWithMessage("Expected type name <%s> to have nominal size %d not %d",
-                            actual.getName(), aNominalSize, actual.getNominalSize());
-        }
-        return this;
-    }
 }

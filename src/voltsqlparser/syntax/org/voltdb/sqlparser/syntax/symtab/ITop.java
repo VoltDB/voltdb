@@ -30,10 +30,6 @@
  */
 public interface ITop {
 
-    public abstract long getNominalSize();
-
-    public abstract long getMaxSize();
-
     public abstract String getName();
 
 }

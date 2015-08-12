@@ -97,7 +97,7 @@ public class ParserFactory implements IParserFactory {
 
     @Override
     public ITable newTable(String aTableName) {
-        return new Table(aTableName, 0, 0);
+        return new Table(aTableName);
     }
 
     @Override
@@ -139,25 +139,37 @@ public class ParserFactory implements IParserFactory {
         return m_operatorMap.get(aText);
     }
 
+    private static Type hasSuperType(Type aLeftType, Type aRightType) {
+        if (aLeftType.getTypeKind() == aRightType.getTypeKind()) {
+            return aLeftType;
+        }
+        return null;
+    }
+
     public Neutrino[] tuac(INeutrino ileft, INeutrino iright) {
         Neutrino left = (Neutrino)ileft;
         Neutrino right = (Neutrino)iright;
         Type leftType = left.getType();
         Type rightType = right.getType();
-        if (leftType.getMaxSize() == rightType.getMaxSize()) { // not comparing nominal size yet.
+        if (leftType.isEqualType(rightType)) {
                 return new Neutrino[]{left,right};
-        } else if (leftType.getMaxSize() < rightType.getMaxSize()) { // right is larger
-                Neutrino converted = new Neutrino(rightType,
+        } else {
+            Type convertedType = hasSuperType(leftType, rightType);
+            if (convertedType != null) {
+                Neutrino lconverted = new Neutrino(convertedType,
                                                   addTypeConversion(left.getAST(),
                                                                     leftType,
-                                                                    rightType));
-                return new Neutrino[]{converted,right};
-        } else { // left is larger
-                Neutrino converted = new Neutrino(leftType,
-                                                  addTypeConversion(right.getAST(),
-                                                                    rightType,
-                                                                    leftType));
-                return new Neutrino[]{left,converted};
+                                                                    convertedType));
+                Neutrino rconverted = new Neutrino(convertedType,
+                                                   addTypeConversion(right.getAST(),
+                                                                     rightType,
+                                                                     convertedType));
+                return new Neutrino[]{lconverted, rconverted};
+            } else {
+                m_errorMessages.addError(-1, -1, "Can't convert type \"%s\" to \"%s\"",
+                                         leftType, rightType);
+                return null;
+            }
         }
     }
 
@@ -210,25 +222,22 @@ public class ParserFactory implements IParserFactory {
         return null;
     }
 
-        public void processWhereExpression(Neutrino aWhereExpression) {
-                unimplementedOperation("processWhereExpression");
-        }
-
-    @Override
-    public IType makeBooleanType() {
-        if (m_booleanType == null) {
-            m_booleanType = new BooleanType("boolean", 0, 0);
-        }
-        return m_booleanType;
-    }
-
-    @Override
-    public IType makeIntegerType() {
-        return m_stdPrelude.getType("integer");
+    public void processWhereExpression(Neutrino aWhereExpression) {
+            unimplementedOperation("processWhereExpression");
     }
 
     @Override
     public ErrorMessageSet getErrorMessages() {
         return m_errorMessages;
+    }
+
+    @Override
+    public IType getBooleanType() {
+        return SymbolTable.getBooleanType();
+    }
+
+    @Override
+    public IType getErrorType() {
+        return SymbolTable.getErrorType();
     }
 }

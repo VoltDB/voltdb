@@ -34,13 +34,20 @@
 
 import org.voltdb.sqlparser.syntax.symtab.IType;
 
+/**
+ * This is the base class of all types.  All types have a name,
+ * a nominal and maximum size and a kind.
+ *
+ * @author bwhite
+ *
+ */
 public class Type extends Top implements IType {
-    public Type(String aName, long aNominalSize, long aMaxSize) {
-        super(aName, aNominalSize, aMaxSize);
+    public TypeKind m_kind;
 
+    public Type(String aName, TypeKind aKind) {
+        super(aName);
+        m_kind = aKind;
     }
-
-
 
     public boolean equals(Type other) {
         return (this.getName().equals(other.getName()));
@@ -54,8 +61,16 @@ public class Type extends Top implements IType {
         return this.getClass().toString();
     }
 
-    public Class getSuperType() {
-        return this.getClass();
+    public boolean isEqualType(Type rightType) {
+        return m_kind == rightType.getTypeKind();
     }
 
+    public final TypeKind getTypeKind() {
+        return m_kind;
+    }
+
+    @Override
+    public boolean isBooleanType() {
+        return false;
+    }
 }

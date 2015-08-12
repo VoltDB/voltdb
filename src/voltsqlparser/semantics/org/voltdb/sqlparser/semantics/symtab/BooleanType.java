@@ -32,11 +32,17 @@
  */
  package org.voltdb.sqlparser.semantics.symtab;
 
+/**
+ * This is the type of booleans.  Although this type is not
+ * available to the user, it is still useful, as some parts of
+ * SQL need to know if expressions have boolean type.
+ *
+ * @author bwhite
+ */
 public class BooleanType extends Type {
 
-        public BooleanType(String aName, long aNominalSize, long aMaxSize) {
-                super(aName, aNominalSize, aMaxSize);
-                // TODO Auto-generated constructor stub
-        }
-
+    public BooleanType(String aName, TypeKind aKind) {
+            super(aName, aKind);
+            // TODO Auto-generated constructor stub
+    }
 }

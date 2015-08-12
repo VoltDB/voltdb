@@ -61,17 +61,24 @@ package org.voltdb.sqlparser;
 import org.junit.Test;
 import org.voltdb.sqlparser.semantics.symtab.IntegerType;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
+import org.voltdb.sqlparser.semantics.symtab.TypeKind;
+
 import static org.voltdb.sqlparser.symtab.SymbolTableAssert.assertThat;
+
+/**
+ * This is really a stupid test.  Surely we can think of something
+ * better than this.
+ *
+ * @author bwhite
+ */
 public class TestSymbolTable {
     @Test
     public void test() {
         SymbolTable s = new SymbolTable(null);
         assertThat(s).isEmpty();
-        IntegerType bigint = new IntegerType("bigint", 8, 8);
+        IntegerType bigint = new IntegerType("bigint", TypeKind.BIGINT);
         s.define(bigint);
         assertThat(s).hasSize(1)
-                     .definesType("bigint")
-                     .hasMaxSize(8)
-                     .hasNominalSize(8);
+                     .definesType("bigint");
     }
 }

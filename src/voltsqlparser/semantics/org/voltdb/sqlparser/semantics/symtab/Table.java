@@ -41,8 +41,8 @@ public class Table extends Top implements ITable {
     Map<String, Column> m_lookup = new TreeMap<String, Column>(String.CASE_INSENSITIVE_ORDER);
     List<String> m_colNames = new ArrayList<String>();
 
-    public Table(String aTableName, int aMaxSize, int aNominalSize) {
-        super(aTableName, aMaxSize, aNominalSize);
+    public Table(String aTableName) {
+        super(aTableName);
     }
 
     /* (non-Javadoc)

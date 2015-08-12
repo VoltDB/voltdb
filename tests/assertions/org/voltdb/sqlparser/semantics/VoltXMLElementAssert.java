@@ -175,13 +175,20 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
                 if (children == null) {
                     Fail.fail(String.format("Can't find child named: <%s>", childName));
                 }
+                boolean success = false;
                 for (VoltXMLElement child : children) {
                     String val = child.attributes.get(key);
                     if (val != null && val.equals(value)) {
                         assertThat(child).hasAllOf(conditions);
+                        success = true;
+                        break;
                     }
                 }
-                return true;
+                if (success == false) {
+                    Fail.fail(String.format("Failed to find a child with name \"%s\" and attribute \"%s\" with value \"%s\"",
+                                            childName, key, value));
+                }
+                return success;
             }
 
         };

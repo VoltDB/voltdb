@@ -44,8 +44,8 @@ public class Column extends Top implements IColumn {
     protected boolean m_isNull          = false;
 
     public Column(String name,Type type) {
-        super(name, 0, 0);
-            this.m_type=type;
+        super(name);
+        this.m_type=type;
     }
 
     /* (non-Javadoc)

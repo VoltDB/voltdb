@@ -71,30 +71,6 @@ public class TopAssert extends AbstractAssert<TopAssert, Top> {
     }
 
     /**
-     * Verifies that the actual Top's maxSize is equal to the given one.
-     * @param maxSize the given maxSize to compare the actual Top's maxSize to.
-     * @return this assertion object.
-     * @throws AssertionError - if the actual Top's maxSize is not equal to the given one.
-     */
-    public TopAssert hasMaxSize(long maxSize) {
-        // check that actual Top we want to make assertions on is not null.
-        isNotNull();
-
-        // we overrides the default error message with a more explicit one
-        String errorMessage = format(
-                "\nExpected <%s> maxSize to be:\n  <%s>\n but was:\n  <%s>",
-                actual, maxSize, actual.getMaxSize());
-
-        // check
-        if (actual.getMaxSize() != maxSize) {
-            throw new AssertionError(errorMessage);
-        }
-
-        // return the current assertion for method chaining
-        return this;
-    }
-
-    /**
      * Verifies that the actual Top's name is equal to the given one.
      * @param name the given name to compare the actual Top's name to.
      * @return this assertion object.
@@ -111,30 +87,6 @@ public class TopAssert extends AbstractAssert<TopAssert, Top> {
 
         // check
         if (!actual.getName().equals(name)) {
-            throw new AssertionError(errorMessage);
-        }
-
-        // return the current assertion for method chaining
-        return this;
-    }
-
-    /**
-     * Verifies that the actual Top's nominalSize is equal to the given one.
-     * @param nominalSize the given nominalSize to compare the actual Top's nominalSize to.
-     * @return this assertion object.
-     * @throws AssertionError - if the actual Top's nominalSize is not equal to the given one.
-     */
-    public TopAssert hasNominalSize(long nominalSize) {
-        // check that actual Top we want to make assertions on is not null.
-        isNotNull();
-
-        // we overrides the default error message with a more explicit one
-        String errorMessage = format(
-                "\nExpected <%s> nominalSize to be:\n  <%s>\n but was:\n  <%s>",
-                actual, nominalSize, actual.getNominalSize());
-
-        // check
-        if (actual.getNominalSize() != nominalSize) {
             throw new AssertionError(errorMessage);
         }
 

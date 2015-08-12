@@ -263,7 +263,8 @@ public class VoltXMLElementTestFromSQL {
             + " */\n"
             + "/*\n"
             + " * This file has been created by elves.  If you make changes to it,\n"
-            + " * the elves will overwrite your changes with their ideas of what should\n"
+            + " * the elves will become annoyed, will overwrite your changes with\n"
+            + " * whatever odd notions they have of what should\n"
             + " * be here, and ignore your plaintive bleatings.  So, don't edit this file,\n"
             + " * Unless you want your work to disappear.\n"
             + " */\n"
@@ -392,10 +393,11 @@ public class VoltXMLElementTestFromSQL {
                     || "indexes".equals(elementName)
                     || "constraints".equals(elementName)) {
                 String childName = child.name;
-                String value = child.attributes.get("name");
+                String attribute = ("columnref".equals(childName) ? "table" : "name");
+                String value = child.attributes.get(attribute);
                 indentStr(aSb, aIndent, true, false)
                   .append(String.format("withChildByAttribute(\"%s\", \"%s\", \"%s\"",
-                                        childName, "name", value));
+                                        childName, attribute, value));
             } else {
                 indentStr(aSb, aIndent, true, false)
                   .append(String.format("withChildNamed(\"%s\"", child.name));

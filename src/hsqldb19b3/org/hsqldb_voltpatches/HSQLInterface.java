@@ -411,7 +411,6 @@ public class HSQLInterface {
                 colXML.withValue("name", colName.toUpperCase())
                       .withValue("index", Integer.toString(colidx))
                       .withValue("nullable", "false")
-                      .withValue("size", Long.toString(col.getMaxSize()))
                       .withValue("valuetype", col.getType().getName().toUpperCase());
                 colidx += 1;
                 columnsXML.children.add(colXML);

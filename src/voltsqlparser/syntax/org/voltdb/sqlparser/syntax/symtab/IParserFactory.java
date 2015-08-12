@@ -199,22 +199,20 @@ public interface IParserFactory {
                       IAST aWhereCondition,
                       ISymbolTable aTables);
     /**
-     * Make the boolean type.  We cannot query for it, since it may not
-     * be defined by name.
-     *
-     * @return
-     */
-    IType makeBooleanType();
-
-    /**
-     * Make an integer type.  We cannot really query for it by name, since
-     * we may not know the names.
-     */
-    IType makeIntegerType();
-
-    /**
      * Get the set of error messages for this factory.
      * @return
      */
     ErrorMessageSet getErrorMessages();
+
+    /**
+     * Get the Boolean type.
+     * @return
+     */
+    IType getBooleanType();
+    /**
+     * Get the error type.  This is used mostly when a parsing
+     * error needs a type, but they type does not need to be anything
+     * specific.
+     */
+    IType getErrorType();
 }

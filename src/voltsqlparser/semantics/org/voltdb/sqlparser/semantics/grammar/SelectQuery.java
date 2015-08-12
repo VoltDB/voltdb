@@ -119,10 +119,6 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
         public Neutrino getNeutrinoMath(IOperator aOperator,
                                            INeutrino aLeftoperand,
                                            INeutrino aRightoperand) {
-                if (!((Neutrino) aRightoperand).getSuperType().equals(((Neutrino) aRightoperand).getSuperType())) {
-                    return null;
-                } // TODO check type is correct (int,float,long,etx);
-
                 INeutrino[] converted = m_factory.tuac(aLeftoperand, aRightoperand);
 
 
@@ -136,33 +132,32 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
     public Neutrino getNeutrinoCompare(IOperator aOperator,
                                        INeutrino aLeftoperand,
                                        INeutrino aRightoperand) {
-                if (!((Neutrino) aRightoperand).getSuperType().equals(((Neutrino) aRightoperand).getSuperType())) {
-                    return null;
-                } // TODO check type is correct (int,float,long,etx);
                 INeutrino[] converted = m_factory.tuac(aLeftoperand, aRightoperand);
-
-
-                return new Neutrino((Type) m_factory.makeBooleanType(),
+                if (converted == null) {
+                    return Neutrino.getErrorNeutrino();
+                }
+                return new Neutrino((Type) m_factory.getBooleanType(),
                                     m_factory.makeBinaryAST(aOperator,
                                                             converted[0],
                                                             converted[1]));
     }
 
-        @Override
-        public Neutrino getNeutrinoBoolean(IOperator aOperator,
-                                           INeutrino aLeftoperand,
-                                           INeutrino aRightoperand) {
-                if (!((Neutrino) aRightoperand).getSuperType().equals(((Neutrino) aRightoperand).getSuperType())) {
-                        return null;
-                }
-                return new Neutrino((Type) aRightoperand.getType(),
-                                    m_factory.makeBinaryAST(aOperator,
-                                                            aLeftoperand,
-                                                            aRightoperand));
+    @Override
+    public Neutrino getNeutrinoBoolean(IOperator aOperator,
+                                       INeutrino aLeftoperand,
+                                       INeutrino aRightoperand) {
+        if (aLeftoperand.getType().isBooleanType() == false
+                || aRightoperand.getType().isBooleanType() == false) {
+            return Neutrino.getErrorNeutrino();
         }
+        return new Neutrino((Type) aRightoperand.getType(),
+                            m_factory.makeBinaryAST(aOperator,
+                                                    aLeftoperand,
+                                                    aRightoperand));
+    }
 
     @Override
-        public Neutrino getColumnNeutrino(String aColumnName, String aTableName) {
+    public Neutrino getColumnNeutrino(String aColumnName, String aTableName) {
         String realTableName;
         String tableAlias;
         Table tbl;
@@ -182,43 +177,43 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
                             m_factory.makeColumnRef(realTableName,
                                                     tableAlias,
                                                     aColumnName));
-        }
+    }
 
-        @Override
-        public String printProjections() {
-                String out = "projections: ";
-                for (int i=0;i<m_projections.size();i++) {
-                        out += "["+m_projections.get(i).toString()+"]";
-                }
-                return out;
+    @Override
+    public String printProjections() {
+        String out = "projections: ";
+        for (int i=0;i<m_projections.size();i++) {
+                out += "["+m_projections.get(i).toString()+"]";
         }
+        return out;
+    }
 
-        @Override
-        public String printTables() {
-                String out = "Tables: ";
-                out += m_tables.toString();
-                return out;
-        }
+    @Override
+    public String printTables() {
+        String out = "Tables: ";
+        out += m_tables.toString();
+        return out;
+    }
 
-        @Override
-        public String printNeutrinos() {
-                String out = "Neutrinos: ";
-                while(!m_neutrinoStack.isEmpty()) {
-                        Neutrino next = m_neutrinoStack.pop();
-                        out += "["+next.toString()+"]";
-                }
-                return out;
+    @Override
+    public String printNeutrinos() {
+        String out = "Neutrinos: ";
+        while(!m_neutrinoStack.isEmpty()) {
+                Neutrino next = m_neutrinoStack.pop();
+                out += "["+next.toString()+"]";
         }
+        return out;
+    }
 
-        @Override
-        public boolean hasNeutrinos() {
-                return !m_neutrinoStack.isEmpty();
-        }
+    @Override
+    public boolean hasNeutrinos() {
+        return !m_neutrinoStack.isEmpty();
+    }
 
-        @Override
-        public void setWhereCondition(INeutrino aNeutrino) {
-            m_whereCondition = (Neutrino) aNeutrino;
-        }
+    @Override
+    public void setWhereCondition(INeutrino aNeutrino) {
+        m_whereCondition = (Neutrino) aNeutrino;
+    }
 
     @Override
     public IAST getWhereCondition() {

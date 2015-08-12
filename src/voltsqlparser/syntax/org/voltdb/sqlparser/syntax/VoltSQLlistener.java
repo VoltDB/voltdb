@@ -59,6 +59,7 @@ import org.voltdb.sqlparser.syntax.util.ErrorMessage;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
 public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRErrorListener {
+    private static final int DEFAULT_STRING_SIZE = 64;
     private ITable m_currentlyCreatedTable = null;
     private ISymbolTable m_symbolTable;
     private IParserFactory m_factory;
@@ -129,9 +130,26 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
         String colName = ctx.column_name().IDENTIFIER().getText();
         String type = ctx.type_expression().type_name().IDENTIFIER().getText();
         IType colType = m_symbolTable.getType(type);
+        int nparms, p1 = -1, p2 = -1;
+        nparms = ctx.type_expression().NUMBER().size();
+        if (nparms > 0) {
+            p1 = Integer.parseInt(ctx.type_expression().NUMBER().get(0).getText());
+            if (nparms > 1) {
+                p2 = Integer.parseInt(ctx.type_expression().NUMBER().get(1).getText());
+            }
+        }
         if (colType == null) {
             addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "Type expected");
         } else {
+            if (colType instanceof IStringType) {
+                int size;
+                if (nparms == 0) {
+                    size = DEFAULT_STRING_SIZE;
+                } else {
+                    size = p1;
+                }
+                colType = ((IStringType) colType).makeInstance(size);
+            }
             IColumn column = m_factory.newColumn(colName, colType);
             column.setHasDefaultValue(m_hasDefaultValue);
             column.setDefaultValue(m_defaultValue);
@@ -347,7 +365,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
      * <p>Push a true neutrino</p>
      */
     @Override public void exitTrue_expr(SQLParserParser.True_exprContext ctx) {
-        IType boolType = m_factory.makeBooleanType();
+        IType boolType = m_factory.getBooleanType();
         m_selectQuery.pushNeutrino(m_selectQuery.getConstantNeutrino(Boolean.valueOf(true), boolType));
     }
     /**
@@ -356,7 +374,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
      * <p>Push a False Neutrino.</p>
      */
     @Override public void exitFalse_expr(SQLParserParser.False_exprContext ctx) {
-        IType boolType = m_factory.makeBooleanType();
+        IType boolType = m_factory.getBooleanType();
         m_selectQuery.pushNeutrino(m_selectQuery.getConstantNeutrino(Boolean.valueOf(false), boolType));
     }
 
@@ -374,7 +392,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
      * {@inheritDoc}
      */
     @Override public void exitNumeric_expr(SQLParserParser.Numeric_exprContext ctx) {
-        IType intType = m_factory.makeIntegerType();
+        IType intType = m_symbolTable.getType("integer");
         m_selectQuery.pushNeutrino(m_selectQuery.getConstantNeutrino(Integer.valueOf(ctx.NUMBER().getText()),
                                                                      intType));
     }

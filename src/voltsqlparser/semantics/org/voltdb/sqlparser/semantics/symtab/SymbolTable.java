@@ -54,8 +54,21 @@ import org.voltdb.sqlparser.syntax.symtab.ITop;
  *
  */
 public class SymbolTable implements ISymbolTable {
+    private static ErrorType m_errorType;
+    private static BooleanType m_booleanType;
+    public static final ErrorType getErrorType() {
+        if (m_errorType == null) {
+            m_errorType = new ErrorType("$error", TypeKind.ERROR);
+        }
+        return m_errorType;
+    }
+    public static final BooleanType getBooleanType() {
+        if (m_booleanType == null) {
+            m_booleanType = new BooleanType("$boolean", TypeKind.BOOLEAN);
+        }
+        return m_booleanType;
+    }
     ISymbolTable m_parent;
-    Type         m_integerType = null;
     public class TablePair {
         Table m_table;
         String m_alias;
@@ -171,10 +184,17 @@ public class SymbolTable implements ISymbolTable {
 
     public static ISymbolTable newStandardPrelude() {
         ISymbolTable answer = new SymbolTable(null);
-        answer.define(new IntegerType("bigint", 8, 8));
-        answer.define(new IntegerType("integer", 4, 4));
-        answer.define(new IntegerType("tinyint", 1, 1));
-        answer.define(new IntegerType("smallint", 2, 2));
+        answer.define(new IntegerType("bigint",      TypeKind.BIGINT));
+        answer.define(new IntegerType("integer",     TypeKind.INTEGER));
+        answer.define(new IntegerType("tinyint",     TypeKind.TINYINT));
+        answer.define(new IntegerType("smallint",    TypeKind.SMALLINT));
+        answer.define(new DecimalType("decimal",     TypeKind.DECIMAL));
+        answer.define(new FloatingPointType("float", TypeKind.FLOAT));
+        answer.define(new StringType("varchar",      TypeKind.VARCHAR));
+        answer.define(new StringType("varbinary",    TypeKind.VARBINARY));
+        answer.define(new TimestampType("timestamp"));
+        answer.define(getErrorType());
+        answer.define(getBooleanType());
         return answer;
     }
 

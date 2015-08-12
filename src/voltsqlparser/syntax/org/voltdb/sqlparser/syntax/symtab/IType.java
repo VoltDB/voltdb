@@ -25,4 +25,6 @@
  */
 public interface IType extends ITop {
 
+    boolean isBooleanType();
+
 }
