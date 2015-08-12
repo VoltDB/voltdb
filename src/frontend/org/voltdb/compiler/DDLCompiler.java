@@ -66,6 +66,7 @@ import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
@@ -1971,33 +1972,42 @@ public class DDLCompiler {
         catalog_const.setType(type.getValue());
     }
 
+    void compileMatViewQueriesToStatement(Statement stmt, VoltXMLElement xmlquery, 
+                                          Database db, DatabaseEstimates estimates) throws VoltCompilerException {
+        // Use the uniqueName as the sqlText. This is easier for differentiating the queries?
+        // Normally for select statements, the unique names will start with "Eselect".
+        // Remove the first "E" to let QueryType.getFromSQL(stmt) generate correct query type value.
+        // (StatementCompiler.java, line 159)
+        stmt.setSqltext( xmlquery.getUniqueName().substring(2) );
+        // For debug:
+        // System.out.println(xmlquery.toString());
+        StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
+                          m_hsql,
+                          db.getCatalog(),
+                          db,
+                          estimates,
+                          stmt,
+                          xmlquery,
+                          stmt.getSqltext(),
+                          null, // no user-supplied join order
+                          DeterminismMode.FASTER,
+                          org.voltdb.planner.StatementPartitioning.inferPartitioning());
+
+    }
+
     // Compile the fallback query XMLs, add the plans into the catalog statement (ENG-8641).
-    void compileFallbackQueriesAndUpdateCatalog(Database db,
-                                                List<VoltXMLElement> fallbackQueryXMLs,
-                                                MaterializedViewInfo matviewinfo) throws VoltCompilerException {
-        org.voltdb.compiler.DatabaseEstimates estimates = new org.voltdb.compiler.DatabaseEstimates();
+    void compileMatViewQueriesAndUpdateCatalog(Database db,
+                                               VoltXMLElement buildUpQueryXML,
+                                               List<VoltXMLElement> fallbackQueryXMLs,
+                                               MaterializedViewInfo matviewinfo) throws VoltCompilerException {
+        DatabaseEstimates estimates = new DatabaseEstimates();
+        Statement buildUpQueryStmt = matviewinfo.getBuildupquerystmt().add("0");
+        compileMatViewQueriesToStatement(buildUpQueryStmt, buildUpQueryXML, db, estimates);
         for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
             String key = String.valueOf(i);
             Statement fallbackQueryStmt = matviewinfo.getFallbackquerystmts().add(key);
             VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
-            // Use the uniqueName as the sqlText. This is easier for differentiating the queries?
-            // Normally for select statements, the unique names will start with "Eselect".
-            // Remove the first "E" to let QueryType.getFromSQL(stmt) generate correct query type value.
-            // (StatementCompiler.java, line 159)
-            fallbackQueryStmt.setSqltext( fallbackQueryXML.getUniqueName().substring(2) );
-            // For debug:
-            // System.out.println(fallbackQueryXML.toString());
-            StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
-                              m_hsql,
-                              db.getCatalog(),
-                              db,
-                              estimates,
-                              fallbackQueryStmt,
-                              fallbackQueryXML,
-                              fallbackQueryStmt.getSqltext(),
-                              null, // no user-supplied join order
-                              DeterminismMode.FASTER,
-                              org.voltdb.planner.StatementPartitioning.forceSP());
+            compileMatViewQueriesToStatement(fallbackQueryStmt, fallbackQueryXML, db, estimates);
         }
     }
 
@@ -2159,9 +2169,10 @@ public class DDLCompiler {
             }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
-            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
+            MatViewQueriesXMLGenerator xmlGen = new MatViewQueriesXMLGenerator(destTable, xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
+            VoltXMLElement buildUpQueryXML = xmlGen.getBuildUpQueryXML();
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
-            compileFallbackQueriesAndUpdateCatalog(db, fallbackQueryXMLs, matviewinfo);
+            compileMatViewQueriesAndUpdateCatalog(db, buildUpQueryXML, fallbackQueryXMLs, matviewinfo);
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {
