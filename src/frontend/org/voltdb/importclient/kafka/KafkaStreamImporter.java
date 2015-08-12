@@ -678,6 +678,31 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     );
         }
 
+        public int submitBouncedTransactions() {
+            int submitCount = 0;
+            if (m_resubmitInvocation.peek() != null) {
+                ArrayList<TopicPartitionInvocationCallback>pendingQueue = new ArrayList<TopicPartitionInvocationCallback>();
+                m_resubmitInvocation.drainTo(pendingQueue);
+                info("Pending transaction queue is: " + pendingQueue + " Resubmitting...");
+                for (TopicPartitionInvocationCallback cb : pendingQueue) {
+                    Invocation invocation = cb.getInvocation();
+                    //So that we resubmit only once.
+                    cb.setInvocation(null);
+                    if (!callProcedure(cb, invocation)) {
+                        if (isDebugEnabled()) {
+                            debug("Failed to process Invocation possibly bad data: " + invocation);
+                        }
+                        synchronized(m_seenOffset) {
+                            //Make this failed offset known to seen offsets so committer can push ahead.
+                            m_seenOffset.add(cb.getNextOffset());
+                        }
+                    }
+                    submitCount++;
+                }
+            }
+            return submitCount;
+        }
+
         @Override
         public void run() {
             info("Starting partition fetcher for " + m_topicAndPartition);
@@ -689,26 +714,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
                 int sleepCounter = 1;
                 while (!m_shutdown) {
-                    if (m_resubmitInvocation.peek() != null) {
-                        ArrayList<TopicPartitionInvocationCallback>pendingQueue = new ArrayList<TopicPartitionInvocationCallback>();
-                        m_resubmitInvocation.drainTo(pendingQueue);
-                        info("Pending transaction queue is: " + pendingQueue + " Resubmitting...");
-                        for (TopicPartitionInvocationCallback cb : pendingQueue) {
-                            Invocation invocation = cb.getInvocation();
-                            //So that we resubmit only once.
-                            cb.setInvocation(null);
-                            if (!callProcedure(cb, invocation)) {
-                                if (isDebugEnabled()) {
-                                    debug("Failed to process Invocation possibly bad data: " + invocation);
-                                }
-                                synchronized(m_seenOffset) {
-                                    //Make this failed offset known to seen offsets so committer can push ahead.
-                                    m_seenOffset.add(cb.getNextOffset());
-                                }
-                            }
-                            submitCount++;
-                        }
-                    }
                     if (m_currentOffset.get() < 0) {
                         getOffsetCoordinator();
                         if (m_offsetManager.get() == null) {
@@ -794,6 +799,8 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             break;
                         }
                     }
+                    //Submit any bounced transactions. We only submit once if it bounces again tough luck.
+                    submitCount += submitBouncedTransactions();
                     if (m_shutdown) {
                         break;
                     }
