@@ -359,11 +359,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final AtomicLong m_cbcnt;
         private final Gap m_tracker;
         private final AtomicBoolean m_dontCommit;
-        private Invocation m_invocation;
+        private final Invocation m_invocation;
         private final BlockingQueue<TopicPartitionInvocationCallback> m_resubmitQueue;
 
         public TopicPartitionInvocationCallback(
-                long offset,
+                final long offset,
                 final AtomicLong cbcnt,
                 final Gap tracker,
                 final AtomicBoolean dontCommit,
@@ -420,7 +420,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private SimpleConsumer m_consumer = null;
         private final TopicAndPartition m_topicAndPartition;
-        private final Gap m_gapTracker = new Gap(8192);
+        private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 8192));
 
         public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String topic, int partition, HostAndPort leader, int fetchSize, int consumerSocketTimeout) {
             m_url = uri;
