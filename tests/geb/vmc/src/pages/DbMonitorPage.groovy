@@ -59,6 +59,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clusterLatency			        { $("#chartClusterLatency") }
         clusterTransactions		        { $("#chartClusterTransactions") }
         partitionIdleTime		        { $("#chartPartitionIdleTime") }
+        commandLogStatistics            { $("#chartCommandLogging") }
+        databaseReplication             { $("#ChartDrReplicationRate") }
         storedProcedures 		        { $("#tblStoredProcedures") }
         dataTables			            { $("#tblDataTables") }
 
@@ -151,6 +153,14 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         //partition idle graph
         partitiongraphmin 		        { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         partitiongraphmax		        { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        
+        //command log statistics graph
+        commandLogStatisticsMin         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
+        commandLogStatisticsMax         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
+        
+        //database replication graph
+        databaseReplicationMin          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
+        databaseReplicationMax          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
         
         partitionstatus			        { $("#visualisationPartitionIdleTime > g > g > g.nv-y.nv-axis > g > g:nth-child(1) > g:nth-child(2) > text")}
         localpartition			        { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(1)")}

@@ -241,7 +241,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         btnSaveDrMaster             { $("#btnSaveDrMaster") }
         btnPopupDrMasterCancel      { $("#btnPopupDrMasterCancel") }
         drTablePopup                { $(class:"overlay-title icon-alert", text:"DR Tables") }
-
+        chkDrMaster                 { $("#row-DrConfig > td.tdDrConfig > div.icheckbox_square-aero.checked.customCheckbox > ins") }
     }
     static at = {
         adminTab.displayed
