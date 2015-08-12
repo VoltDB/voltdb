@@ -51,6 +51,9 @@ public class Tokens {
     public static final String T_ALTER            = "ALTER";
     static final String        T_AND              = "AND";
     public static final String T_ANY              = "ANY";
+    // A VoltDB extension APPROX_COUNT_DISTINCT
+    static final String        T_APPROX_COUNT_DISTINCT = "APPROX_COUNT_DISTINCT";
+    // End of VoltDB extension
     static final String        T_ARE              = "ARE";
     public static final String T_ARRAY            = "ARRAY";
     public static final String T_ARRAY_AGG        = "ARRAY_AGG";
@@ -942,6 +945,9 @@ public class Tokens {
     public static final int ALTER                            = 4;
     public static final int AND                              = 5;
     public static final int ANY                              = 6;
+    // A VoltDB extension APPROX_COUNT_DISTINCT
+    public static final int APPROX_COUNT_DISTINCT            = 1304;
+    // End of VoltDB extension
     public static final int ARE                              = 7;
     public static final int ARRAY                            = 8;
     public static final int ARRAY_AGG                        = 9;
@@ -1832,6 +1838,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_ALTER, ALTER);
         reservedKeys.put(Tokens.T_AND, AND);
         reservedKeys.put(Tokens.T_ANY, ANY);
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        reservedKeys.put(Tokens.T_APPROX_COUNT_DISTINCT, APPROX_COUNT_DISTINCT);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_ARE, ARE);
         reservedKeys.put(Tokens.T_ARRAY, ARRAY);
         reservedKeys.put(Tokens.T_ARRAY_AGG, ARRAY_AGG);
@@ -2630,6 +2639,9 @@ public class Tokens {
             UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
             // A VoltDB extension to support the assume unique index attribute.
             ASSUMEUNIQUE, // For VoltDB
+            // End of VoltDB extension
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+            APPROX_COUNT_DISTINCT,
             // End of VoltDB extension
         };
 

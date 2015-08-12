@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.base.Throwables;
 import static org.voltdb.ClientInterface.getPartitionForProcedure;
 
 import java.io.IOException;
@@ -35,6 +36,12 @@ import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import java.util.concurrent.ExecutionException;
+import org.voltcore.logging.Level;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -51,11 +58,10 @@ public class ImportHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private boolean m_stopped = false;
 
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
+    public final static long SUPPRESS_INTERVAL = 120;
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext, CatalogContext catContext) {
@@ -86,19 +92,25 @@ public class ImportHandler {
     }
 
     public void stop() {
-        m_stopped = true;
-        m_es.submit(new Runnable() {
+        try {
+            m_es.submit(new Runnable() {
 
-            @Override
-            public void run() {
-                try {
-                    m_importContext.stop();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                @Override
+                public void run() {
+                    try {
+                        //Stop the context first so no more work is submitted.
+                        m_importContext.stop();
+                    } catch (Exception ex) {
+                        Throwables.propagate(ex);
+                    }
+                    m_logger.info("Importer stopped: " + m_importContext.getName());
                 }
-                m_logger.info("Importer stopped: " + m_importContext.getName());
-            }
-        });
+            }).get();
+        } catch (InterruptedException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        } catch (ExecutionException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        }
         try {
             m_es.shutdown();
             m_es.awaitTermination(1, TimeUnit.DAYS);
@@ -120,10 +132,20 @@ public class ImportHandler {
         return (table!=null);
     }
 
+    public class NullCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+        }
+    }
+
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
+        return callProcedure(ic, new NullCallback(), proc, fieldList);
+    }
+
+    public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
-            m_logger.warn("Server is paused and is currently unavailable - please try again later.");
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
+            warn(null, "Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -145,28 +167,23 @@ public class ImportHandler {
                 catProc = sysProc.asCatalogProcedure();
             }
             if (catProc == null) {
-                m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
+                String fmt = "Can not invoke procedure %s from streaming interface %s procedure not found.";
+                error(null, fmt, proc, ic.getName());
                 m_failedCount.incrementAndGet();
                 return false;
             }
         }
 
-        int counter = 1;
-        int maxSleepNano = 100000;
-        long start = System.nanoTime();
-        while (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS) {
+        //Indicate backpressure or not.
+        boolean b = m_adapter.hasBackPressure();
+        m_importContext.hasBackPressure(b);
+        if (b) {
             try {
-                int nanos = 500 * counter++;
-                Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
-                if (m_stopped) {
-                    return false;
-                }
-                //We have reached max timeout.
-                if (System.nanoTime() - start > ic.getBackpressureTimeout()) {
-                    return false;
-                }
-            } catch (InterruptedException ex) { }
+                Thread.sleep(100);
+            } catch (InterruptedException ex) {
+            }
         }
+
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
@@ -197,7 +214,8 @@ public class ImportHandler {
             try {
                 partition = getPartitionForProcedure(ppi.index, ppi.type, task);
             } catch (Exception e) {
-                m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
+                String fmt = "Can not invoke procedure %s from streaming interface %s partition not found.";
+                error(null, fmt, proc, ic.getName());
                 m_failedCount.incrementAndGet();
                 tcont.discard();
                 return false;
@@ -205,10 +223,7 @@ public class ImportHandler {
         }
 
         boolean success;
-        //Synchronize this to create good handles across all ImportHandlers
-        synchronized(ImportHandler.class) {
-            success = m_adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
-        }
+        success = m_adapter.createTransaction(m_importContext, proc, catProc, cb, task, tcont, partition, nowNanos);
         if (!success) {
             tcont.discard();
             m_failedCount.incrementAndGet();
@@ -216,6 +231,16 @@ public class ImportHandler {
             m_submitSuccessCount.incrementAndGet();
         }
         return success;
+    }
+
+    //Do rate limited logging for messages.
+    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
+                m_logger, level,
+                cause, format, args
+                );
     }
 
     /**
@@ -233,4 +258,49 @@ public class ImportHandler {
     public void error(String message) {
         m_logger.error(message);
     }
+
+    /**
+     * Log warn message
+     * @param message
+     */
+    public void warn(String message) {
+        m_logger.warn(message);
+    }
+
+    public boolean isDebugEnabled() {
+        return m_logger.isDebugEnabled();
+    }
+
+    public boolean isTraceEnabled() {
+        return m_logger.isTraceEnabled();
+    }
+
+    public boolean isInfoEnabled() {
+        return m_logger.isInfoEnabled();
+    }
+
+    /**
+     * Log debug message
+     * @param message
+     */
+    public void debug(String message) {
+        m_logger.debug(message);
+    }
+
+    /**
+     * Log error message
+     * @param message
+     */
+    public void error(String message, Throwable t) {
+        m_logger.error(message, t);
+    }
+
+    public void error(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.ERROR, t, format, args);
+    }
+
+    public void warn(Throwable t, String format, Object...args) {
+        rateLimitedLog(Level.WARN, t, format, args);
+    }
+
 }

@@ -41,11 +41,11 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
@@ -527,6 +527,9 @@ public abstract class CatalogSchemaTools {
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
+                if (db.getIsactiveactivedred()) {
+                    sb.append(String.format("SET %s=%s;\n", DatabaseConfiguration.DR_MODE_NAME, DatabaseConfiguration.ACTIVE_ACTIVE));
+                }
                 toSchema(sb, importLines);
 
                 for (Group grp : db.getGroups()) {

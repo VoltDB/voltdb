@@ -1385,14 +1385,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Split the original tree into the sub-trees having the same join type for all nodes
         List<JoinNode> subTrees = m_joinTree.extractSubTrees();
 
-        // For a sub-tree with inner joins only any join order is valid. The only requirement is that
-        // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order
+        // For a sub-tree with inner joins only, any join order is valid. The only requirement is that
+        // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order.
         // The outer joins are associative but changing the join order precedence
-        // includes moving ON clauses to preserve the initial SQL semantics. For example,
+        // includes moving ON clauses to preserve the initial SQL semantics.
+        // For example,
         // T1 right join T2 on T1.C1 = T2.C1 left join T3 on T2.C2=T3.C2 can be rewritten as
         // T1 right join (T2 left join T3 on T2.C2=T3.C2) on T1.C1 = T2.C1
-        // At the moment, such transformations are not supported. The specified joined order must
-        // match the SQL order
+        // At the moment, such transformations are not supported.
+        // The specified joined order must match the SQL order.
         int tableNameIdx = 0;
         List<JoinNode> finalSubTrees = new ArrayList<JoinNode>();
         // we need to process the sub-trees last one first because the top sub-tree is the first one on the list

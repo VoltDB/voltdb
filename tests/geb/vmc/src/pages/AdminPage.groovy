@@ -30,7 +30,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         mainservername			    {$("#serverListWrapperAdmin")}
 
         serverresumebuttonmain		{$(class:"shutdown", text:"Resume")}
-        serverstopbtndisable   		{$(class:"disableServer", text:"Stop") }
+        serverstopbtndisable   		{$(class:"disableServer").find(".stopDisable") }
         serverstopbtnenable			{$(class:"shutdown", text:"Stop")}
 
         serverstopbuttonmain		{$("#stopServer_voltdbserver", text:"Paused")}
@@ -196,6 +196,11 @@ class AdminPage extends VoltDBManagementCenterPage {
         deleteNo			{ $("#btnSaveConfigCancel", text:"No")}
         samestreamnameerrorpopup	{ $("#updateInnerErrorPopup")}
         samestreamnameerrorOk		{ $("#btnUpdateErrorOk", text:"Ok")}
+
+        //Admin Import
+        importbtn			{ $("#row-5 > td.configLabel > a", text:"Import")}
+        noimportconfigtxt			{ $("#importConfiguration > tr > td.configLabel")}
+
 
         // SECURITY POPUP
         securityPopup				{ $(class:"popup_content14") }

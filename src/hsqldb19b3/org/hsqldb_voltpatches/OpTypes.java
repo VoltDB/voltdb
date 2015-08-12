@@ -121,5 +121,8 @@ public interface OpTypes {
         USER_AGGREGATE       = 98,
         ARRAY_ACCESS         = 99,
         ARRAY_SUBQUERY       = 100
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        , APPROX_COUNT_DISTINCT = 110
+        // End VoltDB extension
     ;
 }

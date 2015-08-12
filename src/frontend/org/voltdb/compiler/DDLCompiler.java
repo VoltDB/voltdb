@@ -50,6 +50,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
@@ -57,6 +58,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -796,6 +798,36 @@ public class DDLCompiler {
             else {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "While configuring dr, table %s was not present in the catalog.", tableName));
+            }
+            return true;
+        }
+
+        statementMatcher = SQLParser.matchSetGlobalParam(statement);
+        if (statementMatcher.matches()) {
+            String name = statementMatcher.group(1).toUpperCase();
+            String value = statementMatcher.group(2).toUpperCase();
+            switch (name) {
+                case DatabaseConfiguration.DR_MODE_NAME:
+                    switch (value) {
+                        case DatabaseConfiguration.ACTIVE_ACTIVE: {
+                            db.setIsactiveactivedred(true);
+                        }
+                        break;
+                        case DatabaseConfiguration.ACTIVE_PASSIVE:
+                        case "DEFAULT": {
+                            db.setIsactiveactivedred(false);
+                        }
+                        break;
+                        default: {
+                            throw m_compiler.new VoltCompilerException(String.format(
+                                    "Invalid parameter value for %s. Candidate values are %s, %s/DEFAULT",
+                                    name, DatabaseConfiguration.ACTIVE_ACTIVE, DatabaseConfiguration.ACTIVE_PASSIVE));
+                        }
+                    }
+                    break;
+                default:
+                    throw m_compiler.new VoltCompilerException(String.format(
+                        "Unknown global parameter: %s. Candidate parameters are %s", name, DatabaseConfiguration.allNames));
             }
             return true;
         }
@@ -1639,7 +1671,7 @@ public class DDLCompiler {
 
         // Check all the subexpressions we gathered up.
         if (!AbstractExpression.areIndexableExpressions(checkExpressions, msgsb)) {
-            // The error message will be in the StringBuffer msg.
+            // The error message will be in the StringBuffer msgsb.
             throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
         String colList = node.attributes.get("columns");
@@ -1664,8 +1696,8 @@ public class DDLCompiler {
                 }
                 // disallow columns from VARBINARYs
                 if (colType == VoltType.VARBINARY) {
-                    String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
-                    throw this.m_compiler.new VoltCompilerException(msg);
+                    String emsg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         } else {
@@ -1677,8 +1709,8 @@ public class DDLCompiler {
                 }
                 // disallow expressions of type VARBINARY
                 if (colType == VoltType.VARBINARY) {
-                    String msg = "VARBINARY expressions are not currently supported as index keys.";
-                    throw this.m_compiler.new VoltCompilerException(msg);
+                    String emsg = "VARBINARY expressions are not currently supported as index keys.";
+                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         }
@@ -1779,10 +1811,10 @@ public class DDLCompiler {
             }
         }
 
-        String msg = "Created index: " + name + " on table: " +
+        String smsg = "Created index: " + name + " on table: " +
                    table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
 
-        m_compiler.addInfo(msg);
+        m_compiler.addInfo(smsg);
 
         indexMap.put(name, index);
     }
@@ -2092,21 +2124,6 @@ public class DDLCompiler {
                     minMaxAggs.add(aggExpr);
                 }
             }
-            AbstractExpression singleUniqueMinMaxAggExpr = null;
-            /*
-             * ENG-6511: If we only have one distinct min/max aggCol/aggExpr, we can try to
-             * find an index that was built on both the group-by columns and the min/max
-             * aggCol/aggExpr to achieve better performance.
-             */
-            if (hasMinOrMaxAgg) {
-                singleUniqueMinMaxAggExpr = minMaxAggs.get(0);
-                for (int i=1; i<minMaxAggs.size(); ++i) {
-                    if ( ! minMaxAggs.get(i).equals(singleUniqueMinMaxAggExpr)) {
-                        singleUniqueMinMaxAggExpr = null;
-                        break;
-                    }
-                }
-            }
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {
@@ -2121,19 +2138,23 @@ public class DDLCompiler {
             }
 
             if (hasMinOrMaxAgg) {
-                // ENG-6511: If we have only one distinct min/max aggCol/aggExpr, we will pass it into
-                // findBestMatchIndexForMatviewMinOrMax() to see if a better index can be found.
-                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, singleUniqueMinMaxAggExpr);
-                if (found != null) {
-                    matviewinfo.setIndexforminmax(found.getTypeName());
-                } else {
-                    matviewinfo.setIndexforminmax("");
-                    m_compiler.addWarn("No index found to support min() / max() UPDATE and DELETE on Materialized View " +
+                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+                boolean needsWarning = false;
+                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                    IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                    if (found != null) {
+                        refFound.setName(found.getTypeName());
+                    } else {
+                        refFound.setName("");
+                        needsWarning = true;
+                    }
+                }
+                if (needsWarning) {
+                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
                             matviewinfo.getTypeName() +
                             ", and a sequential scan might be issued when current min / max value is updated / deleted.");
                 }
-            } else {
-                matviewinfo.setIndexforminmax("");
             }
 
             // parse out the aggregation columns into the dest table
@@ -2170,7 +2191,7 @@ public class DDLCompiler {
     //   -- (ENG-6511) indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
     // This function is mostly re-written for the fix of ENG-6511. --yzhang
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
-            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression singleUniqueMinMaxAggExpr)
+            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression minMaxAggExpr)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
         StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
@@ -2182,9 +2203,9 @@ public class DDLCompiler {
         for (Index index : allIndexes) {
             // indexOptimalForMinMax == true if the index covered both the group-by columns and the min/max aggExpr.
             boolean indexOptimalForMinMax = false;
-            // If singleUniqueMinMaxAggExpr is not null, the diff can be zero or one.
+            // If minMaxAggExpr is not null, the diff can be zero or one.
             // Otherwise, for a usable index, its number of columns must agree with that of the group-by columns.
-            final int diffAllowance = singleUniqueMinMaxAggExpr == null ? 0 : 1;
+            final int diffAllowance = minMaxAggExpr == null ? 0 : 1;
 
             // Get all indexed exprs if there is any.
             String expressionjson = index.getExpressionsjson();
@@ -2214,7 +2235,7 @@ public class DDLCompiler {
                     List<ColumnRef> indexedColRefs =
                         CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
                     // The number of columns in index can never be less than that in the group-by column list.
-                    // If singleUniqueMinMaxAggExpr == null, they must be equal (diffAllowance == 0)
+                    // If minMaxAggExpr == null, they must be equal (diffAllowance == 0)
                     // Otherwise they may be equal (sub-optimal) or
                     // indexedColRefs.size() == groupbyColRefs.size() + 1 (optimal, diffAllowance == 1)
                     if (isInvalidIndexCandidate(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
@@ -2225,7 +2246,7 @@ public class DDLCompiler {
                         continue;
                     }
                     if (isValidIndexCandidateForMinMax(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
-                        if(! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
                             continue;
                         }
                         indexOptimalForMinMax = true;
@@ -2247,7 +2268,7 @@ public class DDLCompiler {
                         continue;
                     }
                     if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
-                        if(! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, null, indexedExprs, null)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                             continue;
                         }
                         indexOptimalForMinMax = true;
@@ -2271,7 +2292,7 @@ public class DDLCompiler {
                 }
 
                 if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
-                    if (! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, null, indexedExprs, null)) {
+                    if (! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                         continue;
                     }
                     indexOptimalForMinMax = true;
@@ -2372,18 +2393,18 @@ public class DDLCompiler {
     }
 
     private static boolean isIndexOptimalForMinMax(
-            MatViewIndexMatchingGroupby matchingCase, AbstractExpression singleUniqueMinMaxAggExpr,
+            MatViewIndexMatchingGroupby matchingCase, AbstractExpression minMaxAggExpr,
             List<ColumnRef> indexedColRefs, List<AbstractExpression> indexedExprs,
             List<Column> srcColumnArray) {
-        // We have singleUniqueMinMaxAggExpr and the index also has one extra column
+        // We have minMaxAggExpr and the index also has one extra column
         switch(matchingCase) {
         case GB_COL_IDX_COL:
-            if ( ! (singleUniqueMinMaxAggExpr instanceof TupleValueExpression) ) {
+            if ( ! (minMaxAggExpr instanceof TupleValueExpression) ) {
                 // Here because the index columns are all simple columns (indexedExprs == null)
-                // so the singleUniqueMinMaxAggExpr must be TupleValueExpression.
+                // so the minMaxAggExpr must be TupleValueExpression.
                 return false;
             }
-            int aggSrcColIdx = ((TupleValueExpression)singleUniqueMinMaxAggExpr).getColumnIndex();
+            int aggSrcColIdx = ((TupleValueExpression)minMaxAggExpr).getColumnIndex();
             Column aggSrcCol = srcColumnArray.get(aggSrcColIdx);
             Column lastIndexCol = indexedColRefs.get(indexedColRefs.size() - 1).getColumn();
             // Compare the two columns, if they are equal as well, then this is the optimal index! Congrats!
@@ -2393,7 +2414,7 @@ public class DDLCompiler {
             break;
         case GB_COL_IDX_EXP:
         case GB_EXP_IDX_EXP:
-            if (indexedExprs.get(indexedExprs.size()-1).equals(singleUniqueMinMaxAggExpr)) {
+            if (indexedExprs.get(indexedExprs.size()-1).equals(minMaxAggExpr)) {
                 return true;
             }
             break;
@@ -2495,13 +2516,21 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
+        // Check some other materialized view specific things.
+        if (stmt.hasSubquery()) {
+            msgsb.append("with subquery sources is not supported.");
+            throw m_compiler.new VoltCompilerException(msgsb.toString());
+        }
+
         List <AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
 
         int i;
+        // First, check the group by columns.  They are at
+        // the beginning of the display list.
         for (i = 0; i < groupColCount; i++) {
             ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
-
+            // The columns must be equal.
             if (!outcol.expression.equals(gbcol.expression)) {
                 msgsb.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
                 throw m_compiler.new VoltCompilerException(msgsb.toString());
@@ -2511,15 +2540,22 @@ public class DDLCompiler {
             // then check it all.
             checkExpressions.add(outcol.expression);
         }
-
+        // Now, the display list must have a count(*).
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
-            msgsb.append("is missing count(*) as the column after the group by columns, a materialized view requirement.");
+            msgsb.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
             throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
 
+        // Finally, the display columns must have aggregate
+        // calls.  But these are not any aggregate calls. They
+        // must be count(), min(), max() or sum().
         for (i++; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
+            // Note that this expression does not catch all aggregates.
+            // An instance of count(*) here, or avg() would cause the
+            // exception.  We just required count(*) above, but a
+            // second one would fail.
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
@@ -2527,7 +2563,14 @@ public class DDLCompiler {
                 msgsb.append("must have non-group by columns aggregated by sum, count, min or max.");
                 throw m_compiler.new VoltCompilerException(msgsb.toString());
             }
-            checkExpressions.add(outcol.expression.getLeft());
+            // Don't push the expression, though.  Push the argument.
+            // We will check for aggregate calls and fail, and we don't
+            // want to fail on legal aggregate expressions.
+            if (outcol.expression.getLeft() != null) {
+                checkExpressions.add(outcol.expression.getLeft());
+            }
+            assert(outcol.expression.getRight() == null);
+            assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
 
         AbstractExpression where = stmt.getSingleTableFilterExpression();
@@ -2537,10 +2580,11 @@ public class DDLCompiler {
 
         // Check all the subexpressions we gathered up.
         if (!AbstractExpression.areIndexableExpressions(checkExpressions, msgsb)) {
-            // The error message will be in the StringBuffer msg.
+            // The error message will be in the StringBuffer msgsb.
             throw m_compiler.new VoltCompilerException(msgsb.toString());
         }
-     }
+
+    }
 
     void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
             Column destColumn, ExpressionType type, TupleValueExpression colExpr)

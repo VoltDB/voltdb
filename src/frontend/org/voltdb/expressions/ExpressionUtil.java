@@ -409,12 +409,13 @@ public abstract class ExpressionUtil {
      * @return true is expression contains an aggregate subexpression
      */
     public static boolean containsAggregateExpression(AbstractExpression expr) {
-        return expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_AVG) ||
-                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_COUNT) ||
-                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_COUNT_STAR) ||
-                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_MAX) ||
-                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_MIN) ||
-                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_SUM);
+        AbstractExpression.SubexprFinderPredicate pred = new AbstractExpression.SubexprFinderPredicate() {
+            @Override
+            public boolean matches(AbstractExpression expr) {
+                return expr.getExpressionType().isAggregateExpression();
+            }
+        };
+        return expr.hasAnySubexpressionWithPredicate(pred);
     }
 
     private static boolean containsMatchingTVE(AbstractExpression expr, String tableAlias) {

@@ -17,12 +17,13 @@
 
 package org.voltdb;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.utils.Pair;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 
 // Interface through which the outside world can interact with the consumer side
@@ -38,9 +39,9 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void shutdown(boolean blocking) throws InterruptedException;
 
-    public abstract void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId);
+    public abstract void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId);
 
-    public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId);
+    public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId, long localUniqueId);
 
     /**
      * Should only be called before initialization. Populate all previously seen
@@ -55,8 +56,6 @@ public interface ConsumerDRGateway extends Promotable {
     public abstract Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds();
 
     public static class DummyConsumerDRGateway implements ConsumerDRGateway {
-        Map<Integer, Map<Integer, Pair<Long, Long>>> ids = new HashMap<Integer, Map<Integer, Pair<Long, Long>>>();
-
         @Override
         public void initialize(boolean resumeReplication) {}
 
@@ -74,27 +73,18 @@ public interface ConsumerDRGateway extends Promotable {
         public void shutdown(boolean blocking) {}
 
         @Override
-        public void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId) {}
+        public void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId) {}
 
         @Override
-        public void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId) {
-            int dataCenter = (int)(endDRId >> 55);
-            if (!ids.containsKey(dataCenter)) {
-                ids.put(dataCenter, new HashMap<Integer, Pair<Long, Long>>());
-            }
-            ids.get(dataCenter).put(partitionId, Pair.of(endDRId, endUniqueId));
-        };
+        public void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId, long localUniqueId) {}
 
         @Override
         public void assertSequencing(int partitionId, long drId) {}
 
         @Override
-        public Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds() { return ids; }
+        public Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds() { return ImmutableMap.of(); }
 
         @Override
-        public void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, Pair<Long, Long>>> lastAppliedIds) {
-            ids.clear();
-            ids.putAll(lastAppliedIds);
-        }
+        public void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, Pair<Long, Long>>> lastAppliedIds) {}
     }
 }

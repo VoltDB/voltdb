@@ -33,10 +33,15 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     private final BulkLoaderErrorHandler m_errHandler;
     private final AtomicLong m_failedInsertCount = new AtomicLong(0);
 
+    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
+            BulkLoaderErrorHandler errHandler) throws Exception    {
+        m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback());
+        m_errHandler = errHandler;
+    }
+
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
             BulkLoaderErrorHandler errHandler) throws Exception    {
-        m_loader = client.getNewBulkLoader(tableName, batchSize, new CsvFailureCallback());
-        m_errHandler = errHandler;
+        this(client, tableName, batchSize, false, errHandler);
     }
 
     @Override

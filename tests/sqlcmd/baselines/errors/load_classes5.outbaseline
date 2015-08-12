@@ -1,0 +1,2 @@
+
+LOAD CLASSES sqlcmdtest-procs.jar foo.jar;

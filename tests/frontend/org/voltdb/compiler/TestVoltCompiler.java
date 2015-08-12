@@ -381,6 +381,48 @@ public class TestVoltCompiler extends TestCase {
         return compiler.m_errors;
     }
 
+    public void testPartitionProcedureWarningMessage() throws IOException {
+        String ddl = "CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, NUM INTEGER, PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
+                "create procedure myTestProc as select num from PKEY_BIGINT where pkey = ? order by 1;";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+
+        String expectedWarning =
+                "This procedure myTestProc would benefit from being partitioned, by adding a "
+                + "'PARTITION ON TABLE PKEY_BIGINT COLUMN ON PKEY PARAMETER 0' clause to the "
+                + "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
+
+        boolean findMatched = false;
+        for (Feedback fb : compiler.m_warnings) {
+            System.out.println(fb.getStandardFeedbackLine());
+            if (fb.getStandardFeedbackLine().contains(expectedWarning)) {
+                findMatched = true;
+                break;
+            }
+        }
+        assertTrue(findMatched);
+    }
+
     public void testSnapshotSettings() throws IOException {
         String schemaPath = "";
         try {
@@ -2062,6 +2104,23 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
+    public void testDDLCompilerCreateAndDropIndexesOnMatView()
+    {
+        String ddl = "";
+
+        ddl = "create table foo(a integer, b float, c float);\n" +
+              "create view bar (a, b, total) as select a, b, count(*) as total from foo group by a, b;\n" +
+              "create index baridx on bar (a);\n" +
+              "drop index baridx;\n";
+        checkDDLErrorMessage(ddl, null);
+
+        ddl = "create table foo(a integer, b float);\n" +
+              "create view bar (a, total) as select a, count(*) as total from foo group by a;\n" +
+              "create index baridx on bar (a, total);\n" +
+              "drop index baridx;\n";
+        checkDDLErrorMessage(ddl, null);
+    }
+
     public void testColumnNameIndexHash()
     {
         List<Pair<String, IndexType>> passing
@@ -2456,6 +2515,12 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer not null);\n" +
                 "create view my_view as select num, count(*) from t group by num;" +
                 "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        // approx_count_distinct is not a supported aggregate function for materialized views.
+        errorMsg = "Materialized view \"MY_VIEW\" must have non-group by columns aggregated by sum, count, min or max.";
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "create view my_view as select id, count(*), approx_count_distinct(num) from t group by id;";
         checkDDLErrorMessage(ddl, errorMsg);
     }
 
@@ -4025,10 +4090,12 @@ public class TestVoltCompiler extends TestCase {
         // Scalar subquery not allowed in indices.
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
                                     "create index bidx on books ( select title from books as child where child.cash = books.cash );");
-        checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal",
-                                    "create index bidx1 on books ( ( select title from books as child where child.cash = books.cash ) ) ;");
-        checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal",
-                                    "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );");
+        // checkDDLAgainstScalarSubquerySchema("Index \"BIDX1\" with subquery sources is not supported.", //hsql232 ENG-8845 bad error message for use of subquery in index expression
+        checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal", /*workaround hsql232 ENG-8845 */
+                                    "create index bidx1 on books ( ( select title from books as child where child.cash < books.cash ) );");
+        // checkDDLAgainstScalarSubquerySchema("Index \"BIDX2\" with subquery sources is not supported.", //hsql232 ENG-8845 bad error message for use of subquery in index expression
+        checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal", /*workaround hsql232 ENG-8845 */
+                                    "create index bidx2 on books ( cash + ( select cash from books as child where child.cash = books.cash ) ) ;");
         // Scalar subquery not allowed in materialize views.
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
@@ -4045,21 +4112,35 @@ public class TestVoltCompiler extends TestCase {
     }
 
     /*
+     * When ENG-8727 is addressed, reenable this test.
+     */
+    public void notest8727SubqueriesInViewDisplayLists() throws Exception {
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+                                    "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
+    }
+
+    /*
      * When ENG8291 is fixed, this test should be renamed without the ticket number.
      */
     public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
         checkDDLAgainstScalarSubquerySchema("SQL Aggregate with subquery expression is not allowed.",
-                                            "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
+                "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
         checkDDLAgainstScalarSubquerySchema("SQL Aggregate with subquery expression is not allowed.",
-                                    "create view tview as select cash, count(*), max(( select cash from books as child where books.cash = child.cash )) from books group by cash;\n");
+                "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
     }
 
     public void test8290UnboundIdentifiersNotCaughtEarlyEnough() throws Exception {
         // The name parent is not defined here.  This is an
         // HSQL bug somehow.
-        checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal",
+        //hsql232 ENG-8845 bad error message for use of subquery in index expression
+        // These cases used to give an "Object not found: PARENT" error, which was
+        // SLIGHTLY LESS of a red herring since it pointed to an actual error in
+        // a subquery in a context that does not allow even allow valid subqueries.
+        // checkDDLAgainstScalarSubquerySchema("Object not found: PARENT", //hsql232 ENG-8845 bad error message for use of subquery in index expression
+        checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal", //workaround hsql232 ENG-8845 bad error message for use of subquery in index expression
                                     "create index bidx1 on books ( ( select title from books as child where child.cash = parent.cash ) ) ;");
-        checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal",
+        // checkDDLAgainstScalarSubquerySchema("Object not found: PARENT", //hsql232 ENG-8845 bad error message for use of subquery in index expression
+        checkDDLAgainstScalarSubquerySchema("data type cast needed for parameter or null literal", //workaround hsql232 ENG-8845 bad error message for use of subquery in index expression
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < parent.title ) );");
     }
 
@@ -4068,7 +4149,7 @@ public class TestVoltCompiler extends TestCase {
         // Test for time sensitive queries.
         checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
                                     ddl,
-                                    "create index faulty on alpha(id, NOW());");
+                                    "create index faulty on alpha(id, NOW);");
         checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
                                    ddl,
                                    "create index faulty on alpha(id, CURRENT_TIMESTAMP);");

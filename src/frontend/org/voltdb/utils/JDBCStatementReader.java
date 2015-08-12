@@ -309,7 +309,7 @@ class JDBCStatementReader extends SusceptibleRunnable {
 
             @Override
             public boolean apply(TypeToken<?> input) {
-                return input.isAssignableFrom(m_from);
+                return input.isSupertypeOf(m_from);
             }
         }
 
