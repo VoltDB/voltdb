@@ -1820,6 +1820,11 @@ void VoltDBEngine::reportProgressToTopend() {
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {
     assert(m_tuplesModifiedStack.size() > 0);
+    if (m_tuplesModifiedStack.size() == 0) {
+        // Usually because we are internally executing some plan fragments.
+        // In that case we just ignore this **tuple modified** thing.
+        return;
+    }
     m_tuplesModifiedStack.top() += amount;
 }
 

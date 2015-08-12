@@ -73,8 +73,13 @@ public:
     std::vector< boost::shared_ptr<ExecutorVector> > getFallbackExecutorVectors() {
         return m_fallbackExecutorVectors;
     }
+    // Returns the build up executor vectors
+    std::vector< boost::shared_ptr<ExecutorVector> > getBuildUpExecutorVectors() {
+        return m_buildUpExecutorVectors;
+    }
 
     void setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
+    void setBuildUpExecutorVector(const catalog::CatalogMap<catalog::Statement> &buildUpQueryStmts);
 
     // See if the index is just built on group by columns or it also includes min/max agg (ENG-6511)
     bool minMaxIndexIncludesAggCol(TableIndex * index)
@@ -136,6 +141,8 @@ private:
     // Executor vectors to be executed when fallback on min/max value is needed (ENG-8641).
     std::vector< boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
     std::vector< bool > m_usePlanForAgg;
+    // Executor vector used to build up the view from pre-existing rows.
+    std::vector< boost::shared_ptr<ExecutorVector> > m_buildUpExecutorVectors;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
