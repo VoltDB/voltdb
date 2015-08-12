@@ -537,6 +537,16 @@ public abstract class CatalogUtil {
         return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
+    public static String compileDeploymentString(Catalog catalog, String deploymentString,
+                     boolean isPlaceHolderCatalog)
+    {
+        DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
+        if (deployment == null) {
+            return "Error parsing deployment string";
+        }
+        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
+    }
+
     /**
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
@@ -1198,11 +1208,19 @@ public abstract class CatalogUtil {
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
      */
     private static void setExportInfo(Catalog catalog, ExportType exportType) {
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        if (db.getIsactiveactivedred()) {
+            // add default export configuration to DR conflict table
+            exportType = addExportConfigToDRConflictsTable(catalog, exportType);
+        }
+
         if (exportType == null) {
             return;
         }
         List<String> streamList = new ArrayList<String>();
         boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
+
+
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
@@ -1224,7 +1242,6 @@ public abstract class CatalogUtil {
             }
             boolean defaultConnector = streamName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
-            Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(streamName);
             if (catconn == null) {
@@ -2143,11 +2160,11 @@ public abstract class CatalogUtil {
      * @param catalog  current catalog
      * @param export   list of export configuration
      */
-    public static void addExportConfigToDRConflictsTable(Catalog catalog, ExportType export) {
-        boolean userDefineStream = false;
+    public static ExportType addExportConfigToDRConflictsTable(Catalog catalog, ExportType export) {
         if (export == null) {
             export = new ExportType();
         }
+        boolean userDefineStream = false;
         for (ExportConfigurationType exportConfiguration : export.getConfiguration()) {
             if (exportConfiguration.getStream().equals(DR_CONFLICTS_TABLE_EXPORT_GROUP)) {
                 userDefineStream = true;
@@ -2179,7 +2196,7 @@ public abstract class CatalogUtil {
             defaultConfiguration.getProperty().add(outdir);
 
             export.getConfiguration().add(defaultConfiguration);
-            setExportInfo(catalog, export);
         }
+        return export;
     }
 }

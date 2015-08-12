@@ -269,28 +269,43 @@ public class DDLCompiler {
         for (VoltXMLElement node : xmlRoot.children) {
             if (node.name.equals("table")
                     && node.attributes.containsKey("drTable") && node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
-                Table existingTable = null;
+                boolean tableAlreadyExist = false;
                 String drConflictExportTableName = CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + node.attributes.get("name");
                 // Does the conflict export table already existed?
                 if (previousDBIfAny != null) {
-                    existingTable = previousDBIfAny.getTables().get(drConflictExportTableName);
+                    tableAlreadyExist = previousDBIfAny.getTables().get(drConflictExportTableName) != null;
+                } else {
+                    for (VoltXMLElement element : xmlRoot.children) {
+                        if (element.name.equals("table")
+                                && element.attributes.containsKey("export")
+                                && element.attributes.get("name").equals(drConflictExportTableName)) {
+                            tableAlreadyExist = true;
+                        }
+                    }
                 }
-                if (existingTable == null && currentDB.getIsactiveactivedred() == true) {
+                if (!tableAlreadyExist && currentDB.getIsactiveactivedred() == true) {
                     // If the conflict export table doesn't existed yet, create a new one.
                     createConflictExportTableDDL(sb, node, drConflictExportTableName);
                 }
             }
         }
 
-        // Drop the dr conflicts table if corresponding dr table is not existed or A/A is disabled.
+        // Drop the dr conflicts table if corresponding dr table is not existed or A/A is disabled or dr is disabled.
         for (VoltXMLElement node : xmlRoot.children) {
             if (node.name.equals("table")
                     && node.attributes.get("name").startsWith(CatalogUtil.DR_CONFLICTS_TABLE_PREFIX)) {
                 String drTableName = node.attributes.get("name").replaceAll(CatalogUtil.DR_CONFLICTS_TABLE_PREFIX, "");
                 boolean remove = true;
                 for (VoltXMLElement element : xmlRoot.children) {
-                    if (element.name.equals("table") && element.attributes.get("name").equals(drTableName)) {
+                    if (element.name.equals("table")
+                            && element.attributes.containsKey("drTable")
+                            && element.attributes.get("name").equals(drTableName)) {
                         remove = false;
+                    }
+                    if (element.name.equals("table")
+                            && element.attributes.containsKey("drTable")
+                            && element.attributes.get("drTable").equalsIgnoreCase("DISABLE")) {
+                        remove =  true;
                     }
                 }
                 if (!currentDB.getIsactiveactivedred()) {
