@@ -600,7 +600,7 @@ public class SetFunction implements Serializable {
                     // this---e.g., positive and negative zero.
                     //
                     // Incompatible data types in operation
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42561);
                 }
             // End of VoltDB extension for APPROX_COUNT_DISTINCT
             default :

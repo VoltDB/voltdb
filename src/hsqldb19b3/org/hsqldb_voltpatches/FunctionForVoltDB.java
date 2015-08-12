@@ -462,18 +462,18 @@ public class FunctionForVoltDB extends FunctionSQL {
                             nodes[i].dataType = paramTypes[i];
                         }
                     } else if (paramTypes[i].isNumberType() && !nodes[i].dataType.isNumberType()) {
-                        throw Error.error(ErrorCode.X_42565);
+                        throw Error.error(ErrorCode.X_42561);
                     }
                     continue; // accept compatible argument types
                 }
-                throw Error.error(ErrorCode.X_42565); // incompatible data type
+                throw Error.error(ErrorCode.X_42561); // incompatible data type
             }
         }
 
         dataType = m_def.getDataType();
         if (dataType == null && nodes.length > 0) {
             if (parameterArg < 0 || parameterArg >= nodes.length) {
-                throw Error.error(ErrorCode.X_42565); // incompatible data type (so says the error -- we're missing one, actually)
+                throw Error.error(ErrorCode.X_42561); // incompatible data type (so says the error -- we're missing one, actually)
             }
             Expression like_child = nodes[parameterArg];
             if (like_child != null) {
