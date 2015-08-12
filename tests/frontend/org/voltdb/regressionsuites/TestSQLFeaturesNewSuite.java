@@ -245,8 +245,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // This mark two rows to be purged.
         client.callProcedure("@AdHoc",
-                //hsql232 ENG-8325 IN LIST:  "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1 WHERE WAGE IN (20, 40)");
-                "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1 WHERE WAGE = 20 OR WAGE = 40"); // workaround hsql232 ENG-8325 IN LIST
+                "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1 WHERE WAGE IN (20, 40)");
         client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 50, 100);
         vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{0, 30, 60}, {0, 50, 100}});
@@ -458,8 +457,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc",
                 "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX " +
                 "ADD LIMIT PARTITION ROWS 3 " +
-                //hsql232 ENG-8325 IN LIST:  "EXECUTE (DELETE FROM CAPPED3_LIMIT_EXEC_COMPLEX WHERE DEPT IN (4, 7))"
-                "EXECUTE (DELETE FROM CAPPED3_LIMIT_EXEC_COMPLEX WHERE DEPT = 4 OR DEPT = 7)"); //workaround hsql232 ENG-8325 IN LIST
+                "EXECUTE (DELETE FROM CAPPED3_LIMIT_EXEC_COMPLEX WHERE DEPT IN (4, 7))");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 8, 0, "important", 17000).getResults()[0];
@@ -793,8 +791,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         // Set the dept field to -32 as proof that we updated the row.
         validateTableOfScalarLongs(client,
                 "upsert into capped3_limit_rows_exec " +
-                //hsql232 ENG-8325 IN LIST: "select case when wage in (80, 90) then 0 else 1 end, wage, -32 from nocapped "
-                "select case when (wage = 80 or wage = 90) then 0 else 1 end, wage, -32 from nocapped " + // workaround hsql232 ENG-8325 IN LIST
+                "select case when wage in (80, 90) then 0 else 1 end, wage, -32 from nocapped " +
                 "where wage >= 80 " +
                 "order by id, wage, dept",
                 new long[] {8});

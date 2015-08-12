@@ -50,8 +50,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
     private static final boolean doAllTests    = false;
     // hsql232 ENG-8306
     private static final boolean HSQL232_ENG_8306_DONE = false;
-    // hsql232 ENG-8325
-    private static final boolean HSQL232_ENG_8325_DONE = false;
     // hsql232 ENG-8628
     private static final boolean HSQL232_ENG_8628_DONE = false;
     // hsql232 ENG-8633
@@ -1934,20 +1932,17 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
         if (!isHSQL()) {
-            if (doTest(HSQL232_ENG_8325_DONE)) {
-                sql =   "select ID from R1 " +
-                        "where WAGE NOT IN " +
-                        "      (select WAGE from R2 " +
-                        "       where ID IN (100, 102, 103));";
-                validateTableOfLongs(client, sql, EMPTY_TABLE);
-            }
-            if (doTest(HSQL232_ENG_8325_DONE)) {
-                sql =   "select ID from R1 " +
-                        "where NOT WAGE IN " +
-                        "          (select WAGE from R2 " +
-                        "           where ID IN (100, 102, 103));";
-                validateTableOfLongs(client, sql, EMPTY_TABLE);
-            }
+            sql =   "select ID from R1 " +
+                    "where WAGE NOT IN " +
+                    "      (select WAGE from R2 " +
+                    "       where ID IN (100, 102, 103));";
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
+
+            sql =   "select ID from R1 " +
+                    "where NOT WAGE IN " +
+                    "          (select WAGE from R2 " +
+                    "           where ID IN (100, 102, 103));";
+            validateTableOfLongs(client, sql, EMPTY_TABLE);
         }
     }
 
@@ -2122,35 +2117,34 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       where ID > 107);";
         validateTableOfLongs(client, sql, new long[][] {{100}});
 
-        if (doTest(HSQL232_ENG_8325_DONE)) {
-            // The inner set consists only of NULLs
-            sql =   "select ID from R1 " +
-                    "where WAGE = ALL " +
-                    "      (select WAGE from R2 " +
-                    "       where ID in (100, 101));";
-            validateTableOfLongs(client, sql, EMPTY_TABLE);
+        // The inner set consists only of NULLs
+        sql =   "select ID from R1 " +
+                "where WAGE = ALL " +
+                "      (select WAGE from R2 " +
+                "       where ID in (100, 101));";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-            sql =   "select ID from R1 " +
-                    "where (WAGE = ALL " +
-                    "       (select WAGE from R2 " +
-                    "        where ID in (100, 101))) " +
-                    "      IS NULL;";
-            validateTableOfLongs(client, sql, new long[][] {{100}});
+        sql =   "select ID from R1 " +
+                "where (WAGE = ALL " +
+                "       (select WAGE from R2 " +
+                "        where ID in (100, 101))) " +
+                "      IS NULL;";
+        validateTableOfLongs(client, sql, new long[][] {{100}});
 
-            // If inner_expr contains NULL and outer_expr OP inner_expr is TRUE
-            // for all other inner values
-            sql =   "select ID from R1 " +
-                    "where WAGE = ALL " +
-                    "      (select WAGE from R2 " +
-                    "       where ID in (100, 104, 105));";
-            validateTableOfLongs(client, sql, EMPTY_TABLE);
+        // If inner_expr contains NULL and outer_expr OP inner_expr is TRUE
+        // for all other inner values
+        sql =   "select ID from R1 " +
+                "where WAGE = ALL " +
+                "      (select WAGE from R2 " +
+                "       where ID in (100, 104, 105));";
+        validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-            sql =   "select ID from R1 " +
-                    "where (WAGE = ALL " +
-                    "       (select WAGE from R2 where ID in (100, 104, 105))) " +
-                    "      IS NULL;";
-            validateTableOfLongs(client, sql, new long[][] {{100}});
-        }
+        sql =   "select ID from R1 " +
+                "where (WAGE = ALL " +
+                "       (select WAGE from R2 where ID in (100, 104, 105))) " +
+                "      IS NULL;";
+        validateTableOfLongs(client, sql, new long[][] {{100}});
+
         // If inner_expr contains NULL and
         // outer_expr OP inner_expr is FALSE for some other inner values,
         // the result is FALSE
@@ -2862,13 +2856,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
-        if (doTest(HSQL232_ENG_8325_DONE)) {
-            // R1 2, 10, 1 = R2 4, 10, 1 and 5, 10, 1
-            sql =   "select R1.ID from R1 " +
-                    "where (R1.WAGE, R1.DEPT) = ALL " +
-                    "      (select WAGE, DEPT from R2 where ID in (4,5));";
-            validateTableOfLongs(client, sql, new long[][] {{2}});
-        }
+        // R1 2, 10, 1 = R2 4, 10, 1 and 5, 10, 1
+        sql =   "select R1.ID from R1 " +
+                "where (R1.WAGE, R1.DEPT) = ALL " +
+                "      (select WAGE, DEPT from R2 where ID in (4,5));";
+        validateTableOfLongs(client, sql, new long[][] {{2}});
 
         sql =   "select R1.ID from R1 " +
                 "where (R1.WAGE, R1.DEPT) = ALL " +
@@ -2974,15 +2966,13 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) from r1)", new long[] {300});
         validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) - 30 from r1) + 30", new long[] {300});
 
-        if (doTest(HSQL232_ENG_8325_DONE)) {
-            // The IN operator takes a VectorExpression on its RHS, which uses the "args" field.
-            // Make sure that we can handle subqueries in there too.
-            validateTableOfScalarLongs(client,
-                    "select wage from r1 " +
-                    "where wage in (7, 8, (select max(wage) from r1), 9, 10, 200) " +
-                    "order by wage",
-                    new long[] {200, 300});
-        }
+        // The IN operator takes a VectorExpression on its RHS, which uses the "args" field.
+        // Make sure that we can handle subqueries in there too.
+        validateTableOfScalarLongs(client,
+                "select wage from r1 " +
+                        "where wage in (7, 8, (select max(wage) from r1), 9, 10, 200) " +
+                        "order by wage",
+                        new long[] {200, 300});
     }
 
     public void testExistsSimplification() throws Exception

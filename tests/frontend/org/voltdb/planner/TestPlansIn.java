@@ -31,7 +31,6 @@ public class TestPlansIn extends PlannerTestCase {
 
     public void testIn()
     {
-        /* not yet hsql232: ENG-8325, IN list
         compile("select * from new_order where no_w_id in ?;");
         compile("select * from new_order where no_w_id in (5,7);");
         compile("select * from new_order where no_w_id in (?);");
@@ -41,7 +40,6 @@ public class TestPlansIn extends PlannerTestCase {
         compile("select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);");
         compile("select * from new_order where no_w_id in (abs(-1), ?, 17761776);");
         compile("select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
-         */
     }
 
     public void testNonSupportedIn() {

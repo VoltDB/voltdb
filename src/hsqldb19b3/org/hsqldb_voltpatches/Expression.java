@@ -2207,6 +2207,7 @@ public class Expression implements Cloneable {
         prototypes.put(OpTypes.TABLE_SUBQUERY,new VoltXMLElement("tablesubquery").withValue("subquerytype", "table"));
         prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
         prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table"));
+        prototypes.put(OpTypes.VALUELIST,     new VoltXMLElement("table"));
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
         prototypes.put(OpTypes.SQL_FUNCTION,  new VoltXMLElement("function"));
         prototypes.put(OpTypes.ROUTINE_FUNCTION, null); // not used

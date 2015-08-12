@@ -1875,7 +1875,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // Note: the following tests for IN with parameters should at some point
     // be moved into their own suite along with existing tests for IN
     // that now live in TestIndexesSuite.  This is ENG-7607.
-    /* hsql232 not yet supporting IN LISTS ENG-8325
     public void testInWithIntParams() throws Exception {
 
         // HSQL does not support WHERE f IN ?
@@ -2090,7 +2089,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertTrue(callback.getClientResponse().getStatusString().contains(
                 "Array / Scalar parameter mismatch"));
     }
-    // hsql232 not yet supporting IN LISTS */
 
     public void testENG7724() throws Exception {
         Client client = getClient();

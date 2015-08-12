@@ -76,14 +76,12 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "Subquery expressions are only supported in SELECT statements");
          */
 
-        /* hsql232: ENG-8325, use of IN list
         failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)",
                 "Subquery expressions are only supported in SELECT statements");
 
         failToCompile("SELECT * FROM R1 WHERE A IN (32, 33) "
                 + "UNION SELECT * FROM R1 WHERE A = (SELECT MAX(A) FROM R1)",
                 "Subquery expressions are only supported in SELECT statements");
-         */
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {

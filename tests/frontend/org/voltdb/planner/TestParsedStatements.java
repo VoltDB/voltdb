@@ -122,7 +122,6 @@ public class TestParsedStatements extends TestCase {
     }
 
     public void testParsedInStatements() {
-        /* not yet hsql232: ENG-8325: IN list
         runSQLTest("1", "select * from new_order where no_w_id in (5,7);");
         runSQLTest("2", "select * from new_order where no_w_id in (?);");
         runSQLTest("3", "select * from new_order where no_w_id in (?,5,3,?);");
@@ -131,6 +130,5 @@ public class TestParsedStatements extends TestCase {
         runSQLTest("6", "select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);");
         runSQLTest("7", "select * from new_order where no_w_id in (abs(-1), ?, 17761776);");
         runSQLTest("8", "select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
-        */
     }
 }

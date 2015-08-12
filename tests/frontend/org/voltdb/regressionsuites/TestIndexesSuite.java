@@ -52,7 +52,7 @@ public class TestIndexesSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class,
         CheckMultiMultiIntGTEFailure.class,
-        // hsql232 ENG-8325 in lists. CompiledInLists.class
+        CompiledInLists.class
         };
 
     // Index stuff to test:
@@ -353,7 +353,7 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals( ((Double)expected[4]).doubleValue(), vt.getDouble(4), 0.001);
     }
 
-    public void notestInList() // hsql232 ENG-8325 runs no tests yet with IN LISTs
+    public void testInList()
             throws IOException, ProcCallException
     {
         String[] tables = {"P3", "R3"};
@@ -407,19 +407,15 @@ public class TestIndexesSuite extends RegressionSuite {
         } catch (IllegalStateException not_one) {
             fail("IN LIST test query rerurned wrong number of rows: " + not_one);
         }
-//// TODO: enable and investigate:
-// queries like this were causing column index resolution errors.
-// @AdHoc (vs. just @Explain) may be required to repro?
-//        query = "select * from R3, P3 where R3.NUM2 = P3.NUM2 " +
-//            " and R3.NUM IN (200, 300)" +
-//            " and P3.NUM IN (200, 300)" +
-//            "";
-//        /* enable to debug */ dumpQueryPlans(client, query);
-//
-        query = "select * from R3, P3 where R3.NUM2 = P3.NUM2 " +
-            " and P3.NUM IN (200, 300)" +
-            "";
-        /* enable to debug */ dumpQueryPlans(client, query);
+        //// TODO: enable and investigate:
+        // queries like this were causing column index resolution errors.
+        // @AdHoc (vs. just @Explain) may be required to repro?
+        //        query = "select * from R3, P3 where R3.NUM2 = P3.NUM2 " +
+        //            " and R3.NUM IN (200, 300)" +
+        //            " and P3.NUM IN (200, 300)" +
+        //            "";
+        //        /* enable to debug */ dumpQueryPlans(client, query);
+
         // TODO: strengthen this test -- which currently weakly validates
         // only that the statement can be planned --
         // with actual query execution and result checking
@@ -1177,7 +1173,6 @@ public class TestIndexesSuite extends RegressionSuite {
                                  "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)");
         project.addStmtProcedure("InsertR1IX", "insert into R1IX values (?, ?, ?, ?);");
 
-        /* hsql232 ENG-8325 choking on IN LISTS
         project.addStmtProcedure("InlinedInListP3with5DESCs",
                                  "select * from P3 T where T.DESC IN (?, ?, ?, ?, ?)" +
                                  " and T.NUM IN (100, 200, 300, 400, 500)");
@@ -1208,7 +1203,6 @@ public class TestIndexesSuite extends RegressionSuite {
                                  "'this here is a longish string to force a permanent object allocation'" +
                                  ")" +
                                  " and T.NUM IN ?");
-        // hsql232 */
 
         //project.addStmtProcedure("InlinedUpdateInListP3with5NUMs",
         //        "update P3 set NUM = 0 where DESC IN ('a', 'b', 'c', 'g', " +

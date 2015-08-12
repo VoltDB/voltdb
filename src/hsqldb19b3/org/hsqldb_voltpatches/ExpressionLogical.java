@@ -1178,9 +1178,11 @@ public class ExpressionLogical extends Expression {
                     nodes[RIGHT].nodeDataTypes[0] == null) {
                 if (type.isIntegralType()) {
                     // promote parameter type to vector of BIGINT regardless of exact LHS integer scale.
+                    nodes[RIGHT].dataType = Type.SQL_BIGINT;
                     nodes[RIGHT].nodeDataTypes[0] = Type.SQL_BIGINT;
                 }
                 else {
+                    nodes[RIGHT].dataType = type;
                     nodes[RIGHT].nodeDataTypes[0] = type;
                 }
             }
