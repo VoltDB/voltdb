@@ -31,12 +31,10 @@ import datetime
 from sys import maxint
 from voltdbclient import * # for VoltDB types
 from optparse import OptionParser # for use in standalone test mode
-# May need these for debug print of non-ascii characters:
-#import codecs
-#import sys
-##from sys import stdout
-#UTF8Writer = codecs.getwriter('utf8')
-#sys.stdout = UTF8Writer(sys.stdout)
+# Need these to print non-ascii characters:
+import codecs
+UTF8Writer = codecs.getwriter('utf8')
+sys.stdout = UTF8Writer(sys.stdout)
 
 COUNT = 2                       # number of random values to generate by default
 ALLOW_SELF_JOIN = True
@@ -168,11 +166,9 @@ class StringValueGenerator:
     @staticmethod
     def set_ascii_only(ascii_only):
         StringValueGenerator.__ascii_only = ascii_only
-        print "set_ascii_only; __ascii_only set to: " + str(StringValueGenerator.__ascii_only)
 
     @staticmethod
     def get_alphabet():
-        print "get_alphabet; __ascii_only is: " + str(StringValueGenerator.__ascii_only)
         if StringValueGenerator.__ascii_only:
             return StringValueGenerator.ALPHABET
         else:
