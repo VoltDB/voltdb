@@ -49,6 +49,7 @@
 {_cmp |= "<="}
 {_cmp |= ">="}
 {_cmp |= "!="} -- Apparently, an HSQL-supported alias for the standard <>
+{_cmp |= "IS DISTINCT FROM"}
 
 {_jointype |= " "}
 {_jointype |= " INNER "}
