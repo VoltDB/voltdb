@@ -211,7 +211,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
         return 0
 
 def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only,
-    subversion_generation, submit_verbosely, args, testConfigKit):
+    subversion_generation, submit_verbosely, ascii_only, args, testConfigKit):
 
     # Store the current, initial system time (in seconds since January 1, 1970)
     time0 = time.time()
@@ -258,7 +258,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     random_state = random.getstate()
     if "template-jni" in config:
         template = config["template-jni"]
-    generator = SQLGenerator(config["schema"], template, subversion_generation)
+    generator = SQLGenerator(config["schema"], template, subversion_generation, ascii_only)
     counter = 0
 
     statements_file = open(statements_path, "wb")
@@ -637,6 +637,9 @@ if __name__ == "__main__":
     parser.add_option("-S", "--subversion_generation", dest="subversion_generation",
                       action="store_true", default=None,
                       help="enable generation of additional subquery forms for select statements")
+    parser.add_option("-a", "--ascii-only", action="store_true",
+                      dest="ascii_only", default=False,
+                      help="include only ASCII values in randomly generated string constants")
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
                       help="report all attempted SQL statements rather than mismatches")
@@ -700,7 +703,7 @@ if __name__ == "__main__":
             testConfigKits["testCatalog"] = testCatalog
         result = run_config(config_name, config, basedir, report_dir, seed, options.report_all,
                             options.generate_only, options.subversion_generation,
-                            options.report_all, args, testConfigKits)
+                            options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
         if result["mis"] != 0:
