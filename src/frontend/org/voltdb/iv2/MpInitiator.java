@@ -49,7 +49,6 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
-    private ConsumerDRGateway m_consumerDRGateway = null;
 
     public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
     {
@@ -85,10 +84,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
             backend = BackendTarget.NATIVE_EE_JNI;
         }
 
-        m_consumerDRGateway = consumerDRGateway;
-
         super.configureCommon(backend, catalogContext, serializedCatalog,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null, null);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds,
+                null, null, consumerDRGateway);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
