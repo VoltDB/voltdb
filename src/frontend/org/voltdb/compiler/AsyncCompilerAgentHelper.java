@@ -26,11 +26,9 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -187,13 +185,8 @@ public class AsyncCompilerAgentHelper
                 }
             }
 
-            DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
-            if (deployment == null) {
-                retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
-                return retval;
-            }
-
-            result = CatalogUtil.compileDeployment(newCatalog, deployment, false);
+            result =
+                CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
@@ -207,13 +200,6 @@ public class AsyncCompilerAgentHelper
             // verified when / if the update procedure runs in order to verify
             // catalogs only move forward
             retval.expectedCatalogVersion = context.catalogVersion;
-
-            // add default export configuration to DR conflicts table
-            Database newDb = newCatalog.getClusters().get("cluster").getDatabases().get("database");
-            if (newDb.getIsactiveactivedred()) {
-                CatalogUtil.addExportConfigToDRConflictsTable(newCatalog, /* current catalog */
-                        deployment.getExport()); /* current export */
-            }
 
             // compute the diff in StringBuilder
             CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
