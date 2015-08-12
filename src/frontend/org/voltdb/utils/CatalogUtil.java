@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -32,6 +33,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -89,6 +91,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
@@ -103,6 +106,8 @@ import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -115,6 +120,7 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -125,14 +131,6 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
-
-import java.net.URISyntaxException;
-import java.util.HashMap;
-
-import org.voltdb.client.ClientAuthHashScheme;
-import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ImportType;
-import org.voltdb.importer.ImportDataProcessor;
 
 /**
  *
@@ -146,6 +144,14 @@ public abstract class CatalogUtil {
 
     public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
     public static final String SIGNATURE_DELIMITER = ",";
+
+    // DR conflicts export table name prefix
+    public static final String DR_CONFLICTS_TABLE_PREFIX = "AUTOGEN_VOLTDB_DR_CONFLICTS__";
+    // DR conflicts export group name
+    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "AUTOGEN_VOLTDB_DR_CONFLICTS";
+    public static final String DEFAULT_DR_CONFLICTS_EXPORT_TYPE = "csv";
+    public static final String DEFAULT_DR_CONFLICTS_NONCE = "MyExport";
+    public static final String DEFAULT_DR_CONFLICTS_DIR = "dr_conflicts";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -527,16 +533,6 @@ public abstract class CatalogUtil {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
             return "Error parsing deployment file: " + deploymentURL;
-        }
-        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
-    }
-
-    public static String compileDeploymentString(Catalog catalog, String deploymentString,
-            boolean isPlaceHolderCatalog)
-    {
-        DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
-        if (deployment == null) {
-            return "Error parsing deployment string";
         }
         return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
@@ -2139,5 +2135,51 @@ public abstract class CatalogUtil {
 
         assert (map.size() == 1);
         return map.iterator().next().getSqltext();
+    }
+
+    /**
+     * Add default configuration to DR conflicts export stream if deployment file doesn't have the configuration
+     *
+     * @param catalog  current catalog
+     * @param export   list of export configuration
+     */
+    public static void addExportConfigToDRConflictsTable(Catalog catalog, ExportType export) {
+        boolean userDefineStream = false;
+        if (export == null) {
+            export = new ExportType();
+        }
+        for (ExportConfigurationType exportConfiguration : export.getConfiguration()) {
+            if (exportConfiguration.getStream().equals(DR_CONFLICTS_TABLE_EXPORT_GROUP)) {
+                userDefineStream = true;
+            }
+        }
+
+        if (!userDefineStream) {
+            ExportConfigurationType defaultConfiguration = new ExportConfigurationType();
+            defaultConfiguration.setEnabled(true);
+            defaultConfiguration.setStream(DR_CONFLICTS_TABLE_EXPORT_GROUP);
+            defaultConfiguration.setType(ServerExportEnum.FILE);
+
+            // type
+            PropertyType type = new PropertyType();
+            type.setName("type");
+            type.setValue(DEFAULT_DR_CONFLICTS_EXPORT_TYPE);
+            defaultConfiguration.getProperty().add(type);
+
+            // nonce
+            PropertyType nonce = new PropertyType();
+            nonce.setName("nonce");
+            nonce.setValue(DEFAULT_DR_CONFLICTS_NONCE);
+            defaultConfiguration.getProperty().add(nonce);
+
+            // outdir
+            PropertyType outdir = new PropertyType();
+            outdir.setName("outdir");
+            outdir.setValue(catalog.getClusters().get("cluster").getVoltroot() + "/" + DEFAULT_DR_CONFLICTS_DIR);
+            defaultConfiguration.getProperty().add(outdir);
+
+            export.getConfiguration().add(defaultConfiguration);
+            setExportInfo(catalog, export);
+        }
     }
 }

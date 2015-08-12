@@ -386,6 +386,11 @@ public class Inits {
                 VoltDB.crashLocalVoltDB(result);
             }
 
+            // add default export configuration to DR conflict table
+            if (catalog.getClusters().get("cluster").getDatabases().get("database").getIsactiveactivedred()) {
+                CatalogUtil.addExportConfigToDRConflictsTable(catalog, m_deployment.getExport());
+            }
+
             try {
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogStuff.txnId,
