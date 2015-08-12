@@ -397,10 +397,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         public Invocation getInvocation() {
             return m_invocation;
         }
-
-        public void setInvocation(Invocation invocation) {
-            m_invocation = invocation;
-        }
     }
 
     private class TopicPartitionFetcher implements Runnable {
@@ -692,9 +688,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 m_resubmitInvocation.drainTo(pendingQueue);
                 info("Pending transaction queue is: " + pendingQueue + " Resubmitting...");
                 for (TopicPartitionInvocationCallback cb : pendingQueue) {
-                    Invocation invocation = cb.getInvocation();
-                    //So that we resubmit only once.
-                    cb.setInvocation(null);
+                    final Invocation invocation = cb.getInvocation();
                     if (!callProcedure(cb, invocation)) {
                         if (isDebugEnabled()) {
                             debug("Failed to process Invocation possibly bad data: " + invocation);
