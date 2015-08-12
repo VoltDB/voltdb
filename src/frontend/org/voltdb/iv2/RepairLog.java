@@ -170,7 +170,6 @@ public class RepairLog
                     Object[] params = spi.getParams().toArray();
                     m_maxSeenSpBinaryLogDRId = Math.max(m_maxSeenSpBinaryLogDRId, ((Number)params[2]).longValue());
                     m_maxSeenSpBinaryLogUniqueId = Math.max(m_maxSeenSpBinaryLogUniqueId, ((Number)params[3]).longValue());
-                    assert UniqueIdGenerator.getPartitionIdFromUniqueId(m.getUniqueId()) !=  MpInitiator.MP_INIT_PID;
                     m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, m.getUniqueId());
                 }
             }
@@ -192,7 +191,6 @@ public class RepairLog
                     Object[] params = spi.getParams().toArray();
                     m_maxSeenMpBinaryLogDRId = Math.max(m_maxSeenMpBinaryLogDRId, ((Number)params[2]).longValue());
                     m_maxSeenMpBinaryLogUniqueId = Math.max(m_maxSeenMpBinaryLogUniqueId, ((Number)params[3]).longValue());
-                    assert UniqueIdGenerator.getPartitionIdFromUniqueId(m.getUniqueId()) ==  MpInitiator.MP_INIT_PID;
                     m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, m.getUniqueId());
                 }
             }
@@ -276,13 +274,13 @@ public class RepairLog
         items.addAll(m_logMP);
         long maxSeenBinaryLogUniqueId = m_maxSeenMpBinaryLogUniqueId;
         long maxSeenBinaryLogDRId = m_maxSeenMpBinaryLogDRId;
-        long maxSeenLocalDrUniqueId = m_maxSeenLocalSpUniqueId;
+        long maxSeenLocalDrUniqueId = m_maxSeenLocalMpUniqueId;
         // SP repair requests also want the SP transactions
         if (!forMPI) {
             maxSeenBinaryLogUniqueId = m_maxSeenSpBinaryLogUniqueId;
             maxSeenBinaryLogDRId = m_maxSeenSpBinaryLogDRId;
             items.addAll(m_logSP);
-            maxSeenLocalDrUniqueId = m_maxSeenLocalMpUniqueId;
+            maxSeenLocalDrUniqueId = m_maxSeenLocalSpUniqueId;
         }
 
         // Contents need to be sorted in increasing spHandle order
