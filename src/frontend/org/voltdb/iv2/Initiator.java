@@ -74,4 +74,7 @@ public interface Initiator
 
     /** Assign a listener to the spScheduler for notification of CommandLogged (durable) UniqueIds */
     public void setDurableUniqueIdListener(DurableUniqueIdListener listener);
+
+    /** Hook a new ConsumerDRGateway into Initiator promotion */
+    public void setConsumerDRGateway(ConsumerDRGateway gateway);
 }
