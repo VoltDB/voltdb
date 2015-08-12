@@ -162,6 +162,34 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         header          		        { module Header }
         footer          		        { module Footer }
+
+        //DR Section
+
+        showHideDrBlock {$("#showHideDrBlock")}
+
+        drSection {$("#drSection")}
+
+        divDrReplication {$("#divDrReplication")}
+
+        //DR Master Columns
+
+        partitionID {$("#partitionID")}
+
+        status {$("#status")}
+
+        mbOnDisk  {$("#mbOnDisk")}
+
+        replicaLatencyMs {$("#replicaLatencyMs")}
+
+        replicaLatencyTrans {$("#replicaLatencyTrans")}
+
+        ascendingDT		            { $(class:"sorting_asc") }
+        descendingDT	            { $(class:"sorting_desc") }
+
+        drMasterSection {$("#drMasterSection")}
+
+        dbDrMode {$("#dbDrMode")}
+
     }
 
     static at = {
@@ -386,6 +414,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return true
     }
 
+
+
     /**
      * Returns true if the "Data" area (containing Stored Procedures and
      * Database Tables info) is currently open (displayed).
@@ -395,12 +425,22 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return dataArea.displayed
     }
 
+    def boolean isDrAreaOpen() {
+        return drSection.displayed
+    }
+
+
     /**
      * Opens the "Data" area (containing Stored Procedures and Database Tables
      * info), by clicking on "Show/Hide Data" (if it's not open already).
      */
     def boolean openDataArea() {
         clickToDisplay(showHideData, dataArea)
+        return true
+    }
+
+    def boolean openDrArea(){
+        clickToDisplay(showHideDrBlock, drSection)
         return true
     }
 
@@ -412,6 +452,13 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clickToNotDisplay(showHideData, dataArea)
         return true
     }
+
+
+    def boolean closeDrArea() {
+        clickToNotDisplay(showHideDrBlock, drSection)
+        return true
+    }
+
 
     /**
      *	Edits from here
@@ -770,6 +817,28 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
     /*
+    *	return true if table is in ascending order
+    *  to check ascending order, check the class "sorting_asc" displayed
+    */
+    def boolean tableInAscendingOrderDT() {
+        if ( ascendingDT.displayed )
+            return true
+        else
+            return false
+    }
+
+    /*
+     *	return true if table is in descending order
+     *  to check descending order, check the class "sorting_desc" displayed
+     */
+    def boolean tableInDescendingOrderDT() {
+        if ( descendingDT.displayed )
+            return true
+        else
+            return false
+    }
+
+    /*
      *	click the table column in database table
      */
     def boolean clickTable() {
@@ -789,6 +858,43 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean clickMaxRows() {
         maxrows.click()
     }
+
+    /*
+     *	click the partitionID column in database table
+     */
+    def boolean clickPartitionID() {
+        partitionID.click()
+    }
+
+    /*
+     *	click the status column in database table
+     */
+    def boolean clickStatus() {
+        status.click()
+    }
+
+    /*
+     *	click the status column in database table
+     */
+    def boolean clickMbOnDisk() {
+        mbOnDisk.click()
+    }
+
+    /*
+     *	click the replicaLatencyMs column in database table
+     */
+    def boolean clickReplicaLatencyMs() {
+        replicaLatencyMs.click()
+    }
+
+    /*
+     *	click the replicaLatencyTrans column in database table
+     */
+    def boolean clickReplicaLatencyTrans() {
+        replicaLatencyTrans.click()
+    }
+
+
 
     /*
      *	click the min rows column in database table
