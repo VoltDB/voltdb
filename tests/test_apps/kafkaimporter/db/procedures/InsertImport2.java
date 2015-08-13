@@ -106,182 +106,140 @@ public class InsertImport2 extends VoltProcedure {
         	// not_null rows are simple compares. nullable types need to check for null as well
 
             byte ntiVal = (byte) rowData.fetchRow(0).get(TYPE_NULL_TINYINT, VoltType.TINYINT);
-            if (ntiVal == type_null_tinyint) {
-                System.out.println("type_null_tinyint match");
-            } else {
+            if (ntiVal != type_null_tinyint) {
                 System.out.println("Mirror type_null_tinyint (" + type_null_tinyint + ") " +
                     "not equal to import type_null_tinyint (" + ntiVal + ")");
                 rowCheckOk = false;
             }
 
             byte tiVal = (byte) rowData.fetchRow(0).get(TYPE_NOT_NULL_TINYINT, VoltType.TINYINT);
-            if (tiVal == type_not_null_tinyint) {
-                System.out.println("type_not_null_tinyint match!");
-            } else {
+            if (tiVal != type_not_null_tinyint) {
                 System.out.println("Mirror type_not_null_tinyint (" + type_not_null_tinyint + ") " +
                     "not equal to import type_not_null_tinyint (" + tiVal + ")");
                 rowCheckOk = false;
             }
 
             short nsiVal = (short) rowData.fetchRow(0).get(TYPE_NULL_SMALLINT, VoltType.SMALLINT);
-            if (nsiVal == type_null_smallint)  {
-                System.out.println("type_null_smallint match!");
-            } else {
+            if (nsiVal != type_null_smallint)  {
                 System.out.println("Mirror type_null_smallint (" + type_null_smallint + ") " +
                     "not equal to import type_null_smallint (" + nsiVal + ")");
                 rowCheckOk = false;
             }
 
             short siVal = (short) rowData.fetchRow(0).get(TYPE_NOT_NULL_SMALLINT, VoltType.SMALLINT);
-            if (siVal == type_not_null_smallint ) {
-                System.out.println("type_not_null_smallint match!");
-            } else {
+            if (siVal != type_not_null_smallint ) {
                 System.out.println("Mirror type_not_null_smallint (" + type_not_null_smallint + ") " +
                     "not equal to import type_not_null_smallint (" + siVal + ")");
                 rowCheckOk = false;
             }
 
             int nintVal = (int) rowData.fetchRow(0).get(TYPE_NULL_INTEGER, VoltType.INTEGER);
-            if (nintVal == type_null_integer ) {
-                System.out.println("type_null_integer match!!");
-            } else {
+            if (nintVal != type_null_integer ) {
                 System.out.println("Mirror type_null_integer (" + type_null_integer + ") " +
                     "not equal to import type_null_integer (" + nintVal + ")");
                 rowCheckOk = false;
             }
 
             int intVal = (int) rowData.fetchRow(0).get(TYPE_NOT_NULL_INTEGER, VoltType.INTEGER);
-            if (intVal == type_not_null_integer ) {
-                System.out.println("type_not_null_integer match!!");
-            } else {
+            if (intVal != type_not_null_integer ) {
                 System.out.println("Mirror type_not_null_integer (" + type_not_null_integer + ") " +
                     "not equal to import type_not_null_integer (" + intVal + ")");
                 rowCheckOk = false;
             }
 
             long nbigVal = (long) rowData.fetchRow(0).get(TYPE_NULL_BIGINT, VoltType.BIGINT);
-            if (nbigVal == type_null_bigint ) {
-                System.out.println("type_null_bigint match!");
-            } else {
+            if (nbigVal != type_null_bigint ) {
                 System.out.println("Mirror type_null_bigint (" + type_null_bigint + ") " +
                     "not equal to import type_null_bigint (" + nbigVal + ")");
                 rowCheckOk = false;
             }
 
             long bigVal = (long) rowData.fetchRow(0).get(TYPE_NOT_NULL_BIGINT, VoltType.BIGINT);
-            if (bigVal == type_not_null_bigint ) {
-                System.out.println("type_not_null_bigint match!");
-            } else {
+            if (bigVal != type_not_null_bigint ) {
                 System.out.println("Mirror type_not_null_bigint (" + type_not_null_bigint + ") " +
                     "not equal to import type_not_null_bigint (" + bigVal + ")");
                 rowCheckOk = false;
             }
 
             TimestampType ntsVal = (TimestampType) rowData.fetchRow(0).get(TYPE_NULL_TIMESTAMP, VoltType.TIMESTAMP);
-            if ((ntsVal == null && type_null_timestamp == null) || ntsVal.equals(type_null_timestamp)) {
-                System.out.println("type_null_timestamp match!!");
-            } else {
+            if (!(ntsVal == null && type_null_timestamp == null) && !ntsVal.equals(type_null_timestamp)) {
                 System.out.println("Mirror type_null_timestamp (" + type_null_timestamp + ") " +
                     "not equal to import type_null_timestamp (" + ntsVal + ")");
                 rowCheckOk = false;
             }
 
             TimestampType tsVal = (TimestampType) rowData.fetchRow(0).get(TYPE_NOT_NULL_TIMESTAMP, VoltType.TIMESTAMP);
-            if (tsVal.equals(type_not_null_timestamp)) {
-                System.out.println("type_not_null_timestamp match!!");
-            } else {
+            if (!tsVal.equals(type_not_null_timestamp)) {
                 System.out.println("Mirror type_not_null_timestamp (" + type_not_null_timestamp + ") " +
                     "not equal to import type_not_null_timestamp (" + tsVal + ")");
                 rowCheckOk = false;
             }
 
             double nfloatVal = (double) rowData.fetchRow(0).get(TYPE_NULL_FLOAT, VoltType.FLOAT);
-            if (nfloatVal == type_null_float) {
-                System.out.println("type_null_float match!!");
-            } else {
+            if (nfloatVal != type_null_float) {
                 System.out.println("Mirror type_null_float (" + type_null_float + ") " +
                     "not equal to import type_null_float (" + nfloatVal + ")");
                 rowCheckOk = false;
             }
 
             double floatVal = (double) rowData.fetchRow(0).get(TYPE_NOT_NULL_FLOAT, VoltType.FLOAT);
-            if (floatVal == type_not_null_float ) {
-                System.out.println("type_not_null_float match!!");
-            } else {
+            if (floatVal != type_not_null_float ) {
                 System.out.println("Mirror type_not_null_float (" + type_not_null_float + ") " +
                     "not equal to import type_not_null_float (" + floatVal + ")");
                 rowCheckOk = false;
             }
 
             BigDecimal ndecimalVal = (BigDecimal) rowData.fetchRow(0).get(TYPE_NULL_DECIMAL, VoltType.DECIMAL);
-            if ((ndecimalVal == null &&
-            		type_null_decimal == null) ||
-                    ndecimalVal.equals(type_null_decimal)) {
-                    System.out.println("type_null_decimal match!!");
-            } else {
+            if (!(ndecimalVal == null && type_null_decimal == null) && !ndecimalVal.equals(type_null_decimal)) {
                 System.out.println("Mirror type_null_decimal (" + type_null_decimal + ") " +
                     "not equal to import type_null_decimal (" + ndecimalVal + ")");
                 rowCheckOk = false;
             }
 
             BigDecimal decimalVal = (BigDecimal) rowData.fetchRow(0).get(TYPE_NOT_NULL_DECIMAL, VoltType.DECIMAL);
-            if (decimalVal.equals(type_not_null_decimal)) {
-                System.out.println("type_not_null_decimal match!!");
-            } else {
+            if (!decimalVal.equals(type_not_null_decimal)) {
                 System.out.println("Mirror type_not_null_decimal (" + type_not_null_decimal + ") " +
                     "not equal to import type_not_null_decimal (" + decimalVal + ")");
                 rowCheckOk = false;
             }
 
             String nstring25Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR25, VoltType.STRING);
-            if ((nstring25Val == null && type_null_varchar25 == null) || nstring25Val.equals(type_null_varchar25)) {
-                    System.out.println("type_null_varchar25 match!!");
-            } else {
+            if (!(nstring25Val == null && type_null_varchar25 == null) && !nstring25Val.equals(type_null_varchar25)) {
                 System.out.println("Mirror type_null_varchar25 (" + type_null_varchar25 + ") " +
                     "not equal to import type_null_varchar25 (" + nstring25Val + ")");
                 rowCheckOk = false;
             }
 
             String string25Val = (String) rowData.fetchRow(0).get(TYPE_NOT_NULL_VARCHAR25, VoltType.STRING);
-            if (string25Val.equals(type_not_null_varchar25)) {
-                System.out.println("type_not_null_varchar25 match!!");
-            } else {
+            if (!string25Val.equals(type_not_null_varchar25)) {
                 System.out.println("Mirror type_not_null_varchar25 (" + type_not_null_varchar25 + ") " +
                     "not equal to import type_not_null_varchar25 (" + string25Val + ")");
                 rowCheckOk = false;
             }
 
             String nstring128Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR128, VoltType.STRING);
-            if ((nstring128Val == null && type_null_varchar128 == null) || nstring128Val.equals(type_null_varchar128)) {
-                System.out.println("type_null_varchar128 match!!");
-            } else {
+            if (!(nstring128Val == null && type_null_varchar128 == null) && ! nstring128Val.equals(type_null_varchar128)) {
                 System.out.println("Mirror type_null_varchar128 (" + type_null_varchar128 + ") " +
                     "not equal to import type_null_varchar128 (" + nstring128Val + ")");
                 rowCheckOk = false;
             }
 
             String string128Val = (String) rowData.fetchRow(0).get(TYPE_NOT_NULL_VARCHAR128, VoltType.STRING);
-            if (string128Val.equals(type_not_null_varchar128)) {
-                System.out.println("type_not_null_varchar128 match!!");
-            } else {
+            if (!string128Val.equals(type_not_null_varchar128)) {
                 System.out.println("Mirror type_not_null_varchar128 (" + type_not_null_varchar128 + ") " +
                     "not equal to import type_not_null_varchar128 (" + string128Val + ")");
                 rowCheckOk = false;
             }
 
             String nstring1024Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR1024, VoltType.STRING);
-            if ((nstring1024Val == null && type_null_varchar1024 == null) || nstring1024Val.equals(type_null_varchar1024)) {
-                System.out.println("type_null_varchar1024 match!!");
-            } else {
+            if (!(nstring1024Val == null && type_null_varchar1024 == null) && !nstring1024Val.equals(type_null_varchar1024)) {
                 System.out.println("Mirror type_null_varchar1024 (" + type_null_varchar1024 + ") " +
                     "not equal to import type_null_varchar1024 (" + nstring1024Val + ")");
                 rowCheckOk = false;
             }
 
             String string1024Val = (String) rowData.fetchRow(0).get(TYPE_NOT_NULL_VARCHAR1024, VoltType.STRING);
-            if (string1024Val.equals(type_not_null_varchar1024)) {
-                System.out.println("type_not_null_varchar1024 match!!");
-            } else {
+            if (!string1024Val.equals(type_not_null_varchar1024)) {
                 System.out.println("Mirror type_not_null_varchar1024 (" + type_not_null_varchar1024 + ") " +
                     "not equal to import type_not_null_varchar1024 (" + string1024Val + ")");
                 rowCheckOk = false;
