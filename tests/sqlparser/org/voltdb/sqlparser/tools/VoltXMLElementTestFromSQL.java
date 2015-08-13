@@ -59,15 +59,21 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.sqlparser.syntax.SQLKind;
 
 public class VoltXMLElementTestFromSQL {
+    /*
+     * These probably needs to be encapsulated in a
+     * single class.  Too much work.
+     */
     List<String> m_sqlStrings = new ArrayList<String>();
     List<String> m_testNames = new ArrayList<String>();
+    private List<SQLKind> m_testTypes = new ArrayList<SQLKind>();
+    private List<String> m_testComments = new ArrayList<String>();
+
     String m_sqlSourceFolder = "~/src/voltdb/tests/sqlparser";
     String m_fullyQualifiedClassName = null;
     String m_className = null;
     List<String> m_ddl = new ArrayList<String>();
     private PrintStream m_outputStream = null;
     String m_packageName = null;
-    private List<SQLKind> m_testTypes = new ArrayList<SQLKind>();
     int m_errors = 0;
 
 
@@ -78,7 +84,9 @@ public class VoltXMLElementTestFromSQL {
 
     public VoltXMLElementTestFromSQL(String[] args) {
         int idx;
+        String sqlComment;
         for (idx = 0; idx < args.length; idx += 1) {
+            sqlComment = null;
             if ("--source-folder".equals(args[idx]) || "-o".equals(args[idx])) {
                 m_sqlSourceFolder = args[++idx];
             } else if ("--ddl".equals(args[idx])) {
@@ -88,11 +96,13 @@ public class VoltXMLElementTestFromSQL {
             } else if ("--class".equals(args[idx]) || "-C".equals(args[idx])) {
                 m_fullyQualifiedClassName = args[++idx];
             } else if ("--dql-test".equals(args[idx])) {
-                idx = addSQLTest(args, idx, SQLKind.DQL);
+                idx = addSQLTest(args, idx, SQLKind.DQL, sqlComment);
             } else if ("--ddl-test".equals(args[idx])) {
-                idx = addSQLTest(args, idx, SQLKind.DDL);
+                idx = addSQLTest(args, idx, SQLKind.DDL, sqlComment);
             } else if ("--dml-test".equals(args[idx])) {
-                idx = addSQLTest(args, idx, SQLKind.DML);
+                idx = addSQLTest(args, idx, SQLKind.DML, sqlComment);
+            } else if ("--comment".equals(args[idx])) {
+                sqlComment = args[++idx];
             } else {
                 System.err.printf("Unknown comand line parameter \"%s\"\n", args[idx]);
                 usage(args[0]);
@@ -101,7 +111,7 @@ public class VoltXMLElementTestFromSQL {
         }
     }
 
-    private int addSQLTest(String args[], int aIDX, SQLKind aKind) {
+    private int addSQLTest(String args[], int aIDX, SQLKind aKind, String aSQLComment) {
         if (args.length <= aIDX + 2) {
             System.err.printf("Not enough arguments for %s test\n", aKind);
             System.exit(100);
@@ -109,6 +119,7 @@ public class VoltXMLElementTestFromSQL {
         m_testNames.add(args[aIDX + 1]);
         m_sqlStrings.add(args[aIDX + 2]);
         m_testTypes.add(aKind);
+        m_testComments.add(aSQLComment);
         return aIDX + 2;
     }
 
@@ -165,18 +176,19 @@ public class VoltXMLElementTestFromSQL {
             String sql = m_sqlStrings.get(testIdx);
             String testName = m_testNames.get(testIdx);
             SQLKind testKind = m_testTypes.get(testIdx);
+            String comment = m_testComments.get(testIdx);
             try {
                 switch (testKind) {
                 case DML:
                     elem = hif.getXMLCompiledStatement(sql);
-                    writeDMLTestBody(sql, testName, elem);
+                    writeDMLTestBody(sql, testName, elem, comment);
                     break;
                 case DDL:
-                    writeDDLTestBody(sql, testName);
+                    writeDDLTestBody(sql, testName, comment);
                     break;
                 case DQL:
                     elem = hif.getXMLCompiledStatement(sql);
-                    writeDQLTestBody(sql, testName, elem);
+                    writeDQLTestBody(sql, testName, elem, comment);
                     break;
                 }
             } catch (HSQLParseException ex) {
@@ -294,12 +306,15 @@ public class VoltXMLElementTestFromSQL {
         m_outputStream.printf(prefixFmt, m_packageName, m_className, m_className, getSchema());
     }
 
-    private void writeDDLTestBody(String aSql, String aTestName) {
+    private void writeDDLTestBody(String aSql, String aTestName, String aComment) {
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         try {
             hif.runDDLCommand(aSql);
             VoltXMLElement elem = hif.getXMLFromCatalog();
             StringBuffer sb = new StringBuffer();
+            if (aComment != null) {
+                addComment(sb, aComment);
+            }
             sb.append("\n");
             sb.append("    @SuppressWarnings(\"unchecked\")\n");
             sb.append("    @Test\n");
@@ -324,17 +339,20 @@ public class VoltXMLElementTestFromSQL {
 
     }
 
-    private void writeDMLTestBody(String aSQL, String aTestName, VoltXMLElement aElem) {
-        writeSQLTestBody(aSQL, aTestName, aElem, SQLKind.DML);
+    private void writeDMLTestBody(String aSQL, String aTestName, VoltXMLElement aElem, String comment) {
+        writeSQLTestBody(aSQL, aTestName, aElem, SQLKind.DML, comment);
     }
 
-    private void writeDQLTestBody(String aSql, String aTestName, VoltXMLElement aElem) {
-        writeSQLTestBody(aSql, aTestName, aElem, SQLKind.DQL);
+    private void writeDQLTestBody(String aSql, String aTestName, VoltXMLElement aElem, String comment) {
+        writeSQLTestBody(aSql, aTestName, aElem, SQLKind.DQL, comment);
     }
 
-    private void writeSQLTestBody(String aSql, String aTestName, VoltXMLElement aElem, SQLKind aKind) {
+    private void writeSQLTestBody(String aSql, String aTestName, VoltXMLElement aElem, SQLKind aKind, String aComment) {
         StringBuffer sb = new StringBuffer();
         sb.append("\n");
+        if (aComment != null) {
+            addComment(sb, aComment);
+        }
         sb.append("    @SuppressWarnings(\"unchecked\")\n");
         sb.append("    @Test\n");
         sb.append(String.format("    public void %s() throws Exception {\n", aTestName));
@@ -350,6 +368,14 @@ public class VoltXMLElementTestFromSQL {
         m_outputStream.print(sb.toString());
     }
 
+    private void addComment(StringBuffer aSB, String aComment) {
+        aSB.append("    /**\n");
+        aSB.append(String.format("     * %s\n", aComment));
+        aSB.append("     *\n");
+        aSB.append("     * Throws: Exception\n");
+        aSB.append("     */\n");
+
+    }
     private StringBuffer indentStr(StringBuffer aSb,
                                    int aIndent,
                                    boolean aStartNL,

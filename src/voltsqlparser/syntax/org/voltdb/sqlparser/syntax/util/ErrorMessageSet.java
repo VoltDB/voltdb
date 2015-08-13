@@ -23,6 +23,8 @@ import org.voltdb.sqlparser.syntax.util.ErrorMessage.Severity;
 
 public class ErrorMessageSet implements Iterable<ErrorMessage> {
     List<ErrorMessage> m_errorMessages = new ArrayList<ErrorMessage>();
+    int m_numberErrors = 0;
+    int m_numberWarnings = 0;
 
     public void addError(int line,
                          int col,
@@ -33,6 +35,7 @@ public class ErrorMessageSet implements Iterable<ErrorMessage> {
                                              col,
                                              Severity.Error,
                                              msg));
+        m_numberErrors += 1;
     }
 
     public void addWarning(int line, int col, String errorMessageFormat,
@@ -42,6 +45,7 @@ public class ErrorMessageSet implements Iterable<ErrorMessage> {
                                              col,
                                              Severity.Warning,
                                              msg));
+        m_numberWarnings += 1;
     }
 
     public int size() {
@@ -54,4 +58,13 @@ public class ErrorMessageSet implements Iterable<ErrorMessage> {
         return m_errorMessages.iterator();
     }
 
+    public int numberErrors() {
+        // TODO Auto-generated method stub
+        return m_numberErrors;
+    }
+
+    public int numberWarnings() {
+        // TODO Auto-generated method stub
+        return m_numberWarnings;
+    }
 }

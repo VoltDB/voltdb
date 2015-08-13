@@ -45,7 +45,6 @@ public interface ISymbolTable {
      * @return The Type denoted by aName, or else null.
      */
     public IType getType(String aName);
-
     /**
      * Lookup a name and try to interpret it as a value.
      * Return null if the name does not denote a value.

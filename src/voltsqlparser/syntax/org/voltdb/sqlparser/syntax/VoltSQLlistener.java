@@ -85,7 +85,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
     }
 
     public boolean hasErrors() {
-        return m_errorMessages.size() > 0;
+        return m_errorMessages.numberErrors() > 0;
     }
 
     private final void addError(int line, int col, String errorMessageFormat, Object ... args) {
@@ -108,7 +108,11 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
                                 nerrs > 1 ? "" : "an ",
                                 nerrs > 1 ? "s" : ""));
         for (ErrorMessage em : getErrorMessages()) {
-            sb.append(String.format("line %d, column %d: %s\n", em.getLine(), em.getCol(), em.getMsg()));
+            sb.append(String.format("line %d, column %d: %s: %s\n",
+                                    em.getLine(),
+                                    em.getCol(),
+                                    em.getSeverity(),
+                                    em.getMsg()));
         }
         return sb.toString();
     }
@@ -129,7 +133,6 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
     @Override public void exitColumn_definition(SQLParserParser.Column_definitionContext ctx) {
         String colName = ctx.column_name().IDENTIFIER().getText();
         String type = ctx.type_expression().type_name().IDENTIFIER().getText();
-        IType colType = m_symbolTable.getType(type);
         int nparms, p1 = -1, p2 = -1;
         nparms = ctx.type_expression().NUMBER().size();
         if (nparms > 0) {
@@ -138,27 +141,54 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
                 p2 = Integer.parseInt(ctx.type_expression().NUMBER().get(1).getText());
             }
         }
+        IType colType = m_symbolTable.getType(type);
         if (colType == null) {
             addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "Type expected");
-        } else {
-            if (colType instanceof IStringType) {
-                int size;
-                if (nparms == 0) {
-                    size = DEFAULT_STRING_SIZE;
-                } else {
-                    size = p1;
-                }
-                colType = ((IStringType) colType).makeInstance(size);
+            colType = m_factory.getErrorType();
+        } else if (colType.getTypeKind().isFixedPoint()) {
+            /*
+             * Warn if we get scale and precision arguments.  We
+             * just ignore them.
+             */
+            if (nparms > 0) {
+                addWarning(ctx.start.getLine(),
+                           ctx.start.getCharPositionInLine(),
+                           "The type %s has a fixed scale and precision.  These arguments will be ignored.",
+                           colType.getName().toUpperCase());
             }
-            IColumn column = m_factory.newColumn(colName, colType);
-            column.setHasDefaultValue(m_hasDefaultValue);
-            column.setDefaultValue(m_defaultValue);
-            column.setIsPrimaryKey(m_isPrimaryKey);
-            column.setIsUniqueConstraint(m_isUniqueConstraint);
-            column.setIsNullable(m_isNullable);
-            column.setIsNull(m_isNull);
-            m_currentlyCreatedTable.addColumn(colName, column);
+        } else if (colType instanceof IStringType) {
+            int size;
+            /*
+             * We should get zero or one argument.  It is an
+             * error otherwise.
+             */
+            if (nparms == 0) {
+                size = DEFAULT_STRING_SIZE;
+            } else if (nparms == 1) {
+                size = p1;
+                colType = ((IStringType) colType).makeInstance(size);
+            } else {
+                addError(ctx.start.getLine(),
+                         ctx.start.getCharPositionInLine(),
+                         "The string type %s takes only one size parameter.",
+                         colType.getName().toUpperCase());
+                colType = m_factory.getErrorType();
+            }
+        } else if (nparms > 0) {
+            addError(ctx.start.getLine(),
+                     ctx.start.getCharPositionInLine(),
+                     "The type %s takes no type parameters.",
+                     colType.getName().toUpperCase());
+            colType = m_factory.getErrorType();
         }
+        IColumn column = m_factory.newColumn(colName, colType);
+        column.setHasDefaultValue(m_hasDefaultValue);
+        column.setDefaultValue(m_defaultValue);
+        column.setIsPrimaryKey(m_isPrimaryKey);
+        column.setIsUniqueConstraint(m_isUniqueConstraint);
+        column.setIsNullable(m_isNullable);
+        column.setIsNull(m_isNull);
+        m_currentlyCreatedTable.addColumn(colName, column);
     }
 
     /**
