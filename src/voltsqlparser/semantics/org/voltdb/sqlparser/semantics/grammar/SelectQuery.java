@@ -38,11 +38,11 @@ import java.util.Stack;
 
 import org.voltdb.sqlparser.semantics.grammar.ErrorMessage.Severity;
 import org.voltdb.sqlparser.semantics.symtab.Column;
-import org.voltdb.sqlparser.semantics.symtab.Neutrino;
+import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
 import org.voltdb.sqlparser.semantics.symtab.Table;
 import org.voltdb.sqlparser.semantics.symtab.Type;
-import org.voltdb.sqlparser.syntax.grammar.INeutrino;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
@@ -57,9 +57,9 @@ import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 public class SelectQuery implements ISelectQuery, IDQLStatement {
     List<Projection> m_projections = new ArrayList<Projection>();
 
-    private Stack<Neutrino> m_neutrinoStack = new Stack<Neutrino>();
+    private Stack<Semantino> m_semantinoStack = new Stack<Semantino>();
     private SymbolTable m_tables;
-    private Neutrino m_whereCondition;
+    private Semantino m_whereCondition;
     private IParserFactory m_factory;
     private IAST m_ast;
     private ErrorMessageSet m_errorMessages;
@@ -105,59 +105,59 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
     }
 
         @Override
-        public void pushNeutrino(INeutrino aColumnNeutrino) {
-                m_neutrinoStack.push((Neutrino) aColumnNeutrino);
+        public void pushSemantino(ISemantino aColumnSemantino) {
+                m_semantinoStack.push((Semantino) aColumnSemantino);
         }
 
         @Override
-        public Neutrino popNeutrino() {
-                Neutrino bottom = m_neutrinoStack.pop();
+        public Semantino popSemantino() {
+                Semantino bottom = m_semantinoStack.pop();
                 return bottom;
         }
 
         @Override
-        public Neutrino getNeutrinoMath(IOperator aOperator,
-                                           INeutrino aLeftoperand,
-                                           INeutrino aRightoperand) {
-                INeutrino[] converted = m_factory.tuac(aLeftoperand, aRightoperand);
+        public Semantino getSemantinoMath(IOperator aOperator,
+                                           ISemantino aLeftoperand,
+                                           ISemantino aRightoperand) {
+                ISemantino[] converted = m_factory.tuac(aLeftoperand, aRightoperand);
 
 
-                return new Neutrino((Type) converted[0].getType(),
+                return new Semantino((Type) converted[0].getType(),
                                     m_factory.makeBinaryAST(aOperator,
                                                             converted[0],
                                                             converted[1]));
         }
 
     @Override
-    public Neutrino getNeutrinoCompare(IOperator aOperator,
-                                       INeutrino aLeftoperand,
-                                       INeutrino aRightoperand) {
-                INeutrino[] converted = m_factory.tuac(aLeftoperand, aRightoperand);
+    public Semantino getSemantinoCompare(IOperator aOperator,
+                                       ISemantino aLeftoperand,
+                                       ISemantino aRightoperand) {
+                ISemantino[] converted = m_factory.tuac(aLeftoperand, aRightoperand);
                 if (converted == null) {
-                    return Neutrino.getErrorNeutrino();
+                    return Semantino.getErrorSemantino();
                 }
-                return new Neutrino((Type) m_factory.getBooleanType(),
+                return new Semantino((Type) m_factory.getBooleanType(),
                                     m_factory.makeBinaryAST(aOperator,
                                                             converted[0],
                                                             converted[1]));
     }
 
     @Override
-    public Neutrino getNeutrinoBoolean(IOperator aOperator,
-                                       INeutrino aLeftoperand,
-                                       INeutrino aRightoperand) {
+    public Semantino getSemantinoBoolean(IOperator aOperator,
+                                       ISemantino aLeftoperand,
+                                       ISemantino aRightoperand) {
         if (aLeftoperand.getType().isBooleanType() == false
                 || aRightoperand.getType().isBooleanType() == false) {
-            return Neutrino.getErrorNeutrino();
+            return Semantino.getErrorSemantino();
         }
-        return new Neutrino((Type) aRightoperand.getType(),
+        return new Semantino((Type) aRightoperand.getType(),
                             m_factory.makeBinaryAST(aOperator,
                                                     aLeftoperand,
                                                     aRightoperand));
     }
 
     @Override
-    public Neutrino getColumnNeutrino(String aColumnName, String aTableName) {
+    public Semantino getColumnSemantino(String aColumnName, String aTableName) {
         String realTableName;
         String tableAlias;
         Table tbl;
@@ -173,7 +173,7 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
         realTableName = tbl.getName();
         Column col = tbl.getColumnByName(aColumnName);
         Type colType = col.getType();
-        return new Neutrino(colType,
+        return new Semantino(colType,
                             m_factory.makeColumnRef(realTableName,
                                                     tableAlias,
                                                     aColumnName));
@@ -196,23 +196,23 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
     }
 
     @Override
-    public String printNeutrinos() {
-        String out = "Neutrinos: ";
-        while(!m_neutrinoStack.isEmpty()) {
-                Neutrino next = m_neutrinoStack.pop();
+    public String printSemantinos() {
+        String out = "Semantinos: ";
+        while(!m_semantinoStack.isEmpty()) {
+                Semantino next = m_semantinoStack.pop();
                 out += "["+next.toString()+"]";
         }
         return out;
     }
 
     @Override
-    public boolean hasNeutrinos() {
-        return !m_neutrinoStack.isEmpty();
+    public boolean hasSemantinos() {
+        return !m_semantinoStack.isEmpty();
     }
 
     @Override
-    public void setWhereCondition(INeutrino aNeutrino) {
-        m_whereCondition = (Neutrino) aNeutrino;
+    public void setWhereCondition(ISemantino aSemantino) {
+        m_whereCondition = (Semantino) aSemantino;
     }
 
     @Override
@@ -246,7 +246,7 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
     }
 
     @Override
-    public INeutrino getConstantNeutrino(Object value, IType type) {
+    public ISemantino getConstantSemantino(Object value, IType type) {
         assert(false);
         return null;
     }

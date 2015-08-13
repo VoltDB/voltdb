@@ -82,7 +82,7 @@ public class InsertStatement implements IInsertStatement, IDQLStatement {
                 IType aType = column.getType();
                 assert(aType instanceof Type);
                 m_colTypes.add((Type)aType);
-                // TODO: When we process Neutrinos in values, do type checking here.
+                // TODO: When we process Semantinos in values, do type checking here.
                 //       tuac to the rescue, eh?
                 m_colVals.add(aColVals.get(idx));
                 colNames.remove(cn.getColumnName());
@@ -106,7 +106,7 @@ public class InsertStatement implements IInsertStatement, IDQLStatement {
             if (column.hasDefaultValue()) {
                 m_colVals.add(column.getDefaultValue());
             } else if (column.isNullable()) {
-                // TODO: This needs to add the Null Neutrino.
+                // TODO: This needs to add the Null Semantino.
                 m_colVals.add(null);
             } else {
                 assert false;

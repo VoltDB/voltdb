@@ -34,7 +34,7 @@ public interface IInsertStatement {
     /**
      * Insert a collection of columns, given the columns' names
      * and values.  The values are Strings now, but they should be
-     * Neutrinos.
+     * Semantinos.
      *
      * @param colNames
      * @param colVals

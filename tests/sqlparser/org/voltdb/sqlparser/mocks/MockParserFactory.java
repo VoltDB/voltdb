@@ -44,10 +44,10 @@
 import java.util.List;
 
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
-import org.voltdb.sqlparser.semantics.symtab.Neutrino;
+import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
-import org.voltdb.sqlparser.syntax.grammar.INeutrino;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
@@ -97,8 +97,8 @@ public class MockParserFactory extends ParserFactory implements
 
     @Override
     public IAST makeBinaryAST(IOperator aOp,
-                              INeutrino aLeftoperand,
-                              INeutrino aRightoperand) {
+                              ISemantino aLeftoperand,
+                              ISemantino aRightoperand) {
         unimplementedOperation("makeBinaryAST");
         return null;
     }
@@ -121,7 +121,7 @@ public class MockParserFactory extends ParserFactory implements
         return null;
     }
 
-    public void processWhereExpression(Neutrino aWhereExpression) {
+    public void processWhereExpression(Semantino aWhereExpression) {
             unimplementedOperation("processWhereExpression");
     }
 

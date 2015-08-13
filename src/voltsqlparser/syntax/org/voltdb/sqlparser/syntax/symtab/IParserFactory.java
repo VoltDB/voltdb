@@ -19,14 +19,12 @@
 
 import java.util.List;
 
-import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
 import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
-import org.voltdb.sqlparser.syntax.grammar.INeutrino;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
@@ -156,7 +154,7 @@ public interface IParserFactory {
      * @param aRightoperand
      * @return
      */
-    IAST makeBinaryAST(IOperator aOp, INeutrino aLeftoperand, INeutrino aRightoperand);
+    IAST makeBinaryAST(IOperator aOp, ISemantino aLeftoperand, ISemantino aRightoperand);
 
     /**
      * Given a string, such as "+", look up the abstract operator for
@@ -180,14 +178,14 @@ public interface IParserFactory {
     IAST addTypeConversion(IAST aNode, IType aSrcType, IType aTrgType);
 
     /**
-     * Given two neutrinos, both operators, return a pair of neutrinos
+     * Given two semantinos, both operators, return a pair of semantinos
      * which represent expressions converted to a common type.
      *
      * @param aLeftoperand
      * @param aRightoperand
      * @return
      */
-    INeutrino[] tuac(INeutrino aLeftoperand, INeutrino aRightoperand);
+    ISemantino[] tuac(ISemantino aLeftoperand, ISemantino aRightoperand);
 
     /**
      * Given a the pieces of a query, return the abstract syntax tree
@@ -207,7 +205,7 @@ public interface IParserFactory {
      * @param aInsertStatement
      * @return
      */
-    IAST makeInsertAST(InsertStatement aInsertStatement);
+    IAST makeInsertAST(IInsertStatement aInsertStatement);
     /**
      * Get the set of error messages for this factory.
      * @return

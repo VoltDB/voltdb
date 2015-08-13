@@ -17,6 +17,7 @@
  package org.voltdb.sqlparser.semantics.symtab;
 
 import org.voltdb.sqlparser.syntax.symtab.INumericType;
+import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 public class NumericType extends Type implements INumericType {
     public NumericType(String aName, TypeKind aKind) {

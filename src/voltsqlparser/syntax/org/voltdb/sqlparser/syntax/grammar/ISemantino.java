@@ -35,9 +35,14 @@
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 
-public interface INeutrino {
-        boolean isBooleanExpression();
-
+/**
+ * An ISemantino object represents a particle of semantics.  This is
+ * the combination of a type and an IAST.
+ *
+ * @author bwhite
+ *
+ */
+public interface ISemantino {
         public IType getType();
 
         public IAST getAST();

@@ -33,6 +33,7 @@
  package org.voltdb.sqlparser.semantics.symtab;
 
 import org.voltdb.sqlparser.syntax.symtab.IType;
+import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 /**
  * This is the base class of all types.  All types have a name,

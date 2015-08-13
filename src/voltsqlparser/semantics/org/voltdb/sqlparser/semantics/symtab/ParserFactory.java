@@ -44,7 +44,7 @@ import org.voltdb.sqlparser.semantics.grammar.SelectQuery;
 import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
-import org.voltdb.sqlparser.syntax.grammar.INeutrino;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
@@ -124,7 +124,7 @@ public abstract class ParserFactory implements IParserFactory {
      */
     @Override
     public void processQuery(ISelectQuery aSelectQuery) {
-        // put projections onto neutrino stack.
+        // put projections onto semantino stack.
         aSelectQuery.setAST(makeQueryAST(aSelectQuery.getProjections(),
                                          aSelectQuery.getWhereCondition(),
                                          aSelectQuery.getTables()));
@@ -147,25 +147,25 @@ public abstract class ParserFactory implements IParserFactory {
         return null;
     }
 
-    public Neutrino[] tuac(INeutrino ileft, INeutrino iright) {
-        Neutrino left = (Neutrino)ileft;
-        Neutrino right = (Neutrino)iright;
+    public Semantino[] tuac(ISemantino ileft, ISemantino iright) {
+        Semantino left = (Semantino)ileft;
+        Semantino right = (Semantino)iright;
         Type leftType = left.getType();
         Type rightType = right.getType();
         if (leftType.isEqualType(rightType)) {
-                return new Neutrino[]{left,right};
+                return new Semantino[]{left,right};
         } else {
             Type convertedType = hasSuperType(leftType, rightType);
             if (convertedType != null) {
-                Neutrino lconverted = new Neutrino(convertedType,
+                Semantino lconverted = new Semantino(convertedType,
                                                   addTypeConversion(left.getAST(),
                                                                     leftType,
                                                                     convertedType));
-                Neutrino rconverted = new Neutrino(convertedType,
+                Semantino rconverted = new Semantino(convertedType,
                                                    addTypeConversion(right.getAST(),
                                                                      rightType,
                                                                      convertedType));
-                return new Neutrino[]{lconverted, rconverted};
+                return new Semantino[]{lconverted, rconverted};
             } else {
                 m_errorMessages.addError(-1, -1, "Can't convert type \"%s\" to \"%s\"",
                                          leftType, rightType);

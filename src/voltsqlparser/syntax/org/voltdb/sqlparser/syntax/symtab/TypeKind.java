@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.sqlparser.semantics.symtab;
+package org.voltdb.sqlparser.syntax.symtab;
 
 /**
  * This is the type kinds of types.  Each enumeral has a set of

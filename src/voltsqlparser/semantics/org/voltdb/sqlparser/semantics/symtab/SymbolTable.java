@@ -39,6 +39,7 @@ import java.util.TreeMap;
 
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITop;
+import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 /**
  * A SymbolTable associates values and types with

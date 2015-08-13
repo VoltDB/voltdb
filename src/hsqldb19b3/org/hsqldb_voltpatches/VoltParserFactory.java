@@ -2,19 +2,19 @@ package org.hsqldb_voltpatches;
 
 import java.util.List;
 
-import org.voltdb.sqlparser.syntax.symtab.IAST;
-import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
 import org.voltdb.sqlparser.semantics.symtab.Type;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
-import org.voltdb.sqlparser.syntax.grammar.INeutrino;
+import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
+import org.voltdb.sqlparser.syntax.symtab.IAST;
+import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
-import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
 /**
  * This is the most derived class of the parser factory hierarchy.  Its
@@ -57,8 +57,8 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
 
     @Override
     public IAST makeBinaryAST(IOperator aOp,
-                              INeutrino aLeftoperand,
-                              INeutrino aRightoperand) {
+                              ISemantino aLeftoperand,
+                              ISemantino aRightoperand) {
         VoltXMLElement answer = new VoltXMLElement("operation");
         answer.withValue("id", newId())
               .withValue("optype", aOp.getVoltOperation());
@@ -167,21 +167,23 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
         return answer;
     }
 
-
-    public VoltXMLElement makeInsertAST(InsertStatement aInsertStatement) {
+    @Override
+    public VoltXMLElement makeInsertAST(IInsertStatement aInsertStatement) {
+        assert(aInsertStatement instanceof InsertStatement);
+        InsertStatement insertStatement = (InsertStatement)aInsertStatement;
         VoltXMLElement top = new VoltXMLElement("insert");
-        top.withValue("table", aInsertStatement.getTableName().toUpperCase());
+        top.withValue("table", insertStatement.getTableName().toUpperCase());
         VoltXMLElement columns = new VoltXMLElement("columns");
         top.children.add(columns);
-        for (int idx = 0; idx < aInsertStatement.getNumberColumns(); idx += 1) {
+        for (int idx = 0; idx < insertStatement.getNumberColumns(); idx += 1) {
             VoltXMLElement col = new VoltXMLElement("column");
             columns.children.add(col);
-            col.withValue("name", aInsertStatement.getColumnName(idx).toUpperCase());
+            col.withValue("name", insertStatement.getColumnName(idx).toUpperCase());
             VoltXMLElement val = new VoltXMLElement("value");
             col.children.add(val);
             val.withValue("id", Integer.toString(idx+1));
-            val.withValue("value", aInsertStatement.getColumnValue(idx));
-            val.withValue("valuetype", aInsertStatement.getColumnType(idx).getName().toUpperCase());
+            val.withValue("value", insertStatement.getColumnValue(idx));
+            val.withValue("valuetype", insertStatement.getColumnType(idx).getName().toUpperCase());
         }
         VoltXMLElement params = new VoltXMLElement("parameters");
         top.children.add(params);

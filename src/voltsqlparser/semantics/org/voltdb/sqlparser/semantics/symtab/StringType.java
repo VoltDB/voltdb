@@ -18,6 +18,7 @@ package org.voltdb.sqlparser.semantics.symtab;
 
 import org.voltdb.sqlparser.syntax.IStringType;
 import org.voltdb.sqlparser.syntax.symtab.ITop;
+import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 public class StringType extends Type implements ITop, IStringType {
     long m_maxSize = -1;

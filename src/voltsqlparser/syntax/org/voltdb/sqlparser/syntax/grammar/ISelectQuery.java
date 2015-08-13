@@ -48,27 +48,27 @@ public interface ISelectQuery {
 
     void addProjection(String aTableName, String aColumnName, String aAlias, int aLineNo, int aColNo);
 
-    void pushNeutrino(INeutrino aColumnNeutrino);
+    void pushSemantino(ISemantino aColumnSemantino);
 
-    INeutrino popNeutrino();
+    ISemantino popSemantino();
 
     String printProjections();
 
-    String printNeutrinos();
+    String printSemantinos();
 
     void addTable(ITable aITable, String aAlias);
 
     String printTables();
 
-    boolean hasNeutrinos();
+    boolean hasSemantinos();
 
-    INeutrino getColumnNeutrino(String aColumnName, String aTableName);
+    ISemantino getColumnSemantino(String aColumnName, String aTableName);
 
-    INeutrino getConstantNeutrino(Object value, IType type);
+    ISemantino getConstantSemantino(Object value, IType type);
 
     List<Projection> getProjections();
 
-    void setWhereCondition(INeutrino aRet);
+    void setWhereCondition(ISemantino aRet);
 
     IAST getWhereCondition();
 
@@ -76,14 +76,14 @@ public interface ISelectQuery {
 
     void setAST(IAST aMakeQueryAST);
 
-    INeutrino getNeutrinoMath(IOperator aOperator, INeutrino aLeftoperand,
-                    INeutrino aRightoperand);
+    ISemantino getSemantinoMath(IOperator aOperator, ISemantino aLeftoperand,
+                    ISemantino aRightoperand);
 
-    INeutrino getNeutrinoCompare(IOperator aOperator, INeutrino aLeftoperand,
-                    INeutrino aRightoperand);
+    ISemantino getSemantinoCompare(IOperator aOperator, ISemantino aLeftoperand,
+                    ISemantino aRightoperand);
 
-    INeutrino getNeutrinoBoolean(IOperator aOperator, INeutrino aLeftoperand,
-                    INeutrino aRightoperand);
+    ISemantino getSemantinoBoolean(IOperator aOperator, ISemantino aLeftoperand,
+                    ISemantino aRightoperand);
 
     boolean validate();
 

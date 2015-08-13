@@ -61,7 +61,7 @@ package org.voltdb.sqlparser;
 import org.junit.Test;
 import org.voltdb.sqlparser.semantics.symtab.IntegerType;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
-import org.voltdb.sqlparser.semantics.symtab.TypeKind;
+import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 import static org.voltdb.sqlparser.symtab.SymbolTableAssert.assertThat;
 

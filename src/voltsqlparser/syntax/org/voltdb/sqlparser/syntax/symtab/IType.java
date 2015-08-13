@@ -16,9 +16,6 @@
  */
  package org.voltdb.sqlparser.syntax.symtab;
 
-import org.voltdb.sqlparser.semantics.symtab.TypeKind;
-
-
 /**
  * IType is the interface of Types.
  *

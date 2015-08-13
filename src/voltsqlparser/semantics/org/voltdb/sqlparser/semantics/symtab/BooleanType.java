@@ -32,6 +32,8 @@
  */
  package org.voltdb.sqlparser.semantics.symtab;
 
+import org.voltdb.sqlparser.syntax.symtab.TypeKind;
+
 /**
  * This is the type of booleans.  Although this type is not
  * available to the user, it is still useful, as some parts of

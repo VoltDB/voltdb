@@ -32,25 +32,17 @@
  */
  package org.voltdb.sqlparser.semantics.symtab;
 
-import org.voltdb.sqlparser.syntax.grammar.INeutrino;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 
-public class Neutrino implements INeutrino {
+public class Semantino implements ISemantino {
 
-    private static Neutrino m_errorNeutrino = null;
+    private static Semantino m_errorSemantino = null;
 
     private Type m_type;
     private IAST m_ast;
 
-    @Override
-    public boolean isBooleanExpression() {
-            if (m_type.getClass() == BooleanType.class)
-                    return true;
-            else
-                    return false;
-    }
-
-    public Neutrino (Type newtype, IAST xml) {
+    public Semantino (Type newtype, IAST xml) {
             this.m_type = newtype;
             this.m_ast = xml;
     }
@@ -63,10 +55,10 @@ public class Neutrino implements INeutrino {
         return m_ast;
     }
 
-    public static Neutrino getErrorNeutrino() {
-        if (m_errorNeutrino == null) {
-            m_errorNeutrino = new Neutrino(SymbolTable.getErrorType(), null);
+    public static Semantino getErrorSemantino() {
+        if (m_errorSemantino == null) {
+            m_errorSemantino = new Semantino(SymbolTable.getErrorType(), null);
         }
-        return m_errorNeutrino;
+        return m_errorSemantino;
     }
 }

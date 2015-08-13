@@ -16,6 +16,8 @@
  */
  package org.voltdb.sqlparser.semantics.symtab;
 
+import org.voltdb.sqlparser.syntax.symtab.TypeKind;
+
 public class IntegerType extends NumericType {
     public IntegerType(String aName, TypeKind aKind) {
         super(aName, aKind);

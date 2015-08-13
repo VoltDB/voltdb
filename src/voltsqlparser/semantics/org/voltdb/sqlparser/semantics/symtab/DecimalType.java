@@ -16,6 +16,8 @@
  */
 package org.voltdb.sqlparser.semantics.symtab;
 
+import org.voltdb.sqlparser.syntax.symtab.TypeKind;
+
 public class DecimalType extends NumericType {
     private final static int DEFAULT_SCALE = 12;
     private final static int DEFAULT_PRECISION = 38;

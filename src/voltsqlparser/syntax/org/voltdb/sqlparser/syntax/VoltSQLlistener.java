@@ -27,7 +27,7 @@ import org.antlr.v4.runtime.atn.ATNConfigSet;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
-import org.voltdb.sqlparser.syntax.grammar.INeutrino;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserBaseListener;
@@ -290,8 +290,8 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
      * {@inheritDoc}
      */
     @Override public void exitWhere_clause(SQLParserParser.Where_clauseContext ctx) {
-        INeutrino ret = m_selectQuery.popNeutrino();
-        if (!(ret != null && ret.isBooleanExpression())) { // check if expr is boolean
+        ISemantino ret = m_selectQuery.popSemantino();
+        if (!(ret != null && ret.getType().isBooleanType())) { // check if expr is boolean
                 addError(ctx.start.getLine(),
                         ctx.start.getCharPositionInLine(),
                         "Boolean expression expected");
@@ -312,19 +312,19 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
         //
         // Now, given the kind of operation, calculate the output.
         //
-        INeutrino rightoperand = (INeutrino) m_selectQuery.popNeutrino();
-        INeutrino leftoperand = (INeutrino) m_selectQuery.popNeutrino();
-        INeutrino answer;
+        ISemantino rightoperand = (ISemantino) m_selectQuery.popSemantino();
+        ISemantino leftoperand = (ISemantino) m_selectQuery.popSemantino();
+        ISemantino answer;
         if (op.isArithmetic()) {
-            answer = m_selectQuery.getNeutrinoMath(op,
+            answer = m_selectQuery.getSemantinoMath(op,
                                                               leftoperand,
                                                               rightoperand);
         } else if (op.isRelational()) {
-            answer = m_selectQuery.getNeutrinoCompare(op,
+            answer = m_selectQuery.getSemantinoCompare(op,
                                                                  leftoperand,
                                                                  rightoperand);
         } else if (op.isBoolean()) {
-            answer = m_selectQuery.getNeutrinoBoolean(op,
+            answer = m_selectQuery.getSemantinoBoolean(op,
                                                                  leftoperand,
                                                                  rightoperand);
         } else {
@@ -340,12 +340,12 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
                      rightoperand.getType().getName());
             return;
         }
-            m_selectQuery.pushNeutrino(answer);
+            m_selectQuery.pushSemantino(answer);
     }
     /**
      * {@inheritDoc}
      *
-     * <p>Combine two Neutrinos with a product op.</p>
+     * <p>Combine two Semantinos with a product op.</p>
      */
     @Override public void exitTimes_expr(SQLParserParser.Times_exprContext ctx) {
         binOp(ctx.op.start.getText(),
@@ -355,7 +355,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
     /**
      * {@inheritDoc}
      *
-     * <p>Combine two Neutrinos with an add op.</p>
+     * <p>Combine two Semantinos with an add op.</p>
      */
     @Override public void exitAdd_expr(SQLParserParser.Add_exprContext ctx) {
         binOp(ctx.op.start.getText(),
@@ -365,7 +365,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
     /**
      * {@inheritDoc}
      *
-     * <p>Combine two Neutrinos with a relational op.</p>
+     * <p>Combine two Semantinos with a relational op.</p>
      */
     @Override public void exitRel_expr(SQLParserParser.Rel_exprContext ctx) {
         binOp(ctx.op.start.getText(),
@@ -383,20 +383,20 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
     /**
      * {@inheritDoc}
      *
-     * <p>Push a true neutrino</p>
+     * <p>Push a true semantino</p>
      */
     @Override public void exitTrue_expr(SQLParserParser.True_exprContext ctx) {
         IType boolType = m_factory.getBooleanType();
-        m_selectQuery.pushNeutrino(m_selectQuery.getConstantNeutrino(Boolean.valueOf(true), boolType));
+        m_selectQuery.pushSemantino(m_selectQuery.getConstantSemantino(Boolean.valueOf(true), boolType));
     }
     /**
      * {@inheritDoc}
      *
-     * <p>Push a False Neutrino.</p>
+     * <p>Push a False Semantino.</p>
      */
     @Override public void exitFalse_expr(SQLParserParser.False_exprContext ctx) {
         IType boolType = m_factory.getBooleanType();
-        m_selectQuery.pushNeutrino(m_selectQuery.getConstantNeutrino(Boolean.valueOf(false), boolType));
+        m_selectQuery.pushSemantino(m_selectQuery.getConstantSemantino(Boolean.valueOf(false), boolType));
     }
 
     /**
@@ -406,15 +406,15 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
         SQLParserParser.Column_refContext crctx = ctx.column_ref();
         String tableName = (crctx.table_name() != null) ? crctx.table_name().IDENTIFIER().getText() : null;
         String columnName = crctx.column_name().IDENTIFIER().getText();
-        INeutrino crefNeutrino = m_selectQuery.getColumnNeutrino(columnName, tableName);
-        m_selectQuery.pushNeutrino(crefNeutrino);
+        ISemantino crefSemantino = m_selectQuery.getColumnSemantino(columnName, tableName);
+        m_selectQuery.pushSemantino(crefSemantino);
     }
     /**
      * {@inheritDoc}
      */
     @Override public void exitNumeric_expr(SQLParserParser.Numeric_exprContext ctx) {
         IType intType = m_symbolTable.getType("integer");
-        m_selectQuery.pushNeutrino(m_selectQuery.getConstantNeutrino(Integer.valueOf(ctx.NUMBER().getText()),
+        m_selectQuery.pushSemantino(m_selectQuery.getConstantSemantino(Integer.valueOf(ctx.NUMBER().getText()),
                                                                      intType));
     }
 
@@ -462,7 +462,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
         for (ValueContext val : ctx.values().value()) {
             /*
              * TODO: This is not right.  These are expressions in general.  We
-             * need to traffic in Neutrinos here.
+             * need to traffic in Semantinos here.
              */
             String valStr = val.NUMBER().getText();
             colVals.add(valStr);
