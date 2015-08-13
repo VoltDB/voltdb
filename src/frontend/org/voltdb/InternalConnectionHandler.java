@@ -29,6 +29,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.ProcedureInvocationType;
 
@@ -66,8 +67,14 @@ public class InternalConnectionHandler {
         return (table!=null);
     }
 
+    public class NullCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+        }
+    }
+
     public boolean callProcedure(InternalConnectionContext caller, long backPressureTimeout, String proc, Object... fieldList) {
-        return callProcedure(caller, backPressureTimeout, null, proc, fieldList);
+        return callProcedure(caller, backPressureTimeout, new NullCallback(), proc, fieldList);
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
