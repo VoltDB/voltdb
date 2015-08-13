@@ -47,7 +47,7 @@ public class InternalConnectionHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final InternalClientResponseAdapter m_adapter;
 
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTIONS", 400);
+    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION_PER_PARTITION", 400);
 
     public InternalConnectionHandler(InternalClientResponseAdapter adapter) {
         m_adapter = adapter;
