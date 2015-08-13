@@ -81,6 +81,8 @@ public:
     void setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
     void setBuildUpExecutorVector(const catalog::CatalogMap<catalog::Statement> &buildUpQueryStmts);
 
+    void populateViewFromDefinition();
+
     // See if the index is just built on group by columns or it also includes min/max agg (ENG-6511)
     bool minMaxIndexIncludesAggCol(TableIndex * index)
     {

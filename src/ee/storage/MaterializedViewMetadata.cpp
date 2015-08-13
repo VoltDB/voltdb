@@ -91,16 +91,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     setFallbackExecutorVectors(mvInfo->fallbackQueryStmts());
 
     allocateBackedTuples();
-
-    // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
-        ExecutorContext* context = ExecutorContext::getExecutorContext();
-        // executing the stored plan to build up the view.
-        // Note we ignore m_buildUpExecutorVectors[0] it's just send / receive.
-        vector<AbstractExecutor*> executorList = m_buildUpExecutorVectors[1]->getExecutorList();
-        context->executeExecutors(executorList, 0);
-        context->cleanupExecutorsForSubquery(executorList);
-    }
+    populateViewFromDefinition();
 
     /* If there is no group by column and the target table is still empty
      * even after catching up with pre-existing source tuples, we should initialize the
@@ -175,6 +166,18 @@ void MaterializedViewMetadata::setBuildUpExecutorVector(const catalog::CatalogMa
             cout << "Build up query plan:" << endl;
             cout << explanation << endl;
         }
+    }
+}
+
+// Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
+void MaterializedViewMetadata::populateViewFromDefinition() {
+    if (( ! m_srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
+        ExecutorContext* context = ExecutorContext::getExecutorContext();
+        // executing the stored plan to build up the view.
+        // Note we ignore m_buildUpExecutorVectors[0] it's just send / receive.
+        vector<AbstractExecutor*> executorList = m_buildUpExecutorVectors[1]->getExecutorList();
+        context->executeExecutors(executorList, 0);
+        context->cleanupExecutorsForSubquery(executorList);
     }
 }
 

@@ -203,12 +203,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // default iterator
     TableIterator m_iter;
 
+    bool m_viewsUpdateEnabled;
+
  protected:
 
     virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
   public:
     virtual ~PersistentTable();
+
+    void setViewsUpdateEnabled(bool enabled) { m_viewsUpdateEnabled = enabled; }
+    bool isViewsUpdateEnabled() { return m_viewsUpdateEnabled; }
 
     void notifyQuantumRelease() {
         if (compactionPredicate()) {
