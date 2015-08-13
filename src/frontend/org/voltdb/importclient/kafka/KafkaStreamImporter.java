@@ -908,10 +908,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //On getting this event kick off ready
     @Override
     public void onChange(ImporterChannelAssignment assignment) {
-        if (m_stopping) {
-            info("Importer is stopping, ignoring the change notification.");
-            return;
-        }
         if (m_es == null) {
             //Create executor with sufficient threads.
             VoltDB.crashLocalVoltDB("buildTopicLeaderMetadata must be called before getting an onChange", false, null);
@@ -924,6 +920,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 info("KafkaImporter is NOT fetching for resource: " + r);
                 m_fetchers.remove(r.toString());
             }
+        }
+        if (m_stopping) {
+            info("Importer is stopping, ignoring these additions " + assignment.getAdded());
+            return;
         }
 
         //For addeed create fetchers...make sure existing fetchers are not there.
