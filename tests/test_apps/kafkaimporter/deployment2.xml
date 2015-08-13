@@ -10,7 +10,7 @@
             <property name="brokers">kafka2:9092</property>
             <property name="topics">TF1_KAFKAEXPORTTABLE2</property>
             <property name="procedure">InsertImport2</property>
-            <property name="groupid">A</property>
+            <property name="groupid">B</property>
         </configuration>
     </import>
 
