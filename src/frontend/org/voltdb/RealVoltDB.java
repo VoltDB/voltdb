@@ -2219,13 +2219,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 }
                 m_consumerDRGateway.initialize(false);
             }
-
-            // 6.1. If we are a DR replica, we may care about a
+            // 6.2. If we are a DR replica, we may care about a
             // deployment update
             if (m_consumerDRGateway != null) {
                 m_consumerDRGateway.updateCatalog(m_catalogContext);
             }
-            // 6.2. If we are a DR master, update the DR table signature hash
+            // 6.3. If we are a DR master, update the DR table signature hash
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.updateCatalog(m_catalogContext,
                         VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
