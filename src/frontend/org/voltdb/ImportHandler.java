@@ -143,12 +143,6 @@ public class ImportHandler {
     }
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
-        // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
-            warn(null, "Server is paused and is currently unavailable - please try again later.");
-            m_failedCount.incrementAndGet();
-            return false;
-        }
         Procedure catProc = m_catalogContext.procedures.get(proc);
         if (catProc == null) {
             catProc = m_catalogContext.m_defaultProcs.checkForDefaultProcedure(proc);

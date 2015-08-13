@@ -17,28 +17,37 @@
 
 package org.voltdb.importer;
 
-import org.voltdb.*;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.client.ClientResponse;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.ClientInterface;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.ImportHandler;
+import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
 /**
@@ -62,6 +71,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
+    private final AtomicLong m_failures = new AtomicLong(0);
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
 
@@ -236,8 +246,8 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                 public void handle() {
                     try {
                         if (resp.getStatus() != ClientResponse.SUCCESS) {
-                            String fmt = "Importer stored procedure failed: %s Error: %s";
-                            rateLimitedLog(Level.ERROR, null, fmt, callback.getProcedureName(), resp.getStatusString());
+                            String fmt = "Importer stored procedure failed: %s Error: %s failures: %d";
+                            rateLimitedLog(Level.WARN, null, fmt, callback.getProcedureName(), resp.getStatusString(), m_failures.incrementAndGet());
                         }
                         callback.handleResponse(resp);
                     } catch (Exception ex) {

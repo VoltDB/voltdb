@@ -21,6 +21,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.isNull;
 import static com.google_voltpatches.common.base.Predicates.not;
+import static com.google_voltpatches.common.base.Predicates.or;
 import static org.voltcore.zk.ZKUtil.joinZKPath;
 
 import java.io.File;
@@ -1019,6 +1020,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     return;
                 }
 
+                Predicate<Map.Entry<ChannelSpec,String>> inSpecs =
+                        ChannelSpec.specKeyIn(nodespecs.get(), String.class);
+
                 int [] sstamp = new int[]{0};
                 AtomicInteger dstamp = m_hosts.getReference().get(host);
                 if (dstamp == null) {
@@ -1046,7 +1050,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     oldspecs = Maps.filterEntries(prev, thisHost).navigableKeySet();
                     // rebuild the assigned channel spec list
                     mbldr = ImmutableSortedMap.naturalOrder();
-                    mbldr.putAll(Maps.filterEntries(prev, not(thisHost)));
+                    mbldr.putAll(Maps.filterEntries(prev, not(or(thisHost, inSpecs))));
                     for (ChannelSpec spec: nodespecs.get()) {
                         mbldr.put(spec, host);
                     }
@@ -1179,6 +1183,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     return;
                 }
                 if (!m_mode.compareAndSet(prev, next, stamp[0], stat.getVersion())) {
+                    return;
+                }
+                if (prev == next) {
                     return;
                 }
                 if (m_isLeader && !m_done.get() && next == OperationMode.RUNNING) {
