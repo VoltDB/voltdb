@@ -1843,6 +1843,12 @@ public class ParserDQL extends ParserBase {
         Table      table = readTableName();
         SimpleName alias = null;
 
+        // A VoltDB extension to not allow aliases in DML
+        // This may need to change if/when we support subqueries in
+        // DELETE or UPDATE WHERE clauses.  For now it wreaks havoc
+        // with "DELETE FROM t LIMIT 1;" because the LIMIT is treated
+        // as an alias.
+        /* Disabling 13 lines ...
         if (operation != StatementTypes.TRUNCATE
                 && operation != StatementTypes.INSERT) {
             if (token.tokenType == Tokens.AS) {
@@ -1857,6 +1863,8 @@ public class ParserDQL extends ParserBase {
                 read();
             }
         }
+        ... 13 lines disabled */
+        // End of VoltDB extension
 
         if (table.isView) {
             switch (operation) {

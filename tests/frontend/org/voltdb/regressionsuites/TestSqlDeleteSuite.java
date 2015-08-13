@@ -398,8 +398,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         verifyStmtFails(
                 client,
                 "DELETE FROM R1 LIMIT 1",
-                //hsql232 ENG-8639 DELETE with LIMIT: "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
-                "Syntax error in \"DELETE FROM R1 LIMIT 1\" unexpected token: 1"); //hsql232 ENG-8639 current undesirable behavior for DELETE with LIMIT:
+                "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
 
         // This fails in a different way due to a bug in HSQL. OFFSET with no
         // LIMIT confuses HSQL.
@@ -409,13 +408,13 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         verifyStmtFails(
                 client,
                 "DELETE FROM R1 LIMIT 1 OFFSET 1",
-                //hsql232 ENG-8639 DELETE with LIMIT: "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
-                "Syntax error in \"DELETE FROM R1 LIMIT 1 OFFSET 1\" unexpected token: 1"); //hsql232 ENG-8639 current undesirable behavior for DELETE with LIMIT:
+                "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
+
         verifyStmtFails(
                 client,
                 "DELETE FROM R1 OFFSET 1 LIMIT 1",
-                //hsql232 ENG-8639 DELETE with LIMIT: "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
-                "Syntax error in \"DELETE FROM R1 OFFSET 1 LIMIT 1\" unexpected token: 1"); //hsql232 ENG-8639 current undesirable behavior for DELETE with LIMIT:
+                "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
+
         verifyStmtFails(client, "DELETE FROM P1_VIEW ORDER BY ID ASC LIMIT 1",
                 "INSERT, UPDATE, DELETE or TRUNCATE not permitted for table or view");
 
