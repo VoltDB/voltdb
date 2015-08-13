@@ -31,6 +31,7 @@ namespace voltdb {
 class AbstractExpression;
 class PersistentTable;
 class TableIndex;
+class ExecutorVector;
 
 /**
  * Manage the inserts, deletes and updates for a materialized view table based on changes to
@@ -67,6 +68,18 @@ public:
     catalog::MaterializedViewInfo* getMaterializedViewInfo() {
         return m_mvInfo;
     }
+
+    // Returns the fallback executor vectors
+    std::vector< boost::shared_ptr<ExecutorVector> > getFallbackExecutorVectors() {
+        return m_fallbackExecutorVectors;
+    }
+    // Returns the build up executor vectors
+    std::vector< boost::shared_ptr<ExecutorVector> > getBuildUpExecutorVectors() {
+        return m_buildUpExecutorVectors;
+    }
+
+    void setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
+    void setBuildUpExecutorVector(const catalog::CatalogMap<catalog::Statement> &buildUpQueryStmts);
 
     // See if the index is just built on group by columns or it also includes min/max agg (ENG-6511)
     bool minMaxIndexIncludesAggCol(TableIndex * index)
@@ -107,6 +120,11 @@ private:
                                              int negate_for_min,
                                              int aggIndex);
 
+    NValue findFallbackValueUsingPlan(const TableTuple& oldTuple,
+                                      const NValue &initialNull,
+                                      int aggIndex,
+                                      int minMaxAggIdx);
+
     // the source persistent table
     PersistentTable *m_srcTable;
     // the materialized view table
@@ -120,6 +138,11 @@ private:
 
     // the index on srcTable which can be used to maintain min/max
     std::vector<TableIndex *> m_indexForMinMax;
+    // Executor vectors to be executed when fallback on min/max value is needed (ENG-8641).
+    std::vector< boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
+    std::vector< bool > m_usePlanForAgg;
+    // Executor vector used to build up the view from pre-existing rows.
+    std::vector< boost::shared_ptr<ExecutorVector> > m_buildUpExecutorVectors;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
