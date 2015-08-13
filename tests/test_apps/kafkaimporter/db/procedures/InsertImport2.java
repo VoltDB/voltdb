@@ -191,8 +191,9 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             TimestampType ntsVal = (TimestampType) rowData.fetchRow(0).get(TYPE_NULL_TIMESTAMP, VoltType.TIMESTAMP);
-            if ((rowData.wasNull() && type_null_timestamp.toString().equals("null")) ||
-                ntsVal.equals(type_null_timestamp)) {
+            if ((ntsVal == null &&
+            		type_null_timestamp == null) ||
+            		ntsVal.equals(type_null_timestamp)) {
                 System.out.println("type_null_timestamp match!!");
             } else {
                 System.out.println("Mirror type_null_timestamp (" + type_null_timestamp + ") " +
@@ -228,7 +229,8 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             BigDecimal ndecimalVal = (BigDecimal) rowData.fetchRow(0).get(TYPE_NULL_DECIMAL, VoltType.DECIMAL);
-            if ((rowData.wasNull() && type_null_decimal == null) ||
+            if ((ndecimalVal == null &&
+            		type_null_decimal == null) ||
                     ndecimalVal.equals(type_null_decimal)) {
                     System.out.println("type_null_decimal match!!");
             } else {
@@ -247,7 +249,8 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             String nstring25Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR25, VoltType.STRING);
-            if ((rowData.wasNull() && type_null_varchar25 == null) ||
+            if ((nstring25Val == null &&
+            		type_null_varchar25 == null) ||
                     nstring25Val.equals(type_null_varchar25)) {
                     System.out.println("type_null_varchar25 match!!");
             } else {
@@ -266,7 +269,8 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             String nstring128Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR128, VoltType.STRING);
-            if ((rowData.wasNull() && type_null_varchar128 == null) ||
+            if ((nstring128Val == null &&
+            		type_null_varchar128 == null) ||
                     nstring128Val.equals(type_null_varchar128)) {
                     System.out.println("type_null_varchar128 match!!");
             } else {
@@ -285,7 +289,8 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             String nstring1024Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR1024, VoltType.STRING);
-            if ((rowData.wasNull() && type_null_varchar1024 == null) ||
+            if ((nstring1024Val == null &&
+            		type_null_varchar1024 == null) ||
                     nstring1024Val.equals(type_null_varchar1024)) {
                     System.out.println("type_null_varchar1024 match!!");
             } else {
