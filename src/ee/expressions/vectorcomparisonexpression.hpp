@@ -67,11 +67,12 @@ template<typename OP>
 NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
 {
     assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
+
     NValue fallback_result = OP::includes_equality() ? NValue::getTrue() : NValue::getFalse();
     int schemaSize = tuple1.getSchema()->columnCount();
     for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
         NValue value1 = tuple1.getNValue(columnIdx);
-        if (value1.isNull()) {
+        if (OP::isNullRejecting() && value1.isNull()) {
             fallback_result = NValue::getNullValue(VALUE_TYPE_BOOLEAN);
             if (OP::implies_null_for_row()) {
                 return fallback_result;
@@ -79,14 +80,14 @@ NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
             continue;
         }
         NValue value2 = tuple2.getNValue(columnIdx);
-        if (value2.isNull()) {
+        if (OP::isNullRejecting() && value2.isNull()) {
             fallback_result = NValue::getNullValue(VALUE_TYPE_BOOLEAN);
             if (OP::implies_null_for_row()) {
                 return fallback_result;
             }
             continue;
         }
-        if (OP::compare_withoutNull(value1, tuple2.getNValue(columnIdx)).isTrue()) {
+        if (OP::compare(value1, tuple2.getNValue(columnIdx)).isTrue()) {
             if (OP::implies_true_for_row(value1, value2)) {
                 // allow early return on strict inequality
                 return NValue::getTrue();
@@ -134,8 +135,10 @@ struct NValueExtractor
     typedef NValue ValueType;
 
     NValueExtractor(NValue value) :
-        m_value(value), m_hasNext(true)
-    {}
+        m_value(value), m_nullValue(value), m_hasNext(true)
+    {
+        m_nullValue.setNull();
+    }
 
     int64_t resultSize() const
     {
@@ -168,13 +171,13 @@ struct NValueExtractor
     template<typename OP>
     NValue compare(const NValue& nvalue) const
     {
-        if (m_value.isNull()) {
+        if (OP::isNullRejecting() && m_value.isNull()) {
             return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
         }
-        if (nvalue.isNull()) {
+        if (OP::isNullRejecting() && nvalue.isNull()) {
             return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
         }
-        return OP::compare_withoutNull(m_value, nvalue);
+        return OP::compare(m_value, nvalue);
     }
 
     std::string debug() const
@@ -182,7 +185,14 @@ struct NValueExtractor
         return m_value.isNull() ? "NULL" : m_value.debug();
     }
 
+    const ValueType& getNullValue()
+    {
+        return m_nullValue;
+    }
+
+private:
     ValueType m_value;
+    ValueType m_nullValue;
     bool m_hasNext;
 };
 
@@ -194,6 +204,7 @@ struct TupleExtractor
         m_table(getOutputTable(value)),
         m_iterator(m_table->iterator()),
         m_tuple(m_table->schema()),
+        m_null_tuple(m_table->schema()),
         m_size(m_table->activeTupleCount())
     {}
 
@@ -237,18 +248,23 @@ struct TupleExtractor
     {
         assert(m_tuple.getSchema()->columnCount() == 1);
         NValue lvalue = m_tuple.getNValue(0);
-        if (lvalue.isNull()) {
+        if (OP::isNullRejecting() && lvalue.isNull()) {
             return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
         }
-        if (nvalue.isNull()) {
+        if (OP::isNullRejecting() && nvalue.isNull()) {
             return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
         }
-        return OP::compare_withoutNull(lvalue, nvalue);
+        return OP::compare(lvalue, nvalue);
     }
 
     std::string debug() const
     {
         return m_tuple.isNullTuple() ? "NULL" : m_tuple.debug("TEMP");
+    }
+
+    const ValueType& getNullValue()
+    {
+        return m_null_tuple.tuple();
     }
 
 private:
@@ -264,6 +280,7 @@ private:
     Table* m_table;
     TableIterator& m_iterator;
     ValueType m_tuple;
+    const StandAloneTupleStorage m_null_tuple;
     int64_t m_size;
 };
 
@@ -318,7 +335,18 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     if (innerExtractor.resultSize() == 0) {
         switch (m_quantifier) {
         case QUANTIFIER_TYPE_NONE: {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            // the inner extractor (RHS) value either does not have result or is NULL.
+            // Check if the comparison operator is Null rejecting. If it is, return NULL for boolean.
+            // If for the operator NULL is a valid value in result, construct RHS value with NULL and
+            // use that to compare against outer-extractor value.
+
+            if(OP::isNullRejecting() || !outerExtractor.hasNext()) {
+                return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+            }
+
+            const typename ValueExtractorInner::ValueType& innerNullValue = innerExtractor.getNullValue();
+            assert(innerExtractor.hasNullValue());
+            return outerExtractor.template compare<OP>(innerNullValue);
         }
         case QUANTIFIER_TYPE_ANY: {
             return NValue::getFalse();
@@ -330,7 +358,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     }
 
     assert (innerExtractor.resultSize() > 0);
-    if (!outerExtractor.hasNext() || outerExtractor.hasNullValue()) {
+    if (!outerExtractor.hasNext() || (outerExtractor.hasNullValue() && OP::isNullRejecting())) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
     }
 

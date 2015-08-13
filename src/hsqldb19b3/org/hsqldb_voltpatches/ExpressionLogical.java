@@ -1011,7 +1011,13 @@ public class ExpressionLogical extends Expression {
 
             if (leftType == null) {
                 leftType = nodes[LEFT].nodeDataTypes[i] = rightType;
+            // A VoltDB extension: fix issue where check for right child node
+            // data type being null was missing
+            } else if (rightType == null) {
+            /* disable 1 line
             } else if (nodes[RIGHT].dataType == null) {
+            ... disabled 1 line */
+            // End of VoltDB extension
                 rightType = nodes[RIGHT].nodeDataTypes[i] = leftType;
             }
 
