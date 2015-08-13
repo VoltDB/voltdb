@@ -1918,7 +1918,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         int partition = -1;
         try {
-            getPartitionForProcedure(catProc, task);
+            partition = getPartitionForProcedure(catProc, task);
         } catch (Exception e) {
             // unable to hash to a site, return an error
             return getMispartitionedErrorResponse(task, catProc, e);
