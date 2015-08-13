@@ -31,6 +31,8 @@
 
 namespace voltdb {
 
+const int TRUNCATE_TABLE_ROW_EQUIVALENCE = 100;
+
 class CachedIndexKeyTuple {
 public:
     CachedIndexKeyTuple() : m_tuple(), m_cachedIndexCrc(0), m_storageSize(0), m_tupleStorage() {}
@@ -63,12 +65,13 @@ private:
 
 BinaryLogSink::BinaryLogSink() {}
 
-void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
+int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
 
+    in64_t rowCount = 0;
     CachedIndexKeyTuple indexKeyTuple;
     while (taskInfo.hasRemaining()) {
         pool->purge();
@@ -141,6 +144,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             } else {
                 table->insertPersistentTuple(tempTuple, true);
             }
+            rowCount++;
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
@@ -190,6 +194,8 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             PersistentTable *table = tableIter->second;
 
             table->truncateTable(engine, true);
+            
+            rowCount += TRUNCATE_TABLE_ROW_EQUIVALENCE;
             break;
         }
         case DR_RECORD_UPDATE:
@@ -198,6 +204,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             break;
         }
     }
+    return rowCount;
 }
 
 void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const char *end) {

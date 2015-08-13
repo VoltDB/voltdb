@@ -174,7 +174,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushDRBuffer",
-            "(IJJJJLjava/nio/ByteBuffer;)J");
+            "(IJJJLjava/nio/ByteBuffer;)J");
     if (m_pushDRBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushDRBufferMID != NULL);
@@ -470,7 +470,6 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
                 block->startDRSequenceNumber(),
                 block->lastDRSequenceNumber(),
                 block->lastUniqueId(),
-                block->rowCountForDR(),
                 buffer);
         m_jniEnv->DeleteLocalRef(buffer);
     }

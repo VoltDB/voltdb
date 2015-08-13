@@ -170,7 +170,7 @@ private:
 
     void threadLocalPoolAllocations();
 
-    void applyBinaryLog(struct ipc_command*);
+    int64_t applyBinaryLog(struct ipc_command*);
 
     void executeTask(struct ipc_command*);
 
@@ -483,8 +483,7 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           result = kErrorCode_None;
           break;
       case 29:
-          applyBinaryLog(cmd);
-          result = kErrorCode_None;
+          result = applyBinaryLog(cmd);
           break;
       default:
         result = stub(cmd);
@@ -1530,19 +1529,21 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
     }
 }
 
-void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
+int64_t VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
+    int64_t res = -1L;
     try {
         apply_binary_log *params = (apply_binary_log*)cmd;
         m_engine->resetReusedResultOutputBuffer(1);
-        m_engine->applyBinaryLog(ntohll(params->txnId),
-                                 ntohll(params->spHandle),
-                                 ntohll(params->lastCommittedSpHandle),
-                                 ntohll(params->uniqueId),
-                                 ntohll(params->undoToken),
-                                 params->log);
+        res = m_engine->applyBinaryLog(ntohll(params->txnId),
+                                       ntohll(params->spHandle),
+                                       ntohll(params->lastCommittedSpHandle),
+                                       ntohll(params->uniqueId),
+                                       ntohll(params->undoToken),
+                                       params->log);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }
+    return res;
 }
 
 int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
