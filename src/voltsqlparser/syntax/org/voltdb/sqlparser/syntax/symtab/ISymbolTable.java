@@ -16,6 +16,8 @@
  */
  package org.voltdb.sqlparser.syntax.symtab;
 
+import org.voltdb.sqlparser.semantics.symtab.Table;
+
 public interface ISymbolTable {
 
     /**
@@ -53,5 +55,20 @@ public interface ISymbolTable {
      * @return The value denoted by aName, or else null.
      */
     public IValue getValue(String aName);
+
+    /**
+     * Given a column name, return the column's alias.
+     *
+     * @param aColumnName
+     * @return
+     */
+    public String getTableAliasByColumn(String aColumnName);
+
+    /**
+     * Given a table name, return the table to which it refers.
+     * @param tableAlias
+     * @return
+     */
+    public ITable getTable(String tableAlias);
 
 }

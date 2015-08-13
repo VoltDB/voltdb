@@ -235,4 +235,12 @@ public interface IParserFactory {
     IColumnIdent makeColumnRef(String colName,
                                int colLineNo,
                                int colColNo);
+
+    /**
+     * Make a new expression parsing regime.
+     * @param factory
+     *
+     * @return
+     */
+    IExpressionParser makeExpressionParser();
 }

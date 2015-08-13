@@ -35,6 +35,7 @@
 import java.util.List;
 
 import org.voltdb.sqlparser.syntax.symtab.IAST;
+import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
@@ -54,8 +55,6 @@ public interface ISelectQuery {
 
     String printProjections();
 
-    String printSemantinos();
-
     void addTable(ITable aITable, String aAlias);
 
     String printTables();
@@ -65,6 +64,15 @@ public interface ISelectQuery {
     ISemantino getColumnSemantino(String aColumnName, String aTableName);
 
     ISemantino getConstantSemantino(Object value, IType type);
+
+    ISemantino getSemantinoMath(IOperator aOperator, ISemantino aLeftoperand,
+            ISemantino aRightoperand);
+
+    ISemantino getSemantinoCompare(IOperator aOperator, ISemantino aLeftoperand,
+            ISemantino aRightoperand);
+
+    ISemantino getSemantinoBoolean(IOperator aOperator, ISemantino aLeftoperand,
+            ISemantino aRightoperand);
 
     List<Projection> getProjections();
 
@@ -76,15 +84,10 @@ public interface ISelectQuery {
 
     void setAST(IAST aMakeQueryAST);
 
-    ISemantino getSemantinoMath(IOperator aOperator, ISemantino aLeftoperand,
-                    ISemantino aRightoperand);
-
-    ISemantino getSemantinoCompare(IOperator aOperator, ISemantino aLeftoperand,
-                    ISemantino aRightoperand);
-
-    ISemantino getSemantinoBoolean(IOperator aOperator, ISemantino aLeftoperand,
-                    ISemantino aRightoperand);
-
     boolean validate();
+
+    IExpressionParser getExpressionParser();
+
+    void setExpressionParser(IExpressionParser expr);
 
 }

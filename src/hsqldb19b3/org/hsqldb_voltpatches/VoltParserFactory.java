@@ -3,6 +3,7 @@ package org.hsqldb_voltpatches;
 import java.util.List;
 
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
+import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
 import org.voltdb.sqlparser.semantics.symtab.Type;
@@ -12,6 +13,7 @@ import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
+import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
@@ -188,5 +190,10 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
         VoltXMLElement params = new VoltXMLElement("parameters");
         top.children.add(params);
         return top;
+    }
+
+    @Override
+    public IExpressionParser makeExpressionParser() {
+        return new ExpressionParser(this);
     }
 }

@@ -35,6 +35,7 @@ import org.voltdb.sqlparser.syntax.grammar.SQLParserParser;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Column_nameContext;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.ValueContext;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
+import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
@@ -51,6 +52,7 @@ import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
  */
 public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRErrorListener {
     private static final int DEFAULT_STRING_SIZE = 64;
+    private List<IExpressionParser> m_expressionStack = new ArrayList<IExpressionParser>();
     private ITable m_currentlyCreatedTable = null;
     private ISymbolTable m_symbolTable;
     private IParserFactory m_factory;
@@ -58,7 +60,6 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
     private ErrorMessageSet m_errorMessages;
     private ISelectQuery m_selectQuery = null;
     private IInsertStatement m_insertStatement = null;
-    private String m_colName;
     private String m_defaultValue;
     private boolean m_hasDefaultValue;
     private boolean m_isPrimaryKey;
@@ -109,7 +110,6 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
     }
 
     @Override public void enterColumn_definition(SQLParserParser.Column_definitionContext ctx) {
-        m_colName = ctx.column_name().IDENTIFIER().getText();
         m_defaultValue       = null;
         m_hasDefaultValue    = false;
         m_isPrimaryKey       = false;
@@ -288,10 +288,23 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
 
     /**
      * {@inheritDoc}
+     *
+     * <p>The default implementation does nothing.</p>
+     */
+    @Override public void enterWhere_clause(SQLParserParser.Where_clauseContext ctx) {
+        IExpressionParser expr = m_factory.makeExpressionParser();
+        m_expressionStack.add(expr);
+        m_selectQuery.setExpressionParser(expr);
+    }
+    /**
+     * {@inheritDoc}
      */
     @Override public void exitWhere_clause(SQLParserParser.Where_clauseContext ctx) {
-        ISemantino ret = m_selectQuery.popSemantino();
-        if (!(ret != null && ret.getType().isBooleanType())) { // check if expr is boolean
+        assert(m_expressionStack.size() > 0);
+        IExpressionParser expr = m_expressionStack.remove(m_expressionStack.size()-1);
+        assert(expr == m_selectQuery.getExpressionParser());
+        ISemantino ret = expr.popSemantino();
+        if (!(ret != null && ret.getType().isBooleanType())) {
                 addError(ctx.start.getLine(),
                         ctx.start.getCharPositionInLine(),
                         "Boolean expression expected");
@@ -299,6 +312,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
                 // Push where statement, select knows if where exists and can pop it off if it does.
                 m_selectQuery.setWhereCondition(ret);
         }
+        m_selectQuery.setExpressionParser(null);
     }
 
     private void binOp(String opString, int lineno, int colno) {
@@ -316,15 +330,15 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
         ISemantino leftoperand = (ISemantino) m_selectQuery.popSemantino();
         ISemantino answer;
         if (op.isArithmetic()) {
-            answer = m_selectQuery.getSemantinoMath(op,
+            answer = getTopExpressionParser().getSemantinoMath(op,
                                                               leftoperand,
                                                               rightoperand);
         } else if (op.isRelational()) {
-            answer = m_selectQuery.getSemantinoCompare(op,
+            answer = getTopExpressionParser().getSemantinoCompare(op,
                                                                  leftoperand,
                                                                  rightoperand);
         } else if (op.isBoolean()) {
-            answer = m_selectQuery.getSemantinoBoolean(op,
+            answer = getTopExpressionParser().getSemantinoBoolean(op,
                                                                  leftoperand,
                                                                  rightoperand);
         } else {
@@ -340,7 +354,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
                      rightoperand.getType().getName());
             return;
         }
-            m_selectQuery.pushSemantino(answer);
+        getTopExpressionParser().pushSemantino(answer);
     }
     /**
      * {@inheritDoc}
@@ -387,8 +401,9 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
      */
     @Override public void exitTrue_expr(SQLParserParser.True_exprContext ctx) {
         IType boolType = m_factory.getBooleanType();
-        m_selectQuery.pushSemantino(m_selectQuery.getConstantSemantino(Boolean.valueOf(true), boolType));
+        getTopExpressionParser().pushSemantino(getTopExpressionParser().getConstantSemantino(Boolean.valueOf(true), boolType));
     }
+
     /**
      * {@inheritDoc}
      *
@@ -396,7 +411,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
      */
     @Override public void exitFalse_expr(SQLParserParser.False_exprContext ctx) {
         IType boolType = m_factory.getBooleanType();
-        m_selectQuery.pushSemantino(m_selectQuery.getConstantSemantino(Boolean.valueOf(false), boolType));
+        m_selectQuery.pushSemantino(getTopExpressionParser().getConstantSemantino(Boolean.valueOf(false), boolType));
     }
 
     /**
@@ -406,15 +421,15 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
         SQLParserParser.Column_refContext crctx = ctx.column_ref();
         String tableName = (crctx.table_name() != null) ? crctx.table_name().IDENTIFIER().getText() : null;
         String columnName = crctx.column_name().IDENTIFIER().getText();
-        ISemantino crefSemantino = m_selectQuery.getColumnSemantino(columnName, tableName);
-        m_selectQuery.pushSemantino(crefSemantino);
+        ISemantino crefSemantino = getTopExpressionParser().getColumnSemantino(columnName, tableName, m_symbolTable);
+        getTopExpressionParser().pushSemantino(crefSemantino);
     }
     /**
      * {@inheritDoc}
      */
     @Override public void exitNumeric_expr(SQLParserParser.Numeric_exprContext ctx) {
         IType intType = m_symbolTable.getType("integer");
-        m_selectQuery.pushSemantino(m_selectQuery.getConstantSemantino(Integer.valueOf(ctx.NUMBER().getText()),
+        getTopExpressionParser().pushSemantino(getTopExpressionParser().getConstantSemantino(Integer.valueOf(ctx.NUMBER().getText()),
                                                                      intType));
     }
 
@@ -513,5 +528,9 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
 
     protected final IParserFactory getFactory() {
         return m_factory;
+    }
+    private IExpressionParser getTopExpressionParser() {
+        assert(m_expressionStack.size() > 0);
+        return m_expressionStack.get(m_expressionStack.size() - 1);
     }
 }

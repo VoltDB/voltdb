@@ -43,14 +43,15 @@
 
 import java.util.List;
 
-import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
-import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
+import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
-import org.voltdb.sqlparser.syntax.grammar.ISemantino;
+import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
+import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
@@ -78,7 +79,7 @@ public class MockParserFactory extends ParserFactory implements
     }
 
     @Override
-    public IAST makeInsertAST(InsertStatement aInsertStatement) {
+    public IAST makeInsertAST(IInsertStatement aInsertStatement) {
         unimplementedOperation("makeInsertAST");
         return null;
     }
@@ -123,6 +124,11 @@ public class MockParserFactory extends ParserFactory implements
 
     public void processWhereExpression(Semantino aWhereExpression) {
             unimplementedOperation("processWhereExpression");
+    }
+    @Override
+    public IExpressionParser makeExpressionParser() {
+        unimplementedOperation("makeExpressionParser");
+        return null;
     }
 
 }
