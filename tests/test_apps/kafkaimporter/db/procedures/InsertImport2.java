@@ -107,10 +107,10 @@ public class InsertImport2 extends VoltProcedure {
 
 
         voltQueueSQL(selectMirrorRow, key, value);
-        VoltTable[] mirrorResults= voltExecuteSQL();
-        System.out.println("mirrorResults: " + mirrorResults.toString());
+        VoltTable[] mirrorResults = voltExecuteSQL();
+        //System.out.println("mirrorResults: " + mirrorResults.toString());
         VoltTable rowData = mirrorResults[0];
-        System.out.println("rowData: " + rowData.toString() + ". rowData.getRowCount(): " + rowData.getRowCount());
+        //System.out.println("rowData: " + rowData.toString() + ". rowData.getRowCount(): " + rowData.getRowCount());
 
         long deletedCount = 0;
         boolean rowCheckOk = true;
@@ -191,8 +191,8 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             TimestampType ntsVal = (TimestampType) rowData.fetchRow(0).get(TYPE_NULL_TIMESTAMP, VoltType.TIMESTAMP);
-            if (ntsVal.equals(type_null_timestamp) ||
-            		(ntsVal.toString().equals("null") && type_null_timestamp.toString().equals("null"))) {
+            if ((rowData.wasNull() && type_null_timestamp.toString().equals("null")) ||
+                ntsVal.equals(type_null_timestamp)) {
                 System.out.println("type_null_timestamp match!!");
             } else {
                 System.out.println("Mirror type_null_timestamp (" + type_null_timestamp + ") " +
@@ -228,9 +228,9 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             BigDecimal ndecimalVal = (BigDecimal) rowData.fetchRow(0).get(TYPE_NULL_DECIMAL, VoltType.DECIMAL);
-            if (ndecimalVal.equals(type_null_decimal) ||
-            		(ndecimalVal.toString().equals("null") && type_null_decimal.toString().equals("null"))) {
-                System.out.println("type_null_decimal match!!");
+            if ((rowData.wasNull() && type_null_decimal == null) ||
+                    ndecimalVal.equals(type_null_decimal)) {
+                    System.out.println("type_null_decimal match!!");
             } else {
                 System.out.println("Mirror type_null_decimal (" + type_null_decimal + ") " +
                     "not equal to import type_null_decimal (" + ndecimalVal + ")");
@@ -247,9 +247,9 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             String nstring25Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR25, VoltType.STRING);
-            if (nstring25Val.equals(type_null_varchar25) ||
-            		(nstring25Val.toString().equals("null") && type_null_varchar25.toString().equals("null"))) {
-                System.out.println("type_null_varchar25 match!!");
+            if ((rowData.wasNull() && type_null_varchar25 == null) ||
+                    nstring25Val.equals(type_null_varchar25)) {
+                    System.out.println("type_null_varchar25 match!!");
             } else {
                 System.out.println("Mirror type_null_varchar25 (" + type_null_varchar25 + ") " +
                     "not equal to import type_null_varchar25 (" + nstring25Val + ")");
@@ -266,9 +266,9 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             String nstring128Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR128, VoltType.STRING);
-            if (nstring128Val.equals(type_null_varchar128) ||
-            		(nstring128Val.toString().equals("null") && type_null_varchar128.toString().equals("null"))) {
-                System.out.println("type_null_varchar128 match!!");
+            if ((rowData.wasNull() && type_null_varchar128 == null) ||
+                    nstring128Val.equals(type_null_varchar128)) {
+                    System.out.println("type_null_varchar128 match!!");
             } else {
                 System.out.println("Mirror type_null_varchar128 (" + type_null_varchar128 + ") " +
                     "not equal to import type_null_varchar128 (" + nstring128Val + ")");
@@ -285,9 +285,9 @@ public class InsertImport2 extends VoltProcedure {
             }
 
             String nstring1024Val = (String) rowData.fetchRow(0).get(TYPE_NULL_VARCHAR1024, VoltType.STRING);
-            if (nstring1024Val.toString().equals(type_null_varchar1024) ||
-            		(nstring1024Val.toString().equals("null") && type_null_varchar1024.toString().equals("null"))) {
-                System.out.println("type_null_varchar1024 match!!");
+            if ((rowData.wasNull() && type_null_varchar1024 == null) ||
+                    nstring1024Val.equals(type_null_varchar1024)) {
+                    System.out.println("type_null_varchar1024 match!!");
             } else {
                 System.out.println("Mirror type_null_varchar1024 (" + type_null_varchar1024 + ") " +
                     "not equal to import type_null_varchar1024 (" + nstring1024Val + ")");
@@ -345,16 +345,16 @@ public class InsertImport2 extends VoltProcedure {
         			type_null_varchar1024, type_not_null_varchar1024);
         	voltExecuteSQL();
         }
-    	//voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG,
-        //        key, value, rowid_group,
-         //       type_null_tinyint, type_not_null_tinyint, type_null_smallint,
-          //      type_not_null_smallint, type_null_integer, type_not_null_integer,
-           //     type_null_bigint, type_not_null_bigint, type_null_timestamp,
-            //    type_not_null_timestamp, type_null_float, type_not_null_float,
-             //   type_null_decimal, type_not_null_decimal, type_null_varchar25,
-              //  type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128,
-               // type_null_varchar1024, type_not_null_varchar1024);
-        //long deletedCount = voltExecuteSQL()[0].asScalarLong();
+//    	voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG,
+//                key, value, rowid_group,
+//                type_null_tinyint, type_not_null_tinyint, type_null_smallint,
+//                type_not_null_smallint, type_null_integer, type_not_null_integer,
+//                type_null_bigint, type_not_null_bigint, type_null_timestamp,
+//                type_not_null_timestamp, type_null_float, type_not_null_float,
+//                type_null_decimal, type_not_null_decimal, type_null_varchar25,
+//                type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128,
+//                type_null_varchar1024, type_not_null_varchar1024);
+//        long deletedCount = voltExecuteSQL()[0].asScalarLong();
 
 //      if (deletedCount == 0) {
 //          voltQueueSQL(importInsert,
@@ -371,18 +371,18 @@ public class InsertImport2 extends VoltProcedure {
 //              type_null_varchar1024, type_not_null_varchar1024);
 //          voltExecuteSQL(true);
 
-//            System.out.println("Delete 0 path. Values: " +
-//                "key=" + key + "\n" + "value=" + value + "\n" + "rowid_group=" + rowid_group + "\n" +
-//                "type_null_tinyint=" + type_null_tinyint + "\n" + "type_not_null_tinyint=" + type_not_null_tinyint + "\n" +
-//                "type_null_smallint=" + type_null_smallint + "\n" + "type_not_null_smallint=" + type_not_null_smallint + "\n" +
-//                "type_null_integer=" + type_null_integer + "\n" + "type_not_null_integer=" + type_not_null_integer + "\n" +
-//                "type_null_bigint=" + type_null_bigint + "\n" + "type_not_null_bigint=" + type_not_null_bigint + "\n" +
-//                "type_null_timestamp=" + type_null_timestamp + "\n" + "type_not_null_timestamp=" + type_not_null_timestamp + "\n" +
-//                "type_null_float=" + type_null_float + "\n" + "type_not_null_float=" + type_not_null_float + "\n" +
-//                "type_null_decimal=" + type_null_decimal + "\n" + "type_not_null_decimal=" + type_not_null_decimal + "\n" +
-//                "type_null_varchar25="+type_null_varchar25 + "\n" + "type_not_null_varchar25="+type_not_null_varchar25 + "\n" +
-//                "type_null_varchar128=" + type_null_varchar128 + "\n" + "type_not_null_varchar128=" + type_not_null_varchar128 + "\n" +
-//                "type_null_varchar1024=" + type_null_varchar1024 + "\n" + "type_not_null_varchar1024=" + type_not_null_varchar1024);
+            System.out.println("Deleted: " + deletedCount + ". Values: " +
+                "key=" + key + "\n" + "value=" + value + "\n" + "rowid_group=" + rowid_group + "\n" +
+                "type_null_tinyint=" + type_null_tinyint + "\n" + "type_not_null_tinyint=" + type_not_null_tinyint + "\n" +
+                "type_null_smallint=" + type_null_smallint + "\n" + "type_not_null_smallint=" + type_not_null_smallint + "\n" +
+                "type_null_integer=" + type_null_integer + "\n" + "type_not_null_integer=" + type_not_null_integer + "\n" +
+                "type_null_bigint=" + type_null_bigint + "\n" + "type_not_null_bigint=" + type_not_null_bigint + "\n" +
+                "type_null_timestamp=" + type_null_timestamp + "\n" + "type_not_null_timestamp=" + type_not_null_timestamp + "\n" +
+                "type_null_float=" + type_null_float + "\n" + "type_not_null_float=" + type_not_null_float + "\n" +
+                "type_null_decimal=" + type_null_decimal + "\n" + "type_not_null_decimal=" + type_not_null_decimal + "\n" +
+                "type_null_varchar25="+type_null_varchar25 + "\n" + "type_not_null_varchar25="+type_not_null_varchar25 + "\n" +
+                "type_null_varchar128=" + type_null_varchar128 + "\n" + "type_not_null_varchar128=" + type_not_null_varchar128 + "\n" +
+                "type_null_varchar1024=" + type_null_varchar1024 + "\n" + "type_not_null_varchar1024=" + type_not_null_varchar1024);
 
             voltQueueSQL(selectCounts);
             VoltTable[] result = voltExecuteSQL();
