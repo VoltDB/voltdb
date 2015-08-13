@@ -139,7 +139,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_isForReplay;
     }
 
-    public boolean isForDR() {
+    public boolean isForDRv1() {
         return m_originalDRTxnId != -1;
     }
 
