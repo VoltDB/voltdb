@@ -64,7 +64,7 @@ import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
  * @author bwhite
  *
  */
-public class ParserFactory implements IParserFactory {
+public abstract class ParserFactory implements IParserFactory {
     ICatalogAdapter m_catalog;
     private static Map<String, IOperator> m_operatorMap = initOperatorMap();
     private Type m_booleanType = null;
@@ -174,59 +174,6 @@ public class ParserFactory implements IParserFactory {
         }
     }
 
-    /*
-     * All of these need to be implemented in VoltDB.
-     */
-    @Override
-    public IAST makeQueryAST(List<Projection> aProjections,
-                              IAST aWhereCondition,
-                              ISymbolTable aTables) {
-        unimplementedOperation("makeQueryAST");
-        return null;
-    }
-
-    @Override
-    public IAST makeUnaryAST(IType t, boolean b) {
-        unimplementedOperation("makeUnaryAST(boolean)");
-        return null;
-    }
-
-    @Override
-    public IAST makeUnaryAST(IType aIntType, int aValueOf) {
-        unimplementedOperation("makeUnaryAST(int)");
-        return null;
-    }
-
-    @Override
-    public IAST makeBinaryAST(IOperator aOp,
-                              INeutrino aLeftoperand,
-                              INeutrino aRightoperand) {
-        unimplementedOperation("makeBinaryAST");
-        return null;
-    }
-
-    private void unimplementedOperation(String aFuncName) {
-        throw new AssertionError("Unimplemented ParserFactory Method " + aFuncName);
-    }
-
-    @Override
-    public IAST addTypeConversion(IAST aNode, IType aSrcType, IType aTrgType) {
-        unimplementedOperation("addTypeConversion");
-        return null;
-    }
-
-    @Override
-    public IAST makeColumnRef(String aRealTableName,
-                              String aTableAlias,
-                              String aColumnName) {
-        unimplementedOperation("makeColumnRef");
-        return null;
-    }
-
-    public void processWhereExpression(Neutrino aWhereExpression) {
-            unimplementedOperation("processWhereExpression");
-    }
-
     @Override
     public ErrorMessageSet getErrorMessages() {
         return m_errorMessages;
@@ -248,4 +195,5 @@ public class ParserFactory implements IParserFactory {
                                       int    aColColNo) {
         return new ColumnIdent(aColName, aColLineNo, aColColNo);
     }
+
 }

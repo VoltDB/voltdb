@@ -16,6 +16,14 @@
  */
 package org.voltdb.sqlparser.syntax;
 
+/**
+ * This type has enumerals for each kind of SQL.  We use this to
+ * steer parsing by choosing the right parser non-terminal to begin
+ * parsing.
+ *
+ * @author bwhite
+ *
+ */
 public enum SQLKind {
     DDL, DML, DQL
 }

@@ -66,6 +66,7 @@ import static org.voltdb.sqlparser.symtab.TableAssert.withColumnNamed;
 import java.io.IOException;
 
 import org.junit.Test;
+import org.voltdb.sqlparser.mocks.MockParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.syntax.SQLKind;
@@ -77,7 +78,7 @@ public class TestWhereSelect {
 
     VoltSQLlistener newListener() {
         CatalogAdapter catalog = new CatalogAdapter();
-        ParserFactory m_factory = new ParserFactory(catalog);
+        ParserFactory m_factory = new MockParserFactory(catalog);
         VoltSQLlistener listener = new VoltSQLlistener(m_factory);
         return listener;
     }

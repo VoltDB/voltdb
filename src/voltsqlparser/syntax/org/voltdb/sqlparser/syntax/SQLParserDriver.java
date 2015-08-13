@@ -30,6 +30,19 @@ import org.voltdb.sqlparser.syntax.grammar.SQLParserLexer;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserListener;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser;
 
+/**
+ * This class defines a driver for the parser.  We give it the
+ * bits we need, the SQL, the error listener, and the kind of SQL
+ * we expect to parse, and the driver does the rest.  The error
+ * listener knows how to gather up error messages.
+ *
+ * The string is parsed in the constructor, to form an Antlr parse
+ * tree.  The walk function below takes a listener object and walks
+ * the tree, calling the appropriate listener functions as it goes.
+ *
+ * @author bwhite
+ *
+ */
 public class SQLParserDriver {
     private ParseTree m_tree;
     /**

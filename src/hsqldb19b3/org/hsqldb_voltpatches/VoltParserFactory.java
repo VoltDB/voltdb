@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
+import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
 import org.voltdb.sqlparser.semantics.symtab.Type;
@@ -15,6 +16,15 @@ import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
+/**
+ * This is the most derived class of the parser factory hierarchy.  Its
+ * main goal is creating IAST objects.  We discover here that, much to our
+ * surprise, the IAST objects are, in fact, VoltXMLElements. Who would have
+ * thunk it?
+ *
+ * @author bwhite
+ *
+ */
 public class VoltParserFactory extends ParserFactory implements IParserFactory {
     int m_id = 1;
     public VoltParserFactory(ICatalogAdapter aCatalog) {
@@ -155,5 +165,26 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
               .withValue("table", aRealTableName.toUpperCase())
               .withValue("tableAlias", aTableAlias.toUpperCase());
         return answer;
+    }
+
+
+    public VoltXMLElement makeInsertAST(InsertStatement aInsertStatement) {
+        VoltXMLElement top = new VoltXMLElement("insert");
+        top.withValue("table", aInsertStatement.getTableName().toUpperCase());
+        VoltXMLElement columns = new VoltXMLElement("columns");
+        top.children.add(columns);
+        for (int idx = 0; idx < aInsertStatement.getNumberColumns(); idx += 1) {
+            VoltXMLElement col = new VoltXMLElement("column");
+            columns.children.add(col);
+            col.withValue("name", aInsertStatement.getColumnName(idx).toUpperCase());
+            VoltXMLElement val = new VoltXMLElement("value");
+            col.children.add(val);
+            val.withValue("id", Integer.toString(idx+1));
+            val.withValue("value", aInsertStatement.getColumnValue(idx));
+            val.withValue("valuetype", aInsertStatement.getColumnType(idx).getName().toUpperCase());
+        }
+        VoltXMLElement params = new VoltXMLElement("parameters");
+        top.children.add(params);
+        return top;
     }
 }

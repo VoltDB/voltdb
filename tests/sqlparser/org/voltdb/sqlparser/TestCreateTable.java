@@ -65,6 +65,7 @@ import static org.voltdb.sqlparser.symtab.TableAssert.withColumnNamed;
 import java.io.IOException;
 
 import org.junit.Test;
+import org.voltdb.sqlparser.mocks.MockParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.syntax.SQLKind;
@@ -81,7 +82,7 @@ public class TestCreateTable {
 
     private void testDDL1(String ddl) throws IOException {
         CatalogAdapter catalog = new CatalogAdapter();
-        ParserFactory factory = new ParserFactory(catalog);
+        ParserFactory factory = new MockParserFactory(catalog);
         VoltSQLlistener listener = new VoltSQLlistener(factory);
         SQLParserDriver driver = new SQLParserDriver(ddl, null, SQLKind.DDL);
         driver.walk(listener);
@@ -93,7 +94,7 @@ public class TestCreateTable {
 
     private void testDDL2(String ddl) throws IOException {
         CatalogAdapter catalog = new CatalogAdapter();
-        ParserFactory factory = new ParserFactory(catalog);
+        ParserFactory factory = new MockParserFactory(catalog);
         VoltSQLlistener listener = new VoltSQLlistener(factory);
         SQLParserDriver driver = new SQLParserDriver(ddl, null, SQLKind.DDL);
         driver.walk(listener);

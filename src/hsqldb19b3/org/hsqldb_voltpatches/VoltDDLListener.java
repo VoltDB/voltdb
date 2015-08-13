@@ -49,24 +49,7 @@ public class VoltDDLListener extends VoltSQLlistener {
      */
     private VoltXMLElement getVoltXML(IInsertStatement aInsertStatement) {
         assert(aInsertStatement instanceof InsertStatement);
-        InsertStatement insertStatement = (InsertStatement)aInsertStatement;
-        VoltXMLElement top = new VoltXMLElement("insert");
-        top.withValue("table", insertStatement.getTableName().toUpperCase());
-        VoltXMLElement columns = new VoltXMLElement("columns");
-        top.children.add(columns);
-        for (int idx = 0; idx < insertStatement.getNumberColumns(); idx += 1) {
-            VoltXMLElement col = new VoltXMLElement("column");
-            columns.children.add(col);
-            col.withValue("name", insertStatement.getColumnName(idx).toUpperCase());
-            VoltXMLElement val = new VoltXMLElement("value");
-            col.children.add(val);
-            val.withValue("id", Integer.toString(idx+1));
-            val.withValue("value", insertStatement.getColumnValue(idx));
-            val.withValue("valuetype", insertStatement.getColumnType(idx).getName().toUpperCase());
-        }
-        VoltXMLElement params = new VoltXMLElement("parameters");
-        top.children.add(params);
-        return top;
+        return (VoltXMLElement)getFactory().makeInsertAST((InsertStatement)aInsertStatement);
     }
 
     private VoltXMLElement getVoltXML(ISelectQuery qstat) {

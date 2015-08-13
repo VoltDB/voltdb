@@ -19,6 +19,8 @@
 
 import java.util.List;
 
+import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
 import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
@@ -199,6 +201,13 @@ public interface IParserFactory {
     IAST makeQueryAST(List<Projection> aProjections,
                       IAST aWhereCondition,
                       ISymbolTable aTables);
+    /**
+     * Make an AST for in insert statement.
+     *
+     * @param aInsertStatement
+     * @return
+     */
+    IAST makeInsertAST(InsertStatement aInsertStatement);
     /**
      * Get the set of error messages for this factory.
      * @return
