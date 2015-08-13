@@ -14,28 +14,42 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.sqlparser.syntax;
+package org.voltdb.sqlparser.semantics.symtab;
+
+import org.voltdb.sqlparser.syntax.IColumnIdent;
 
 /**
  * Hold the parts needed to define a column in an insert statement.
  *
  * @author bwhite
  */
-public class ColumnIdent {
+public class ColumnIdent implements IColumnIdent {
     private final String m_colName;
     private final int    m_colLineNo;
     private final int    m_colColNo;
-    ColumnIdent(String aColName, int aColLineNo, int aColColNo) {
+    public ColumnIdent(String aColName, int aColLineNo, int aColColNo) {
         m_colName = aColName;
         m_colLineNo = aColLineNo;
         m_colColNo = aColColNo;
     }
-    public final String getColName() {
+    /* (non-Javadoc)
+     * @see org.voltdb.sqlparser.syntax.IColumnIdent#getColName()
+     */
+    @Override
+    public final String getColumnName() {
         return m_colName;
     }
+    /* (non-Javadoc)
+     * @see org.voltdb.sqlparser.syntax.IColumnIdent#getColLineNo()
+     */
+    @Override
     public final int getColLineNo() {
         return m_colLineNo;
     }
+    /* (non-Javadoc)
+     * @see org.voltdb.sqlparser.syntax.IColumnIdent#getColColNo()
+     */
+    @Override
     public final int getColColNo() {
         return m_colColNo;
     }

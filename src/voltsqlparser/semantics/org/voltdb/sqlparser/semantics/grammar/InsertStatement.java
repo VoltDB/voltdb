@@ -21,15 +21,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.voltdb.sqlparser.syntax.ColumnIdent;
+import org.voltdb.sqlparser.semantics.symtab.Type;
+import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
-import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
-import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
-import org.voltdb.sqlparser.semantics.symtab.Type;
 
 public class InsertStatement implements IInsertStatement, IDQLStatement {
     String m_tableName;
@@ -68,26 +66,26 @@ public class InsertStatement implements IInsertStatement, IDQLStatement {
     public void addColumns(int aLineNo,
                            int aColNo,
                            ErrorMessageSet aErrors,
-                           List<ColumnIdent> aColIdents,
+                           List<IColumnIdent> aColIdents,
                            List<String> aColVals) {
         Set<String> colNames = new HashSet<String>(m_table.getColumnNamesAsSet());
         int idx = 0;
-        for (ColumnIdent cn : aColIdents) {
-            String colName = cn.getColName();
+        for (IColumnIdent cn : aColIdents) {
+            String colName = cn.getColumnName();
             IColumn column = m_table.getColumnByName(colName);
             if (column == null) {
                 aErrors.addError(cn.getColLineNo(), cn.getColColNo(),
                                  "Undefined table \"%s\".",
                                  colName);
             } else {
-                m_colNames.add(cn.getColName());
+                m_colNames.add(cn.getColumnName());
                 IType aType = column.getType();
                 assert(aType instanceof Type);
                 m_colTypes.add((Type)aType);
                 // TODO: When we process Neutrinos in values, do type checking here.
                 //       tuac to the rescue, eh?
                 m_colVals.add(aColVals.get(idx));
-                colNames.remove(cn.getColName());
+                colNames.remove(cn.getColumnName());
             }
             idx += 1;
         }

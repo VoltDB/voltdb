@@ -41,6 +41,7 @@ import java.util.Map;
 
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
 import org.voltdb.sqlparser.semantics.grammar.SelectQuery;
+import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.INeutrino;
@@ -239,5 +240,12 @@ public class ParserFactory implements IParserFactory {
     @Override
     public IType getErrorType() {
         return SymbolTable.getErrorType();
+    }
+
+    @Override
+    public IColumnIdent makeColumnRef(String aColName,
+                                      int    aColLineNo,
+                                      int    aColColNo) {
+        return new ColumnIdent(aColName, aColLineNo, aColColNo);
     }
 }

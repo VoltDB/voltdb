@@ -41,6 +41,7 @@ import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.atn.ATNConfigSet;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.voltdb.sqlparser.semantics.symtab.ColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.INeutrino;
@@ -449,13 +450,13 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
                      ctx.start.getCharPositionInLine(),
                      "No values specified.");
         }
-        List<ColumnIdent> columns = new ArrayList<ColumnIdent>();
+        List<IColumnIdent> columns = new ArrayList<IColumnIdent>();
         if (ctx.column_name_list() != null) {
             for (Column_nameContext cnctx : ctx.column_name_list().column_name()) {
                 String colName = cnctx.IDENTIFIER().getText();
                 int colLineNo = cnctx.start.getLine();
                 int colColNo = cnctx.start.getCharPositionInLine();
-                columns.add(new ColumnIdent(colName, colLineNo, colColNo));
+                columns.add(m_factory.makeColumnRef(colName, colLineNo, colColNo));
             }
         } else {
             List<String> colNames = table.getColumnNames();

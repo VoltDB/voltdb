@@ -64,17 +64,6 @@ public class Projection {
         return m_alias;
     }
 
-    public String toString() {
-        String tab = "";
-        String alias = "";
-        if (m_tabName != null) {
-                tab = m_tabName+".";
-        } if (m_alias != null) {
-                alias = " as "+m_alias;
-        }
-        return tab+m_columnName+alias;
-    }
-
     public int getLineNo() {
         return m_lineNo;
     }

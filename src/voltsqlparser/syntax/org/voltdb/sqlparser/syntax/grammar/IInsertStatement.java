@@ -18,10 +18,8 @@
 
 import java.util.List;
 
-import org.voltdb.sqlparser.syntax.ColumnIdent;
-import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
+import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
-import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
 /**
@@ -44,7 +42,7 @@ public interface IInsertStatement {
     void addColumns(int aLineNo,
                     int aColNo,
                     ErrorMessageSet aErrs,
-                    List<ColumnIdent> aColNames,
+                    List<IColumnIdent> aColNames,
                     List<String> aColVals);
 
 }

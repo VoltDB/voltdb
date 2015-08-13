@@ -19,6 +19,7 @@
 
 import java.util.List;
 
+import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.INeutrino;
@@ -215,4 +216,16 @@ public interface IParserFactory {
      * specific.
      */
     IType getErrorType();
+    /**
+     * Make a new reference to a column with the given name.  The
+     * reference is at the given column and line number.
+     *
+     * @param colName
+     * @param colLineNo
+     * @param colColNo
+     * @return
+     */
+    IColumnIdent makeColumnRef(String colName,
+                               int colLineNo,
+                               int colColNo);
 }
