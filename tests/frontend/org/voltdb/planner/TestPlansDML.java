@@ -114,6 +114,20 @@ public class TestPlansDML extends PlannerTestCase {
 
     }
 
+    public void testDMLAliases() {
+        // These statements are all valid standard SQL, but we don't support them
+        // yet, as they wreak havoc with DELETE FROM foo ORDER BY ... LIMIT ...;
+        failToCompile("delete from p1 as foo", "Syntax error", "unexpected token: AS");
+        failToCompile("delete from p1 foo", "Syntax error", "unexpected token: FOO");
+        failToCompile("delete from p1 as foo where a = 0", "Syntax error", "unexpected token: AS");
+        failToCompile("delete from p1 foo where a = 1", "Syntax error", "unexpected token: FOO");
+
+        failToCompile("update p1 as foo set a = 1", "Syntax error", "unexpected token: AS");
+        failToCompile("update p1 foo set a = 30", "Syntax error", "unexpected token: FOO");
+        failToCompile("update p1 as foo set a = 50 where a = 0", "Syntax error", "unexpected token: AS");
+        failToCompile("update p1 foo set a = 99 where a = 1", "Syntax error", "unexpected token: FOO");
+    }
+
     public void testTruncateTable() {
         String tbs[] = {"R1", "P1"};
         for (String tb: tbs) {

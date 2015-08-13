@@ -208,12 +208,10 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                 + "constraint row_limit limit partition rows 5 "
                 + "execute (delete from partitioned_blah));");
 
-        /* hsql232: ENG-8298, limit constraints with delete statements
-        ddlErrorTest("Table T1 has invalid DELETE statement for LIMIT PARTITION ROWS constraint: parse error: SQL Syntax error",
+        ddlErrorTest("Table T1 has invalid DELETE statement for LIMIT PARTITION ROWS constraint: parse error: Syntax error",
                 "create table t1 (i integer, "
                 + "constraint row_limit limit partition rows 5 "
                 + "execute (delete frm partitioned_blah));");
-         */
     }
 
     public void testHexLiterals() throws Exception {
