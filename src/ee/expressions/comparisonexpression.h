@@ -80,7 +80,11 @@ class CmpEq {
 public:
     inline static const char* op_name() { return "CmpEq"; }
     inline static NValue compare(const NValue& l, const NValue& r)
-    { return l.op_equals_withoutNull(r);}
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.op_equals_withoutNull(r);
+    }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return false; }
     inline static bool implies_false_for_row(const NValue& l, const NValue& r) { return true; }
     inline static bool implies_null_for_row() { return false; }
@@ -101,7 +105,11 @@ class CmpNe {
 public:
     inline static const char* op_name() { return "CmpNe"; }
     inline static NValue compare(const NValue& l, const NValue& r)
-    { return l.op_notEquals_withoutNull(r);}
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.op_notEquals_withoutNull(r);
+    }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
     inline static bool implies_false_for_row(const NValue& l, const NValue& r) { return false; }
     inline static bool implies_null_for_row() { return false; }
@@ -113,7 +121,11 @@ class CmpLt {
 public:
     inline static const char* op_name() { return "CmpLt"; }
     inline static NValue compare(const NValue& l, const NValue& r)
-    { return l.op_lessThan_withoutNull(r);}
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.op_lessThan_withoutNull(r);
+    }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
     inline static bool implies_false_for_row(const NValue& l, const NValue& r)
     { return l.op_notEquals_withoutNull(r).isTrue(); }
@@ -126,7 +138,11 @@ class CmpGt {
 public:
     inline static const char* op_name() { return "CmpGt"; }
     inline static NValue compare(const NValue& l, const NValue& r)
-    { return l.op_greaterThan_withoutNull(r);}
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.op_greaterThan_withoutNull(r);
+    }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r) { return true; }
     inline static bool implies_false_for_row(const NValue& l, const NValue& r)
     { return l.op_notEquals_withoutNull(r).isTrue(); }
@@ -139,7 +155,11 @@ class CmpLte {
 public:
     inline static const char* op_name() { return "CmpLte"; }
     inline static NValue compare(const NValue& l, const NValue& r)
-    { return l.op_lessThanOrEqual_withoutNull(r);}
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.op_lessThanOrEqual_withoutNull(r);
+    }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r)
     { return l.op_notEquals_withoutNull(r).isTrue(); }
     inline static bool implies_false_for_row(const NValue& l, const NValue& r) { return true; }
@@ -152,7 +172,11 @@ class CmpGte {
 public:
     inline static const char* op_name() { return "CmpGte"; }
     inline static NValue compare(const NValue& l, const NValue& r)
-    { return l.op_greaterThanOrEqual_withoutNull(r);}
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.op_greaterThanOrEqual_withoutNull(r);
+    }
     inline static bool implies_true_for_row(const NValue& l, const NValue& r)
     { return l.op_notEquals_withoutNull(r).isTrue(); }
     inline static bool implies_false_for_row(const NValue& l, const NValue& r) { return true; }
@@ -167,14 +191,24 @@ public:
 class CmpLike {
 public:
     inline static const char* op_name() { return "CmpLike"; }
-    inline static NValue compare(const NValue& l, const NValue& r) { return l.like(r);}
+    inline static NValue compare(const NValue& l, const NValue& r) {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.like(r);
+    }
+    inline static bool isNullRejecting() { return true; }
 };
 
 class CmpIn {
 public:
     inline static const char* op_name() { return "CmpIn"; }
     inline static NValue compare(const NValue& l, const NValue& r)
-    { return l.inList(r) ? NValue::getTrue() : NValue::getFalse(); }
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.inList(r) ? NValue::getTrue() : NValue::getFalse();
+    }
+    inline static bool isNullRejecting() { return true; }
 };
 
 template <typename OP>
@@ -201,12 +235,12 @@ public:
         assert(m_right != NULL);
 
         NValue lnv = m_left->eval(tuple1, tuple2);
-        if (lnv.isNull()) {
+        if (lnv.isNull() && OP::isNullRejecting()) {
             return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
         }
 
         NValue rnv = m_right->eval(tuple1, tuple2);
-        if (rnv.isNull()) {
+        if (rnv.isNull() && OP::isNullRejecting()) {
             return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
         }
 
@@ -251,42 +285,6 @@ public:
                                          AbstractExpression *right)
         : ComparisonExpression<C>(type, left, right)
     {}
-};
-
-
-class NotDistinctExpression : public AbstractExpression {
-public:
-    NotDistinctExpression(ExpressionType type,
-                          AbstractExpression *left,
-                          AbstractExpression *right)
-        : AbstractExpression(type, left, right)
-    {
-        m_left = left;
-        m_right = right;
-    };
-
-    inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const
-    {
-        NValue lnv = m_left->eval(tuple1, tuple2);
-        NValue rnv = m_right->eval(tuple1, tuple2);
-
-        NValue result = lnv.op_equals(rnv);
-
-        VOLT_TRACE("eval NotDistinct. left %s, right %s. ret=%s",
-                           typeid(*(m_left)).name(),
-                           typeid(*(m_right)).name(),
-                           result.isTrue()? "TRUE" : "FALSE");
-        return result;
-    }
-
-
-    std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "ComparisonExpression\n");
-    }
-
-private:
-    AbstractExpression *m_left;
-    AbstractExpression *m_right;
 };
 }
 #endif

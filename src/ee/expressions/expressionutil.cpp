@@ -226,7 +226,7 @@ getGeneral(ExpressionType c,
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new ComparisonExpression<CmpIn>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
-        return new NotDistinctExpression(c, l, r);
+        return new ComparisonExpression<CmpNotDistinct>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -261,7 +261,7 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new InlinedComparisonExpression<CmpIn, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
-        return new NotDistinctExpression(c, l, r);
+        return new InlinedComparisonExpression<CmpNotDistinct, L, R>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"

@@ -42,6 +42,50 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         super(name);
     }
 
+    static private void setUpSchema(VoltProjectBuilder project) throws IOException
+    {
+
+        final String literalSchema =
+                "CREATE TABLE S1 ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "WAGE INTEGER, " +
+                "DEPT INTEGER, " +
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE TABLE S2 ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "WAGE INTEGER, " +
+                "DEPT INTEGER, " +
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE TABLE R1 ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP, " +
+                "PRIMARY KEY (ID) ); " +
+
+                // Test unique generalized index on a function of an already indexed column.
+                "CREATE UNIQUE INDEX R1_ABS_ID_DESC ON R1 ( ABS(ID), DESC ); " +
+
+                // Test generalized expression index with a constant argument.
+                "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
+
+                //Test generalized expression index with case when.
+                "CREATE INDEX R1_CASEWHEN ON R1 (CASE WHEN num < 3 THEN num/2 ELSE num + 10 END); " +
+
+                "CREATE TABLE INLINED_VC_VB_TABLE (" +
+                "ID INTEGER DEFAULT 0 NOT NULL," +
+                "VC1 VARCHAR(6)," +     // inlined
+                "VC2 VARCHAR(16)," +    // not inlined
+                "VB1 VARBINARY(6)," +   // inlined
+                "VB2 VARBINARY(64));" + // not inlined
+                "";
+
+            project.addLiteralSchema(literalSchema);
+    }
+
     public void testIsDistinctFrom() throws Exception
     {
         System.out.println("\nSTARTING test is Distinct from ...");
@@ -52,29 +96,35 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         subTestIsDistinctFromInCompatibleTypes(client);
     }
 
+    private void populateTableForIsDistinctFromTests(Client client)
+            throws IOException, NoConnectionsException, ProcCallException
+    {
+                                //       id, wage, dept
+        client.callProcedure("S1.insert", 1, 1000, 1);
+        client.callProcedure("S1.insert", 3, 3000, 1);
+        client.callProcedure("S1.insert", 5, 2553, 3);
+        client.callProcedure("S1.insert", 7, 4552, 2);
+        client.callProcedure("S1.insert", 9, 5152, 2);
+
+        client.callProcedure("S2.insert", 1, 1000, 2);
+        client.callProcedure("S2.insert", 4, null, 2);
+        client.callProcedure("S2.insert", 5, 5253, 3);
+    }
+
     private void subTestIsDistinctFrom(Client client)
             throws Exception
     {
         String sql;
-        VoltTable vt;
 
         // NULL constant - results in non-parameterized plan
         sql = "SELECT * FROM S2 A WHERE  A.WAGE is not distinct from NULL;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(vt.getRowCount(), 1);
-        if(!isHSQL()) {
-            validateTableOfLongs(client, sql, new long[][] {{4,     Long.MIN_VALUE,     2}});
-        }
+        validateTableOfLongs(client, sql, new long[][] {{4,     Long.MIN_VALUE,     2}});
 
         // Non-Null constant results in parameterized plan
         sql = "SELECT * FROM S2 A WHERE  A.WAGE is  distinct from 1000.01;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(vt.getRowCount(), 3);
-        if(!isHSQL()) {
-            validateTableOfLongs(client, sql, new long[][] {{1,     1000,               2},
-                                                            {4,     Long.MIN_VALUE,     2},
-                                                            {5,     5253,               3}});
-        }
+        validateTableOfLongs(client, sql, new long[][] {{1,     1000,               2},
+                                                        {4,     Long.MIN_VALUE,     2},
+                                                        {5,     5253,               3}});
 
         // Join operation
         // case 1: on column that can't have null values
@@ -99,32 +149,29 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "S1.Wage, S1.Dept, " +
                 "S2.WAGE, S2.Dept " +
                 "from S1, S2 where S1.WAGE is distinct from S2.WAGE;";
-
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(vt.getRowCount(), 14);
-        if(!isHSQL()) {
-            validateTableOfLongs(client, sql, new long[][] {{1, 1000,   1,  Long.MIN_VALUE, 2},
-                                                            {1, 1000,   1,  5253,           3},
-                                                            {3,  3000,  1,  1000,           2},
-                                                            {3,  3000,  1,  Long.MIN_VALUE, 2},
-                                                            {3,  3000,  1,  5253,           3},
-                                                            {5,  2553,  3,  1000,           2},
-                                                            {5,  2553,  3,  Long.MIN_VALUE, 2},
-                                                            {5,  2553,  3,  5253,           3},
-                                                            {7,  4552,  2,  1000,           2},
-                                                            {7,  4552,  2,  Long.MIN_VALUE, 2},
-                                                            {7,  4552,  2,  5253,           3},
-                                                            {9,  5152,  2,  1000,           2},
-                                                            {9,  5152,  2,  Long.MIN_VALUE, 2},
-                                                            {9,  5152,  2,  5253,           3}});
-        }
+        validateTableOfLongs(client, sql, new long[][] {{1, 1000,   1,  Long.MIN_VALUE, 2},
+                                                        {1, 1000,   1,  5253,           3},
+                                                        {3,  3000,  1,  1000,           2},
+                                                        {3,  3000,  1,  Long.MIN_VALUE, 2},
+                                                        {3,  3000,  1,  5253,           3},
+                                                        {5,  2553,  3,  1000,           2},
+                                                        {5,  2553,  3,  Long.MIN_VALUE, 2},
+                                                        {5,  2553,  3,  5253,           3},
+                                                        {7,  4552,  2,  1000,           2},
+                                                        {7,  4552,  2,  Long.MIN_VALUE, 2},
+                                                        {7,  4552,  2,  5253,           3},
+                                                        {9,  5152,  2,  1000,           2},
+                                                        {9,  5152,  2,  Long.MIN_VALUE, 2},
+                                                        {9,  5152,  2,  5253,           3}});
 
         // left join on column that has null values
         sql = "Select S2.wage, S2.ID, count (*) from S1 left Join S2 On S2.WAGE is not distinct from S2.wage group by S2.wage, S2.ID;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(vt.getRowCount(), 3);
-
-        if(!isHSQL()) {
+        if(isHSQL()) {
+            validateTableOfLongs(client, sql, new long[][] {{1000,              1,   5},
+                                                            {Long.MIN_VALUE,    4,   5},
+                                                            {5253,              5,   5}});
+        }
+        else {
             validateTableOfLongs(client, sql, new long[][] {{5253,              5,   5},
                                                             {Long.MIN_VALUE,    4,   5},
                                                             {1000,              1,   5}});
@@ -134,17 +181,17 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
     private void subTestIsDistinctFromUsingSubqueries(Client client) throws Exception
     {
         String sql;
-        VoltTable vt;
 
         // test cases below test different subquery condition paths in EE like LHS NULL, RHS NOT NULL and so forth
         sql = "SELECT wage salary, count(*) from S2 "+
                 "WHERE WAGE is distinct from  " +
                 "(SELECT SUM(WAGE) FROM S2 where WAGE is not distinct from 1000) " +
                 "GROUP BY WAGE HAVING COUNT(*) is distinct from 7;";
-
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(vt.getRowCount(), 2);
-        if(!isHSQL()) {
+        if(isHSQL()) {
+            validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    1},
+                                                            {5253,              1}});
+        }
+        else {
             validateTableOfLongs(client, sql, new long[][] {{5253,              1},
                                                             {Long.MIN_VALUE,    1}});
         }
@@ -153,10 +200,11 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "WHERE WAGE is distinct from  " +
                 "(SELECT SUM(WAGE) FROM S2 where WAGE is distinct from 1000) " +
                 "GROUP BY WAGE HAVING COUNT(*) is distinct from 7;";
-
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(vt.getRowCount(), 2);
-        if(!isHSQL()) {
+        if(isHSQL()) {
+            validateTableOfLongs(client, sql, new long[][] {{1000,              1},
+                                                            {Long.MIN_VALUE,    1}});
+        }
+        else {
             validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    1},
                                                             {1000,              1}});
         }
@@ -164,8 +212,6 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         sql = "SELECT wage salary, count(*)  from S2 " +
                 "WHERE  (select S2.wage from S2 where S2.ID<>1 and S2.id<>5) is distinct from wage "+
                 "GROUP BY WAGE HAVING COUNT(*) is distinct from 7;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(vt.getRowCount(), 2);
         if(isHSQL()) {
             validateTableOfLongs(client, sql, new long[][] {{1000, 1}, {5253, 1}});
         }
@@ -177,23 +223,24 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "On S2.WAGE is distinct from  " +
                 "(SELECT MIN(WAGE) FROM S2 where WAGE is  distinct from 1000)" +
                 "group by S1.wage  having COUNT(*) is not distinct from 1;";
+        validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    1}});
 
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(vt.getRowCount(), 1);
-        if(!isHSQL()) {
-            validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    1}});
-        }
+
+        sql = "select * from S1 where S1.WAGE = ANY " +
+                "(select S2.wage from S2 where S2.wage is distinct from  5253 or S2.Wage is not distinct from  Null);";
+        validateTableOfLongs(client, sql, new long[][] {{1,     1000,      1}});
+
+        // ***TODO: query below currently is not compiling. need to work on this. "unexpected token: SELECT" for inner select token
+        // sql = "select * from S1 where S1.WAGE is not distinct from ANY " +
+        // "(select S2.wage from S2 where S2.wage is distinct from  5253 or S2.Wage is not distinct from  Null);";
     }
 
     private void subTestIsDistinctFromInCompatibleTypes(Client client) throws Exception {
-        try {
             String sql;
             sql = "SELECT * FROM S1 A WHERE  A.WAGE is distinct from \'Z\';";
-            client.callProcedure("@AdHoc", sql);
-            fail("Expected incompatible data types exception");
-        } catch (ProcCallException excp) {
-            assertTrue(excp.getMessage().contains("incompatible data types in combination"));
-        }
+            //client.callProcedure("@AdHoc", sql);
+            //fail("Expected incompatible data types exception");
+            verifyStmtFails(client, sql, "incompatible data types in combination");
     }
 
     public void testCaseWhen() throws Exception {
@@ -389,65 +436,4 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
 
         return builder;
     }
-
-
-    static private void setUpSchema(VoltProjectBuilder project) throws IOException
-    {
-
-        final String literalSchema =
-                "CREATE TABLE S1 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER, " +
-                "DEPT INTEGER, " +
-                "PRIMARY KEY (ID) );" +
-
-                "CREATE TABLE S2 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER, " +
-                "DEPT INTEGER, " +
-                "PRIMARY KEY (ID) );" +
-
-                "CREATE TABLE R1 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "DESC VARCHAR(300), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PAST TIMESTAMP, " +
-                "PRIMARY KEY (ID) ); " +
-
-                // Test unique generalized index on a function of an already indexed column.
-                "CREATE UNIQUE INDEX R1_ABS_ID_DESC ON R1 ( ABS(ID), DESC ); " +
-
-                // Test generalized expression index with a constant argument.
-                "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
-
-                //Test generalized expression index with case when.
-                "CREATE INDEX R1_CASEWHEN ON R1 (CASE WHEN num < 3 THEN num/2 ELSE num + 10 END); " +
-
-                "CREATE TABLE INLINED_VC_VB_TABLE (" +
-                "ID INTEGER DEFAULT 0 NOT NULL," +
-                "VC1 VARCHAR(6)," +     // inlined
-                "VC2 VARCHAR(16)," +    // not inlined
-                "VB1 VARBINARY(6)," +   // inlined
-                "VB2 VARBINARY(64));" + // not inlined
-                "";
-
-            project.addLiteralSchema(literalSchema);
-    }
-
-    private void populateTableForIsDistinctFromTests(Client client)
-            throws IOException, NoConnectionsException, ProcCallException
-    {
-                                //       id, wage, dept
-        client.callProcedure("S1.insert", 1, 1000, 1);
-        client.callProcedure("S1.insert", 3, 3000, 1);
-        client.callProcedure("S1.insert", 5, 2553, 3);
-        client.callProcedure("S1.insert", 7, 4552, 2);
-        client.callProcedure("S1.insert", 9, 5152, 2);
-
-        client.callProcedure("S2.insert", 1, 1000, 2);
-        client.callProcedure("S2.insert", 4, null, 2);
-        client.callProcedure("S2.insert", 5, 5253, 3);
-    }
-
 }
