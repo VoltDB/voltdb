@@ -1534,12 +1534,16 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     try {
         apply_binary_log *params = (apply_binary_log*)cmd;
         m_engine->resetReusedResultOutputBuffer(1);
-        m_engine->applyBinaryLog(ntohll(params->txnId),
-                                 ntohll(params->spHandle),
-                                 ntohll(params->lastCommittedSpHandle),
-                                 ntohll(params->uniqueId),
-                                 ntohll(params->undoToken),
-                                 params->log);
+        int64_t rows = m_engine->applyBinaryLog(ntohll(params->txnId),
+                                        ntohll(params->spHandle),
+                                        ntohll(params->lastCommittedSpHandle),
+                                        ntohll(params->uniqueId),
+                                        ntohll(params->undoToken),
+                                        params->log);
+        char response[9];
+        response[0] = kErrorCode_Success;
+        *reinterpret_cast<int64_t*>(&response[1]) = htonll(rows);
+        writeOrDie(m_fd, (unsigned char*)response, 9);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }

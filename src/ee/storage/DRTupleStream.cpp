@@ -117,7 +117,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     m_uso += io.position();
 
     // update row count
-    m_txnRowCount += TRUNCATE_TABLE_ROW_EQUIVALENCE;
+    m_txnRowCount += rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE);
 
     return startingUso;
 }
@@ -228,7 +228,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     m_uso += io.position();
 
     // update row count
-    m_txnRowCount++;
+    m_txnRowCount += rowCostForDRRecord(type);
 
 //    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
     return startingUso;
@@ -355,7 +355,7 @@ void DRTupleStream::endTransaction() {
 
      m_opened = false;
 
-    uint32_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
+    size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
         extendBufferChain(0);
     }
