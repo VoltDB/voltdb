@@ -47,7 +47,7 @@ public class InsertExport2 extends VoltProcedure {
 
     public long run(long key, long value)
     {
-    	//@SuppressWarnings("deprecation")
+        //@SuppressWarnings("deprecation")
         //long key = getVoltPrivateRealTransactionIdDontUseMe();
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = new Random(value);
