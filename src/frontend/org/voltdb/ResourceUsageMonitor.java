@@ -61,6 +61,16 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         return m_resourceCheckInterval;
     }
 
+    public void logResourceLimitConfigurationInfo()
+    {
+        if (hasResourceLimitsConfigured()) {
+            m_logger.info("Resource limit monitoring configured to run every " + m_resourceCheckInterval + " seconds with:\n" +
+                    "\tRSS limit=" + m_rssLimit);
+        } else {
+            m_logger.info("No resource usage limit monitoring configured");
+        }
+    }
+
     @Override
     public void run()
     {

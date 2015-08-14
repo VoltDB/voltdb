@@ -1358,6 +1358,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_periodicWorks.remove(resMonitorWork);
         }
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
+        resMonitor.logResourceLimitConfigurationInfo();
         if (resMonitor.hasResourceLimitsConfigured()) {
             resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
             m_periodicWorks.add(resMonitorWork);
