@@ -38,6 +38,13 @@ APPCLASSPATH=$CLASSPATH:$({ \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=voltkv-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/tomcat-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/mchange-commons-java-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/c3p0-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/bonecp-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/HikariCP-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/guava-19.0-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/slf4j-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
