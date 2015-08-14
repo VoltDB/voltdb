@@ -69,7 +69,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
 
-    int64_t rowCount = 0;
+    size_t rowCount = 0;
     CachedIndexKeyTuple indexKeyTuple;
     while (taskInfo.hasRemaining()) {
         pool->purge();
@@ -201,7 +201,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             break;
         }
     }
-    return rowCount;
+    return static_cast<int64_t>(rowCount);
 }
 
 void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const char *end) {

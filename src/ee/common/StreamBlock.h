@@ -146,7 +146,7 @@ namespace voltdb
             m_lastUniqueId = lastUniqueId;
         }
 
-        uint32_t updateRowCountForDR(uint32_t rowsToCommit) {
+        size_t updateRowCountForDR(size_t rowsToCommit) {
             m_rowCountForDR += rowsToCommit;
             return m_rowCountForDR;
         }
@@ -209,7 +209,7 @@ namespace voltdb
         int64_t m_lastCommittedSpHandle;
         size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
         bool m_hasDRBeginTxn;    // only used for DR Buffer
-        uint32_t m_rowCountForDR;
+        size_t m_rowCountForDR;
         int64_t m_startDRSequenceNumber;
         int64_t m_lastDRSequenceNumber;
         int64_t m_lastUniqueId;

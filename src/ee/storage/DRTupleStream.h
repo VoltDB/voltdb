@@ -97,7 +97,7 @@ private:
     size_t m_secondaryCapacity;
     bool m_opened;
     int64_t m_rowTarget;
-    uint32_t m_txnRowCount;
+    size_t m_txnRowCount;
 };
 
 class MockDRTupleStream : public DRTupleStream {
