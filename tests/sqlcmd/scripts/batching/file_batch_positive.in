@@ -12,3 +12,6 @@ insert into s values (3, 'platypii');
 select * from t order by i;
 
 select * from s order by i;
+
+drop table t;
+drop table s;

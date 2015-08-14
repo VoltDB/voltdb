@@ -50,7 +50,7 @@ public class SpProcedureTask extends ProcedureTask
         HOST_TRACE_ENABLED = hostLog.isTraceEnabled();
     }
 
-    SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
+    public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg,
                   PartitionDRGateway drGateway)
     {

@@ -3184,6 +3184,7 @@ class DbMonitorTest extends TestBase {
 		then:
 		println("")
     }   
+
     // end of Command Log Statistics
 
     // Database Replication

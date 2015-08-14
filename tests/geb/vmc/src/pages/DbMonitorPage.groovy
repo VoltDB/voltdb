@@ -158,10 +158,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         commandLogStatisticsMin         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
         commandLogStatisticsMax         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
         
+
         //database replication graph
         databaseReplicationMin          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
         databaseReplicationMax          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
-        
+
         partitionstatus			        { $("#visualisationPartitionIdleTime > g > g > g.nv-y.nv-axis > g > g:nth-child(1) > g:nth-child(2) > text")}
         localpartition			        { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(1)")}
         clusterwide			            { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(2)")}
@@ -172,6 +173,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         header          		        { module Header }
         footer          		        { module Footer }
+
 
         //DR Section
 

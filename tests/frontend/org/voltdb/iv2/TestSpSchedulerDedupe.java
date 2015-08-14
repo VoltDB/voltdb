@@ -23,10 +23,15 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -104,6 +109,7 @@ public class TestSpSchedulerDedupe extends TestCase
         // Mock an invocation for MockSPName.
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         when(spi.getProcName()).thenReturn(MockSPName);
+        when(spi.getOriginalTxnId()).thenReturn((long)-1);
         ParameterSet bleh = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(bleh);
         Iv2InitiateTaskMessage task =

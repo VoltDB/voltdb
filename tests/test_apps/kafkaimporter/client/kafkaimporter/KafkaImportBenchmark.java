@@ -214,7 +214,7 @@ public class KafkaImportBenchmark {
             public void run() {
                 long count = MatchChecks.getImportRowCount(client);
                 importProgress.add((int) count);
-                log.info(importProgress.toString());
+                //log.info(importProgress.toString());
                 if (importProgress.size() > 1) {
                     log.info("Import Throughput " + (count - importProgress.get(importProgress.size() - 2)) / period + "/s, Total Rows: " + count);
                 }

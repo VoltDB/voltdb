@@ -172,7 +172,7 @@ public class MpScheduler extends Scheduler
         long sequenceWithTxnId = Long.MIN_VALUE;
 
         boolean dr = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
+                ((TransactionInfoBaseMessage)message).isForDRv1()));
 
         if (dr) {
             sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
@@ -231,7 +231,7 @@ public class MpScheduler extends Scheduler
         if (message.isForReplay()) {
             timestamp = message.getUniqueId();
             m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
-        } else if (message.isForDR()) {
+        } else if (message.isForDRv1()) {
             timestamp = message.getStoredProcedureInvocation().getOriginalUniqueId();
             // @LoadMultipartitionTable does not have a valid uid
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
