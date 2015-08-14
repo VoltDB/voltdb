@@ -64,6 +64,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
+    private final AtomicLong m_failures = new AtomicLong(0);
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
 
@@ -244,8 +245,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 public void handle() {
                     try {
                         if (resp.getStatus() != ClientResponse.SUCCESS) {
-                            String fmt = "Importer stored procedure failed: %s Error: %s";
-                            rateLimitedLog(Level.ERROR, null, fmt, callback.getProcedureName(), resp.getStatusString());
+                            String fmt = "Importer stored procedure failed: %s Error: %s failures: %d";
+                            rateLimitedLog(Level.WARN, null, fmt, callback.getProcedureName(), resp.getStatusString(), m_failures.incrementAndGet());
                         }
                         callback.handleResponse(resp);
                     } catch (Exception ex) {
