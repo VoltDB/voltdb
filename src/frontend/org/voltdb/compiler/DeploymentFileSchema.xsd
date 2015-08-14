@@ -132,6 +132,24 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="memoryLimitType">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="1000"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <xs:complexType name="resourceMonitorType">
+      <xs:all>
+        <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="size" type="memoryLimitType" default="0"/>
+            </xs:complexType>
+        </xs:element>
+      </xs:all>
+      <xs:attribute name="frequency" type="xs:int" default="60"/>
+  </xs:complexType>
+
   <!-- <systemsettings> -->
   <xs:complexType name="systemSettingsType">
     <xs:all>
@@ -156,7 +174,7 @@
                 <xs:attribute name="timeout" type="latencyType" default="0"/>
             </xs:complexType>
         </xs:element>
-
+        <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
     </xs:all>
   </xs:complexType>
 
