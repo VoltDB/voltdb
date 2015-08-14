@@ -88,7 +88,10 @@ public class ImportProcessor implements ImportDataProcessor {
 
         public void stop() {
             try {
-                m_handler.stop();
+                //Handler can be null for initial period if shutdown come quickly.
+                if (m_handler != null) {
+                    m_handler.stop();
+                }
                 if (m_bundle != null) {
                     m_bundle.stop();
                 }
