@@ -1056,6 +1056,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    public void checkForSyncLoggedSysProcs(CommandLog.CompletionChecks currentChecks) {
+        currentChecks.checkForSyncLoggedSysProcs();
+    }
+
     @Override
     public void dump()
     {

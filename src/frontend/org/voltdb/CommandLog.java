@@ -85,6 +85,8 @@ public interface CommandLog {
         public int getTaskListSize();
 
         public void processChecks();
+
+        public void checkForSyncLoggedSysProcs();
     }
 
     public interface DurabilityListener {
@@ -124,6 +126,12 @@ public interface CommandLog {
          * @param completionChecks
          */
         void processDurabilityChecks(CompletionChecks completionChecks);
+
+        /**
+         * Make sure Read-Only SysProcs get executed in with Synchronous Command Logging
+         * @param completionChecks
+         */
+        void checkForSyncLoggedSysProcs(CompletionChecks completionChecks);
     }
 
     /**
