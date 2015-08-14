@@ -79,7 +79,7 @@ public class InternalConnectionHandler {
     public boolean callProcedure(InternalConnectionContext caller, long backPressureTimeout, ProcedureCallback procCallback, String proc, Object... fieldList) {
         Procedure catProc = VoltDB.instance().getClientInterface().getProcedureFromName(proc, VoltDB.instance().getCatalogContext());
         if (catProc == null) {
-            String fmt = "Cannot invoke procedure %s from streaming interface $s. Procedure not found.";
+            String fmt = "Cannot invoke procedure %s from streaming interface %s. Procedure not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
             m_failedCount.incrementAndGet();
             return false;
@@ -123,7 +123,7 @@ public class InternalConnectionHandler {
             partition = getPartitionForProcedure(catProc, task);
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);
             m_failedCount.incrementAndGet();
             tcont.discard();
             return false;
