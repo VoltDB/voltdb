@@ -48,7 +48,6 @@ import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.importer.ImportManager;
 
 /**
  * End to end Import tests using the injected socket importer.

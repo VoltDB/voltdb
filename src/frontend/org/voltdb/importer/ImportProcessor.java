@@ -36,10 +36,13 @@ import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.catalog.Procedure;
 
 public class ImportProcessor implements ImportDataProcessor {
 
@@ -220,14 +223,28 @@ public class ImportProcessor implements ImportDataProcessor {
     }
 
     @Override
-    public void setProcessorConfig(Map<String, Properties> config) {
+    public void setProcessorConfig(CatalogContext catalogContext, Map<String, Properties> config) {
+        List<String> configuredImporters = new ArrayList<String>();
         for (String cname : config.keySet()) {
             Properties properties = config.get(cname);
 
             String importBundleJar = properties.getProperty(IMPORT_MODULE);
             Preconditions.checkNotNull(importBundleJar, "Import source is undefined or custom export plugin class missing.");
+            String procedure = properties.getProperty(IMPORT_PROCEDURE);
+            //TODO: If processors is a list dont start till all procedures exists.
+            Procedure catProc = catalogContext.procedures.get(procedure);
+            if (catProc == null) {
+                catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
+            }
+
+            if (catProc == null) {
+                m_logger.info("Importer " + cname + " Procedure " + procedure + " is missing will disable this importer until the procedure becomes available.");
+                continue;
+            }
+            configuredImporters.add(cname);
             addProcessorConfig(properties);
         }
+        m_logger.info("Import Processor is configured. Configured Importers: " + configuredImporters);
     }
 
 }
