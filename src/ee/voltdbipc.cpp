@@ -1534,7 +1534,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     try {
         apply_binary_log *params = (apply_binary_log*)cmd;
         m_engine->resetReusedResultOutputBuffer(1);
-        rows = m_engine->applyBinaryLog(ntohll(params->txnId),
+        int64_t rows = m_engine->applyBinaryLog(ntohll(params->txnId),
                                         ntohll(params->spHandle),
                                         ntohll(params->lastCommittedSpHandle),
                                         ntohll(params->uniqueId),
