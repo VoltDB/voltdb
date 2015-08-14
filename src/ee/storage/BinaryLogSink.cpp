@@ -31,8 +31,6 @@
 
 namespace voltdb {
 
-const int TRUNCATE_TABLE_ROW_EQUIVALENCE = 100;
-
 class CachedIndexKeyTuple {
 public:
     CachedIndexKeyTuple() : m_tuple(), m_cachedIndexCrc(0), m_storageSize(0), m_tupleStorage() {}
@@ -71,7 +69,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
 
-    in64_t rowCount = 0;
+    int64_t rowCount = 0;
     CachedIndexKeyTuple indexKeyTuple;
     while (taskInfo.hasRemaining()) {
         pool->purge();
@@ -81,6 +79,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             throwFatalException("Unsupported DR version %d", drVersion);
         }
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
+        rowCount += rowCostForDRRecord(type);
 
         int64_t tableHandle = 0;
 
@@ -144,7 +143,6 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             } else {
                 table->insertPersistentTuple(tempTuple, true);
             }
-            rowCount++;
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
@@ -194,8 +192,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             PersistentTable *table = tableIter->second;
 
             table->truncateTable(engine, true);
-            
-            rowCount += TRUNCATE_TABLE_ROW_EQUIVALENCE;
+
             break;
         }
         case DR_RECORD_UPDATE:
