@@ -37,6 +37,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
@@ -543,7 +544,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             stringBytes.flip();
 
-            final String retval = new String(stringBytes.array());
+            final String retval = new String(stringBytes.array(), Constants.UTF8ENCODING);
             return retval;
         }
 
