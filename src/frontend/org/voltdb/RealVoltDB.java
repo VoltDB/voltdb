@@ -61,7 +61,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -133,6 +132,7 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -209,6 +209,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     GlobalServiceElector m_globalServiceElector = null;
     MpInitiator m_MPI = null;
     Map<Integer, Long> m_iv2InitiatorStartingTxnIds = new HashMap<Integer, Long>();
+    private ScheduledFuture<?> resMonitorWork;
 
 
     // Should the execution sites be started in recovery mode
@@ -383,7 +384,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
             m_messenger = null;
-            m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
             m_asyncCompilerAgent = null;
             m_snapshotCompletionMonitor = null;
@@ -1345,7 +1345,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES));
+
         GCInspector.instance.start(m_periodicPriorityWorkThread);
+    }
+
+    private void startResourceUsageMonitor() {
+        if (resMonitorWork != null) {
+            resMonitorWork.cancel(false);
+            try {
+                resMonitorWork.get();
+            } catch(Exception e) { } // Ignore exceptions because we don't really care about the result here.
+            m_periodicWorks.remove(resMonitorWork);
+        }
+        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
+        resMonitor.logResourceLimitConfigurationInfo();
+        if (resMonitor.hasResourceLimitsConfigured()) {
+            resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
+            m_periodicWorks.add(resMonitorWork);
+        }
     }
 
     int readDeploymentAndCreateStarterCatalogContext() {
@@ -2254,6 +2271,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 logSystemSettingFromCatalogContext();
             }
 
+            // restart resource usage monitoring task
+            startResourceUsageMonitor();
+
             return Pair.of(m_catalogContext, csp);
         }
     }
@@ -2404,6 +2424,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 prepareReplication();
             }
         }
+        startResourceUsageMonitor();
 
         try {
             if (m_adminListener != null) {
@@ -2579,10 +2600,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // Start listening on the DR ports
             prepareReplication();
+            startResourceUsageMonitor();
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData(m_catalogContext, m_messenger);
-
         }
 
         try {

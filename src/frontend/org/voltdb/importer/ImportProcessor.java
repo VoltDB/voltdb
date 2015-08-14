@@ -159,7 +159,7 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 for (BundleWrapper bw : m_bundles.values()) {
                     try {
-                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, catContext);
+                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy);
                         //Set the internal handler
                         bw.setHandler(importHandler);
                         if (!bw.m_handlerProxy.isRunEveryWhere()) {
