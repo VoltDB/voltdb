@@ -745,7 +745,19 @@ public class TestDDLCompiler extends TestCase {
 
         try {
             assertTrue(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
-            assertNotNull(compiler.getCatalogDatabase().getTables().get(CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + "T"));
+            Table t = compiler.getCatalogDatabase().getTables().get(CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + "T");
+            assertNotNull(t);
+            // verify table schema
+            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_TABLE_NAME"));
+            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_CLUSTER_ID"));
+            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_TIMESTAMP"));
+            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_OPERATION_TYPE"));
+            assertNotNull(t.getColumns().get("D1"));
+            assertNotNull(t.getColumns().get("D2"));
+            assertNotNull(t.getColumns().get("D3"));
+            assertNotNull(t.getColumns().get("VAL1"));
+            assertNotNull(t.getColumns().get("VAL2"));
+            assertNotNull(t.getColumns().get("VAL3"));
         } catch (Exception e) {
             e.printStackTrace();
             fail(e.getMessage());
