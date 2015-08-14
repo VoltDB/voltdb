@@ -355,7 +355,7 @@ void DRTupleStream::endTransaction() {
 
      m_opened = false;
 
-    uint32_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
+    size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
         extendBufferChain(0);
     }
