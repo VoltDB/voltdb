@@ -54,7 +54,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
     private final TickProducer m_tickProducer;
-    private ConsumerDRGateway m_consumerDRGateway = null;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -111,7 +110,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway,
                         startAction);
         ((SpScheduler) m_scheduler).setDRGateway(drGateway);
-        m_consumerDRGateway = consumerDRGateway;
 
         PartitionDRGateway mpPDRG = null;
         if (createMpDRGateway) {
@@ -120,7 +118,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
-                csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway, mpPDRG);
+                csp, numberOfPartitions, startAction, agent, memStats, cl,
+                coreBindIds, drGateway, mpPDRG, consumerDRGateway);
 
         m_tickProducer.start();
 
