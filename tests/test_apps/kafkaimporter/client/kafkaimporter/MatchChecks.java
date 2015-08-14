@@ -66,7 +66,7 @@ public class MatchChecks {
         long mirrorRowCount = 0;
 
         try {
-            VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
+            VoltTable[] countQueryResult = client.callProcedure("CountMirror2").getResults();
             mirrorRowCount = countQueryResult[0].asScalarLong();
         } catch (Exception e) {
             log.error("Exception from callProcedure", e);
@@ -175,7 +175,7 @@ public class MatchChecks {
         // check row count in import table
         long importRowCount = 0;
         try {
-            VoltTable[] countQueryResult = client.callProcedure("CountImport").getResults();
+            VoltTable[] countQueryResult = client.callProcedure("CountImport2").getResults();
             importRowCount = countQueryResult[0].asScalarLong();
         } catch (Exception e) {
             log.error("Exception from callProcedure", e);

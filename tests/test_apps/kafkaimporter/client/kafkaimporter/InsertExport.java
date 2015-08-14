@@ -38,10 +38,9 @@ public class InsertExport {
     final Client m_client;
     static AtomicLong m_rowsAdded;
     final static String INSERT_PN = "InsertFinal";
-    final static String EXPORT_PN = "InsertExport";
+    final static String EXPORT_PN = "InsertExport2";
 
     public InsertExport(Client client, AtomicLong rowsAdded) {
-
         m_client = client;
         m_rowsAdded = rowsAdded;
     }
