@@ -67,12 +67,12 @@ import kafka.network.BlockingChannel;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+import org.voltdb.InternalClientResponseAdapter;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.CSVInvocation;
-import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportHandlerProxy;
 import org.voltdb.importer.ImporterChannelAssignment;
 import org.voltdb.importer.Invocation;
@@ -688,7 +688,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 ArrayList<TopicPartitionInvocationCallback>pendingQueue = new ArrayList<TopicPartitionInvocationCallback>();
                 String msg = "Bounced pending transaction queue is: " + m_resubmitInvocation.size() + " Resubmitting... ";
                 //Dont kill ourself by submitting too many
-                m_resubmitInvocation.drainTo(pendingQueue, (int )ImportClientResponseAdapter.MAX_PENDING_TRANSACTIONS_PER_PARTITION - 1);
+                m_resubmitInvocation.drainTo(pendingQueue, (int )InternalClientResponseAdapter.MAX_PENDING_TRANSACTIONS_PER_PARTITION - 1);
                 info(msg + pendingQueue.size());
                 for (TopicPartitionInvocationCallback cb : pendingQueue) {
                     final Invocation invocation = cb.getInvocation();
@@ -898,7 +898,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     }
 
     @Override
-    public void hasBackPressure(boolean flag) {
+    public void setBackPressure(boolean flag) {
         if (m_stopping) return;
         for (TopicPartitionFetcher fetcher : m_fetchers.values()) {
             fetcher.hasBackPressure(flag);

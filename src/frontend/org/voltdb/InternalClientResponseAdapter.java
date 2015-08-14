@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.importer;
+package org.voltdb;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -41,11 +41,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
-import org.voltdb.ClientInterface;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.ImportHandler;
-import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -54,19 +49,17 @@ import org.voltdb.client.ProcedureCallback;
  * A very simple adapter for import handler that deserializes bytes into client responses.
  * For each partition it creates a single thread executor to sequence per partition transaction submission.
  * Responses are also written on a single thread executor to avoid bottlenecking on callback doing heavy work.
- * It calls
- * crashLocalVoltDB() if the deserialization fails, which should only happen if there's a bug.
+ * It calls crashLocalVoltDB() if the deserialization fails, which should only happen if there's a bug.
  */
-public class ImportClientResponseAdapter implements Connection, WriteStream {
-
+public class InternalClientResponseAdapter implements Connection, WriteStream {
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
-    public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
+    public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION = Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
 
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
         public String getProcedureName();
         public int getPartitionId();
-        public ImportContext getImportContext();
+        public InternalConnectionContext getInternalContext();
     }
 
     private final long m_connectionId;
@@ -75,16 +68,17 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
 
-    private class ImportCallback implements Callback {
+    private class InternalCallback implements Callback {
 
         private DBBPool.BBContainer m_cont;
+        @SuppressWarnings("unused")
         private final long m_id;
         private final ProcedureCallback m_cb;
         private final String m_procedure;
         private final int m_partition;
-        private final ImportContext m_context;
+        private final InternalConnectionContext m_context;
 
-        public ImportCallback(final ImportContext context, final DBBPool.BBContainer cont, String proc, int partition, ProcedureCallback cb, long id) {
+        public InternalCallback(final InternalConnectionContext context, final DBBPool.BBContainer cont, String proc, int partition, ProcedureCallback cb, long id) {
             m_context = context;
             m_cont = cont;
             m_cb = cb;
@@ -122,7 +116,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         }
 
         @Override
-        public ImportContext getImportContext() {
+        public InternalConnectionContext getInternalContext() {
             return m_context;
         }
     }
@@ -140,24 +134,29 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         return VoltDB.instance().getClientInterface();
     }
 
-    public boolean createTransaction(final ImportContext context, final String procName, final Procedure catProc, final ProcedureCallback proccb, final StoredProcedureInvocation task,
-            final DBBPool.BBContainer tcont, final int partition, final long nowNanos) {
+    public boolean createTransaction(final InternalConnectionContext context,
+            final String procName,
+            final Procedure catProc,
+            final ProcedureCallback proccb,
+            final StoredProcedureInvocation task,
+            final DBBPool.BBContainer tcont,
+            final int partition, final long nowNanos) {
 
         if (!m_partitionExecutor.containsKey(partition)) {
-            m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("ImportHandlerExecutor - " + partition));
+            m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
         }
         ExecutorService executor = m_partitionExecutor.get(partition);
         try {
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
-                    context.hasBackPressure(hasBackPressure());
+                    context.setBackPressure(hasBackPressure());
                     submitTransaction();
                 }
                 public boolean submitTransaction() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final ImportCallback cb = new ImportCallback(context, tcont, procName, partition, proccb, handle);
+                    final InternalCallback cb = new InternalCallback(context, tcont, procName, partition, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
@@ -185,7 +184,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      *                        node.
      * @param name            Human readable name identifying the adapter, will stand in for hostname
      */
-    public ImportClientResponseAdapter(long connectionId, String name) {
+    public InternalClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
     }
 
@@ -215,7 +214,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             }
             enqueue(buf);
         } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, e);
+            VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, e);
         }
     }
 
@@ -227,11 +226,11 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         try {
             resp.initFromBuffer(b);
         } catch (IOException ex) {
-            VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, ex);
+            VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, ex);
         }
         final Callback callback = m_callbacks.get(resp.getClientHandle());
         if (!m_partitionExecutor.containsKey(callback.getPartitionId())) {
-            m_logger.error("Invalid partition response recieved for sending importer response.");
+            m_logger.error("Invalid partition response recieved for sending internal client response.");
             return;
         }
         ExecutorService executor = m_partitionExecutor.get(callback.getPartitionId());
@@ -239,14 +238,14 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
-                    callback.getImportContext().hasBackPressure(hasBackPressure());
+                    callback.getInternalContext().setBackPressure(hasBackPressure());
                     handle();
                 }
 
                 public void handle() {
                     try {
                         if (resp.getStatus() != ClientResponse.SUCCESS) {
-                            String fmt = "Importer stored procedure failed: %s Error: %s failures: %d";
+                            String fmt = "InternalClientResponseAdapter stored procedure failed: %s Error: %s failures: %d";
                             rateLimitedLog(Level.WARN, null, fmt, callback.getProcedureName(), resp.getStatusString(), m_failures.incrementAndGet());
                         }
                         callback.handleResponse(resp);
@@ -268,7 +267,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         if (b.length == 1) {
             enqueue(b[0]);
         } else {
-            throw new UnsupportedOperationException("Buffer chains not supported in Import invocation adapter");
+            throw new UnsupportedOperationException("Buffer chains not supported in internal invocation adapter");
         }
     }
 
@@ -324,12 +323,12 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public String getHostnameAndIPAndPort() {
-        return "ImportAdapter";
+        return "InternalAdapter";
     }
 
     @Override
     public String getHostnameOrIP() {
-        return "ImportAdapter";
+        return "InternalAdapter";
     }
 
     @Override
