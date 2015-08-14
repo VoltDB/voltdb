@@ -100,7 +100,9 @@ function async-benchmark() {
         --partfillerrowmb=128 \
         --progresstimeout=120 \
         --usecompression=false \
-        --allowinprocadhoc=false
+        --allowinprocadhoc=false \
+        --disabledthreads=ddlt
+#ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
 }
 
 function help() {
