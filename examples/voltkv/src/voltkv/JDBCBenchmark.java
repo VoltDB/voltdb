@@ -33,6 +33,11 @@
  */
 package voltkv;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -275,49 +280,68 @@ public class JDBCBenchmark
             // Prepare the Datasource if choose to use a connection pool
             if (config.externalConnectionPool.equalsIgnoreCase(C3P0_CONNECTIONPOOL)) {
                 useConnectionPool = true;
-
-                ComboPooledDataSource cpds = new ComboPooledDataSource();
+                ComboPooledDataSource cpds = new ComboPooledDataSource("voltkv");
                 cpds.setDriverClass(DRIVER_NAME); //loads the jdbc driver
                 cpds.setJdbcUrl(url);
-
-                // the settings below are optional -- c3p0 can work with defaults
-                cpds.setMinPoolSize(config.threads * 2);
-                // cpds.setAcquireIncrement(5);
-                cpds.setMaxPoolSize(config.threads * 2);
-                cpds.setInitialPoolSize(config.threads * 2);
-                cpds.setNumHelperThreads(config.threads);
                 Ds = cpds;
             }
             else if (config.externalConnectionPool.equalsIgnoreCase(TOMCAT_CONNECTIONPOOL)) {
                 useConnectionPool = true;
+                // read the config file for connection pool
+                String configName = "tomcat.properties";
+                boolean useDefaultConnectionPoolConfig = true;
+                Properties cpProperties = new Properties();
+                try {
+                    FileInputStream fileInput = new FileInputStream(new File(configName));
+                    cpProperties.load(fileInput);
+                    fileInput.close();
+                    useDefaultConnectionPoolConfig = false;
+                } catch (FileNotFoundException e) {
+                    System.out.println("connection pool property file '" + configName + " not found, use default settings");
+                }
                 PoolProperties p = new PoolProperties();
                 p.setUrl(url);
                 p.setDriverClassName(DRIVER_NAME);
-                p.setInitialSize(config.threads + 1);
+                if (useDefaultConnectionPoolConfig) {
+                    p.setInitialSize(config.threads + 1);
+                }
+                else {
+                    p.setInitialSize(Integer.parseInt(cpProperties.getProperty("tomcat.initialSize","40")));
+                }
                 org.apache.tomcat.jdbc.pool.DataSource tomcatDs = new org.apache.tomcat.jdbc.pool.DataSource();
                 tomcatDs.setPoolProperties(p);
                 Ds = tomcatDs;
             } else if (config.externalConnectionPool.equalsIgnoreCase(BONE_CONNECTIONPOOL)) {
                 useConnectionPool = true;
-                BoneCPConfig p = new BoneCPConfig();   // create a new configuration object
+                String configName = "bone.properties";
+                boolean useDefaultConnectionPoolConfig = true;
+                Properties cpProperties = new Properties();
+                try {
+                    FileInputStream fileInput = new FileInputStream(new File(configName));
+                    cpProperties.load(fileInput);
+                    fileInput.close();
+                    useDefaultConnectionPoolConfig = false;
+                } catch (FileNotFoundException e) {
+                    System.out.println("connection pool property file '" + configName + " not found, use default settings");
+                }
+                BoneCPConfig p;
+                if (useDefaultConnectionPoolConfig) {
+                    p = new BoneCPConfig();
+                    p.setDefaultReadOnly(false);
+                    p.setPartitionCount(config.threads/2);
+                    p.setMaxConnectionsPerPartition(4);
+                } else {
+                    p = new BoneCPConfig(cpProperties);
+                }
                 p.setJdbcUrl(url);  // set the JDBC url
-                // p.setDefaultReadOnly(false);
-                p.setPartitionCount(config.threads-39);
                 BoneCPDataSource boneDs  = new BoneCPDataSource(p);
-
-                // boneDs.setJdbcUrl(url);
-                // boneDs.setDriverClass(DRIVER_NAME);
-                // boneDs.setPartitionCount(40);
-                // boneDs.setMaxConnectionsPerPartition(1);
-                // boneDs.setDefaultReadOnly(false);
                 Ds = boneDs;
             } else if (config.externalConnectionPool.equalsIgnoreCase(HIKARI_CONNECTIONPOOL)) {
                 useConnectionPool = true;
-                // HikariConfig p = new HikariConfig("some/path/hikari.properties");
-                HikariDataSource hiDs = new HikariDataSource();
+                HikariConfig p = new HikariConfig("hikari.properties");
+                HikariDataSource hiDs = new HikariDataSource(p);
                 hiDs.setJdbcUrl(url);
                 hiDs.setDriverClassName(DRIVER_NAME);
-                hiDs.setMaximumPoolSize(config.threads + 1);
                 Ds = hiDs;
             } else {
                 useConnectionPool = false;

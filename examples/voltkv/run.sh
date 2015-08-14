@@ -31,20 +31,23 @@ else
     VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
-APPCLASSPATH=$CLASSPATH:$({ \
+CONNECTIONPOOL_LIB="$HOME/workspace/common"
+CONNECIONPOOLCLASSPATH=$({\
+    \ls -1 "$CONNECTIONPOOL_LIB"/tomcat-*.jar; \
+    \ls -1 "$CONNECTIONPOOL_LIB"/mchange-commons-java-*.jar; \
+    \ls -1 "$CONNECTIONPOOL_LIB"/c3p0-*.jar; \
+    \ls -1 "$CONNECTIONPOOL_LIB"/bonecp-*.jar; \
+    \ls -1 "$CONNECTIONPOOL_LIB"/HikariCP-*.jar; \
+    \ls -1 "$CONNECTIONPOOL_LIB"/guava-19.0-*.jar; \
+    \ls -1 "$CONNECTIONPOOL_LIB"/slf4j-*.jar; \
+} 2> /dev/null | paste -sd ':' - )
+APPCLASSPATH=$CLASSPATH:$CONNECIONPOOLCLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=voltkv-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/tomcat-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/mchange-commons-java-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/c3p0-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/bonecp-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/HikariCP-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/guava-19.0-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/slf4j-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -174,6 +177,78 @@ function jdbc-benchmark() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
+        --threads=40
+}
+
+function jdbc-benchmark-c3p0() {
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH:$CONNECIONPOOLCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        voltkv.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost:21212 \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+	--externalConnectionPool=c3p0 \
+        --threads=40
+}
+
+function jdbc-benchmark-tomcat() {
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH:$CONNECIONPOOLCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        voltkv.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost:21212 \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+	--externalConnectionPool=tomcat \
+        --threads=40
+}
+
+function jdbc-benchmark-bone() {
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH:$CONNECIONPOOLCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        voltkv.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost:21212 \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+	--externalConnectionPool=bone \
+        --threads=40
+}
+
+function jdbc-benchmark-hiraki() {
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH:$CONNECIONPOOLCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        voltkv.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost:21212 \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+	--externalConnectionPool=hiraki \
         --threads=40
 }
 
