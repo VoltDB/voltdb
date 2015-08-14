@@ -135,6 +135,7 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -1667,8 +1668,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      */
     void buildClusterMesh(boolean isRejoin) {
         final String leaderAddress = m_config.m_leader;
-        String hostname = MiscUtils.getHostnameFromHostnameColonPort(leaderAddress);
-        int port = MiscUtils.getPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
+        HostAndPort hostAndPort = MiscUtils.getHostAndPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
+        String hostname = hostAndPort.getHostText();
+        int port = hostAndPort.getPort();
 
         org.voltcore.messaging.HostMessenger.Config hmconfig;
 

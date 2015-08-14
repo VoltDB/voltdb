@@ -48,6 +48,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
     private long m_maxBinaryLogUniqueId = Long.MIN_VALUE;
     private long m_maxBinaryLogSequenceNumber = Long.MIN_VALUE;
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
@@ -171,8 +172,14 @@ public class MpPromoteAlgo implements RepairAlgo
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
             }
 
-            m_maxBinaryLogSequenceNumber = Math.max(m_maxBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
-            m_maxBinaryLogUniqueId = Math.max(m_maxBinaryLogUniqueId, response.getBinaryLogUniqueId());
+            if (response.getSequence() == 0) {
+                // The first Repair Log message contains the maximum values needed by DR for promotion
+                assert response.getLocalDrUniqueId() == Long.MIN_VALUE ||
+                        UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalDrUniqueId()) ==  MpInitiator.MP_INIT_PID;
+                m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, response.getLocalDrUniqueId());
+                m_maxBinaryLogSequenceNumber = Math.max(m_maxBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
+                m_maxBinaryLogUniqueId = Math.max(m_maxBinaryLogUniqueId, response.getBinaryLogUniqueId());
+            }
 
             // Step 2: track hashinator versions
 
@@ -258,6 +265,7 @@ public class MpPromoteAlgo implements RepairAlgo
         }
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId,
+                                               m_maxSeenLocalMpUniqueId,
                                                m_maxBinaryLogSequenceNumber,
                                                m_maxBinaryLogUniqueId));
     }

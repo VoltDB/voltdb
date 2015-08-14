@@ -124,11 +124,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 long txnid = Long.MIN_VALUE;
                 long binaryLogDRId = Long.MIN_VALUE;
                 long binaryLogUniqueId = Long.MIN_VALUE;
+                long localMpUniqueId = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
                     binaryLogDRId = res.m_binaryLogDRId;
                     binaryLogUniqueId = res.m_binaryLogUniqueId;
+                    localMpUniqueId = res.m_localDrUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -166,7 +168,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
                     if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
-                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, Long.MIN_VALUE);
+                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, localMpUniqueId);
                     }
                 }
                 else {

@@ -84,7 +84,9 @@ public class RandomMsgGenerator
     private FragmentTaskMessage makeFragmentTaskMsg(boolean readOnly, boolean isFinal)
     {
         FragmentTaskMessage msg =
-            new FragmentTaskMessage(0l, 0l, m_mpiTxnEgo.getTxnId(), 0l, readOnly, isFinal, false);
+            new FragmentTaskMessage(0l, 0l, m_mpiTxnEgo.getTxnId(),
+                    UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(), 0, MpInitiator.MP_INIT_PID),
+                    readOnly, isFinal, false);
         return msg;
     }
 
