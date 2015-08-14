@@ -311,6 +311,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return true
     }
 
+    def boolean isDrSectionOpen(){
+        return divDrReplication.displayed
+    }
+
     /**
      * Closes the Server list, by clicking on the "Server" button (if it's not
      * closed already).
@@ -438,6 +442,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean isDrAreaOpen() {
         return drSection.displayed
     }
+
+
+    def boolean isDrMasterSectionOpen() {
+        return drMasterSection.displayed
+    }
+
 
 
     /**
