@@ -170,7 +170,7 @@ private:
 
     void threadLocalPoolAllocations();
 
-    int64_t applyBinaryLog(struct ipc_command*);
+    void applyBinaryLog(struct ipc_command*);
 
     void executeTask(struct ipc_command*);
 
@@ -483,7 +483,8 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           result = kErrorCode_None;
           break;
       case 29:
-          result = applyBinaryLog(cmd);
+          applyBinaryLog(cmd);
+          result = kErrorCode_None;
           break;
       default:
         result = stub(cmd);
@@ -1529,21 +1530,23 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
     }
 }
 
-int64_t VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
-    int64_t res = -1L;
+void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     try {
         apply_binary_log *params = (apply_binary_log*)cmd;
         m_engine->resetReusedResultOutputBuffer(1);
-        res = m_engine->applyBinaryLog(ntohll(params->txnId),
-                                       ntohll(params->spHandle),
-                                       ntohll(params->lastCommittedSpHandle),
-                                       ntohll(params->uniqueId),
-                                       ntohll(params->undoToken),
-                                       params->log);
+        rows = m_engine->applyBinaryLog(ntohll(params->txnId),
+                                        ntohll(params->spHandle),
+                                        ntohll(params->lastCommittedSpHandle),
+                                        ntohll(params->uniqueId),
+                                        ntohll(params->undoToken),
+                                        params->log);
+        char response[9];
+        response[0] = kErrorCode_Success;
+        *reinterpret_cast<int64_t*>(&response[1]) = htonll(rows);
+        writeOrDie(m_fd, (unsigned char*)response, 9);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }
-    return res;
 }
 
 int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
