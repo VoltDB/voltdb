@@ -43,79 +43,24 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-
-#include "boost/foreach.hpp"
-
 #include "receivenode.h"
 
+#include <sstream>
+
 namespace voltdb {
-
-namespace {
-    void schemaDebugInfo(std::ostringstream& buffer, const std::vector<SchemaColumn*>& schema,
-        const std::string& schema_name, const std::string& spacer) {
-        buffer << spacer << schema_name << " Table Columns[" << schema.size() << "]:\n";
-        for (int ctr = 0, cnt = (int)schema.size(); ctr < cnt; ctr++) {
-            SchemaColumn* col = schema[ctr];
-            buffer << spacer << "  [" << ctr << "] ";
-            buffer << "name=" << col->getColumnName() << " : ";
-            buffer << "size=" << col->getExpression()->getValueSize() << " : ";
-            buffer << "type=" << col->getExpression()->getValueType() << "\n";
-        }
-    }
-}
-
-
-ReceivePlanNode::ReceivePlanNode() :
-    m_mergeReceive(false), m_outputSchemaPreAgg()
-{ }
-
-ReceivePlanNode::~ReceivePlanNode()
-{
-    if (m_mergeReceive) {
-        BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
-            delete scol;
-        }
-    }
-}
 
 PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
 std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
 {
     std::ostringstream buffer;
-    if (!m_mergeReceive) {
-        schemaDebugInfo(buffer, getOutputSchema(), "Incoming", spacer);
-    } else {
-        buffer << spacer << "Merge Receive\n";
-        schemaDebugInfo(buffer, m_outputSchemaPreAgg, "Incoming", spacer);
-        schemaDebugInfo(buffer, getOutputSchema(), "Outgoing", spacer);
-    }
+    AbstractReceivePlanNode::schemaDebugInfo(buffer, getOutputSchema(), "Incoming", spacer);
     return buffer.str();
 }
 
 void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    if (obj.hasNonNullKey("MERGE_RECEIVE")) {
-        m_mergeReceive = obj.valueForKey("MERGE_RECEIVE").asBool();
-        if (m_mergeReceive) {
-            if (obj.hasNonNullKey("OUTPUT_SCHEMA_PRE_AGG")) {
-                PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
-                m_outputSchemaPreAgg.reserve(outputSchemaArray.arrayLen());
-
-                for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
-                    PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
-                    SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
-                    m_outputSchemaPreAgg.push_back(outputColumn);
-                }
-            }
-        }
-    }
 }
 
-TupleSchema* ReceivePlanNode::allocateTupleSchemaPreAgg() const
-{
-    return AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
-}
 
 } // namespace voltdb

@@ -46,11 +46,14 @@
 #ifndef HSTOREORDERBYMERGEEXECUTOR_H
 #define HSTOREORDERBYMERGEEXECUTOR_H
 
-#include <boost/scoped_ptr.hpp>
-
 #include "common/common.h"
+#include "common/tabletuple.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+
+#include <boost/scoped_ptr.hpp>
+
+#include <vector>
 
 namespace voltdb {
 
@@ -58,16 +61,27 @@ namespace voltdb {
     class OrderByPlanNode;
     class LimitPlanNode;
     class AggregateExecutorBase;
+    class ProgressMonitorProxy;
 
     /**
-     * The ORDER BY executor to be used at the coordinator node
+     * The optimized replacement for an ORDER BY executor to be used at the coordinator node
      * to merge-sort results from multiple partitions. The assumption is
-     * that the individual partitions results are already sorted in the right order
+     * that the individual partitions results are already sorted in the order
+     * specified by the inlined OrderByPlanNode
      */
     class MergeReceiveExecutor : public AbstractExecutor {
     public:
         MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
+        // Public for testing purpose only
+        static void merge_sort(const std::vector<TableTuple>& tuples,
+                               std::vector<int64_t>& partitionTupleCounts,
+                               AbstractExecutor::TupleComparer comp,
+                               int limit,
+                               int offset,
+                               AggregateExecutorBase* agg_exec,
+                               TempTable* output_table,
+                               ProgressMonitorProxy* pmp);
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);

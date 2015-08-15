@@ -43,21 +43,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <list>
-#include <vector>
-#include <utility>
-
-#include <boost/lexical_cast.hpp>
-
 #include "mergereceiveexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "plannodes/receivenode.h"
+#include "plannodes/mergereceivenode.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
@@ -66,6 +59,11 @@
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
 
+#include <boost/lexical_cast.hpp>
+
+#include <vector>
+#include <utility>
+#include <algorithm>
 
 namespace voltdb {
 
@@ -73,32 +71,35 @@ namespace {
 
 typedef std::vector<TableTuple>::const_iterator tuple_iterator;
 typedef std::pair<tuple_iterator, tuple_iterator> tuple_range;
-typedef std::list<tuple_range>::iterator range_iterator;
+typedef std::vector<tuple_range>::iterator range_iterator;
 
-range_iterator min_tuple_range(std::list<tuple_range>& partitions, TupleComparer comp) {
-    assert(!partitions.empty());
+struct TupleRangeComparer
+{
+    TupleRangeComparer(AbstractExecutor::TupleComparer comp) :
+        m_comp(comp)
+    {}
 
-    range_iterator smallest_range = partitions.begin();
-    range_iterator rangeIt = smallest_range;
-    range_iterator rangeEnd = partitions.end();
-    ++rangeIt;
-    for (; rangeIt != rangeEnd; ++rangeIt) {
-        assert(rangeIt->first != rangeIt->second);
-        if (comp(*rangeIt->first, *smallest_range->first)) {
-            smallest_range = rangeIt;
-        }
+    bool operator()(const tuple_range& ta, const tuple_range& tb) const
+    {
+        // Assert both ranges are not empty
+        assert(ta.first != ta.second);
+        assert(tb.first != tb.second);
+        // We need the range with a first min tuple
+        return !m_comp(*ta.first, *tb.first);
     }
-    return smallest_range;
+    AbstractExecutor::TupleComparer m_comp;
+};
+
 }
 
-void merge_sort(const std::vector<TableTuple>& tuples,
+void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
     std::vector<int64_t>& partitionTupleCounts,
-    TupleComparer comp,
+    AbstractExecutor::TupleComparer comp,
     int limit,
     int offset,
     AggregateExecutorBase* agg_exec,
     TempTable* output_table,
-    ProgressMonitorProxy pmp) {
+    ProgressMonitorProxy* pmp) {
 
     if (partitionTupleCounts.empty()) {
         return;
@@ -108,7 +109,8 @@ void merge_sort(const std::vector<TableTuple>& tuples,
 
     // Vector to hold pairs of iterators denoting the range of tuples
     // for a given partition
-    std::list<tuple_range> partitions;
+    std::vector<tuple_range> partitions;
+    partitions.reserve(nonEmptyPartitions);
     tuple_iterator begin = tuples.begin();
     for (size_t i = 0; i < nonEmptyPartitions; ++i) {
         tuple_iterator end = begin + partitionTupleCounts[i];
@@ -117,49 +119,46 @@ void merge_sort(const std::vector<TableTuple>& tuples,
         assert( i != nonEmptyPartitions -1 || end == tuples.end());
     }
 
+    // make a heap out of partitions
+    TupleRangeComparer tupleRangeComp(comp);
+    std::make_heap(partitions.begin(), partitions.end(), tupleRangeComp);
+
     int tupleCnt = 0;
     int tupleSkipped = 0;
 
-    while (limit == -1 || tupleCnt < limit) {
-        range_iterator rangeIt = partitions.begin();
-        // remove partitions that are empty
-        while (rangeIt != partitions.end()) {
-            if (rangeIt->first == rangeIt->second) {
-                rangeIt = partitions.erase(rangeIt);
-                --nonEmptyPartitions;
-            } else {
-                ++rangeIt;
-            }
-        }
-        if (nonEmptyPartitions == 1) {
-            // copy the remaining tuples to the output
+    while ((limit == -1 || tupleCnt < limit) && !partitions.empty()) {
+        // Find the range that has the next tuple to be inserted
+        // and remove from the heap
+        assert(!partitions.empty());
+        TableTuple tuple;
+        if (partitions.size() == 1) {
             range_iterator rangeIt = partitions.begin();
-            while (rangeIt->first != rangeIt->second && (limit == -1 || tupleCnt < limit)) {
-                TableTuple tuple = *rangeIt->first;
+            if (rangeIt->first != rangeIt->second) {
+                tuple = *rangeIt->first;
                 ++rangeIt->first;
-                if (tupleSkipped++ < offset) {
-                    continue;
-                }
-                if (agg_exec != NULL) {
-                    if (agg_exec->p_execute_tuple(tuple)) {
-                    // Get enough rows for LIMIT
-                    break;
-                }
-                } else {
-                    output_table->insertTempTuple(tuple);
-                }
-                ++tupleCnt;
-                pmp.countdownProgress();
+            } else {
+                // the last partition is empty
+                return;
             }
-            return;
+        } else {
+            // Pop the top of the heap with the minimal tuple
+            std::pop_heap(partitions.begin(), partitions.end(), tupleRangeComp);
+            tuple_range nextPartition = partitions.back();
+            partitions.pop_back();
+
+            // Get the first tuple from that partition
+            assert(nextPartition.first != nextPartition.second);
+            tuple = *nextPartition.first;
+
+            // advance the partition iterator
+            ++nextPartition.first;
+            if (nextPartition.first != nextPartition.second) {
+                // put the range back to the heap
+                partitions.push_back(nextPartition);
+                std::push_heap(partitions.begin(), partitions.end(), tupleRangeComp);
+            }
         }
 
-        // Find the range that has the next tuple to be inserted
-        range_iterator minRangeIt = min_tuple_range(partitions, comp);
-        // copy the first tuple to the output
-        TableTuple tuple = *minRangeIt->first;
-        // advance the iterator
-        ++minRangeIt->first;
         if (tupleSkipped++ < offset) {
             continue;
         }
@@ -174,28 +173,10 @@ void merge_sort(const std::vector<TableTuple>& tuples,
         }
 
         ++tupleCnt;
-        pmp.countdownProgress();
+        if (pmp != NULL) {
+            pmp->countdownProgress();
+        }
     }
-}
-
-TempTable* allocate_temp_table(CatalogId databaseId, TupleSchema* schema, TempTableLimits* limits, const char* tempTableName) {
-    assert(limits);
-    assert(schema);
-    int column_count = schema->columnCount();
-    std::vector<std::string> column_names;
-    column_names.reserve(column_count);
-
-    for (int ctr = 0; ctr < column_count; ctr++) {
-        column_names.push_back(boost::lexical_cast<std::string>(ctr));
-    }
-
-    return TableFactory::getTempTable(databaseId,
-                                      tempTableName,
-                                      schema,
-                                      column_names,
-                                      limits);
-}
-
 }
 
 MergeReceiveExecutor::MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
@@ -208,7 +189,7 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init MergeReceive Executor");
 
-    ReceivePlanNode* merge_receive_node = dynamic_cast<ReceivePlanNode*>(abstract_node);
+    MergeReceivePlanNode* merge_receive_node = dynamic_cast<MergeReceivePlanNode*>(abstract_node);
     assert(merge_receive_node != NULL);
 
     // Create output table based on output schema from the plan
@@ -235,21 +216,14 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     m_agg_exec = voltdb::getInlineAggregateExecutor(merge_receive_node);
 
     // Create a temp table to collect tuples from multiple partitions
-    if (m_agg_exec != NULL) {
-        TupleSchema* pre_agg_schema = merge_receive_node->allocateTupleSchemaPreAgg();
-        assert(pre_agg_schema != NULL);
-        m_tmpInputTable.reset(allocate_temp_table(m_abstractNode->databaseId(),
-                                                  pre_agg_schema,
-                                                  limits,
-                                                  "tempInput"));
-    } else {
-        m_tmpInputTable.reset(TableFactory::getTempTable(m_abstractNode->databaseId(),
+    TupleSchema* pre_agg_schema = (m_agg_exec != NULL) ?
+        merge_receive_node->allocateTupleSchemaPreAgg() : m_abstractNode->generateTupleSchema();
+    std::vector<std::string> column_names(pre_agg_schema->columnCount());
+    m_tmpInputTable.reset(TableFactory::getTempTable(m_abstractNode->databaseId(),
                                                          "tempInput",
                                                          m_abstractNode->generateTupleSchema(),
-                                                         m_tmpOutputTable->getColumnNames(),
+                                                         column_names,
                                                          limits));
-    }
-
     return true;
 }
 
@@ -257,7 +231,7 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     int loadedDeps = 0;
 
     // iterate over dependencies and merge them into the temp table.
-    // The assumption is that the dependencies results are are sorted.
+    // The assumption is that each dependency result is already sorted.
     int64_t previousTupleCount = 0;
     std::vector<int64_t> partitionTupleCounts;
     do {
@@ -303,8 +277,8 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     }
 
     // Merge Sort
-    TupleComparer comp(m_orderby_node->getSortExpressions(), m_orderby_node->getSortDirections());
-    merge_sort(xs, partitionTupleCounts, comp, limit, offset, m_agg_exec, m_tmpOutputTable, pmp);
+    AbstractExecutor::TupleComparer comp(m_orderby_node->getSortExpressions(), m_orderby_node->getSortDirections());
+    merge_sort(xs, partitionTupleCounts, comp, limit, offset, m_agg_exec, m_tmpOutputTable, &pmp);
 
     VOLT_TRACE("Result of MergeReceive:\n '%s'", m_tmpOutputTable->debug().c_str());
 

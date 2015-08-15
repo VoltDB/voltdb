@@ -43,21 +43,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <algorithm>
-#include <vector>
 #include "orderbyexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
-#include "executors/executorutil.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
+
+#include <algorithm>
+#include <vector>
 
 using namespace voltdb;
 using namespace std;
@@ -77,7 +77,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         assert(node->getChildren()[0] != NULL);
 
         //
-        // Our output table should look exactly like out input table
+        // Our output table should look exactly like our input table
         //
         node->
             setOutputTable(TableFactory::
@@ -85,12 +85,14 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
                                           node->getInputTable()->name(),
                                           node->getInputTable(),
                                           limits));
-    }
-
-    // pickup an inlined limit, if one exists
-    limit_node =
-        dynamic_cast<LimitPlanNode*>(node->
+        // pickup an inlined limit, if one exists
+        limit_node =
+            dynamic_cast<LimitPlanNode*>(node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    } else {
+        assert(node->getChildren().empty());
+        assert(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT) == NULL);
+    }
 
 #if defined(VOLT_LOG_LEVEL)
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
@@ -144,11 +146,11 @@ OrderByExecutor::p_execute(const NValueArray &params)
     if (limit >= 0 && xs.begin() + limit + offset < xs.end()) {
         // partial sort
         partial_sort(xs.begin(), xs.begin() + limit + offset, xs.end(),
-                TupleComparer(node->getSortExpressions(), node->getSortDirections()));
+                AbstractExecutor::TupleComparer(node->getSortExpressions(), node->getSortDirections()));
     } else {
         // full sort
         sort(xs.begin(), xs.end(),
-                TupleComparer(node->getSortExpressions(), node->getSortDirections()));
+                AbstractExecutor::TupleComparer(node->getSortExpressions(), node->getSortDirections()));
     }
 
     int tuple_ctr = 0;

@@ -276,6 +276,7 @@ CTX.INPUT['plannodes'] = """
  abstractjoinnode.cpp
  abstractoperationnode.cpp
  abstractplannode.cpp
+ abstractreceivenode.cpp
  abstractscannode.cpp
  aggregatenode.cpp
  deletenode.cpp
@@ -286,6 +287,7 @@ CTX.INPUT['plannodes'] = """
  limitnode.cpp
  materializenode.cpp
  materializedscanplannode.cpp
+ mergereceivenode.cpp
  nestloopindexnode.cpp
  nestloopnode.cpp
  orderbynode.cpp
@@ -414,6 +416,7 @@ if whichtests in ("${eetestsuite}", "execution"):
 if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
+    MergeReceiveExecutorTest
     """
 
 
