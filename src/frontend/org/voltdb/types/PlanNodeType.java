@@ -31,6 +31,7 @@ import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -78,6 +79,7 @@ public enum PlanNodeType {
     //
     SEND            (40, SendPlanNode.class),
     RECEIVE         (41, ReceivePlanNode.class),
+    MERGERECEIVE    (42, MergeReceivePlanNode.class),
 
     //
     // Misc Nodes

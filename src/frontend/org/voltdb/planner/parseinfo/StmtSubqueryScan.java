@@ -35,10 +35,9 @@ import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.types.PlanNodeType;
 
 /**
  * StmtTableScan caches data related to a given instance of a sub-query within the statement scope
@@ -304,7 +303,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         if (! m_subqueriesPartitioning.requiresTwoFragments()) {
             return root;
         }
-        assert(root.findAllNodesOfType(PlanNodeType.RECEIVE).size() == 1);
+        assert(root.findAllNodesOfClass(AbstractReceivePlanNode.class).size() == 1);
         assert(m_subqueryStmt != null);
 
         // recursive check for its nested subqueries for should have receive node.
@@ -419,7 +418,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     static public AbstractPlanNode removeCoordinatorSendReceivePairRecursive(AbstractPlanNode root,
             AbstractPlanNode current) {
-        if (current instanceof ReceivePlanNode) {
+        if (current instanceof AbstractReceivePlanNode) {
             assert(current.getChildCount() == 1);
 
             AbstractPlanNode child = current.getChild(0);

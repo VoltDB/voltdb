@@ -308,7 +308,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Does the output is sorted according to the order implied by the (expression, sort order) pairs.
+     * Does the plan guarantee a result sorted according to the required sort order.
      * The default implementation delegates the question to its child if there is only one child.
      *
      *@param sortExpressions list of ordering columns expressions
@@ -320,9 +320,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         assert(sortExpressions.size() == sortDirections.size());
         if (m_children.size() == 1) {
             return m_children.get(0).isOutputOrdered(sortExpressions, sortDirections);
-        } else {
-            return false;
         }
+        return false;
     }
 
     /**
@@ -865,7 +864,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (isInline()) {
             return "fontcolor=\"white\" style=\"filled\" fillcolor=\"red\"";
         }
-        if (pnt == PlanNodeType.SEND || pnt == PlanNodeType.RECEIVE) {
+        if (pnt == PlanNodeType.SEND || pnt == PlanNodeType.RECEIVE || pnt == PlanNodeType.MERGERECEIVE) {
             return "fontcolor=\"white\" style=\"filled\" fillcolor=\"black\"";
         }
         return "";

@@ -47,14 +47,18 @@
 #define VOLTDBNODEABSTRACTEXECUTOR_H
 
 #include "common/InterruptException.h"
+#include "common/tabletuple.h"
+#include "common/types.h"
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
 
 #include <cassert>
+#include <vector>
 
 namespace voltdb {
 
+class AbstractExpression;
 class TempTableLimits;
 class VoltDBEngine;
 
@@ -104,6 +108,20 @@ class AbstractExecutor {
         return true;
     }
 
+    // Compares two tuples based on the provided sets of expressions and sort directions
+    struct TupleComparer
+    {
+        TupleComparer(const std::vector<AbstractExpression*>& keys,
+                  const std::vector<SortDirectionType>& dirs);
+
+        bool operator()(TableTuple ta, TableTuple tb) const;
+
+    private:
+        const std::vector<AbstractExpression*>& m_keys;
+        const std::vector<SortDirectionType>& m_dirs;
+        size_t m_keyCount;
+    };
+
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;
@@ -136,6 +154,7 @@ class AbstractExecutor {
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
+
 };
 
 

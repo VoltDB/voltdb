@@ -31,6 +31,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -192,20 +193,14 @@ public class TestPlansLimit extends PlannerTestCase {
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
         p = p.getChild(0);
-        boolean mergereceive = false;
-        if (p instanceof ReceivePlanNode) {
-            assertTrue(((ReceivePlanNode)p).isMergeReceive());
+        if (p instanceof MergeReceivePlanNode) {
             assertNotNull(p.getInlinePlanNode(PlanNodeType.ORDERBY));
-            mergereceive = true;
-        } else {
-            assertTrue(p instanceof OrderByPlanNode);
-        }
-        if (mergereceive) {
             AbstractPlanNode aggr = AggregatePlanNode.getInlineAggregationNode(p);
             if (aggr != null) {
                 assertNotNull(aggr.getInlinePlanNode(PlanNodeType.LIMIT));
             }
         } else {
+            assertTrue(p instanceof OrderByPlanNode);
             assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
         }
 
@@ -226,8 +221,7 @@ public class TestPlansLimit extends PlannerTestCase {
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
         p = p.getChild(0);
-        assertTrue(p instanceof ReceivePlanNode);
-        assertTrue(((ReceivePlanNode)p).isMergeReceive());
+        assertTrue(p instanceof MergeReceivePlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
         assertNotNull(p.getInlinePlanNode(PlanNodeType.ORDERBY));
 

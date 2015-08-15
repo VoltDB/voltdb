@@ -43,23 +43,30 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORERECEIVENODE_H
-#define HSTORERECEIVENODE_H
-
 #include "abstractreceivenode.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-class ReceivePlanNode : public AbstractReceivePlanNode
+AbstractReceivePlanNode::AbstractReceivePlanNode()
 {
-public:
-    PlanNodeType getPlanNodeType() const;
-    std::string debugInfo(const std::string& spacer) const;
+}
 
-protected:
-    void loadFromJSONObject(PlannerDomValue obj);
-};
+AbstractReceivePlanNode::~AbstractReceivePlanNode()
+{
+}
+
+void AbstractReceivePlanNode::schemaDebugInfo(std::ostringstream& buffer, const std::vector<SchemaColumn*>& schema,
+    const std::string& schema_name, const std::string& spacer) {
+    buffer << spacer << schema_name << " Table Columns[" << schema.size() << "]:\n";
+    for (int ctr = 0, cnt = (int)schema.size(); ctr < cnt; ctr++) {
+        SchemaColumn* col = schema[ctr];
+        buffer << spacer << "  [" << ctr << "] ";
+        buffer << "name=" << col->getColumnName() << " : ";
+        buffer << "size=" << col->getExpression()->getValueSize() << " : ";
+        buffer << "type=" << col->getExpression()->getValueType() << "\n";
+    }
+}
 
 } // namespace voltdb
-
-#endif

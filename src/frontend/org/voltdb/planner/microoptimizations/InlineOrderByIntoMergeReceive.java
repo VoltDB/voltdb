@@ -18,12 +18,10 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
@@ -32,11 +30,12 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.types.PlanNodeType;
 
-public class ReplaceOrderBy extends MicroOptimization {
+public class InlineOrderByIntoMergeReceive extends MicroOptimization {
 
     @Override
     protected AbstractPlanNode recursivelyApply(AbstractPlanNode planNode)
@@ -48,10 +47,12 @@ public class ReplaceOrderBy extends MicroOptimization {
 
         while(!children.isEmpty()) {
             AbstractPlanNode plan = children.remove();
-            if (PlanNodeType.RECEIVE == plan.getPlanNodeType()) {
+            PlanNodeType nodeType = plan.getPlanNodeType();
+            if (PlanNodeType.RECEIVE == nodeType) {
                 // continue. We are after the coordinator ORDER BY node.
                 return planNode;
-            } else if (PlanNodeType.ORDERBY == plan.getPlanNodeType()) {
+            }
+            if (PlanNodeType.ORDERBY == nodeType) {
                 assert(plan instanceof OrderByPlanNode);
                 AbstractPlanNode newPlan = applyOptimization((OrderByPlanNode)plan);
                 if (newPlan != plan) {
@@ -80,6 +81,8 @@ public class ReplaceOrderBy extends MicroOptimization {
      * @return optimized plan
      */
     AbstractPlanNode applyOptimization(OrderByPlanNode orderbyNode) {
+        // Find all child RECEIVE nodes. We are not interested in the MERGERECEIVE nodes there
+        // because they could only come from subqueries.
         List<AbstractPlanNode> receives = orderbyNode.findAllNodesOfType(PlanNodeType.RECEIVE);
         if (receives.isEmpty()) {
             return orderbyNode;
@@ -97,31 +100,29 @@ public class ReplaceOrderBy extends MicroOptimization {
         //      LIMIT, AGGREGATE/PARTIALAGGREGATE/HASHAGGREGATE
         // The HASHAGGREGATE must be convertible to AGGREGATE or PARTIALAGGREGATE for optimization
         // to be applicable.
-        Map<PlanNodeType, AbstractPlanNode> inlineCandidates = new HashMap<PlanNodeType, AbstractPlanNode>();
+
+        // LIMIT can be already inline with ORDER BY node
+        AbstractPlanNode limitNode = orderbyNode.getInlinePlanNode(PlanNodeType.LIMIT);
+        AbstractPlanNode aggregateNode = null;
         AbstractPlanNode inlineCandidate = receive.getParent(0);
-        inlineCandidates.put(orderbyNode.getPlanNodeType(), orderbyNode);
         while (orderbyNode != inlineCandidate) {
             if (inlineCandidate instanceof AbstractScanPlanNode) {
                 // it's a subquery
                 return orderbyNode;
             }
             PlanNodeType nodeType = inlineCandidate.getPlanNodeType();
-            // Can't handle more than one aggregation
-            if (inlineCandidate instanceof AggregatePlanNode &&
-                    (inlineCandidates.containsKey(PlanNodeType.AGGREGATE) || inlineCandidates.containsKey(PlanNodeType.PARTIALAGGREGATE))) {
-                return orderbyNode;
-            }
-            if (nodeType == PlanNodeType.HASHAGGREGATE) {
-                AbstractPlanNode newAggr = convertToSerialAggregation(inlineCandidate, orderbyNode);
-                if (newAggr.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
+            if (nodeType == PlanNodeType.LIMIT && limitNode == null) {
+                limitNode = inlineCandidate;
+            } else if ((nodeType == PlanNodeType.AGGREGATE || nodeType == PlanNodeType.PARTIALAGGREGATE) &&
+                    aggregateNode == null) {
+                aggregateNode = inlineCandidate;
+            } else if (nodeType == PlanNodeType.HASHAGGREGATE && aggregateNode == null) {
+                aggregateNode = convertToSerialAggregation(inlineCandidate, orderbyNode);
+                if (PlanNodeType.HASHAGGREGATE == aggregateNode.getPlanNodeType()) {
                     return orderbyNode;
                 }
-                inlineCandidates.put(newAggr.getPlanNodeType(), newAggr);
-            } else if ((nodeType == PlanNodeType.AGGREGATE || nodeType == PlanNodeType.PARTIALAGGREGATE
-                    || nodeType == PlanNodeType.LIMIT) && !inlineCandidates.containsKey(nodeType)) {
-                inlineCandidates.put(nodeType, inlineCandidate);
             } else {
-                // Don't know how to handle this node
+                // Don't know how to handle this node or there is already a node of this type
                 return orderbyNode;
             }
             // move up one node
@@ -137,50 +138,39 @@ public class ReplaceOrderBy extends MicroOptimization {
         }
 
         // At this point we confirmed that the optimization is applicable.
-        // Short circuit the current ORDER BY parent (if such exists) and the RECIEVE node
-        // that becomes MERGE RECEIVE. All in-between nodes will be inlined
+        // Short circuit the current ORDER BY parent (if such exists) and
+        // the new MERGERECIEVE node.. All in-between nodes will be inlined
         assert (orderbyNode.getParentCount() <= 1);
         AbstractPlanNode rootNode = (orderbyNode.getParentCount() == 1) ? orderbyNode.getParent(0) : null;
-        receive.clearParents();
+        MergeReceivePlanNode mergeReceive = new MergeReceivePlanNode();
+        assert(receive.getChildCount() == 1);
+        mergeReceive.addAndLinkChild(receive.getChild(0));
+        receive.removeFromGraph();
         if (rootNode == null) {
-            rootNode = receive;
+            rootNode = mergeReceive;
         } else {
             rootNode.clearChildren();
-            rootNode.addAndLinkChild(receive);
+            rootNode.addAndLinkChild(mergeReceive);
         }
 
-        // Add inline ORDER BY node
-        AbstractPlanNode orderByNode = inlineCandidates.get(PlanNodeType.ORDERBY);
-        assert(orderByNode != null);
-        receive.addInlinePlanNode(orderByNode);
-
-        // LIMIT can be already inline with ORDER BY node
-        AbstractPlanNode limitNode = orderByNode.getInlinePlanNode(PlanNodeType.LIMIT);
+        // Add inline ORDER BY node and remove inline LIMIT node if any
+        mergeReceive.addInlinePlanNode(orderbyNode);
         if (limitNode != null) {
-            orderByNode.removeInlinePlanNode(PlanNodeType.LIMIT);
-        } else {
-            limitNode  = inlineCandidates.get(PlanNodeType.LIMIT);
+            orderbyNode.removeInlinePlanNode(PlanNodeType.LIMIT);
         }
 
         // Add inline aggregate
-        AbstractPlanNode aggrNode = inlineCandidates.get(PlanNodeType.AGGREGATE);
-        if (aggrNode == null) {
-            aggrNode = inlineCandidates.get(PlanNodeType.PARTIALAGGREGATE);
-        }
-        if (aggrNode != null) {
+        if (aggregateNode != null) {
             if (limitNode != null) {
                 // Inline LIMIT with aggregate
-                aggrNode.addInlinePlanNode(limitNode);
+                aggregateNode.addInlinePlanNode(limitNode);
             }
-            receive.addInlinePlanNode(aggrNode);
+            mergeReceive.addInlinePlanNode(aggregateNode);
         }
         // Add LIMIT if it is exist and wasn't inline with aggregate node
-        if (limitNode != null && aggrNode == null) {
-            receive.addInlinePlanNode(limitNode);
+        if (limitNode != null && aggregateNode == null) {
+            mergeReceive.addInlinePlanNode(limitNode);
         }
-
-        // Convert the receive node to the merge receive
-        receive.setMergeReceive(true);
 
         // return the new root
         return rootNode;
@@ -208,8 +198,7 @@ public class ReplaceOrderBy extends MicroOptimization {
             int idx = 0;
             for (AbstractExpression groupby : groupbys) {
                 if (!coveredGroupByColumns.contains(idx)) {
-                    // This groupby expression is not bind to any orderby yet
-                    if (orderby.bindingToIndexedExpression(groupby) != null) {
+                    if (orderby.equals(groupby)) {
                         orderbyIt.remove();
                         coveredGroupByColumns.add(idx);
                         break;
@@ -221,14 +210,14 @@ public class ReplaceOrderBy extends MicroOptimization {
         if (orderbys.isEmpty() && groupbys.size() == coveredGroupByColumns.size()) {
             // All GROUP BY expressions are also ORDER BY - Serial aggregation
             return AggregatePlanNode.convertToSerialAggregatePlanNode(hashAggr);
-        } else if (orderbys.isEmpty() && !coveredGroupByColumns.isEmpty() ) {
+        }
+        if (orderbys.isEmpty() && !coveredGroupByColumns.isEmpty() ) {
             // Partial aggregation
             List<Integer> coveredGroupByColumnList = new ArrayList<Integer>();
             coveredGroupByColumnList.addAll(coveredGroupByColumns);
             return AggregatePlanNode.convertToPartialAggregatePlanNode(hashAggr, coveredGroupByColumnList);
-        } else {
-            return aggregateNode;
         }
+        return aggregateNode;
     }
 
 }

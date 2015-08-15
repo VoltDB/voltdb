@@ -56,6 +56,7 @@
 #include "plannodes/limitnode.h"
 #include "plannodes/materializenode.h"
 #include "plannodes/materializedscanplannode.h"
+#include "plannodes/mergereceivenode.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/projectionnode.h"
@@ -194,6 +195,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_RECEIVE):
             ret = new voltdb::ReceivePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // Merge Receive
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_MERGERECEIVE):
+            ret = new voltdb::MergeReceivePlanNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }

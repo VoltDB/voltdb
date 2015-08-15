@@ -50,13 +50,12 @@
 
 #include "executors/aggregateexecutor.h"
 #include "executors/deleteexecutor.h"
-#include "executors/indexscanexecutor.h"
 #include "executors/indexcountexecutor.h"
-#include "executors/tablecountexecutor.h"
+#include "executors/indexscanexecutor.h"
 #include "executors/insertexecutor.h"
 #include "executors/limitexecutor.h"
-#include "executors/materializeexecutor.h"
 #include "executors/materializedscanexecutor.h"
+#include "executors/materializeexecutor.h"
 #include "executors/mergereceiveexecutor.h"
 #include "executors/nestloopexecutor.h"
 #include "executors/nestloopindexexecutor.h"
@@ -65,10 +64,10 @@
 #include "executors/receiveexecutor.h"
 #include "executors/sendexecutor.h"
 #include "executors/seqscanexecutor.h"
+#include "executors/tablecountexecutor.h"
 #include "executors/tuplescanexecutor.h"
 #include "executors/unionexecutor.h"
 #include "executors/updateexecutor.h"
-#include "plannodes/receivenode.h"
 
 #include <cassert>
 
@@ -95,15 +94,8 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_RECEIVE: {
-        ReceivePlanNode* receive_plan_node = dynamic_cast<ReceivePlanNode*>(abstract_node);
-        assert(receive_plan_node != NULL);
-        if (receive_plan_node->isMergeReceive()) {
-            return new MergeReceiveExecutor(engine, abstract_node);
-        } else {
-            return new ReceiveExecutor(engine, abstract_node);
-        }
-    }
+    case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_MERGERECEIVE: return new MergeReceiveExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
@@ -114,33 +106,6 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     }
     VOLT_ERROR( "Undefined plan node type %d", (int) type);
     return NULL;
-}
-
-bool TupleComparer::operator()(TableTuple ta, TableTuple tb) const
-{
-    for (size_t i = 0; i < m_keyCount; ++i)
-    {
-        AbstractExpression* k = m_keys[i];
-        SortDirectionType dir = m_dirs[i];
-        int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
-        if (dir == SORT_DIRECTION_TYPE_ASC)
-        {
-            if (cmp < 0) return true;
-            if (cmp > 0) return false;
-        }
-        else if (dir == SORT_DIRECTION_TYPE_DESC)
-        {
-            if (cmp < 0) return false;
-            if (cmp > 0) return true;
-        }
-        else
-        {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                            "Attempted to sort using"
-                                            " SORT_DIRECTION_TYPE_INVALID");
-        }
-    }
-    return false; // ta == tb on these keys
 }
 
 }
