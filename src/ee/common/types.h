@@ -203,6 +203,7 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_SEND             = 40,
     PLAN_NODE_TYPE_RECEIVE          = 41,
+    PLAN_NODE_TYPE_MERGERECEIVE     = 42,
 
     //
     // Misc Nodes

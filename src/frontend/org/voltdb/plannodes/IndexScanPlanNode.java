@@ -344,24 +344,26 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // starting from the first one
         List<AbstractExpression> indexedExprs = new ArrayList<AbstractExpression>();
         List<ColumnRef> indexedColRefs = new ArrayList<ColumnRef>();
-        List<Integer> indexedColIds = new ArrayList<Integer>();
-        CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
-                indexedExprs, indexedColRefs, indexedColIds);
-        int indexExprCount = (indexedExprs.isEmpty()) ? indexedColRefs.size() : indexedExprs.size();
+        boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
+                indexedExprs, indexedColRefs);
+        int indexExprCount = (columnIndex) ? indexedColRefs.size() : indexedExprs.size();
         if (indexExprCount < sortExpressions.size()) {
             // Not enough index expressions to cover all of the sort expressions
             return false;
         }
-        for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
-            AbstractExpression sortExpression = sortExpressions.get(idxToCover);
-            boolean covered = false;
-            if (!indexedExprs.isEmpty()) {
-                covered = isSortExpressionCovered(sortExpression, indexedExprs, idxToCover);
-            } else {
-                covered = isSortExpressionCovered(sortExpression, indexedColRefs, idxToCover, getTableScan());
+        if (columnIndex) {
+            for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
+                AbstractExpression sortExpression = sortExpressions.get(idxToCover);
+                if (!isSortExpressionCovered(sortExpression, indexedColRefs, idxToCover, getTableScan())) {
+                    return false;
+                }
             }
-            if (!covered) {
-                return false;
+        } else {
+            for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
+                AbstractExpression sortExpression = sortExpressions.get(idxToCover);
+                if (!isSortExpressionCovered(sortExpression, indexedExprs, idxToCover)) {
+                    return false;
+                }
             }
         }
         return true;
@@ -371,7 +373,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             int idxToCover) {
         assert(idxToCover < indexedExprs.size());
         AbstractExpression indexExpression = indexedExprs.get(idxToCover);
-        return sortExpression.bindingToIndexedExpression(indexExpression) != null;
+        return sortExpression.equals(indexExpression);
     }
 
     private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<ColumnRef> indexedColRefs,

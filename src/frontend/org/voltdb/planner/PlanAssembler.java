@@ -52,6 +52,7 @@ import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
@@ -848,7 +849,7 @@ public class PlanAssembler {
             boolean mvFixInfoCoordinatorNeeded = true;
             boolean mvFixInfoEdgeCaseOuterJoin = false;
 
-            ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfClass(AbstractReceivePlanNode.class);
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
@@ -997,7 +998,7 @@ public class PlanAssembler {
             return false;
         }
 
-        if (root.getPlanNodeType() == PlanNodeType.RECEIVE &&
+        if (root instanceof AbstractReceivePlanNode &&
                 m_parsedSelect.hasPartitionColumnInGroupby()) {
             // Top aggregate has been removed, its schema is exactly the same to
             // its local aggregate node.
@@ -1716,10 +1717,10 @@ public class PlanAssembler {
         AbstractPlanNode receiveNode = root;
         AbstractPlanNode reAggParent = null;
         // Find receive plan node and insert the constructed re-aggregation plan node.
-        if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+        if (root instanceof AbstractReceivePlanNode) {
             root = reAggNode;
         } else {
-            List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            List<AbstractPlanNode> recList = root.findAllNodesOfClass(AbstractReceivePlanNode.class);
             assert(recList.size() == 1);
             receiveNode = recList.get(0);
 
@@ -1921,7 +1922,7 @@ public class PlanAssembler {
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
 
-            if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+            if (root instanceof AbstractReceivePlanNode) {
                 // do not apply index scan for serial/partial aggregation
                 // for distinct that does not group by partition column
                 if (!m_parsedSelect.hasAggregateDistinct() || m_parsedSelect.hasPartitionColumnInGroupby()) {
@@ -2115,6 +2116,7 @@ public class PlanAssembler {
         if ( ! IndexType.isScannable(index.getType())) {
             return;
         }
+
         ArrayList<AbstractExpression> bindings = new ArrayList<>();
         gbInfo.m_coveredGroupByColumns = calculateGroupbyColumnsCovered(
                 index, fromTableAlias, bindings);

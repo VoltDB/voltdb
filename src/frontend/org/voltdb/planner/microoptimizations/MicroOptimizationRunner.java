@@ -36,7 +36,7 @@ public class MicroOptimizationRunner {
         optimizations.add(new InlineAggregation());
 
         // MP ORDER BY Optimization
-        optimizations.add(new ReplaceOrderBy());
+        optimizations.add(new InlineOrderByIntoMergeReceive());
     }
 
     public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
