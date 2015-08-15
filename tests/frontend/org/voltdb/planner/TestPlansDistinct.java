@@ -29,6 +29,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -372,13 +373,11 @@ public class TestPlansDistinct extends PlannerTestCase {
         } else if (apn2 instanceof LimitPlanNode) {
             hasLimit = true;
             apn2 = apn2.getChild(0);
-        } else if (apn2 instanceof ReceivePlanNode) {
-            if (((ReceivePlanNode)apn2).isMergeReceive()) {
-                assertTrue(apn2.getInlinePlanNode(PlanNodeType.ORDERBY) != null);
-                hasOrderby = true;
-                hasLimit = apn2.getInlinePlanNode(PlanNodeType.LIMIT) != null;
-                groupByMergeReceive = true;
-            }
+        } else if (apn2 instanceof MergeReceivePlanNode) {
+            assertTrue(apn2.getInlinePlanNode(PlanNodeType.ORDERBY) != null);
+            hasOrderby = true;
+            hasLimit = apn2.getInlinePlanNode(PlanNodeType.LIMIT) != null;
+            groupByMergeReceive = true;
         }
 
         // check the DISTINCT query plan
@@ -391,8 +390,7 @@ public class TestPlansDistinct extends PlannerTestCase {
                     assertNotNull(apn1.getInlinePlanNode(PlanNodeType.LIMIT));
                 }
                 apn1 = apn1.getChild(0);
-            } else if (apn1 instanceof ReceivePlanNode) {
-                assertTrue(((ReceivePlanNode)apn1).isMergeReceive());
+            } else if (apn1 instanceof MergeReceivePlanNode) {
                 distinctMergeReceive = true;
                 assertNotNull(apn1.getInlinePlanNode(PlanNodeType.ORDERBY));
                 assertEquals(0, apn1.getChildCount());

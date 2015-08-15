@@ -277,11 +277,11 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         if (aggrNode != null && aggrNode.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
             return false;
         }
+        // Not yet handling ORDER BY expressions based on more than just the left-most table
         if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN || outerTable instanceof AbstractJoinPlanNode) {
             return outerTable.isOutputOrdered(sortExpressions, sortDirections);
-        } else {
-            return false;
         }
+        return false;
     }
 
     // TODO: need to extend the sort direction for join from one table to the other table if possible

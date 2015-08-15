@@ -367,6 +367,17 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * A getSortedCatalogItems variant with the result list filled in-place
+     * @param <T> The type of item to sort.
+     * @param items The set of catalog items.
+     * @param sortFieldName The name of the field to sort on.
+     * @param An output list of catalog items, sorted on the specified field.
+     */
+    public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
+        result.addAll(getSortedCatalogItems(items, sortFieldName    ));
+    }
+
+    /**
      * For a given Table catalog object, return the PrimaryKey Index catalog object
      * @param catalogTable
      * @return The index representing the primary key.
@@ -2240,23 +2251,21 @@ public abstract class CatalogUtil {
      * @param tableScan table
      * @param indexedExprs   index expressions. This list remains empty if the index is just on simple columns.
      * @param indexedColRefs indexed columns. This list remains empty if indexedExprs is in use.
-     * @param indexedColIds indexed columns ids. This list remains empty if indexedExprs is in use.
+     * @return true if this is a column based index
      */
-    public static void getCatalogIndexExpressions(Index index, StmtTableScan tableScan,
-            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs, List<Integer> indexedColIds) {
+    public static boolean getCatalogIndexExpressions(Index index, StmtTableScan tableScan,
+            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs) {
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
-            indexedColRefs.addAll(CatalogUtil.getSortedCatalogItems(index.getColumns(), "index"));
-            for (ColumnRef cr : indexedColRefs) {
-                indexedColIds.add(cr.getColumn().getIndex());
-            }
+            CatalogUtil.getSortedCatalogItems(index.getColumns(), "index", indexedColRefs);
         } else {
             try {
-                indexedExprs.addAll(AbstractExpression.fromJSONArrayString(exprsjson, tableScan));
+                AbstractExpression.fromJSONArrayString(exprsjson, tableScan, indexedExprs);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
             }
         }
+        return exprsjson.isEmpty();
     }
 }

@@ -824,29 +824,34 @@ public class TestOrderBySuite extends RegressionSuite {
         client.callProcedure("InsertO3", 4, 4, 1, 1);
         client.callProcedure("InsertO3", 10, 10, 10, 10);
 
+        String sql;
         // Partitions Result sets are ordered by index. No LIMIT/OFFEST
-        VoltTable vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM O1 ORDER BY PKEY DESC").getResults()[0];
+        sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         long[][] expected = new long[][] {{7}, {6}, {5}, {4}, {3}, {2}, {1}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain", "SELECT PKEY FROM O1 ORDER BY PKEY DESC").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // Partitions Result sets are ordered by index with LIMIT/OFFSET
-        vt = client.callProcedure("@AdHoc", "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3 OFFSET 3").getResults()[0];
+        sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3 OFFSET 3";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{4}, {3}, {2}};
         validateTableOfLongs(vt, expected);
 
         // IDX_O1_A_INT_PKEY index provides the right order for the coordinator. Merge Receive
-        vt = client.callProcedure("@AdHoc", "SELECT A_INT, PKEY from O1 ORDER BY A_INT DESC, PKEY DESC LIMIT 3").getResults()[0];
+        sql = "SELECT A_INT, PKEY FROM O1 ORDER BY A_INT DESC, PKEY DESC LIMIT 3";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{8,7}, {7,6}, {7,2}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain", "SELECT A_INT, PKEY from O1 ORDER BY A_INT DESC, PKEY DESC LIMIT 3").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // NLIJ with index outer table scan
-        vt = client.callProcedure("@AdHoc", "select O1.A_INT from O1, O3 where O1.A_INT = O3.I3 order by O1.A_INT").getResults()[0];
+        sql = "SELECT O1.A_INT FROM O1, O3 WHERE O1.A_INT = O3.I3 ORDER BY O1.A_INT";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {7}, {7}, {7}, {7}, {8}};
-        vt = client.callProcedure("@Explain", "select O1.A_INT from O1, O3 where O1.A_INT = O3.I3 order by O1.A_INT limit 3").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
     }
@@ -855,7 +860,6 @@ public class TestOrderBySuite extends RegressionSuite {
     {
         Client client = getClient();
         client.callProcedure("TruncateP");
-        client.callProcedure("TruncateP1");
         client.callProcedure("@AdHoc", "insert into P values(1, 11, 1, 1)");
         client.callProcedure("@AdHoc", "insert into P values(1, 1, 2, 1)");
         client.callProcedure("@AdHoc", "insert into P values(3, 6, 2, 1)");
@@ -864,30 +868,31 @@ public class TestOrderBySuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "insert into P values(7, 1, 4, 1)");
         client.callProcedure("@AdHoc", "insert into P values(7, 6, 1, 1)");
 
+        String sql;
+        VoltTable vt;
+        long[][] expected;
         // Merge Receive with Serial aggregation
         //            select indexed_non_partition_key, max(col)
         //            from partitioned
         //            group by indexed_non_partition_key
         //            order by indexed_non_partition_key;"
-        VoltTable vt = client.callProcedure("@AdHoc",
-                "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1").getResults()[0];
-        long[][] expected = new long[][] {{1, 4}, {6, 2}, {11, 2}};
+        sql = "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1, 4}, {6, 2}, {11, 2}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain",
-                "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // Merge Receive with Partial aggregation
         //            select indexed_non_partition_key, col, max(col)
         //            from partitioned
         //            group by indexed_non_partition_key, col
-        //            order by indexed_non_partition_key;"
-        vt = client.callProcedure("@AdHoc",
-                "select P_D1, P_D3, max(P_D2) from P group by P_D1, P_D3 order by P_D1").getResults()[0];
+        //            order by indexed_non_partition_key;
+        sql = "select P_D1, P_D3, max(P_D2) from P group by P_D1, P_D3 order by P_D1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1, 1, 4}, {6, 1, 2}, {11, 1, 2}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain",
-                "select P_D1, P_D3, max(P_D2) from P group by P_D1, P_D3 order by P_D1").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // No aggregation at coordinator
@@ -895,12 +900,11 @@ public class TestOrderBySuite extends RegressionSuite {
         //          from partitioned
         //          group by indexed_partition_key
         //          order by indexed_partition_key;"
-        vt = client.callProcedure("@AdHoc",
-                "select max(P_D2), P_D0 from P group by P_D0  order by P_D0").getResults()[0];
+        sql = "select max(P_D2), P_D0 from P group by P_D0  order by P_D0";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{2, 1}, {2, 3}, {1, 4}, {2, 5}, {4, 7}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain",
-                "select max(P_D2), P_D0 from P group by P_D0  order by P_D0").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // No aggregation at coordinator
@@ -908,12 +912,11 @@ public class TestOrderBySuite extends RegressionSuite {
         //          from partitioned
         //          group by indexed_non_partition_key, indexed_partition_key
         //          order by indexed_partition_key;"
-        vt = client.callProcedure("@AdHoc",
-                "select max(P_D2), P_D1, P_D0 from P group by P_D1, P_D0 order by P_D0  limit 3 offset 2").getResults()[0];
+        sql = "select max(P_D2), P_D1, P_D0 from P group by P_D1, P_D0 order by P_D0  limit 3 offset 2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{2, 6, 3}, {1, 6, 4}, {2, 11,5}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain",
-                "select max(P_D2), P_D1 from P group by P_D1, P_D0 order by P_D0  limit 3 offset 2").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // Merge Receive with Serial aggregation
@@ -921,12 +924,11 @@ public class TestOrderBySuite extends RegressionSuite {
         //            from partitioned
         //            group by indexed_non_partition_key1, indexed_non_partition_key2
         //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
-        vt = client.callProcedure("@AdHoc",
-                "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2 limit 2").getResults()[0];
+        sql = "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2 limit 2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1, 1, 7}, {1, 2, 5}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain",
-                "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2 limit 2").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // Merge Receive without aggregation at coordinator
@@ -934,8 +936,8 @@ public class TestOrderBySuite extends RegressionSuite {
         //            from partitioned
         //            group by indexed_non_partition_key1, indexed_non_partition_key2, col
         //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
-        vt = client.callProcedure("@AdHoc",
-                "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2").getResults()[0];
+        sql = "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1, 1}, {1, 1}, {1, 1}, {1, 2}, {1, 2}, {1, 2}, {1, 4}};
         assertEquals(expected.length, vt.getRowCount());
         for(int i = 0; i < expected.length; ++i) {
@@ -943,18 +945,68 @@ public class TestOrderBySuite extends RegressionSuite {
             assertEquals(expected[i][0], row.getLong("P_D3"));
             assertEquals(expected[i][1], row.getLong("P_D2"));
         }
-        vt = client.callProcedure("@Explain",
-                "select P_D3, P_D3, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
-        vt = client.callProcedure("@AdHoc",
-                "SELECT V_P_D1 FROM V_P order by V_P_D1").getResults()[0];
+        //  Merge Receive from view, ordering by its non-partition-key grouping columns
+        sql = "SELECT V_P_D1 FROM V_P order by V_P_D1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {1}, {6}, {6}, {11}, {11}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain",
-                "SELECT V_P_D1 FROM V_P order by V_P_D1").getResults()[0];
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        sql = "SELECT V_P_D1, V_P_D2 FROM V_P order by V_P_D1 DESC , V_P_D2 DESC";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{11, 2}, {11, 1}, {6, 2}, {6, 1}, {1, 4}, {1, 2}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
     }
+
+    private void subtestOrderByMP_Subquery() throws Exception
+    {
+        Client client = getClient();
+        client.callProcedure("TruncateP");
+        client.callProcedure("@AdHoc", "insert into P values(11, 11, 1, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(1, 1, 2, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(3, 6, 2, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(8, 4, 1, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(5, 11, 2, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(4, 1, 4, 1)");
+        client.callProcedure("@AdHoc", "insert into P values(7, 6, 1, 1)");
+
+        String sql;
+        VoltTable vt;
+        long[][] expected;
+        // Select from an ordered subquery. The subquery SeqScanPlanNode.isOutputOrdered
+        // unconditionally returns FALSE even if the parent sort expressions and order matches
+        // its own ones. The parent ORDER BY is not converted to MERGERECEIVE
+        // The subquery MERGERECEIVE node is removed
+        sql = "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1) P_T order by PT_D1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1}, {1}, {4}, {6}, {6}, {11}, {11}};
+        validateTableOfLongs(vt, expected);
+
+        // Same SQL as above but with subquery LIMIT. The MERGERECEIVE node is preserved
+        sql = "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1 limit 4) P_T order by PT_D1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1}, {1}, {4}, {6}};
+        validateTableOfLongs(vt, expected);
+
+        // The subquery with non-partition GROUP BY column - The MERGERECEIVE node is preserved
+        sql = "select PT_D1, MP_D3 from (select P_D1 as PT_D1, max(P_D3) as MP_D3 from P group by P_D1 order by P_D1 limit 4) P_T order by PT_D1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1}, {4}, {6}, {11}};
+        validateTableOfLongs(vt, expected);
+
+        // The subquery with partition GROUP BY - The subquery MERGERECEIVE node is removed
+        // The parent query qualifies for the optimization because of the pushed down ORDER BY PT_D1
+        sql = "select PT_D1, MP_D3 from (select P_D0  as PT_D0, P_D1 as PT_D1, max(P_D3) as MP_D3 from P group by P_D0, P_D1 order by P_D0, P_D1) P_T order by PT_D1 limit 5";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1}, {1}, {4}, {6}, {6}};
+        validateTableOfLongs(vt, expected);
+}
 
     public void testAll()
     throws Exception
@@ -974,6 +1026,7 @@ public class TestOrderBySuite extends RegressionSuite {
         subtestPartialIndex();
         subtestOrderByMP();
         subtestOrderByMP_Agg();
+        subtestOrderByMP_Subquery();
     }
 
     //

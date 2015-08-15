@@ -46,11 +46,7 @@
 #ifndef HSTOREEXECUTORUTIL_H
 #define HSTOREEXECUTORUTIL_H
 
-#include <vector>
-
-#include "common/types.h"
 #include "executors/abstractexecutor.h"
-#include "expressions/abstractexpression.h"
 #include "plannodes/abstractplannode.h"
 
 namespace voltdb {
@@ -60,25 +56,6 @@ class AbstractPlanNode;
 class VoltDBEngine;
 
 AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
-
-// Compares two tuples based on the provided sets of expressions and sort directions
-class TupleComparer
-{
-public:
-    TupleComparer(const std::vector<AbstractExpression*>& keys,
-                  const std::vector<SortDirectionType>& dirs)
-        : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size())
-    {
-        assert(keys.size() == dirs.size());
-    }
-
-    bool operator()(TableTuple ta, TableTuple tb) const;
-
-private:
-    const std::vector<AbstractExpression*>& m_keys;
-    const std::vector<SortDirectionType>& m_dirs;
-    size_t m_keyCount;
-};
 
 }
 
