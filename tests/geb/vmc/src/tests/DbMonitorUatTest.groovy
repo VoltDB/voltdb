@@ -519,4 +519,123 @@ class DbMonitorUatTest extends TestBase {
     }   
     //end of Database Replication 
  
+    //
+    def "Verify the invisibility of the Command Log Statistics Graph using Display Preferences"() {
+        expect: 'at DbMonitorPage'
+        at DbMonitorPage
+        
+        when:
+        println("Test Start: Verify the invisibility of the Command Log Statistics Graph using Display Preferences")
+        
+        int count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                waitFor(waitTime) { page.commandLogStatistics.isDisplayed() }
+                println("Success")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        if(page.commandLogStatistics.isDisplayed()) {
+            page.openDisplayPreference()
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
+
+            page.commandLogStatisticsCheckBoxDisplayed()
+            page.commandLogStatisticsCheckBoxClick()
+
+            page.savePreferences()
+            page.serverCpuDisplayed()
+            page.serverRamDisplayed()
+            page.clusterLatencyDisplayed()
+            page.clusterTransactionsDisplayed()
+            page.partitionIdleTimeDisplayed()
+            !page.commandLogStatisticsDisplayed()
+
+            page.openDisplayPreference()
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
+
+            page.commandLogStatisticsCheckBoxDisplayed()
+            page.commandLogStatisticsCheckBoxClick()
+
+            page.savePreferences()
+            page.serverCpuDisplayed()
+            page.serverRamDisplayed()
+            page.clusterLatencyDisplayed()
+            page.clusterTransactionsDisplayed()
+            page.partitionIdleTimeDisplayed()
+            page.commandLogStatisticsDisplayed()
+		}
+		else {
+		    println("The Command Log Statistics graph is not visible")
+		    println("Test End: Verify the invisibility of the Command Log Statistics Graph using Display Preferences")
+		}
+		then:
+		println("")
+    }
+    
+    
+    def "Verify the invisibility of the Database Replication Graph using Display Preferences"() {
+        expect: 'at DbMonitorPage'
+        at DbMonitorPage
+        
+        when:
+        println("Test Start: Verify the invisibility of the Database Replication Graph using Display Preferences")
+        
+        int count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                waitFor(waitTime) { page.databaseReplication.isDisplayed() }
+                println("Success")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        if(page.databaseReplication.isDisplayed()) {
+            page.openDisplayPreference()
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
+
+            page.databaseReplicationCheckboxDisplayed()
+            page.databaseReplicationCheckboxClick()
+
+            page.savePreferences()
+            page.serverCpuDisplayed()
+            page.serverRamDisplayed()
+            page.clusterLatencyDisplayed()
+            page.clusterTransactionsDisplayed()
+            page.partitionIdleTimeDisplayed()
+            !page.databaseReplicationDisplayed()
+            
+            page.openDisplayPreference()
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
+
+            page.databaseReplicationCheckboxDisplayed()
+            page.databaseReplicationCheckboxClick()
+
+            page.savePreferences()
+            page.serverCpuDisplayed()
+            page.serverRamDisplayed()
+            page.clusterLatencyDisplayed()
+            page.clusterTransactionsDisplayed()
+            page.partitionIdleTimeDisplayed()
+            page.databaseReplicationDisplayed()
+		}
+		else {
+		    println("The Command Log Statistics graph is not visible")
+		    println("Test End: Verify the invisibility of the Database Replication Graph using Display Preferences")
+		}
+		then:
+		println("")
+    }
 }
