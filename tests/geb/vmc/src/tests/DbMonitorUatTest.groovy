@@ -553,7 +553,7 @@ class DbMonitorUatTest extends TestBase {
             page.clusterLatencyDisplayed()
             page.clusterTransactionsDisplayed()
             page.partitionIdleTimeDisplayed()
-            !page.commandLogStatisticsDisplayed()
+            !page.commandLogStatistics.isDisplayed()
             
             println("Command Log Statistics Graph isn't displayed")
             
@@ -571,7 +571,7 @@ class DbMonitorUatTest extends TestBase {
             page.clusterLatencyDisplayed()
             page.clusterTransactionsDisplayed()
             page.partitionIdleTimeDisplayed()
-            page.commandLogStatisticsDisplayed()
+            page.commandLogStatistics.isDisplayed()
             
             println("Command Log Statistics Graph is displayed")
             println("Test End: Verify the invisibility of the Command Log Statistics Graph using Display Preferences")
@@ -618,7 +618,7 @@ class DbMonitorUatTest extends TestBase {
             page.clusterLatencyDisplayed()
             page.clusterTransactionsDisplayed()
             page.partitionIdleTimeDisplayed()
-            !page.databaseReplicationDisplayed()
+            !page.databaseReplication.isDisplayed()
             
             println("The Database Replication graph isn't displayed")
             
@@ -636,7 +636,7 @@ class DbMonitorUatTest extends TestBase {
             page.clusterLatencyDisplayed()
             page.clusterTransactionsDisplayed()
             page.partitionIdleTimeDisplayed()
-            page.databaseReplicationDisplayed()
+            page.databaseReplication.isDisplayed()
             
             println("The Database Replication graph is displayed")
 		    println("Test End: Verify the invisibility of the Database Replication Graph using Display Preferences")
