@@ -126,10 +126,6 @@
         <appender-ref ref="console"/>
     </logger>
 
-    <logger name="com.mchange.v2.c3p0">
-	<level value="INFO"/>
-    </logger>
-
     <root>
         <priority value="info" />
         <appender-ref ref="file" />

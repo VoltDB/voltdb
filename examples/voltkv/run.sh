@@ -31,16 +31,18 @@ else
     VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
-CONNECTIONPOOL_LIB="$HOME/workspace/common"
+# Jars needed to compile JDBC Benchmark. Apprunner uses a nfs shared path.
+CONNECTIONPOOLLIB=${CONNECTIONPOOLLIB:-"/home/opt"}
 CONNECIONPOOLCLASSPATH=$({\
-    \ls -1 "$CONNECTIONPOOL_LIB"/tomcat-*.jar; \
-    \ls -1 "$CONNECTIONPOOL_LIB"/mchange-commons-java-*.jar; \
-    \ls -1 "$CONNECTIONPOOL_LIB"/c3p0-*.jar; \
-    \ls -1 "$CONNECTIONPOOL_LIB"/bonecp-*.jar; \
-    \ls -1 "$CONNECTIONPOOL_LIB"/HikariCP-*.jar; \
-    \ls -1 "$CONNECTIONPOOL_LIB"/guava-19.0-*.jar; \
-    \ls -1 "$CONNECTIONPOOL_LIB"/slf4j-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/tomcat-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/mchange-commons-java-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/c3p0-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/bonecp-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/HikariCP-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/guava-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/slf4j-*.jar; \
 } 2> /dev/null | paste -sd ':' - )
+CLASSPATH="$CLASSPATH:$CONNECIONPOOLCLASSPATH"
 APPCLASSPATH=$CLASSPATH:$CONNECIONPOOLCLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
@@ -216,7 +218,7 @@ function jdbc-benchmark-tomcat() {
         --threads=40
 }
 
-function jdbc-benchmark-bone() {
+function jdbc-benchmark-bonecp() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH:$CONNECIONPOOLCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkv.JDBCBenchmark \
@@ -230,11 +232,11 @@ function jdbc-benchmark-bone() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
-	--externalConnectionPool=bone \
+	--externalConnectionPool=bonecp \
         --threads=40
 }
 
-function jdbc-benchmark-hiraki() {
+function jdbc-benchmark-hikari() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH:$CONNECIONPOOLCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkv.JDBCBenchmark \
@@ -248,7 +250,7 @@ function jdbc-benchmark-hiraki() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
-	--externalConnectionPool=hiraki \
+	--externalConnectionPool=hikari \
         --threads=40
 }
 

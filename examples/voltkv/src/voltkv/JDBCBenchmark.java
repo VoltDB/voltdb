@@ -36,8 +36,6 @@ package voltkv;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -57,10 +55,7 @@ import org.voltdb.jdbc.IVoltDBConnection;
 
 import javax.sql.DataSource;
 
-import org.apache.tomcat.jdbc.pool.DataSourceProxy;
 import org.apache.tomcat.jdbc.pool.PoolProperties;
-
-import com.jolbox.bonecp.BoneCP;
 import com.jolbox.bonecp.BoneCPConfig;
 import com.jolbox.bonecp.BoneCPDataSource;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
@@ -87,7 +82,7 @@ public class JDBCBenchmark
     private static boolean useConnectionPool = false;
     private static final String C3P0_CONNECTIONPOOL = "c3p0";
     private static final String TOMCAT_CONNECTIONPOOL = "tomcat";
-    private static final String BONE_CONNECTIONPOOL = "bone";
+    private static final String BONECP_CONNECTIONPOOL = "bonecp";
     private static final String HIKARI_CONNECTIONPOOL = "hikari";
 
     /**
@@ -179,20 +174,23 @@ public class JDBCBenchmark
             Connection con = null;
             try
             {
-                con = useConnectionPool ? Ds.getConnection() : DriverManager.getConnection(url, "", "");
-                final CallableStatement getCS = con.prepareCall("{call STORE.select(?)}");
-                final CallableStatement putCS = con.prepareCall("{call STORE.upsert(?,?)}");
                 long endTime = System.currentTimeMillis() + (1000l * this.duration);
                 Random rand = new Random();
                 while (endTime > System.currentTimeMillis())
                 {
+                    if (con != null) {
+                        try { con.close(); } catch (Exception x) {}
+                    }
+                    con = useConnectionPool ? Ds.getConnection() : DriverManager.getConnection(url, "", "");
                     // Decide whether to perform a GET or PUT operation
                     if (rand.nextDouble() < getPutRatio)
                     {
+                        CallableStatement getCS = con.prepareCall("{call STORE.select(?)}");
+                        ResultSet result = null;
                         try
                         {
                             getCS.setString(1, processor.generateRandomKeyForRetrieval());
-                            ResultSet result = getCS.executeQuery();
+                            result = getCS.executeQuery();
                             if (result.next())
                             {
                                 final PayloadProcessor.Pair pair = processor.retrieveFromStore(result.getString(1), result.getBytes(2));
@@ -207,9 +205,16 @@ public class JDBCBenchmark
                         {
                             GetStoreResults.incrementAndGet(1);
                         }
+                        finally {
+                            getCS.close();
+                            if (result != null) {
+                                result.close();
+                            }
+                        }
                     }
                     else
                     {
+                        CallableStatement putCS = con.prepareCall("{call STORE.upsert(?,?)}");
                         final PayloadProcessor.Pair pair = processor.generateForStore();
                         try
                         {
@@ -227,6 +232,7 @@ public class JDBCBenchmark
                         {
                             PutCompressionResults.addAndGet(0, pair.getStoreValueLength());
                             PutCompressionResults.addAndGet(1, pair.getRawValueLength());
+                            putCS.close();
                         }
                     }
                 }
@@ -280,7 +286,7 @@ public class JDBCBenchmark
             // Prepare the Datasource if choose to use a connection pool
             if (config.externalConnectionPool.equalsIgnoreCase(C3P0_CONNECTIONPOOL)) {
                 useConnectionPool = true;
-                ComboPooledDataSource cpds = new ComboPooledDataSource("voltkv");
+                ComboPooledDataSource cpds = new ComboPooledDataSource();
                 cpds.setDriverClass(DRIVER_NAME); //loads the jdbc driver
                 cpds.setJdbcUrl(url);
                 Ds = cpds;
@@ -311,9 +317,9 @@ public class JDBCBenchmark
                 org.apache.tomcat.jdbc.pool.DataSource tomcatDs = new org.apache.tomcat.jdbc.pool.DataSource();
                 tomcatDs.setPoolProperties(p);
                 Ds = tomcatDs;
-            } else if (config.externalConnectionPool.equalsIgnoreCase(BONE_CONNECTIONPOOL)) {
+            } else if (config.externalConnectionPool.equalsIgnoreCase(BONECP_CONNECTIONPOOL)) {
                 useConnectionPool = true;
-                String configName = "bone.properties";
+                String configName = "bonecp.properties";
                 boolean useDefaultConnectionPoolConfig = true;
                 Properties cpProperties = new Properties();
                 try {
@@ -333,15 +339,15 @@ public class JDBCBenchmark
                 } else {
                     p = new BoneCPConfig(cpProperties);
                 }
-                p.setJdbcUrl(url);  // set the JDBC url
+                p.setJdbcUrl(url + "?enableSetReadOnly=true");  // set the JDBC url
                 BoneCPDataSource boneDs  = new BoneCPDataSource(p);
                 Ds = boneDs;
             } else if (config.externalConnectionPool.equalsIgnoreCase(HIKARI_CONNECTIONPOOL)) {
                 useConnectionPool = true;
                 HikariConfig p = new HikariConfig("hikari.properties");
+                p.setDriverClassName(DRIVER_NAME);
+                p.setJdbcUrl(url);
                 HikariDataSource hiDs = new HikariDataSource(p);
-                hiDs.setJdbcUrl(url);
-                hiDs.setDriverClassName(DRIVER_NAME);
                 Ds = hiDs;
             } else {
                 useConnectionPool = false;
@@ -356,7 +362,6 @@ public class JDBCBenchmark
                 try
                 {
                     if (useConnectionPool) {
-                        System.out.printf("Start Using Connection Pool: %s\n", config.externalConnectionPool);
                         Ds.getConnection();
                         System.out.printf("Using Connection Pool: %s\n", config.externalConnectionPool);
                     }
@@ -365,7 +370,7 @@ public class JDBCBenchmark
                 }
                 catch (Exception e)
                 {
-                    System.err.printf("Connection failed - retrying in %d second(s).\n", sleep/1000);
+                    System.err.printf("Connection failed - retrying in %d second(s).\n " + e , sleep/1000);
                     try {Thread.sleep(sleep);} catch(Exception tie){}
                     if (sleep < 8000)
                         sleep += sleep;
