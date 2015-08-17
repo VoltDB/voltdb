@@ -222,12 +222,15 @@ class Overview extends Module {
 		queryTimeout			{ $(class:"configLabel", text:"Query Timeout") }
 		maxTempTableMemory		{ $(class:"configLabel", text:"Max Temp Table Memory") }
 		snapshotPriority		{ $(class:"configLabel", text:"Snapshot Priority") }
-		
+        memoryLimitSize         { $(class:"configLabel", text:"Memory Limit") }
+
 		maxJavaHeapValue		{ $("#maxJavaHeap") }
 		heartbeatTimeoutValue	{ $("#formHeartbeatTimeout") }
 		queryTimeoutValue		{ $("#queryTimeOutUnitSpan") }
 		maxTempTableMemoryValue	{ $("#temptablesmaxsizeUnit") }
 		snapshotPriorityValue	{ $("#snapshotpriority") }
+        memoryLimitSizeValue    { $("#memoryLimitSize") }
+        memoryLimitSizeUnit     { $("#memoryLimitSizeUnit") }
 
         // heartbeat timeout
         heartTimeoutEdit		{ $("#btnEditHrtTimeOut") }
