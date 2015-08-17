@@ -128,7 +128,8 @@ public interface CommandLog {
         void processDurabilityChecks(CompletionChecks completionChecks);
 
         /**
-         * Make sure Read-Only SysProcs get executed in with Synchronous Command Logging
+         * Make sure Non-Durable SysProcs get executed with Synchronous Command Logging
+         * and no other pending transactions
          * @param completionChecks
          */
         void checkForSyncLoggedSysProcs(CompletionChecks completionChecks);
