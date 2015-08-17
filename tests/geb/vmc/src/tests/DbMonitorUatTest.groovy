@@ -544,8 +544,8 @@ class DbMonitorUatTest extends TestBase {
             page.savePreferencesBtnDisplayed()
             page.popupCloseDisplayed()
 
-            page.commandLogStatisticsCheckBox.isDisplayed()
-            page.commandLogStatisticsCheckBox.click()
+            page.commandLogStatisticsCheckbox.isDisplayed()
+            page.commandLogStatisticsCheckbox.click()
 
             page.savePreferences()
             page.serverCpuDisplayed()
@@ -554,14 +554,16 @@ class DbMonitorUatTest extends TestBase {
             page.clusterTransactionsDisplayed()
             page.partitionIdleTimeDisplayed()
             !page.commandLogStatisticsDisplayed()
-
+            
+            println("Command Log Statistics Graph isn't displayed")
+            
             page.openDisplayPreference()
             page.preferencesTitleDisplayed()
             page.savePreferencesBtnDisplayed()
             page.popupCloseDisplayed()
 
-            page.commandLogStatisticsCheckBox.isDisplayed()
-            page.commandLogStatisticsCheckBox.click()
+            page.commandLogStatisticsCheckbox.isDisplayed()
+            page.commandLogStatisticsCheckbox.click()
 
             page.savePreferences()
             page.serverCpuDisplayed()
@@ -570,6 +572,9 @@ class DbMonitorUatTest extends TestBase {
             page.clusterTransactionsDisplayed()
             page.partitionIdleTimeDisplayed()
             page.commandLogStatisticsDisplayed()
+            
+            println("Command Log Statistics Graph is displayed")
+            println("Test End: Verify the invisibility of the Command Log Statistics Graph using Display Preferences")
 		}
 		else {
 		    println("The Command Log Statistics graph is not visible")
@@ -615,6 +620,8 @@ class DbMonitorUatTest extends TestBase {
             page.partitionIdleTimeDisplayed()
             !page.databaseReplicationDisplayed()
             
+            println("The Database Replication graph is displayed")
+            
             page.openDisplayPreference()
             page.preferencesTitleDisplayed()
             page.savePreferencesBtnDisplayed()
@@ -630,9 +637,12 @@ class DbMonitorUatTest extends TestBase {
             page.clusterTransactionsDisplayed()
             page.partitionIdleTimeDisplayed()
             page.databaseReplicationDisplayed()
+            
+            println("The Database Replication graph is displayed")
+		    println("Test End: Verify the invisibility of the Database Replication Graph using Display Preferences")
 		}
 		else {
-		    println("The Command Log Statistics graph is not visible")
+		    println("The Database Replication graph is not visible")
 		    println("Test End: Verify the invisibility of the Database Replication Graph using Display Preferences")
 		}
 		then:
