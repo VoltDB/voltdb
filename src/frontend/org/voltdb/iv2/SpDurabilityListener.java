@@ -23,7 +23,7 @@ import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 
-class SpDurabilityListener implements DurabilityListener {
+public class SpDurabilityListener implements DurabilityListener {
 
     // No command logging
     class NoCompletionChecks implements CommandLog.CompletionChecks {

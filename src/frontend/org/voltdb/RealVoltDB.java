@@ -61,7 +61,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -133,8 +132,10 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -208,6 +209,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     GlobalServiceElector m_globalServiceElector = null;
     MpInitiator m_MPI = null;
     Map<Integer, Long> m_iv2InitiatorStartingTxnIds = new HashMap<Integer, Long>();
+    private ScheduledFuture<?> resMonitorWork;
 
 
     // Should the execution sites be started in recovery mode
@@ -382,7 +384,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
             m_messenger = null;
-            m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
             m_asyncCompilerAgent = null;
             m_snapshotCompletionMonitor = null;
@@ -1187,6 +1188,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         private void logCatalogAndDeployment() {
             File voltDbRoot = CatalogUtil.getVoltDbRoot(m_catalogContext.getDeployment().getPaths());
             String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
+            new File(pathToConfigInfoDir).mkdirs();
 
             try {
                 m_catalogContext.writeCatalogJarToFile(pathToConfigInfoDir, "catalog.jar");
@@ -1343,7 +1345,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES));
+
         GCInspector.instance.start(m_periodicPriorityWorkThread);
+    }
+
+    private void startResourceUsageMonitor() {
+        if (resMonitorWork != null) {
+            resMonitorWork.cancel(false);
+            try {
+                resMonitorWork.get();
+            } catch(Exception e) { } // Ignore exceptions because we don't really care about the result here.
+            m_periodicWorks.remove(resMonitorWork);
+        }
+        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
+        resMonitor.logResourceLimitConfigurationInfo();
+        if (resMonitor.hasResourceLimitsConfigured()) {
+            resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
+            m_periodicWorks.add(resMonitorWork);
+        }
     }
 
     int readDeploymentAndCreateStarterCatalogContext() {
@@ -1650,8 +1669,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      */
     void buildClusterMesh(boolean isRejoin) {
         final String leaderAddress = m_config.m_leader;
-        String hostname = MiscUtils.getHostnameFromHostnameColonPort(leaderAddress);
-        int port = MiscUtils.getPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
+        HostAndPort hostAndPort = MiscUtils.getHostAndPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
+        String hostname = hostAndPort.getHostText();
+        int port = hostAndPort.getPort();
 
         org.voltcore.messaging.HostMessenger.Config hmconfig;
 
@@ -1957,6 +1977,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         sc.get();
                     } catch (Throwable t) {}
                 }
+
+                //Shutdown import processors.
+                ImportManager.instance().shutdown();
+
                 m_periodicWorks.clear();
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
@@ -2001,9 +2025,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 if (m_configLogger != null) {
                     m_configLogger.join();
                 }
-
-                //Shutdown import processors.
-                ImportManager.instance().shutdown();
 
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
@@ -2250,6 +2271,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 logSystemSettingFromCatalogContext();
             }
 
+            // restart resource usage monitoring task
+            startResourceUsageMonitor();
+
             return Pair.of(m_catalogContext, csp);
         }
     }
@@ -2400,6 +2424,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 prepareReplication();
             }
         }
+        startResourceUsageMonitor();
 
         try {
             if (m_adminListener != null) {
@@ -2575,10 +2600,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // Start listening on the DR ports
             prepareReplication();
+            startResourceUsageMonitor();
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData(m_catalogContext, m_messenger);
-
         }
 
         try {
