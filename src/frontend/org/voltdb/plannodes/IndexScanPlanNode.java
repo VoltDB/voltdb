@@ -373,7 +373,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             int idxToCover) {
         assert(idxToCover < indexedExprs.size());
         AbstractExpression indexExpression = indexedExprs.get(idxToCover);
-        return sortExpression.equals(indexExpression);
+        List<AbstractExpression> bindings = sortExpression.bindingToIndexedExpression(indexExpression);
+        if (bindings != null) {
+            m_bindings.addAll(bindings);
+            return true;
+        }
+        return false;
     }
 
     private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<ColumnRef> indexedColRefs,

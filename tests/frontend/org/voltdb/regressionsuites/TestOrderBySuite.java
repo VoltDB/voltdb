@@ -824,11 +824,19 @@ public class TestOrderBySuite extends RegressionSuite {
         client.callProcedure("InsertO3", 4, 4, 1, 1);
         client.callProcedure("InsertO3", 10, 10, 10, 10);
 
+        client.callProcedure("TruncateP");
+        client.callProcedure("@AdHoc", "insert into P values (0, 1, 2, 10)");
+        client.callProcedure("@AdHoc", "insert into P values (1, 1, 1, 10)");
+        client.callProcedure("@AdHoc", "insert into P values (2, 1, 1, 20)");
+        client.callProcedure("@AdHoc", "insert into P values (3, 1, 0, 30)");
+
         String sql;
+        VoltTable vt;
+        long[][] expected;
         // Partitions Result sets are ordered by index. No LIMIT/OFFEST
         sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC";
-        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        long[][] expected = new long[][] {{7}, {6}, {5}, {4}, {3}, {2}, {1}};
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{7}, {6}, {5}, {4}, {3}, {2}, {1}};
         validateTableOfLongs(vt, expected);
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
@@ -851,6 +859,37 @@ public class TestOrderBySuite extends RegressionSuite {
         sql = "SELECT O1.A_INT FROM O1, O3 WHERE O1.A_INT = O3.I3 ORDER BY O1.A_INT";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {7}, {7}, {7}, {7}, {8}};
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        // Index P_D32_10_IDX ON P (P_D3 / 10, P_D2) covers ORDER BY expressions (P_D3 / 10, P_D2)
+        sql = "select P_D0 from P where P.P_D3 / 10 > 0 order by P_D3 / 10, P_D2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1}, {0}, {2}, {3}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+        assertTrue(vt.toString().contains("P_D32_10_IDX"));
+
+        // Index P_D32_10_IDX ON P (P_D3 / 10, P_D2) does not cover ORDER BY expressions (P_D3 / 5, P_D2)
+        sql = "select P_D0 from P where P.P_D3 / 10 > 0 order by P_D3 / 5, P_D2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1}, {0}, {2}, {3}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(!vt.toString().contains("MERGE RECEIVE"));
+        assertTrue(vt.toString().contains("P_D32_10_IDX"));
+
+        // P_D0 is a partition column for P. All rows are from a single partition.
+        // Merge Receive
+        client.callProcedure("TruncateP");
+        client.callProcedure("@AdHoc", "insert into P values (1, 1, 2, 10)");
+        client.callProcedure("@AdHoc", "insert into P values (3, 1, 1, 10)");
+        client.callProcedure("@AdHoc", "insert into P values (5, 1, 1, 20)");
+        client.callProcedure("@AdHoc", "insert into P values (7, 1, 0, 30)");
+        sql = "select P_D0 from P where P.P_D3 / 10 > 0 order by P_D3 / 10, P_D2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{3}, {1}, {5}, {7}};
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
