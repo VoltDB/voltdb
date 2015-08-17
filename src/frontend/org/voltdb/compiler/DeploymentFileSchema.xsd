@@ -138,7 +138,7 @@
       <xs:maxInclusive value="1000"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <xs:complexType name="resourceMonitorType">
       <xs:all>
         <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
@@ -356,6 +356,7 @@
 
   <xs:simpleType name="ServerImportEnum">
     <xs:restriction base="xs:token">
+      <xs:enumeration value="kafka"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>

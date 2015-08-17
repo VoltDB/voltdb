@@ -1124,6 +1124,9 @@ public abstract class CatalogUtil {
         switch(importConfiguration.getType()) {
             case CUSTOM:
                 break;
+            case KAFKA:
+                importBundleUrl = "kafkastream.jar";
+                break;
             default:
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
