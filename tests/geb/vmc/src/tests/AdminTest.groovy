@@ -2805,6 +2805,14 @@ then:
             page.overview.snapshotPriority.text().equals("Snapshot Priority")
             !page.overview.snapshotPriorityValue.text().equals("")
 
+            page.overview.memoryLimitSize.text().equals("Memory Limit")
+            !page.overview.memoryLimitSizeValue.text().equals("")
+
+            if(page.overview.memoryLimitSizeValue.text() == "Not Enforced"){
+                page.overview.memoryLimitSizeUnit.text().equals("")
+            } else {
+                !page.overview.memoryLimitSizeUnit.text().equals("")
+            }
         }
     }
 
