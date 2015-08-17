@@ -69,6 +69,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clusterLatencyCheckbox		    { $("#ClusterLatency") }
         clusterTransactionsCheckbox	    { $("#ClusterTransactions") }
         partitionIdleTimeCheckbox	    { $("#PartitionIdleTime") }
+        commandLogStatisticsCheckbox    { $("#CommandLogStat") }
+        databaseReplicationCheckbox     { $("#DrReplicationRate") }
         storedProceduresCheckbox	    { $("#StoredProcedures") }
         dataTablesCheckbox		        { $("#DatabaseTables") }
 
@@ -201,6 +203,16 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         drMasterSection {$("#drMasterSection")}
 
         dbDrMode {$("#dbDrMode")}
+
+
+        //Dr Replica Section
+
+        drReplicaSection {$("#drReplicaSection")}
+
+        replicaServer{$("#replicaServer")}
+        replicaStatus{$("#replicaStatus")}
+        replicationRate1 {$("#replicationRate1")}
+        replicationRate5 {$("#replicationRate5")}
 
     }
 
@@ -450,6 +462,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return drMasterSection.displayed
     }
 
+    def boolean isDrReplicaSectionOpen() {
+        return drReplicaSection.displayed
+    }
+
 
 
     /**
@@ -555,6 +571,22 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean partitionIdleTimeDisplayed() {
         return partitionIdleTime.displayed
     }
+    
+    // edits
+    /**
+     * Check if Partition Idle Time is displayed
+     */
+    def boolean commandLogStatisticsDisplayed() {
+        return commandLogStatistics.displayed
+    }
+    
+    /**
+     * Check if Partition Idle Time is displayed
+     */
+    def boolean databaseReplicationDisplayed() {
+        return databaseReplication.displayed
+    }
+    
 
     /**
      * Check if Stored Procedures is displayed
@@ -605,6 +637,22 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return partitionIdleTimeCheckbox.displayed
     }
 
+    // edits
+    /*
+     *	Returns true if Checkbox for Command Log Statistics in preferences
+     */
+    def boolean commandLogStatisticsCheckBoxDisplayed() {
+        return commandLogStatisticsCheckBox.displayed
+    }
+
+    /*
+     *	Returns true if Checkbox for Database Replication in preferences
+     */
+    def boolean databaseReplicationCheckBoxDisplayed() {
+        return databaseReplicationCheckBox.displayed
+    }
+    
+    
     /*
      *	Returns true if Checkbox for Stored Procedures in preferences
      */
@@ -673,6 +721,21 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      */
     def boolean partitionIdleTimeCheckboxClick() {
         partitionIdleTimeCheckbox.click()
+    }
+    
+    //edits
+    /*
+     *	Click the check in Command Log Statistics Checkbox
+     */
+    def boolean commandLogStatisticsCheckboxClick() {
+        commandLogStatisticsCheckbox.click()
+    }
+    
+    /*
+     *	Click the check in Database Replication Checkbox
+     */
+    def boolean databaseReplicationCheckboxClick() {
+        databaseReplicationCheckbox.click()
     }
 
     /*
@@ -889,31 +952,59 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
     /*
-     *	click the status column in database table
+     *	click the status column in DR MAster table
      */
     def boolean clickStatus() {
         status.click()
     }
 
     /*
-     *	click the status column in database table
+     *	click the status column in DR MAster table
      */
     def boolean clickMbOnDisk() {
         mbOnDisk.click()
     }
 
     /*
-     *	click the replicaLatencyMs column in database table
+     *	click the replicaLatencyMs column in DR MAster table
      */
     def boolean clickReplicaLatencyMs() {
         replicaLatencyMs.click()
     }
 
     /*
-     *	click the replicaLatencyTrans column in database table
+     *	click the replicaLatencyTrans column in DR MAster table
      */
     def boolean clickReplicaLatencyTrans() {
         replicaLatencyTrans.click()
+    }
+
+    /*
+     *	click the server column in DR Replica table
+     */
+    def boolean clickReplicaServer() {
+        replicaServer.click()
+    }
+
+    /*
+     *	click the status column in DR Replica table
+     */
+    def boolean clickReplicaStatus() {
+        replicaStatus.click()
+    }
+
+    /*
+     *	click the status column in Replication Rate 1min table
+     */
+    def boolean clickReplicationRate1() {
+        replicationRate1.click()
+    }
+
+    /*
+     *	click the status column in Replication Rate 5 min table
+     */
+    def boolean clickReplicationRate5() {
+        replicationRate5.click()
     }
 
 
