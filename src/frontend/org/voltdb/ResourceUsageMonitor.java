@@ -24,7 +24,6 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
-
 /**
  * Used to periodically check if the server's resource utilization is above the configured limits
  * and pause the server.
@@ -64,6 +63,16 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
     public int getResourceCheckInterval()
     {
         return m_resourceCheckInterval;
+    }
+
+    public void logResourceLimitConfigurationInfo()
+    {
+        if (hasResourceLimitsConfigured()) {
+            m_logger.info("Resource limit monitoring configured to run every " + m_resourceCheckInterval + " seconds with:\n" +
+                    "\tRSS limit=" + m_rssLimit);
+        } else {
+            m_logger.info("No resource usage limit monitoring configured");
+        }
     }
 
     @Override

@@ -288,7 +288,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 (((TransactionInfoBaseMessage)message).isForReplay()));
 
         boolean dr = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
+                ((TransactionInfoBaseMessage)message).isForDRv1()));
 
         boolean sentinel = message instanceof MultiPartitionParticipantMessage;
 
@@ -422,7 +422,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     hostLog.fatal("Invocation: " + message);
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
-            } else if (message.isForDR()) {
+            } else if (message.isForDRv1()) {
+                assert false;
                 uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
                 // @LoadSinglepartitionTable does not have a valid uid
                 if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {

@@ -53,7 +53,7 @@ import org.voltdb.client.ProcedureCallback;
  */
 public class InternalClientResponseAdapter implements Connection, WriteStream {
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
-    public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
+    public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION = Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
 
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
@@ -64,6 +64,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
+    private final AtomicLong m_failures = new AtomicLong(0);
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
 
@@ -142,7 +143,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final int partition, final long nowNanos) {
 
         if (!m_partitionExecutor.containsKey(partition)) {
-            m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("ImportHandlerExecutor - " + partition));
+            m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
         }
         ExecutorService executor = m_partitionExecutor.get(partition);
         try {
@@ -213,7 +214,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             }
             enqueue(buf);
         } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("enqueue() in IClientResponseAdapter throw an exception", true, e);
+            VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, e);
         }
     }
 
@@ -225,11 +226,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         try {
             resp.initFromBuffer(b);
         } catch (IOException ex) {
-            VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, ex);
+            VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, ex);
         }
         final Callback callback = m_callbacks.get(resp.getClientHandle());
         if (!m_partitionExecutor.containsKey(callback.getPartitionId())) {
-            m_logger.error("Invalid partition response recieved for sending importer response.");
+            m_logger.error("Invalid partition response recieved for sending internal client response.");
             return;
         }
         ExecutorService executor = m_partitionExecutor.get(callback.getPartitionId());
@@ -244,8 +245,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 public void handle() {
                     try {
                         if (resp.getStatus() != ClientResponse.SUCCESS) {
-                            String fmt = "Importer stored procedure failed: %s Error: %s";
-                            rateLimitedLog(Level.ERROR, null, fmt, callback.getProcedureName(), resp.getStatusString());
+                            String fmt = "InternalClientResponseAdapter stored procedure failed: %s Error: %s failures: %d";
+                            rateLimitedLog(Level.WARN, null, fmt, callback.getProcedureName(), resp.getStatusString(), m_failures.incrementAndGet());
                         }
                         callback.handleResponse(resp);
                     } catch (Exception ex) {

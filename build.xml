@@ -162,7 +162,6 @@
 
     <!-- Specific Excluded pro tests -->
     <exclude name="**/TestCommandLogServer.class" />
-    <exclude name="**/TestCommandLog.class"/>
     <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
     <exclude name="**/TestExportBase.class"/>
     <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
@@ -2286,6 +2285,9 @@ TEST CASES
     <condition property="config_config" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
     </condition>
+    <condition property="config_ascii_only" value="-a" else="">
+        <isset property="ascii_only"/>
+    </condition>
     <condition property="config_verbose" value="-r" else="">
         <isset property="sql_coverage_verbose"/>
     </condition>
@@ -2343,6 +2345,7 @@ TEST CASES
         <arg line='sql_coverage_test.py' />
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
+        <arg line="${config_ascii_only}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />
         <arg file="${sqlcov.dir}" />

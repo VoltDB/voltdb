@@ -29,6 +29,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.ProcedureInvocationType;
 
@@ -47,8 +48,6 @@ public class InternalConnectionHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final InternalClientResponseAdapter m_adapter;
 
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTIONS", 400);
-
     public InternalConnectionHandler(InternalClientResponseAdapter adapter) {
         m_adapter = adapter;
     }
@@ -66,22 +65,22 @@ public class InternalConnectionHandler {
         return (table!=null);
     }
 
+    public class NullCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+        }
+    }
+
     public boolean callProcedure(InternalConnectionContext caller, long backPressureTimeout, String proc, Object... fieldList) {
-        return callProcedure(caller, backPressureTimeout, null, proc, fieldList);
+        return callProcedure(caller, backPressureTimeout, new NullCallback(), proc, fieldList);
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
     public boolean callProcedure(InternalConnectionContext caller, long backPressureTimeout, ProcedureCallback procCallback, String proc, Object... fieldList) {
-        // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
-            rateLimitedWarn(null, "Server is paused and is currently unavailable - please try again later.");
-            m_failedCount.incrementAndGet();
-            return false;
-        }
         Procedure catProc = VoltDB.instance().getClientInterface().getProcedureFromName(proc, VoltDB.instance().getCatalogContext());
         if (catProc == null) {
-            String fmt = "Cannot invoke procedure %s from streaming interface $s. Procedure not found.";
-            rateLimitedError(null, fmt, proc, caller);
+            String fmt = "Cannot invoke procedure %s from streaming interface %s. Procedure not found.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -124,7 +123,7 @@ public class InternalConnectionHandler {
             partition = getPartitionForProcedure(catProc, task);
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
-            rateLimitedError(null, fmt, proc, caller);
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);
             m_failedCount.incrementAndGet();
             tcont.discard();
             return false;
@@ -143,13 +142,5 @@ public class InternalConnectionHandler {
 
     public boolean hasBackPressure() {
         return m_adapter.hasBackPressure();
-    }
-
-    private void rateLimitedError(Throwable t, String format, Object...args) {
-        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, t, format, args);
-    }
-
-    private void rateLimitedWarn(Throwable t, String format, Object...args) {
-        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, t, format, args);
     }
 }
