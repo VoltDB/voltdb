@@ -648,13 +648,13 @@ public class Benchmark {
             Thread.sleep(1000);
             System.out.println("Wait for hashinator..");
         }
-        
+
         if (!config.disabledThreads.contains("clients")) {
             for (ClientThread t : clientThreads) {
                 t.start();
             }
         }
-        
+
         if (!config.disabledThreads.contains("partTrunclt")) {
             partTrunclt = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
