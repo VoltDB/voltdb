@@ -57,6 +57,7 @@ import org.voltdb.client.ClientStatsContext;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
+import org.voltdb.VoltType;
 
 public class KafkaImportBenchmark {
 
