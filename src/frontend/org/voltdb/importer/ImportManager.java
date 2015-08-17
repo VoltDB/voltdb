@@ -138,9 +138,8 @@ public class ImportManager implements ChannelChangeCallback {
 
             ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
-            newProcessor.setProcessorConfig(m_processorConfig);
+            newProcessor.setProcessorConfig(catalogContext, m_processorConfig);
             m_processor.set(newProcessor);
-            importLog.info("Import Processor is configured.");
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }

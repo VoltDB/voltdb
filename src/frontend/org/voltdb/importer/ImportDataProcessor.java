@@ -30,6 +30,7 @@ import org.voltdb.CatalogContext;
 public interface ImportDataProcessor  {
 
     public static final String IMPORT_MODULE = "__IMPORT_MODULE__";
+    public static final String IMPORT_PROCEDURE = "procedure";
     public static final String IMPORTER_CLASS = "impl";
     public static final String IMPORTER_SERVICE_CLASS = "org.voltdb.importer.ImportHandlerProxy";
     /**
@@ -46,8 +47,9 @@ public interface ImportDataProcessor  {
 
     /**
      * Pass processor specific processor configuration properties
+     * @param context current catalog context
      * @param config an instance of {@linkplain Properties}
      */
-    public void setProcessorConfig(Map<String, Properties> config);
+    public void setProcessorConfig(CatalogContext context, Map<String, Properties> config);
 
 }
