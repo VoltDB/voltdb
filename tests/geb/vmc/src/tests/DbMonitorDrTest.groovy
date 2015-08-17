@@ -382,7 +382,7 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the Server column of Status table (REPLICA)"(){
+    def "Verify the Ascending and Descending in the Status column of Database Replication (DR) table (REPLICA)"(){
         String before = ""
         String after  = ""
         when:"Check if Dr Master is Displayed"
@@ -417,7 +417,7 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the Replication Rate(1 min) column of Status table (REPLICA)"(){
+    def "Verify the Ascending and Descending in the Replication Rate(1 min) column of Database Replication (DR) table (REPLICA)"(){
         String before = ""
         String after  = ""
         when:"Check if Dr Master is Displayed"
@@ -452,7 +452,7 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the Replication Rate(5 min) column of Status table (REPLICA)"(){
+    def "Verify the Ascending and Descending in the Replication Rate(5 min) column of Database Replication (DR) table (REPLICA)"(){
         String before = ""
         String after  = ""
         when:"Check if Dr Master is Displayed"
