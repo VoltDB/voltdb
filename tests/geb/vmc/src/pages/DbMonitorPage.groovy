@@ -558,22 +558,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return partitionIdleTime.displayed
     }
     
-    // edits
-    /**
-     * Check if Partition Idle Time is displayed
-     */
-    def boolean commandLogStatisticsDisplayed() {
-        return commandLogStatistics.displayed
-    }
-    
-    /**
-     * Check if Partition Idle Time is displayed
-     */
-    def boolean databaseReplicationDisplayed() {
-        return databaseReplication.displayed
-    }
-    
-
     /**
      * Check if Stored Procedures is displayed
      */
@@ -622,22 +606,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean partitionIdleTimeCheckboxDisplayed() {
         return partitionIdleTimeCheckbox.displayed
     }
-
-    // edits
-    /*
-     *	Returns true if Checkbox for Command Log Statistics in preferences
-     */
-    def boolean commandLogStatisticsCheckBoxDisplayed() {
-        return commandLogStatisticsCheckBox.displayed
-    }
-
-    /*
-     *	Returns true if Checkbox for Database Replication in preferences
-     */
-    def boolean databaseReplicationCheckBoxDisplayed() {
-        return databaseReplicationCheckBox.displayed
-    }
-    
     
     /*
      *	Returns true if Checkbox for Stored Procedures in preferences
@@ -707,21 +675,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      */
     def boolean partitionIdleTimeCheckboxClick() {
         partitionIdleTimeCheckbox.click()
-    }
-    
-    //edits
-    /*
-     *	Click the check in Command Log Statistics Checkbox
-     */
-    def boolean commandLogStatisticsCheckboxClick() {
-        commandLogStatisticsCheckbox.click()
-    }
-    
-    /*
-     *	Click the check in Database Replication Checkbox
-     */
-    def boolean databaseReplicationCheckboxClick() {
-        databaseReplicationCheckbox.click()
     }
 
     /*

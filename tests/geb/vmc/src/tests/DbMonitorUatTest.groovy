@@ -620,7 +620,7 @@ class DbMonitorUatTest extends TestBase {
             page.partitionIdleTimeDisplayed()
             !page.databaseReplicationDisplayed()
             
-            println("The Database Replication graph is displayed")
+            println("The Database Replication graph isn't displayed")
             
             page.openDisplayPreference()
             page.preferencesTitleDisplayed()
