@@ -23,9 +23,11 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -370,6 +372,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             validateMergeReceive(pn, true, new int[] {0});
         }
+        {
+            // Index P_D32_10_IDX ON P (P_D3 / 10, P_D2) covers ORDER BY expressions (P_D3 / 10, P_D2)
+            // Merge Receive
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from P where P.P_D3 / 10 > 0 order by P_D3 / 10, P_D2");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateMergeReceive(pn, false, new int[] {2, 1});
+        }
     }
 
     public void testOrderByMPNonOptimized() {
@@ -455,16 +466,13 @@ public class TestPlansOrderBy extends PlannerTestCase {
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
-        // Still in process. See code review comments for IndexScanPlanNode.isSortExpressionCovered
         {
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1 from P where P.P_D3 / 10 > 0 order by P_D3 / 10, P_D2");
-            assertEquals(2, frags.size());
-        }
-        {
+            // Index P_D32_10_IDX ON P (P_D3 / 10, P_D2) does not cover ORDER BY expressions (P_D3 / 5, P_D2)
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1 from P where P.P_D3 / 10 > 0 order by P_D3 / 5, P_D2");
             assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
     }
 
@@ -709,8 +717,13 @@ public class TestPlansOrderBy extends PlannerTestCase {
         List<AbstractExpression> ses = opn.getSortExpressions();
         assertEquals(sortColumnIdx.length, ses.size());
         int idx = 0;
+        List<AbstractExpression> sesTves = new ArrayList<>();
         for (AbstractExpression se : ses) {
-            assertEquals(sortColumnIdx[idx++], ((TupleValueExpression) se).getColumnIndex());
+            sesTves.addAll(ExpressionUtil.findAllExpressionsOfClass(se, TupleValueExpression.class));
+        }
+        assertEquals(sortColumnIdx.length, sesTves.size());
+        for (AbstractExpression seTve : sesTves) {
+            assertEquals(sortColumnIdx[idx++], ((TupleValueExpression) seTve).getColumnIndex());
         }
     }
 
