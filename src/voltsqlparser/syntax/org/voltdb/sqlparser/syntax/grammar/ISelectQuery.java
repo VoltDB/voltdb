@@ -49,6 +49,8 @@ public interface ISelectQuery {
 
     void addProjection(String aTableName, String aColumnName, String aAlias, int aLineNo, int aColNo);
 
+    void addProjection(int aLineNo, int aColNo);
+
     void pushSemantino(ISemantino aColumnSemantino);
 
     ISemantino popSemantino();

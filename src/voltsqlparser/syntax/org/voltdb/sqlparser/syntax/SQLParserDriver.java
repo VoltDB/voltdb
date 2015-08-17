@@ -81,6 +81,8 @@ public class SQLParserDriver {
 
         // create a parser that feeds off the tokens buffer
         SQLParserParser parser = new SQLParserParser(tokens);
+        // Set this to true to cause tracing.
+        // parser.setTrace(true);
 
         if (errorListener != null) {
             parser.addErrorListener(errorListener);

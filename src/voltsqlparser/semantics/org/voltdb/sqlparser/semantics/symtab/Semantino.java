@@ -34,20 +34,21 @@
 
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
+import org.voltdb.sqlparser.syntax.symtab.IType;
 
 public class Semantino implements ISemantino {
 
     private static Semantino m_errorSemantino = null;
 
-    private Type m_type;
+    private IType m_type;
     private IAST m_ast;
 
-    public Semantino (Type newtype, IAST xml) {
-            this.m_type = newtype;
-            this.m_ast = xml;
+    public Semantino (IType aNewType, IAST aXML) {
+        this.m_type = aNewType;
+        this.m_ast = aXML;
     }
 
-    public Type getType() {
+    public IType getType() {
             return m_type;
     }
 

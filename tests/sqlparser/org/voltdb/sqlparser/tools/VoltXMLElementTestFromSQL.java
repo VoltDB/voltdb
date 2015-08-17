@@ -315,6 +315,8 @@ public class VoltXMLElementTestFromSQL {
             if (aComment != null) {
                 addComment(sb, aComment);
             }
+            List<String> initialContext = new ArrayList<String>();
+            initialContext.add(elem.name);
             sb.append("\n");
             sb.append("    @SuppressWarnings(\"unchecked\")\n");
             sb.append("    @Test\n");
@@ -325,9 +327,9 @@ public class VoltXMLElementTestFromSQL {
             sb.append("        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);\n");
             sb.append("        VoltXMLElement element = hif.getXMLFromCatalog();\n");
             sb.append("        assertThat(element)\n");
-            sb.append(String.format("            .hasName(\"%s\")\n", "databaseschema"));
+            sb.append(String.format("            .hasName(\"%s\")\n", elem.name));
             sb.append("            .hasAllOf(");
-            describeVoltXML(elem, sb, 16, "");
+            describeVoltXML(elem, initialContext, sb, 16, "");
             sb.append(");\n");
             sb.append("    }\n");
             m_outputStream.print(sb.toString());
@@ -353,6 +355,8 @@ public class VoltXMLElementTestFromSQL {
         if (aComment != null) {
             addComment(sb, aComment);
         }
+        List<String> initialContext = new ArrayList<String>();
+        initialContext.add(aElem.name);
         sb.append("    @SuppressWarnings(\"unchecked\")\n");
         sb.append("    @Test\n");
         sb.append(String.format("    public void %s() throws Exception {\n", aTestName));
@@ -362,7 +366,7 @@ public class VoltXMLElementTestFromSQL {
         sb.append("        assertThat(element)\n");
         sb.append(String.format("            .hasName(\"%s\")\n", aElem.name));
         sb.append("            .hasAllOf(");
-        describeVoltXML(aElem, sb, 16, "");
+        describeVoltXML(aElem, initialContext, sb, 16, "");
         sb.append(");\n");
         sb.append("    }\n");
         m_outputStream.print(sb.toString());
@@ -393,6 +397,7 @@ public class VoltXMLElementTestFromSQL {
     }
 
     private void describeVoltXML(VoltXMLElement aHSQLThinksItShouldBe,
+                                 List<String>   aContext,
                                  StringBuffer   aSb,
                                  int            aIndent,
                                  String         aEOL) {
@@ -415,11 +420,26 @@ public class VoltXMLElementTestFromSQL {
         for (VoltXMLElement child : aHSQLThinksItShouldBe.children) {
             aSb.append(aEOL);
             aEOL = ",";
-            if ("columns".equals(elementName)
-                    || "indexes".equals(elementName)
-                    || "constraints".equals(elementName)) {
+            // Sometimes we will have an element with multiple
+            // children, all with the same name.  In this case
+            // we need to disambiguate by looking at the attributes.
+            // The particular attribute we care about depends on
+            // the context.
+            String attribute = null;
+            //
+            // Add the child name, so that the match can see it.
+            // We'll use this as well when recursing below.
+            //
+            aContext.add(child.name);
+            if (contextMatch(aContext, "databaseschema.table.columns.column")
+                    || contextMatch(aContext, "databaseschema.table.indexes.index")
+                    || contextMatch(aContext, "databaseschema.table.constraints.constraint")) {
+                attribute = "name";
+            } else if (contextMatch(aContext, "select.columns.columnref")) {
+                attribute = "alias";
+            }
+            if (attribute != null) {
                 String childName = child.name;
-                String attribute = ("columnref".equals(childName) ? "table" : "name");
                 String value = child.attributes.get(attribute);
                 indentStr(aSb, aIndent, true, false)
                   .append(String.format("withChildByAttribute(\"%s\", \"%s\", \"%s\"",
@@ -428,9 +448,43 @@ public class VoltXMLElementTestFromSQL {
                 indentStr(aSb, aIndent, true, false)
                   .append(String.format("withChildNamed(\"%s\"", child.name));
             }
-            describeVoltXML(child, aSb, aIndent + 4, ",");
+            describeVoltXML(child, aContext, aSb, aIndent + 4, ",");
+            //
+            // We don't need the child name in the context anymore.
+            //
+            aContext.remove(aContext.size()-1);
             aSb.append(")");
         }
+    }
+
+    /**
+     * Return true iff the aMatch string describes the current
+     * context.
+     *
+     * That is to say, if we are given a context, which is a list of names, and
+     * a string which is a sequence of names separated by dots,
+     * return true iff the sequence of names matches the trailing
+     * sequence of the context.
+     *
+     * @param aContext
+     * @param aMatch
+     * @return
+     */
+    private boolean contextMatch(List<String> aContext, String aMatch) {
+       String names[] = aMatch.split("[.]");
+       int nidx = names.length - 1;
+       int cidx = aContext.size() - 1;
+       for (;nidx > 0 && cidx > 0;
+            nidx -= 1, cidx -= 1) {
+           String nname = names[nidx];
+           String cname = aContext.get(cidx);
+           if (nname == null || nname.equals(cname) == false) {
+               return false;
+           }
+       }
+       // If the context is shorter than the match, it's
+       // not a match, is it?
+       return cidx == 0;
     }
 
     private void writePostfix() {

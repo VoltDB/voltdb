@@ -28,12 +28,12 @@ select_statement:
     ;
 
 projection_clause:
-        '*'
-    |
         projection (',' projection)*
     ;
     
 projection:
+        STAR
+    |
         projection_ref ( ( AS )? column_name )?
     ;
 
@@ -158,7 +158,7 @@ column_name: IDENTIFIER ;
 
 alias_name: IDENTIFIER;
 
-NUMBER: NZDIGIT ( DIGIT )* ;
+NUMBER: ( NZDIGIT ( DIGIT )* ) | ZERODIGIT;
 
 /*
  * Note: I think this is wrong.  I think single quotes are doubled in the input.
@@ -184,6 +184,7 @@ VALUE:       V A L U E;
 PRIMARY:     P R I M A R Y;
 KEY:         K E Y;
 UNIQUE:      U N I Q U E;
+STAR:        '*';
 
 IDENTIFIER: LETTER ( LETTER | DIGIT )*;
 
@@ -192,6 +193,9 @@ LETTER: [a-zA-Z\u0080-\u00FF_] ;
 
 fragment
 NZDIGIT: [1-9];
+
+fragment
+ZERODIGIT: '0';
 
 fragment
 DIGIT: [0-9];

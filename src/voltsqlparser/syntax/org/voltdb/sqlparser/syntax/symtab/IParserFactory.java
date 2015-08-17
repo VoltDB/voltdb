@@ -108,14 +108,13 @@ public interface IParserFactory {
     IInsertStatement newInsertStatement();
 
     /**
-     * Make an IAST object for an integer constant.  The particular
-     * integer type is given.
+     * Make an IAST object for a constant.
      *
      * @param aIntType
      * @param aIntegerValue
      * @return
      */
-    IAST makeUnaryAST(IType aIntType, int aIntegerValue);
+    IAST makeUnaryAST(IType aIntType, Object aIntegerValue);
 
     /**
      * Make an IAST object for a boolean constant.  The particular
@@ -242,5 +241,5 @@ public interface IParserFactory {
      *
      * @return
      */
-    IExpressionParser makeExpressionParser();
+    IExpressionParser makeExpressionParser(ISymbolTable aSymbolTable);
 }
