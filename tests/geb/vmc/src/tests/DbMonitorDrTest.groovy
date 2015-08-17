@@ -298,4 +298,53 @@ class DbMonitorDrTest extends TestBase {
             assert true
     }
 
+    def "Verify Show and Hide Database Replication (DR) table (REPLICA)" (){
+
+//        when:"Check showHideDiv is displayed"
+//        if(waitFor(30){!page.isDrSectionOpen()})
+//        {
+//            println("Dr Replication didnot open in 30 seconds")
+//        }
+//        then:
+//        println("proceed")
+        when: "Check Dr Mode"
+        page.dbDrMode.isDisplayed()
+        then: "Dr Mode must be Master or Both"
+        println("DR Mode" + page.dbDrMode.text())
+        if(page.dbDrMode.text().equals("") || page.dbDrMode.text().equals("Master"))
+        {
+            println("No Replica mode")
+        }
+        else
+        {
+            println("Replica mode")
+            when: "ensure the DR section is open"
+            if(!page.isDrSectionOpen())
+            {
+                waitFor(30){ page.openDrArea()}
+            }
+            then: 'DR area is open (initially)'
+            page.isDrAreaOpen()
+
+            when: 'click Show/Hide Graph (to close)'
+            page.closeDrArea()
+
+            then:'Dr area is closed'
+            !page.isDrAreaOpen()
+
+            when:'click Show/Hide Graph (to open)'
+            page.openDrArea()
+
+            then:'Dr area is open (again)'
+            page.isDrAreaOpen()
+
+            when: 'click Show/Hide DR (to close again)'
+            page.closeDrArea()
+            then: 'Graph area is closed (again)'
+            !page.isDrAreaOpen()
+        }
+
+
+    }
+
 }

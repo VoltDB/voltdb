@@ -202,6 +202,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         dbDrMode {$("#dbDrMode")}
 
+        //Dr Replica Section
+
+        drReplicaSection {$("#drReplicaSection")}
+
+
     }
 
     static at = {
