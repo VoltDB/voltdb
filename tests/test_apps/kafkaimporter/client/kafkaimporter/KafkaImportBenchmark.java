@@ -196,6 +196,8 @@ public class KafkaImportBenchmark {
 
             thrup = stats.getTxnThroughput();
             long rows = MatchChecks.getExportRowCount(client);
+            if (rows == VoltType.NULL_BIGINT)
+                rows = 0;
             log.info(String.format("Export Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
                     thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
                     stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
@@ -213,6 +215,8 @@ public class KafkaImportBenchmark {
             @Override
             public void run() {
                 long count = MatchChecks.getImportRowCount(client);
+                if (count == VoltType.NULL_BIGINT)
+                    count = 0;
                 importProgress.add((int) count);
                 //log.info(importProgress.toString());
                 if (importProgress.size() > 1) {
