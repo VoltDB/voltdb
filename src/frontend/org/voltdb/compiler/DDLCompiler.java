@@ -148,7 +148,6 @@ public class DDLCompiler {
 
     private static final Pattern drConflictsTablePattern = Pattern.compile(
             CatalogUtil.DR_CONFLICTS_TABLE_PREFIX +             /* table prefix */
-            "(?i)" +                                            /* ignore case instruction */
             "(" +                                               /* start of group 1 */
             "[\\w]+" +                                          /* DR table name, have at least one character */
             ")"                                                 /* end of group 1 */
@@ -269,63 +268,68 @@ public class DDLCompiler {
         sb.append("EXPORT TABLE " + tableName + " TO STREAM " + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + ";\n");
     }
 
-    // Generate DDL to create or drop the DR conflict table
-    // TODO:When DR table supports dynamic schema change, we need also change the schema of conflict table,
-    //       maybe dropping the old one and recreating a new one is the easiest way.
-    private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny) {
-        VoltXMLElement xmlRoot = m_schema;
-        StringBuilder sb = new StringBuilder();
-        if (currentDB.getIsactiveactivedred()) {
-            for (VoltXMLElement node : xmlRoot.children) {
-                if (node.name.equals("table")
-                        && node.attributes.containsKey("drTable") && node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
-                    boolean tableAlreadyExist = false;
-                    String drConflictExportTableName = CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + node.attributes.get("name");
-                    // Does the conflict export table already existed?
-                    if (previousDBIfAny != null) {
-                        tableAlreadyExist = previousDBIfAny.getTables().get(drConflictExportTableName) != null;
-                    } else {
-                        for (VoltXMLElement element : xmlRoot.children) {
-                            if (element.name.equals("table")
-                                    && element.attributes.containsKey("export")
-                                    && element.attributes.get("name").equals(drConflictExportTableName)) {
-                                tableAlreadyExist = true;
-                                break;
-                            }
+    private void createDRConflictTables(StringBuilder sb, Database previousDBIfAny) {
+        for (VoltXMLElement node : m_schema.children) {
+            if (node.name.equals("table")
+                    && node.attributes.containsKey("drTable") && node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
+                boolean tableAlreadyExist = false;
+                String drConflictExportTableName = CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + node.attributes.get("name");
+                // Does the conflict export table already existed?
+                if (previousDBIfAny != null) {
+                    tableAlreadyExist = previousDBIfAny.getTables().get(drConflictExportTableName) != null;
+                } else {
+                    for (VoltXMLElement element : m_schema.children) {
+                        if (element.name.equals("table")
+                                && element.attributes.containsKey("export")
+                                && element.attributes.get("name").equals(drConflictExportTableName)) {
+                            tableAlreadyExist = true;
+                            break;
                         }
                     }
-                    if (!tableAlreadyExist) {
-                        // If the conflict export table doesn't existed yet, create a new one.
-                        createConflictExportTableDDL(sb, node, drConflictExportTableName);
-                    }
+                }
+                if (!tableAlreadyExist) {
+                    // If the conflict export table doesn't existed yet, create a new one.
+                    createConflictExportTableDDL(sb, node, drConflictExportTableName);
                 }
             }
         }
+    }
 
-        // Drop the dr conflicts table if corresponding dr table is not existed or A/A is disabled or dr is disabled.
+    // Drop the dr conflicts table if corresponding dr table is not existed or A/A is disabled or dr is disabled.
+    private void dropDRConflictTablesIfNeeded(StringBuilder sb, Database currentDB) {
         Matcher matcher;
-        for (VoltXMLElement node : xmlRoot.children) {
+        for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")
                     && (matcher = drConflictsTablePattern.matcher(node.attributes.get("name"))).matches()) {
+                String drTable = matcher.group(1);
                 boolean remove = true;
                 if (currentDB.getIsactiveactivedred()) {
-                    for (VoltXMLElement element : xmlRoot.children) {
+                    for (VoltXMLElement element : m_schema.children) {
                         if (element.name.equals("table")
                                 && element.attributes.containsKey("drTable")
                                 && element.attributes.get("drTable").equalsIgnoreCase("ENABLE")
-                                && element.attributes.get("name").equals(matcher.group(1))) {
+                                && element.attributes.get("name").equals(drTable)) {
                             remove = false;
                             break;
                         }
                     }
-                } else {
-                    remove = true;
                 }
                 if (remove) {
                     sb.append("DROP TABLE " + node.attributes.get("name") + ";\n");
                 }
             }
         }
+    }
+
+    // Generate DDL to create or drop the DR conflict table
+    // TODO:When DR table supports dynamic schema change, we need also change the schema of conflict table,
+    //       maybe dropping the old one and recreating a new one is the easiest way.
+    private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny) {
+        StringBuilder sb = new StringBuilder();
+        if (currentDB.getIsactiveactivedred()) {
+            createDRConflictTables(sb, previousDBIfAny);
+        }
+        dropDRConflictTablesIfNeeded(sb, currentDB);
         return sb.toString();
     }
 
