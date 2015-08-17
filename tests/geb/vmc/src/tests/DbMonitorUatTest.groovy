@@ -544,8 +544,8 @@ class DbMonitorUatTest extends TestBase {
             page.savePreferencesBtnDisplayed()
             page.popupCloseDisplayed()
 
-            page.commandLogStatisticsCheckBoxDisplayed()
-            page.commandLogStatisticsCheckBoxClick()
+            page.commandLogStatisticsCheckBox.isDisplayed()
+            page.commandLogStatisticsCheckBox.click()
 
             page.savePreferences()
             page.serverCpuDisplayed()
@@ -560,8 +560,8 @@ class DbMonitorUatTest extends TestBase {
             page.savePreferencesBtnDisplayed()
             page.popupCloseDisplayed()
 
-            page.commandLogStatisticsCheckBoxDisplayed()
-            page.commandLogStatisticsCheckBoxClick()
+            page.commandLogStatisticsCheckBox.isDisplayed()
+            page.commandLogStatisticsCheckBox.click()
 
             page.savePreferences()
             page.serverCpuDisplayed()
@@ -604,8 +604,8 @@ class DbMonitorUatTest extends TestBase {
             page.savePreferencesBtnDisplayed()
             page.popupCloseDisplayed()
 
-            page.databaseReplicationCheckboxDisplayed()
-            page.databaseReplicationCheckboxClick()
+            page.databaseReplicationCheckbox.isDisplayed()
+            page.databaseReplicationCheckbox.click()
 
             page.savePreferences()
             page.serverCpuDisplayed()
@@ -620,8 +620,8 @@ class DbMonitorUatTest extends TestBase {
             page.savePreferencesBtnDisplayed()
             page.popupCloseDisplayed()
 
-            page.databaseReplicationCheckboxDisplayed()
-            page.databaseReplicationCheckboxClick()
+            page.databaseReplicationCheckbox.isDisplayed()
+            page.databaseReplicationCheckbox.click()
 
             page.savePreferences()
             page.serverCpuDisplayed()
