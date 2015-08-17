@@ -206,6 +206,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         drReplicaSection {$("#drReplicaSection")}
 
+        replicaServer{$("#replicaServer")}
+        replicaStatus{$("#replicaStatus")}
+        replicationRate1 {$("#replicationRate1")}
+        replicationRate5 {$("#replicationRate5")}
 
     }
 
@@ -453,6 +457,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
     def boolean isDrMasterSectionOpen() {
         return drMasterSection.displayed
+    }
+
+    def boolean isDrReplicaSectionOpen() {
+        return drReplicaSection.displayed
     }
 
 
@@ -894,31 +902,59 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
     /*
-     *	click the status column in database table
+     *	click the status column in DR MAster table
      */
     def boolean clickStatus() {
         status.click()
     }
 
     /*
-     *	click the status column in database table
+     *	click the status column in DR MAster table
      */
     def boolean clickMbOnDisk() {
         mbOnDisk.click()
     }
 
     /*
-     *	click the replicaLatencyMs column in database table
+     *	click the replicaLatencyMs column in DR MAster table
      */
     def boolean clickReplicaLatencyMs() {
         replicaLatencyMs.click()
     }
 
     /*
-     *	click the replicaLatencyTrans column in database table
+     *	click the replicaLatencyTrans column in DR MAster table
      */
     def boolean clickReplicaLatencyTrans() {
         replicaLatencyTrans.click()
+    }
+
+    /*
+     *	click the server column in DR Replica table
+     */
+    def boolean clickReplicaServer() {
+        replicaServer.click()
+    }
+
+    /*
+     *	click the status column in DR Replica table
+     */
+    def boolean clickReplicaStatus() {
+        replicaStatus.click()
+    }
+
+    /*
+     *	click the status column in Replication Rate 1min table
+     */
+    def boolean clickReplicationRate1() {
+        replicationRate1.click()
+    }
+
+    /*
+     *	click the status column in Replication Rate 5 min table
+     */
+    def boolean clickReplicationRate5() {
+        replicationRate5.click()
     }
 
 
