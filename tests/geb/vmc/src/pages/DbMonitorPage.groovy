@@ -214,6 +214,35 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         replicationRate1 {$("#replicationRate1")}
         replicationRate5 {$("#replicationRate5")}
 
+        // Command Log Table
+
+        showHideCLPBlock {$("#showHideCLPBlock")}
+        clpSection {$("#clpSection")}
+
+        cmdServer {$("#cmdServer")}
+        cmdPendingBytes {$("#cmdPendingBytes")}
+        cmdPendingTrans {$("#cmdPendingTrans")}
+        cmdTotalSegments {$("#cmdTotalSegments")}
+        cmdSegmentsInUse {$("#cmdSegmentsInUse")}
+        cmdFsyncInterval {$("#cmdFsyncInterval")}
+
+        
+        // UAT 
+        drTableModeTypeText         { $("#dbDrMode") }
+        drTableBlock                { $("#showHideDrBlock") }
+        drTableCurrentPageReplica   { $("#tblDrReplica_paginate > div > span.pageIndex") }
+        drTableTotalPagesReplica    { $("#tblDrReplica_paginate > div > span.totalPages") }
+        drTableNextReplicaDisabled  { $("#tblDrReplica_paginate > span.paginate_disabled_next.paginate_button") }
+        drTablePrevReplicaDisabled  { $("#tblDrReplica_paginate > span.paginate_disabled_previous.paginate_button") }
+        drTableNextReplicaEnabled   { $("#tblDrReplica_paginate > span.paginate_enabled_next.paginate_button") }
+        drTablePrevReplicaEnabled   { $("#tblDrReplica_paginate > span.paginate_enabled_previous.paginate_button") }
+        
+        drTableCurrentPageMaster    { $("#tblDrMAster_paginate > div > span.pageIndex") }
+        drTableTotalPagesMaster     { $("#tblDrMAster_paginate > div > span.totalPages") }
+        drTableNextMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_next.paginate_button") }
+        drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_abled_previous.paginate_button") }
+        drTableNextMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_next.paginate_button") }
+        drTablePrevMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_previous.paginate_button") }
     }
 
     static at = {
@@ -458,12 +487,22 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
 
+
     def boolean isDrMasterSectionOpen() {
         return drMasterSection.displayed
     }
 
     def boolean isDrReplicaSectionOpen() {
         return drReplicaSection.displayed
+    }
+
+
+    def boolean isCmdLogSectionOpen() {
+        return showHideCLPBlock.displayed
+    }
+
+    def boolean isCLPAreaOpen() {
+        return clpSection.displayed
     }
 
 
@@ -482,6 +521,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return true
     }
 
+    def boolean openCLPArea(){
+        clickToDisplay(showHideCLPBlock, clpSection)
+        return true
+    }
+
     /**
      * Closes the "Data" area (containing Stored Procedures and Database Tables
      * info), by clicking on "Show/Hide Data" (if it's not closed already).
@@ -494,6 +538,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
     def boolean closeDrArea() {
         clickToNotDisplay(showHideDrBlock, drSection)
+        return true
+    }
+
+
+    def boolean closeCLPArea() {
+        clickToNotDisplay(showHideCLPBlock, clpSection)
         return true
     }
 
@@ -954,11 +1004,56 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
     /*
-     *	click the status column in Replication Rate 5 min table
+     *	click the ReplicationRate5 column in DR Replica table
      */
     def boolean clickReplicationRate5() {
         replicationRate5.click()
     }
+
+/*
+     *	click the cmdServer column in  Command log table
+     */
+    def boolean clickCmdServer() {
+        cmdServer.click()
+    }
+
+    /*
+     *	click the CmdPendingBytes column in  Command log table
+     */
+    def boolean clickCmdPendingBytes() {
+        cmdPendingBytes.click()
+    }
+
+    /*
+     *	click the CmdPendingTrans column in  Command log table
+     */
+    def boolean clickCmdPendingTrans() {
+        cmdPendingTrans.click()
+    }
+
+    /*
+     *	click the TotalSegments column in  Command log table
+     */
+    def boolean clickCmdTotalSegments() {
+        cmdTotalSegments.click()
+    }
+
+    /*
+   *	click the SegmentsInUse column in  Command log table
+   */
+    def boolean clickCmdSegmentsInUse() {
+        cmdSegmentsInUse.click()
+    }
+
+
+    /*
+   *	click the FsyncInterval column in  Command log table
+   */
+    def boolean clickCmdFsyncInterval() {
+        cmdFsyncInterval.click()
+    }
+
+
 
 
 

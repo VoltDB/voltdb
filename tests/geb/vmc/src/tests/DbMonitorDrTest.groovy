@@ -115,8 +115,8 @@ class DbMonitorDrTest extends TestBase {
 
             }
             else {
+                when: 'click Partition ID'
 
-                when: 'click Partion ID'
                 waitFor(10){ page.clickPartitionID()}
                 then: 'check if row count is in descending'
                 if (waitFor(20){page.tableInDescendingOrderDT()})
@@ -452,19 +452,17 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the Replication Rate(5 min) column of Database Replication (DR) table (REPLICA)"(){
+    def "Verify the Ascending and Descending in the Replication Rate(5 min) column of Database Replication (DR) table (REPLICA)"() {
         String before = ""
-        String after  = ""
-        when:"Check if Dr Master is Displayed"
+        String after = ""
+        when: "Check if Dr Master is Displayed"
 
-        if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrReplicaSectionOpen()})
-        {
+        if (page.dbDrMode.text().equals("") || !waitFor(40) { page.isDrReplicaSectionOpen() }) {
             println("Replica section is not visible")
 
-        }
-        else {
+        } else {
             when: 'click Replication Rate (5 min)'
-            waitFor(10){ page.clickReplicationRate5()}
+            waitFor(10) { page.clickReplicationRate5() }
             then: 'check if row count is in ascending'
             if (page.tableInAscendingOrderDT())
                 before = "ascending"
@@ -472,9 +470,9 @@ class DbMonitorDrTest extends TestBase {
                 before = "descending"
 
             when: 'click Replication Rate (5 min)'
-            waitFor(10){ page.clickReplicationRate5()}
+            waitFor(10) { page.clickReplicationRate5() }
             then: 'check if row count is in descending'
-            if (waitFor(20){page.tableInDescendingOrderDT()})
+            if (waitFor(20) { page.tableInDescendingOrderDT() })
                 after = "descending"
             else
                 after = "ascending"
@@ -485,5 +483,22 @@ class DbMonitorDrTest extends TestBase {
         }
         then:
         assert true
+    }
+
+    def "Verify the text in the Title in Database Replication Table (MASTER) "(){
+        when: "Check Master Title is displayed or not"
+        if(page.drMasterTitleDisplayed())
+        {
+            assert true
+        }
+        then:
+        if(page.drMasterTitleDisplayed()) {
+            println(waitFor(20) { page.drMasterTitle.text() })
+            page.drMasterTitle.text().equals("Master")
+        }
+        else
+        {
+            println("Master Section is not visible")
+        }
     }
 }
