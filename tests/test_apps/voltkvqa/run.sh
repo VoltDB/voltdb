@@ -25,7 +25,7 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 # Jars needed to compile JDBC Benchmark. Apprunner uses a nfs shared path.
-CONNECTIONPOOLLIB=${CONNECTIONPOOLLIB:-"/home/opt"}
+CONNECTIONPOOLLIB=${CONNECTIONPOOLLIB:-"/home/opt/connection-pool"}
 CONNECIONPOOLCLASSPATH=$({\
     \ls -1 "$CONNECTIONPOOLLIB"/tomcat-*.jar; \
     \ls -1 "$CONNECTIONPOOLLIB"/mchange-commons-java-*.jar; \
