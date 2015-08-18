@@ -33,9 +33,10 @@ namespace voltdb {
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
-static void createThreadLocalKey() {
-    (void)pthread_key_create( &static_key, NULL);
-
+/**
+ * This function will initiate global settings and create thread key once per process.
+ * */
+static void globalInitOrCreateOncePerProcess() {
 #ifdef LINUX
     // We ran into an issue where memory wasn't being returned to the
     // operating system (and thus reducing RSS) when freeing. See
@@ -62,6 +63,8 @@ static void createThreadLocalKey() {
     // Be explicit about running in the standard C locale for now.
     std::locale::global(std::locale("C"));
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
+
+    (void)pthread_key_create(&static_key, NULL);
 }
 
 ExecutorContext::ExecutorContext(int64_t siteId,
@@ -94,7 +97,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_drClusterId(drClusterId),
     m_epoch(0) // set later
 {
-    (void)pthread_once(&static_keyOnce, createThreadLocalKey);
+    (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();
 }
 
@@ -119,7 +122,7 @@ void ExecutorContext::bindToThread()
 
 
 ExecutorContext* ExecutorContext::getExecutorContext() {
-    (void)pthread_once(&static_keyOnce, createThreadLocalKey);
+    (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
 
