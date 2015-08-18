@@ -484,4 +484,21 @@ class DbMonitorDrTest extends TestBase {
         then:
         assert true
     }
+
+    def "Verify the text in the Title in Database Replication Table (MASTER) "(){
+        when: "Check Master Title is displayed or not"
+        if(page.drMasterTitleDisplayed())
+        {
+            assert true
+        }
+        then:
+        if(page.drMasterTitleDisplayed()) {
+            println(waitFor(20) { page.drMasterTitle.text() })
+            page.drMasterTitle.text().equals("Master")
+        }
+        else
+        {
+            println("Master Section is not visible")
+        }
+    }
 }
