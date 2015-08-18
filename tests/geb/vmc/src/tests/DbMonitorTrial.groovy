@@ -79,7 +79,7 @@ class DbMonitorTrial extends TestBase {
             
             String totalPageString = page.drTableTotalPagesMaster.text()
             println("Total page string " + totalPageString)
-            int totalPage = Integer.parseInt(totalPage)
+            int totalPage = Integer.parseInt(totalPageString)
             int expectedCurrentPage = 1
             int actualCurrentPage = 1
             
