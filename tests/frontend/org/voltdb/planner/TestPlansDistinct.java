@@ -394,19 +394,6 @@ public class TestPlansDistinct extends PlannerTestCase {
                 distinctMergeReceive = true;
                 assertNotNull(apn1.getInlinePlanNode(PlanNodeType.ORDERBY));
                 assertEquals(0, apn1.getChildCount());
-                AbstractPlanNode aggr = apn1.getInlinePlanNode(PlanNodeType.AGGREGATE);
-                if (aggr == null) {
-                    aggr = apn1.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE);
-                }
-                if (hasLimit) {
-                    // check inline limit
-                    if (aggr == null) {
-                        assertNotNull(apn1.getInlinePlanNode(PlanNodeType.LIMIT));
-                    } else {
-                        assertNotNull(aggr.getInlinePlanNode(PlanNodeType.LIMIT));
-                    }
-                }
-                apn1 = aggr;
             } else {
                 fail("The distinctSQL top node is not OrderBy or MergeReceive.");
             }
@@ -417,10 +404,15 @@ public class TestPlansDistinct extends PlannerTestCase {
 
         // Check DISTINCT group by plan node
         if (distinctMergeReceive) {
-            assertTrue(apn1 instanceof AggregatePlanNode);
-            assertEquals(0, ((AggregatePlanNode)apn1).getAggregateTypesSize());
+            AbstractPlanNode aggr = AggregatePlanNode.getInlineAggregationNode(apn1);
+            assertTrue(aggr instanceof AggregatePlanNode);
+            assertEquals(0, ((AggregatePlanNode)aggr).getAggregateTypesSize());
             assertEquals(pns1.get(0).getOutputSchema().getColumns().size(),
-                ((AggregatePlanNode)apn1).getGroupByExpressionsSize());
+                ((AggregatePlanNode)aggr).getGroupByExpressionsSize());
+            if (hasLimit) {
+                // check inline limit
+                assertNotNull(aggr.getInlinePlanNode(PlanNodeType.LIMIT));
+            }
         } else {
             assertTrue(apn1 instanceof HashAggregatePlanNode);
             assertEquals(0, ((HashAggregatePlanNode)apn1).getAggregateTypesSize());
@@ -439,11 +431,14 @@ public class TestPlansDistinct extends PlannerTestCase {
             assertFalse(hasTopProjection2);
         }
 
-        // check the rest plan nodes. In case of applied 'MERGE RECEIVE' optimization
-        // the whole top fragment is a single Receive node with other inline nodes which were
-        // already checked above
+        // check the rest plan nodes.
         if (distinctMergeReceive == false && groupByMergeReceive == false) {
             assertEquals(apn1.toExplainPlanString(), apn2.toExplainPlanString());
+        } else if (distinctMergeReceive == true && groupByMergeReceive == true) {
+            // In case of applied MergeReceive optimization the apn1 and apn2 nodes
+            // should not have any children
+            assertEquals(0, apn1.getChildCount());
+            assertEquals(0, apn2.getChildCount());
         }
 
         // Distributed DISTINCT GROUP BY
