@@ -129,15 +129,43 @@ public:
 
 class DRTupleStreamDisableGuard {
 public:
-    DRTupleStreamDisableGuard(DRTupleStream *stream) : m_stream(stream), m_oldValue(stream->m_enabled) {
-        stream->m_enabled = false;
+    DRTupleStreamDisableGuard(DRTupleStream *drStream, DRTupleStream *drReplicatedStream, bool ignore) :
+            m_drStream(drStream), m_drReplicatedStream(drReplicatedStream),
+            m_drStreamOldValue(drStream->m_enabled), m_drReplciatedStreamOldValue(false)
+    {
+        if (!ignore) {
+            m_drStream->m_enabled = false;
+            if (m_drReplicatedStream) {
+                m_drReplciatedStreamOldValue = m_drReplicatedStream->m_enabled;
+                m_drReplicatedStream->m_enabled = false;
+            }
+        }
+        else
+        if (m_drReplicatedStream) {
+            m_drReplciatedStreamOldValue = m_drReplicatedStream->m_enabled;
+        }
+    }
+    DRTupleStreamDisableGuard(DRTupleStream *drStream, DRTupleStream *drReplicatedStream) :
+            m_drStream(drStream), m_drReplicatedStream(drReplicatedStream),
+            m_drStreamOldValue(drStream->m_enabled), m_drReplciatedStreamOldValue(false)
+    {
+        m_drStream->m_enabled = false;
+        if (m_drReplicatedStream) {
+            m_drReplciatedStreamOldValue = m_drReplicatedStream->m_enabled;
+            m_drReplicatedStream->m_enabled = false;
+        }
     }
     ~DRTupleStreamDisableGuard() {
-        m_stream->m_enabled = m_oldValue;
+        m_drStream->m_enabled = m_drStreamOldValue;
+        if (m_drReplicatedStream) {
+            m_drReplicatedStream->m_enabled = m_drReplciatedStreamOldValue;
+        }
     }
 private:
-    DRTupleStream *m_stream;
-    const bool m_oldValue;
+    DRTupleStream *m_drStream;
+    DRTupleStream *m_drReplicatedStream;
+    const bool m_drStreamOldValue;
+    bool m_drReplciatedStreamOldValue;
 };
 
 }
