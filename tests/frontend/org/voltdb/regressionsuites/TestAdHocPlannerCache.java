@@ -169,7 +169,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         assertTrue(l1After <= ExecutionEngine.EE_PLAN_CACHE_SIZE);
 
         // Assuming the max size of cache has not been reached
-        assertTrue(l1Before + 1 == l1After);
+        assertEquals(l1Before + 1, l1After);
     }
 
     public void testAdHocPlannerCache() throws IOException, ProcCallException {
