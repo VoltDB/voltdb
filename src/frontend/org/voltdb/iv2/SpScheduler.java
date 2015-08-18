@@ -1056,8 +1056,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    public void checkForSyncLoggedSysProcs(CommandLog.CompletionChecks currentChecks) {
-        currentChecks.checkForSyncLoggedSysProcs();
+    public void checkForSyncLoggedSysProcs(final CommandLog.CompletionChecks currentChecks) {
+        final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
+            @Override
+            void run() {
+                assert(currentChecks != null);
+                synchronized (m_lock) {
+                    currentChecks.checkForSyncLoggedSysProcs();
+                }
+            }
+        };
+        if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
+            m_tasks.offer(r);
+        } else {
+            r.run();
+        }
     }
 
     @Override
