@@ -576,11 +576,6 @@ public class CatalogDiffEngine {
                                             final CatalogType prevType,
                                             final String field)
     {
-        if (suspect instanceof Deployment) {
-            // ignore host count differences as clusters may elastically expand,
-            // and yet require catalog changes
-            return "hostcount".equals(field);
-        }
         return false;
     }
 
