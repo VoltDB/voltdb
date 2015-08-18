@@ -226,7 +226,13 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         cmdSegmentsInUse {$("#cmdSegmentsInUse")}
         cmdFsyncInterval {$("#cmdFsyncInterval")}
 
-
+        
+        // UAT 
+        drTableModeTypeText         { $("#dbDrMode") }
+        drTableCurrentPage          { $("#tblDrReplica_paginate > div > span.pageIndex") }
+        drTableTotalPages           { $("#tblDrReplica_paginate > div > span.totalPages") }
+        drTableNext                 { $("#tblDrReplica_paginate > span.paginate_disabled_next.paginate_button") }
+        drTablePrev                 { $("#tblDrReplica_paginate > span.paginate_disabled_previous.paginate_button") }
     }
 
     static at = {
