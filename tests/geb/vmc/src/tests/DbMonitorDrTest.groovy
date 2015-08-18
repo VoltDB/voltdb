@@ -452,19 +452,17 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the Replication Rate(5 min) column of Database Replication (DR) table (REPLICA)"(){
+    def "Verify the Ascending and Descending in the Replication Rate(5 min) column of Database Replication (DR) table (REPLICA)"() {
         String before = ""
-        String after  = ""
-        when:"Check if Dr Master is Displayed"
+        String after = ""
+        when: "Check if Dr Master is Displayed"
 
-        if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrReplicaSectionOpen()})
-        {
+        if (page.dbDrMode.text().equals("") || !waitFor(40) { page.isDrReplicaSectionOpen() }) {
             println("Replica section is not visible")
 
-        }
-        else {
+        } else {
             when: 'click Replication Rate (5 min)'
-            waitFor(10){ page.clickReplicationRate5()}
+            waitFor(10) { page.clickReplicationRate5() }
             then: 'check if row count is in ascending'
             if (page.tableInAscendingOrderDT())
                 before = "ascending"
@@ -472,9 +470,9 @@ class DbMonitorDrTest extends TestBase {
                 before = "descending"
 
             when: 'click Replication Rate (5 min)'
-            waitFor(10){ page.clickReplicationRate5()}
+            waitFor(10) { page.clickReplicationRate5() }
             then: 'check if row count is in descending'
-            if (waitFor(20){page.tableInDescendingOrderDT()})
+            if (waitFor(20) { page.tableInDescendingOrderDT() })
                 after = "descending"
             else
                 after = "ascending"
@@ -485,44 +483,5 @@ class DbMonitorDrTest extends TestBase {
         }
         then:
         assert true
-    }
-
-
-    def "Verify Show and Hide in Command Log Performance  table" (){
-        when: "ensure CLP section is present or not"
-        println("test" +page.isCmdLogSectionOpen())
-        if( page.isCmdLogSectionOpen()==false)
-        {
-            println("CLP section is not present")
-            assert true
-        }
-            then:
-            println("proceed")
-        if( page.isCmdLogSectionOpen())
-        {
-            println("CLP section is present")
-            when: "ensure the CLP section is open"
-            waitFor(30) { page.openCLPArea() }
-            then: 'DR area is open (initially)'
-            page.isCLPAreaOpen()
-
-            when: 'click Show/Hide Graph (to close)'
-            page.closeCLPArea()
-
-            then: 'CLP area is closed'
-            !page.isCLPAreaOpen()
-
-            when: 'click Show/Hide Graph (to open)'
-            page.openCLPArea()
-
-            then: 'CLP area is open (again)'
-            page.isCLPAreaOpen()
-
-            when: 'click Show/Hide CLP (to close again)'
-            page.closeCLPArea()
-            then: 'CLP area is closed (again)'
-            !page.isCLPAreaOpen()
-        }
-
     }
 }

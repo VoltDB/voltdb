@@ -219,6 +219,13 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         showHideCLPBlock {$("#showHideCLPBlock")}
         clpSection {$("#clpSection")}
 
+        cmdServer {$("#cmdServer")}
+        cmdPendingBytes {$("#cmdPendingBytes")}
+        cmdPendingTrans {$("#cmdPendingTrans")}
+        cmdTotalSegments {$("#cmdTotalSegments")}
+        cmdSegmentsInUse {$("#cmdSegmentsInUse")}
+        cmdFsyncInterval {$("#cmdFsyncInterval")}
+
 
     }
 
@@ -981,11 +988,56 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
     /*
-     *	click the status column in Replication Rate 5 min table
+     *	click the ReplicationRate5 column in DR Replica table
      */
     def boolean clickReplicationRate5() {
         replicationRate5.click()
     }
+
+/*
+     *	click the cmdServer column in  Command log table
+     */
+    def boolean clickCmdServer() {
+        cmdServer.click()
+    }
+
+    /*
+     *	click the CmdPendingBytes column in  Command log table
+     */
+    def boolean clickCmdPendingBytes() {
+        cmdPendingBytes.click()
+    }
+
+    /*
+     *	click the CmdPendingTrans column in  Command log table
+     */
+    def boolean clickCmdPendingTrans() {
+        cmdPendingTrans.click()
+    }
+
+    /*
+     *	click the TotalSegments column in  Command log table
+     */
+    def boolean clickCmdTotalSegments() {
+        cmdTotalSegments.click()
+    }
+
+    /*
+   *	click the SegmentsInUse column in  Command log table
+   */
+    def boolean clickCmdSegmentsInUse() {
+        cmdSegmentsInUse.click()
+    }
+
+
+    /*
+   *	click the FsyncInterval column in  Command log table
+   */
+    def boolean clickCmdFsyncInterval() {
+        cmdFsyncInterval.click()
+    }
+
+
 
 
 
