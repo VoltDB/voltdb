@@ -25,17 +25,36 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import glob
+import os.path
+
+def check_thp_file(file_pattern, file_prefix):
+    filename = file_pattern.format(file_prefix)
+    if not os.path.isfile(filename):
+        return None
+    with file(filename) as f:
+        if '[always]' in f.read():
+            return True
+    return False
+
+def check_thp_files(file_prefix):
+    res = check_thp_file("/sys/kernel/mm/{0}transparent_hugepage/enabled", file_prefix)
+    if res is not False:
+        return res
+    return bool(check_thp_file("/sys/kernel/mm/{0}transparent_hugepage/defrag", file_prefix))
 
 def check_thp_config():
-    thp_filenames = glob.glob("/sys/kernel/mm/*transparent_hugepage/enabled")
-    thp_filenames += glob.glob("/sys/kernel/mm/*transparent_hugepage/defrag")
-    for filename in thp_filenames:
-        with file(filename) as f:
-            if '[always]' in f.read():
-                return "The kernel is configured to use transparent huge pages (THP). " \
-                    "This is not supported when running VoltDB. See the VoltDB Administrator's " \
-                    "Guide for instructions for disabling THP."
+    file_prefix = "redhat_"
+    has_error = check_thp_files(file_prefix)
+    if has_error is None:
+        file_prefix = ""
+        has_error = bool(check_thp_files(file_prefix))
+    if has_error:
+        return "The kernel is configured to use transparent huge pages (THP). " \
+            "This is not supported when running VoltDB. Use the following commands " \
+            "to disable this feature for the current session:\n\n" \
+            "bash -c \"echo never > /sys/kernel/mm/{0}transparent_hugepage/enabled\"\n" \
+            "bash -c \"echo never > /sys/kernel/mm/{0}transparent_hugepage/defrag\"\n\n" \
+            "To disable THP on reboot, add the preceding commands to the /etc/rc.local file.".format(file_prefix)
 
 def check_config():
     return check_thp_config()
