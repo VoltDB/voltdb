@@ -1588,36 +1588,10 @@ public abstract class AbstractParsedStmt {
             HashSet<AbstractExpression> orderByExprs,
             List<ParsedColInfo> candidateColumns) {
         HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
-        // If a TVE is equal to a parameter or a constant, it can only be a single
-        // value.  So, it is an honorary order by expression for this purpose.
-        //
-        // Since we are scanning the select list here, we might as well check to
-        // see that all the select list expressions which are TVEs are from the
-        // same table scan.  If we see a table which has a different name from
-        // the other tables, or which has no table name, since it is a sub-query,
-        // then we have nothing else to do here.  We need to finish the entire
-        // select list, even if we see multiple tables.
-        String scanName = null;
-        String scanAlias = null;
-        boolean earlyOut = false;
         for (ParsedColInfo colInfo : candidateColumns) {
             AbstractExpression colExpr = colInfo.expression;
             if (colExpr instanceof TupleValueExpression) {
                 TupleValueExpression tve = (TupleValueExpression)colExpr;
-                String tveName = tve.getTableName();
-                String tveAlias = tve.getTableAlias();
-                if (scanName == null && scanAlias == null) {
-                    // This is the initial case.
-                    scanName = tveName;
-                    scanAlias = tveAlias;
-                    if (scanName == null) {
-                        // No sense doing anything else.  We've seen
-                        // a sub-query, which can have no unique indices.
-                        earlyOut = true;
-                    }
-                } else if ((tveName == null) || (scanName.equalsIgnoreCase(tveName) == false)) {
-                    earlyOut = true;
-                }
                 Set<AbstractExpression> tveEquivs = valueEquivalence.get(colExpr);
                 if (tveEquivs != null) {
                     for (AbstractExpression expr : tveEquivs) {
@@ -1629,15 +1603,17 @@ public abstract class AbstractParsedStmt {
                 }
             }
         }
-        // If we didn't see a table in the from list, it could
-        // be that nothing is a TVE, or that there are more than
-        // one table.  In either case, there is no work
-        // for us here anymore.
-        if (earlyOut || scanName == null) {
+        // If there is not exactly one table scans we will not proceed.
+        // We don't really know how to make indices work with joins,
+        // and there is nothing more to do with subqueries.  The processing
+        // of joins is the content of ticket ENG-8677.
+        if (m_tableAliasMap.size() != 1) {
             return;
         }
+        // We know there's exactly one.
+        StmtTableScan scan = m_tableAliasMap.values().iterator().next();
         // Get the table.  There's only one.
-        Table table = getTableFromDB(scanName);
+        Table table = getTableFromDB(scan.getTableName());
         // If we can't find the table, something is probably wrong.
         // But don't crash, just return and hope everything sorts
         // itself out.

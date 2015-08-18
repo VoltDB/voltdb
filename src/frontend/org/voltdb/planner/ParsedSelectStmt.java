@@ -1695,6 +1695,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : displayColumns) {
+            if (displayCol.orderBy) {
+                continue;
+            }
             if (displayCol.groupBy) {
                 AbstractExpression displayExpr = displayCol.expression;
                 // Round up the usual suspects -- if there were uncooperative GROUP BY expressions,
