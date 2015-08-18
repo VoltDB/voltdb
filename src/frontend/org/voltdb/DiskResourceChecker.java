@@ -34,13 +34,13 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
 /**
- * TODO:
+ * Disk space monitoring related functionality of resource monitoring.
  */
 public class DiskResourceChecker
 {
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
-    static FileCheckForTest s_testFileCheck;
+    static FileCheckForTest s_testFileCheck; // used only for testing
     private final Map<FeatureNameType, FeatureDiskLimitConfig> m_configuredLimits = new HashMap<>();
 
     public DiskResourceChecker(SystemSettingsType systemSettings, PathsType pathsConfig)
@@ -58,6 +58,17 @@ public class DiskResourceChecker
         }
 
         return false;
+    }
+
+    public void logConfiguredLimits()
+    {
+        for (FeatureDiskLimitConfig config : m_configuredLimits.values())
+        {
+            if (config.m_diskSizeLimit > 0 || config.m_diskSizeLimitPerc > 0) {
+                m_logger.info(config.m_featureName.value() + " on " + config.m_path + " configured with size limit: " +
+                        (config.m_diskSizeLimit > 0 ? config.m_diskSizeLimit + "GB" : config.m_diskSizeLimitPerc + "%"));
+            }
+        }
     }
 
     public boolean isOverLimitConfiguration()
