@@ -52,10 +52,10 @@ bool ElasticScanner::continueScan() {
             if (!m_scanComplete) {
                 // Shift to the next block.
                 m_tuplePtr = m_blockIterator.key();
-                m_currentBlockPtr = m_blockIterator.data();
+                m_currentBlockPtr = m_blockIterator.value();
                 m_scannedBlocks.insert(m_currentBlockPtr);
                 assert(m_currentBlockPtr->address() == m_tuplePtr);
-                m_blockIterator.data() = TBPtr();
+                m_blockIterator.setValue(TBPtr());
                 m_tupleIndex = 0;
                 m_blockIterator++;
             }
@@ -93,13 +93,13 @@ bool ElasticScanner::next(TableTuple &out)
  */
 void ElasticScanner::notifyBlockWasCompactedAway(TBPtr block) {
     if (!m_scanComplete && m_blockIterator != m_blockEnd) {
-        TBPtr nextBlock = m_blockIterator.data();
+        TBPtr nextBlock = m_blockIterator.value();
         if (nextBlock == block) {
             // The next block was compacted away.
             m_blockIterator++;
             if (m_blockIterator != m_blockEnd) {
                 // There is a block to skip to.
-                TBPtr newNextBlock = m_blockIterator.data();
+                TBPtr newNextBlock = m_blockIterator.value();
                 m_blockMap.erase(block->address());
                 m_blockIterator = m_blockMap.find(newNextBlock->address());
                 m_blockEnd = m_blockMap.end();
