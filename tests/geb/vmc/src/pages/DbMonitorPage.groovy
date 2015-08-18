@@ -214,6 +214,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         replicationRate1 {$("#replicationRate1")}
         replicationRate5 {$("#replicationRate5")}
 
+        // Command Log Table
+
+        showHideCLPBlock {$("#showHideCLPBlock")}
+        clpSection {$("#clpSection")}
+
+
     }
 
     static at = {
@@ -458,12 +464,21 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
 
+
     def boolean isDrMasterSectionOpen() {
         return drMasterSection.displayed
     }
 
     def boolean isDrReplicaSectionOpen() {
         return drReplicaSection.displayed
+    }
+
+    def boolean isCmdLogSectionOpen() {
+        return showHideCLPBlock.displayed
+    }
+
+    def boolean isCLPAreaOpen() {
+        return clpSection.displayed
     }
 
 
@@ -482,6 +497,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return true
     }
 
+    def boolean openCLPArea(){
+        clickToDisplay(showHideCLPBlock, clpSection)
+        return true
+    }
+
     /**
      * Closes the "Data" area (containing Stored Procedures and Database Tables
      * info), by clicking on "Show/Hide Data" (if it's not closed already).
@@ -494,6 +514,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
     def boolean closeDrArea() {
         clickToNotDisplay(showHideDrBlock, drSection)
+        return true
+    }
+
+    def boolean closeCLPArea() {
+        clickToNotDisplay(showHideCLPBlock, clpSection)
         return true
     }
 

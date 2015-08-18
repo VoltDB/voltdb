@@ -116,7 +116,7 @@ class DbMonitorDrTest extends TestBase {
             }
             else {
 
-                when: 'click Partion ID'
+                when: 'click Partition ID'
                 waitFor(10){ page.clickPartitionID()}
                 then: 'check if row count is in descending'
                 if (waitFor(20){page.tableInDescendingOrderDT()})
@@ -485,5 +485,43 @@ class DbMonitorDrTest extends TestBase {
         }
         then:
         assert true
+    }
+
+    def "Verify Show and Hide in Command Log Performance  table" (){
+        when: "ensure CLP section is present or not"
+        println("test" +page.isCmdLogSectionOpen())
+        if( page.isCmdLogSectionOpen()==false)
+        {
+            println("CLP section is not present")
+            assert true
+        }
+            then:
+            println("proceed")
+        if( page.isCmdLogSectionOpen())
+        {
+            println("CLP section is present")
+            when: "ensure the CLP section is open"
+            waitFor(30) { page.openCLPArea() }
+            then: 'DR area is open (initially)'
+            page.isCLPAreaOpen()
+
+            when: 'click Show/Hide Graph (to close)'
+            page.closeCLPArea()
+
+            then: 'CLP area is closed'
+            !page.isCLPAreaOpen()
+
+            when: 'click Show/Hide Graph (to open)'
+            page.openCLPArea()
+
+            then: 'CLP area is open (again)'
+            page.isCLPAreaOpen()
+
+            when: 'click Show/Hide CLP (to close again)'
+            page.closeCLPArea()
+            then: 'CLP area is closed (again)'
+            !page.isCLPAreaOpen()
+        }
+
     }
 }
