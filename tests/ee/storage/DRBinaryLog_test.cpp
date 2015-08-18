@@ -26,6 +26,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "harness.h"
+#include "execution/VoltDBEngine.h"
 #include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
 #include "common/debuglog.h"
@@ -48,6 +49,7 @@ using namespace voltdb;
 
 const int COLUMN_COUNT = 6;
 const int HIDDEN_COLUMN_COUNT = 1;
+const std::string DR_CONFLICT_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
 
 static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
@@ -66,6 +68,7 @@ public:
         *reinterpret_cast<int64_t*>(replicatedTableHandle) = 24;
         *reinterpret_cast<int64_t*>(otherTableHandleWithIndex) = 43;
         *reinterpret_cast<int64_t*>(otherTableHandleWithoutIndex) = 44;
+        *reinterpret_cast<int64_t*>(exportTableHandle) = 55;
 
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
@@ -162,12 +165,31 @@ public:
                                                                                                           singleColumnName,
                                                                                                           tableHandle + 1, false, 0));
         m_singleColumnTable->setDR(true);
+
+        std::vector<ValueType> exportColumnType;
+        std::vector<int32_t> exportColumnLength;
+        std::vector<bool> exportColumnAllowNull(6, false);
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(std::strlen("OTHER_TABLE_2"));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+
+        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
+        string exportColumnNamesArray[6] = { "VOLTDB_AUTOGEN_TABLE_NAME", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
+                                            "VOLTDB_AUTOGEN_OPERATION_TYPE", "C_TINYINT", "C_BIGINT"};
+        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 6);
+
+        m_exportTable = voltdb::TableFactory::getPersistentTable(0, DR_CONFLICT_TABLE_PREFIX + "OTHER_TABLE_2", m_exportSchema, exportColumnName,
+                                                                 exportTableHandle, false, 0, true, true);
     }
 
     virtual ~DRBinaryLogTest() {
         for (vector<NValue>::const_iterator cit = m_cachedStringValues.begin(); cit != m_cachedStringValues.end(); ++cit) {
             (*cit).free();
         }
+        delete m_engine;
         delete m_table;
         delete m_replicatedTable;
         delete m_tableReplica;
@@ -177,6 +199,7 @@ public:
         delete m_otherTableWithoutIndex;
         delete m_otherTableWithIndexReplica;
         delete m_otherTableWithoutIndexReplica;
+        delete m_exportTable;
     }
 
     void beginTxn(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
@@ -376,6 +399,8 @@ public:
     }
 
 protected:
+    VoltDBEngine* m_engine;
+
     DRTupleStream m_drStream;
     DRTupleStream m_drReplicatedStream;
 
@@ -388,6 +413,7 @@ protected:
     TupleSchema* m_otherSchemaWithIndexReplica;
     TupleSchema* m_otherSchemaWithoutIndexReplica;
     TupleSchema* m_singleColumnSchema;
+    TupleSchema* m_exportSchema;
 
     PersistentTable* m_table;
     PersistentTable* m_replicatedTable;
@@ -399,6 +425,7 @@ protected:
     PersistentTable* m_otherTableWithoutIndexReplica;
     // This table does not exist on the replica
     PersistentTable* m_singleColumnTable;
+    Table* m_exportTable;
 
     UndoLog m_undoLog;
     int64_t m_undoToken;
@@ -411,6 +438,7 @@ protected:
     char replicatedTableHandle[20];
     char otherTableHandleWithIndex[20];
     char otherTableHandleWithoutIndex[20];
+    char exportTableHandle[20];
 
     vector<NValue> m_cachedStringValues;//To free at the end of the test
 };
@@ -489,6 +517,28 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     EXPECT_EQ(3, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
     EXPECT_EQ(-1, m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueId().first);
 }
+
+// TODO: when we implement conflict detection, the testcase should rewrite to manually create a conflict
+TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
+    ASSERT_FALSE(flush(98));
+
+    // single row write transaction
+    TableTuple tempTuple = m_otherTableWithoutIndex->tempTuple();
+    tempTuple.setNValue(0, ValueFactory::getTinyIntValue(42));
+    tempTuple.setNValue(1, ValueFactory::getBigIntValue(555555555));
+
+    // single row write transaction
+    TableTuple otherTempTuple = m_otherTableWithoutIndex->tempTuple();
+    otherTempTuple.setNValue(0, ValueFactory::getTinyIntValue(123));
+    otherTempTuple.setNValue(1, ValueFactory::getBigIntValue(9999999999));
+
+    m_sink.exportDRConflict(m_otherTableWithoutIndex, m_exportTable, DR_RECORD_INSERT, tempTuple);
+    m_sink.exportDRConflict(m_otherTableWithoutIndex, m_exportTable, DR_RECORD_INSERT, otherTempTuple);
+
+    // Really have no idea what to test for now.
+    EXPECT_EQ(2, m_exportTable->activeTupleCount());
+}
+
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     m_singleColumnTable->setDR(false);
