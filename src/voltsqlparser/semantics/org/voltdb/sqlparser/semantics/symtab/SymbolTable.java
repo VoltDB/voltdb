@@ -69,7 +69,7 @@ public class SymbolTable implements ISymbolTable {
         }
         return m_booleanType;
     }
-    ISymbolTable m_parent;
+    ISymbolTable m_parent = null;
     public class TablePair {
         Table m_table;
         String m_alias;
@@ -95,12 +95,13 @@ public class SymbolTable implements ISymbolTable {
      * @see org.voltdb.sqlparser.symtab.ISymbolTable#define(org.voltdb.sqlparser.symtab.Top)
      */
     @Override
-    public void define(ITop aEntity) {
-        if (aEntity.getName() != null) {
-            m_lookup.put(aEntity.getName(), (Top) aEntity);
+    public void define(ITop aDefiniens) {
+        String definiendum = aDefiniens.getName();
+        if (definiendum != null) {
+            m_lookup.put(definiendum, (Top) aDefiniens);
         }
-        if (aEntity instanceof Table) {
-            m_tables.add(new TablePair((Table)aEntity, aEntity.getName()));
+        if (aDefiniens instanceof Table) {
+            m_tables.add(new TablePair((Table)aDefiniens, definiendum));
         }
     }
 
@@ -142,9 +143,8 @@ public class SymbolTable implements ISymbolTable {
     @Override
     public final Top get(String aName) {
         Top ret = m_lookup.get(aName);
-        if (ret == null) {
-                if (m_parent != null)
-                        ret = (Top) m_parent.get(aName);
+        if (ret == null && m_parent != null) {
+            ret = (Top) m_parent.get(aName);
         }
         return ret;
     }

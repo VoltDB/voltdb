@@ -21,7 +21,7 @@ public interface IExpressionParser {
      */
     void pushSemantino(ISemantino aSemantino);
 
-    ISemantino getColumnSemantino(String aColumnName, String aTableName, ISymbolTable aTables);
+    ISemantino getColumnSemantino(String aColumnName, String aTableName);
 
     ISemantino getConstantSemantino(Object value, IType type);
 

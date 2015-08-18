@@ -36,7 +36,6 @@
 package org.voltdb.sqlparser.semantics.symtab;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
@@ -44,12 +43,11 @@ import org.voltdb.sqlparser.semantics.grammar.SelectQuery;
 import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
-import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
-import org.voltdb.sqlparser.syntax.grammar.Projection;
-import org.voltdb.sqlparser.syntax.symtab.IAST;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
+import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
@@ -150,8 +148,8 @@ public abstract class ParserFactory implements IParserFactory {
     public Semantino[] tuac(ISemantino ileft, ISemantino iright) {
         Semantino left = (Semantino)ileft;
         Semantino right = (Semantino)iright;
-        Type leftType = left.getType();
-        Type rightType = right.getType();
+        Type leftType = (Type) left.getType();
+        Type rightType = (Type) right.getType();
         if (leftType.isEqualType(rightType)) {
                 return new Semantino[]{left,right};
         } else {
@@ -194,6 +192,11 @@ public abstract class ParserFactory implements IParserFactory {
                                       int    aColLineNo,
                                       int    aColColNo) {
         return new ColumnIdent(aColName, aColLineNo, aColColNo);
+    }
+
+    @Override
+    public IExpressionParser makeExpressionParser(ISymbolTable aSymbolTable) {
+        return new ExpressionParser(this, aSymbolTable);
     }
 
 }

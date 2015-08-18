@@ -33,42 +33,55 @@
  package org.voltdb.sqlparser.syntax.grammar;
 
 public class Projection {
-
         String m_tabName;
         String m_columnName;
         String m_alias;
         int    m_lineNo;
         int    m_colNo;
+        boolean m_star;
 
-    public Projection(String aTableName,
+        public Projection(int aLineNumber, int aColumnNumber) {
+            m_star   = true;
+            m_lineNo = aLineNumber;
+            m_colNo  = aColumnNumber;
+            m_alias  = m_tabName = m_columnName = null;
+        }
+
+        public Projection(String aTableName,
                       String aColumnName,
                       String aAlias,
                       int    aLineNo,
                       int    aColNo) {
-        m_tabName = aTableName;
+        m_tabName    = aTableName;
         m_columnName = aColumnName;
-        m_alias = aAlias;
-        m_lineNo = aLineNo;
-        m_colNo = aColNo;
+        m_alias      = aAlias;
+        m_lineNo     = aLineNo;
+        m_star       = false;
+        m_colNo      = aColNo;
     }
 
-    public String getTableName() {
+    public final String getTableName() {
         return m_tabName;
     }
 
-    public String getColumnName() {
+    public final String getColumnName() {
         return m_columnName;
     }
 
-    public String getAlias() {
+    public final String getAlias() {
         return m_alias;
     }
 
-    public int getLineNo() {
+    public final int getLineNo() {
         return m_lineNo;
     }
 
-    public int getColNo() {
+    public final int getColNo() {
         return m_colNo;
     }
+
+    public final boolean isStar() {
+        return m_star;
+    }
+
 }

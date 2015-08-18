@@ -19,11 +19,11 @@ package org.voltdb.sqlparser.semantics.grammar;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.crypto.AEADBadTagException;
-
+import org.voltdb.sqlparser.semantics.symtab.Column;
 import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
 import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
+import org.voltdb.sqlparser.semantics.symtab.SymbolTable.TablePair;
 import org.voltdb.sqlparser.semantics.symtab.Table;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
@@ -61,6 +61,18 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
         return m_projections;
     }
 
+    /**
+     * This is called when a '*' is in the select list.
+     *
+     * @param aLineNo
+     * @param aColNo
+     */
+    @Override
+    public void addProjection(int     aLineNumber,
+                              int     aColumnNumber) {
+        m_projections.add(new Projection(aLineNumber, aColumnNumber));
+    }
+
     @Override
     public void addProjection(String aTableName,
                               String aColumnName,
@@ -73,9 +85,9 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
     @Override
     public void addTable(ITable aTable, String aAlias) {
         if (aAlias != null)
-                m_tables.addTable((Table)aTable, aAlias);
+            m_tables.addTable((Table)aTable, aAlias);
         else
-                m_tables.addTable((Table)aTable, aTable.getName());
+            m_tables.addTable((Table)aTable, aTable.getName());
     }
 
     public ITable getTableByName(String aName) {
@@ -115,7 +127,7 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
 
     @Override
     public ISemantino getColumnSemantino(String aColumnName, String aTableName) {
-        return m_expressionParser.getColumnSemantino(aColumnName, aTableName, m_tables);
+        return m_expressionParser.getColumnSemantino(aColumnName, aTableName);
     }
 
     @Override
@@ -186,7 +198,8 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
 
     @Override
     public final void setExpressionParser(IExpressionParser aExpressionParser) {
-        assert(aExpressionParser instanceof ExpressionParser);
+        assert(aExpressionParser == null || aExpressionParser instanceof ExpressionParser);
         m_expressionParser = (ExpressionParser)aExpressionParser;
     }
+
 }

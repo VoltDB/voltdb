@@ -45,6 +45,7 @@ package org.voltdb.sqlparser.semantics;
 
 import static java.lang.String.format;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -117,11 +118,16 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
         isNotNull();
 
         String value = actual.attributes.get(attributeName);
+        String idValue = actual.attributes.get("id");
+        if (idValue == null) {
+        	idValue = "<undefined>";
+        }
         if (value == null) {
-            throw new AssertionError(format("\nExpected attribute named <%s>, but it was undefined.", attributeName));
+            throw new AssertionError(format("\nIn node with id=\"%s\", expected attribute named \"%s\", but it was undefined.", idValue, attributeName));
         }
         // we overrides the default error message with a more explicit one
-        String errorMessage = format("\nExpected attribute named \"%s\" to be:\n  \"%s\"\n but was:\n  \"%s\"",
+        String errorMessage = format("\nIn node with id=<%s>, expected attribute named \"%s\" to be:\n  \"%s\"\n but was:\n  \"%s\"",
+        		 				     idValue,
                                      attributeName,
                                      attributeValue,
                                      value);
@@ -144,51 +150,68 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
         return this;
     }
 
+    /**
+     * Assert that a parent element has a child with the given element name, a
+     * given set of attribute values and a given set of conditions.  The
+     * parameters are the child's element name, followed by a sequence
+     * of pairs of attributes and values, followed by a sequence of
+     * Condition<VoltXMLElement> conditions.
+     * 
+     * @param childName
+     * @param aMatchConds
+     * @return
+     */
     @SafeVarargs
     public static Condition<VoltXMLElement> withChildNamed(final String childName,
-                                                           final Condition<VoltXMLElement> ... conditions) {
+                                                           final Object ... aMatchConds) {
         return new Condition<VoltXMLElement>() {
 
-            @Override
+            @SuppressWarnings("unchecked")
+			@Override
             public boolean matches(VoltXMLElement aParent) {
+            	String parentId = aParent.attributes.get("id");
+            	List<String> attributes                    = new ArrayList<String>();
+            	List<String> values                        = new ArrayList<String>();
+            	ArrayList<Condition<VoltXMLElement>> conditions = new ArrayList<Condition<VoltXMLElement>>();
+            	// Sort out the attributes, values and conditions.
+            	for (int idx = 0; idx < aMatchConds.length; idx += 1) {
+            		Object obj = aMatchConds[idx++];
+            		if (obj instanceof String) {
+            			attributes.add((String)obj);
+            			if (idx < aMatchConds.length  && aMatchConds[idx] instanceof String) {
+            				values.add((String)aMatchConds[idx]);
+            			}
+            		} else if (obj instanceof Condition<?>) {
+            			conditions.add((Condition<VoltXMLElement>)obj);
+            		} else {
+            			Fail.fail(String.format("In node with id \"%s\", bad Match condition\n",
+            					                (parentId == null) ? "<none>" : parentId));
+            		}
+            	}
+            	
                 List<VoltXMLElement> children = aParent.findChildren(childName);
                 if (children == null) {
                     Fail.fail(String.format("Can't find child named: <%s>", childName));
                 }
+                VoltXMLElement matchingChild = null;
+                boolean attrsMatch = true;
                 for (VoltXMLElement child : children) {
-                    assertThat(child).hasAllOf(conditions);
+                	for (int idx = 0; idx < attributes.size(); idx += 1) {
+                		String attrName     = attributes.get(idx);
+                		String expValue     = values.get(idx);
+                		String elementValue = child.attributes.get(attrName);
+                		if (elementValue == null || expValue.equals(elementValue) == false) {
+                			attrsMatch = false;
+                			break;
+                		}
+                	}
+                	if (attrsMatch == true) {
+                		matchingChild = child;
+                		break;
+                	}
                 }
+                assertThat(matchingChild).hasAllOf((Condition<VoltXMLElement>[]) conditions.toArray(new Condition<?>[conditions.size()]));
                 return true;
-            }
-
-        };
-    }
-
-    @SafeVarargs
-    public static Condition<VoltXMLElement> withChildByAttribute(final String childName, final String key, final String value,
-                                                           final Condition<VoltXMLElement> ... conditions) {
-        return new Condition<VoltXMLElement>() {
-
-            @Override
-            public boolean matches(VoltXMLElement aParent) {
-                List<VoltXMLElement> children = aParent.findChildren(childName);
-                if (children == null) {
-                    Fail.fail(String.format("Can't find child named: <%s>", childName));
-                }
-                boolean success = false;
-                for (VoltXMLElement child : children) {
-                    String val = child.attributes.get(key);
-                    if (val != null && val.equals(value)) {
-                        assertThat(child).hasAllOf(conditions);
-                        success = true;
-                        break;
-                    }
-                }
-                if (success == false) {
-                    Fail.fail(String.format("Failed to find a child with name \"%s\" and attribute \"%s\" with value \"%s\"",
-                                            childName, key, value));
-                }
-                return success;
             }
 
         };

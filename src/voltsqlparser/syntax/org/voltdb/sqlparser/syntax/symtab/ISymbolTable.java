@@ -16,12 +16,10 @@
  */
  package org.voltdb.sqlparser.syntax.symtab;
 
-import org.voltdb.sqlparser.semantics.symtab.Table;
-
 public interface ISymbolTable {
 
     /**
-     * Define an entity in the Symbol Table.
+     * Define an entity in the Symbol Table with its intrinsic name.
      * @param aEntity
      */
     public void define(ITop aEntity);

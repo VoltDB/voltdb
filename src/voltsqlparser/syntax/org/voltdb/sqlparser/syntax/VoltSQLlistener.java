@@ -248,20 +248,25 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
      * {@inheritDoc}
      */
     @Override public void exitProjection(SQLParserParser.ProjectionContext ctx) {
-        String tableName = null;
-        String columnName = ctx.projection_ref().column_name().IDENTIFIER().getText();
-        String alias = null;
-        if (ctx.projection_ref().table_name() != null) {
-            tableName = ctx.projection_ref().table_name().IDENTIFIER().getText();
+        if (ctx.STAR() != null) {
+            m_selectQuery.addProjection(ctx.STAR().getSymbol().getLine(),
+                                        ctx.STAR().getSymbol().getCharPositionInLine());
+        } else {
+            String tableName = null;
+            String columnName = ctx.projection_ref().column_name().IDENTIFIER().getText();
+            String alias = null;
+            if (ctx.projection_ref().table_name() != null) {
+                tableName = ctx.projection_ref().table_name().IDENTIFIER().getText();
+            }
+            if (ctx.column_name() != null) {
+                alias = ctx.column_name().IDENTIFIER().getText();
+            }
+            m_selectQuery.addProjection(tableName,
+                                        columnName,
+                                        alias,
+                                        ctx.start.getLine(),
+                                        ctx.start.getCharPositionInLine());
         }
-        if (ctx.column_name() != null) {
-            alias = ctx.column_name().IDENTIFIER().getText();
-        }
-        m_selectQuery.addProjection(tableName,
-                                    columnName,
-                                    alias,
-                                    ctx.start.getLine(),
-                                    ctx.start.getCharPositionInLine());
     }
     /**
      * {@inheritDoc}
@@ -270,7 +275,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
     @Override public void exitTable_clause(SQLParserParser.Table_clauseContext ctx) {
         for (SQLParserParser.Table_refContext tr : ctx.table_ref()) {
             String tableName = tr.table_name().get(0).IDENTIFIER().getText();
-            String alias = null;
+            String alias = tableName;
             if (tr.table_name().size() > 1) {
                 alias = tr.table_name().get(1).IDENTIFIER().getText();
             }
@@ -292,7 +297,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
      * <p>The default implementation does nothing.</p>
      */
     @Override public void enterWhere_clause(SQLParserParser.Where_clauseContext ctx) {
-        IExpressionParser expr = m_factory.makeExpressionParser();
+        IExpressionParser expr = m_factory.makeExpressionParser(m_selectQuery.getTables());
         m_expressionStack.add(expr);
         m_selectQuery.setExpressionParser(expr);
     }
@@ -421,7 +426,7 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
         SQLParserParser.Column_refContext crctx = ctx.column_ref();
         String tableName = (crctx.table_name() != null) ? crctx.table_name().IDENTIFIER().getText() : null;
         String columnName = crctx.column_name().IDENTIFIER().getText();
-        ISemantino crefSemantino = getTopExpressionParser().getColumnSemantino(columnName, tableName, m_symbolTable);
+        ISemantino crefSemantino = getTopExpressionParser().getColumnSemantino(columnName, tableName);
         getTopExpressionParser().pushSemantino(crefSemantino);
     }
     /**

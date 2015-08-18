@@ -7,6 +7,7 @@ import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
 import org.voltdb.sqlparser.semantics.symtab.Type;
+import org.voltdb.sqlparser.semantics.symtab.SymbolTable.TablePair;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
@@ -38,12 +39,13 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
     }
 
     @Override
-    public IAST makeUnaryAST(IType aIntType, int aValueOf) {
-        Type intType = (Type)aIntType;
+    public IAST makeUnaryAST(IType aType, Object aValueOf) {
+        assert(aType instanceof Type);
+        Type vtype = (Type)aType;
         VoltXMLElement answer = new VoltXMLElement("value");
         answer.withValue("id", newId());
-        answer.withValue("value", Integer.toString(aValueOf));
-        answer.withValue("valuetype", intType.getName().toUpperCase());
+        answer.withValue("value", aValueOf.toString());
+        answer.withValue("valuetype", vtype.getName().toUpperCase());
         return answer;
     }
 
@@ -130,30 +132,51 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
         SymbolTable symtab = (SymbolTable)aTables;
         VoltXMLElement answer = new VoltXMLElement("columns");
         for (Projection proj : aProjections) {
-            VoltXMLElement colref = new VoltXMLElement("columnref");
-            answer.children.add(colref);
-            String colName = proj.getColumnName();
-            String tableName = proj.getTableName();
-            if (tableName == null) {
-                tableName = symtab.getTableNameByColumn(colName);
+            if (proj.isStar()) {
+                addAllColumns(answer, aTables);
+            } else {
+                String colName = proj.getColumnName();
+                String tableAlias = proj.getTableName();
+                String tableName = symtab.getTableNameByColumn(colName);
+                if (tableName == null) {
+                    getErrorMessages().addError(proj.getLineNo(),
+                                                proj.getColNo(),
+                                                "Cannot find column named \"%s\"",
+                                                colName);
+                    tableName = "<<NOT_FOUND>>";
+                }
+                String alias = proj.getAlias();
+                if (alias == null) {
+                    alias = colName;
+                }
+                addOneColumn(answer, tableName, tableAlias, colName, alias);
             }
-            if (tableName == null) {
-                getErrorMessages().addError(proj.getLineNo(),
-                                            proj.getColNo(),
-                                            "Cannot find column named \"%s\"",
-                                            colName);
-                tableName = "<<NOT_FOUND>>";
-            }
-            String alias = proj.getAlias();
-            if (alias == null) {
-                alias = colName;
-            }
-            colref.withValue("id", newId())
-                  .withValue("table", tableName.toUpperCase())
-                  .withValue("column", colName.toUpperCase())
-                  .withValue("alias", alias.toUpperCase());
         }
         return answer;
+    }
+
+    private void addOneColumn(VoltXMLElement aAnswer, String aTableName, String aTableAlias, String aColumnName, String aColumnAlias) {
+        VoltXMLElement colref = new VoltXMLElement("columnref");
+        aAnswer.children.add(colref);
+        colref.withValue("id", newId())
+              .withValue("table", aTableName.toUpperCase())
+              .withValue("column", aColumnName.toUpperCase())
+              .withValue("alias", aColumnAlias.toUpperCase());
+        if (aTableAlias != null) {
+            colref.withValue("tablealias", aTableAlias.toUpperCase());
+        }
+    }
+
+    public void addAllColumns(VoltXMLElement aParent, ISymbolTable aTables) {
+        assert(aTables instanceof SymbolTable);
+        SymbolTable tables = (SymbolTable)aTables;
+        for (TablePair tblpair : tables.getTables()) {
+            String tableName = tblpair.getTable().getName();
+            String tableAlias = tblpair.getAlias();
+            for (String colName : tblpair.getTable().getColumnNames()) {
+                addOneColumn(aParent, tableName, tableAlias, colName, colName);
+            }
+        }
     }
 
     @Override
@@ -165,7 +188,7 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
               .withValue("column", aColumnName.toUpperCase())
               .withValue("id", newId())
               .withValue("table", aRealTableName.toUpperCase())
-              .withValue("tableAlias", aTableAlias.toUpperCase());
+              .withValue("tablealias", aTableAlias.toUpperCase());
         return answer;
     }
 
@@ -190,10 +213,5 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
         VoltXMLElement params = new VoltXMLElement("parameters");
         top.children.add(params);
         return top;
-    }
-
-    @Override
-    public IExpressionParser makeExpressionParser() {
-        return new ExpressionParser(this);
     }
 }

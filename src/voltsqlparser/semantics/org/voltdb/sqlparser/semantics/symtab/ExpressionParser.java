@@ -13,9 +13,11 @@ import org.voltdb.sqlparser.syntax.symtab.IType;
 public class ExpressionParser implements IExpressionParser {
     private final Stack<Semantino> m_semantinoStack = new Stack<Semantino>();
     private final IParserFactory m_factory;
+    private final ISymbolTable   m_symbolTable;
 
-    public ExpressionParser(IParserFactory aFactory) {
+    public ExpressionParser(IParserFactory aFactory, ISymbolTable aSymbolTable) {
         m_factory = aFactory;
+        m_symbolTable = aSymbolTable;
     }
     @Override
     public void pushSemantino(ISemantino aSemantino) {
@@ -48,17 +50,16 @@ public class ExpressionParser implements IExpressionParser {
 
     @Override
     public ISemantino getColumnSemantino(String aColumnName,
-                                         String aTableName,
-                                         ISymbolTable aTables) {
+                                         String aTableName) {
         String realTableName;
         String tableAlias;
         ITable itbl;
         if (aTableName != null) {
             tableAlias = aTableName;
         } else {
-            tableAlias = aTables.getTableAliasByColumn(aColumnName);
+            tableAlias = m_symbolTable.getTableAliasByColumn(aColumnName);
         }
-        itbl = aTables.getTable(tableAlias);
+        itbl = m_symbolTable.getTable(tableAlias);
         if (itbl == null) {
             return null;
         }
@@ -72,9 +73,8 @@ public class ExpressionParser implements IExpressionParser {
     }
 
     @Override
-    public ISemantino getConstantSemantino(Object value, IType type) {
-        assert(false);
-        return null;
+    public ISemantino getConstantSemantino(Object aValue, IType aType) {
+        return new Semantino(aType, m_factory.makeUnaryAST(aType, aValue));
     }
 
     @Override
