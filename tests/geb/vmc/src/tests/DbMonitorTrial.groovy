@@ -77,7 +77,7 @@ class DbMonitorTrial extends TestBase {
         if(page.drTableModeTypeText.text().equals("Master")) {
             println("The Current Mode is MASTER")
             
-            String totalPageString = page.drTableTotalPages.text()
+            String totalPageString = page.drTableTotalPagesMaster.text()
             println("Total page string " + totalPageString)
             int totalPage = Integer.parseInt(totalPage)
             int expectedCurrentPage = 1
@@ -87,12 +87,12 @@ class DbMonitorTrial extends TestBase {
                 println("There are multiple pages")
                 
                 while(expectedCurrentPage <= totalPage) {
-                    actualCurrentPage = Integer.parseInt(page.drTableCurrentPage.text())
+                    actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
                     actualCurrentPage == expectedCurrentPage
                     expectedCurrentPage++
+                    if(expectedCurrentPage < totalPage)
+                        page.drTableNextMasterEnabled.click()
                 }
-                                
-                page.drTableNext.click()
             }
             else {
                 println("There is no multiple pages")
@@ -101,7 +101,7 @@ class DbMonitorTrial extends TestBase {
 		else if(page.drTableModeTypeText.text().equals("Replica")) {
 		    println("The Current Mode is REPLICA")
 		    
-		    int totalPage = Integer.parseInt(page.drTableTotalPages.text())
+		    int totalPage = Integer.parseInt(page.drTableTotalPagesReplica.text())
             int expectedCurrentPage = 1
             int actualCurrentPage = 1
             
@@ -109,12 +109,13 @@ class DbMonitorTrial extends TestBase {
                 println("There are multiple pages")
                 
                 while(expectedCurrentPage <= totalPage) {
-                    actualCurrentPage = Integer.parseInt(page.drTableCurrentPage.text())
+                    actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
                     actualCurrentPage == expectedCurrentPage
                     expectedCurrentPage++
+                    
+                    if(expectedCurrentPage < totalPage)
+                        page.drTableNextReplicaEnabled.click()
                 }
-                                
-                page.drTableNext.click()
             }
             else {
                 println("There is no multiple pages")
@@ -135,8 +136,6 @@ class DbMonitorTrial extends TestBase {
                     actualCurrentPage == expectedCurrentPage
                     expectedCurrentPage++
                 }
-                                
-                page.drTableNext.click()
             }
             else {
                 println("There is no multiple pages")
