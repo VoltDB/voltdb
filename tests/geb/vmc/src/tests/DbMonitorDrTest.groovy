@@ -115,8 +115,8 @@ class DbMonitorDrTest extends TestBase {
 
             }
             else {
-
                 when: 'click Partition ID'
+
                 waitFor(10){ page.clickPartitionID()}
                 then: 'check if row count is in descending'
                 if (waitFor(20){page.tableInDescendingOrderDT()})
@@ -486,6 +486,7 @@ class DbMonitorDrTest extends TestBase {
         then:
         assert true
     }
+
 
     def "Verify Show and Hide in Command Log Performance  table" (){
         when: "ensure CLP section is present or not"

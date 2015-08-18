@@ -2808,10 +2808,12 @@ then:
         waitFor(waitTime){
             page.overview.snapshotPriority.text().equals("Snapshot Priority")
             !page.overview.snapshotPriorityValue.text().equals("")
+
         }
         waitFor(waitTime){
             page.overview.memoryLimitSize.text().equals("Memory Limit")
             !page.overview.memoryLimitSizeValue.text().equals("")
+
             if(page.overview.memoryLimitSizeValue.text() == "Not Enforced"){
                 page.overview.memoryLimitSizeUnit.text().equals("")
             } else {

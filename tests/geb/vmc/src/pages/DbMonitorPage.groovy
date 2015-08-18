@@ -473,6 +473,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return drReplicaSection.displayed
     }
 
+
     def boolean isCmdLogSectionOpen() {
         return showHideCLPBlock.displayed
     }
@@ -516,6 +517,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clickToNotDisplay(showHideDrBlock, drSection)
         return true
     }
+
 
     def boolean closeCLPArea() {
         clickToNotDisplay(showHideCLPBlock, clpSection)
