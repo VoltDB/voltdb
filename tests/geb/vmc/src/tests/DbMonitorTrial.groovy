@@ -65,7 +65,7 @@ class DbMonitorTrial extends TestBase {
         while(count<numberOfTrials) {
             count ++
             try {
-                waitFor(waitTime) { page.drTableModeTypeText.isDisplayed() }
+                waitFor(waitTime) { page.drTableBlock.isDisplayed() }
                 println("Success")
                 break
             } catch(geb.waiting.WaitTimeoutException e) {

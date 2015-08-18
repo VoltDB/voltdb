@@ -229,6 +229,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         
         // UAT 
         drTableModeTypeText         { $("#dbDrMode") }
+        drTableBlock                { $("#showHideDrBlock") }
         drTableCurrentPage          { $("#tblDrReplica_paginate > div > span.pageIndex") }
         drTableTotalPages           { $("#tblDrReplica_paginate > div > span.totalPages") }
         drTableNext                 { $("#tblDrReplica_paginate > span.paginate_disabled_next.paginate_button") }
