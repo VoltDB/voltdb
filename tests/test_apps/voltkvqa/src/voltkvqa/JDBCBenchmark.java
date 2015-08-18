@@ -130,7 +130,7 @@ public class JDBCBenchmark
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
-        @Option(desc = "Use External Connection Pool, c3p0 or tomcat")
+        @Option(desc = "Use External Connection Pool, c3p0, tomcat, bonecp or hikari")
         String externalConnectionPool = "";
 
         @Override
