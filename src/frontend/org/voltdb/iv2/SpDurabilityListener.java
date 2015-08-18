@@ -43,6 +43,9 @@ public class SpDurabilityListener implements DurabilityListener {
 
         @Override
         public void processChecks() {}
+
+        @Override
+        public void checkForSyncLoggedSysProcs() {}
     };
 
     class AsyncCompletionChecks implements CommandLog.CompletionChecks {
@@ -81,6 +84,9 @@ public class SpDurabilityListener implements DurabilityListener {
                 listener.lastUniqueIdsMadeDurable(m_lastSpUniqueId, m_lastMpUniqueId);
             }
         }
+
+        @Override
+        public void checkForSyncLoggedSysProcs() {}
     };
 
     class SyncCompletionChecks extends AsyncCompletionChecks {
@@ -107,8 +113,7 @@ public class SpDurabilityListener implements DurabilityListener {
             return m_pendingTransactions.size();
         }
 
-        @Override
-        public void processChecks() {
+        private void queuePendingTasks() {
             // Notify all sync transactions and the SP UniqueId listeners
             for (TransactionTask o : m_pendingTransactions) {
                 m_pendingTasks.offer(o);
@@ -117,9 +122,20 @@ public class SpDurabilityListener implements DurabilityListener {
                     m_spScheduler.offerPendingMPTasks(o.getTxnId());
                 }
             }
+        }
+
+        @Override
+        public void processChecks() {
+            queuePendingTasks();
             super.processChecks();
         }
+
+        @Override
+        public void checkForSyncLoggedSysProcs() {
+            queuePendingTasks();
+        }
     }
+
 
     private CommandLog.CompletionChecks m_currentCompletionChecks = null;
 
@@ -187,5 +203,10 @@ public class SpDurabilityListener implements DurabilityListener {
     @Override
     public void processDurabilityChecks(CommandLog.CompletionChecks completionChecks) {
         m_spScheduler.processDurabilityChecks(completionChecks);
+    }
+
+    @Override
+    public void checkForSyncLoggedSysProcs(CommandLog.CompletionChecks completionChecks) {
+        m_spScheduler.checkForSyncLoggedSysProcs(completionChecks);
     }
 }
