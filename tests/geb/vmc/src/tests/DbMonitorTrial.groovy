@@ -72,6 +72,8 @@ class DbMonitorTrial extends TestBase {
             }
         }
         
+        println("The mode is " + page.drTableModeTypeText.text())
+        
         if(page.drTableModeTypeText.text().equals("Master")) {
             println("The Current Mode is MASTER")
             
