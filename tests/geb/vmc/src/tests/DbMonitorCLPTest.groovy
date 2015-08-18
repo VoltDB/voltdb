@@ -107,19 +107,21 @@ class DbMonitorCLPTest extends TestBase {
         else {
             when: 'click cmd Server'
             waitFor(10){ page.clickCmdServer()}
+            then: 'check if row count is in descending'
+            if (waitFor(20){page.tableInDescendingOrderDT()})
+                after = "descending"
+            else
+                after = "ascending"
+
+            when: 'click cmd Server'
+            waitFor(10){ page.clickCmdServer()}
             then: 'check if row count is in ascending'
             if (page.tableInAscendingOrderDT())
                 before = "ascending"
             else
                 before = "descending"
 
-            when: 'click cmd Server'
-            waitFor(10){ page.clickCmdServer()}
-            then: 'check if row count is in descending'
-            if (waitFor(20){page.tableInDescendingOrderDT()})
-                after = "descending"
-            else
-                after = "ascending"
+
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
             else
