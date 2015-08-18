@@ -77,7 +77,9 @@ class DbMonitorTrial extends TestBase {
         if(page.drTableModeTypeText.text().equals("Master")) {
             println("The Current Mode is MASTER")
             
-            int totalPage = Integer.parseInt(page.drTableTotalPages.text())
+            String totalPageString = page.drTableTotalPages.text()
+            println("Total page string " + totalPageString)
+            int totalPage = Integer.parseInt(totalPage)
             int expectedCurrentPage = 1
             int actualCurrentPage = 1
             
