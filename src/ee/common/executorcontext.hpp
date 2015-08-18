@@ -22,11 +22,14 @@
 #include "common/UndoQuantum.h"
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
+#include "common/ValuePeeker.hpp"
 
 #include <vector>
 #include <map>
 
 namespace voltdb {
+
+const int64_t HIDDEN_VALUE_TIMESTAMP_MASK = (1LL << 49) - 1LL;
 
 class AbstractExecutor;
 class DRTupleStream;
@@ -87,7 +90,7 @@ class ExecutorContext {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
         m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
         m_uniqueId = uniqueId;
-        m_currentDRTimestamp = (static_cast<int64_t>(m_drClusterId) << 49) | (m_uniqueId >> 14);
+        m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
     }
 
     // data available via tick()
@@ -116,6 +119,20 @@ class ExecutorContext {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
         assert(m_subqueryContextMap.empty());
+    }
+
+    static int64_t createDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
+        return (clusterId << 49) | (uniqueId >> 14);
+    }
+
+    static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        return hiddenValue & HIDDEN_VALUE_TIMESTAMP_MASK;
+    }
+
+    static int8_t getClusterIdFromHiddenNValue(NValue &value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        return static_cast<int8_t>(hiddenValue >> 49);
     }
 
     UndoQuantum *getCurrentUndoQuantum() {

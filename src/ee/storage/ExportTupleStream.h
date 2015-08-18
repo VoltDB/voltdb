@@ -64,7 +64,7 @@ public:
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
     /** write a tuple to the stream */
-    size_t appendTuple(int64_t lastCommittedSpHandle,
+    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        int64_t spHandle,
                        int64_t seqNo,
                        int64_t uniqueId,
