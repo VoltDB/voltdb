@@ -472,6 +472,12 @@ Table* VoltDBEngine::getTable(std::string name) const
     return findInMapOrNull(name, m_tablesByName);
 }
 
+Table* VoltDBEngine::getDRConflictTable(PersistentTable* drTable) const
+{
+    // Caller responsible for checking null return value.
+    return findInMapOrNull(drTable, m_cachedDRConflictLookupTable);
+}
+
 TableCatalogDelegate* VoltDBEngine::getTableDelegate(std::string name) const
 {
     // Caller responsible for checking null return value.
@@ -1241,6 +1247,7 @@ void VoltDBEngine::rebuildTableCollections()
     m_tables.clear();
     m_tablesByName.clear();
     m_tablesBySignatureHash.clear();
+    m_cachedDRConflictLookupTable.clear();
 
     // need to re-map all the table ids / indexes
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
@@ -1270,6 +1277,10 @@ void VoltDBEngine::rebuildTableCollections()
             }
         }
     }
+}
+
+void VoltDBEngine::addToDRConflictTableMap(PersistentTable* drTable, Table* exportTable) {
+    m_cachedDRConflictLookupTable[drTable] = exportTable;
 }
 
 void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
