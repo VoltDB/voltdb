@@ -474,11 +474,36 @@ class ColumnGenerator(BaseGenerator):
             self.__supertype = ""
 
     def configure_from_schema(self, schema, prior_generators):
-        """ Get matcing column values fom schema
+        """ Get matching column values from schema
         """
         self.values = schema.get_typed_columns(self.__supertype)
         self.prior_generator = prior_generators.get("variable")
         prior_generators["variable"] = self # new variable generator at the head of the chain
+        return prior_generators
+
+
+class TextGenerator(BaseGenerator):
+    """This replaces occurrences of token _text with a piece of text, such as a function name.
+       Within a statement, intended occurrences of the same text must use the same '#label'.
+       Attributes only matter on the first occurrence of "_text" for a given label.
+       As a convenience, forward references can use the __[#label] syntax instead of _text[#label]
+       to defer locking in attribute settings until a later _text occurrence.
+    """
+
+    def __init__(self):
+        BaseGenerator.__init__(self, "_text")
+
+    def prepare_params(self, attribute_groups):
+        self.__supertype = attribute_groups[BaseGenerator.TYPE_PATTERN_GROUP]
+        if not self.__supertype:
+            self.__supertype = ""
+
+    def configure_from_schema(self, schema, prior_generators):
+        """ Get matching text values; does not actually use the schema.
+        """
+        self.values.append(self.__supertype)
+        self.prior_generator = prior_generators.get("text")
+        prior_generators["text"] = self # new text generator at the head of the chain
         return prior_generators
 
 
@@ -825,7 +850,7 @@ class SQLGenerator:
         self.__max_statements_per_pattern = 0
         self.__num_insert_statements      = 0
 
-    GENERATOR_TYPES = (TableGenerator, ColumnGenerator, ConstantGenerator, IdGenerator)
+    GENERATOR_TYPES = (TableGenerator, ColumnGenerator, TextGenerator, ConstantGenerator, IdGenerator)
 
     UNRESOLVED_PUNCTUATION = re.compile(r'[][#@]') # Literally, ']', '[', '#', or '@'.
     UNRESOLVED_GENERATOR = re.compile(r'(^|\W)[_]')
