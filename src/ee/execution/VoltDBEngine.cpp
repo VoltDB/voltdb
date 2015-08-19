@@ -98,6 +98,8 @@
 #ifdef LINUX
 #include <malloc.h>
 #endif // LINUX
+#include <iostream>
+using namespace std;
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -1069,6 +1071,21 @@ VoltDBEngine::loadTable(int32_t tableId,
         throwFatalException("%s", e.message().c_str());
     }
     return true;
+}
+
+void VoltDBEngine::setViewsUpdateEnabled(bool enabled) {
+    BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
+        catalog::Table *catalogTable = labeledTable.second;
+        Table *table = m_tables[catalogTable->relativeIndex()];
+        // Only persistent tables
+        PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
+        if (pTable != NULL) {
+            pTable->setViewsUpdateEnabled(enabled);
+            if (m_executorContext->m_siteId == 0) {
+              cout << "Update on views on table " << table->name() << " is " << (enabled ? "enabled." : "disabled") << endl;
+            }
+        }
+    }
 }
 
 /*

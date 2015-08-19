@@ -410,6 +410,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
+    @Override 
+    public void setViewsUpdateEnabled(final boolean enabled) {
+        nativeSetViewsUpdateEnabled(pointer, enabled);
+    }
+
     /**
      * This method should be called roughly every second. It allows the EE
      * to do periodic non-transactional work.
