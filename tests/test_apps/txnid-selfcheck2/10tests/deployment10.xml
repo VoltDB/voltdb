@@ -1,0 +1,14 @@
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="ddl" />
+    <commandlog enabled="true" synchronous="true" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <paths>
+	<commandlog path="/mnt/raid0-10k-64kwb/pwrtest/" />
+	<commandlogsnapshot path="/mnt/raid0-10k-64kwb/pwrtest/" />
+	<voltdbroot path="/mnt/raid0-10k-64kwb/pwrtest/" />
+<!-- <commandlogsnapshot path="/tmp/" /> -->
+    </paths>
+    <export enabled="false" target="file" />
+</deployment>

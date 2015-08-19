@@ -578,6 +578,13 @@ public class Benchmark {
             }
         }
 
+	Runtime.getRuntime().addShutdownHook(new Thread() {
+            public void run() {
+                printClientStats();
+	    }
+        });
+
+
         // get partition count
         int partitionCount = 0;
         int trycount = 12;
@@ -667,11 +674,11 @@ public class Benchmark {
         /* TEMPORARY disable cappedcollection test until ENG-8733 is resolved -PR */
         partitionedCapped = new CappedTableLoader(client, "capp", // more
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
-        partitionedCapped.start();
+        //partitionedCapped.start();
         if (config.mpratio > 0.0) {
             replicatedCapped = new CappedTableLoader(client, "capr", // more
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
-            replicatedCapped.start();
+            //replicatedCapped.start();
         }
 
         plt = new LoadTableLoader(client, "loadp",
@@ -684,8 +691,9 @@ public class Benchmark {
         //rlt.start(); 
         }
 
-        ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
-                config.allowinprocadhoc, config.mpratio, permits);
+
+	readThread = new ReadThread(client, config.threads, config.threadoffset,
+            config.allowinprocadhoc, config.mpratio, permits);
         //readThread.start();
 
         AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio, permits);
@@ -707,32 +715,20 @@ public class Benchmark {
                 clientThreads.add(clientThread);
 	    }
         }
-        log.info("All threads started...");
-
-        Thread clientStats = new Thread( new Runnable() {
-            public void run() {
-                log.info("Starting client stats thread");
-		try {
-                    Thread.sleep(5000);
-                    while (ClientThread.currActiveClients > 0) {
-                        Thread.sleep(1000);
-                    }
-		    if (ClientThread.numClientsMissingCmds > 0)
-                        printClientStats();
-                } catch (Exception e) {}
-            }
-        });
-        clientStats.start();
+        log.info("All threads started in "+(System.currentTimeMillis() - benchmarkStartTS)+" ms ...");
 
         // subtract time spent initializing threads and starting them
+	long millis = System.currentTimeMillis();
         long rt = (1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS);
         if (rt > 0) {
             Thread.sleep(5000); // These lines just for testing purposes. 
-            while (ClientThread.currActiveClients > 0) { // This could be done with a countdown latch. 
+            while (ClientThread.currActiveClients > 0 && System.currentTimeMillis()-millis < rt) { // This could be done with a countdown latch. 
                 Thread.sleep(1000);
+		
             }
             //Thread.sleep(rt);
         }
+	System.out.println("Curr diff: "+(System.currentTimeMillis()-millis)+" rt: "+rt);
 	if (ClientThread.currActiveClients <= 0)
 		log.info("Client threads all died, shutting down....");
 	else 
@@ -816,10 +812,6 @@ public class Benchmark {
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");
-        if (ClientThread.numClientsMissingCmds > 0)
-            printClientStats();
-        else 
-            log.info("No clients were missing transactions, so client stats were not printed. ");
         System.exit(exitcode);
     }
 
@@ -840,3 +832,4 @@ public class Benchmark {
         benchmark.runBenchmark();
     }
 }
+
