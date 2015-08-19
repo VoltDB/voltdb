@@ -210,6 +210,10 @@ public class VoltXMLElementAssert extends AbstractAssert<VoltXMLElementAssert, V
                 		break;
                 	}
                 }
+                if (matchingChild == null) {
+                	Fail.fail(String.format("In node with id \"%s\", can't find child with name \"%s\"",
+                			                parentId, childName));
+                }
                 assertThat(matchingChild).hasAllOf((Condition<VoltXMLElement>[]) conditions.toArray(new Condition<?>[conditions.size()]));
                 return true;
             }

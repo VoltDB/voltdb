@@ -55,7 +55,7 @@ public class TestTableCreation {
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
-        VoltXMLElement element = hif.getXMLFromCatalog();
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
         assertThat(element)
             .hasName("databaseschema")
             .hasAllOf(
@@ -103,7 +103,7 @@ public class TestTableCreation {
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
-        VoltXMLElement element = hif.getXMLFromCatalog();
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
         assertThat(element)
             .hasName("databaseschema")
             .hasAllOf(
@@ -151,7 +151,7 @@ public class TestTableCreation {
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
-        VoltXMLElement element = hif.getXMLFromCatalog();
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
         assertThat(element)
             .hasName("databaseschema")
             .hasAllOf(
@@ -199,7 +199,7 @@ public class TestTableCreation {
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
-        VoltXMLElement element = hif.getXMLFromCatalog();
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
         assertThat(element)
             .hasName("databaseschema")
             .hasAllOf(
@@ -247,7 +247,7 @@ public class TestTableCreation {
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
-        VoltXMLElement element = hif.getXMLFromCatalog();
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
         assertThat(element)
             .hasName("databaseschema")
             .hasAllOf(
@@ -301,7 +301,7 @@ public class TestTableCreation {
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
-        VoltXMLElement element = hif.getXMLFromCatalog();
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
         assertThat(element)
             .hasName("databaseschema")
             .hasAllOf(

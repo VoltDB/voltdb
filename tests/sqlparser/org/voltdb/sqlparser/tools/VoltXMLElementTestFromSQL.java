@@ -325,7 +325,7 @@ public class VoltXMLElementTestFromSQL {
             sb.append("        IDTable idTable = new IDTable();\n");
             sb.append("        HSQLInterface hif = HSQLInterface.loadHsqldb();\n");
             sb.append("        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);\n");
-            sb.append("        VoltXMLElement element = hif.getXMLFromCatalog();\n");
+            sb.append("        VoltXMLElement element = hif.getVoltCatalogXML(null, null);\n");
             sb.append("        assertThat(element)\n");
             sb.append(String.format("            .hasName(\"%s\")\n", elem.name));
             sb.append("            .hasAllOf(");
