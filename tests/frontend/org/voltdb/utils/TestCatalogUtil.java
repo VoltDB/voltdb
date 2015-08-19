@@ -40,9 +40,11 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
@@ -1761,6 +1763,68 @@ public class TestCatalogUtil extends TestCase {
 
         String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
         assertNull("deployment should compile with missing file export type", msg);
+    }
+
+    public void testDefaultDRConflictTableExportSetting() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "</deployment>";
+        final String ddl =
+                "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                 "DR TABLE T;\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(db.getIsactiveactivedred());
+        assertTrue(db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP) != null);
+    }
+
+    public void testOverrideDRConflictTableExportSetting() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='" + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + "' enabled='true' type='file'>"
+                + "            <property name=\"type\">csv</property>"
+                + "            <property name=\"nonce\">newNonce</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String ddl =
+                "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                 "DR TABLE T;\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+
+        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(db.getIsactiveactivedred());
+        Connector conn = db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP);
+        assertTrue(conn != null);
+        assertTrue(conn.getConfig().get("nonce").getValue().equals("newNonce"));
+
     }
 
     @SafeVarargs

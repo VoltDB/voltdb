@@ -306,6 +306,7 @@ class DbMonitorCLPTest extends TestBase {
         assert true
     }
 
+
     def "Verify the text in the Title in Command Log Performance "(){
         when: "Check Command Log Performance Title is displayed or not"
         if(page.drCLPTitleDisplayed())

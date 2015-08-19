@@ -88,6 +88,7 @@ class DbMonitorTrial extends TestBase {
                 
                 while(expectedCurrentPage <= totalPage) {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+
                     if(actualCurrentPage != expectedCurrentPage) {
                         assert false
                     }
@@ -98,6 +99,12 @@ class DbMonitorTrial extends TestBase {
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
                     }
                     expectedCurrentPage++
+
+                    actualCurrentPage == expectedCurrentPage
+                    expectedCurrentPage++
+                    if(expectedCurrentPage < totalPage)
+                        page.drTableNextMasterEnabled.click()
+
                 }
             }
             else {
@@ -118,7 +125,9 @@ class DbMonitorTrial extends TestBase {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
                     actualCurrentPage == expectedCurrentPage
                     expectedCurrentPage++
+
                     println("Expected Current Page " + expectedCurrentPage)
+
                     if(expectedCurrentPage < totalPage)
                         page.drTableNextReplicaEnabled.click()
                 }
