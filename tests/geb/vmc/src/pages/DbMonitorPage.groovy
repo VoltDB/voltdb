@@ -245,7 +245,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         drTableCurrentPageMaster    { $("#tblDrMAster_paginate > div > span.pageIndex") }
         drTableTotalPagesMaster     { $("#tblDrMAster_paginate > div > span.totalPages") }
         drTableNextMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_next.paginate_button") }
-        drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_abled_previous.paginate_button") }
+        drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_previous.paginate_button") }
         drTableNextMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_next.paginate_button") }
         drTablePrevMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_previous.paginate_button") }
     }
