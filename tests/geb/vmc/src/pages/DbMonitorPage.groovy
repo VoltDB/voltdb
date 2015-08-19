@@ -226,6 +226,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         cmdSegmentsInUse {$("#cmdSegmentsInUse")}
         cmdFsyncInterval {$("#cmdFsyncInterval")}
 
+
+        drMasterTitle {$("#drMasterTitle")}
+        drReplicaTitle {$("#drReplicaTitle")}
+        drCLPTitle {$("#drCLPTitle")}
+
         
         // UAT 
         drTableModeTypeText         { $("#dbDrMode") }
@@ -571,6 +576,18 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      */
     def boolean preferencesTitleDisplayed() {
         return preferencesTitle.displayed
+    }
+
+    def boolean drMasterTitleDisplayed(){
+        return drMasterTitle.displayed
+    }
+
+    def boolean drReplicaTitleDisplayed(){
+        return drReplicaTitle.displayed
+    }
+
+    def boolean drCLPTitleDisplayed(){
+        return drCLPTitle.displayed
     }
 
     /**
