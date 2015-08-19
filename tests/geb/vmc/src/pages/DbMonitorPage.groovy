@@ -226,6 +226,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         cmdSegmentsInUse {$("#cmdSegmentsInUse")}
         cmdFsyncInterval {$("#cmdFsyncInterval")}
 
+
+        drMasterTitle {$("#drMasterTitle")}
+        drReplicaTitle {$("#drReplicaTitle")}
+        drCLPTitle {$("#drCLPTitle")}
+
         
         // UAT 
         drTableModeTypeText         { $("#dbDrMode") }
@@ -240,7 +245,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         drTableCurrentPageMaster    { $("#tblDrMAster_paginate > div > span.pageIndex") }
         drTableTotalPagesMaster     { $("#tblDrMAster_paginate > div > span.totalPages") }
         drTableNextMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_next.paginate_button") }
-        drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_abled_previous.paginate_button") }
+        drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_previous.paginate_button") }
         drTableNextMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_next.paginate_button") }
         drTablePrevMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_previous.paginate_button") }
     }
@@ -571,6 +576,18 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      */
     def boolean preferencesTitleDisplayed() {
         return preferencesTitle.displayed
+    }
+
+    def boolean drMasterTitleDisplayed(){
+        return drMasterTitle.displayed
+    }
+
+    def boolean drReplicaTitleDisplayed(){
+        return drReplicaTitle.displayed
+    }
+
+    def boolean drCLPTitleDisplayed(){
+        return drCLPTitle.displayed
     }
 
     /**

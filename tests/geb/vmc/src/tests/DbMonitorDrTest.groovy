@@ -501,4 +501,22 @@ class DbMonitorDrTest extends TestBase {
             println("Master Section is not visible")
         }
     }
+
+    def "Verify the text in the Title in Database Replication Table (REPLICA) "(){
+        when: "Check Replica Title is displayed or not"
+        if(page.drReplicaTitleDisplayed())
+        {
+            assert true
+        }
+        then:
+        if(page.drReplicaTitleDisplayed()) {
+            println(waitFor(20) { page.drReplicaTitle.text() })
+            page.drReplicaTitle.text().equals("Replica")
+        }
+        else
+        {
+            println("Replica Section is not visible")
+        }
+    }
+
 }

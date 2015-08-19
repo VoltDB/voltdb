@@ -110,44 +110,47 @@ public class ImportProcessor implements ImportDataProcessor {
         String bundleJar = moduleAttrs[1];
         String moduleType = moduleAttrs[0];
 
-        Preconditions.checkState(!m_bundles.containsKey(bundleJar), "Import to source is already defined.");
         try {
-            BundleWrapper wrapper = null;
+            BundleWrapper wrapper = m_bundles.get(bundleJar);
             ImportHandlerProxy importHandlerProxy = null;
-            if (moduleType.equalsIgnoreCase("osgi")) {
+            if (wrapper == null) {
+                if (moduleType.equalsIgnoreCase("osgi")) {
 
-                Bundle bundle = m_framework.getBundleContext().installBundle(bundleJar);
-                bundle.start();
-                ServiceReference refs[] = bundle.getRegisteredServices();
-                //Must have one service only.
-                ServiceReference reference = refs[0];
-                if (reference == null) {
-                    m_logger.error("Failed to initialize importer from: " + bundleJar);
-                    bundle.stop();
-                    return;
+                    Bundle bundle = m_framework.getBundleContext().installBundle(bundleJar);
+                    bundle.start();
+                    ServiceReference refs[] = bundle.getRegisteredServices();
+                    //Must have one service only.
+                    ServiceReference reference = refs[0];
+                    if (reference == null) {
+                        m_logger.error("Failed to initialize importer from: " + bundleJar);
+                        bundle.stop();
+                        return;
+                    }
+                    Object o = bundle.getBundleContext().getService(reference);
+                    importHandlerProxy = (ImportHandlerProxy )o;
+                    wrapper = new BundleWrapper(importHandlerProxy, properties, bundle);
+                } else {
+                    //Class based importer.
+                    Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
+                    if (reference == null) {
+                        m_logger.error("Failed to initialize importer from: " + bundleJar);
+                        return;
+                    }
+
+                    importHandlerProxy = (ImportHandlerProxy )reference.newInstance();
+                     wrapper = new BundleWrapper(importHandlerProxy, properties, null);
                 }
-                Object o = bundle.getBundleContext().getService(reference);
-                importHandlerProxy = (ImportHandlerProxy )o;
-                wrapper = new BundleWrapper(importHandlerProxy, properties, bundle);
+                String name = importHandlerProxy.getName();
+                if (name == null || name.trim().length() == 0) {
+                    throw new RuntimeException("Importer must implement and return a valid unique name.");
+                }
+                Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
+                importHandlerProxy.configure(properties);
+                m_bundlesByName.put(name, wrapper);
+                m_bundles.put(bundleJar, wrapper);
             } else {
-                //Class based importer.
-                Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
-                if (reference == null) {
-                    m_logger.error("Failed to initialize importer from: " + bundleJar);
-                    return;
-                }
-
-                importHandlerProxy = (ImportHandlerProxy )reference.newInstance();
-                 wrapper = new BundleWrapper(importHandlerProxy, properties, null);
+                wrapper.m_handlerProxy.configure(properties);
             }
-            importHandlerProxy.configure(properties);
-            String name = importHandlerProxy.getName();
-            if (name == null || name.trim().length() == 0) {
-                throw new RuntimeException("Importer must implement and return a valid unique name.");
-            }
-            Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-            m_bundlesByName.put(name, wrapper);
-            m_bundles.put(bundleJar, wrapper);
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
             Throwables.propagate(t);
