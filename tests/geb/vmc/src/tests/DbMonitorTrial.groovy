@@ -106,6 +106,22 @@ class DbMonitorTrial extends TestBase {
                         page.drTableNextMasterEnabled.click()
 
                 }
+                
+                expectedCurrentPage = totalPage
+                
+                while(expectedCurrentPage >= 1) {
+                    actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+                    if(actualCurrentPage != expectedCurrentPage) {
+                        assert false
+                    }
+                    
+                    println("Actual Current Page " + actualCurrentPage)
+                    if(expectedCurrentPage > 1) {
+                        page.drTablePrevMasterEnabled.click()
+                        actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+                    }
+                    expectedCurrentPage--
+                }
             }
             else {
                 println("There is no multiple pages")
@@ -130,6 +146,7 @@ class DbMonitorTrial extends TestBase {
 
                     if(expectedCurrentPage < totalPage)
                         page.drTableNextReplicaEnabled.click()
+                    expectedCurrentPage++
                 }
             }
             else {
@@ -149,6 +166,8 @@ class DbMonitorTrial extends TestBase {
                 while(expectedCurrentPage <= totalPage) {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPage.text())
                     actualCurrentPage == expectedCurrentPage
+                    if(expectedCurrentPage < totalPage)
+                        page.drTableNextReplicaEnabled.click()
                     expectedCurrentPage++
                 }
             }
