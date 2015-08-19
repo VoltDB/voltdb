@@ -377,6 +377,15 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 }
 
+void PersistentTable::setViewsUpdateEnabled(bool enabled) {
+    m_viewsUpdateEnabled = enabled;
+    if (enabled) {
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->populateViewFromDefinition();
+        }
+    }
+}
+
 
 void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(0, source.getNValue(1));
