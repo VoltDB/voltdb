@@ -235,11 +235,19 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         // UAT 
         drTableModeTypeText         { $("#dbDrMode") }
         drTableBlock                { $("#showHideDrBlock") }
-        drTableCurrentPage          { $("#tblDrReplica_paginate > div > span.pageIndex") }
-        drTableTotalPages           { $("#tblDrReplica_paginate > div > span.totalPages") }
-        drTableNext                 { $("#tblDrReplica_paginate > span.paginate_disabled_next.paginate_button") }
-        drTablePrev                 { $("#tblDrReplica_paginate > span.paginate_disabled_previous.paginate_button") }
-
+        drTableCurrentPageReplica   { $("#tblDrReplica_paginate > div > span.pageIndex") }
+        drTableTotalPagesReplica    { $("#tblDrReplica_paginate > div > span.totalPages") }
+        drTableNextReplicaDisabled  { $("#tblDrReplica_paginate > span.paginate_disabled_next.paginate_button") }
+        drTablePrevReplicaDisabled  { $("#tblDrReplica_paginate > span.paginate_disabled_previous.paginate_button") }
+        drTableNextReplicaEnabled   { $("#tblDrReplica_paginate > span.paginate_enabled_next.paginate_button") }
+        drTablePrevReplicaEnabled   { $("#tblDrReplica_paginate > span.paginate_enabled_previous.paginate_button") }
+        
+        drTableCurrentPageMaster    { $("#tblDrMAster_paginate > div > span.pageIndex") }
+        drTableTotalPagesMaster     { $("#tblDrMAster_paginate > div > span.totalPages") }
+        drTableNextMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_next.paginate_button") }
+        drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_abled_previous.paginate_button") }
+        drTableNextMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_next.paginate_button") }
+        drTablePrevMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_previous.paginate_button") }
     }
 
     static at = {
