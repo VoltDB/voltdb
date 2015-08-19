@@ -88,11 +88,16 @@ class DbMonitorTrial extends TestBase {
                 
                 while(expectedCurrentPage <= totalPage) {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
-                    actualCurrentPage == expectedCurrentPage
-                    expectedCurrentPage++
+                    if(actualCurrentPage != expectedCurrentPage) {
+                        assert false
+                    }
+                    
                     println("Actual Current Page " + actualCurrentPage)
-                    if(expectedCurrentPage < totalPage)
+                    if(expectedCurrentPage < totalPage) {
                         page.drTableNextMasterEnabled.click()
+                        actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+                    }
+                    expectedCurrentPage++
                 }
             }
             else {
