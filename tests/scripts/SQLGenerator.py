@@ -280,7 +280,7 @@ class BaseGenerator:
     #                   |       |             |
     TYPE_PATTERN_GROUP  =                                           "type" # optional type for columns, values
     #                   |       |             |                      |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+)?\s*" \
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>[\w=<>!]+)?\s*" \
                       r"(:(?P<min>(-?\d*)),(?P<max>(-?\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
     #                         |                |                             |                   |
     #                         |                |                             |       end of [] attribute section
@@ -847,7 +847,7 @@ class SQLGenerator:
         self.__statements = self.__template.get_statements()
 
         self.__min_statements_per_pattern = sys.maxint
-        self.__max_statements_per_pattern = 0
+        self.__max_statements_per_pattern = -1
         self.__num_insert_statements      = 0
 
     GENERATOR_TYPES = (TableGenerator, ColumnGenerator, TextGenerator, ConstantGenerator, IdGenerator)
