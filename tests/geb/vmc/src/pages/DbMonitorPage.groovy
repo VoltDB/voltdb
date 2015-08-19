@@ -228,8 +228,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
 
         drMasterTitle {$("#drMasterTitle")}
-//        drReplicaTitle {$("#drReplicaTitle")}
-//        drCLPTitle {$("#drCLPTitle")}
+        drReplicaTitle {$("#drReplicaTitle")}
+        drCLPTitle {$("#drCLPTitle")}
 
         
         // UAT 
@@ -574,13 +574,13 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return drMasterTitle.displayed
     }
 
-//    def boolean drReplicaTitleDisplayed(){
-//        return drReplicaTitle.displayed
-//    }
+    def boolean drReplicaTitleDisplayed(){
+        return drReplicaTitle.displayed
+    }
 
-//    def boolean drCLPTitleDisplayed(){
-//        return drCLPTitle.displayed
-//    }
+    def boolean drCLPTitleDisplayed(){
+        return drCLPTitle.displayed
+    }
 
     /**
      * Check if Save button of Preferences is displayed
