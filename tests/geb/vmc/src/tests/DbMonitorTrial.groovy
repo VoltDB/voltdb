@@ -88,10 +88,28 @@ class DbMonitorTrial extends TestBase {
                 
                 while(expectedCurrentPage <= totalPage) {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
-                    actualCurrentPage == expectedCurrentPage
-                    expectedCurrentPage++
-                    if(expectedCurrentPage < totalPage)
+                    if(actualCurrentPage != expectedCurrentPage) {
+                        assert false
+                    }
+                    if(expectedCurrentPage < totalPage) {
                         page.drTableNextMasterEnabled.click()
+                        actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+                    }
+                    expectedCurrentPage++
+                }
+                
+                expectedCurrentPage = totalPage
+                
+                while(expectedCurrentPage >= 1) {
+                    actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+                    if(actualCurrentPage != expectedCurrentPage) {
+                        assert false
+                    }
+                    if(expectedCurrentPage > 1) {
+                        page.drTablePrevMasterEnabled.click()
+                        actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+                    }
+                    expectedCurrentPage--
                 }
             }
             else {
@@ -110,11 +128,28 @@ class DbMonitorTrial extends TestBase {
                 
                 while(expectedCurrentPage <= totalPage) {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
-                    actualCurrentPage == expectedCurrentPage
-                    expectedCurrentPage++
-                    
-                    if(expectedCurrentPage < totalPage)
+                    if(actualCurrentPage != expectedCurrentPage) {
+                        assert false
+                    }
+                    if(expectedCurrentPage < totalPage) {
                         page.drTableNextReplicaEnabled.click()
+                        actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
+                    }
+                    expectedCurrentPage++
+                }
+                
+                expectedCurrentPage = totalPage
+                
+                while(expectedCurrentPage >= 1) {
+                    actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
+                    if(actualCurrentPage != expectedCurrentPage) {
+                        assert false
+                    }
+                    if(expectedCurrentPage > 1) {
+                        page.drTableNextReplicaEnabled.click()
+                        actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
+                    }
+                    expectedCurrentPage--
                 }
             }
             else {
@@ -134,6 +169,8 @@ class DbMonitorTrial extends TestBase {
                 while(expectedCurrentPage <= totalPage) {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPage.text())
                     actualCurrentPage == expectedCurrentPage
+                    if(expectedCurrentPage < totalPage)
+                        page.drTableNextReplicaEnabled.click()
                     expectedCurrentPage++
                 }
             }
@@ -149,16 +186,4 @@ class DbMonitorTrial extends TestBase {
 		then:
 		println("Test End: Verify pagination in Database Replication table")
     }
-
-/*
-    def "Check"() {
-        expect: 'at DbMonitorPage'
-        at DbMonitorPage
-        
-        when:
-        String str = page.header.help.text()
-        then:
-        println(str)
-    }
-    */
 } 
