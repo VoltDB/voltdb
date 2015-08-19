@@ -6,7 +6,7 @@ APPNAME="txnid"
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(pwd)/../../../../bin"
+    VOLTDB_BIN="$VOLT_HOME/bin/"
 fi
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
@@ -15,8 +15,8 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
 else
-    VOLTDB_LIB="`pwd`/../../../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../../../voltdb"
+    VOLTDB_LIB="$VOLT_HOME/lib"
+    VOLTDB_VOLTDB="$VOLT_HOME/voltdb"
 fi
 
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
