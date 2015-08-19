@@ -99,6 +99,22 @@ class DbMonitorTrial extends TestBase {
                     }
                     expectedCurrentPage++
                 }
+                
+                expectedCurrentPage = totalPage
+                
+                while(expectedCurrentPage >= 1) {
+                    actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+                    if(actualCurrentPage != expectedCurrentPage) {
+                        assert false
+                    }
+                    
+                    println("Actual Current Page " + actualCurrentPage)
+                    if(expectedCurrentPage > 1) {
+                        page.drTablePrevMasterEnabled.click()
+                        actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
+                    }
+                    expectedCurrentPage--
+                }
             }
             else {
                 println("There is no multiple pages")
@@ -117,10 +133,11 @@ class DbMonitorTrial extends TestBase {
                 while(expectedCurrentPage <= totalPage) {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
                     actualCurrentPage == expectedCurrentPage
-                    expectedCurrentPage++
+                    
                     println("Expected Current Page " + expectedCurrentPage)
                     if(expectedCurrentPage < totalPage)
                         page.drTableNextReplicaEnabled.click()
+                    expectedCurrentPage++
                 }
             }
             else {
@@ -140,6 +157,8 @@ class DbMonitorTrial extends TestBase {
                 while(expectedCurrentPage <= totalPage) {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPage.text())
                     actualCurrentPage == expectedCurrentPage
+                    if(expectedCurrentPage < totalPage)
+                        page.drTableNextReplicaEnabled.click()
                     expectedCurrentPage++
                 }
             }
