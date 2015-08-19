@@ -39,12 +39,23 @@ public class ProcedureInvocation {
     private final long m_originalUniqueId;
     private final ProcedureInvocationType m_type;
 
+    private int m_fragTimeout;
+
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
         this(-1, -1, handle, procName, parameters);
     }
 
+    public ProcedureInvocation(long handle, int fragTimeout, String procName, Object... parameters) {
+        this(-1, -1, handle, fragTimeout, procName, parameters);
+    }
+
     ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
                         String procName, Object... parameters) {
+        this(originalTxnId, originalUniqueId, handle, BatchTimeoutType.NO_TIMEOUT, procName, parameters);
+    }
+
+    ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
+            int fragTimeout, String procName, Object... parameters) {
         super();
         m_originalTxnId = originalTxnId;
         m_originalUniqueId = originalUniqueId;
@@ -60,6 +71,8 @@ public class ProcedureInvocation {
         } else {
             m_type = ProcedureInvocationType.REPLICATED;
         }
+
+        m_fragTimeout = fragTimeout;
     }
 
     /** return the clientHandle value */
@@ -77,6 +90,7 @@ public class ProcedureInvocation {
         } catch (Exception e) {/*No UTF-8? Really?*/}
         int size =
             1 + (m_type == ProcedureInvocationType.REPLICATED ? 16 : 0) +
+            1 + (m_fragTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4) +
             m_procNameBytes.length + 4 + 8 + m_parameters.getSerializedSize();
         return size;
     }
@@ -95,6 +109,14 @@ public class ProcedureInvocation {
             buf.putLong(m_originalTxnId);
             buf.putLong(m_originalUniqueId);
         }
+
+        if (m_fragTimeout == BatchTimeoutType.NO_TIMEOUT) {
+            buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
+        } else {
+            buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
+            buf.putInt(m_fragTimeout);
+        }
+
         SerializationHelper.writeVarbinary(m_procNameBytes, buf);
         buf.putLong(m_clientHandle);
         m_parameters.flattenToBuffer(buf);

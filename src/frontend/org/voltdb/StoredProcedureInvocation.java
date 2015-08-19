@@ -27,6 +27,7 @@ import java.util.concurrent.FutureTask;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.client.BatchTimeoutType;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.common.Constants;
 import org.voltdb.messaging.FastDeserializer;
@@ -63,6 +64,8 @@ public class StoredProcedureInvocation implements JSONString {
         returned to the client in the ClientResponse */
     long clientHandle = -1;
 
+    int fragTimeout = BatchTimeoutType.NO_TIMEOUT;
+
     public StoredProcedureInvocation getShallowCopy()
     {
         StoredProcedureInvocation copy = new StoredProcedureInvocation();
@@ -80,6 +83,8 @@ public class StoredProcedureInvocation implements JSONString {
         {
             copy.serializedParams = null;
         }
+
+        copy.fragTimeout = fragTimeout;
 
         return copy;
     }
@@ -176,6 +181,7 @@ public class StoredProcedureInvocation implements JSONString {
     public int getSerializedSize()
     {
         int size = 1 // Version/type
+            + 1 // fragment time out byte
             + 4 // proc name string length
             + procName.length()
             + 8; // clientHandle
@@ -184,6 +190,10 @@ public class StoredProcedureInvocation implements JSONString {
         {
             size += 8 + // original TXN ID for WAN replication procedures
                     8; // original timestamp for WAN replication procedures
+        }
+
+        if (fragTimeout != BatchTimeoutType.NO_TIMEOUT) {
+            size += 4;
         }
 
         if (serializedParams != null)
@@ -214,6 +224,12 @@ public class StoredProcedureInvocation implements JSONString {
         if (type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(originalTxnId);
             buf.putLong(originalUniqueId);
+        }
+        if (fragTimeout == BatchTimeoutType.NO_TIMEOUT) {
+            buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
+        } else {
+            buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
+            buf.putInt(fragTimeout);
         }
         buf.putInt(procName.length());
         buf.put(procName.getBytes(Constants.UTF8ENCODING));
@@ -266,6 +282,13 @@ public class StoredProcedureInvocation implements JSONString {
             originalUniqueId = in.readLong();
         }
 
+        BatchTimeoutType fragTimeoutType = BatchTimeoutType.typeFromByte(in.readByte());
+        if (fragTimeoutType == BatchTimeoutType.NO_BATCH_TIMEOUT) {
+            fragTimeout = BatchTimeoutType.NO_TIMEOUT;
+        } else {
+            fragTimeout = in.readInt();
+        }
+
         procName = in.readString().intern();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
@@ -291,6 +314,7 @@ public class StoredProcedureInvocation implements JSONString {
             retval += "null";
         retval += ")";
         retval += " type=" + String.valueOf(type);
+        retval += " fragTimeout=" + BatchTimeoutType.toString(fragTimeout);
         retval += " clientHandle=" + String.valueOf(clientHandle);
         retval += " originalTxnId=" + String.valueOf(originalTxnId);
         retval += " originalUniqueId=" + String.valueOf(originalUniqueId);
@@ -350,5 +374,9 @@ public class StoredProcedureInvocation implements JSONString {
             throw new RuntimeException("Failed to serialize an invocation to JSON.", e);
         }
         return js.toString();
+    }
+
+    public int getFragTimeout() {
+        return fragTimeout;
     }
 }

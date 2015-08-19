@@ -548,4 +548,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void applyBinaryLog(long txnId, long spHandle, long uniqueId, byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
+
+    @Override
+    public void setFragTimeout(int fragTimeout) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
+    public int getFragTimeout() {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
 }

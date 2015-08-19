@@ -98,7 +98,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private static long INITIAL_LOG_DURATION = 1000; // in milliseconds,
                                                      // not final to allow unit testing
     private static final long LONG_OP_THRESHOLD = 10000;
-    private static int TIME_OUT_MILLIS = 0; // No time out
+
+    public final int INITIAL_TIMEOUT_VALUE = 0;
+    /** Fragment or batch time out in milliseconds.
+     *  By default 0 means no time out setting.
+     */
+    private int m_fragTimeout = INITIAL_TIMEOUT_VALUE;
 
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
@@ -124,12 +129,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         return m_dirty;
     }
 
-    public void setTimeoutLatency(int newLatency) {
-        TIME_OUT_MILLIS = newLatency;
+    public void setFragTimeout(int fragTimeout) {
+        m_fragTimeout = fragTimeout;
     }
 
-    public int getTimeoutLatency() {
-        return TIME_OUT_MILLIS;
+    public int getFragTimeout() {
+        return m_fragTimeout;
+    }
+
+    private boolean shouldTimedOut (long latency) {
+        if (m_readOnly
+                && m_fragTimeout > INITIAL_TIMEOUT_VALUE
+                && m_fragTimeout < latency) {
+            return true;
+        }
+        return false;
     }
 
     /** Utility method to verify return code and throw as required */
@@ -359,7 +373,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
         long latency = currentTime - m_startTime;
 
-        if (m_readOnly && TIME_OUT_MILLIS > 0 && latency > TIME_OUT_MILLIS) {
+        if (shouldTimedOut(latency)) {
             String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeName, true);
             log.info(msg);
 

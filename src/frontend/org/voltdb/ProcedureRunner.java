@@ -1294,6 +1294,7 @@ public class ProcedureRunner {
                                                  false,
                                                  txnState.isForReplay());
            m_localTask.setProcedureName(procedureName);
+           m_localTask.setFragTimeout(m_txnState.getInvocation().getFragTimeout());
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1306,6 +1307,7 @@ public class ProcedureRunner {
            m_distributedTask.setProcedureName(procedureName);
            // this works fine if procToLoad is NULL
            m_distributedTask.setProcNameToLoad(procToLoad);
+           m_distributedTask.setFragTimeout(m_txnState.getInvocation().getFragTimeout());
        }
 
        /*

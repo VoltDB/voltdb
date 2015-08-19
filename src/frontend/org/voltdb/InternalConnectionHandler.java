@@ -30,6 +30,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.BatchTimeoutType;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.ProcedureInvocationType;
 
@@ -98,13 +99,14 @@ public class InternalConnectionHandler {
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
-        //type + procname(len + name) + connectionId (long) + params
-        int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
+        //type + timeout byte + procname(len + name) + connectionId (long) + params
+        int sz = 1 + 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
         //This is released in callback from adapter side.
         final BBContainer tcont = getBuffer(sz);
         final ByteBuffer taskbuf = tcont.b();
         try {
             taskbuf.put(ProcedureInvocationType.ORIGINAL.getValue());
+            taskbuf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
             taskbuf.putInt(proc.length());
             taskbuf.put(proc.getBytes());
             taskbuf.putLong(m_adapter.connectionId());

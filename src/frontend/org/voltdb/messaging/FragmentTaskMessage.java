@@ -33,6 +33,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.client.BatchTimeoutType;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
@@ -149,6 +150,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     byte[] m_procedureName = null;
     int m_currentBatchIndex = 0;
 
+    int m_fragTimeout = BatchTimeoutType.NO_TIMEOUT;
+
     public int getCurrentBatchIndex() {
         return m_currentBatchIndex;
     }
@@ -203,6 +206,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_currentBatchIndex = ftask.m_currentBatchIndex;
         m_involvedPartitions = ftask.m_involvedPartitions;
         m_procNameToLoad = ftask.m_procNameToLoad;
+        m_fragTimeout = ftask.m_fragTimeout;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -376,6 +380,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         else {
             return null;
         }
+    }
+
+    public int getFragTimeout() {
+        return m_fragTimeout;
+    }
+
+    public void setFragTimeout(int fragTimeout) {
+        m_fragTimeout = fragTimeout;
     }
 
     public boolean isFinalTask() {
@@ -577,6 +589,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // int for which batch (4)
         msgsize += 4;
 
+        // 1 byte for the timeout flag
+        msgsize += 1;
+
+        msgsize += m_fragTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4;
+
         // Involved partitions
         msgsize += 2 + m_involvedPartitions.size() * 4;
 
@@ -728,6 +745,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // ints for batch context
         buf.putInt(m_currentBatchIndex);
 
+        // put byte flag for timeout value and 4 bytes int value if necessary
+        if (m_fragTimeout == BatchTimeoutType.NO_TIMEOUT) {
+            buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
+        } else {
+            buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
+            buf.putInt(m_fragTimeout);
+        }
+
         buf.putShort((short) m_involvedPartitions.size());
         for (int pid : m_involvedPartitions) {
             buf.putInt(pid);
@@ -848,6 +873,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // ints for batch context
         m_currentBatchIndex = buf.getInt();
+
+        BatchTimeoutType fragTimeoutType = BatchTimeoutType.typeFromByte(buf.get());
+        if (fragTimeoutType == BatchTimeoutType.NO_BATCH_TIMEOUT) {
+            m_fragTimeout = BatchTimeoutType.NO_TIMEOUT;
+        } else {
+            m_fragTimeout = buf.getInt();
+        }
 
         // Involved partition
         short involvedPartitionCount = buf.getShort();
