@@ -112,7 +112,7 @@ class DbMonitorTrial extends TestBase {
                     actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
                     actualCurrentPage == expectedCurrentPage
                     expectedCurrentPage++
-                    
+                    println("Expected Current Page " + expectedCurrentPage)
                     if(expectedCurrentPage < totalPage)
                         page.drTableNextReplicaEnabled.click()
                 }
