@@ -937,7 +937,7 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </import>"
                 + "</deployment>";
-        final String withBadImport4 =
+        final String withGoodImport0 =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
@@ -1018,8 +1018,8 @@ public class TestCatalogUtil extends TestCase {
         String msg3 = CatalogUtil.compileDeployment(cat3, bad_deployment3, false);
         assertTrue("compilation should have failed", msg3.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
 
-        //import with dup bundlename
-        final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withBadImport4);
+        //import with dup should be ok now
+        final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withGoodImport0);
         DeploymentType bad_deployment4 = CatalogUtil.getDeployment(new FileInputStream(tmpBad4));
 
         VoltCompiler compiler4 = new VoltCompiler();
@@ -1027,7 +1027,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat4 = compiler4.compileCatalogFromDDL(x4);
 
         String msg4 = CatalogUtil.compileDeployment(cat4, bad_deployment4, false);
-        assertTrue("compilation should have failed", msg4.contains("Error validating deployment configuration: Multiple connectors can not be assigned to single import module"));
+        assertNull(msg4);
 
         //import good bundle not necessary loadable by felix.
         final File good1 = VoltProjectBuilder.writeStringToTempFile(goodImport1);
