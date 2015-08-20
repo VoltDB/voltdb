@@ -31,8 +31,27 @@ public interface IExpressionParser {
     ISemantino getSemantinoCompare(IOperator aOperator, ISemantino aLeftoperand,
             ISemantino aRightoperand);
 
+    /**
+     * Create a Semantino for a binary operation.  This would be OR or AND.  The
+     * IOperator knows which one it is.
+     * 
+     * @param aOperator
+     * @param aLeftoperand
+     * @param aRightoperand
+     * @return
+     */
     ISemantino getSemantinoBoolean(IOperator aOperator, ISemantino aLeftoperand,
             ISemantino aRightoperand);
+
+    /**
+     * Create a Semantino for a unary boolean operation.  There is only one
+     * of these, NOT, but we drag it along anyway.
+     * 
+     * @param op
+     * @param operand
+     * @return
+     */
+	ISemantino getSemantinoBoolean(IOperator op, ISemantino operand);
 
 
 }

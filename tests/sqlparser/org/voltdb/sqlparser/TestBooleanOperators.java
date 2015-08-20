@@ -41,10 +41,10 @@ import org.voltdb.sqlparser.syntax.SQLKind;
 
 import static org.voltdb.sqlparser.semantics.VoltXMLElementAssert.*;
 
-public class TestRelationalOperators {
+public class TestBooleanOperators {
     HSQLInterface m_HSQLInterface = null;
     String        m_schema = null;
-    public TestRelationalOperators() {
+    public TestBooleanOperators() {
         m_HSQLInterface = HSQLInterface.loadHsqldb();
         String m_schema = "create table alpha ( id integer, beta integer );create table gamma ( id integer not null, zooba integer );create table fargle ( id integer not null, dooba integer )";
         try {

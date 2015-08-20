@@ -5,6 +5,7 @@ import java.util.List;
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
 import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
+import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
 import org.voltdb.sqlparser.semantics.symtab.Type;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable.TablePair;
@@ -39,7 +40,7 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
     }
 
     @Override
-    public IAST makeUnaryAST(IType aType, Object aValueOf) {
+    public IAST makeConstantAST(IType aType, Object aValueOf) {
         assert(aType instanceof Type);
         Type vtype = (Type)aType;
         VoltXMLElement answer = new VoltXMLElement("value");
@@ -214,4 +215,20 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
         top.children.add(params);
         return top;
     }
+
+	@Override
+	public ISemantino getErrorSemantino() {
+		return Semantino.getErrorSemantino();
+	}
+
+	@Override
+	public IAST makeUnaryAST(IType type, 
+							 IOperator aOperator,
+							 ISemantino aOperand) {
+        VoltXMLElement answer = new VoltXMLElement("operation");
+        answer.withValue("id", newId())
+              .withValue("optype", aOperator.getVoltOperation());
+        answer.children.add((VoltXMLElement)aOperand.getAST());
+        return answer;
+	}
 }

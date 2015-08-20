@@ -37,13 +37,28 @@ import org.voltdb.sqlparser.syntax.symtab.IType;
 
 /**
  * An ISemantino object represents a particle of semantics.  This is
- * the combination of a type and an IAST.
+ * the combination of a type and an IAST.  We can also ask if a
+ * Semantino is the error semantino.
  *
  * @author bwhite
- *
  */
 public interface ISemantino {
-        public IType getType();
+	/**
+	 * Fetch the type of a Semantino.
+	 * @return
+	 */
+	public IType getType();
 
-        public IAST getAST();
+	/**
+	 * Fetch the Abstract Syntax Tree of a Semantino.
+	 * @return
+	 */
+	public IAST getAST();
+        
+	/**
+	 * Test if a Semantino is the error Semantino.
+	 * 
+	 * @return true only for the (unique) Semantino.
+	 */
+	public boolean isErrorSemantino();
 }

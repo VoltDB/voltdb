@@ -74,4 +74,9 @@ public class Type extends Top implements IType {
     public boolean isBooleanType() {
         return m_kind.isBoolean();
     }
+
+	@Override
+	public boolean isErrorType() {
+		return false;
+	}
 }

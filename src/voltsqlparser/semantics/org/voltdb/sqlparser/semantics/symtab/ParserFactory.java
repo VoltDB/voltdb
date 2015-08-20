@@ -198,5 +198,9 @@ public abstract class ParserFactory implements IParserFactory {
     public IExpressionParser makeExpressionParser(ISymbolTable aSymbolTable) {
         return new ExpressionParser(this, aSymbolTable);
     }
-
+    
+    @Override
+    public ISemantino getErrorSemantino() {
+    	return Semantino.getErrorSemantino();
+    }
 }

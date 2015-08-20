@@ -74,7 +74,7 @@ public class ExpressionParser implements IExpressionParser {
 
     @Override
     public ISemantino getConstantSemantino(Object aValue, IType aType) {
-        return new Semantino(aType, m_factory.makeUnaryAST(aType, aValue));
+        return new Semantino(aType, m_factory.makeConstantAST(aType, aValue));
     }
 
     @Override
@@ -102,5 +102,13 @@ public class ExpressionParser implements IExpressionParser {
                                                     aLeftoperand,
                                                     aRightoperand));
     }
+	@Override
+	public ISemantino getSemantinoBoolean(IOperator aOperator, ISemantino aOperand) {
+		if (aOperand.getType().isBooleanType() == false) {
+			return Semantino.getErrorSemantino();
+		}
+		return new Semantino((Type) aOperand.getType(),
+				            m_factory.makeUnaryAST(aOperand.getType(), aOperator, aOperand));
+	}
 
 }

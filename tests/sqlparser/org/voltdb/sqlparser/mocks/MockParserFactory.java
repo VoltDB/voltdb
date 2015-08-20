@@ -91,7 +91,7 @@ public class MockParserFactory extends ParserFactory implements
     }
 
     @Override
-    public IAST makeUnaryAST(IType aIntType, Object aValueOf) {
+    public IAST makeConstantAST(IType aIntType, Object aValueOf) {
         unimplementedOperation("makeUnaryAST(Object)");
         return null;
     }
@@ -125,4 +125,10 @@ public class MockParserFactory extends ParserFactory implements
     public void processWhereExpression(Semantino aWhereExpression) {
             unimplementedOperation("processWhereExpression");
     }
+	@Override
+	public IAST makeUnaryAST(IType type, IOperator aOperator,
+			ISemantino aOperand) {
+		unimplementedOperation("makeUnaryAST");
+		return null;
+	}
 }

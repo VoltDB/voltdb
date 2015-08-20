@@ -328,11 +328,12 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
                      opString);
             return;
         }
+        
         //
         // Now, given the kind of operation, calculate the output.
         //
-        ISemantino rightoperand = (ISemantino) m_selectQuery.popSemantino();
-        ISemantino leftoperand = (ISemantino) m_selectQuery.popSemantino();
+        ISemantino rightoperand = (ISemantino) getTopExpressionParser().popSemantino();
+        ISemantino leftoperand = (ISemantino) getTopExpressionParser().popSemantino();
         ISemantino answer;
         if (op.isArithmetic()) {
             answer = getTopExpressionParser().getSemantinoMath(op,
@@ -361,6 +362,33 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
         }
         getTopExpressionParser().pushSemantino(answer);
     }
+
+    private void unaryOp(String aOpString, int aLineNo, int aCharPositionInLine) {
+        IOperator op = m_factory.getExpressionOperator(aOpString);
+        if (op == null) {
+            addError(aLineNo, aCharPositionInLine,
+                     "Unknown operator \"%s\"",
+                     aOpString);
+            return;
+        }
+        
+        //
+        // Now, given the kind of operation, calculate the output.
+        //
+        ISemantino operand = (ISemantino) getTopExpressionParser().popSemantino();
+        ISemantino answer;
+        if (op.isBoolean()) {
+            answer = getTopExpressionParser().getSemantinoBoolean(op,
+                                                                 operand);
+        } else {
+            addError(aLineNo, aCharPositionInLine,
+                    "Internal Error: Unknown operation kind for operator \"%s\"",
+                    aOpString);
+            answer = m_factory.getErrorSemantino();
+        }
+        getTopExpressionParser().pushSemantino(answer);
+	}
+
     /**
      * {@inheritDoc}
      *
@@ -400,6 +428,15 @@ public class VoltSQLlistener extends SQLParserBaseListener implements ANTLRError
               ctx.op.start.getCharPositionInLine());
     }
     /**
+     * {@inheritDoc}
+     */
+    @Override public void exitNot_expr(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Not_exprContext ctx) {
+    	unaryOp(ctx.NOT().getText(),
+    			ctx.NOT().getSymbol().getLine(),
+    			ctx.NOT().getSymbol().getCharPositionInLine());
+    };
+
+	/**
      * {@inheritDoc}
      *
      * <p>Push a true semantino</p>

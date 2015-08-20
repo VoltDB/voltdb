@@ -79,21 +79,9 @@ public class TestTableCreation {
                             withAttribute("size", "3"),
                             withAttribute("valuetype", "TINYINT"))),
                     withChildNamed("indexes",
-                        withAttribute("name", "indexes"),
-                        withChildNamed("index",
-                                       "name", "VOLTDB_AUTOGEN_IDX_ALPHA",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("columns", ""),
-                            withAttribute("name", "VOLTDB_AUTOGEN_IDX_ALPHA"),
-                            withAttribute("unique", "true"))),
+                        withAttribute("name", "indexes")),
                     withChildNamed("constraints",
-                        withAttribute("name", "constraints"),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10017",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10017"),
-                            withAttribute("rowslimit", "2147483647")))));
+                        withAttribute("name", "constraints"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -127,21 +115,9 @@ public class TestTableCreation {
                             withAttribute("size", "5"),
                             withAttribute("valuetype", "SMALLINT"))),
                     withChildNamed("indexes",
-                        withAttribute("name", "indexes"),
-                        withChildNamed("index",
-                                       "name", "VOLTDB_AUTOGEN_IDX_ALPHA",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("columns", ""),
-                            withAttribute("name", "VOLTDB_AUTOGEN_IDX_ALPHA"),
-                            withAttribute("unique", "true"))),
+                        withAttribute("name", "indexes")),
                     withChildNamed("constraints",
-                        withAttribute("name", "constraints"),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10017",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10017"),
-                            withAttribute("rowslimit", "2147483647")))));
+                        withAttribute("name", "constraints"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -175,21 +151,9 @@ public class TestTableCreation {
                             withAttribute("size", "10"),
                             withAttribute("valuetype", "INTEGER"))),
                     withChildNamed("indexes",
-                        withAttribute("name", "indexes"),
-                        withChildNamed("index",
-                                       "name", "VOLTDB_AUTOGEN_IDX_ALPHA",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("columns", ""),
-                            withAttribute("name", "VOLTDB_AUTOGEN_IDX_ALPHA"),
-                            withAttribute("unique", "true"))),
+                        withAttribute("name", "indexes")),
                     withChildNamed("constraints",
-                        withAttribute("name", "constraints"),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10017",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10017"),
-                            withAttribute("rowslimit", "2147483647")))));
+                        withAttribute("name", "constraints"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -223,21 +187,9 @@ public class TestTableCreation {
                             withAttribute("size", "19"),
                             withAttribute("valuetype", "BIGINT"))),
                     withChildNamed("indexes",
-                        withAttribute("name", "indexes"),
-                        withChildNamed("index",
-                                       "name", "VOLTDB_AUTOGEN_IDX_ALPHA",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("columns", ""),
-                            withAttribute("name", "VOLTDB_AUTOGEN_IDX_ALPHA"),
-                            withAttribute("unique", "true"))),
+                        withAttribute("name", "indexes")),
                     withChildNamed("constraints",
-                        withAttribute("name", "constraints"),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10017",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10017"),
-                            withAttribute("rowslimit", "2147483647")))));
+                        withAttribute("name", "constraints"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -271,27 +223,9 @@ public class TestTableCreation {
                             withAttribute("size", "100"),
                             withAttribute("valuetype", "DECIMAL"))),
                     withChildNamed("indexes",
-                        withAttribute("name", "indexes"),
-                        withChildNamed("index",
-                                       "name", "VOLTDB_AUTOGEN_IDX_ALPHA",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("columns", ""),
-                            withAttribute("name", "VOLTDB_AUTOGEN_IDX_ALPHA"),
-                            withAttribute("unique", "true"))),
+                        withAttribute("name", "indexes")),
                     withChildNamed("constraints",
-                        withAttribute("name", "constraints"),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10017",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10017"),
-                            withAttribute("rowslimit", "2147483647")),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10018",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10018"),
-                            withAttribute("rowslimit", "2147483647")))));
+                        withAttribute("name", "constraints"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -325,26 +259,153 @@ public class TestTableCreation {
                             withAttribute("size", "10"),
                             withAttribute("valuetype", "DECIMAL"))),
                     withChildNamed("indexes",
-                        withAttribute("name", "indexes"),
-                        withChildNamed("index",
-                                       "name", "VOLTDB_AUTOGEN_IDX_ALPHA",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("columns", ""),
-                            withAttribute("name", "VOLTDB_AUTOGEN_IDX_ALPHA"),
-                            withAttribute("unique", "true"))),
+                        withAttribute("name", "indexes")),
                     withChildNamed("constraints",
-                        withAttribute("name", "constraints"),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10017",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10017"),
-                            withAttribute("rowslimit", "2147483647")),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10018",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10018"),
-                            withAttribute("rowslimit", "2147483647")))));
+                        withAttribute("name", "constraints"))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testCreateTableFloat() throws Exception {
+        String ddl    = "create table alpha ( id BiGiNt not null, beta FlOaT)";
+        IDTable idTable = new IDTable();
+        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
+        assertThat(element)
+            .hasName("databaseschema")
+            .hasAllOf(
+                withAttribute("name", "databaseschema"),
+                withChildNamed("table",
+                    withAttribute("name", "ALPHA"),
+                    withChildNamed("columns",
+                        withAttribute("name", "columns"),
+                        withChildNamed("column",
+                                       "name", "ID",
+                            withAttribute("index", "0"),
+                            withAttribute("name", "ID"),
+                            withAttribute("nullable", "false"),
+                            withAttribute("size", "19"),
+                            withAttribute("valuetype", "BIGINT")),
+                        withChildNamed("column",
+                                       "name", "BETA",
+                            withAttribute("index", "1"),
+                            withAttribute("name", "BETA"),
+                            withAttribute("nullable", "true"),
+                            withAttribute("size", "0"),
+                            withAttribute("valuetype", "FLOAT"))),
+                    withChildNamed("indexes",
+                        withAttribute("name", "indexes")),
+                    withChildNamed("constraints",
+                        withAttribute("name", "constraints"))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testCreateTableVarchar() throws Exception {
+        String ddl    = "create table alpha ( id BiGiNt not null, beta varchar(100))";
+        IDTable idTable = new IDTable();
+        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
+        assertThat(element)
+            .hasName("databaseschema")
+            .hasAllOf(
+                withAttribute("name", "databaseschema"),
+                withChildNamed("table",
+                    withAttribute("name", "ALPHA"),
+                    withChildNamed("columns",
+                        withAttribute("name", "columns"),
+                        withChildNamed("column",
+                                       "name", "ID",
+                            withAttribute("index", "0"),
+                            withAttribute("name", "ID"),
+                            withAttribute("nullable", "false"),
+                            withAttribute("size", "19"),
+                            withAttribute("valuetype", "BIGINT")),
+                        withChildNamed("column",
+                                       "name", "BETA",
+                            withAttribute("bytes", "false"),
+                            withAttribute("index", "1"),
+                            withAttribute("name", "BETA"),
+                            withAttribute("nullable", "true"),
+                            withAttribute("size", "100"),
+                            withAttribute("valuetype", "VARCHAR"))),
+                    withChildNamed("indexes",
+                        withAttribute("name", "indexes")),
+                    withChildNamed("constraints",
+                        withAttribute("name", "constraints"))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testCreateTableVarbinary() throws Exception {
+        String ddl    = "create table alpha ( id BiGiNt not null, beta varbinary(100))";
+        IDTable idTable = new IDTable();
+        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
+        assertThat(element)
+            .hasName("databaseschema")
+            .hasAllOf(
+                withAttribute("name", "databaseschema"),
+                withChildNamed("table",
+                    withAttribute("name", "ALPHA"),
+                    withChildNamed("columns",
+                        withAttribute("name", "columns"),
+                        withChildNamed("column",
+                                       "name", "ID",
+                            withAttribute("index", "0"),
+                            withAttribute("name", "ID"),
+                            withAttribute("nullable", "false"),
+                            withAttribute("size", "19"),
+                            withAttribute("valuetype", "BIGINT")),
+                        withChildNamed("column",
+                                       "name", "BETA",
+                            withAttribute("index", "1"),
+                            withAttribute("name", "BETA"),
+                            withAttribute("nullable", "true"),
+                            withAttribute("size", "100"),
+                            withAttribute("valuetype", "VARBINARY"))),
+                    withChildNamed("indexes",
+                        withAttribute("name", "indexes")),
+                    withChildNamed("constraints",
+                        withAttribute("name", "constraints"))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testCreateTableTimestamp() throws Exception {
+        String ddl    = "create table alpha ( id BiGiNt not null, beta timestamp)";
+        IDTable idTable = new IDTable();
+        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
+        assertThat(element)
+            .hasName("databaseschema")
+            .hasAllOf(
+                withAttribute("name", "databaseschema"),
+                withChildNamed("table",
+                    withAttribute("name", "ALPHA"),
+                    withChildNamed("columns",
+                        withAttribute("name", "columns"),
+                        withChildNamed("column",
+                                       "name", "ID",
+                            withAttribute("index", "0"),
+                            withAttribute("name", "ID"),
+                            withAttribute("nullable", "false"),
+                            withAttribute("size", "19"),
+                            withAttribute("valuetype", "BIGINT")),
+                        withChildNamed("column",
+                                       "name", "BETA",
+                            withAttribute("index", "1"),
+                            withAttribute("name", "BETA"),
+                            withAttribute("nullable", "true"),
+                            withAttribute("size", "8"),
+                            withAttribute("valuetype", "TIMESTAMP"))),
+                    withChildNamed("indexes",
+                        withAttribute("name", "indexes")),
+                    withChildNamed("constraints",
+                        withAttribute("name", "constraints"))));
     }
 }

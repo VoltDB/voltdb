@@ -64,6 +64,8 @@ expression:
         |
                 expression op=relop expression    #rel_expr
         |
+        		NOT expression                    #not_expr
+        |
                 expression op=boolop expression   #bool_expr
         |
                 boolconst=TRUE                    #true_expr

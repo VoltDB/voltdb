@@ -114,7 +114,7 @@ public interface IParserFactory {
      * @param aIntegerValue
      * @return
      */
-    IAST makeUnaryAST(IType aIntType, Object aIntegerValue);
+    IAST makeConstantAST(IType aIntType, Object aIntegerValue);
 
     /**
      * Make an IAST object for a boolean constant.  The particular
@@ -242,4 +242,20 @@ public interface IParserFactory {
      * @return
      */
     IExpressionParser makeExpressionParser(ISymbolTable aSymbolTable);
+    /**
+     * When handling errors, we sometimes need a Semantino to represent
+     * a value which is not in evidence.
+     * 
+     * @return
+     */
+	ISemantino getErrorSemantino();
+	
+	/**
+	 * Make a unary IAST for a Semantino.
+	 * @param type
+	 * @param aOperator
+	 * @param aOperand
+	 * @return
+	 */
+	IAST makeUnaryAST(IType type, IOperator aOperator, ISemantino aOperand);
 }
