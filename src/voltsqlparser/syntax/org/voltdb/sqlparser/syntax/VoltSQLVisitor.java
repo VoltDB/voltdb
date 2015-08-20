@@ -9,6 +9,7 @@ import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.atn.ATNConfigSet;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
@@ -50,6 +51,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         m_catalog = aFactory.getCatalog();
         m_insertStatement = null;
         m_errorMessages = aFactory.getErrorMessages();
+        pushExpressionStack(new ExpressionParser(m_factory, m_symbolTable));
     }
 
     public boolean hasErrors() {
@@ -229,6 +231,9 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         if (getTopSelectQuery().validate()) {
             m_factory.processQuery(getTopSelectQuery());
         }
+        ISelectQuery query = popSelectQueryStack();
+        ISemantino querySemantino = m_factory.makeQuerySemantino(query);
+        getTopExpressionParser().pushSemantino(querySemantino);
         return null;
     }
 
@@ -639,8 +644,12 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     }
     private ISelectQuery popSelectQueryStack() {
     	assert(m_selectQueryStack.size() > 0);
-    	return m_selectQueryStack.get(m_selectQueryStack.size() - 1);
+    	return m_selectQueryStack.remove(m_selectQueryStack.size() - 1);
     }
 
-
+    protected ISemantino getResultSemantino() {
+    	assert (m_selectQueryStack.size() == 0);
+    	assert (m_expressionStack.size() == 1);
+    	return (m_expressionStack.get(m_expressionStack.size() - 1).popSemantino());
+    }
 }

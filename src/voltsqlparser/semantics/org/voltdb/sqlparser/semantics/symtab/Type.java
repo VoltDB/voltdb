@@ -75,6 +75,10 @@ public class Type extends Top implements IType {
         return m_kind.isBoolean();
     }
 
+    @Override
+    public boolean isVoidType() {
+    	return m_kind.isVoid();
+    }
 	@Override
 	public boolean isErrorType() {
 		return false;

@@ -258,4 +258,11 @@ public interface IParserFactory {
 	 * @return
 	 */
 	IAST makeUnaryAST(IType type, IOperator aOperator, ISemantino aOperand);
+	/**
+	 * Make a Semantino for a query statement.
+	 * 
+	 * @param query
+	 * @return
+	 */
+	ISemantino makeQuerySemantino(ISelectQuery query);
 }

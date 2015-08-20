@@ -12,6 +12,7 @@ import org.voltdb.sqlparser.semantics.symtab.SymbolTable.TablePair;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
+import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
@@ -230,5 +231,13 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
               .withValue("optype", aOperator.getVoltOperation());
         answer.children.add((VoltXMLElement)aOperand.getAST());
         return answer;
+	}
+
+	@Override
+	public ISemantino makeQuerySemantino(ISelectQuery aQuery) {
+		return new Semantino(SymbolTable.getVoidType(),
+							 makeQueryAST(aQuery.getProjections(),
+									 	  aQuery.getWhereCondition(),
+									 	  aQuery.getTables()));
 	}
 }

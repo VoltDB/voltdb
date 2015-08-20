@@ -5,6 +5,8 @@ import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.syntax.VoltSQLVisitor;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
+import org.voltdb.sqlparser.syntax.symtab.IAST;
 
 public class VoltDDLVisitor extends VoltSQLVisitor {
     public VoltDDLVisitor(ParserFactory aFactory) {
@@ -23,14 +25,19 @@ public class VoltDDLVisitor extends VoltSQLVisitor {
         if (istat != null) {
             return getVoltXML(istat);
         }
-        ISelectQuery qstat = getSelectQuery();
-        if (qstat != null) {
-            return getVoltXML(qstat);
+        ISemantino iresult = getResultSemantino();
+        if (iresult != null) {
+        	if (iresult.getType().isVoidType()) {
+        		IAST  resAST  = iresult.getAST();
+        		if (resAST instanceof VoltXMLElement) {
+        			return (VoltXMLElement)resAST;
+        		}
+        	}
         }
         return null;
     }
 
-    /**
+	/**
      * Calculate the VoltXMLElement for an insert statement.  This
      * probably needs to be moved to the factory object.
      *

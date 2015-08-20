@@ -39,6 +39,7 @@ import java.util.TreeMap;
 
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITop;
+import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 /**
@@ -55,8 +56,16 @@ import org.voltdb.sqlparser.syntax.symtab.TypeKind;
  *
  */
 public class SymbolTable implements ISymbolTable {
-    private static ErrorType m_errorType;
+    private static ErrorType   m_errorType;
     private static BooleanType m_booleanType;
+    private static VoidType    m_voidType;
+    public static VoidType getVoidType() {
+		if (m_voidType == null) {
+			m_voidType = new VoidType("$void", TypeKind.VOID);
+		}
+		return m_voidType;
+	}
+
     public static final ErrorType getErrorType() {
         if (m_errorType == null) {
             m_errorType = new ErrorType("$error", TypeKind.ERROR);
@@ -196,6 +205,7 @@ public class SymbolTable implements ISymbolTable {
         answer.define(new TimestampType("timestamp"));
         answer.define(getErrorType());
         answer.define(getBooleanType());
+        answer.define(getVoidType());
         return answer;
     }
 

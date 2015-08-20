@@ -48,6 +48,7 @@ import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
+import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
@@ -129,6 +130,11 @@ public class MockParserFactory extends ParserFactory implements
 	public IAST makeUnaryAST(IType type, IOperator aOperator,
 			ISemantino aOperand) {
 		unimplementedOperation("makeUnaryAST");
+		return null;
+	}
+	@Override
+	public ISemantino makeQuerySemantino(ISelectQuery query) {
+		unimplementedOperation("makeQueryAST");
 		return null;
 	}
 }

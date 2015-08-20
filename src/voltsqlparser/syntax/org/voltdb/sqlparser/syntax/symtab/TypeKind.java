@@ -32,18 +32,19 @@ package org.voltdb.sqlparser.syntax.symtab;
  *
  */
 public enum TypeKind {
-           /*  bool,   int,   float, str,   u-code, fixed, tmst, error,  size */
-    ERROR      (false, false, false, false, false, false, false, true,    0),
-    BOOLEAN    (true,  false, false, false, false, false, false, false,   4),
-    TINYINT    (false, true,  false, false, false, false, false, false,   1),
-    SMALLINT   (false, true , false, false, false, false, false, false,   2),
-    INTEGER    (false, true,  false, false, false, false, false, false,   4),
-    BIGINT     (false, true,  false, false, false, false, false, false,   8),
-    FLOAT      (false, false, true,  false, false, false, false, false,   8),
-    VARCHAR    (false, false, false, true,  true,  false, false, false,  -1),
-    VARBINARY  (false, false, false, true,  false, false, false, false,  -1),
-    DECIMAL    (false, false, false, false, false, true,  false, false,   8),
-    TIMESTAMP  (false, false, false, false, false, false, true,  false,   8);
+           /*  bool,   int,   float, str,   u-code, fixed, tmst, error,  void, size */
+    VOID       (false, false, false, false, false, false, false, false,   true,   0),
+    ERROR      (false, false, false, false, false, false, false, true,    false,  0),
+    BOOLEAN    (true,  false, false, false, false, false, false, false,   false,  4),
+    TINYINT    (false, true,  false, false, false, false, false, false,   false,  1),
+    SMALLINT   (false, true , false, false, false, false, false, false,   false,  2),
+    INTEGER    (false, true,  false, false, false, false, false, false,   false,  4),
+    BIGINT     (false, true,  false, false, false, false, false, false,   false,  8),
+    FLOAT      (false, false, true,  false, false, false, false, false,   false,  8),
+    VARCHAR    (false, false, false, true,  true,  false, false, false,   false, -1),
+    VARBINARY  (false, false, false, true,  false, false, false, false,   false, -1),
+    DECIMAL    (false, false, false, false, false, true,  false, false,   false,  8),
+    TIMESTAMP  (false, false, false, false, false, false, true,  false,   false,  8); 
     private boolean m_isBoolean;
     private boolean m_isInteger;
     private boolean m_isString;
@@ -51,6 +52,7 @@ public enum TypeKind {
     private boolean m_isFloat;
     private boolean m_isTimeStamp;
     private boolean m_isUnicode;
+    private boolean m_isVoid;
     private int m_sizeInBytes;
 
     private TypeKind(boolean aIsBoolean,
@@ -61,6 +63,7 @@ public enum TypeKind {
                      boolean aIsFixedPoint,
                      boolean aIsTimestamp,
                      boolean aIsError,
+                     boolean aIsVoid,
                      int     aSizeInBytes) {
         m_isBoolean    = aIsBoolean;
         m_isInteger    = aIsInteger;
@@ -69,6 +72,7 @@ public enum TypeKind {
         m_isFixedPoint = aIsFixedPoint;
         m_isFloat      = aIsFloat;
         m_isTimeStamp  = aIsTimestamp;
+        m_isVoid       = aIsVoid;
         m_sizeInBytes  = aSizeInBytes;
     }
 
@@ -107,4 +111,8 @@ public enum TypeKind {
     public final boolean isInternal() {
         return getSizeInBytes() == 0;
     }
+
+	public final boolean isVoid() {
+		return m_isVoid;
+	}
 }

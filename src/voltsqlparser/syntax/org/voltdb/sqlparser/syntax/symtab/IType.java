@@ -30,4 +30,6 @@ public interface IType extends ITop {
 
 	boolean isErrorType();
 
+	boolean isVoidType();
+
 }
