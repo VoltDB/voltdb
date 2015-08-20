@@ -233,7 +233,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         cmdFsyncInterval {$("#cmdFsyncInterval")}
 
 
-
         drMasterTitle {$("#drMasterTitle")}
         drReplicaTitle {$("#drReplicaTitle")}
         drCLPTitle {$("#drCLPTitle")}
