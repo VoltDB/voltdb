@@ -1130,6 +1130,9 @@ public abstract class CatalogUtil {
         switch(importConfiguration.getType()) {
             case CUSTOM:
                 break;
+            case KAFKA:
+                importBundleUrl = "kafkastream.jar";
+                break;
             default:
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
@@ -1321,10 +1324,7 @@ public abstract class CatalogUtil {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (streamList.contains(importConfiguration.getModule())) {
-                throw new RuntimeException("Multiple connectors can not be assigned to single import module: " +
-                        importConfiguration.getModule()+ ".");
-            } else {
+            if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
@@ -1338,20 +1338,17 @@ public abstract class CatalogUtil {
             return processorConfig;
         }
         List<String> streamList = new ArrayList<String>();
-
+        int i = 0;
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (streamList.contains(importConfiguration.getModule())) {
-                throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
-                        importConfiguration.getModule()+ ".");
-            } else {
+            if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
             Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
-            processorConfig.put(importConfiguration.getModule(), processorProperties);
+            processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
         return processorConfig;
     }
