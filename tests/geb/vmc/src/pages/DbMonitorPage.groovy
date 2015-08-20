@@ -219,8 +219,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         replicaStatus{$("#replicaStatus")}
         replicationRate1 {$("#replicationRate1")}
         replicationRate5 {$("#replicationRate5")}
-        filterHostID {$("#filterHostID")}
-        filterReplicaServerRows {$("#tblDrReplica").find(class:"sorting_1")}
 
         // Command Log Table
 
@@ -238,9 +236,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         drMasterTitle {$("#drMasterTitle")}
         drReplicaTitle {$("#drReplicaTitle")}
         drCLPTitle {$("#drCLPTitle")}
-filterServer {$("#filterServer")}
 
-        clpServerRows {$("#tblCmdLog").find(class:"sorting_1")}
         
         // UAT 
         drTableModeTypeText         { $("#dbDrMode") }
@@ -258,6 +254,15 @@ filterServer {$("#filterServer")}
         drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_previous.paginate_button") }
         drTableNextMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_next.paginate_button") }
         drTablePrevMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_previous.paginate_button") }
+        
+        //
+        clpPrevDisabled             { $("#tblCmdLog_paginate > span.paginate_disabled_previous.paginate_button") }
+        clpNextDisabled             { $("#tblCmdLog_paginate > span.paginate_disabled_next.paginate_button") }
+        clpPrevEnabled              { $("#tblCmdLog_paginate > span.paginate_enabled_previous.paginate_button") }
+        clpNextEnabled              { $("#tblCmdLog_paginate > span.paginate_enabled_next.paginate_button") }
+        
+        clpCurrentPage              { $("#tblCmdLog_paginate > div > span.pageIndex") }
+        clpTotalPages               { $("#tblCmdLog_paginate > div > span.totalPages") }
     }
 
     static at = {

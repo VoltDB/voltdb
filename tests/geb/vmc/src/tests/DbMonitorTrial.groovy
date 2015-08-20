@@ -153,7 +153,7 @@ class DbMonitorTrial extends TestBase {
                 }
             }
             else {
-                println("There is no multiple pages")
+                println("There are no multiple pages")
             }
 		}
 		else if(page.drTableModeTypeText.text().equals("Both")) {
@@ -185,5 +185,65 @@ class DbMonitorTrial extends TestBase {
 		}
 		then:
 		println("Test End: Verify pagination in Database Replication table")
+    }
+    
+    def "Verify pagination in Command Log Performance table"() {
+        expect: 'at DbMonitorPage'
+        at DbMonitorPage
+        
+        when:
+        println("Test Start: Verify pagination in Command Log Performance table")
+        
+        int count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                waitFor(waitTime) { page.showHideCLPBlock.isDisplayed() }
+                println("Success")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        String totalPageString = page.clpTotalPages.text()
+        println("Total page string " + totalPageString)
+        int totalPage = Integer.parseInt(totalPageString)
+        int expectedCurrentPage = 1
+        int actualCurrentPage = 1
+            
+        if(totalPage>1) {
+            println("There are multiple pages")
+            
+            while(expectedCurrentPage <= totalPage) {
+                actualCurrentPage = Integer.parseInt(page.clpCurrentPage.text())
+                if(actualCurrentPage != expectedCurrentPage) {
+                    assert false
+                }
+                if(expectedCurrentPage < totalPage) {
+                    page.clpNextEnabled.click()
+                    actualCurrentPage = Integer.parseInt(page.clpCurrentPage.text())
+                }
+                expectedCurrentPage++
+            }
+                
+            expectedCurrentPage = totalPage
+               
+            while(expectedCurrentPage >= 1) {
+                actualCurrentPage = Integer.parseInt(page.clpCurrentPage.text())
+                if(actualCurrentPage != expectedCurrentPage) {
+                    assert false
+                }
+                if(expectedCurrentPage > 1) {
+                    page.clpPrevEnabled.click()
+                    actualCurrentPage = Integer.parseInt(page.clpCurrentPage.text())
+                }
+                expectedCurrentPage--
+            }
+        }
+        else {
+            println("There are no multiple pages")
+        }		
+        then:
+		println("Test End: Verify pagination in Command Log Performance table")
     }
 } 
