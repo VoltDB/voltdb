@@ -577,7 +577,64 @@ class DbMonitorDrTest extends TestBase {
                 assert false;
             }
 
+    }
 
+    def "Verify search in Database Replication table (REPLICA)"(){
+        boolean isValid=false
+        String searchText = ""
+        boolean isDROpen = false
+
+        when: "Check if DR section is present"
+        if(!page.isDrSectionOpen())
+        {
+            isDROpen = false
+            println("Dr Replication is not present")
+        }
+        else
+        {
+            if(!page.isDrReplicaSectionOpen())
+            {
+                println("Dr Replica section is not present")
+                isDROpen = false
+            }
+            else {
+                isDROpen = true
+            }
+        }
+        then:
+        println("proceed")
+        when: "Set the value of Master filter"
+        if(isDROpen==true) {
+            if (page.filterReplicaServerRows.size() > 1) {
+                searchText = page.filterReplicaServerRows[0].text().substring(0, 1)
+                page.filterHostID.value(page.filterReplicaServerRows[0].text().substring(0, 1))
+            } else {
+                isValid = false
+                assert true
+            }
+            then: "check the table"
+            for (def i = 0; i <= page.filterReplicaServerRows.size() - 1; i++) {
+                if (!page.filterReplicaServerRows[i].text().toString().contains(searchText)) {
+                    println("test false")
+                    isValid = false
+                    break
+                } else {
+                    isValid = true
+                }
+
+            }
+        }
+        else
+        {
+            isValid=true
+        }
+        then:
+        println("proceed")
+        if (isValid == true) {
+            assert true;
+        } else {
+            assert false;
+        }
 
     }
 }

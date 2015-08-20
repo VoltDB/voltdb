@@ -219,6 +219,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         replicaStatus{$("#replicaStatus")}
         replicationRate1 {$("#replicationRate1")}
         replicationRate5 {$("#replicationRate5")}
+        filterHostID {$("#filterHostID")}
+        filterReplicaServerRows {$("#tblDrReplica").find(class:"sorting_1")}
 
         // Command Log Table
 
@@ -236,7 +238,9 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         drMasterTitle {$("#drMasterTitle")}
         drReplicaTitle {$("#drReplicaTitle")}
         drCLPTitle {$("#drCLPTitle")}
+filterServer {$("#filterServer")}
 
+        clpServerRows {$("#tblCmdLog").find(class:"sorting_1")}
         
         // UAT 
         drTableModeTypeText         { $("#dbDrMode") }
