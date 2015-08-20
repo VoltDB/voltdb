@@ -35,7 +35,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     private IParserFactory m_factory;
     private ICatalogAdapter m_catalog;
     private ErrorMessageSet m_errorMessages;
-    private ISelectQuery m_selectQuery = null;
+    private List<ISelectQuery> m_selectQueryStack = new ArrayList<ISelectQuery>();
     private IInsertStatement m_insertStatement = null;
     private String m_defaultValue;
     private boolean m_hasDefaultValue;
@@ -48,7 +48,6 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         m_factory = aFactory;
         m_symbolTable = aFactory.getStandardPrelude();
         m_catalog = aFactory.getCatalog();
-        m_selectQuery = null;
         m_insertStatement = null;
         m_errorMessages = aFactory.getErrorMessages();
     }
@@ -216,21 +215,24 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * {@inheritDoc}
      */
     @Override public Void visitSelect_statement(SQLParserParser.Select_statementContext ctx) {
-        m_selectQuery = m_factory.newSelectQuery(m_symbolTable,
+        pushSelectQuery(m_factory.newSelectQuery(m_symbolTable,
                                                  ctx.stop.getLine(),
-                                                 ctx.stop.getCharPositionInLine());
+                                                 ctx.stop.getCharPositionInLine()));
         /*
-         * Walk the subtree.
+         * Walk the table_clause first.
          */
-        super.visitSelect_statement(ctx);
-
-        if (m_selectQuery.validate()) {
-            m_factory.processQuery(m_selectQuery);
+        visitTable_clause(ctx.table_clause());
+        visitProjection_clause(ctx.projection_clause());
+        if (ctx.where_clause() != null) {
+        	visitWhere_clause(ctx.where_clause());
+        }
+        if (getTopSelectQuery().validate()) {
+            m_factory.processQuery(getTopSelectQuery());
         }
         return null;
     }
 
-    /**
+	/**
      * {@inheritDoc}
      */
     @Override public Void visitProjection(SQLParserParser.ProjectionContext ctx) {
@@ -240,8 +242,8 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     	super.visitProjection(ctx);
     	
         if (ctx.STAR() != null) {
-            m_selectQuery.addProjection(ctx.STAR().getSymbol().getLine(),
-                                        ctx.STAR().getSymbol().getCharPositionInLine());
+            getTopSelectQuery().addProjection(ctx.STAR().getSymbol().getLine(),
+                                              ctx.STAR().getSymbol().getCharPositionInLine());
         } else {
             String tableName = null;
             String columnName = ctx.projection_ref().column_name().IDENTIFIER().getText();
@@ -252,7 +254,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
             if (ctx.column_name() != null) {
                 alias = ctx.column_name().IDENTIFIER().getText();
             }
-            m_selectQuery.addProjection(tableName,
+            getTopSelectQuery().addProjection(tableName,
                                         columnName,
                                         alias,
                                         ctx.start.getLine(),
@@ -283,7 +285,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
                          "Cannot find table %s",
                          tableName);
             } else {
-                m_selectQuery.addTable(table, alias);
+                getTopSelectQuery().addTable(table, alias);
             }
         }
         return null;
@@ -295,17 +297,17 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * <p>The default implementation does nothing.</p>
      */
     @Override public Void visitWhere_clause(SQLParserParser.Where_clauseContext ctx) {
-        IExpressionParser expr = m_factory.makeExpressionParser(m_selectQuery.getTables());
+        IExpressionParser expr = m_factory.makeExpressionParser(getTopSelectQuery().getTables());
         m_expressionStack.add(expr);
-        m_selectQuery.setExpressionParser(expr);
+        getTopSelectQuery().setExpressionParser(expr);
         /*
          * Walk the subtree.
          */
         super.visitWhere_clause(ctx);
         
         assert(m_expressionStack.size() > 0);
-        expr = m_expressionStack.remove(m_expressionStack.size()-1);
-        assert(expr == m_selectQuery.getExpressionParser());
+        expr = popExpressionStack();
+        assert(expr == getTopSelectQuery().getExpressionParser());
         ISemantino ret = expr.popSemantino();
         if (!(ret != null && ret.getType().isBooleanType())) {
                 addError(ctx.start.getLine(),
@@ -313,13 +315,13 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
                         "Boolean expression expected");
         } else {
                 // Push where statement, select knows if where exists and can pop it off if it does.
-                m_selectQuery.setWhereCondition(ret);
+                getTopSelectQuery().setWhereCondition(ret);
         }
-        m_selectQuery.setExpressionParser(null);
+        getTopSelectQuery().setExpressionParser(null);
         return null;
     }
 
-    private void binOp(String opString, int lineno, int colno) {
+	private void binOp(String opString, int lineno, int colno) {
         IOperator op = m_factory.getExpressionOperator(opString);
         if (op == null) {
             addError(lineno, colno,
@@ -483,7 +485,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     @Override public Void visitFalse_expr(SQLParserParser.False_exprContext ctx) {
     	super.visitFalse_expr(ctx);
         IType boolType = m_factory.getBooleanType();
-        m_selectQuery.pushSemantino(getTopExpressionParser().getConstantSemantino(Boolean.valueOf(false), boolType));
+        getTopSelectQuery().pushSemantino(getTopExpressionParser().getConstantSemantino(Boolean.valueOf(false), boolType));
         return null;
     }
 
@@ -602,7 +604,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     }
 
     public final ISelectQuery getSelectQuery() {
-        return m_selectQuery;
+        return getTopSelectQuery();
     }
 
     public final IInsertStatement getInsertStatement() {
@@ -620,5 +622,25 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         assert(m_expressionStack.size() > 0);
         return m_expressionStack.get(m_expressionStack.size() - 1);
     }
+    private void pushExpressionStack(IExpressionParser aParser) {
+    	m_expressionStack.add(aParser);
+    }
+    private IExpressionParser popExpressionStack() {
+    	assert(m_expressionStack.size() > 0);
+    	return m_expressionStack.remove(m_expressionStack.size() - 1);
+	}
+
+    private ISelectQuery getTopSelectQuery() {
+    	assert(m_selectQueryStack.size() > 0);
+    	return m_selectQueryStack.get(m_selectQueryStack.size() - 1);
+	}
+    private void pushSelectQuery(ISelectQuery aQuery) {
+    	m_selectQueryStack.add(aQuery);
+    }
+    private ISelectQuery popSelectQueryStack() {
+    	assert(m_selectQueryStack.size() > 0);
+    	return m_selectQueryStack.get(m_selectQueryStack.size() - 1);
+    }
+
 
 }
