@@ -204,6 +204,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         dbDrMode {$("#dbDrMode")}
 
+        filterPartitionId {$("#filterPartitionId")}
+
+        partitionIdRows{$("#tblDrMAster").find(class:"sorting_1")}
+
+
+
 
         //Dr Replica Section
 
