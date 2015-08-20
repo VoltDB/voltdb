@@ -27,7 +27,6 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserLexer;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserListener;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser;
 
 /**
@@ -105,10 +104,7 @@ public class SQLParserDriver {
     /**
      * Parse the input stream.
      */
-    public void walk(SQLParserListener aListener) {
-        // Create a generic parse tree walker that can trigger callbacks
-        ParseTreeWalker walker = new ParseTreeWalker();
-        // Walk the tree created during the parse, trigger callbacks
-        walker.walk(aListener, m_tree);
+    public void walk(VoltSQLVisitor aVisitor) {
+        aVisitor.visit(m_tree);
     }
 }

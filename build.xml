@@ -1017,8 +1017,8 @@ Antlr4 Compilation Macro
 	  dir="${pkg.sqlparser.syntax.dir}/grammar">
         <arg value="-o"/>
         <arg value="${pkg.antlr.generated.dir}"/>
-	<arg value="-listener" />
-	<arg value="-no-visitor" />
+	<arg value="-no-listener" />
+	<arg value="-visitor" />
 	<arg value="-encoding" />
 	<arg value="UTF-8" />
 	<arg value="SQLParser.g4" />

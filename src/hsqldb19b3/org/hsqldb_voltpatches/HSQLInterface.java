@@ -674,20 +674,20 @@ public class HSQLInterface {
     public void processDDLStatementsUsingVoltSQLParser(String sql, CatalogAdapter aAdapter) throws HSQLParseException {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
-        VoltDDLListener listener = new VoltDDLListener(factory);
-        processSQLWithListener(sql, listener, SQLKind.DDL);
+        VoltDDLVisitor visitor = new VoltDDLVisitor(factory);
+        processSQLWithListener(sql, visitor, SQLKind.DDL);
     }
 
-    private void processSQLWithListener(String sql, VoltDDLListener listener, SQLKind aKind) throws HSQLParseException {
+    private void processSQLWithListener(String aSQL, VoltDDLVisitor aVisitor, SQLKind aKind) throws HSQLParseException {
         SQLParserDriver driver;
         try {
-            driver = new SQLParserDriver(sql, listener, aKind);
+            driver = new SQLParserDriver(aSQL, aVisitor, aKind);
         } catch (IOException e) {
             throw new HSQLParseException(e.getMessage());
         }
-        driver.walk(listener);
-        if (listener.hasErrors()) {
-            throw new HSQLParseException(listener.getErrorMessagesAsString());
+        driver.walk(aVisitor);
+        if (aVisitor.hasErrors()) {
+            throw new HSQLParseException(aVisitor.getErrorMessagesAsString());
         }
     }
 
@@ -706,9 +706,9 @@ public class HSQLInterface {
     public VoltXMLElement getVoltXMLFromSQLUsingVoltSQLParser(String aSQL, CatalogAdapter aAdapter, SQLKind aKind) throws HSQLParseException {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
-        VoltDDLListener listener = new VoltDDLListener(factory);
-        processSQLWithListener(aSQL, listener, aKind);
-        return listener.getVoltXML();
+        VoltDDLVisitor visitor = new VoltDDLVisitor(factory);
+        processSQLWithListener(aSQL, visitor, aKind);
+        return visitor.getVoltXML();
     }
 
     private boolean usingVoltSQLParser() {
