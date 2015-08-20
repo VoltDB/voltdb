@@ -237,6 +237,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         drReplicaTitle {$("#drReplicaTitle")}
         drCLPTitle {$("#drCLPTitle")}
 
+        filterServer {$("#filterServer")}
+
+        clpServerRows {$("#tblCmdLog").find(class:"sorting_1")}
+
         
         // UAT 
         drTableModeTypeText         { $("#dbDrMode") }
