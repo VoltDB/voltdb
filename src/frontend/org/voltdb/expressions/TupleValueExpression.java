@@ -406,12 +406,12 @@ public class TupleValueExpression extends AbstractValueExpression {
     private String chooseTwoNames(String name, String alias) {
         if (name != null) {
             if (alias != null && !name.equals(alias)) {
-                return String.format("%s AS %s", name, alias);
+                return String.format("%s(%s)", name, alias);
             } else {
                 return name;
             }
         } else if (alias != null) {
-            return String.format ("<> AS %s", alias);
+            return String.format ("(%s)", alias);
         } else {
             return "<none>";
         }
@@ -419,7 +419,8 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     protected String getExpressionNodeNameForToString() {
-        return String.format("%s.%s",
+        return String.format("%s: %s.%s",
+                             super.getExpressionNodeNameForToString(),
                              chooseTwoNames(m_tableName, m_tableAlias),
                              chooseTwoNames(m_columnName, m_columnAlias));
     }
