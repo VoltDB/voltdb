@@ -99,6 +99,7 @@ class DbMonitorTrial extends TestBase {
                             try {
                                 page.drTableNextMasterEnabled.click()
                             } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                            } catch(geb.error.RequiredPageContentNotPresent e) {
                             }
                         }
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
@@ -121,6 +122,7 @@ class DbMonitorTrial extends TestBase {
                             try {
                                 page.drTablePrevMasterEnabled.click()
                             } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                            } catch(geb.error.RequiredPageContentNotPresent e) {
                             }
                         }
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
@@ -155,6 +157,7 @@ class DbMonitorTrial extends TestBase {
                             try {
                                 page.drTableNextReplicaEnabled.click()
                             } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                            } catch(geb.error.RequiredPageContentNotPresent e) {
                             }
                         }
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
@@ -177,6 +180,7 @@ class DbMonitorTrial extends TestBase {
                             try {
                                 page.drTableNextReplicaEnabled.click()
                             } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                            } catch(geb.error.RequiredPageContentNotPresent e) {
                             }
                         }
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
@@ -240,7 +244,13 @@ class DbMonitorTrial extends TestBase {
         String totalPageString = ""
         count = 0
         while(count<numberOfTrials) {
-            totalPageString = page.clpTotalPages.text()
+            count++
+            try {
+                totalPageString = page.clpTotalPages.text()
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+            }
+            
         }
         println("Total page string " + totalPageString)
         int totalPage = Integer.parseInt(totalPageString)
@@ -263,6 +273,7 @@ class DbMonitorTrial extends TestBase {
                         try {
                             page.clpNextEnabled.click()
                         } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                        } catch(geb.error.RequiredPageContentNotPresent e) {
                         }
                     }
                     actualCurrentPage = Integer.parseInt(page.clpCurrentPage.text())
@@ -285,6 +296,7 @@ class DbMonitorTrial extends TestBase {
                         try {
                             page.clpPrevEnabled.click()
                         } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                        } catch(geb.error.RequiredPageContentNotPresent e) {
                         }
                     }
                     actualCurrentPage = Integer.parseInt(page.clpCurrentPage.text())
