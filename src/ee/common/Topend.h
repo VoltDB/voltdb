@@ -62,7 +62,7 @@ class Topend {
             bool sync,
             bool endOfStream) = 0;
 
-    virtual void pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
+    virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
 
@@ -93,7 +93,7 @@ public:
 
     virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream);
 
-    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
@@ -105,6 +105,7 @@ public:
     std::vector<boost::shared_array<char> > data;
     bool receivedDRBuffer;
     bool receivedExportBuffer;
+    int64_t pushDRBufferRetval;
 
 };
 
