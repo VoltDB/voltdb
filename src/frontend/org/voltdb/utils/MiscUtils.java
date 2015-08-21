@@ -63,6 +63,17 @@ public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final String licenseFileName = "license.xml";
+    private static final boolean assertsEnabled;
+
+    static {
+        boolean assertCaught = false;
+        assert(assertCaught = true);
+        assertsEnabled = assertCaught;
+    }
+
+    public static boolean areAssertsEnabled() {
+        return assertsEnabled;
+    }
 
     /**
      * Simple code to copy a file from one place to another...
