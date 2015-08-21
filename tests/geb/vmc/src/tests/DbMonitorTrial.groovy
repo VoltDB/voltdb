@@ -55,6 +55,8 @@ class DbMonitorTrial extends TestBase {
     }
 
     def "Verify pagination in Database Replication table"() {
+        int count = 0
+        
         expect: 'at DbMonitorPage'
         at DbMonitorPage
         
@@ -92,7 +94,15 @@ class DbMonitorTrial extends TestBase {
                         assert false
                     }
                     if(expectedCurrentPage < totalPage) {
-                        page.drTableNextMasterEnabled.click()
+                        count = 0
+                        
+                        while(count<numberOfTrials) {
+                            count++
+                            try {
+                                page.drTableNextMasterEnabled.click()
+                            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                            }
+                        }
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
                     }
                     expectedCurrentPage++
@@ -106,7 +116,15 @@ class DbMonitorTrial extends TestBase {
                         assert false
                     }
                     if(expectedCurrentPage > 1) {
-                        page.drTablePrevMasterEnabled.click()
+                        count = 0
+                        
+                        while(count<numberOfTrials) {
+                            count++
+                            try {
+                                page.drTablePrevMasterEnabled.click()
+                            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                            }
+                        }
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageMaster.text())
                     }
                     expectedCurrentPage--
@@ -132,7 +150,15 @@ class DbMonitorTrial extends TestBase {
                         assert false
                     }
                     if(expectedCurrentPage < totalPage) {
-                        page.drTableNextReplicaEnabled.click()
+                        count = 0
+                        
+                        while(count<numberOfTrials) {
+                            count++
+                            try {
+                                page.drTableNextReplicaEnabled.click()
+                            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                            }
+                        }
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
                     }
                     expectedCurrentPage++
@@ -146,7 +172,15 @@ class DbMonitorTrial extends TestBase {
                         assert false
                     }
                     if(expectedCurrentPage > 1) {
-                        page.drTableNextReplicaEnabled.click()
+                        count = 0
+                        
+                        while(count<numberOfTrials) {
+                            count++
+                            try {
+                                page.drTableNextReplicaEnabled.click()
+                            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                            }
+                        }
                         actualCurrentPage = Integer.parseInt(page.drTableCurrentPageReplica.text())
                     }
                     expectedCurrentPage--
@@ -220,7 +254,15 @@ class DbMonitorTrial extends TestBase {
                     assert false
                 }
                 if(expectedCurrentPage < totalPage) {
-                    page.clpNextEnabled.click()
+                    count = 0
+                    
+                    while(count<numberOfTrials) {
+                        count++
+                        try {
+                            page.clpNextEnabled.click()
+                        } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                        }
+                    }
                     actualCurrentPage = Integer.parseInt(page.clpCurrentPage.text())
                 }
                 expectedCurrentPage++
@@ -234,7 +276,15 @@ class DbMonitorTrial extends TestBase {
                     assert false
                 }
                 if(expectedCurrentPage > 1) {
-                    page.clpPrevEnabled.click()
+                    count = 0
+                    
+                    while(count<numberOfTrials) {
+                        count++
+                        try {
+                            page.clpPrevEnabled.click()
+                        } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                        }
+                    }
                     actualCurrentPage = Integer.parseInt(page.clpCurrentPage.text())
                 }
                 expectedCurrentPage--
