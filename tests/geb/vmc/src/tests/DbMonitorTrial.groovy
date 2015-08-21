@@ -54,9 +54,7 @@ class DbMonitorTrial extends TestBase {
 		}
     }
 
-    def "Verify pagination in Database Replication table"() {
-        int count = 0
-        
+    def "Verify pagination in Database Replication table"() {      
         expect: 'at DbMonitorPage'
         at DbMonitorPage
         
@@ -239,7 +237,11 @@ class DbMonitorTrial extends TestBase {
             }
         }
         
-        String totalPageString = page.clpTotalPages.text()
+        String totalPageString = ""
+        count = 0
+        while(count<numberOfTrials) {
+            totalPageString = page.clpTotalPages.text()
+        }
         println("Total page string " + totalPageString)
         int totalPage = Integer.parseInt(totalPageString)
         int expectedCurrentPage = 1
