@@ -220,6 +220,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         replicationRate1 {$("#replicationRate1")}
         replicationRate5 {$("#replicationRate5")}
 
+        filterReplicaServerRows{$("#tblDrReplica").find(class:"sorting_1")}
+
+        filterHostID {($("#filterHostID"))}
+
         // Command Log Table
 
         showHideCLPBlock {$("#showHideCLPBlock")}
