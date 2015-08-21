@@ -213,7 +213,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     virtual ~PersistentTable();
 
     void setViewsUpdateEnabled(bool enabled);
-    bool isViewsUpdateEnabled() { return m_viewsUpdateEnabled; }
 
     void notifyQuantumRelease() {
         if (compactionPredicate()) {

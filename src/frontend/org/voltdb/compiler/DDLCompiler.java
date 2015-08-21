@@ -1972,7 +1972,7 @@ public class DDLCompiler {
         catalog_const.setType(type.getValue());
     }
 
-    void compileMatViewQueriesToStatement(Statement stmt, VoltXMLElement xmlquery,
+    void compileMatViewQueryToStatement(Statement stmt, VoltXMLElement xmlquery,
                                           Database db, DatabaseEstimates estimates) throws VoltCompilerException {
         // Use the uniqueName as the sqlText. This is easier for differentiating the queries?
         // Normally for select statements, the unique names will start with "Eselect".
@@ -2002,12 +2002,12 @@ public class DDLCompiler {
                                                MaterializedViewInfo matviewinfo) throws VoltCompilerException {
         DatabaseEstimates estimates = new DatabaseEstimates();
         Statement buildUpQueryStmt = matviewinfo.getBuildupquerystmt().add("0");
-        compileMatViewQueriesToStatement(buildUpQueryStmt, buildUpQueryXML, db, estimates);
+        compileMatViewQueryToStatement(buildUpQueryStmt, buildUpQueryXML, db, estimates);
         for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
             String key = String.valueOf(i);
             Statement fallbackQueryStmt = matviewinfo.getFallbackquerystmts().add(key);
             VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
-            compileMatViewQueriesToStatement(fallbackQueryStmt, fallbackQueryXML, db, estimates);
+            compileMatViewQueryToStatement(fallbackQueryStmt, fallbackQueryXML, db, estimates);
         }
     }
 

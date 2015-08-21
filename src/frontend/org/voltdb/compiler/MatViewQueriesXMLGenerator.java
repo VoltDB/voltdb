@@ -69,11 +69,11 @@ public class MatViewQueriesXMLGenerator {
 
     private void adjustColumnAliases() {
         ArrayList<String> realColumnNames = new ArrayList<String>(Collections.nCopies(m_destTable.getColumns().size(), ""));
-        Collections.fill(realColumnNames, null);
+        List<VoltXMLElement> viewColumns = VoltXMLElementHelper.getFirstChild(m_xml, "columns").children;
+        assert(viewColumns.size() == m_destTable.getColumns().size());
         for (Column info : m_destTable.getColumns()) {
             realColumnNames.set(info.getIndex(), info.getName());
         }
-        List<VoltXMLElement> viewColumns = VoltXMLElementHelper.getFirstChild(m_xml, "columns").children;
         for (int i=0; i<viewColumns.size(); ++i) {
             VoltXMLElement columnref = viewColumns.get(i);
             String realColumnName = realColumnNames.get(i);
