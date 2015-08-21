@@ -22,6 +22,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -54,15 +55,20 @@ import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType.Memorylimit;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
@@ -72,9 +78,6 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ImportType;
-import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -283,6 +286,8 @@ public class VoltProjectBuilder {
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
+    private Double m_rssLimit = null;
+    private Integer m_resourceCheckInterval = null;
 
     private boolean m_useDDLSchema = false;
 
@@ -292,6 +297,16 @@ public class VoltProjectBuilder {
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
+        return this;
+    }
+
+    public VoltProjectBuilder setRssLimit(double limit) {
+        m_rssLimit = limit;
+        return this;
+    }
+
+    public VoltProjectBuilder setResourceCheckInterval(int seconds) {
+        m_resourceCheckInterval = seconds;
         return this;
     }
 
@@ -990,29 +1005,7 @@ public class VoltProjectBuilder {
             admin.setAdminstartup(dinfo.adminOnStartup);
         }
 
-        // <systemsettings>
-        SystemSettingsType systemSettingType = factory.createSystemSettingsType();
-        Temptables temptables = factory.createSystemSettingsTypeTemptables();
-        temptables.setMaxsize(m_maxTempTableMemory);
-        systemSettingType.setTemptables(temptables);
-        if (m_snapshotPriority != null) {
-            SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
-            snapshot.setPriority(m_snapshotPriority);
-            systemSettingType.setSnapshot(snapshot);
-        }
-        if (m_elasticThroughput != null || m_elasticDuration != null) {
-            SystemSettingsType.Elastic elastic = factory.createSystemSettingsTypeElastic();
-            if (m_elasticThroughput != null) elastic.setThroughput(m_elasticThroughput);
-            if (m_elasticDuration != null) elastic.setDuration(m_elasticDuration);
-            systemSettingType.setElastic(elastic);
-        }
-        if (m_queryTimeout != null) {
-            SystemSettingsType.Query query = factory.createSystemSettingsTypeQuery();
-            query.setTimeout(m_queryTimeout);
-            systemSettingType.setQuery(query);
-        }
-
-        deployment.setSystemsettings(systemSettingType);
+        deployment.setSystemsettings(createSystemSettingsType(factory));
 
         // <users>
         if (m_users.size() > 0) {
@@ -1137,6 +1130,54 @@ public class VoltProjectBuilder {
         return deploymentPath;
             }
 
+
+    private SystemSettingsType createSystemSettingsType(org.voltdb.compiler.deploymentfile.ObjectFactory factory)
+    {
+        SystemSettingsType systemSettingType = factory.createSystemSettingsType();
+        Temptables temptables = factory.createSystemSettingsTypeTemptables();
+        temptables.setMaxsize(m_maxTempTableMemory);
+        systemSettingType.setTemptables(temptables);
+        if (m_snapshotPriority != null) {
+            SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
+            snapshot.setPriority(m_snapshotPriority);
+            systemSettingType.setSnapshot(snapshot);
+        }
+        if (m_elasticThroughput != null || m_elasticDuration != null) {
+            SystemSettingsType.Elastic elastic = factory.createSystemSettingsTypeElastic();
+            if (m_elasticThroughput != null) elastic.setThroughput(m_elasticThroughput);
+            if (m_elasticDuration != null) elastic.setDuration(m_elasticDuration);
+            systemSettingType.setElastic(elastic);
+        }
+        if (m_queryTimeout != null) {
+            SystemSettingsType.Query query = factory.createSystemSettingsTypeQuery();
+            query.setTimeout(m_queryTimeout);
+            systemSettingType.setQuery(query);
+        }
+        if (m_rssLimit != null) {
+            ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
+            Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
+            memoryLimit.setSize(new BigDecimal(m_rssLimit));
+            monitorType.setMemorylimit(memoryLimit);
+        }
+
+        if (m_resourceCheckInterval != null) {
+            ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
+            monitorType.setFrequency(m_resourceCheckInterval);
+        }
+
+        return systemSettingType;
+    }
+
+    private ResourceMonitorType initializeResourceMonitorType(SystemSettingsType systemSettingType,
+            org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
+            ResourceMonitorType monitorType = systemSettingType.getResourcemonitor();
+            if (monitorType == null) {
+                monitorType = factory.createResourceMonitorType();
+                systemSettingType.setResourcemonitor(monitorType);
+            }
+
+            return monitorType;
+    }
 
     public File getPathToVoltRoot() {
         return new File(m_voltRootPath);

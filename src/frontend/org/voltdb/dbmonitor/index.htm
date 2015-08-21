@@ -345,7 +345,7 @@
                             <div id="drMasterSection" class="masterWrapper" style="display:block;">
                                 <div id="tblMAster_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
-                                        <div class="drTitle icon-master">Master</div>
+                                        <div class="drTitle icon-master" id="drMasterTitle">Master</div>
                                         <div class="filter"><input name="filter" id="filterPartitionId" type="text" class="search-box" onblur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
@@ -375,7 +375,7 @@
                             <div id="drReplicaSection" class="replicaWrapper" style="display:block">
                                 <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
-                                        <div class="drTitle icon-replica">Replica</div>
+                                        <div class="drTitle icon-replica" id="drReplicaTitle">Replica</div>
                                         <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
@@ -417,7 +417,7 @@
                             <!--<div id="drMasterSection" class="masterWrapper" style="display:block;">-->
                             <div id="tblCmdLog_wrapper" class="dataTables_wrapper no-footer">
                                 <div class="tabs-filter-wrapperDR">
-                                    <div class="drTitle icon-command">Command Log</div>
+                                    <div class="drTitle icon-command" id="drCLPTitle">Command Log</div>
                                     <div class="filter"><input name="filter" id="filterServer" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchServer" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                     <div class="clear"></div>
                                 </div>
@@ -775,6 +775,15 @@
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
+                                <tr class="child-row-6 subLabelRow">
+                                    <td class="configLabel">Memory Limit</td>
+                                    <td align="right">
+                                        <span id="memoryLimitSize"></span>
+                                        <span id="memoryLimitSizeUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
                             </table>
                         </div>
                         <div class="drWrapperAdmin" id="divDrWrapperAdmin" style="display:none">
@@ -851,9 +860,9 @@
                             <div style="overflow: auto">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
                                     <tr>
-                                        <th width="30%">Port Name</th>
+                                        <th width="30%" id="hPortName">Port Name</th>
                                         <th width="45%" id="hServerSettings">Server Settings</th>
-                                        <th width="25%">Cluster Settings</th>
+                                        <th width="25%" id="hClusterSettings">Cluster Settings</th>
                                     </tr>
                                     <tr>
                                         <td>Client Port</td>

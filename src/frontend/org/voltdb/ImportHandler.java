@@ -17,29 +17,17 @@
 
 package org.voltdb;
 
-import static org.voltdb.ClientInterface.getPartitionForProcedure;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Table;
-import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.importer.ImportClientResponseAdapter;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.ImportContext;
 
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import org.voltcore.logging.Level;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -50,27 +38,16 @@ public class ImportHandler {
 
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
 
-    // Atomically allows the catalog reference to change between access
-    private final CatalogContext m_catalogContext;
-    private final AtomicLong m_failedCount = new AtomicLong();
-    private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private volatile boolean m_stopped = false;
 
-    private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
-
-    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
-    final static long SUPPRESS_INTERVAL = 60;
+    public final static long SUPPRESS_INTERVAL = 120;
 
     // The real handler gets created for each importer.
-    public ImportHandler(ImportContext importContext, CatalogContext catContext) {
-        m_catalogContext = catContext;
-
+    public ImportHandler(ImportContext importContext) {
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
         m_importContext = importContext;
-        VoltDB.instance().getClientInterface().bindAdapter(m_adapter, null);
     }
 
     /**
@@ -92,21 +69,25 @@ public class ImportHandler {
     }
 
     public void stop() {
-        m_stopped = true;
-        m_es.submit(new Runnable() {
+        try {
+            m_es.submit(new Runnable() {
 
-            @Override
-            public void run() {
-                try {
-                    //Drain the adapter so all calbacks are done
-                    m_adapter.drain();
-                    m_importContext.stop();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                @Override
+                public void run() {
+                    try {
+                        //Stop the context first so no more work is submitted.
+                        m_importContext.stop();
+                    } catch (Exception ex) {
+                        Throwables.propagate(ex);
+                    }
+                    m_logger.info("Importer stopped: " + m_importContext.getName());
                 }
-                m_logger.info("Importer stopped: " + m_importContext.getName());
-            }
-        });
+            }).get();
+        } catch (InterruptedException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        } catch (ExecutionException ex) {
+            m_logger.warn("Failed to successfully stop import context for: " + m_importContext.getName(), ex);
+        }
         try {
             m_es.shutdown();
             m_es.awaitTermination(1, TimeUnit.DAYS);
@@ -115,136 +96,26 @@ public class ImportHandler {
         }
     }
 
-    //Allocate and pool similar row sizes will reuse the buffers.
-    private BBContainer getBuffer(int sz) {
-        return DBBPool.allocateDirectAndPool(sz);
-    }
-
     /**
      * Returns true if a table with the given name exists in the server catalog.
      */
     public boolean hasTable(String name) {
-        Table table = m_catalogContext.tables.get(name);
-        return (table!=null);
-    }
-
-    public class NullCallback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-        }
+        return VoltDB.instance().getClientInterface().getInternalConnectionHandler().hasTable(name);
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
-        return callProcedure(ic, new NullCallback(), proc, fieldList);
+        return callProcedure(ic, null, proc, fieldList);
     }
 
-    public boolean callProcedure(ImportContext ic, ProcedureCallback cb, String proc, Object... fieldList) {
-        if (m_stopped) {
-            return false;
-        }
-        // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
-            m_logger.warn("Server is paused and is currently unavailable - please try again later.");
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-        Procedure catProc = m_catalogContext.procedures.get(proc);
-        if (catProc == null) {
-            catProc = m_catalogContext.m_defaultProcs.checkForDefaultProcedure(proc);
-        }
-
-        if (catProc == null) {
-            if (proc.equals("@AdHoc")) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(proc);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-            if (catProc == null) {
-                m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
-                m_failedCount.incrementAndGet();
-                return false;
-            }
-        }
-
-        int counter = 1;
-        int maxSleepNano = 100000;
-        long start = System.nanoTime();
-        while (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS) {
-            try {
-                int nanos = 500 * counter++;
-                Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
-                if (m_stopped) {
-                    return false;
-                }
-                //We have reached max timeout.
-                if (System.nanoTime() - start > ic.getBackpressureTimeout()) {
-                    return false;
-                }
-            } catch (InterruptedException ex) { }
-        }
-        final long nowNanos = System.nanoTime();
-        StoredProcedureInvocation task = new StoredProcedureInvocation();
-        ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
-        //type + procname(len + name) + connectionId (long) + params
-        int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
-        //This is released in callback from adapter side.
-        final BBContainer tcont = getBuffer(sz);
-        final ByteBuffer taskbuf = tcont.b();
-        try {
-            taskbuf.put(ProcedureInvocationType.ORIGINAL.getValue());
-            taskbuf.putInt(proc.length());
-            taskbuf.put(proc.getBytes());
-            taskbuf.putLong(m_adapter.connectionId());
-            pset.flattenToBuffer(taskbuf);
-            taskbuf.flip();
-            task.initFromBuffer(taskbuf);
-        } catch (IOException ex) {
-            m_failedCount.incrementAndGet();
-            m_logger.error("Failed to serialize parameters for stream: " + proc, ex);
-            tcont.discard();
-            return false;
-        }
-
-        final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)catProc.getAttachment();
-
-        int partition = -1;
-        if (catProc.getSinglepartition()) {
-            try {
-                partition = getPartitionForProcedure(ppi.index, ppi.type, task);
-            } catch (Exception e) {
-                m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
-                m_failedCount.incrementAndGet();
-                tcont.discard();
-                return false;
-            }
-        }
-
-        boolean success;
-        success = m_adapter.createTransaction(catProc, cb, task, tcont, partition, nowNanos);
-        if (!success) {
-            tcont.discard();
-            m_failedCount.incrementAndGet();
-        } else {
-            m_submitSuccessCount.incrementAndGet();
-        }
-        return success;
+    public boolean callProcedure(ImportContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
+        return getInternalConnectionHandler()
+                .callProcedure(ic, ic.getBackpressureTimeout(), procCallback, proc, fieldList);
     }
 
-    //Do rate limited logging for messages.
-    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
-        RateLimitedLogger.tryLogForMessage(
-                EstTime.currentTimeMillis(),
-                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
-                m_logger, level,
-                cause, format, args
-                );
+    private InternalConnectionHandler getInternalConnectionHandler() {
+        return VoltDB.instance().getClientInterface().getInternalConnectionHandler();
     }
+
 
     /**
      * Log info message
@@ -298,12 +169,12 @@ public class ImportHandler {
         m_logger.error(message, t);
     }
 
-    public void error(Throwable t, String format, Object...args) {
-        rateLimitedLog(Level.ERROR, t, format, args);
+    public void rateLimitedError(Throwable t, String format, Object...args) {
+        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, t, format, args);
     }
 
-    public void warn(Throwable t, String format, Object...args) {
-        rateLimitedLog(Level.WARN, t, format, args);
+    public void rateLimitedWarn(Throwable t, String format, Object...args) {
+        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, t, format, args);
     }
 
 }

@@ -1909,7 +1909,8 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_ft_unique on t(abs(id+num));\n" +
-                "create index idx_ft on t(abs(num));";
+                "create index idx_ft on t(abs(num));\n" +
+                "create index poweridx on t(power(id, 2));";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());
         Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -2503,6 +2504,12 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer not null);\n" +
                 "create view my_view as select num, count(*) from t group by num;" +
                 "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        // approx_count_distinct is not a supported aggregate function for materialized views.
+        errorMsg = "Materialized view \"MY_VIEW\" must have non-group by columns aggregated by sum, count, min or max.";
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "create view my_view as select id, count(*), approx_count_distinct(num) from t group by id;";
         checkDDLErrorMessage(ddl, errorMsg);
     }
 

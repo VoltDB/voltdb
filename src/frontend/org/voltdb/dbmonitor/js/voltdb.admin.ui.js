@@ -62,6 +62,8 @@ function loadAdminPage() {
         tempTablesMaxSize: $("#temptablesmaxsize"),
         tempTablesMaxSizeLabel: $("#temptablesmaxsizeUnit"),
         snapshotPriority: $("#snapshotpriority"),
+        memoryLimitSize: $("#memoryLimitSize"),
+        memoryLimitSizeUnit: $("#memoryLimitSizeUnit"),
         clientPort: $('#clientport'),
         adminPort: $('#adminport'),
         httpPort: $('#httpport'),
@@ -2860,6 +2862,8 @@ function loadAdminPage() {
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != null ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != null ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
+            adminDOMObjects.memoryLimitSize.text(adminConfigValues.memorylimit != undefined ? adminConfigValues.memorylimit : "Not Enforced");
+            adminDOMObjects.memoryLimitSizeUnit.text(adminConfigValues.memorylimit != undefined ? "GB" : "");
             configureQueryTimeout(adminConfigValues);
 
             //edit configuration
@@ -2990,7 +2994,7 @@ function loadAdminPage() {
 
             if (result == "") {
                 result += '<tr class="propertyLast subLabelRow">' +
-                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
+                        '<td width="67%" class="configLabel" colspan="3" id="noConfigExport">No configuration available.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
             }

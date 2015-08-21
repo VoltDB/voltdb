@@ -323,10 +323,10 @@ public class RejoinProducer extends JoinProducerBase {
                         REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
                         exportSequenceNumbers = event.exportSequenceNumbers;
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
-                    }
 
-                    drSequenceNumbers = event.drSequenceNumbers;
-                    VoltDB.instance().getConsumerDRGateway().populateLastAppliedSegmentIds(event.remoteDCLastIds);
+                        drSequenceNumbers = event.drSequenceNumbers;
+                        VoltDB.instance().getConsumerDRGateway().populateLastAppliedSegmentIds(event.remoteDCLastIds);
+                    }
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");
@@ -349,7 +349,7 @@ public class RejoinProducer extends JoinProducerBase {
                         siteConnection,
                         exportSequenceNumbers,
                         drSequenceNumbers,
-                        true /* requireExistingSequenceNumbers */);
+                        m_schemaHasNoTables == false /* requireExistingSequenceNumbers */);
             }
         };
         try {

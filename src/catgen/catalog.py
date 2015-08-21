@@ -463,7 +463,7 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
         for field in actualFields:
             if field.type[-1] == '*':
                 ftype = field.type.rstrip('*')
-                itr = ftype.lower() + '_iter'
+                itr = field.name.lower() + '_iter'
                 privname = 'm_' + field.name
                 tab = '   '
                 write(interp('$tab std::map<std::string, $ftype*>::const_iterator $itr = $privname.begin();', locals()))

@@ -36,7 +36,8 @@ class Overview extends Module {
         autoSnapshotsValue			{ $("#txtAutoSnapshot") }
         commandLoggingValue			{ $("#commandLogLabel") }
 
-        securityEdit				{ $("#securityEdit") }
+        securityEdit				{ $("#securityEdit", class:"edit")}
+
         securityEditCheckbox		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-6.hasSubLabel.parent.security td.securitytd div.icheckbox_square-aero.checked.customCheckbox ins.iCheck-helper") }
         securityEditOk				{ $("#btnEditSecurityOk") }
         securityEditCancel			{ $("#btnEditSecurityCancel") }
@@ -124,7 +125,7 @@ class Overview extends Module {
         exportExpanded              { $(class:"labelCollapsed labelExpanded", text:"Export") }
         exportTablesText            { $(class:"configLabel", text:"Export Tables") }
         listOfExport                { $("#lstExportTbl") }
-        exportNoConfigAvailable     { $(class:"configLabel", text:"No configuration available.") }
+        exportNoConfigAvailable     { $("#noConfigExport") }
         exportConfiguration         { $("#exportConfiguration") }
         exportConfig                { $(class:"configLabel expoStream", title:"Click to expand/collapse", number) }
         
@@ -221,12 +222,15 @@ class Overview extends Module {
 		queryTimeout			{ $(class:"configLabel", text:"Query Timeout") }
 		maxTempTableMemory		{ $(class:"configLabel", text:"Max Temp Table Memory") }
 		snapshotPriority		{ $(class:"configLabel", text:"Snapshot Priority") }
-		
+        memoryLimitSize         { $(class:"configLabel", text:"Memory Limit") }
+
 		maxJavaHeapValue		{ $("#maxJavaHeap") }
 		heartbeatTimeoutValue	{ $("#formHeartbeatTimeout") }
 		queryTimeoutValue		{ $("#queryTimeOutUnitSpan") }
 		maxTempTableMemoryValue	{ $("#temptablesmaxsizeUnit") }
 		snapshotPriorityValue	{ $("#snapshotpriority") }
+        memoryLimitSizeValue    { $("#memoryLimitSize") }
+        memoryLimitSizeUnit     { $("#memoryLimitSizeUnit") }
 
         // heartbeat timeout
         heartTimeoutEdit		{ $("#btnEditHrtTimeOut") }

@@ -49,7 +49,6 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
-    private ConsumerDRGateway m_consumerDRGateway = null;
 
     public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
     {
@@ -85,10 +84,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
             backend = BackendTarget.NATIVE_EE_JNI;
         }
 
-        m_consumerDRGateway = consumerDRGateway;
-
         super.configureCommon(backend, catalogContext, serializedCatalog,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null, null);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds,
+                null, null, consumerDRGateway);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
@@ -124,11 +122,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 long txnid = Long.MIN_VALUE;
                 long binaryLogDRId = Long.MIN_VALUE;
                 long binaryLogUniqueId = Long.MIN_VALUE;
+                long localMpUniqueId = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
                     binaryLogDRId = res.m_binaryLogDRId;
                     binaryLogUniqueId = res.m_binaryLogUniqueId;
+                    localMpUniqueId = res.m_localDrUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -166,7 +166,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
                     if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
-                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, Long.MIN_VALUE);
+                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, localMpUniqueId);
                     }
                 }
                 else {
