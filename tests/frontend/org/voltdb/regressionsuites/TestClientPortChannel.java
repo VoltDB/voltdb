@@ -349,10 +349,8 @@ public class TestClientPortChannel extends TestCase {
 
     final int iVERSION = 0;
     final int iLENGH = 1;
-    final byte TIMEOUT = (byte) -1;
     final byte VAR1[] = {
         0,                       // Version (1 byte)
-        TIMEOUT,                 // TIMEOUT not set flag
         0, 0, 0, 5,              // procedure name string length (4 byte int)
         '@', 'P', 'i', 'n', 'g', // procedure name
         0, 0, 0, 0, 0, 0, 0, 0,  // Client Data (8 byte long)
@@ -396,40 +394,42 @@ public class TestClientPortChannel extends TestCase {
         System.out.println("Testing good Ping invocation");
         verifyInvocation(pingr, channel, (byte) 1);
 
+        final byte ERROR_CODE = -3;
+
         //With bad message length of various shapes and sizes
         //Procedure name length mismatch
         System.out.println("Testing Ping invocation with bad procname length");
         byte bad_length[] = VAR1.clone();
         updateLength(bad_length, 6);
-        verifyInvocation(bad_length, channel, (byte) -3);
+        verifyInvocation(bad_length, channel, ERROR_CODE);
 
         //Procedure name length -ve long
         System.out.println("Testing Ping invocation with -1 procname length.");
         byte neg1_length[] = VAR1.clone();
         updateLength(neg1_length, -1);
-        verifyInvocation(neg1_length, channel, (byte) -3);
+        verifyInvocation(neg1_length, channel, ERROR_CODE);
 
         System.out.println("Testing Ping invocation with -200 procname length.");
         byte neg2_length[] = VAR1.clone();
         updateLength(neg2_length, -200);
-        verifyInvocation(neg2_length, channel, (byte) -3);
+        verifyInvocation(neg2_length, channel, ERROR_CODE);
 
         //Procedure name length too long
         System.out.println("Testing Ping invocation with looooong procname length.");
         byte too_long_length[] = VAR1.clone();
         updateLength(too_long_length, Integer.MAX_VALUE);
-        verifyInvocation(too_long_length, channel, (byte) -3);
+        verifyInvocation(too_long_length, channel, ERROR_CODE);
 
         //Bad protocol version
         System.out.println("Testing good Ping invocation with bad protocol version.");
         byte bad_proto[] = VAR1.clone();
-        bad_proto[iVERSION] = 1;
-        verifyInvocation(bad_proto, channel, (byte) 1);
+        bad_proto[iVERSION] = 8; // VERSION 1 is valid NOW
+        verifyInvocation(bad_proto, channel, ERROR_CODE);
 
         //Client Data - Bad Data meaning invalid number of bytes.
         System.out.println("Testing good Ping invocation with incomplete client data");
         byte bad_cl_data[] = Arrays.copyOfRange(VAR1, 0, 12);
-        verifyInvocation(bad_cl_data, channel, (byte) -3);
+        verifyInvocation(bad_cl_data, channel, ERROR_CODE);
 
         System.out.println("Testing good Ping invocation Again");
         verifyInvocation(pingr, channel, (byte) 1);
@@ -447,7 +447,6 @@ public class TestClientPortChannel extends TestCase {
 
     final byte VAR2[] = {
         0,                       // Version (1 byte)
-        TIMEOUT,                 // TIMEOUT not set flag
         0, 0, 0, 8,              // procedure name string length (4 byte int)
         'B', '.', 'i', 'n', 's', 'e', 'r', 't', // procedure name
         0, 0, 0, 0, 0, 0, 0, 0,  // Client Data (8 byte long)
@@ -504,7 +503,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Lie length of param string.
         byte i3[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -515,7 +513,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Pass string length of 8 but dont pass string.
         byte i4[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -523,13 +520,11 @@ public class TestClientPortChannel extends TestCase {
             0, 0, 0, 0 //String length
         };
         updateShortBytes(i4, (short) 1);
-        int iStringLen = i4.length - 4;
-        updateIntBytes(i4, 8, iStringLen);
+        updateIntBytes(i4, 8, 24);
         verifyInvocation(i4, channel, ERROR_CODE);
 
         //Pass string length of 6 and pass 6 byte string this should succeed.
         byte i5[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -538,12 +533,11 @@ public class TestClientPortChannel extends TestCase {
             'v', 'o', 'l', 't', 'd', 'b'
         };
         updateShortBytes(i5, (short) 1);
-        updateIntBytes(i5, 6, iStringLen);
+        updateIntBytes(i5, 6, 24);
         verifyInvocation(i5, channel, (byte) 1);
 
         //Lie length of param  array.
         byte i6[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -554,7 +548,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Lie length of param  array.
         byte i61[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -566,7 +559,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Array of Array not supported should not crash server.
         byte i62[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -578,7 +570,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Array of string but no data.
         byte i63[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -590,7 +581,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Array of string with bad length
         byte i631[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -603,7 +593,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Array of long but no data.
         byte i64[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -615,7 +604,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Array of long with non parsable long
         byte i65[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -628,7 +616,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Lie data type invaid data type.
         byte i7[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
@@ -639,7 +626,6 @@ public class TestClientPortChannel extends TestCase {
 
         //Lie data type invaid data type.
         byte i71[] = {0, //Version
-            TIMEOUT,
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
