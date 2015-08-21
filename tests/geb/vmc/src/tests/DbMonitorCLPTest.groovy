@@ -345,8 +345,8 @@ class DbMonitorCLPTest extends TestBase {
         when: "Set the value of Master filter"
         println("isCLPOpen" + isCLPOpen)
         if(isCLPOpen==true) {
-            if (page.clpServerRows.size() > 1) {
-                searchText = waitFor(20){page.clpServerRows[0].text().substring(0, 1)}
+            if (waitFor(20){page.clpServerRows.size()} > 1) {
+                searchText = page.clpServerRows[0].text().substring(0, 1)
                 page.filterServer.value(page.clpServerRows[0].text().substring(0, 1))
             } else {
                 isValid = false
