@@ -237,6 +237,9 @@ public class TestQueryTimeout extends RegressionSuite {
             return;
         }
         Client client = this.getClient();
+        // negative tests on the timeout value
+        subtestNegativeIndividualProcTimeout(client);
+
         boolean syncs[] = {true, false};
         for (boolean sync : syncs) {
             System.out.println("Testing " + (sync ? "synchronously": "asynchronously") + "  call");
@@ -261,6 +264,34 @@ public class TestQueryTimeout extends RegressionSuite {
             // truncate the data
             truncateTables(client);
         }
+    }
+
+    private void subtestNegativeIndividualProcTimeout(Client client) throws IOException, ProcCallException, InterruptedException {
+        // negative timeout value
+        try {
+            client.callProcedureWithTimeout(TIMEOUT * -1, "PartitionReadOnlyProc");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Timeout value can't be negative"));
+        }
+
+        try {
+            client.callProcedureWithTimeout(m_callback, TIMEOUT * -1, "PartitionReadOnlyProc");
+            client.drain();
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Timeout value can't be negative"));
+        }
+
+        // Integer overflow
+        try {
+            client.callProcedureWithTimeout(TIMEOUT * Integer.MAX_VALUE, "PartitionReadOnlyProc");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Timeout value can't be negative"));
+        }
+
+        // underflow, asynchronously should be on the same path...
     }
 
     //
