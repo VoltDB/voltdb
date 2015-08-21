@@ -261,11 +261,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                     return plan;
                 }
             }
-            if (numberOfExprs > 1) {
+            else if (numberOfExprs > 1) {
                 // ENG-4016: Optimization for query SELECT MAX(X) FROM T WHERE [other prefix filters] X < / <= ?
                 // Just keep trying, don't return early.
                 boolean earlyReturn = true;
-                for (int i=0; i<exprs.size(); ++i) {
+                for (int i=0; i<numberOfExprs; ++i) {
                     AbstractExpression expr = exprs.get(i);
                     AbstractExpression indexedExpr = indexedExprs == null ? expr.getLeft() : indexedExprs.get(i);
                     if ( aggExpr.bindingToIndexedExpression(indexedExpr) != null &&
