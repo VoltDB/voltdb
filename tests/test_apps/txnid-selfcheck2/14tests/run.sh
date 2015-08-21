@@ -68,11 +68,11 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB create -d deployment14.xml -l $LICENSE -H $HOST $APPNAME.jar
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 function restore() {
-    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB recover -d deployment14.xml
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB recover -d deployment.xml
 }
 
 # run the client that drives the example
@@ -93,7 +93,7 @@ function async-benchmark() {
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=120 \
-        --servers=volt13i,volt13j,volt13l \
+        --servers=volt14a \
         --threads=20 \
         --threadoffset=0 \
         --minvaluesize=1024000 \

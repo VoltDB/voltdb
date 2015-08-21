@@ -6,7 +6,7 @@ APPNAME="txnid"
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(pwd)/../../../bin"
+    VOLTDB_BIN="$(pwd)/../../../../bin"
 fi
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
@@ -15,8 +15,8 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
 else
-    VOLTDB_LIB="`pwd`/../../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
+    VOLTDB_LIB="`pwd`/../../../../lib"
+    VOLTDB_VOLTDB="`pwd`/../../../../voltdb"
 fi
 
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
@@ -35,8 +35,8 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $CLASSPATH -d obj \
-        src/txnIdSelfCheck/*.java \
-        src/txnIdSelfCheck/procedures/*.java
+        ../src/txnIdSelfCheck/*.java \
+        ../src/txnIdSelfCheck/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -46,18 +46,18 @@ function catalog() {
     srccompile
 
     # primary catalog
-    $VOLTDB compile --classpath obj -o $APPNAME.jar src/txnIdSelfCheck/ddl.sql
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ../src/txnIdSelfCheck/ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 
     # alternate catalog that adds an index
     $VOLTDB compile --classpath obj -o $APPNAME-alt.jar \
-        src/txnIdSelfCheck/ddl.sql src/txnIdSelfCheck/ddl-annex.sql
+        ../src/txnIdSelfCheck/ddl.sql ../src/txnIdSelfCheck/ddl-annex.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 
     # primary no-export catalog
-    $VOLTDB compile --classpath obj -o $APPNAME-noexport.jar src/txnIdSelfCheck/ddl-noexport.sql
+    $VOLTDB compile --classpath obj -o $APPNAME-noexport.jar ../src/txnIdSelfCheck/ddl-noexport.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 
@@ -68,30 +68,34 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    ~/voltdb-ent-5.4/bin/voltdb create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB create -d deployment10.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+function restore() {
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB recover -d deployment10.xml
 }
 
 # run the client that drives the example
 function client() {
-    benchmark
+    async-benchmark
 }
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function benchmark-help() {
+function aysnc-benchmark-help() {
     srccompile
     java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
 }
 
-function benchmark() {
+function async-benchmark() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=99999 \
-        --servers=volt10a \
+	--servers=volt13i \
         --threads=20 \
-	--threadoffset=0 \
+        --threadoffset=0 \
         --minvaluesize=1024000 \
         --maxvaluesize=1024000 \
         --entropy=127 \

@@ -51,7 +51,7 @@ function catalog() {
 
     # alternate catalog that adds an index
     $VOLTDB compile --classpath obj -o $APPNAME-alt.jar \
-        ../src/txnIdSelfCheck/ddl.sql ../src/txnIdSelfCheck/ddl-annex.sql
+        ./src/txnIdSelfCheck/ddl.sql ../src/txnIdSelfCheck/ddl-annex.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 
@@ -67,11 +67,11 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB create -d deployment13.xml -l $LICENSE -H $HOST $APPNAME.jar
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 function recover() {
-    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB recover -d deployment13.xml
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB recover -d deployment.xml -l $LICENSE
 }
 
 # run the client that drives the example

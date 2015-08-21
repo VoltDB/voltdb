@@ -69,11 +69,11 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB create -d deployment10.xml -l $LICENSE -H $HOST $APPNAME.jar
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 function restore() {
-    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB recover -d deployment10.xml
+    VOLTDB_OPTS="-DLOG_SEGMENT_SIZE=5" $VOLTDB recover -d deployment.xml -l $LICENSE
 }
 
 # run the client that drives the example
