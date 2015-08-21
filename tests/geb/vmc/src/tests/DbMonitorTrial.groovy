@@ -310,4 +310,180 @@ class DbMonitorTrial extends TestBase {
         then:
 		println("Test End: Verify pagination in Command Log Performance table")
     }
+    
+    def "Verify pagination in Stored Procedures table"() {      
+        expect: 'at DbMonitorPage'
+        at DbMonitorPage
+        
+        when:
+        println("Test Start: Verify pagination in Stored Procedures table")
+        
+        int count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                waitFor(waitTime) { page.showHideData.isDisplayed() }
+                println("Success")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        String totalPageString = ""
+        count = 0
+        while(count<numberOfTrials) {
+            count++
+            try {
+                totalPageString = page.storedProcTotalPages.text()
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+            }
+        }
+        println("Total page " + totalPageString)
+        int totalPage = Integer.parseInt(totalPageString)
+        int expectedCurrentPage = 1
+        int actualCurrentPage = 1
+            
+        if(totalPage>1) {
+            println("There are multiple pages")
+            
+            while(expectedCurrentPage <= totalPage) {
+                actualCurrentPage = Integer.parseInt(page.storedProcCurrentPage.text())
+                if(actualCurrentPage != expectedCurrentPage) {
+                    assert false
+                }
+                if(expectedCurrentPage < totalPage) {
+                    count = 0
+                    
+                    while(count<numberOfTrials) {
+                        count++
+                        try {
+                            page.storedProcNext.click()
+                        } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                        } catch(geb.error.RequiredPageContentNotPresent e) {
+                        }
+                    }
+                    actualCurrentPage = Integer.parseInt(page.storedProcCurrentPage.text())
+                }
+                expectedCurrentPage++
+            }
+                
+            expectedCurrentPage = totalPage
+               
+            while(expectedCurrentPage >= 1) {
+                actualCurrentPage = Integer.parseInt(page.storedProcCurrentPage.text())
+                if(actualCurrentPage != expectedCurrentPage) {
+                    assert false
+                }
+                if(expectedCurrentPage > 1) {
+                    count = 0
+                    
+                    while(count<numberOfTrials) {
+                        count++
+                        try {
+                            page.storedProcPrev.click()
+                        } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                        } catch(geb.error.RequiredPageContentNotPresent e) {
+                        }
+                    }
+                    actualCurrentPage = Integer.parseInt(page.storedProcCurrentPage.text())
+                }
+                expectedCurrentPage--
+            }
+        }
+        else {
+            println("There are no multiple pages")
+        }		
+        then:
+		println("Test End: Verify pagination in Stored Procedures table")
+    
+    }
+    
+    def "Verify pagination in Database table"() {      
+        expect: 'at DbMonitorPage'
+        at DbMonitorPage
+        
+        when:
+        println("Test Start: Verify pagination in Database table")
+        
+        int count = 0
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                waitFor(waitTime) { page.showHideData.isDisplayed() }
+                println("Success")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+        
+        String totalPageString = ""
+        count = 0
+        while(count<numberOfTrials) {
+            count++
+            try {
+                totalPageString = page.databaseTableTotalPage.text()
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+            }
+        }
+        println("Total page " + totalPageString)
+        int totalPage = Integer.parseInt(totalPageString)
+        int expectedCurrentPage = 1
+        int actualCurrentPage = 1
+            
+        if(totalPage>1) {
+            println("There are multiple pages")
+            
+            while(expectedCurrentPage <= totalPage) {
+                actualCurrentPage = Integer.parseInt(page.databaseTableCurrentPage.text())
+                if(actualCurrentPage != expectedCurrentPage) {
+                    assert false
+                }
+                if(expectedCurrentPage < totalPage) {
+                    count = 0
+                    
+                    while(count<numberOfTrials) {
+                        count++
+                        try {
+                            page.tablesNext.click()
+                        } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                        } catch(geb.error.RequiredPageContentNotPresent e) {
+                        }
+                    }
+                    actualCurrentPage = Integer.parseInt(page.databaseTableCurrentPage.text())
+                }
+                expectedCurrentPage++
+            }
+                
+            expectedCurrentPage = totalPage
+               
+            while(expectedCurrentPage >= 1) {
+                actualCurrentPage = Integer.parseInt(page.databaseTableCurrentPage.text())
+                if(actualCurrentPage != expectedCurrentPage) {
+                    assert false
+                }
+                if(expectedCurrentPage > 1) {
+                    count = 0
+                    
+                    while(count<numberOfTrials) {
+                        count++
+                        try {
+                            page.tablesPrev.click()
+                        } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                        } catch(geb.error.RequiredPageContentNotPresent e) {
+                        }
+                    }
+                    actualCurrentPage = Integer.parseInt(page.databaseTableCurrentPage.text())
+                }
+                expectedCurrentPage--
+            }
+        }
+        else {
+            println("There are no multiple pages")
+        }		
+        then:
+		println("Test End: Verify pagination in Database table")
+    
+    }
 } 

@@ -273,6 +273,16 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         clpCurrentPage              { $("#tblCmdLog_paginate > div > span.pageIndex") }
         clpTotalPages               { $("#tblCmdLog_paginate > div > span.totalPages") }
+        
+        //
+        storedProcPrev              { $("#previousProcedures") }
+        storedProcNext              { $("#nextProcedures") }
+        storedProcCurrentPage       { $("#lblPrevious") }
+        storedProcTotalPages        { $("#lblTotalPages") }
+        
+        //
+        tablesPrev                  { $("#previousTables") }
+        tablesNext                  { $("#nextTables") }
     }
 
     static at = {
