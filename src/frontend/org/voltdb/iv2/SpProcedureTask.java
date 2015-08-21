@@ -77,18 +77,18 @@ public class SpProcedureTask extends ProcedureTask
         SpTransactionState txnState = (SpTransactionState)m_txnState;
 
         InitiateResponseMessage response;
-        int originalTimeout = siteConnection.getFragTimeout();
-        int individualTimeout = m_txnState.getInvocation().getFragTimeout();
+        int originalTimeout = siteConnection.getBatchTimeout();
+        int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
         try {
             // run the procedure with a specific individual timeout
             if (BatchTimeoutType.isUserSetTimeout(individualTimeout) ) {
-                siteConnection.setFragTimeout(individualTimeout);
+                siteConnection.setBatchTimeout(individualTimeout);
             }
             response = processInitiateTask(txnState.m_initiationMsg, siteConnection);
         } finally {
             // reset the deployment timeout value back to its original value
             if (BatchTimeoutType.isUserSetTimeout(individualTimeout) ) {
-                siteConnection.setFragTimeout(originalTimeout);
+                siteConnection.setBatchTimeout(originalTimeout);
             }
         }
 

@@ -150,7 +150,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     byte[] m_procedureName = null;
     int m_currentBatchIndex = 0;
 
-    int m_fragTimeout = BatchTimeoutType.NO_TIMEOUT;
+    int m_batchTimeout = BatchTimeoutType.NO_TIMEOUT;
 
     public int getCurrentBatchIndex() {
         return m_currentBatchIndex;
@@ -206,7 +206,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_currentBatchIndex = ftask.m_currentBatchIndex;
         m_involvedPartitions = ftask.m_involvedPartitions;
         m_procNameToLoad = ftask.m_procNameToLoad;
-        m_fragTimeout = ftask.m_fragTimeout;
+        m_batchTimeout = ftask.m_batchTimeout;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -382,12 +382,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
     }
 
-    public int getFragTimeout() {
-        return m_fragTimeout;
+    public int getBatchTimeout() {
+        return m_batchTimeout;
     }
 
-    public void setFragTimeout(int fragTimeout) {
-        m_fragTimeout = fragTimeout;
+    public void setBatchTimeout(int batchTimeout) {
+        m_batchTimeout = batchTimeout;
     }
 
     public boolean isFinalTask() {
@@ -592,7 +592,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // 1 byte for the timeout flag
         msgsize += 1;
 
-        msgsize += m_fragTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4;
+        msgsize += m_batchTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4;
 
         // Involved partitions
         msgsize += 2 + m_involvedPartitions.size() * 4;
@@ -746,11 +746,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.putInt(m_currentBatchIndex);
 
         // put byte flag for timeout value and 4 bytes int value if necessary
-        if (m_fragTimeout == BatchTimeoutType.NO_TIMEOUT) {
+        if (m_batchTimeout == BatchTimeoutType.NO_TIMEOUT) {
             buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
         } else {
             buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
-            buf.putInt(m_fragTimeout);
+            buf.putInt(m_batchTimeout);
         }
 
         buf.putShort((short) m_involvedPartitions.size());
@@ -874,11 +874,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // ints for batch context
         m_currentBatchIndex = buf.getInt();
 
-        BatchTimeoutType fragTimeoutType = BatchTimeoutType.typeFromByte(buf.get());
-        if (fragTimeoutType == BatchTimeoutType.NO_BATCH_TIMEOUT) {
-            m_fragTimeout = BatchTimeoutType.NO_TIMEOUT;
+        BatchTimeoutType batchTimeoutType = BatchTimeoutType.typeFromByte(buf.get());
+        if (batchTimeoutType == BatchTimeoutType.NO_BATCH_TIMEOUT) {
+            m_batchTimeout = BatchTimeoutType.NO_TIMEOUT;
         } else {
-            m_fragTimeout = buf.getInt();
+            m_batchTimeout = buf.getInt();
         }
 
         // Involved partition

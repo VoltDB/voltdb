@@ -73,12 +73,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         private final long m_origInitialLogDuration;
 
         AutoEngineSettings() {
-            m_origTimeoutLatency = m_ee.getFragTimeout();
+            m_origTimeoutLatency = m_ee.getBatchTimeout();
             m_origInitialLogDuration = m_ee.getInitialLogDurationForTest();
         }
 
         public void setTimeoutLatency(int timeoutLatency) {
-            m_ee.setFragTimeout(timeoutLatency);
+            m_ee.setBatchTimeout(timeoutLatency);
         }
 
         public void setInitialLogDuration(long initialLogDuration) {
@@ -88,7 +88,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Sets execution engine settings back to what they were.
         @Override
         public void close() throws Exception {
-            m_ee.setFragTimeout(m_origTimeoutLatency);
+            m_ee.setBatchTimeout(m_origTimeoutLatency);
             m_ee.setInitialLogDurationForTest(m_origInitialLogDuration);
         }
 

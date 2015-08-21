@@ -119,8 +119,8 @@ public interface SiteProcedureConnection {
      */
     public void setProcedureName(String procedureName);
 
-    public void setFragTimeout(int fragTimeout);
-    public int getFragTimeout();
+    public void setBatchTimeout(int batchTimeout);
+    public int getBatchTimeout();
 
     /**
      * Legacy recursable execution interface for MP transaction states.

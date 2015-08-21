@@ -220,6 +220,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public ClientResponse callProcedureWithTimeout(int batchTimeout, String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
+        if (batchTimeout < 0) {
+            throw new RuntimeException("Timeout value can't be negative." );
+        }
+
         return callProcedureWithClientTimeout(batchTimeout, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
@@ -322,6 +326,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedureWithTimeout(ProcedureCallback callback, int batchTimeout, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
+        if (batchTimeout < 0) {
+            throw new RuntimeException("Timeout value can't be negative." );
+        }
+
         //Time unit doesn't matter in this case since the timeout isn't being specified
         return callProcedureWithClientTimeout(callback, batchTimeout, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);

@@ -97,11 +97,11 @@ public class FragmentTask extends TransactionTask
             }
         }
 
-        int originalTimeout = siteConnection.getFragTimeout();
-        int individualTimeout = m_fragmentMsg.getFragTimeout();
+        int originalTimeout = siteConnection.getBatchTimeout();
+        int individualTimeout = m_fragmentMsg.getBatchTimeout();
         try {
             if (BatchTimeoutType.isUserSetTimeout(individualTimeout)) {
-                siteConnection.setFragTimeout(individualTimeout);
+                siteConnection.setBatchTimeout(individualTimeout);
             }
 
             // execute the procedure
@@ -111,7 +111,7 @@ public class FragmentTask extends TransactionTask
             m_initiator.deliver(response);
         } finally {
             if (BatchTimeoutType.isUserSetTimeout(individualTimeout)) {
-                siteConnection.setFragTimeout(originalTimeout);
+                siteConnection.setBatchTimeout(originalTimeout);
             }
         }
 

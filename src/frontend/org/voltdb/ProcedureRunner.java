@@ -233,7 +233,7 @@ public class ProcedureRunner {
      */
     long getTransactionId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+        if (invocation != null && ProcedureInvocationType.isDRv1Type(invocation.getType())) {
             return invocation.getOriginalTxnId();
         } else {
             return m_txnState.txnId;
@@ -415,7 +415,7 @@ public class ProcedureRunner {
             }
             if ((m_txnState != null) && // may be null for tests
                 (m_txnState.getInvocation() != null) &&
-                (m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED))
+                (ProcedureInvocationType.isDRv1Type(m_txnState.getInvocation().getType())))
             {
                 retval.convertResultsToHashForDeterminism();
             }
@@ -544,7 +544,7 @@ public class ProcedureRunner {
      */
     public Date getTransactionTime() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+        if (invocation != null && ProcedureInvocationType.isDRv1Type(invocation.getType())) {
             return new Date(UniqueIdGenerator.getTimestampFromUniqueId(invocation.getOriginalUniqueId()));
         } else {
             return new Date(UniqueIdGenerator.getTimestampFromUniqueId(m_txnState.uniqueId));
@@ -559,7 +559,7 @@ public class ProcedureRunner {
      */
     public long getUniqueId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+        if (invocation != null && ProcedureInvocationType.isDRv1Type(invocation.getType())) {
             return invocation.getOriginalUniqueId();
         } else {
             return m_txnState.uniqueId;
@@ -1294,7 +1294,7 @@ public class ProcedureRunner {
                                                  false,
                                                  txnState.isForReplay());
            m_localTask.setProcedureName(procedureName);
-           m_localTask.setFragTimeout(m_txnState.getInvocation().getFragTimeout());
+           m_localTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1307,7 +1307,7 @@ public class ProcedureRunner {
            m_distributedTask.setProcedureName(procedureName);
            // this works fine if procToLoad is NULL
            m_distributedTask.setProcNameToLoad(procToLoad);
-           m_distributedTask.setFragTimeout(m_txnState.getInvocation().getFragTimeout());
+           m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
        }
 
        /*

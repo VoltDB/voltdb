@@ -39,14 +39,14 @@ public class ProcedureInvocation {
     private final long m_originalUniqueId;
     private final ProcedureInvocationType m_type;
 
-    private int m_fragTimeout;
+    private int m_batchTimeout;
 
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
         this(-1, -1, handle, procName, parameters);
     }
 
-    public ProcedureInvocation(long handle, int fragTimeout, String procName, Object... parameters) {
-        this(-1, -1, handle, fragTimeout, procName, parameters);
+    public ProcedureInvocation(long handle, int batchTimeout, String procName, Object... parameters) {
+        this(-1, -1, handle, batchTimeout, procName, parameters);
     }
 
     ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
@@ -55,7 +55,7 @@ public class ProcedureInvocation {
     }
 
     ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
-            int fragTimeout, String procName, Object... parameters) {
+            int batchTimeout, String procName, Object... parameters) {
         super();
         m_originalTxnId = originalTxnId;
         m_originalUniqueId = originalUniqueId;
@@ -67,12 +67,16 @@ public class ProcedureInvocation {
 
         // auto-set the type if both txn IDs are set
         if (m_originalTxnId == -1 && m_originalUniqueId == -1) {
-            m_type = ProcedureInvocationType.ORIGINAL;
+            if (BatchTimeoutType.isUserSetTimeout(batchTimeout)) {
+                m_type = ProcedureInvocationType.SECOND;
+            } else {
+                m_type = ProcedureInvocationType.ORIGINAL;
+            }
         } else {
             m_type = ProcedureInvocationType.REPLICATED;
         }
 
-        m_fragTimeout = fragTimeout;
+        m_batchTimeout = batchTimeout;
     }
 
     /** return the clientHandle value */
@@ -88,9 +92,14 @@ public class ProcedureInvocation {
         try {
             m_procNameBytes = m_procName.getBytes("UTF-8");
         } catch (Exception e) {/*No UTF-8? Really?*/}
+
+        int timeoutSize = 0;
+        if (m_type.getValue() >= BatchTimeoutType.BATCH_TIMEOUT_VERSION) {
+            timeoutSize = 1 + (m_batchTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4);
+        }
         int size =
-            1 + (m_type == ProcedureInvocationType.REPLICATED ? 16 : 0) +
-            1 + (m_fragTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4) +
+            1 + (ProcedureInvocationType.isDRv1Type(m_type)? 16 : 0) +
+            timeoutSize +
             m_procNameBytes.length + 4 + 8 + m_parameters.getSerializedSize();
         return size;
     }
@@ -105,16 +114,18 @@ public class ProcedureInvocation {
 
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(m_type.getValue());//Version
-        if (m_type == ProcedureInvocationType.REPLICATED) {
+        if (ProcedureInvocationType.isDRv1Type(m_type)) {
             buf.putLong(m_originalTxnId);
             buf.putLong(m_originalUniqueId);
         }
 
-        if (m_fragTimeout == BatchTimeoutType.NO_TIMEOUT) {
-            buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
-        } else {
-            buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
-            buf.putInt(m_fragTimeout);
+        if (m_type.getValue() >= BatchTimeoutType.BATCH_TIMEOUT_VERSION) {
+            if (m_batchTimeout == BatchTimeoutType.NO_TIMEOUT) {
+                buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
+            } else {
+                buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
+                buf.putInt(m_batchTimeout);
+            }
         }
 
         SerializationHelper.writeVarbinary(m_procNameBytes, buf);

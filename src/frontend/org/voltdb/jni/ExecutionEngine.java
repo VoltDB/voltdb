@@ -99,11 +99,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                      // not final to allow unit testing
     private static final long LONG_OP_THRESHOLD = 10000;
 
-    public final int INITIAL_TIMEOUT_VALUE = 0;
+    public final int INITIAL_BATCH_TIMEOUT_VALUE = 0;
     /** Fragment or batch time out in milliseconds.
      *  By default 0 means no time out setting.
      */
-    private int m_fragTimeout = INITIAL_TIMEOUT_VALUE;
+    private int m_batchTimeout = INITIAL_BATCH_TIMEOUT_VALUE;
 
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
@@ -129,18 +129,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         return m_dirty;
     }
 
-    public void setFragTimeout(int fragTimeout) {
-        m_fragTimeout = fragTimeout;
+    public void setBatchTimeout(int batchTimeout) {
+        m_batchTimeout = batchTimeout;
     }
 
-    public int getFragTimeout() {
-        return m_fragTimeout;
+    public int getBatchTimeout() {
+        return m_batchTimeout;
     }
 
     private boolean shouldTimedOut (long latency) {
         if (m_readOnly
-                && m_fragTimeout > INITIAL_TIMEOUT_VALUE
-                && m_fragTimeout < latency) {
+                && m_batchTimeout > INITIAL_BATCH_TIMEOUT_VALUE
+                && m_batchTimeout < latency) {
             return true;
         }
         return false;

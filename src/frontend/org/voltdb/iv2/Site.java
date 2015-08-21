@@ -520,7 +520,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_mpDrGateway != null);
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializedCatalog);
-            eeTemp.setFragTimeout(m_context.cluster.getDeployment().get("deployment").
+            eeTemp.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getQuerytimeout());
         }
         // just print error info an bail if we run into an error here
@@ -1195,7 +1195,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         m_context = context;
-        m_ee.setFragTimeout(m_context.cluster.getDeployment().get("deployment").
+        m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
@@ -1321,12 +1321,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setFragTimeout(int fragTimeout) {
-        m_ee.setFragTimeout(fragTimeout);
+    public void setBatchTimeout(int batchTimeout) {
+        m_ee.setBatchTimeout(batchTimeout);
     }
 
     @Override
-    public int getFragTimeout() {
-        return m_ee.getFragTimeout();
+    public int getBatchTimeout() {
+        return m_ee.getBatchTimeout();
     }
 }

@@ -176,6 +176,7 @@ public class TestQueryTimeout extends RegressionSuite {
                 client.drain();
             }
         } catch(Exception ex) {
+            System.err.println(ex.getMessage());
             fail(procName + " is suppose to succeed!");
         }
 

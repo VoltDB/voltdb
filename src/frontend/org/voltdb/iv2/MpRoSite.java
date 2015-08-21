@@ -550,12 +550,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setFragTimeout(int fragTimeout) {
+    public void setBatchTimeout(int batchTimeout) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 
     @Override
-    public int getFragTimeout() {
+    public int getBatchTimeout() {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 }

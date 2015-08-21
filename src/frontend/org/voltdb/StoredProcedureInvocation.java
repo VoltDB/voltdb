@@ -64,7 +64,7 @@ public class StoredProcedureInvocation implements JSONString {
         returned to the client in the ClientResponse */
     long clientHandle = -1;
 
-    int fragTimeout = BatchTimeoutType.NO_TIMEOUT;
+    int batchTimeout = BatchTimeoutType.NO_TIMEOUT;
 
     public StoredProcedureInvocation getShallowCopy()
     {
@@ -84,14 +84,18 @@ public class StoredProcedureInvocation implements JSONString {
             copy.serializedParams = null;
         }
 
-        copy.fragTimeout = fragTimeout;
+        copy.batchTimeout = batchTimeout;
 
         return copy;
     }
 
     private void setType() {
         if (originalTxnId == UNITIALIZED_ID && originalUniqueId == UNITIALIZED_ID) {
-            type = ProcedureInvocationType.ORIGINAL;
+            if (BatchTimeoutType.isUserSetTimeout(batchTimeout)) {
+                type = ProcedureInvocationType.SECOND;
+            } else {
+                type = ProcedureInvocationType.ORIGINAL;
+            }
         } else {
             type = ProcedureInvocationType.REPLICATED;
         }
@@ -180,20 +184,21 @@ public class StoredProcedureInvocation implements JSONString {
 
     public int getSerializedSize()
     {
+        int timeoutSize = 0;
+        if (type.getValue() >= BatchTimeoutType.BATCH_TIMEOUT_VERSION) {
+            timeoutSize = 1 + (batchTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4);
+        }
+
         int size = 1 // Version/type
-            + 1 // fragment time out byte
+            + timeoutSize // batch time out byte
             + 4 // proc name string length
             + procName.length()
             + 8; // clientHandle
 
-        if (type == ProcedureInvocationType.REPLICATED)
+        if (ProcedureInvocationType.isDRv1Type(type))
         {
             size += 8 + // original TXN ID for WAN replication procedures
                     8; // original timestamp for WAN replication procedures
-        }
-
-        if (fragTimeout != BatchTimeoutType.NO_TIMEOUT) {
-            size += 4;
         }
 
         if (serializedParams != null)
@@ -220,16 +225,18 @@ public class StoredProcedureInvocation implements JSONString {
     {
         assert(!((params == null) && (serializedParams == null)));
         assert((params != null) || (serializedParams != null));
-        buf.put(type.getValue()); //version and type, version is currently 0
-        if (type == ProcedureInvocationType.REPLICATED) {
+        buf.put(type.getValue()); //version and type
+        if (ProcedureInvocationType.isDRv1Type(type)) {
             buf.putLong(originalTxnId);
             buf.putLong(originalUniqueId);
         }
-        if (fragTimeout == BatchTimeoutType.NO_TIMEOUT) {
-            buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
-        } else {
-            buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
-            buf.putInt(fragTimeout);
+        if (type.getValue() >= BatchTimeoutType.BATCH_TIMEOUT_VERSION) {
+            if (batchTimeout == BatchTimeoutType.NO_TIMEOUT) {
+                buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
+            } else {
+                buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
+                buf.putInt(batchTimeout);
+            }
         }
         buf.putInt(procName.length());
         buf.put(procName.getBytes(Constants.UTF8ENCODING));
@@ -277,16 +284,18 @@ public class StoredProcedureInvocation implements JSONString {
          * following the version byte. The first txn ID is the new txn ID, the
          * second one is the original txn ID.
          */
-        if (type == ProcedureInvocationType.REPLICATED) {
+        if (ProcedureInvocationType.isDRv1Type(type)) {
             originalTxnId = in.readLong();
             originalUniqueId = in.readLong();
         }
 
-        BatchTimeoutType fragTimeoutType = BatchTimeoutType.typeFromByte(in.readByte());
-        if (fragTimeoutType == BatchTimeoutType.NO_BATCH_TIMEOUT) {
-            fragTimeout = BatchTimeoutType.NO_TIMEOUT;
-        } else {
-            fragTimeout = in.readInt();
+        if (version >= BatchTimeoutType.BATCH_TIMEOUT_VERSION) {
+            BatchTimeoutType batchTimeoutType = BatchTimeoutType.typeFromByte(in.readByte());
+            if (batchTimeoutType == BatchTimeoutType.NO_BATCH_TIMEOUT) {
+                batchTimeout = BatchTimeoutType.NO_TIMEOUT;
+            } else {
+                batchTimeout = in.readInt();
+            }
         }
 
         procName = in.readString().intern();
@@ -314,7 +323,7 @@ public class StoredProcedureInvocation implements JSONString {
             retval += "null";
         retval += ")";
         retval += " type=" + String.valueOf(type);
-        retval += " fragTimeout=" + BatchTimeoutType.toString(fragTimeout);
+        retval += " batchTimeout=" + BatchTimeoutType.toString(batchTimeout);
         retval += " clientHandle=" + String.valueOf(clientHandle);
         retval += " originalTxnId=" + String.valueOf(originalTxnId);
         retval += " originalUniqueId=" + String.valueOf(originalUniqueId);
@@ -376,7 +385,7 @@ public class StoredProcedureInvocation implements JSONString {
         return js.toString();
     }
 
-    public int getFragTimeout() {
-        return fragTimeout;
+    public int getBatchTimeout() {
+        return batchTimeout;
     }
 }

@@ -35,6 +35,7 @@ public enum BatchTimeoutType {
         return value;
     }
 
+    public static final int BATCH_TIMEOUT_VERSION = 1;
     public static final int NO_TIMEOUT = NO_BATCH_TIMEOUT.getValue(); // -1
 
     public static BatchTimeoutType typeFromByte(byte b) {
@@ -44,7 +45,7 @@ public enum BatchTimeoutType {
         case 1:
             return HAS_BATCH_TIMEOUT;
         default:
-            throw new RuntimeException("");
+            throw new RuntimeException("Unkonwn BatchTimeoutType " + b);
         }
     }
 
