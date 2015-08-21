@@ -34,8 +34,8 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $CLASSPATH -d obj \
-        ../src/txnIdSelfCheck/*.java \
-        ../src/txnIdSelfCheck/procedures/*.java
+        ./src/txnIdSelfCheck/*.java \
+        ./src/txnIdSelfCheck/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -45,18 +45,18 @@ function catalog() {
     srccompile
 
     # primary catalog
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ../src/txnIdSelfCheck/ddl.sql
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ./src/txnIdSelfCheck/ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 
     # alternate catalog that adds an index
     $VOLTDB compile --classpath obj -o $APPNAME-alt.jar \
-        ../src/txnIdSelfCheck/ddl.sql ../src/txnIdSelfCheck/ddl-annex.sql
+        ../src/txnIdSelfCheck/ddl.sql ./src/txnIdSelfCheck/ddl-annex.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 
     # primary no-export catalog
-    $VOLTDB compile --classpath obj -o $APPNAME-noexport.jar ../src/txnIdSelfCheck/ddl-noexport.sql
+    $VOLTDB compile --classpath obj -o $APPNAME-noexport.jar ./src/txnIdSelfCheck/ddl-noexport.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 
@@ -92,8 +92,8 @@ function async-benchmark() {
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=99999 \
-        --servers=volt13i \
-        --threads=60 \
+        --servers=localhost \
+        --threads=20 \
         --threadoffset=0 \
         --minvaluesize=1024000 \
         --maxvaluesize=1024000 \

@@ -72,7 +72,7 @@ public class ClientThread extends BenchmarkThread {
     final Random m_random = new Random();
     final Semaphore m_permits;
     public long m_cnt = 0;
-    public static boolean m_connected = true;
+    public boolean m_connected = false;
     
     public static boolean m_synchronous;
     public static byte currActiveClients = 0;
@@ -93,10 +93,7 @@ public class ClientThread extends BenchmarkThread {
         m_processor = processor;
         m_txnsRun = txnsRun;
         m_permits = permits;
-        m_connected = true;
         m_synchronous = isSync;
-        numTotalClients += 1;
-        currActiveClients += 1;
         log.info("ClientThread(CID=" + String.valueOf(cid) + ") " + m_type.toString());
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
@@ -120,6 +117,7 @@ public class ClientThread extends BenchmarkThread {
         long pNextRid = (t1.getRowCount() == 0) ? 1 : t1.fetchRow(0).getLong("rid") + 1;
         long rNextRid = (t2.getRowCount() == 0) ? 1 : t2.fetchRow(0).getLong("rid") + 1;
         m_nextRid = pNextRid > rNextRid ? pNextRid : rNextRid; // max
+        numTotalClients += 1;
     }
 
     class UserProcCallException extends Exception {
@@ -134,7 +132,6 @@ public class ClientThread extends BenchmarkThread {
     void runOne() throws Exception {
         // 1/10th of txns roll back
         byte shouldRollback = (byte) (m_random.nextInt(10) == 0 ? 1 : 0);
-
         try {
             String procName = null;
             int expectedTables = 4;
@@ -174,6 +171,8 @@ public class ClientThread extends BenchmarkThread {
                 if (shouldRollback == 0) {
                     if (m_connected) { // is this part ever found besides disconnecting?
                         m_connected = false;
+                        System.out.println("Client "+m_cid+" Disconnecting! ");
+                        currActiveClients -= 1;
                     }
                     log.warn("ClientThread threw after " + m_txnsRun.get() +
                             " calls while calling procedure: " + procName +
@@ -182,6 +181,10 @@ public class ClientThread extends BenchmarkThread {
                             ", shouldRollback: " + shouldRollback);
                 }
                 throw e; // Nothing makes it past this, right? 
+            }
+            if (!m_connected) {
+                m_connected = true;
+                currActiveClients += 1;
             }
             // fake a proc call exception if we think one should be thrown
             if (response.getStatus() != ClientResponse.SUCCESS) {
@@ -198,10 +201,7 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-	    if (true /*m_synchronous*/) {
-                if (!m_connected) {
-                    m_shouldContinue.set(false);
-                }
+	    if (m_synchronous) {
                 long cnt = data.fetchRow(0).getLong("cnt");
                 // check to see if the DB's last count matches with the last count reported by the server...
                 short dif = (short) (m_cnt-cnt);
@@ -258,6 +258,10 @@ public class ClientThread extends BenchmarkThread {
 
             // take a breather to avoid slamming the log (stay paused if no connections)
             do {
+                if (m_connected) { 
+                    m_connected = false;
+                    currActiveClients -= 1;
+                }
                 try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
                 // bail on wakeup if we're supposed to bail
                 if (!m_shouldContinue.get()) {
@@ -278,7 +282,6 @@ public class ClientThread extends BenchmarkThread {
                 runOne();
             }
             catch (NoConnectionsException e) {
-                m_connected = false;
                 log.error("ClientThread got NoConnectionsException on proc call. Will sleep.");
                 // take a breather to avoid slamming the log (stay paused if no connections)
                 do {
@@ -308,7 +311,6 @@ public class ClientThread extends BenchmarkThread {
                 hardStop("ClientThread had a non proc-call exception", e);
             }
         }
-        System.out.println("A client is dying!");
-        currActiveClients -= 1;
+        System.out.println("OHGODNO");
     }
 }

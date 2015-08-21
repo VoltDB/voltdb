@@ -92,7 +92,7 @@ function async-benchmark() {
     java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000 -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
-        --duration=99999 \
+        --duration=5555520 \
 	--servers=volt13i \
         --threads=20 \
         --threadoffset=0 \
@@ -102,7 +102,7 @@ function async-benchmark() {
         --fillerrowsize=10240 \
         --replfillerrowmb=32 \
         --partfillerrowmb=128 \
-        --progresstimeout=99999 \
+        --progresstimeout=120 \
         --usecompression=false \
         --allowinprocadhoc=false
 }

@@ -440,7 +440,8 @@ public class Benchmark {
         timer = new Timer("Stats Timer", true);
         TimerTask statsPrinting = new TimerTask() {
             @Override
-            public void run() { printStatistics(); }
+            public void run() { printStatistics(); 
+            System.out.println("active clients: "+ClientThread.currActiveClients+" total clients: "+ClientThread.numTotalClients);}
         };
         timer.scheduleAtFixedRate(statsPrinting,
                                   config.displayinterval * 1000,
@@ -528,8 +529,8 @@ public class Benchmark {
     private void printClientStats() {
         int least = ClientThread.leastMissingCmds;
         log.info("Starting stats output for client threads.  \n"
-                + "Total Clients ---------------------------------- : "+ClientThread.numTotalClients+"\n"
-                + "Total Clients Missing Transactions ------------- : "+ClientThread.numClientsMissingCmds+"\n"
+                + "Number of Running Client Threads --------------- : "+ClientThread.numTotalClients+"\n"
+                + "Clients Missing Transactions After Recover ----- : "+ClientThread.numClientsMissingCmds+"\n"
                 + "Max Missing Transactions For One Client -------- : "+ClientThread.maxMissingCmds+"\n"
                 + "Min Missing Transactions For One Client -------- : "+(least == Short.MAX_VALUE ? 0 : least)+"\n"
                 + "Total Missing Transactions For All Clients ----- : "+ClientThread.totalMissingCmds+"\n"
@@ -634,7 +635,7 @@ public class Benchmark {
         if (!config.disabledThreads.contains("clients")) {
             for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
                 ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
-                        config.allowinprocadhoc, config.mpratio);
+                        config.allowinprocadhoc, config.mpratio, isSynchronous);
                 //clientThread.start(); # started after preload is complete
                 clientThreads.add(clientThread);
             }
@@ -667,6 +668,7 @@ public class Benchmark {
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
+        scheduleRunTimer();
         // reset progress tracker
         lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
@@ -676,6 +678,7 @@ public class Benchmark {
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         log.info("Running benchmark...");
+        System.out.println("unique string! -- " + config.disabledThreads.toString());
         while (((ClientImpl) client).isHashinatorInitialized() == false) {
             Thread.sleep(1000);
             System.out.println("Wait for hashinator..");
@@ -685,7 +688,7 @@ public class Benchmark {
             for (ClientThread t : clientThreads) {
                 t.start();
             }
-        }
+        } else ClientThread.currActiveClients = 1;
 
 
         if (!config.disabledThreads.contains("partTrunclt")) {
@@ -747,197 +750,122 @@ public class Benchmark {
         // subtract time spent initializing threads and starting them
         long millis = System.currentTimeMillis();
         long rt = (1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS);
-        if (rt > 0) {
+        while (rt > 0) {
             Thread.sleep(5000); // These lines just for testing purposes. 
             while (ClientThread.currActiveClients > 0 && System.currentTimeMillis()-millis < rt) { // This could be done with a countdown latch. 
                 Thread.sleep(1000);
             }
-            //Thread.sleep(rt);
-        }
-	System.out.println("Curr diff: "+(System.currentTimeMillis()-millis)+" rt: "+rt);
-	if (ClientThread.currActiveClients <= 0)
-		log.info("Client threads all died, shutting down....");
-	else 
-        	log.info("Duration completed shutting down...");
-
-        // check if loaders are done or still working
-        int lpcc = partitionedLoader.getPercentLoadComplete();
-        if (! partitionedLoader.isAlive() && lpcc < 100) {
-            exitcode = reportDeadThread(partitionedLoader, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
-        } else
-            log.info(partitionedLoader + " was at " + lpcc + "% of rows loaded");
-        lpcc = replicatedLoader.getPercentLoadComplete();
-        if (! replicatedLoader.isAlive() && lpcc < 100) {
-            exitcode = reportDeadThread(replicatedLoader, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
-        } else
-            log.info(replicatedLoader + " was at " + lpcc + "% of rows loaded");
-        // check if all threads still alive
-        if (! partitionedTruncater.isAlive())
-            exitcode = reportDeadThread(partitionedTruncater);
-        if (! replicatedTruncater.isAlive())
-            exitcode = reportDeadThread(replicatedTruncater);
-        /* XXX if (! plt.isAlive())
-            exitcode = reportDeadThread(plt);
-        if (! rlt.isAlive())
-            exitcode = reportDeadThread(rlt);
-        */if (! readThread.isAlive())
-            exitcode = reportDeadThread(readThread);
-        if (! config.disableadhoc && ! adHocMayhemThread.isAlive())
-            exitcode = reportDeadThread(adHocMayhemThread);
-        if (! idpt.isAlive())
-            exitcode = reportDeadThread(idpt);
-        /* XXX if (! ddlt.isAlive())
-            exitcode = reportDeadThread(ddlt);*/
-        for (ClientThread ct : clientThreads) {
-            if (! ct.isAlive()) {
-                exitcode = reportDeadThread(ct);
+            while (ClientThread.currActiveClients < ClientThread.numTotalClients) {
+                Thread.sleep(1000);
             }
+            if (ClientThread.numClientsMissingCmds > 0)
+                printClientStats();
         }
-
-        /* XXX/PSR
-        replicatedLoader.shutdown();
-        partitionedLoader.shutdown();
-        replicatedTruncater.shutdown();
-        partitionedTruncater.shutdown();
-        readThread.shutdown();
-        adHocMayhemThread.shutdown();
-        idpt.shutdown();
-        ddlt.shutdown();
-        for (ClientThread clientThread : clientThreads) {
-            clientThread.shutdown();
-        }
-        replicatedLoader.join();
-        partitionedLoader.join();
-        readThread.join();
-        adHocMayhemThread.join();
-        idpt.join();
-        ddlt.join();
-
-        //Shutdown LoadTableLoader
-        rlt.shutdown();
-        plt.shutdown();
-        rlt.join();
-        plt.join();
-
-        for (ClientThread clientThread : clientThreads) {
-            clientThread.join();
-        }
-        */
-        // cancel periodic stats printing
-        timer.cancel();
-        checkpointTimer.cancel();
-        /*
-        shutdown.set(true);
-        es.shutdownNow();
-
-        // block until all outstanding txns return
-        client.drain();
-        client.close();
-        permitsTimer.cancel();
-        */
-
-        log.info(HORIZONTAL_RULE);
-        log.info("Benchmark Complete");
-        System.exit(exitcode);
     }
-###############################################################################
-            /**
-             * Create a Timer task to time the run
-             * at end of run, check if we actually did anything
-             */
-            private void scheduleRunTimer() throws IOException {
-                runTimer = new Timer("Run Timer", true);
-                TimerTask runEndTask = new TimerTask() {
-                    @Override
-                    public void run() {
-                        log.info(HORIZONTAL_RULE);
-                        log.info("Benchmark Complete");
 
-                        int exitcode = 0;
+    /**
+     * Create a Timer task to time the run
+     * at end of run, check if we actually did anything
+     */
+    private void scheduleRunTimer() throws IOException {
+        runTimer = new Timer("Run Timer", true);
+        TimerTask runEndTask = new TimerTask() {
+            @Override
+            public void run() {
+                log.info(HORIZONTAL_RULE);
+                log.info("Benchmark Complete");
 
-                        // check if loaders are done or still working
-                        int lpcc = partBiglt.getPercentLoadComplete();
-                        if (!partBiglt.isAlive() && lpcc < 100) {
-                            exitcode = reportDeadThread(partBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
-                        } else
-                            log.info(partBiglt + " was at " + lpcc + "% of rows loaded");
-                        lpcc = replBiglt.getPercentLoadComplete();
-                        if (!replBiglt.isAlive() && lpcc < 100) {
-                            exitcode = reportDeadThread(replBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
-                        } else
-                            log.info(replBiglt + " was at " + lpcc + "% of rows loaded");
-                        // check if all threads still alive
-                        if (!partTrunclt.isAlive())
-                            exitcode = reportDeadThread(partTrunclt);
-                        if (!replTrunclt.isAlive())
-                            exitcode = reportDeadThread(replTrunclt);
-                        /* XXX if (! partLoadlt.isAlive())
-                            exitcode = reportDeadThread(partLoadlt);
-                        if (! replLoadlt.isAlive())
-                            exitcode = reportDeadThread(replLoadlt);
-                        */
-                        if (!readThread.isAlive())
-                            exitcode = reportDeadThread(readThread);
-                        if (!config.disableadhoc && !adHocMayhemThread.isAlive())
-                            exitcode = reportDeadThread(adHocMayhemThread);
-                        if (!idpt.isAlive())
-                            exitcode = reportDeadThread(idpt);
-                        /* XXX if (! ddlt.isAlive())
-                            exitcode = reportDeadThread(ddlt);*/
-                        for (ClientThread ct : clientThreads) {
-                            if (!ct.isAlive()) {
-                                exitcode = reportDeadThread(ct);
-                            }
-                        }
-                        /*
-                        replBiglt.shutdown();
-                        partBiglt.shutdown();
-                        replTrunclt.shutdown();
-                        partTrunclt.shutdown();
-                        readThread.shutdown();
-                        adHocMayhemThread.shutdown();
-                        idpt.shutdown();
-                        ddlt.shutdown();
-                        for (ClientThread clientThread : clientThreads) {
-                            clientThread.shutdown();
-                        }
-                        replBiglt.join();
-                        partBiglt.join();
-                        readThread.join();
-                        adHocMayhemThread.join();
-                        idpt.join();
-                        ddlt.join();
+                int exitcode = 0;
 
-                        //Shutdown LoadTableLoader
-                        replLoadlt.shutdown();
-                        partLoadlt.shutdown();
-                        replLoadlt.join();
-                        partLoadlt.join();
+                // check if loaders are done or still working
+                if (partBiglt != null) {
+                    int lpcc = partBiglt.getPercentLoadComplete();
+                    if (!partBiglt.isAlive() && lpcc < 100) {
+                        exitcode = reportDeadThread(partBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+                    } else
+                        log.info(partBiglt + " was at " + lpcc + "% of rows loaded");
+                } if (replBiglt != null) {
+                    int lpcc = replBiglt.getPercentLoadComplete();
+                    if (!replBiglt.isAlive() && lpcc < 100) {
+                        exitcode = reportDeadThread(replBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+                    } else
+                        log.info(replBiglt + " was at " + lpcc + "% of rows loaded");
+                }
+                // check if all threads still alive
+                if (partTrunclt != null && !partTrunclt.isAlive())
+                    exitcode = reportDeadThread(partTrunclt);
+                if (replTrunclt != null && !replTrunclt.isAlive())
+                    exitcode = reportDeadThread(replTrunclt);
+                /* XXX if (! partLoadlt.isAlive())
+                    exitcode = reportDeadThread(partLoadlt);
+                if (! replLoadlt.isAlive())
+                    exitcode = reportDeadThread(replLoadlt);
+                */
+                if (readThread != null && !readThread.isAlive())
+                    exitcode = reportDeadThread(readThread);
+                if (adHocMayhemThread != null && !config.disableadhoc && !adHocMayhemThread.isAlive())
+                    exitcode = reportDeadThread(adHocMayhemThread);
+                if (idpt != null && !idpt.isAlive())
+                    exitcode = reportDeadThread(idpt);
+                /* XXX if (! ddlt.isAlive())
+                    exitcode = reportDeadThread(ddlt);*/
+                for (ClientThread ct : clientThreads) {
+                    if (!ct.isAlive()) {
+                        exitcode = reportDeadThread(ct);
+                    }
+                }
+                /*
+                replBiglt.shutdown();
+                partBiglt.shutdown();
+                replTrunclt.shutdown();
+                partTrunclt.shutdown();
+                readThread.shutdown();
+                adHocMayhemThread.shutdown();
+                idpt.shutdown();
+                ddlt.shutdown();
+                for (ClientThread clientThread : clientThreads) {
+                    clientThread.shutdown();
+                }
+                replBiglt.join();
+                partBiglt.join();
+                readThread.join();
+                adHocMayhemThread.join();
+                idpt.join();
+                ddlt.join();
 
-                        for (ClientThread clientThread : clientThreads) {
-                            clientThread.join();
-                        }
-                        */
-                        // cancel periodic stats printing
-                        timer.cancel();
-                        checkpointTimer.cancel();
-                        /*
-                        shutdown.set(true);
-                        es.shutdownNow();
+                //Shutdown LoadTableLoader
+                replLoadlt.shutdown();
+                partLoadlt.shutdown();
+                replLoadlt.join();
+                partLoadlt.join();
 
-                        // block until all outstanding txns return
-                        client.drain();
-                        client.close();
-                        permitsTimer.cancel();
-                        */
-                        long count = txnCount.get();
-                        log.info("Client thread transaction count: " + count + "\n");
-                        if (exitcode > 0 && txnCount.get() == 0) {
-                            System.err.println("Shutting down, but found that no work was done.");
-                            exitcode = 2;
-                        }
-                        System.exit(exitcode);
-######################################################################
+                for (ClientThread clientThread : clientThreads) {
+                    clientThread.join();
+                }
+                */
+                // cancel periodic stats printing
+                timer.cancel();
+                checkpointTimer.cancel();
+                /*
+                shutdown.set(true);
+                es.shutdownNow();
+
+                // block until all outstanding txns return
+                client.drain();
+                client.close();
+                permitsTimer.cancel();
+                */
+                long count = txnCount.get();
+                log.info("Client thread transaction count: " + count + "\n");
+                if (exitcode > 0 && txnCount.get() == 0) {
+                    System.err.println("Shutting down, but found that no work was done.");
+                    exitcode = 2;
+                }
+                System.exit(exitcode);
+            }
+        };
+        runTimer.schedule(runEndTask, config.duration * 1000);
+    }
                         
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
