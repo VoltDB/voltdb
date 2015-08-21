@@ -17,6 +17,7 @@
 
 package org.voltdb.client;
 
+
 /**
  * The type is embedded in the version byte of procedure invocation when send
  * across the wire.

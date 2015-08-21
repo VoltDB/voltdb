@@ -40,6 +40,8 @@ import org.voltdb.messaging.FastDeserializer;
 public class StoredProcedureInvocation implements JSONString {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    public static final int CURRENT_MOST_RECENT_VERSION = 1;
+
     ProcedureInvocationType type = ProcedureInvocationType.ORIGINAL;
     String procName = null;
 

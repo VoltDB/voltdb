@@ -31,6 +31,7 @@ import java.util.Arrays;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -423,7 +424,7 @@ public class TestClientPortChannel extends TestCase {
         //Bad protocol version
         System.out.println("Testing good Ping invocation with bad protocol version.");
         byte bad_proto[] = VAR1.clone();
-        bad_proto[iVERSION] = 8; // VERSION 1 is valid NOW
+        bad_proto[iVERSION] = StoredProcedureInvocation.CURRENT_MOST_RECENT_VERSION + 1;
         verifyInvocation(bad_proto, channel, ERROR_CODE);
 
         //Client Data - Bad Data meaning invalid number of bytes.
