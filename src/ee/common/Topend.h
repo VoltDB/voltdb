@@ -105,6 +105,7 @@ public:
     std::vector<boost::shared_array<char> > data;
     bool receivedDRBuffer;
     bool receivedExportBuffer;
+    int64_t pushDRBufferRetval;
 
 };
 
