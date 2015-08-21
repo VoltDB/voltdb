@@ -1972,7 +1972,7 @@ public class DDLCompiler {
         catalog_const.setType(type.getValue());
     }
 
-    void compileMatViewQueriesToStatement(Statement stmt, VoltXMLElement xmlquery, 
+    void compileMatViewQueriesToStatement(Statement stmt, VoltXMLElement xmlquery,
                                           Database db, DatabaseEstimates estimates) throws VoltCompilerException {
         // Use the uniqueName as the sqlText. This is easier for differentiating the queries?
         // Normally for select statements, the unique names will start with "Eselect".

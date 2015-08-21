@@ -1081,9 +1081,10 @@ void VoltDBEngine::setViewsUpdateEnabled(bool enabled) {
         PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
         if (pTable != NULL) {
             pTable->setViewsUpdateEnabled(enabled);
-            if (m_executorContext->m_siteId == 0) {
-              cout << "Update on views on table " << table->name() << " is " << (enabled ? "enabled." : "disabled") << endl;
-            }
+            // For debug:
+            // if (m_executorContext->m_siteId == 0) {
+            //   cout << "Update on views on table " << table->name() << " is " << (enabled ? "enabled." : "disabled") << endl;
+            // }
         }
     }
 }

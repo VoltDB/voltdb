@@ -410,7 +410,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    @Override 
+    @Override
     public void setViewsUpdateEnabled(final boolean enabled) {
         nativeSetViewsUpdateEnabled(pointer, enabled);
     }

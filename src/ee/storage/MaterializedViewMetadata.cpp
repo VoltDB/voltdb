@@ -150,7 +150,7 @@ void MaterializedViewMetadata::setBuildUpExecutorVector(const catalog::CatalogMa
     BOOST_FOREACH (LabeledStatement labeledStatement, buildUpQueryStmts) {
         catalog::Statement *stmt = labeledStatement.second;
         // The build up query normally looks like "INSERT INTO SELECT ..."
-        // So for most of the cases we will get 2 plan fragments. 
+        // So for most of the cases we will get 2 plan fragments.
         // The first fragment ususally is SEND and RECEIVE (maybe also LIMIT)
         // The second fragment is the real fragment for INSERT INTO SELECT...
         // In current case we only execute the second fragment. (ENG-8840, Ethan)
@@ -162,10 +162,10 @@ void MaterializedViewMetadata::setBuildUpExecutorVector(const catalog::CatalogMa
         }
         string explanation = hexDecodeToString(stmt->explainplan());
         // For debug:
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-            cout << "Build up query plan:" << endl;
-            cout << explanation << endl;
-        }
+        // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        //     cout << "Build up query plan:" << endl;
+        //     cout << explanation << endl;
+        // }
     }
 }
 
@@ -212,10 +212,11 @@ void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::Catalog
         AbstractPlanNode* apn = executorList[0]->getPlanNode();
         if ( apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN ) {
             if ( m_indexForMinMax[idx] ) {
-                if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-                    cout << "hard-coded function uses: " << m_indexForMinMax[idx]->getName() << endl;
-                    cout << "plan uses: " << ((IndexScanPlanNode *)apn)->getTargetIndexName() << endl;
-                }
+                // For debug:
+                // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+                //     cout << "hard-coded function uses: " << m_indexForMinMax[idx]->getName() << endl;
+                //     cout << "plan uses: " << ((IndexScanPlanNode *)apn)->getTargetIndexName() << endl;
+                // }
                 m_usePlanForAgg.push_back( m_indexForMinMax[idx]->getName().compare( ((IndexScanPlanNode *)apn)->getTargetIndexName() ) != 0 );
             }
             else {
@@ -226,11 +227,11 @@ void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::Catalog
             m_usePlanForAgg.push_back(false);
         }
         // For debug:
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-            cout << "Aggregation " << idx << endl;
-            cout << explanation << endl;
-            cout << "Uses " << (m_usePlanForAgg[idx] ? "plan." : "hard-coded function.") << endl << endl;
-        }
+        // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        //     cout << "Aggregation " << idx << endl;
+        //     cout << explanation << endl;
+        //     cout << "Uses " << (m_usePlanForAgg[idx] ? "plan." : "hard-coded function.") << endl << endl;
+        // }
         ++ idx;
     }
 }

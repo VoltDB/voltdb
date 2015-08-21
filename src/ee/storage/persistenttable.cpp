@@ -506,7 +506,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     // handle any materialized views
-    if (m_viewsUpdateEnabled) {    
+    if (m_viewsUpdateEnabled) {
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleInsert(target, fallible);
         }

@@ -141,7 +141,7 @@ public class MockExecutionEngine extends ExecutionEngine {
         return null;
     }
 
-    @Override 
+    @Override
     public void setViewsUpdateEnabled(final boolean enabled) {
     }
 
