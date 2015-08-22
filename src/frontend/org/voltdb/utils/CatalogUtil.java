@@ -121,6 +121,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -130,12 +131,6 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
-import java.net.URISyntaxException;
-import java.util.HashMap;
-import org.voltdb.client.ClientAuthHashScheme;
-import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ImportType;
-import org.voltdb.importer.ImportDataProcessor;
 
 /**
  *
@@ -149,6 +144,14 @@ public abstract class CatalogUtil {
 
     public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
     public static final String SIGNATURE_DELIMITER = ",";
+
+    // DR conflicts export table name prefix
+    public static final String DR_CONFLICTS_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
+    // DR conflicts export group name
+    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_AUTOGEN_DR_CONFLICTS";
+    public static final String DEFAULT_DR_CONFLICTS_EXPORT_TYPE = "csv";
+    public static final String DEFAULT_DR_CONFLICTS_NONCE = "MyExport";
+    public static final String DEFAULT_DR_CONFLICTS_DIR = "dr_conflicts";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -511,6 +514,19 @@ public abstract class CatalogUtil {
         return true;
     }
 
+    public static String checkLicenseConstraint(Catalog catalog, LicenseApi licenseApi) {
+        String prefix = "Unable to use feature not included in license: ";
+        String errMsg = null;
+
+        if (catalog.getClusters().get("cluster").getDatabases().get("database").getIsactiveactivedred()) {
+            if (!licenseApi.isDrActiveActiveAllowed()) {
+                errMsg = prefix + "DR Active-Active replication";
+            }
+        }
+
+        return errMsg;
+    }
+
     public static String compileDeployment(Catalog catalog, String deploymentURL,
             boolean isPlaceHolderCatalog)
     {
@@ -522,7 +538,7 @@ public abstract class CatalogUtil {
     }
 
     public static String compileDeploymentString(Catalog catalog, String deploymentString,
-            boolean isPlaceHolderCatalog)
+                     boolean isPlaceHolderCatalog)
     {
         DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
         if (deployment == null) {
@@ -1022,6 +1038,7 @@ public abstract class CatalogUtil {
             case KAFKA: exportClientClassName = "org.voltdb.exportclient.kafka.KafkaExportClient"; break;
             case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
+            case ELASTICSEARCH: exportClientClassName = "org.voltdb.exportclient.ElasticSearchHttpExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 exportClientClassName = exportConfiguration.getExportconnectorclass();
@@ -1113,6 +1130,9 @@ public abstract class CatalogUtil {
         switch(importConfiguration.getType()) {
             case CUSTOM:
                 break;
+            case KAFKA:
+                importBundleUrl = "kafkastream.jar";
+                break;
             default:
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
@@ -1191,11 +1211,19 @@ public abstract class CatalogUtil {
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
      */
     private static void setExportInfo(Catalog catalog, ExportType exportType) {
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        if (db.getIsactiveactivedred()) {
+            // add default export configuration to DR conflict table
+            exportType = addExportConfigToDRConflictsTable(catalog, exportType);
+        }
+
         if (exportType == null) {
             return;
         }
         List<String> streamList = new ArrayList<String>();
         boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
+
+
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
@@ -1217,7 +1245,6 @@ public abstract class CatalogUtil {
             }
             boolean defaultConnector = streamName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
-            Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(streamName);
             if (catconn == null) {
@@ -1297,10 +1324,7 @@ public abstract class CatalogUtil {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (streamList.contains(importConfiguration.getModule())) {
-                throw new RuntimeException("Multiple connectors can not be assigned to single import module: " +
-                        importConfiguration.getModule()+ ".");
-            } else {
+            if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
@@ -1314,20 +1338,17 @@ public abstract class CatalogUtil {
             return processorConfig;
         }
         List<String> streamList = new ArrayList<String>();
-
+        int i = 0;
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (streamList.contains(importConfiguration.getModule())) {
-                throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
-                        importConfiguration.getModule()+ ".");
-            } else {
+            if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
             Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
-            processorConfig.put(importConfiguration.getModule(), processorProperties);
+            processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
         return processorConfig;
     }
@@ -1708,6 +1729,7 @@ public abstract class CatalogUtil {
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
+                cluster.setDrconsumerenabled(drConnection.isEnabled());
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
         }
@@ -2127,5 +2149,51 @@ public abstract class CatalogUtil {
 
         assert (map.size() == 1);
         return map.iterator().next().getSqltext();
+    }
+
+    /**
+     * Add default configuration to DR conflicts export stream if deployment file doesn't have the configuration
+     *
+     * @param catalog  current catalog
+     * @param export   list of export configuration
+     */
+    public static ExportType addExportConfigToDRConflictsTable(Catalog catalog, ExportType export) {
+        if (export == null) {
+            export = new ExportType();
+        }
+        boolean userDefineStream = false;
+        for (ExportConfigurationType exportConfiguration : export.getConfiguration()) {
+            if (exportConfiguration.getStream().equals(DR_CONFLICTS_TABLE_EXPORT_GROUP)) {
+                userDefineStream = true;
+            }
+        }
+
+        if (!userDefineStream) {
+            ExportConfigurationType defaultConfiguration = new ExportConfigurationType();
+            defaultConfiguration.setEnabled(true);
+            defaultConfiguration.setStream(DR_CONFLICTS_TABLE_EXPORT_GROUP);
+            defaultConfiguration.setType(ServerExportEnum.FILE);
+
+            // type
+            PropertyType type = new PropertyType();
+            type.setName("type");
+            type.setValue(DEFAULT_DR_CONFLICTS_EXPORT_TYPE);
+            defaultConfiguration.getProperty().add(type);
+
+            // nonce
+            PropertyType nonce = new PropertyType();
+            nonce.setName("nonce");
+            nonce.setValue(DEFAULT_DR_CONFLICTS_NONCE);
+            defaultConfiguration.getProperty().add(nonce);
+
+            // outdir
+            PropertyType outdir = new PropertyType();
+            outdir.setName("outdir");
+            outdir.setValue(catalog.getClusters().get("cluster").getVoltroot() + "/" + DEFAULT_DR_CONFLICTS_DIR);
+            defaultConfiguration.getProperty().add(outdir);
+
+            export.getConfiguration().add(defaultConfiguration);
+        }
+        return export;
     }
 }

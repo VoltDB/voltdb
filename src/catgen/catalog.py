@@ -73,6 +73,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     os.system( interp( "cp $prepath/CatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/DRCatalogDiffEngine.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/DatabaseConfiguration.java $postpath", locals() ) )
 
     ##########
     # WRITE THE SOURCE FILES
@@ -462,7 +463,7 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
         for field in actualFields:
             if field.type[-1] == '*':
                 ftype = field.type.rstrip('*')
-                itr = ftype.lower() + '_iter'
+                itr = field.name.lower() + '_iter'
                 privname = 'm_' + field.name
                 tab = '   '
                 write(interp('$tab std::map<std::string, $ftype*>::const_iterator $itr = $privname.begin();', locals()))

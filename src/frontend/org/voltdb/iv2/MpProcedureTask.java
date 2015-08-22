@@ -24,9 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.collect.Maps;
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
@@ -39,6 +37,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 
+import com.google_voltpatches.common.collect.Maps;
+
 /**
  * Implements the Multi-partition procedure ProcedureTask.
  * Runs multi-partition transaction, causing work to be distributed
@@ -46,7 +46,6 @@ import org.voltdb.utils.LogKeys;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-    private static final VoltLogger log = new VoltLogger("HOST");
 
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters
@@ -130,7 +129,7 @@ public class MpProcedureTask extends ProcedureTask
                         new VoltTable[] {},
                         "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +
                         ", and system procedures can not be restarted."));
-            txn.setNeedsRollback();
+            txn.setNeedsRollback(true);
             completeInitiateTask(siteConnection);
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(errorResp);
@@ -168,7 +167,7 @@ public class MpProcedureTask extends ProcedureTask
         int status = response.getClientResponseData().getStatus();
         if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
             if (!response.shouldCommit()) {
-                txn.setNeedsRollback();
+                txn.setNeedsRollback(true);
             }
             completeInitiateTask(siteConnection);
             // Set the source HSId (ugh) to ourselves so we track the message path correctly

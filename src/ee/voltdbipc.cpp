@@ -233,7 +233,7 @@ typedef struct {
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
     int64_t undoToken;
-    int32_t undo;
+    int32_t returnUniqueViolations;
     int32_t shouldDRStream;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
@@ -568,6 +568,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         long siteId;
         int partitionId;
         int hostId;
+        int drClusterId;
         int64_t logLevels;
         int64_t tempTableMemory;
         int32_t createDrReplicatedStream;
@@ -582,6 +583,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
+    cs->drClusterId = ntohl(cs->drClusterId);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
     cs->createDrReplicatedStream = ntohl(cs->createDrReplicatedStream);
@@ -604,6 +606,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
+                                 cs->drClusterId,
                                  cs->tempTableMemory,
                                  createDrReplicatedStream) == true) {
             return kErrorCode_Success;
@@ -796,7 +799,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
     const int64_t uniqueId = ntohll(loadTableCommand->uniqueId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
-    const bool undo = loadTableCommand->undo != 0;
+    const bool returnUniqueViolations = loadTableCommand->returnUniqueViolations != 0;
     const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
@@ -805,7 +808,9 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         ReferenceSerializeInputBE serialize_in(offset, sz);
         m_engine->setUndoToken(undoToken);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, txnId, spHandle, lastCommittedSpHandle, uniqueId, undo, shouldDRStream);
+        bool success = m_engine->loadTable(tableId, serialize_in,
+                                           txnId, spHandle, lastCommittedSpHandle, uniqueId,
+                                           returnUniqueViolations, shouldDRStream);
         if (success) {
             return kErrorCode_Success;
         } else {

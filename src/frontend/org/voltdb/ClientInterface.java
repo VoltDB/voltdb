@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -152,7 +153,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
-    public static final long IMPORTER_CID               = Long.MIN_VALUE + 5;
+    public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
@@ -169,8 +170,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
-    private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
-    private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
+    private final SnapshotDaemon m_snapshotDaemon;
+    private final SnapshotDaemonAdapter m_snapshotDaemonAdapter;
+    private final InternalConnectionHandler m_internalConnectionHandler;
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
@@ -685,7 +687,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (ap == AuthProvider.KERBEROS) {
                     arq = context.authSystem.new KerberosAuthenticationRequest(socket);
                 } else {
-                    arq = context.authSystem.new HashAuthenticationRequest(username, password, hashScheme);
+                    arq = context.authSystem.new HashAuthenticationRequest(username, password);
                 }
                 /*
                  * Authenticate the user.
@@ -1151,6 +1153,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
             Cartographer cartographer, int[] allPartitions) throws Exception {
         m_catalogContext.set(context);
+        m_snapshotDaemon = new SnapshotDaemon(context);
+        m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
         m_cartographer = cartographer;
 
         // pre-allocate single partition array
@@ -1204,6 +1208,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+
+        InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
+        bindAdapter(internalAdapter, null);
+        m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter);
+    }
+
+    public InternalConnectionHandler getInternalConnectionHandler() {
+        return m_internalConnectionHandler;
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {
@@ -1736,32 +1748,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final CatalogContext catalogContext = m_catalogContext.get();
         final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
 
-        Procedure catProc = catalogContext.procedures.get(task.procName);
-        if (catProc == null) {
-            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(task.procName);
-        }
-
-        if (catProc == null) {
-            String proc = task.procName;
-            if (task.procName.equals("@AdHoc") || task.procName.equals("@AdHocSpForTest")) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            else if (task.procName.equals("@UpdateClasses")) {
-                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
-                // permissions and replication policy for @UAC, and we'll deal with the
-                // parameter validation stuff separately (the different name will
-                // skip the @UAC-specific policy)
-                proc = "@UpdateApplicationCatalog";
-            }
-            Config sysProc = SystemProcedureCatalog.listing.get(proc);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-        }
+        Procedure catProc = getProcedureFromName(task.procName, catalogContext);
 
         if (user == null) {
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
@@ -1789,8 +1776,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     new VoltTable[0], "Server is paused and is available in read-only mode - please try again later.",
                     task.clientHandle);
         }
-
-        final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
 
         ClientResponseImpl error = null;
         //Check permissions
@@ -1864,6 +1849,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
             }
+            else if (task.procName.equals("@ResetDR")) {
+                return dispatchResetDR(task);
+            }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
@@ -1929,21 +1917,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         int partition = -1;
-        if (catProc.getSinglepartition()) {
-            // break out the Hashinator and calculate the appropriate partition
-            try {
-                partition =
-                        getPartitionForProcedure(
-                                ppi.index,
-                                ppi.type,
-                                task);
-            } catch (Exception e) {
-                // unable to hash to a site, return an error
-                return getMispartitionedErrorResponse(task, catProc, e);
-            }
+        try {
+            partition = getPartitionForProcedure(catProc, task);
+        } catch (Exception e) {
+            // unable to hash to a site, return an error
+            return getMispartitionedErrorResponse(task, catProc, e);
         }
-        boolean success =
-                createTransaction(handler.connectionId(),
+        boolean success = createTransaction(handler.connectionId(),
                         task,
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
@@ -1962,6 +1942,37 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return null;
+    }
+
+    public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
+        Procedure catProc = catalogContext.procedures.get(procName);
+        if (catProc == null) {
+            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procName);
+        }
+
+        if (catProc == null) {
+            String proc = procName;
+            if (procName.equals("@AdHoc") || procName.equals("@AdHocSpForTest")) {
+                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
+                // configured differently for @AdHoc... variants this code will have to
+                // change in order to use the proper variant based on whether the work
+                // is single or multi partition and read-only or read-write.
+                proc = "@AdHoc_RW_MP";
+            }
+            else if (procName.equals("@UpdateClasses")) {
+                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
+                // permissions and replication policy for @UAC, and we'll deal with the
+                // parameter validation stuff separately (the different name will
+                // skip the @UAC-specific policy)
+                proc = "@UpdateApplicationCatalog";
+            }
+            Config sysProc = SystemProcedureCatalog.listing.get(proc);
+            if (sysProc != null) {
+                catProc = sysProc.asCatalogProcedure();
+            }
+        }
+
+        return catProc;
     }
 
     private boolean allowPauseModeExecution(ClientInputHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
@@ -2112,7 +2123,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         int ihid = (Integer) params[0];
-        List<Integer> liveHids = VoltDB.instance().getHostMessenger().getLiveHostIds();
+        Set<Integer> liveHids = VoltDB.instance().getHostMessenger().getLiveHostIds();
         if (!liveHids.contains(ihid)) {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
@@ -2140,6 +2151,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
+
+    private ClientResponseImpl dispatchResetDR(StoredProcedureInvocation task) {
+        if (VoltDB.instance().getNodeDRGateway() != null) {
+            VoltDB.instance().getNodeDRGateway().resetDRProducer();
+        }
+        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+        t.addRow(VoltSystemProcedure.STATUS_OK);
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] {t}, "SUCCESS", task.clientHandle);
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch, Connection c)
@@ -2672,6 +2692,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_notifier.start();
     }
 
+    static int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) throws Exception {
+        final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)procedure.getAttachment();
+        if (procedure.getSinglepartition()) {
+            // break out the Hashinator and calculate the appropriate partition
+            return getPartitionForProcedure( ppi.index, ppi.type, task);
+        } else {
+            return -1;
+        }
+    }
     /**
      * Identify the partition for an execution site task.
      * @return The partition best set up to execute the procedure.

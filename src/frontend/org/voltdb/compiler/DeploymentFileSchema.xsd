@@ -132,6 +132,24 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="memoryLimitType">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="1000"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="resourceMonitorType">
+      <xs:all>
+        <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="size" type="memoryLimitType" default="0"/>
+            </xs:complexType>
+        </xs:element>
+      </xs:all>
+      <xs:attribute name="frequency" type="xs:int" default="60"/>
+  </xs:complexType>
+
   <!-- <systemsettings> -->
   <xs:complexType name="systemSettingsType">
     <xs:all>
@@ -156,7 +174,7 @@
                 <xs:attribute name="timeout" type="latencyType" default="0"/>
             </xs:complexType>
         </xs:element>
-
+        <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
     </xs:all>
   </xs:complexType>
 
@@ -331,12 +349,14 @@
       <xs:enumeration value="kafka"/>
       <xs:enumeration value="http"/>
       <xs:enumeration value="rabbitmq"/>
+      <xs:enumeration value="elasticsearch"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
 
   <xs:simpleType name="ServerImportEnum">
     <xs:restriction base="xs:token">
+      <xs:enumeration value="kafka"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
@@ -370,7 +390,7 @@
         <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="id" type="clusterIdType" use="required"/>
-    <xs:attribute name="listen" type="xs:boolean" default="false" />
+    <xs:attribute name="listen" type="xs:boolean" default="true" />
     <xs:attribute name="port" type="xs:int" default="5555"/>
   </xs:complexType>
 
@@ -379,11 +399,12 @@
       <xs:simpleType>
         <xs:restriction base="xs:string">
           <!-- Only the most basic validation that this could possibly be a hostname -->
-          <xs:minLength value="1"/>
+          <xs:minLength value="0"/>
           <xs:pattern value="[a-zA-Z0-9\-\.]*(:[0-9]*)?"/>
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="enabled" type="xs:boolean" default="true" />
   </xs:complexType>
 
   <!-- restriction on id -->

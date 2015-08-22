@@ -380,6 +380,48 @@ public class TestVoltCompiler extends TestCase {
         return compiler.m_errors;
     }
 
+    public void testPartitionProcedureWarningMessage() throws IOException {
+        String ddl = "CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, NUM INTEGER, PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
+                "create procedure myTestProc as select num from PKEY_BIGINT where pkey = ? order by 1;";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+
+        String expectedWarning =
+                "This procedure myTestProc would benefit from being partitioned, by adding a "
+                + "'PARTITION ON TABLE PKEY_BIGINT COLUMN ON PKEY PARAMETER 0' clause to the "
+                + "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
+
+        boolean findMatched = false;
+        for (Feedback fb : compiler.m_warnings) {
+            System.out.println(fb.getStandardFeedbackLine());
+            if (fb.getStandardFeedbackLine().contains(expectedWarning)) {
+                findMatched = true;
+                break;
+            }
+        }
+        assertTrue(findMatched);
+    }
+
     public void testSnapshotSettings() throws IOException {
         String schemaPath = "";
         try {
@@ -1867,7 +1909,8 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_ft_unique on t(abs(id+num));\n" +
-                "create index idx_ft on t(abs(num));";
+                "create index idx_ft on t(abs(num));\n" +
+                "create index poweridx on t(power(id, 2));";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());
         Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -2021,7 +2064,7 @@ public class TestVoltCompiler extends TestCase {
     {
         // Test indexes.
         String ddl = "";
-        String errorIndexMsg = "Index IDX_T_TM cannot include the function NOW or CURRENT_TIMESTAMP.";
+        String errorIndexMsg = "Index \"IDX_T_TM\" cannot include the function NOW or CURRENT_TIMESTAMP.";
         ddl = "create table t(id integer not null, tm timestamp);\n" +
               "create index idx_t_tm on t(since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm));";
         checkDDLErrorMessage(ddl, errorIndexMsg);
@@ -2059,6 +2102,23 @@ public class TestVoltCompiler extends TestCase {
                 "where since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm) > 60 " +
                 "group by tm;";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
+    }
+
+    public void testDDLCompilerCreateAndDropIndexesOnMatView()
+    {
+        String ddl = "";
+
+        ddl = "create table foo(a integer, b float, c float);\n" +
+              "create view bar (a, b, total) as select a, b, count(*) as total from foo group by a, b;\n" +
+              "create index baridx on bar (a);\n" +
+              "drop index baridx;\n";
+        checkDDLErrorMessage(ddl, null);
+
+        ddl = "create table foo(a integer, b float);\n" +
+              "create view bar (a, total) as select a, count(*) as total from foo group by a;\n" +
+              "create index baridx on bar (a, total);\n" +
+              "drop index baridx;\n";
+        checkDDLErrorMessage(ddl, null);
     }
 
     public void testColumnNameIndexHash()
@@ -2444,6 +2504,12 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer not null);\n" +
                 "create view my_view as select num, count(*) from t group by num;" +
                 "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        // approx_count_distinct is not a supported aggregate function for materialized views.
+        errorMsg = "Materialized view \"MY_VIEW\" must have non-group by columns aggregated by sum, count, min or max.";
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "create view my_view as select id, count(*), approx_count_distinct(num) from t group by id;";
         checkDDLErrorMessage(ddl, errorMsg);
     }
 
@@ -4017,15 +4083,21 @@ public class TestVoltCompiler extends TestCase {
         // Scalar subquery not allowed in indices.
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
                                     "create index bidx on books ( select title from books as child where child.cash = books.cash );");
-        checkDDLAgainstScalarSubquerySchema("Index BIDX1 with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Index \"BIDX1\" with subquery sources is not supported.",
                                     "create index bidx1 on books ( ( select title from books as child where child.cash = books.cash ) ) ;");
-        checkDDLAgainstScalarSubquerySchema("Index BIDX2 with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Index \"BIDX2\" with subquery sources is not supported.",
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );");
         // Scalar subquery not allowed in materialize views.
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select cash, count(*) from books where ( select cash from books as child where books.title = child.title ) < 100 group by cash;\n");
+    }
+
+    /*
+     * When ENG-8727 is addressed, reenable this test.
+     */
+    public void notest8727SubqueriesInViewDisplayLists() throws Exception {
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
     }
@@ -4045,6 +4117,41 @@ public class TestVoltCompiler extends TestCase {
         checkDDLAgainstScalarSubquerySchema("Object not found: PARENT",
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < parent.title ) );");
     }
+
+    public void testAggregateExpressionsInIndices() throws Exception {
+        String ddl = "create table alpha (id integer not null, seqnum float);";
+        // Test for time sensitive queries.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
+                                    ddl,
+                                    "create index faulty on alpha(id, NOW);");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, CURRENT_TIMESTAMP);");
+        // Test for aggregate calls.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + avg(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + max(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + min(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + count(seqnum));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, seqnum + count(*));");
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id, 100 + sum(id));");
+        // Test for subqueries.
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with subquery sources is not supported\\.",
+                                   ddl,
+                                   "create index faulty on alpha(id = (select id + id from alpha));");
+    }
+
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;
         for (String string : diagnostics) {

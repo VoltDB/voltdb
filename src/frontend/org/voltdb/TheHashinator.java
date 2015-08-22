@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.google_voltpatches.common.base.*;
 import com.google_voltpatches.common.collect.MapMaker;
+
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -566,9 +567,9 @@ public abstract class TheHashinator {
     public static final String CNAME_PARTITION_KEY = "PARTITION_KEY";
 
     private Supplier<VoltTable> getSupplierForType(final VoltType type) {
-        return new Supplier() {
+        return new Supplier<VoltTable>() {
             @Override
-            public Object get() {
+            public VoltTable get() {
                 VoltTable vt = new VoltTable(new VoltTable.ColumnInfo[] {
                         new VoltTable.ColumnInfo(
                                 VoltSystemProcedure.CNAME_PARTITION_ID,

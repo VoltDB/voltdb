@@ -157,7 +157,7 @@ inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function
         return;
     }
     char msg[1024];
-    snprintf(msg, 1024, "Invalid result value (%f) from floating point %s", value, function);
+    snprintf(msg, sizeof(msg), "Invalid result value (%f) from floating point %s", value, function);
     throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg);
 }
 

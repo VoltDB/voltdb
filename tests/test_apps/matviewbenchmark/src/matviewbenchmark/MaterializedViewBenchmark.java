@@ -294,6 +294,11 @@ public class MaterializedViewBenchmark {
                                 execTimeInMicroSec));
     }
 
+    private boolean isMinMatViewCase(String matView) {
+        return matView.toLowerCase().endsWith("minmatview") ||
+               matView.toLowerCase().endsWith("minmatviewopt");
+    }
+
     /**
      * Run half of the benchmark
      * @param matView True if running with materialized view half, otherwise false.
@@ -320,11 +325,21 @@ public class MaterializedViewBenchmark {
                 csvStr = "w min";
                 procStr = "idsWithMinMatView";
                 break;
-            default: // "minMatViewOpt"
+            case "minMatViewOpt":
                 systemStr = "w/ min opt";
                 csvStr = "w min opt";
                 procStr = "idsWithMinMatViewOpt";
                 break;
+            case "4MinMatView":
+                systemStr = "4mins";
+                csvStr = "4mins";
+                procStr = "idsWith4MinMatView";
+                break;
+            default:
+                assert(matView.equals("4MinMatViewOpt"));
+                systemStr = "4mins opt";
+                csvStr = "4mins opt";
+                procStr = "idsWith4MinMatViewOpt";
         }
 
         int grp = 1;
@@ -340,11 +355,20 @@ public class MaterializedViewBenchmark {
 
         if (config.group > 0) {
             for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
+                if (systemStr.startsWith("4")) {
+                    client.callProcedure(new NullCallback(),
                                      procStr + "_insert",
                                      i,
                                      grp,
-                                     i);
+                                     i, -i, i, -i);
+                }
+                else {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         grp,
+                                         i);
+                }
                 if (grp == config.group) {
                     grp = 1;
                 } else {
@@ -353,11 +377,20 @@ public class MaterializedViewBenchmark {
             }
         } else {
             for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     procStr + "_insert",
-                                     i,
-                                     i,
-                                     i);
+                if (systemStr.startsWith("4")) {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         i,
+                                         i, -i, i, -i);
+                }
+                else {
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_insert",
+                                         i,
+                                         i,
+                                         i);
+                }
             }
         }
         timer.cancel();
@@ -370,7 +403,7 @@ public class MaterializedViewBenchmark {
         }
         System.out.print(HORIZONTAL_RULE);
 
-        if (!matView.equals("minMatView") && !matView.equals("minMatViewOpt")) {
+        if ( ! isMinMatViewCase(matView) ) {
             // grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
             grp = 2;
 
@@ -503,6 +536,16 @@ public class MaterializedViewBenchmark {
                                      i,
                                      i,
                                      i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatView_insert",
+                                     i,
+                                     i,
+                                     i, i, i, i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatViewOpt_insert",
+                                     i,
+                                     i,
+                                     i, i, i, i);
             }
             client.drain();
             for (int i=0; i<config.warmup; i++){
@@ -517,6 +560,12 @@ public class MaterializedViewBenchmark {
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWithMinMatViewOpt_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatView_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatViewOpt_delete",
                                      i);
             }
             client.drain();
@@ -538,6 +587,12 @@ public class MaterializedViewBenchmark {
         runHalf("minMatView", fw);
         System.out.print(HORIZONTAL_RULE);
         runHalf("minMatViewOpt", fw);
+        System.out.print(HORIZONTAL_RULE);
+
+        insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
+        runHalf("4MinMatView", fw);
+        System.out.print(HORIZONTAL_RULE);
+        runHalf("4MinMatViewOpt", fw);
         benchmarkActive = false;
 
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {

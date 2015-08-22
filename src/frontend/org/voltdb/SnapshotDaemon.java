@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -193,7 +194,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private State m_state = State.STARTUP;
 
-    SnapshotDaemon() {
+    SnapshotDaemon(CatalogContext catalogContext) {
         m_esBase.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         m_esBase.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 
@@ -205,10 +206,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_path = null;
         m_prefixAndSeparator = null;
 
-
-
         // Register the snapshot status to the StatsAgent
         SnapshotStatus snapshotStatus = new SnapshotStatus();
+        snapshotStatus.setSnapshotPath(
+                catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath(),
+                catalogContext.database.getSnapshotschedule().get("default").getPath());
         VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUS,
                                                               0,
                                                               snapshotStatus);
@@ -303,7 +305,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 // Do scan work on all known live hosts
                 VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
-                List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                 for (int hostId : liveHosts) {
                     m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
                 }

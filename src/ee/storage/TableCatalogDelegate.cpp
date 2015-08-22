@@ -27,6 +27,7 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/CatalogUtil.h"
 #include "common/types.h"
+#include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
 #include "expressions/expressionutil.h"
 #include "expressions/functionexpression.h"
@@ -62,36 +63,42 @@ TableCatalogDelegate::~TableCatalogDelegate()
     }
 }
 
-TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catalogTable) {
+TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Database const &catalogDatabase,
+                                                     catalog::Table const &catalogTable) {
     // Columns:
     // Column is stored as map<String, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
     const int numColumns = static_cast<int>(catalogTable.columns().size());
-    vector<ValueType> columnTypes(numColumns);
-    vector<int32_t> columnLengths(numColumns);
-    vector<bool> columnAllowNull(numColumns);
-    vector<bool> columnInBytes(numColumns);
+    bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable.isDRed();
+    TupleSchemaBuilder schemaBuilder(numColumns,
+                                     needsDRTimestamp ? 1 : 0); // number of hidden columns
+
     map<string, catalog::Column*>::const_iterator col_iterator;
-    vector<string> columnNames(numColumns);
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
+
         const catalog::Column *catalog_column = col_iterator->second;
-        const int columnIndex = catalog_column->index();
-        const ValueType type = static_cast<ValueType>(catalog_column->type());
-        columnTypes[columnIndex] = type;
-        const int32_t size = static_cast<int32_t>(catalog_column->size());
-        //Strings length is provided, other lengths are derived from type
-        bool varlength = (type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY);
-        const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
-        columnLengths[columnIndex] = length;
-        columnAllowNull[columnIndex] = catalog_column->nullable();
-        columnInBytes[columnIndex] = catalog_column->inbytes();
+        schemaBuilder.setColumnAtIndex(catalog_column->index(),
+                                       static_cast<ValueType>(catalog_column->type()),
+                                       static_cast<int32_t>(catalog_column->size()),
+                                       catalog_column->nullable(),
+                                       catalog_column->inbytes());
     }
 
-    return TupleSchema::createTupleSchema(columnTypes,
-                                          columnLengths,
-                                          columnAllowNull,
-                                          columnInBytes);
+    if (needsDRTimestamp) {
+        // Create a hidden timestamp column for a DRed table in an
+        // active-active context.
+        //
+        // Column will be marked as not nullable in TupleSchema,
+        // because we never expect a null value here, but this is not
+        // actually enforced at runtime.
+        schemaBuilder.setHiddenColumnAtIndex(0,
+                                             VALUE_TYPE_BIGINT,
+                                             8,      // field size in bytes
+                                             false); // nulls not allowed
+    }
+
+    return schemaBuilder.build();
 }
 
 bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
@@ -278,7 +285,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     }
 
     // get the schema for the table
-    TupleSchema *schema = createTupleSchema(catalogTable);
+    TupleSchema *schema = createTupleSchema(catalogDatabase, catalogTable);
 
     // Indexes
     map<string, TableIndexScheme> index_map;

@@ -67,6 +67,9 @@ public class TestSQLParser extends TestCase {
         assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "import table ex_tbl;"));
 
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
+                "set abc=123;"));
+
         // Now test multiple statements and comments...
 
         assertTrue(SQLParser.appearsToBeValidDDLBatch(

@@ -16,11 +16,7 @@
  */
 package org.voltcore.messaging;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.LinkedList;
-
 import com.google_voltpatches.common.collect.ImmutableList;
 import org.apache.zookeeper_voltpatches.data.Id;
 import org.apache.zookeeper_voltpatches.server.Request;
@@ -31,9 +27,6 @@ public class AgreementTaskMessage extends VoltMessage {
     public long m_txnId;
     public long m_initiatorHSId;
     public long m_lastSafeTxnId;
-
-    private LinkedList<byte[]> m_schemes = new LinkedList<byte[]>();
-    private LinkedList<byte[]> m_ids = new LinkedList<byte[]>();
 
     public AgreementTaskMessage() {}
 
@@ -99,9 +92,6 @@ public class AgreementTaskMessage extends VoltMessage {
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
-
-        m_ids = null;
-        m_schemes = null;
     }
 
 }

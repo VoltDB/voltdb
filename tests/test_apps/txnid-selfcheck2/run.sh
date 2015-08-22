@@ -78,12 +78,12 @@ function client() {
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function benchmark-help() {
+function aysnc-benchmark-help() {
     srccompile
     java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
 }
 
-function benchmark() {
+function async-benchmark() {
     srccompile
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
@@ -100,7 +100,9 @@ function benchmark() {
         --partfillerrowmb=128 \
         --progresstimeout=120 \
         --usecompression=false \
-        --allowinprocadhoc=false
+        --allowinprocadhoc=false \
+        --disabledthreads=none
+#ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
 }
 
 function help() {

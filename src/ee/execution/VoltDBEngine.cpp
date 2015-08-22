@@ -94,9 +94,6 @@
 
 #include <sstream>
 #include <locale>
-#ifdef LINUX
-#include <malloc.h>
-#endif // LINUX
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -344,32 +341,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_drReplicatedStream(NULL),
       m_tuplesModifiedStack()
 {
-#ifdef LINUX
-    // We ran into an issue where memory wasn't being returned to the
-    // operating system (and thus reducing RSS) when freeing. See
-    // ENG-891 for some info. It seems that some code we use somewhere
-    // (maybe JVM, but who knows) calls mallopt and changes some of
-    // the tuning parameters. At the risk of making that software
-    // angry, the following code resets the tunable parameters to
-    // their default values.
-
-    // Note: The parameters and default values come from looking at
-    // the glibc 2.5 source, which I is the version that shipps
-    // with redhat/centos 5. The code seems to also be effective on
-    // newer versions of glibc (tested againsts 2.12.1).
-
-    mallopt(M_MXFAST, 128);                 // DEFAULT_MXFAST
-    // note that DEFAULT_MXFAST was increased to 128 for 64-bit systems
-    // sometime between glibc 2.5 and glibc 2.12.1
-    mallopt(M_TRIM_THRESHOLD, 128 * 1024);  // DEFAULT_TRIM_THRESHOLD
-    mallopt(M_TOP_PAD, 0);                  // DEFAULT_TOP_PAD
-    mallopt(M_MMAP_THRESHOLD, 128 * 1024);  // DEFAULT_MMAP_THRESHOLD
-    mallopt(M_MMAP_MAX, 65536);             // DEFAULT_MMAP_MAX
-    mallopt(M_CHECK_ACTION, 3);             // DEFAULT_CHECK_ACTION
-#endif // LINUX
-    // Be explicit about running in the standard C locale for now.
-    std::locale::global(std::locale("C"));
-    setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 }
 
 bool
@@ -378,6 +349,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          std::string hostname,
+                         int32_t drClusterId,
                          int64_t tempTableMemoryLimit,
                          bool createDrReplicatedStream,
                          int32_t compactionThreshold)
@@ -437,7 +409,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             hostname,
                                             hostId,
                                             m_drStream,
-                                            m_drReplicatedStream);
+                                            m_drReplicatedStream,
+                                            drClusterId);
     return true;
 }
 
@@ -1899,6 +1872,12 @@ void VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int64_t uniqueId,
                                   int64_t undoToken,
                                   const char *log) {
+    if (m_database->isActiveActiveDRed()) {
+        DRTupleStreamDisableGuard guard(m_drStream);
+        if (m_drReplicatedStream) {
+            DRTupleStreamDisableGuard guardReplicated(m_drReplicatedStream);
+        }
+    }
     setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,

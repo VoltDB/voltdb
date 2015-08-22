@@ -62,6 +62,8 @@ function loadAdminPage() {
         tempTablesMaxSize: $("#temptablesmaxsize"),
         tempTablesMaxSizeLabel: $("#temptablesmaxsizeUnit"),
         snapshotPriority: $("#snapshotpriority"),
+        memoryLimitSize: $("#memoryLimitSize"),
+        memoryLimitSizeUnit: $("#memoryLimitSizeUnit"),
         clientPort: $('#clientport'),
         adminPort: $('#adminport'),
         httpPort: $('#httpport'),
@@ -175,6 +177,10 @@ function loadAdminPage() {
         loadingConfiguration: $("#loadingConfiguration"),
         exportConfiguration: $("#exportConfiguration"),
         exportConfigurationLoading: $('#exportConfigurationLoading'),
+
+        //Import Settings
+        loadingImportConfig: $("#loadingImportConfig"),
+        importConfiguration: $("#importConfiguration"),
 
         //Dr Mode object
         labelDrmode: $("#drMode"),
@@ -341,6 +347,18 @@ function loadAdminPage() {
                 } else {
                     adminEditObjects.exportConfiguration.show();
                     adminEditObjects.exportConfigurationLoading.show();
+                }
+            }
+
+            //Handle import configuration
+            if ($(this).text() == "Import") {
+                //If parent is closed, then hide export configuration
+                if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
+                    adminEditObjects.importConfiguration.hide();
+                    //If parent is open, then open the export configuration.
+                } else {
+                    adminEditObjects.importConfiguration.show();
+
                 }
             }
         });
@@ -1659,10 +1677,9 @@ function loadAdminPage() {
                 '    <td>' +
                 '       <select id="txtType" name="txtType"> ';
 
-            exporttypes.type.splice(2, 1);
+            exporttypes.type.splice(3, 1);
 
             exporttypes.type.push("CUSTOM");
-
 
             for (var i = 0; i <= exporttypes.type.length - 1; i++) {
                 contents = contents +
@@ -1800,15 +1817,20 @@ function loadAdminPage() {
                     $("#deleteFirstProperty").trigger("click");
                 }
                 var count = 1;
+                var multiPropertyCount = 0;
                 for (var i = 0; i < properties.length; i++) {
-                    if (VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name)) {
+                    if (VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name) || VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name + '_' + config.type)) {
                         if (properties[i].name == "broker.host" || properties[i].name == "amqp.uri") {
                             $("#selectRabbitMq").val(properties[i].name);
                         }
                         if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).length) {
                             $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).val(properties[i].value);
                             $(".newStreamMinProperty").addClass("orgProperty");
-                        } else {
+                        } else if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name + '_' + config.type]).length && multiPropertyCount==0) {
+                            $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name + '_' + config.type]).val(properties[i].value);
+                            $(".newStreamMinProperty").addClass("orgProperty");
+                            multiPropertyCount++;
+                        }else {
                             $("#lnkAddNewProperty").trigger("click");
                             $("#txtName" + count).val(properties[i].name);
                             $("#txtValue" + count).val(properties[i].value);
@@ -1912,7 +1934,6 @@ function loadAdminPage() {
                         adminConfigurations.export.configuration.push(newConfig);
                     } else {
                         var updatedConfig = adminConfigurations.export.configuration[editId * 1];
-
                         updatedConfig.stream = newConfig.stream;
                         updatedConfig.type = newConfig.type;
                         updatedConfig.enabled = newConfig.enabled;
@@ -1930,7 +1951,8 @@ function loadAdminPage() {
                 adminEditObjects.addNewConfigLink.hide();
                 adminEditObjects.exportConfiguration.html(loadingConfig);
                 adminEditObjects.loadingConfiguration.show();
-                adminEditObjects.exportConfiguration.data("status", "loading");
+
+
 
                 //Close the popup
                 popup.close();
@@ -2127,6 +2149,22 @@ function loadAdminPage() {
                     '</tr>';
             }
 
+        } else if (exportType.toUpperCase() == "ELASTICSEARCH") {
+            if (!$('#txtEndpointES').length) {
+                exportProperties = '<tr class="newStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtEndpointES" name="txtEndpointES" value="endpoint" disabled="disabled" class="newStreamPropertyName newStreamProperty  requiredProperty" type="text">' +
+                    '       <label id="errorEndpoint" for="txtEndpoint" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtEndpointESValue" name="txtEndpointESValue" class="newStreamPropertyValue newStreamProperty" type="text">' +
+                    '       <label id="errorEndpointESValue" for="txtEndpointESValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtEndpointES').attr("disabled", "disabled");
+            }
         }
         $('#tblAddNewProperty tr.headerProperty').after(exportProperties);
 
@@ -2159,6 +2197,7 @@ function loadAdminPage() {
     };
 
     var removeDuplicate = function (object, propertyName) {
+        var exportType = $('#txtType').val();
         if (!$(object).hasClass("requiredProperty")) {
             var val = $(':input:eq(' + ($(':input').index(object) + 1) + ')').val();
             if ($(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName]).length) {
@@ -2166,6 +2205,11 @@ function loadAdminPage() {
                 $(".newStreamMinProperty").addClass("addedProperty");
                 var $row = $(object).closest("tr");
                 $row.remove();
+            } else if ($(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName + '_' + exportType]).length) {
+                $(VoltDbAdminConfig.newStreamMinmPropertyName[propertyName + '_' + exportType]).val(val);
+                $(".newStreamMinProperty").addClass("addedProperty");
+                var $row1 = $(object).closest("tr");
+                $row1.remove();
             }
             if (propertyName == "broker.host" || propertyName == "amqp.uri") {
                 $("#selectRabbitMq").val(propertyName);
@@ -2210,6 +2254,12 @@ function loadAdminPage() {
             setDefaultDisplay($("#selectRabbitMq"));
         } else {
             setNormalDisplay($("#selectRabbitMq"));
+        }
+        
+        if (exportType.toUpperCase() == "ELASTICSEARCH") {
+            setDefaultDisplay($("#txtEndpointES"));
+        } else {
+            setNormalDisplay($("#txtEndpointES"));
         }
 
     };
@@ -2709,12 +2759,13 @@ function loadAdminPage() {
             "outdir": "#txtOutdirValue",
             "nonce": "#txtnonceValue",
             "type": "#txtFileTypeValue",
-            "endpoint": "#txtEndpointValue",
+            "endpoint_HTTP": "#txtEndpointValue",
             "metadata.broker.list": "#txtMetadataBrokerListValue",
             "jdbcurl": "#txtJdbcUrlValue",
             "jdbcdriver": "#txtJdbcDriverValue",
             "broker.host": "#txtRabbitMqValue",
-            "amqp.uri": "#txtRabbitMqValue"
+            "amqp.uri": "#txtRabbitMqValue",
+            "endpoint_ELASTICSEARCH": "#txtEndpointESValue"
         };
 
         this.orgTypeValue = "";
@@ -2811,6 +2862,8 @@ function loadAdminPage() {
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != null ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != null ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
+            adminDOMObjects.memoryLimitSize.text(adminConfigValues.memorylimit != undefined ? adminConfigValues.memorylimit : "Not Enforced");
+            adminDOMObjects.memoryLimitSizeUnit.text(adminConfigValues.memorylimit != undefined ? "GB" : "");
             configureQueryTimeout(adminConfigValues);
 
             //edit configuration
@@ -2828,6 +2881,8 @@ function loadAdminPage() {
             getExportProperties(adminConfigValues.configuration);
             //dr setting
             getDrMode(adminConfigValues.drListen);
+
+            getImportProperties(adminConfigValues.importConfiguration);
             //adminConfigValues.drListen = false;
             if (VoltDbUI.isDRInfoRequired) {
                 adminEditObjects.labelDrId.text(adminConfigValues.drId);
@@ -2866,7 +2921,7 @@ function loadAdminPage() {
                 } else {
                     adminEditObjects.labelDrmode.text("Replica");
                 }
-                
+
             } else {
                 adminEditObjects.labelDrmode.text("Master");
             }
@@ -2939,13 +2994,86 @@ function loadAdminPage() {
 
             if (result == "") {
                 result += '<tr class="propertyLast subLabelRow">' +
-                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
+                        '<td width="67%" class="configLabel" colspan="3" id="noConfigExport">No configuration available.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
             }
 
             $('#exportConfiguration').html(result);
 
+        };
+
+        var getImportProperties = function (data) {
+            var result = "";
+            if (data != undefined) {
+
+                //Do not update the data in loading condition
+                if (adminEditObjects.importConfiguration.data("status") == "loading") {
+                    return;
+                }
+
+                for (var i = 0; i < data.length; i++) {
+                    var module = VoltDbAdminConfig.escapeHtml(data[i].module);
+                    var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
+                    var enabled = data[i].enabled;
+                    var importProperty = data[i].property;
+                    var rowId = 'row-5' + i;
+                    var style = '';
+                    var additionalCss = (VoltDbAdminConfig.toggleStates[rowId] === true) ? 'labelExpanded' : '';
+
+                    if (!VoltDbAdminConfig.toggleStates.hasOwnProperty(rowId) || VoltDbAdminConfig.toggleStates[rowId] === false) {
+                        VoltDbAdminConfig.toggleStates[rowId] = false;
+                        style = 'style = "display:none;"';
+                    }
+
+                    result += '<tr class="child-row-5 subLabelRow parentprop" id="' + rowId + '">' +
+                            '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + module + type + '</a>' +
+                            '   </td>' +
+                            '   <td align="right">' +
+                            '       <div class="' + getOnOffClass(enabled) + '"></div>' +
+                            '   </td>' +
+                            '   <td>' + getOnOffText(enabled) + '</td>' +
+                            '   <td>' +
+                            //'       <div class="exportDelete" style="display:none;"></div>' +
+                            //'       <a href="javascript:void(0)" id="exportEdit' + i + '" class="edit" onclick="editStream(' + i + ')" title="Edit">&nbsp;</a>' +
+                            '   </td>' +
+                            '</tr>';
+
+                    if (importProperty && importProperty.length > 0) {
+
+                        for (var j = 0; j < importProperty.length; j++) {
+                            var name = importProperty[j].name;
+                            var value = importProperty[j].value;
+
+                            result += '' +
+                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                                '   <td class="configLabe2">' + name + '</td>' +
+                                '   <td align="right">' + value + '</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '</tr>';
+                        }
+
+
+                    } else {
+                        result += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
+                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
+                            '   <td width="33%">&nbsp</td>' +
+                            '</tr>';
+                    }
+                }
+            }
+
+            if (result == "") {
+                result += '<tr class="propertyLast subLabelRow">' +
+                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
+                        '<td width="33%">&nbsp</td>' +
+                        '</tr>';
+            }
+
+            $('#importConfiguration').html(result);
         };
 
 

@@ -36,9 +36,9 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -53,8 +53,10 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -69,8 +71,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.FunctionExpression;
-import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.parser.HSQLLexer;
@@ -137,6 +137,21 @@ public class DDLCompiler {
     final ClassLoader m_classLoader;
 
     private final Set<String> tableLimitConstraintCounter = new HashSet<>();
+
+    // Addition columns for DR conflicts table
+    private static final String [] DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS = {
+        "VOLTDB_AUTOGEN_TABLE_NAME VARCHAR",  // actual size of this column will be calculated at runtime
+        "VOLTDB_AUTOGEN_CLUSTER_ID TINYINT",
+        "VOLTDB_AUTOGEN_TIMESTAMP BIGINT",
+        "VOLTDB_AUTOGEN_OPERATION_TYPE TINYINT"
+    };
+
+    private static final Pattern drConflictsTablePattern = Pattern.compile(
+            CatalogUtil.DR_CONFLICTS_TABLE_PREFIX +             /* table prefix */
+            "(" +                                               /* start of group 1 */
+            "[\\w]+" +                                          /* DR table name, have at least one character */
+            ")"                                                 /* end of group 1 */
+    );
 
     private class DDLStatement {
         public DDLStatement() {
@@ -216,6 +231,124 @@ public class DDLCompiler {
         m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
         // possibly save some memory
         m_classMatcher.clear();
+    }
+
+    private void createConflictExportTableDDL(StringBuilder sb, VoltXMLElement node, String tableName) {
+
+        sb.append("CREATE TABLE " + tableName + " (");
+        for (VoltXMLElement subnode : node.children) {
+            // Indexes and constraints are not needed for export table
+            if (subnode.name.equals("columns")) {
+                // Insert additional columns to DR conflicts table first
+                for (String column : DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS) {
+                    sb.append(column);
+                    if (column.startsWith("TABLE_NAME")) {
+                        sb.append("(" + node.attributes.get("name").length() + " BYTES" + ")");
+                    }
+                    sb.append(", ");
+                }
+                // Then duplicate all columns of the original table
+                int columnIdx = 0;
+                for (VoltXMLElement columnNode : subnode.children) {
+                    sb.append(columnNode.attributes.get("name") + " " + columnNode.attributes.get("valuetype"));
+                    if (columnNode.attributes.get("nullable").equals("false")) {
+                        sb.append(" NOT NULL");
+                    }
+                    columnIdx++;
+                    if (columnIdx != subnode.children.size()) {
+                        sb.append(", ");
+                    }
+                }
+            }
+        }
+        sb.append(");\n");
+        if (node.attributes.containsKey("partitioncolumn")) {
+            sb.append("PARTITION TABLE " + tableName + " ON COLUMN " + node.attributes.get("partitioncolumn") + ";\n");
+        }
+        sb.append("EXPORT TABLE " + tableName + " TO STREAM " + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + ";\n");
+    }
+
+    private void createDRConflictTables(StringBuilder sb, Database previousDBIfAny) {
+        for (VoltXMLElement node : m_schema.children) {
+            if (node.name.equals("table")
+                    && node.attributes.containsKey("drTable") && node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
+                boolean tableAlreadyExist = false;
+                String drConflictExportTableName = CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + node.attributes.get("name");
+                // Does the conflict export table already existed?
+                if (previousDBIfAny != null) {
+                    tableAlreadyExist = previousDBIfAny.getTables().get(drConflictExportTableName) != null;
+                } else {
+                    for (VoltXMLElement element : m_schema.children) {
+                        if (element.name.equals("table")
+                                && element.attributes.containsKey("export")
+                                && element.attributes.get("name").equals(drConflictExportTableName)) {
+                            tableAlreadyExist = true;
+                            break;
+                        }
+                    }
+                }
+                if (!tableAlreadyExist) {
+                    // If the conflict export table doesn't existed yet, create a new one.
+                    createConflictExportTableDDL(sb, node, drConflictExportTableName);
+                }
+            }
+        }
+    }
+
+    // Drop the dr conflicts table if corresponding dr table is not existed or A/A is disabled or dr is disabled.
+    private void dropDRConflictTablesIfNeeded(StringBuilder sb, Database currentDB) {
+        Matcher matcher;
+        for (VoltXMLElement node : m_schema.children) {
+            if (node.name.equals("table")
+                    && (matcher = drConflictsTablePattern.matcher(node.attributes.get("name"))).matches()) {
+                String drTable = matcher.group(1);
+                boolean remove = true;
+                if (currentDB.getIsactiveactivedred()) {
+                    for (VoltXMLElement element : m_schema.children) {
+                        if (element.name.equals("table")
+                                && element.attributes.containsKey("drTable")
+                                && element.attributes.get("drTable").equalsIgnoreCase("ENABLE")
+                                && element.attributes.get("name").equals(drTable)) {
+                            remove = false;
+                            break;
+                        }
+                    }
+                }
+                if (remove) {
+                    sb.append("DROP TABLE " + node.attributes.get("name") + ";\n");
+                }
+            }
+        }
+    }
+
+    // Generate DDL to create or drop the DR conflict table
+    // TODO:When DR table supports dynamic schema change, we need also change the schema of conflict table,
+    //       maybe dropping the old one and recreating a new one is the easiest way.
+    private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny) {
+        StringBuilder sb = new StringBuilder();
+        if (currentDB.getIsactiveactivedred()) {
+            createDRConflictTables(sb, previousDBIfAny);
+        }
+        dropDRConflictTablesIfNeeded(sb, currentDB);
+        return sb.toString();
+    }
+
+    /**
+     * Load auto generated DR conflicts table into current schema.
+     * DR conflict table will be generated by
+     * 1) compiling the catalog if DR table exist and A/A DR is on,
+     * 2) liveDDL to enable DR table and turn A/A DR on
+     * 3) @UpdateApplicationCatalog to enable DR table and turn A/A DR on
+     *
+     * @param db  current database
+     * @param previousDBIfAny  previous status of database, liveDDL needs it
+     * @param whichProcs  which type(s) of procedures to load
+     * @throws VoltCompilerException
+     */
+    public void loadAutogenExportTableSchema(Database db, Database previousDBIfAny, DdlProceduresToLoad whichProcs)
+            throws VoltCompilerException {
+        Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny));
+        loadSchema(reader, db, whichProcs);
     }
 
     private void applyDiff(VoltXMLDiff stmtDiff)
@@ -799,6 +932,36 @@ public class DDLCompiler {
             else {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "While configuring dr, table %s was not present in the catalog.", tableName));
+            }
+            return true;
+        }
+
+        statementMatcher = SQLParser.matchSetGlobalParam(statement);
+        if (statementMatcher.matches()) {
+            String name = statementMatcher.group(1).toUpperCase();
+            String value = statementMatcher.group(2).toUpperCase();
+            switch (name) {
+                case DatabaseConfiguration.DR_MODE_NAME:
+                    switch (value) {
+                        case DatabaseConfiguration.ACTIVE_ACTIVE: {
+                            db.setIsactiveactivedred(true);
+                        }
+                        break;
+                        case DatabaseConfiguration.ACTIVE_PASSIVE:
+                        case "DEFAULT": {
+                            db.setIsactiveactivedred(false);
+                        }
+                        break;
+                        default: {
+                            throw m_compiler.new VoltCompilerException(String.format(
+                                    "Invalid parameter value for %s. Candidate values are %s, %s/DEFAULT",
+                                    name, DatabaseConfiguration.ACTIVE_ACTIVE, DatabaseConfiguration.ACTIVE_PASSIVE));
+                        }
+                    }
+                    break;
+                default:
+                    throw m_compiler.new VoltCompilerException(String.format(
+                        "Unknown global parameter: %s. Candidate parameters are %s", name, DatabaseConfiguration.allNames));
             }
             return true;
         }
@@ -1603,29 +1766,6 @@ public class DDLCompiler {
         return true;
     }
 
-    /**
-     * This function will recursively find any function expression with ID functionId.
-     * If found, return true. Else, return false.
-     * @param expr
-     * @param functionId
-     * @return
-     */
-    public static boolean containsTimeSensitiveFunction(AbstractExpression expr, int functionId) {
-        if (expr == null || expr instanceof TupleValueExpression) {
-            return false;
-        }
-
-        List<AbstractExpression> functionsList = expr.findAllSubexpressionsOfClass(FunctionExpression.class);
-        for (AbstractExpression funcExpr: functionsList) {
-            assert(funcExpr instanceof FunctionExpression);
-            if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
@@ -1637,29 +1777,24 @@ public class DDLCompiler {
 
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
         dummy.setTable(table);
-
+        StringBuffer msg = new StringBuffer(String.format("Index \"%s\" ", name));
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         List<AbstractExpression> exprs = null;
         // "parse" the WHERE expression for partial index if any
         AbstractExpression predicate = null;
+        // Some expressions have special validation in indices.  We
+        // gather all these up into the list checkExpressions.  We
+        // will check them all at once.
+        List<AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<AbstractExpression>();
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
-
-                    // The expr cannnot contain a scalar subquery.
-                    if (!expr.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
-                        String msg = String.format("Index %s with subquery expression(s) is not supported.", name);
-                        throw this.m_compiler.new VoltCompilerException(msg);
-                    }
-                    if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
-                        String msg = String.format("Index %s cannot include the function NOW or CURRENT_TIMESTAMP.", name);
-                        throw this.m_compiler.new VoltCompilerException(msg);
-                    }
-
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
+                    // We will check this for validity later.
+                    checkExpressions.add(expr);
                     exprs.add(expr);
                 }
             } else if (subNode.name.equals("predicate")) {
@@ -1668,6 +1803,11 @@ public class DDLCompiler {
             }
         }
 
+        // Check all the subexpressions we gathered up.
+        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+            // The error message will be in the StringBuffer msg.
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
@@ -1690,8 +1830,8 @@ public class DDLCompiler {
                 }
                 // disallow columns from VARBINARYs
                 if (colType == VoltType.VARBINARY) {
-                    String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
-                    throw this.m_compiler.new VoltCompilerException(msg);
+                    String emsg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         } else {
@@ -1703,8 +1843,8 @@ public class DDLCompiler {
                 }
                 // disallow expressions of type VARBINARY
                 if (colType == VoltType.VARBINARY) {
-                    String msg = "VARBINARY expressions are not currently supported as index keys.";
-                    throw this.m_compiler.new VoltCompilerException(msg);
+                    String emsg = "VARBINARY expressions are not currently supported as index keys.";
+                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         }
@@ -1726,9 +1866,9 @@ public class DDLCompiler {
             // If the column type is not an integer, we cannot
             // make the index a hash.
             if (has_nonint_col) {
-                String msg = "Index " + name + " in table " + table.getTypeName() +
+                String emsg = "Index " + name + " in table " + table.getTypeName() +
                              " uses a non-hashable column " + nonint_col_name;
-                throw m_compiler.new VoltCompilerException(msg);
+                throw m_compiler.new VoltCompilerException(emsg);
             }
             index.setType(IndexType.HASH_TABLE.getValue());
         }
@@ -1795,9 +1935,9 @@ public class DDLCompiler {
                 // if the index is a user-named index...
                 if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
-                    String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
+                    String emsg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
-                    m_compiler.addWarn(msg);
+                    m_compiler.addWarn(emsg);
                 }
 
                 // drop the index and GTFO
@@ -1806,10 +1946,10 @@ public class DDLCompiler {
             }
         }
 
-        String msg = "Created index: " + name + " on table: " +
-                    table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
+        String smsg = "Created index: " + name + " on table: " +
+                   table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
 
-        m_compiler.addInfo(msg);
+        m_compiler.addInfo(smsg);
 
         indexMap.put(name, index);
     }
@@ -2118,21 +2258,6 @@ public class DDLCompiler {
                     minMaxAggs.add(aggExpr);
                 }
             }
-            AbstractExpression singleUniqueMinMaxAggExpr = null;
-            /*
-             * ENG-6511: If we only have one distinct min/max aggCol/aggExpr, we can try to
-             * find an index that was built on both the group-by columns and the min/max
-             * aggCol/aggExpr to achieve better performance.
-             */
-            if (hasMinOrMaxAgg) {
-                singleUniqueMinMaxAggExpr = minMaxAggs.get(0);
-                for (int i=1; i<minMaxAggs.size(); ++i) {
-                    if ( ! minMaxAggs.get(i).equals(singleUniqueMinMaxAggExpr)) {
-                        singleUniqueMinMaxAggExpr = null;
-                        break;
-                    }
-                }
-            }
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {
@@ -2147,19 +2272,23 @@ public class DDLCompiler {
             }
 
             if (hasMinOrMaxAgg) {
-                // ENG-6511: If we have only one distinct min/max aggCol/aggExpr, we will pass it into
-                // findBestMatchIndexForMatviewMinOrMax() to see if a better index can be found.
-                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, singleUniqueMinMaxAggExpr);
-                if (found != null) {
-                    matviewinfo.setIndexforminmax(found.getTypeName());
-                } else {
-                    matviewinfo.setIndexforminmax("");
-                    m_compiler.addWarn("No index found to support min() / max() UPDATE and DELETE on Materialized View " +
+                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+                boolean needsWarning = false;
+                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                    IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                    if (found != null) {
+                        refFound.setName(found.getTypeName());
+                    } else {
+                        refFound.setName("");
+                        needsWarning = true;
+                    }
+                }
+                if (needsWarning) {
+                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
                             matviewinfo.getTypeName() +
                             ", and a sequential scan might be issued when current min / max value is updated / deleted.");
                 }
-            } else {
-                matviewinfo.setIndexforminmax("");
             }
 
             // parse out the aggregation columns into the dest table
@@ -2196,7 +2325,7 @@ public class DDLCompiler {
     //   -- (ENG-6511) indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
     // This function is mostly re-written for the fix of ENG-6511. --yzhang
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
-            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression singleUniqueMinMaxAggExpr)
+            Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression minMaxAggExpr)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
         StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
@@ -2208,9 +2337,9 @@ public class DDLCompiler {
         for (Index index : allIndexes) {
             // indexOptimalForMinMax == true if the index covered both the group-by columns and the min/max aggExpr.
             boolean indexOptimalForMinMax = false;
-            // If singleUniqueMinMaxAggExpr is not null, the diff can be zero or one.
+            // If minMaxAggExpr is not null, the diff can be zero or one.
             // Otherwise, for a usable index, its number of columns must agree with that of the group-by columns.
-            final int diffAllowance = singleUniqueMinMaxAggExpr == null ? 0 : 1;
+            final int diffAllowance = minMaxAggExpr == null ? 0 : 1;
 
             // Get all indexed exprs if there is any.
             String expressionjson = index.getExpressionsjson();
@@ -2240,7 +2369,7 @@ public class DDLCompiler {
                     List<ColumnRef> indexedColRefs =
                         CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
                     // The number of columns in index can never be less than that in the group-by column list.
-                    // If singleUniqueMinMaxAggExpr == null, they must be equal (diffAllowance == 0)
+                    // If minMaxAggExpr == null, they must be equal (diffAllowance == 0)
                     // Otherwise they may be equal (sub-optimal) or
                     // indexedColRefs.size() == groupbyColRefs.size() + 1 (optimal, diffAllowance == 1)
                     if (isInvalidIndexCandidate(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
@@ -2251,7 +2380,7 @@ public class DDLCompiler {
                         continue;
                     }
                     if (isValidIndexCandidateForMinMax(indexedColRefs.size(), groupbyColRefs.size(), diffAllowance)) {
-                        if(! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, indexedColRefs, null, srcColumnArray)) {
                             continue;
                         }
                         indexOptimalForMinMax = true;
@@ -2273,7 +2402,7 @@ public class DDLCompiler {
                         continue;
                     }
                     if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyColRefs.size(), diffAllowance)) {
-                        if(! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, null, indexedExprs, null)) {
+                        if(! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                             continue;
                         }
                         indexOptimalForMinMax = true;
@@ -2297,7 +2426,7 @@ public class DDLCompiler {
                 }
 
                 if (isValidIndexCandidateForMinMax(indexedExprs.size(), groupbyExprs.size(), diffAllowance)) {
-                    if (! isIndexOptimalForMinMax(matchingCase, singleUniqueMinMaxAggExpr, null, indexedExprs, null)) {
+                    if (! isIndexOptimalForMinMax(matchingCase, minMaxAggExpr, null, indexedExprs, null)) {
                         continue;
                     }
                     indexOptimalForMinMax = true;
@@ -2398,18 +2527,18 @@ public class DDLCompiler {
     }
 
     private static boolean isIndexOptimalForMinMax(
-            MatViewIndexMatchingGroupby matchingCase, AbstractExpression singleUniqueMinMaxAggExpr,
+            MatViewIndexMatchingGroupby matchingCase, AbstractExpression minMaxAggExpr,
             List<ColumnRef> indexedColRefs, List<AbstractExpression> indexedExprs,
             List<Column> srcColumnArray) {
-        // We have singleUniqueMinMaxAggExpr and the index also has one extra column
+        // We have minMaxAggExpr and the index also has one extra column
         switch(matchingCase) {
         case GB_COL_IDX_COL:
-            if ( ! (singleUniqueMinMaxAggExpr instanceof TupleValueExpression) ) {
+            if ( ! (minMaxAggExpr instanceof TupleValueExpression) ) {
                 // Here because the index columns are all simple columns (indexedExprs == null)
-                // so the singleUniqueMinMaxAggExpr must be TupleValueExpression.
+                // so the minMaxAggExpr must be TupleValueExpression.
                 return false;
             }
-            int aggSrcColIdx = ((TupleValueExpression)singleUniqueMinMaxAggExpr).getColumnIndex();
+            int aggSrcColIdx = ((TupleValueExpression)minMaxAggExpr).getColumnIndex();
             Column aggSrcCol = srcColumnArray.get(aggSrcColIdx);
             Column lastIndexCol = indexedColRefs.get(indexedColRefs.size() - 1).getColumn();
             // Compare the two columns, if they are equal as well, then this is the optimal index! Congrats!
@@ -2419,7 +2548,7 @@ public class DDLCompiler {
             break;
         case GB_COL_IDX_EXP:
         case GB_EXP_IDX_EXP:
-            if (indexedExprs.get(indexedExprs.size()-1).equals(singleUniqueMinMaxAggExpr)) {
+            if (indexedExprs.get(indexedExprs.size()-1).equals(minMaxAggExpr)) {
                 return true;
             }
             break;
@@ -2490,81 +2619,100 @@ public class DDLCompiler {
     private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
         int groupColCount = stmt.m_groupByColumns.size();
         int displayColCount = stmt.m_displayColumns.size();
-        String msg = "Materialized view \"" + viewName + "\" ";
-
-        if (stmt.hasSubquery()) {
-            msg += "with subquery sources is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.m_tableList.size() != 1) {
-            msg += "has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-            "Only one source table is allowed.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.orderByColumns().size() != 0) {
-            msg += "with ORDER BY clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.hasLimitOrOffset()) {
-            msg += "with LIMIT or OFFSET clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.m_having != null) {
-            msg += "with HAVING clause is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (displayColCount <= groupColCount) {
-            msg += "has too few columns.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
+        StringBuffer msg = new StringBuffer();
+        msg.append("Materialized view \"" + viewName + "\" ");
 
         List <AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
 
         int i;
+        // First, check the group by columns.  They are at
+        // the beginning of the display list.
         for (i = 0; i < groupColCount; i++) {
             ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
-
+            // The columns must be equal.
             if (!outcol.expression.equals(gbcol.expression)) {
-                msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
-                throw m_compiler.new VoltCompilerException(msg);
+                msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
+                throw m_compiler.new VoltCompilerException(msg.toString());
             }
             checkExpressions.add(outcol.expression);
         }
-
+        // Now, the display list must have a count(*).
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
-            msg += "is missing count(*) as the column after the group by columns, a materialized view requirement.";
-            throw m_compiler.new VoltCompilerException(msg);
+            msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
+            throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
+        // Finally, the display columns must have aggregate
+        // calls.  But these are not any aggregate calls. They
+        // must be count(), min(), max() or sum().
         for (i++; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
+            // Note that this expression does not catch all aggregates.
+            // An instance of count(*) here, or avg() would cause the
+            // exception.  We just required count(*) above, but a
+            // second one would fail.
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
-                msg += "must have non-group by columns aggregated by sum, count, min or max.";
-                throw m_compiler.new VoltCompilerException(msg);
+                msg.append("must have non-group by columns aggregated by sum, count, min or max.");
+                throw m_compiler.new VoltCompilerException(msg.toString());
             }
-            checkExpressions.add(outcol.expression);
+            // Don't push the expression, though.  Push the argument.
+            // We will check for aggregate calls and fail, and we don't
+            // want to fail on legal aggregate expressions.
+            if (outcol.expression.getLeft() != null) {
+                checkExpressions.add(outcol.expression.getLeft());
+            }
+            assert(outcol.expression.getRight() == null);
+            assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
 
-        // Check unsupported SQL functions like: NOW, CURRENT_TIMESTAMP
         AbstractExpression where = stmt.getSingleTableFilterExpression();
-        checkExpressions.add(where);
-
-        for (AbstractExpression expr: checkExpressions) {
-            if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId())) {
-                msg += "cannot include the function NOW or CURRENT_TIMESTAMP.";
-                throw m_compiler.new VoltCompilerException(msg);
-            }
+        if (where != null) {
+            checkExpressions.add(where);
         }
+
+        // Check all the subexpressions we gathered up.
+        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+            // The error message will be in the StringBuffer msg.
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        // Check some other materialized view specific things.
+        if (stmt.hasSubquery()) {
+            msg.append("with subquery sources is not supported.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (stmt.m_tableList.size() != 1) {
+            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
+                       "Only one source table is allowed.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (stmt.orderByColumns().size() != 0) {
+            msg.append("with ORDER BY clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (stmt.hasLimitOrOffset()) {
+            msg.append("with LIMIT or OFFSET clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (stmt.m_having != null) {
+            msg.append("with HAVING clause is not supported.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+        if (displayColCount <= groupColCount) {
+            msg.append("has too few columns.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
      }
 
     void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,

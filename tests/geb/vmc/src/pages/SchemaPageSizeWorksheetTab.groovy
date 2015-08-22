@@ -41,8 +41,10 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         tableMin	{ $(class:"tablesorter-header-inner", text:"Table Min") }
         tableMax	{ $(class:"tablesorter-header-inner", text:"Table Max") }
 
-        ascending	{ $(class:"tablesorter-icon icon-chevron-up") }
-        descending	{ $(class:"tablesorter-icon icon-chevron-down") }
+        //ascending		{ $(class:"tablesorter-icon icon-chevron-up") }
+        ascending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerAsc") }
+        //descending		{ $(class:"tablesorter-icon icon-chevron-down") }
+        descending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerDesc") }
 
         sizeAnalysisSummary	{ $("h3", text:"Size Analysis Summary") }
 
@@ -58,7 +60,7 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         textIndex			{ $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
         textTotal			{ $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(5) > td:nth-child(1) > b") }
 
-        tablenamePresent	{ $(class:"table-view-name") }
+        tablenamePresent	(required:false) { $(class:"table-view-name", text:"lina") }
 
         searchName			{ $("#sizetable > thead > tr.tablesorter-filter-row > td:nth-child(1) > input") }
         documentationLink 	{ $("#iconDoc") }
@@ -67,10 +69,10 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
 
     }
 
-
     static at = {
         sizeTab.displayed
         sizeTab.attr('class') == 'active'
     }
-
+    
+    
 }

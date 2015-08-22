@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -27,7 +28,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public class DummyCommandLog implements CommandLog {
     @Override
-    public void init(CatalogContext context, long txnId, int partitionCount,
+    public void init(int logSize, long txnId, int partitionCount,
                      String affinity, Map<Integer, Long> perPartitionTxnId) {}
 
     @Override
@@ -39,7 +40,7 @@ public class DummyCommandLog implements CommandLog {
     public void shutdown() throws InterruptedException {}
 
     @Override
-    public void initForRejoin(CatalogContext context, long txnId, int partitionCount,
+    public void initForRejoin(int logSize, long txnId, int partitionCount,
                               boolean isRejoin, String affinity,
                               Map<Integer, Long> perPartitionTxnId) {}
 
@@ -49,7 +50,7 @@ public class DummyCommandLog implements CommandLog {
             long spHandle,
             int[] involvedPartitions,
             DurabilityListener l,
-            Object handle) {
+            TransactionTask handle) {
         return Futures.immediateFuture(null);
     }
 
@@ -82,4 +83,17 @@ public class DummyCommandLog implements CommandLog {
         rowValues[columnNameToIndex.get(CommandLogStats.StatName.FSYNC_INTERVAL.name())] = 0;
     }
 
+    public boolean isSynchronous() {
+        return false;
+    }
+
+    @Override
+    public boolean canOfferTask()
+    {
+        return true;
+    }
+
+    @Override
+    public void registerDurabilityListener(DurabilityListener durabilityListener) {
+    }
 }

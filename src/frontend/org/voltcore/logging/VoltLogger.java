@@ -25,6 +25,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
+
 import com.google_voltpatches.common.base.Throwables;
 
 /**
@@ -100,6 +103,7 @@ public class VoltLogger {
         public void log(Level level, Object message, Throwable t);
         public void l7dlog(Level level, String key, Object[] params, Throwable t);
         public long getLogLevels(VoltLogger loggers[]);
+        public void setLevel(Level level);
     }
 
     /*
@@ -303,6 +307,10 @@ public class VoltLogger {
         return m_logger.getLogLevels(loggers);
     }
 
+    public void setLevel(Level level) {
+        m_logger.setLevel(level);
+    }
+
     /**
      * Static method to change the Log4j config globally. This fails
      * if you're not using Log4j for now.
@@ -342,5 +350,14 @@ public class VoltLogger {
         }
         // set the final variable for the core logger
         m_logger = tempLogger;
+    }
+
+    public void rateLimitedLog(long suppressInterval, Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                suppressInterval, TimeUnit.SECONDS,
+                this, level,
+                cause, format, args
+                );
     }
 }

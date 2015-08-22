@@ -1,0 +1,17 @@
+# A gnuplot script to generate a bar chart
+reset
+set style fill solid 1.00 border 0
+set style histogram clustered gap 2
+set style data histogram
+set xtics rotate by -45
+set grid ytics
+set xlabel "Number of rows"
+set ylabel "Cardinality"
+set yrange [0:*]
+set key on left
+
+set term png size 1280, 960 font 'Helvetica,20' noenhanced
+set output 'bench_accuracy.png'
+
+plot 'bench_accuracy.dat' using 2:xticlabel(sprintf("%s\n%2.1f%% error", stringcolumn(1), column(4))) ti "Exact", \
+'bench_accuracy.dat' using 3:xticlabel(sprintf("%s\n%2.1f%% error", stringcolumn(1), column(4))) ti "Estimate"

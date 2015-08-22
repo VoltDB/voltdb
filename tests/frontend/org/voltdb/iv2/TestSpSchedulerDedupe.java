@@ -23,9 +23,11 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -43,6 +45,7 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
@@ -89,9 +92,14 @@ public class TestSpSchedulerDedupe extends TestCase
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
+        final CommandLog cl = mock(CommandLog.class);
+        doReturn(CoreUtils.COMPLETED_FUTURE).when(cl).log(any(Iv2InitiateTaskMessage.class), anyLong(), any(int[].class),
+                                                          any(CommandLog.DurabilityListener.class),
+                                                          any(TransactionTask.class));
+
         dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
         dut.setMailbox(mbox);
-        dut.setCommandLog(mock(CommandLog.class));
+        dut.setCommandLog(cl);
         dut.setLock(mbox);
     }
 
@@ -101,6 +109,7 @@ public class TestSpSchedulerDedupe extends TestCase
         // Mock an invocation for MockSPName.
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         when(spi.getProcName()).thenReturn(MockSPName);
+        when(spi.getOriginalTxnId()).thenReturn((long)-1);
         ParameterSet bleh = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(bleh);
         Iv2InitiateTaskMessage task =

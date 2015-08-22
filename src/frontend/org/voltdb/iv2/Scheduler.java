@@ -28,6 +28,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.rejoin.TaskLog;
 
@@ -154,6 +155,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_lock = o;
     }
 
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
+        // Durability Listeners should never be assigned to the MP Scheduler
+        assert false;
+    }
+
     /**
      * Update last seen txnIds in the replay sequencer. This is used on MPI repair.
      * @param message
@@ -165,19 +171,19 @@ abstract public class Scheduler implements InitiatorMessageHandler
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
 
-        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
+        boolean drV1 = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDRv1()));
 
         boolean sentinel = message instanceof MultiPartitionParticipantMessage;
 
-        boolean replay = commandLog || sentinel || dr;
+        boolean replay = commandLog || sentinel || drV1;
 
-        assert(!(commandLog && dr));
+        assert(!(commandLog && drV1));
 
         if (commandLog || sentinel) {
             sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
         }
-        else if (dr) {
+        else if (drV1) {
             sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
         }
 

@@ -681,42 +681,42 @@ public abstract class VoltTableRow {
         switch (columnType) {
         case TINYINT:
             value = getLong(columnIndex);
-            if (value == VoltType.NULL_TINYINT)
+            if (wasNull())
                 js.value(null);
             else
                 js.value(value);
             break;
         case SMALLINT:
             value = getLong(columnIndex);
-            if (value == VoltType.NULL_SMALLINT)
+            if (wasNull())
                 js.value(null);
             else
                 js.value(value);
             break;
         case INTEGER:
             value = getLong(columnIndex);
-            if (value == VoltType.NULL_INTEGER)
+            if (wasNull())
                 js.value(null);
             else
                 js.value(value);
             break;
         case BIGINT:
             value = getLong(columnIndex);
-            if (value == VoltType.NULL_BIGINT)
+            if (wasNull())
                 js.value(null);
             else
                 js.value(value);
             break;
         case TIMESTAMP:
             value = getTimestampAsLong(columnIndex);
-            if (value == VoltType.NULL_BIGINT)
+            if (wasNull())
                 js.value(null);
             else
                 js.value(value);
             break;
         case FLOAT:
             dvalue = getDouble(columnIndex);
-            if (dvalue == VoltType.NULL_FLOAT)
+            if (wasNull())
                 js.value(null);
             else
                 js.value(dvalue);
@@ -730,16 +730,19 @@ public abstract class VoltTableRow {
             break;
         case DECIMAL:
             Object dec = getDecimalAsBigDecimal(columnIndex);
-            if (dec == null)
+            if (wasNull())
                 js.value(null);
             else
                 js.value(dec.toString());
             break;
+        // VoltType includes a few values that aren't valid column value types
         case INVALID:
             break;
         case NULL:
             break;
         case NUMERIC:
+            break;
+        case BOOLEAN:
             break;
         case VOLTTABLE:
             break;

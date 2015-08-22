@@ -19,10 +19,7 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Deque;
@@ -34,11 +31,9 @@ import java.util.TreeMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DBBPool.MBBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.EELibraryLoader;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
-import org.xerial.snappy.Snappy;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Throwables;
@@ -170,11 +165,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             if (deleteEmpty) {
                                 if (qs.getNumEntries() == 0) {
                                     LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + pathname.getName());
+                                    if (m_usageSpecificLog.isDebugEnabled()) {
+                                        m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted during init");
+                                    }
                                     qs.closeAndDelete();
                                     return false;
                                 }
                             }
                             m_numObjects += qs.getNumEntries();
+                            if (m_usageSpecificLog.isDebugEnabled()) {
+                                m_usageSpecificLog.debug("Segment " + qs.file() + " has been recovered");
+                            }
                             qs.close();
                             segments.put( index, qs);
                         } catch (IOException e) {
@@ -299,11 +300,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
         //Check to see if the tail is completely consumed so we can close and delete it
         if (!tail.hasMoreEntries() && tail.isEmpty()) {
             m_segments.pollLast();
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("Segment " + tail.file() + " has been closed and deleted because of empty queue");
+            }
             tail.closeAndDelete();
         }
         Long nextIndex = tail.segmentId() + 1;
         tail = newSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
         tail.open(true);
+        if (m_usageSpecificLog.isDebugEnabled()) {
+            m_usageSpecificLog.debug("Segment " + tail.file() + " has been created because of an offer");
+        }
         closeTailAndOffer(tail);
         return tail;
     }
@@ -355,6 +362,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
             writeSegment.open(true);
             nextIndex--;
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("Segment " + writeSegment.file() + " has been created because of a push");
+            }
 
             while (currentSegmentContents.peek() != null) {
                 writeSegment.offer(currentSegmentContents.pollFirst(), false);
@@ -421,6 +431,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     if (segment.isEmpty()) {
                         if (segment != m_segments.peekLast()) {
                             m_segments.remove(segment);
+                            if (m_usageSpecificLog.isDebugEnabled()) {
+                                m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted after discarding last buffer");
+                            }
                             segment.closeAndDelete();
                         }
                     }
@@ -501,6 +514,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (m_closed) return;
         m_closed = true;
         for (PBDSegment qs : m_segments) {
+            m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted due to delete all");
             qs.closeAndDelete();
         }
     }
@@ -606,6 +620,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
             addToNumObjects(-segment.getNumEntries());
             iterator.remove();
+            m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted by truncator");
             segment.closeAndDelete();
         }
 
@@ -618,6 +633,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         PBDSegment newSegment = newSegment(newSegmentIndex, new VoltFile(m_path, m_nonce + "." + newSegmentIndex + ".pbd"));
         newSegment.open(true);
+        if (m_usageSpecificLog.isDebugEnabled()) {
+            m_usageSpecificLog.debug("Segment " + newSegment.file() + " has been created by PBD truncator");
+        }
         m_segments.offer(newSegment);
         assertions();
     }

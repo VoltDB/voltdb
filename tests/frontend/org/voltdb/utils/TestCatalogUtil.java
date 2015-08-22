@@ -26,6 +26,7 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
@@ -39,9 +40,11 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
@@ -54,6 +57,8 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
 
 public class TestCatalogUtil extends TestCase {
@@ -518,6 +523,98 @@ public class TestCatalogUtil extends TestCase {
         }
     }
 
+    public void testCheckLicenseConstraint() {
+        catalog_db.setIsactiveactivedred(true);
+
+        LicenseApi lapi = new LicenseApi() {
+            @Override
+            public boolean initializeFromFile(File license) {
+                return false;
+            }
+
+            @Override
+            public boolean isTrial() {
+                return false;
+            }
+
+            @Override
+            public int maxHostcount() {
+                return 0;
+            }
+
+            @Override
+            public Calendar expires() {
+                return null;
+            }
+
+            @Override
+            public boolean verify() throws LicenseException {
+                return false;
+            }
+
+            @Override
+            public boolean isDrReplicationAllowed() {
+                return false;
+            }
+
+            @Override
+            public boolean isDrActiveActiveAllowed() {
+                return true;
+            }
+
+            @Override
+            public boolean isCommandLoggingAllowed() {
+                return false;
+            }
+        };
+        assertNull("Setting DR Active-Active should succeed with qualified license",
+                   CatalogUtil.checkLicenseConstraint(catalog, lapi));
+
+        lapi = new LicenseApi() {
+            @Override
+            public boolean initializeFromFile(File license) {
+                return false;
+            }
+
+            @Override
+            public boolean isTrial() {
+                return false;
+            }
+
+            @Override
+            public int maxHostcount() {
+                return 0;
+            }
+
+            @Override
+            public Calendar expires() {
+                return null;
+            }
+
+            @Override
+            public boolean verify() throws LicenseException {
+                return false;
+            }
+
+            @Override
+            public boolean isDrReplicationAllowed() {
+                return false;
+            }
+
+            @Override
+            public boolean isDrActiveActiveAllowed() {
+                return false;
+            }
+
+            @Override
+            public boolean isCommandLoggingAllowed() {
+                return false;
+            }
+        };
+        assertNotNull("Setting DR Active-Active should fail with unqualified license",
+                CatalogUtil.checkLicenseConstraint(catalog, lapi));
+    }
+
     public void testCompileDeploymentAgainstEmptyCatalog() {
         Catalog catalog = new Catalog();
         Cluster cluster = catalog.getClusters().add("cluster");
@@ -669,6 +766,26 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
+        final String withBuiltinElasticSearchExportNew =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='true' type='elasticsearch'>"
+                + "            <property name=\"endpoint\">http://localhost:9200/index_%t/type_%p</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String withBuiltinElasticSearchExportOld =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='elasticsearch'>"
+                + "        <configuration>"
+                + "            <property name=\"endpoint\">http://localhost:9200/index_%t/type_%p</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
         final String ddl =
                 "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
                 + "EXPORT TABLE export_data;";
@@ -738,6 +855,40 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(builtin_kafkadeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.KAFKA);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.kafka.KafkaExportClient");
+
+        //Check elastic-search option.
+        final File tmpElasticSearchNewBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinElasticSearchExportNew);
+        DeploymentType builtin_elasticsearchnewdeployment = CatalogUtil.getDeployment(new FileInputStream(tmpElasticSearchNewBuiltin));
+
+        Catalog cat5 = compiler.compileCatalogFromDDL(x);
+        msg = CatalogUtil.compileDeployment(cat5, builtin_elasticsearchnewdeployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        db = cat5.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        assertNotNull(catconn);
+
+        assertTrue(builtin_elasticsearchnewdeployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(builtin_elasticsearchnewdeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.ELASTICSEARCH);
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.ElasticSearchHttpExportClient");
+
+        //Check elastic-search with legacy deployment XML
+        final File tmpElasticSearchOldBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinElasticSearchExportOld);
+        DeploymentType builtin_elasticsearcholddeployment = CatalogUtil.getDeployment(new FileInputStream(tmpElasticSearchOldBuiltin));
+
+        Catalog cat6 = compiler.compileCatalogFromDDL(x);
+        msg = CatalogUtil.compileDeployment(cat6, builtin_elasticsearcholddeployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        db = cat6.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        assertNotNull(catconn);
+
+        assertTrue(builtin_elasticsearcholddeployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(builtin_elasticsearcholddeployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.ELASTICSEARCH);
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.ElasticSearchHttpExportClient");
     }
 
     public void testImportSettings() throws Exception {
@@ -786,7 +937,7 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </import>"
                 + "</deployment>";
-        final String withBadImport4 =
+        final String withGoodImport0 =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
@@ -867,8 +1018,8 @@ public class TestCatalogUtil extends TestCase {
         String msg3 = CatalogUtil.compileDeployment(cat3, bad_deployment3, false);
         assertTrue("compilation should have failed", msg3.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
 
-        //import with dup bundlename
-        final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withBadImport4);
+        //import with dup should be ok now
+        final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withGoodImport0);
         DeploymentType bad_deployment4 = CatalogUtil.getDeployment(new FileInputStream(tmpBad4));
 
         VoltCompiler compiler4 = new VoltCompiler();
@@ -876,7 +1027,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat4 = compiler4.compileCatalogFromDDL(x4);
 
         String msg4 = CatalogUtil.compileDeployment(cat4, bad_deployment4, false);
-        assertTrue("compilation should have failed", msg4.contains("Error validating deployment configuration: Multiple connectors can not be assigned to single import module"));
+        assertNull(msg4);
 
         //import good bundle not necessary loadable by felix.
         final File good1 = VoltProjectBuilder.writeStringToTempFile(goodImport1);
@@ -1371,7 +1522,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
-        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
         assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpEnabled = VoltProjectBuilder.writeStringToTempFile(oneEnabledConnection);
@@ -1383,7 +1534,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
-        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
         assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(drDisabled);
@@ -1612,6 +1763,68 @@ public class TestCatalogUtil extends TestCase {
 
         String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
         assertNull("deployment should compile with missing file export type", msg);
+    }
+
+    public void testDefaultDRConflictTableExportSetting() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "</deployment>";
+        final String ddl =
+                "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                 "DR TABLE T;\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(db.getIsactiveactivedred());
+        assertTrue(db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP) != null);
+    }
+
+    public void testOverrideDRConflictTableExportSetting() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='" + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + "' enabled='true' type='file'>"
+                + "            <property name=\"type\">csv</property>"
+                + "            <property name=\"nonce\">newNonce</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String ddl =
+                "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                 "DR TABLE T;\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+
+        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(db.getIsactiveactivedred());
+        Connector conn = db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP);
+        assertTrue(conn != null);
+        assertTrue(conn.getConfig().get("nonce").getValue().equals("newNonce"));
+
     }
 
     @SafeVarargs

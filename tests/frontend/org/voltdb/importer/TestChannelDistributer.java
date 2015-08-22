@@ -56,10 +56,16 @@ public class TestChannelDistributer extends ZKTestBase {
 
     Map<String, ZooKeeper> zks;
     Map<String, ChannelDistributer> distributers;
-    BlockingDeque<ChannelAssignment> queue;
+    BlockingDeque<ImporterChannelAssignment> queue;
 
-    static Set<ChannelSpec> fromURIs(Set<URI> uris) {
-        return FluentIterable.from(uris).transform(ChannelSpec.fromUri(YO)).toSet();
+    public class Collector implements ChannelChangeCallback {
+        @Override
+        public void onChange(ImporterChannelAssignment assignment) {
+            queue.offer(assignment);
+        }
+        @Override
+        public void onClusterStateChange(VersionedOperationMode mode) {
+        }
     }
 
     static Set<URI> generateURIs(int count) {
@@ -70,10 +76,14 @@ public class TestChannelDistributer extends ZKTestBase {
         return sbldr.build();
     }
 
-    Set<ChannelSpec> getRemoved(int expected) throws Exception {
+    static Set<ChannelSpec> asSpecs(Set<URI> uris) {
+        return FluentIterable.from(uris).transform(ChannelSpec.fromUri(YO)).toSet();
+    }
+
+    Set<URI> getRemoved(int expected) throws Exception {
         int received = 0;
-        ImmutableSet.Builder<ChannelSpec> sbldr = ImmutableSet.builder();
-        ChannelAssignment assignment = null;
+        ImmutableSet.Builder<URI> sbldr = ImmutableSet.builder();
+        ImporterChannelAssignment assignment = null;
         while (received < expected && (assignment=queue.poll(200,TimeUnit.MILLISECONDS)) != null) {
             received += assignment.getRemoved().size();
             sbldr.addAll(assignment.getRemoved());
@@ -83,11 +93,11 @@ public class TestChannelDistributer extends ZKTestBase {
         return sbldr.build();
     }
 
-    Set<ChannelSpec> getAdded(int expected) throws Exception {
+    Set<URI> getAdded(int expected) throws Exception {
         int received = 0;
-        ImmutableSet.Builder<ChannelSpec> sbldr = ImmutableSet.builder();
-        ChannelAssignment assignment = null;
-        while (received < expected && (assignment=queue.poll(200,TimeUnit.MILLISECONDS)) != null) {
+        ImmutableSet.Builder<URI> sbldr = ImmutableSet.builder();
+        ImporterChannelAssignment assignment = null;
+        while (received < expected && (assignment=queue.poll(200, TimeUnit.MILLISECONDS)) != null) {
             received += assignment.getAdded().size();
             sbldr.addAll(assignment.getAdded());
         }
@@ -106,24 +116,27 @@ public class TestChannelDistributer extends ZKTestBase {
                 .put(DUE,  getClient(2))
                 .build();
         distributers = ImmutableMap.<String, ChannelDistributer>builder()
-                .put(ZERO, new ChannelDistributer(zks.get(ZERO), ZERO, queue))
-                .put(UNO,  new ChannelDistributer(zks.get(UNO), UNO, queue))
-                .put(DUE,  new ChannelDistributer(zks.get(DUE), DUE, queue))
+                .put(ZERO, new ChannelDistributer(zks.get(ZERO), ZERO))
+                .put(UNO,  new ChannelDistributer(zks.get(UNO), UNO))
+                .put(DUE,  new ChannelDistributer(zks.get(DUE), DUE))
                 .build();
+        for (ChannelDistributer cd: distributers.values()) {
+            cd.registerCallback(YO, new Collector());
+        }
     }
 
     @Test
     public void testRegistration() throws Exception {
         Set<URI> uris = generateURIs(9);
-        Set<ChannelSpec> expected = fromURIs(uris);
+        Set<URI> expected = uris;
         // add nine
         distributers.get(UNO).registerChannels(YO, uris);
-        Set<ChannelSpec> actual = getAdded(9);
+        Set<URI> actual = getAdded(9);
 
         assertEquals(expected, actual);
 
         Set<URI> pruned = generateURIs(6);
-        expected = Sets.difference(fromURIs(uris), fromURIs(pruned));
+        expected = Sets.difference(uris, pruned);
         // remove 3
         distributers.get(DUE).registerChannels(YO, pruned);
         actual = getRemoved(3);
@@ -131,17 +144,17 @@ public class TestChannelDistributer extends ZKTestBase {
         assertEquals(expected, actual);
         // register the same
         distributers.get(ZERO).registerChannels(YO, pruned);
-        assertNull(queue.poll(200,TimeUnit.MILLISECONDS));
+        assertNull(queue.poll(200, TimeUnit.MILLISECONDS));
 
         uris = generateURIs(8);
-        expected = Sets.difference(fromURIs(uris), fromURIs(pruned));
+        expected = Sets.difference(uris, pruned);
         // add two
         distributers.get(UNO).registerChannels(YO, uris);
         actual = getAdded(2);
 
         assertEquals(expected, actual);
 
-        expected = fromURIs(uris);
+        expected = uris;
         // remove all
         distributers.get(UNO).registerChannels(YO, ImmutableSet.<URI>of());
         actual = getRemoved(8);
@@ -160,10 +173,10 @@ public class TestChannelDistributer extends ZKTestBase {
     @Test
     public void testHostFailure() throws Exception {
         Set<URI> uris = generateURIs(9);
-        Set<ChannelSpec> expected = fromURIs(uris);
+        Set<URI> expected = uris;
         // add nine
         distributers.get(UNO).registerChannels(YO, uris);
-        Set<ChannelSpec> actual = getAdded(9);
+        Set<URI> actual = getAdded(9);
 
         assertEquals(expected, actual);
 
@@ -189,7 +202,7 @@ public class TestChannelDistributer extends ZKTestBase {
         zks.get(ZERO).close();
 
         actual = getAdded(inZERO.size());
-        assertEquals(inZERO, actual);
+        assertEquals(inZERO, asSpecs(actual));
     }
 
     @After

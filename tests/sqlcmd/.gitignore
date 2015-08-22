@@ -3,3 +3,4 @@
 /scripts/*/*.out
 /scripts/*/*.outclean
 /sqlcmdtest.report
+/sqlcmdtest-procs.jar

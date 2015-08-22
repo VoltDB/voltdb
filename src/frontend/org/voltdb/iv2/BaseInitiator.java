@@ -26,15 +26,18 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.CommandLog;
-import org.voltdb.PartitionDRGateway;
+import org.voltdb.ConsumerDRGateway;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.rejoin.TaskLog;
 
 /**
@@ -59,6 +62,7 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
+    protected ConsumerDRGateway m_consumerDRGateway = null;
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
             StartAction startAction)
@@ -126,9 +130,12 @@ public abstract class BaseInitiator implements Initiator
                           CommandLog cl,
                           String coreBindIds,
                           PartitionDRGateway drGateway,
-                          PartitionDRGateway mpDrGateway)
+                          PartitionDRGateway mpDrGateway,
+                          ConsumerDRGateway consumerDRGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
+            m_consumerDRGateway = consumerDRGateway;
+
             int snapshotPriority = 6;
             if (catalogContext.cluster.getDeployment().get("deployment") != null) {
                 snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
@@ -219,6 +226,24 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
+    }
+
+    @Override
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
+    {
+        // Durability Listeners should never be assigned to the MP Scheduler
+        assert false;
+    }
+
+    @Override
+    public void setConsumerDRGateway(ConsumerDRGateway gateway) {
+        assert m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway;
+        m_consumerDRGateway = gateway;
+        if (m_term != null && m_consumerDRGateway instanceof ClientInterfaceRepairCallback) {
+            // We're the leader, and this consumer gateway is late to the party
+            ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback)gateway;
+            callback.repairCompleted(m_partitionId, m_initiatorMailbox.getHSId());
+        }
     }
 
     abstract protected void acceptPromotion() throws Exception;

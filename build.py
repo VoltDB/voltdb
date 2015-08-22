@@ -174,6 +174,7 @@ CTX.INPUT['catalog'] = """
  constraintref.cpp
  database.cpp
  index.cpp
+ indexref.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp
@@ -220,17 +221,17 @@ CTX.INPUT['execution'] = """
 """
 
 CTX.INPUT['executors'] = """
+ OptimizedProjector.cpp
  abstractexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
  executorutil.cpp
- indexscanexecutor.cpp
  indexcountexecutor.cpp
- tablecountexecutor.cpp
+ indexscanexecutor.cpp
  insertexecutor.cpp
  limitexecutor.cpp
- materializeexecutor.cpp
  materializedscanexecutor.cpp
+ materializeexecutor.cpp
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
@@ -238,6 +239,7 @@ CTX.INPUT['executors'] = """
  receiveexecutor.cpp
  sendexecutor.cpp
  seqscanexecutor.cpp
+ tablecountexecutor.cpp
  tuplescanexecutor.cpp
  unionexecutor.cpp
  updateexecutor.cpp
@@ -378,13 +380,14 @@ if whichtests in ("${eetestsuite}", "logging"):
 if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test
-     serializeio_test
-     undolog_test
-     valuearray_test
+     elastic_hashinator_test
      nvalue_test
      pool_test
+     serializeio_test
      tabletuple_test
-     elastic_hashinator_test
+     tupleschema_test
+     undolog_test
+     valuearray_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):
@@ -393,6 +396,11 @@ if whichtests in ("${eetestsuite}", "execution"):
      engine_test
      FragmentManagerTest
     """
+if whichtests in ("${eetestsuite}", "executors"):
+    CTX.TESTS['executors'] = """
+    OptimizedProjectorTest
+    """
+
 
 if whichtests in ("${eetestsuite}", "expressions"):
     CTX.TESTS['expressions'] = """
@@ -412,20 +420,21 @@ if whichtests in ("${eetestsuite}", "indexes"):
 if whichtests in ("${eetestsuite}", "storage"):
     CTX.TESTS['storage'] = """
      CompactionTest
-     constraint_test
      CopyOnWriteTest
+     DRBinaryLog_test
+     DRTupleStream_test
+     ExportTupleStream_test
+     PersistentTableMemStatsTest
+     StreamedTable_test
+     TempTableLimitsTest
+     constraint_test
      filter_test
      persistent_table_log_test
-     PersistentTableMemStatsTest
+     persistenttable_test
      serialize_test
-     StreamedTable_test
      table_and_indexes_test
      table_test
      tabletuple_export_test
-     TempTableLimitsTest
-     ExportTupleStream_test
-     DRTupleStream_test
-     DRBinaryLog_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):
@@ -434,6 +443,7 @@ if whichtests in ("${eetestsuite}", "structures"):
      CompactingMapIndexCountTest
      CompactingHashTest
      CompactingPoolTest
+     CompactingMapBenchmark
     """
 
 if whichtests in ("${eetestsuite}", "plannodes"):
