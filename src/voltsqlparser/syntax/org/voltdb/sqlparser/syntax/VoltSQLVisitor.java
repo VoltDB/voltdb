@@ -9,7 +9,6 @@ import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.atn.ATNConfigSet;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
@@ -51,7 +50,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         m_catalog = aFactory.getCatalog();
         m_insertStatement = null;
         m_errorMessages = aFactory.getErrorMessages();
-        pushExpressionStack(new ExpressionParser(m_factory, m_symbolTable));
+        pushExpressionStack(aFactory.makeExpressionParser(m_symbolTable));
     }
 
     public boolean hasErrors() {
@@ -442,18 +441,34 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
               ctx.op.start.getCharPositionInLine());
         return null;
     }
-    /**
-     * {@inheritDoc}
-     */
-    @Override public Void visitBool_expr(SQLParserParser.Bool_exprContext ctx) {
+	/**
+	 * {@inheritDoc}
+	 *
+	 */
+	@Override public Void visitDisjunction_expr(SQLParserParser.Disjunction_exprContext ctx) {
     	/*
     	 * Walk the subtree
     	 */
-    	super.visitBool_expr(ctx);
+    	super.visitDisjunction_expr(ctx);
     	
-        binOp(ctx.op.start.getText(),
-              ctx.op.start.getLine(),
-              ctx.op.start.getCharPositionInLine());
+        binOp(ctx.OR().getSymbol().getText(),
+              ctx.OR().getSymbol().getLine(),
+              ctx.OR().getSymbol().getCharPositionInLine());
+        return null;
+    }
+	/**
+	 * {@inheritDoc}
+	 *
+	 */
+	@Override public Void visitConjunction_expr(SQLParserParser.Conjunction_exprContext ctx) {
+    	/*
+    	 * Walk the subtree
+    	 */
+    	super.visitConjunction_expr(ctx);
+    	
+        binOp(ctx.AND().getSymbol().getText(),
+              ctx.AND().getSymbol().getLine(),
+              ctx.AND().getSymbol().getCharPositionInLine());
         return null;
     }
     /**

@@ -66,7 +66,9 @@ expression:
         |
         		NOT expression                    #not_expr
         |
-                expression op=boolop expression   #bool_expr
+        		expression AND expression          #conjunction_expr
+        |
+                expression OR expression          #disjunction_expr
         |
                 boolconst=TRUE                    #true_expr
         |
@@ -87,12 +89,6 @@ addop:
         
 relop:
                 '='|'<'|'>'|'<='|'>='|'!='
-        ;
-
-boolop: 
-            AND
-        |
-            OR
         ;
 
 ddl_statement:

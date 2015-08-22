@@ -6,11 +6,11 @@
 	<classpathentry kind="src" path="src/voltsqlparser/semantics"/>
 	<classpathentry kind="src" path="src/hsqldb19b3"/>
 	<classpathentry kind="src" path="src/frontend"/>
-	<classpathentry kind="src" path="tests/assertions"/>
-	<classpathentry kind="src" path="tests/sqlparser"/>
 	<classpathentry kind="src" path="tests/testprocs"/>
 	<classpathentry kind="src" path="tests/hsqldb"/>
 	<classpathentry kind="src" path="tests/frontend"/>
+	<classpathentry kind="src" path="tests/sqlparser/tests"/>
+	<classpathentry kind="src" path="tests/sqlparser/tools"/>
 	<classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
 	<classpathentry kind="lib" path="lib/commons-cli-1.2.jar"/>
 	<classpathentry kind="lib" path="lib/jline-2.10.jar"/>

@@ -74,6 +74,9 @@
 <property name='pkg.sqlparser.syntax.dir'    location='${src.sqlparser.syntax.dir}/org/voltdb/sqlparser/syntax' />
 <property name='src.sqlparser.semantics.dir' location='src/voltsqlparser/semantics' />
 <property name='pkg.sqlparser.semantics.dir' location='${src.sqlparser.semantics.dir}/org/voltdb/sqlparser/semantics' />
+<property name='src.sqlparser.tests.dir'     location='tests/sqlparser' />
+<property name='sqlparserVoltXMLTests.touch' location='${src.sqlparser.tests.dir}.sqlparserVoltXMLTests.touch' />
+
 
 <!-- Antlr4 properties -->
 <property name='antlr.version'               value='4.5' />
@@ -1029,6 +1032,34 @@ Antlr4 Compilation Macro
     <touch file="${antlr4.touch}" mkdirs="true"/>
 </target>
 
+<!--
+****************************************************
+Create the sqlparser's SQL to VoltXMLElement Tests.
+****************************************************
+-->
+<target name="check_for_sqlparser_VoltXML_tests"
+	    description="Check that the sqlparser's SQL to VoltXMLElement tests are up to date.">
+    <uptodate property="sqlparserVoltXMLTestsUpToDate"
+		      targetfile="${sqlparserVoltXMLTests.touch}"
+		      srcfile="${src.sqlparser.tests.dir}/tests/SimpleTestSuite.xml" />
+</target> 
+
+<target name="create_sqlparser_tools"
+		description="Compile the sqlparser VoltXMLElement test generator.">
+	<invoke-javac srcdir="${src.sqlparser.tests.dir}/tools" />
+</target>
+<target name="create_sqlparser_tests"
+		description="Generate the sqlparser's SQL to VoltXMLELement tests"
+		depends="check_for_sqlparser_VoltXML_tests, create_sqlparser_tools" >
+	<java classname="org.voltdb.sqlparser.tools.VoltXMLElementTestFromSQL" fork="true" failonerror="true"
+	      dir="${base.dir}">
+		<classpath refid="project.classpath" />
+		<arg value="--xml-file" />
+		<arg value="tests/sqlparser/tests/SimpleTestSuite.xml" />
+	</java>
+    <touch file="${sqlparserVoltXMLTests.touch}" mkdirs="true"/>
+</target>
+
 <target name="compile_client">
     <ant antfile="build-client.xml" target="compile" inheritAll="false">
         <property name="build" value="${build}"/>
@@ -1044,7 +1075,7 @@ Antlr4 Compilation Macro
         executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
         failonerror='true' />
     <depend
-        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.assertions.dir}:${src.test.dir}:${src.testproc.dir}:${vendor.src.dir}"
+        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${src.testproc.dir}:${vendor.src.dir}"
         destdir="${build.prod.dir}:${build.test.dir}:${build.testproc.dir}"
         cache="${depcache}">
         <classpath refid="project.classpath" />
@@ -1122,7 +1153,6 @@ Antlr4 Compilation Macro
             <include name="*.sql"/>
         </fileset>
     </copy>
-
     <!-- compile the individual source directories -->
     <!-- sqlparser syntax -->
     <echo level="info" message="Compiling SQL Parser ANTLR Generated Packages." />
@@ -1152,10 +1182,12 @@ Antlr4 Compilation Macro
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
+	<!-- Create the sqlparser VoltXMLElement tests -->
+	<antcall target="create_sqlparser_tests" />
     <!-- compile the individual test directories -->
+	<invoke-javac srcdir="${src.sqlparser.tests.dir}/tests" destdir="${build.test.dir}"/>
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
-    <invoke-javac srcdir="${src.test.assertions.dir}" destdir='${build.test.dir}' />
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
         excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>
 </target>
