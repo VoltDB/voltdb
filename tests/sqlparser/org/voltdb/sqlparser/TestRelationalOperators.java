@@ -56,8 +56,8 @@ public class TestRelationalOperators {
 
     @SuppressWarnings("unchecked")
     @Test
-    public void TestAnd() throws Exception {
-        String sql    = "select * from alpha where alpha.id = 0 and alpha.id = 1";
+    public void TestEq() throws Exception {
+        String sql    = "select * from alpha where alpha.id = 0";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -89,43 +89,25 @@ public class TestRelationalOperators {
                         withChildNamed("joincond",
                             withChildNamed("operation",
                                 withIdAttribute(idTable),
-                                withAttribute("optype", "and"),
-                                withChildNamed("operation",
+                                withAttribute("optype", "equal"),
+                                withChildNamed("columnref",
+                                               "alias", "ID",
+                                               "column", "ID",
+                                               "table", "ALPHA",
+                                    withAttribute("alias", "ID"),
+                                    withAttribute("column", "ID"),
                                     withIdAttribute(idTable),
-                                    withAttribute("optype", "equal"),
-                                    withChildNamed("columnref",
-                                                   "alias", "ID",
-                                                   "column", "ID",
-                                                   "table", "ALPHA",
-                                        withAttribute("alias", "ID"),
-                                        withAttribute("column", "ID"),
-                                        withIdAttribute(idTable),
-                                        withAttribute("table", "ALPHA")),
-                                    withChildNamed("value",
-                                        withIdAttribute(idTable),
-                                        withAttribute("value", "0"),
-                                        withAttribute("valuetype", "INTEGER"))),
-                                withChildNamed("operation",
+                                    withAttribute("table", "ALPHA")),
+                                withChildNamed("value",
                                     withIdAttribute(idTable),
-                                    withAttribute("optype", "equal"),
-                                    withChildNamed("columnref",
-                                                   "alias", "ID",
-                                                   "column", "ID",
-                                                   "table", "ALPHA",
-                                        withAttribute("alias", "ID"),
-                                        withAttribute("column", "ID"),
-                                        withIdAttribute(idTable),
-                                        withAttribute("table", "ALPHA")),
-                                    withChildNamed("value",
-                                        withIdAttribute(idTable),
-                                        withAttribute("value", "1"),
-                                        withAttribute("valuetype", "INTEGER"))))))));
+                                    withAttribute("value", "0"),
+                                    withAttribute("valuetype", "INTEGER")))))));
     }
 
     @SuppressWarnings("unchecked")
     @Test
-    public void TestNot() throws Exception {
-        String sql    = "select * from alpha where not alpha.id < 0";
+    public void TestNotEq() throws Exception {
+        String sql    = "select * from alpha where alpha.id != 0";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -157,21 +139,218 @@ public class TestRelationalOperators {
                         withChildNamed("joincond",
                             withChildNamed("operation",
                                 withIdAttribute(idTable),
-                                withAttribute("optype", "not"),
-                                withChildNamed("operation",
+                                withAttribute("optype", "notequal"),
+                                withChildNamed("columnref",
+                                               "alias", "ID",
+                                               "column", "ID",
+                                               "table", "ALPHA",
+                                    withAttribute("alias", "ID"),
+                                    withAttribute("column", "ID"),
                                     withIdAttribute(idTable),
-                                    withAttribute("optype", "lessthan"),
-                                    withChildNamed("columnref",
-                                                   "alias", "ID",
-                                                   "column", "ID",
-                                                   "table", "ALPHA",
-                                        withAttribute("alias", "ID"),
-                                        withAttribute("column", "ID"),
-                                        withIdAttribute(idTable),
-                                        withAttribute("table", "ALPHA")),
-                                    withChildNamed("value",
-                                        withIdAttribute(idTable),
-                                        withAttribute("value", "0"),
-                                        withAttribute("valuetype", "INTEGER"))))))));
+                                    withAttribute("table", "ALPHA")),
+                                withChildNamed("value",
+                                    withIdAttribute(idTable),
+                                    withAttribute("value", "0"),
+                                    withAttribute("valuetype", "INTEGER")))))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void TestLessThan() throws Exception {
+        String sql    = "select * from alpha where alpha.id < 0";
+        IDTable idTable = new IDTable();
+        VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
+        assertThat(element)
+            .hasName("select")
+            .hasAllOf(
+                withChildNamed("columns",
+                    withChildNamed("columnref",
+                                   "alias", "ID",
+                                   "column", "ID",
+                                   "table", "ALPHA",
+                        withAttribute("alias", "ID"),
+                        withAttribute("column", "ID"),
+                        withIdAttribute(idTable),
+                        withAttribute("table", "ALPHA")),
+                    withChildNamed("columnref",
+                                   "alias", "BETA",
+                                   "column", "BETA",
+                                   "table", "ALPHA",
+                        withAttribute("alias", "BETA"),
+                        withAttribute("column", "BETA"),
+                        withIdAttribute(idTable),
+                        withAttribute("table", "ALPHA"))),
+                withChildNamed("parameters"),
+                withChildNamed("tablescans",
+                    withChildNamed("tablescan",
+                                   "table", "ALPHA",
+                        withAttribute("jointype", "inner"),
+                        withAttribute("table", "ALPHA"),
+                        withChildNamed("joincond",
+                            withChildNamed("operation",
+                                withIdAttribute(idTable),
+                                withAttribute("optype", "lessthan"),
+                                withChildNamed("columnref",
+                                               "alias", "ID",
+                                               "column", "ID",
+                                               "table", "ALPHA",
+                                    withAttribute("alias", "ID"),
+                                    withAttribute("column", "ID"),
+                                    withIdAttribute(idTable),
+                                    withAttribute("table", "ALPHA")),
+                                withChildNamed("value",
+                                    withIdAttribute(idTable),
+                                    withAttribute("value", "0"),
+                                    withAttribute("valuetype", "INTEGER")))))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void TestLessEqual() throws Exception {
+        String sql    = "select * from alpha where alpha.id <= 0";
+        IDTable idTable = new IDTable();
+        VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
+        assertThat(element)
+            .hasName("select")
+            .hasAllOf(
+                withChildNamed("columns",
+                    withChildNamed("columnref",
+                                   "alias", "ID",
+                                   "column", "ID",
+                                   "table", "ALPHA",
+                        withAttribute("alias", "ID"),
+                        withAttribute("column", "ID"),
+                        withIdAttribute(idTable),
+                        withAttribute("table", "ALPHA")),
+                    withChildNamed("columnref",
+                                   "alias", "BETA",
+                                   "column", "BETA",
+                                   "table", "ALPHA",
+                        withAttribute("alias", "BETA"),
+                        withAttribute("column", "BETA"),
+                        withIdAttribute(idTable),
+                        withAttribute("table", "ALPHA"))),
+                withChildNamed("parameters"),
+                withChildNamed("tablescans",
+                    withChildNamed("tablescan",
+                                   "table", "ALPHA",
+                        withAttribute("jointype", "inner"),
+                        withAttribute("table", "ALPHA"),
+                        withChildNamed("joincond",
+                            withChildNamed("operation",
+                                withIdAttribute(idTable),
+                                withAttribute("optype", "lessthanorequalto"),
+                                withChildNamed("columnref",
+                                               "alias", "ID",
+                                               "column", "ID",
+                                               "table", "ALPHA",
+                                    withAttribute("alias", "ID"),
+                                    withAttribute("column", "ID"),
+                                    withIdAttribute(idTable),
+                                    withAttribute("table", "ALPHA")),
+                                withChildNamed("value",
+                                    withIdAttribute(idTable),
+                                    withAttribute("value", "0"),
+                                    withAttribute("valuetype", "INTEGER")))))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void TestGreaterThan() throws Exception {
+        String sql    = "select * from alpha where alpha.id > 0";
+        IDTable idTable = new IDTable();
+        VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
+        assertThat(element)
+            .hasName("select")
+            .hasAllOf(
+                withChildNamed("columns",
+                    withChildNamed("columnref",
+                                   "alias", "ID",
+                                   "column", "ID",
+                                   "table", "ALPHA",
+                        withAttribute("alias", "ID"),
+                        withAttribute("column", "ID"),
+                        withIdAttribute(idTable),
+                        withAttribute("table", "ALPHA")),
+                    withChildNamed("columnref",
+                                   "alias", "BETA",
+                                   "column", "BETA",
+                                   "table", "ALPHA",
+                        withAttribute("alias", "BETA"),
+                        withAttribute("column", "BETA"),
+                        withIdAttribute(idTable),
+                        withAttribute("table", "ALPHA"))),
+                withChildNamed("parameters"),
+                withChildNamed("tablescans",
+                    withChildNamed("tablescan",
+                                   "table", "ALPHA",
+                        withAttribute("jointype", "inner"),
+                        withAttribute("table", "ALPHA"),
+                        withChildNamed("joincond",
+                            withChildNamed("operation",
+                                withIdAttribute(idTable),
+                                withAttribute("optype", "greaterthan"),
+                                withChildNamed("columnref",
+                                               "alias", "ID",
+                                               "column", "ID",
+                                               "table", "ALPHA",
+                                    withAttribute("alias", "ID"),
+                                    withAttribute("column", "ID"),
+                                    withIdAttribute(idTable),
+                                    withAttribute("table", "ALPHA")),
+                                withChildNamed("value",
+                                    withIdAttribute(idTable),
+                                    withAttribute("value", "0"),
+                                    withAttribute("valuetype", "INTEGER")))))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void TestGreaterEqual() throws Exception {
+        String sql    = "select * from alpha where alpha.id >= 0";
+        IDTable idTable = new IDTable();
+        VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
+        assertThat(element)
+            .hasName("select")
+            .hasAllOf(
+                withChildNamed("columns",
+                    withChildNamed("columnref",
+                                   "alias", "ID",
+                                   "column", "ID",
+                                   "table", "ALPHA",
+                        withAttribute("alias", "ID"),
+                        withAttribute("column", "ID"),
+                        withIdAttribute(idTable),
+                        withAttribute("table", "ALPHA")),
+                    withChildNamed("columnref",
+                                   "alias", "BETA",
+                                   "column", "BETA",
+                                   "table", "ALPHA",
+                        withAttribute("alias", "BETA"),
+                        withAttribute("column", "BETA"),
+                        withIdAttribute(idTable),
+                        withAttribute("table", "ALPHA"))),
+                withChildNamed("parameters"),
+                withChildNamed("tablescans",
+                    withChildNamed("tablescan",
+                                   "table", "ALPHA",
+                        withAttribute("jointype", "inner"),
+                        withAttribute("table", "ALPHA"),
+                        withChildNamed("joincond",
+                            withChildNamed("operation",
+                                withIdAttribute(idTable),
+                                withAttribute("optype", "greaterthanorequalto"),
+                                withChildNamed("columnref",
+                                               "alias", "ID",
+                                               "column", "ID",
+                                               "table", "ALPHA",
+                                    withAttribute("alias", "ID"),
+                                    withAttribute("column", "ID"),
+                                    withIdAttribute(idTable),
+                                    withAttribute("table", "ALPHA")),
+                                withChildNamed("value",
+                                    withIdAttribute(idTable),
+                                    withAttribute("value", "0"),
+                                    withAttribute("valuetype", "INTEGER")))))));
     }
 }

@@ -53,10 +53,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.sqlparser.syntax.SQLKind;
+import org.voltdb.sqlparser.tools.model.Test;
+import org.voltdb.sqlparser.tools.model.Testpoint;
+import org.voltdb.sqlparser.tools.model.VoltXMLElementTestSuite;
 
 public class VoltXMLElementTestFromSQL {
     /*
@@ -75,16 +82,82 @@ public class VoltXMLElementTestFromSQL {
     private PrintStream m_outputStream = null;
     String m_packageName = null;
     int m_errors = 0;
+    String m_xmlFile = null;
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws JAXBException {
         VoltXMLElementTestFromSQL elem = new VoltXMLElementTestFromSQL(args);
-        elem.process();
+        elem.processAll();
+        System.exit(elem.getErrors() > 0 ? 100 : 0);
     }
 
-    public VoltXMLElementTestFromSQL(String[] args) {
+	private final int getErrors() {
+		return m_errors;
+	}
+
+	private void VoltXMLElementTest() {
+    	JAXBContext jc;
+		try {
+			jc = JAXBContext.newInstance( "org.voltdb.sqlparser.tools.model" );
+	    	Unmarshaller u = jc.createUnmarshaller();
+	    	Object o = u.unmarshal(new File(m_xmlFile));
+	    	assert(o instanceof VoltXMLElementTestSuite);
+	    	processTestSuite((VoltXMLElementTestSuite)o);
+		} catch (JAXBException e) {
+			System.err.println(e.getMessage());
+			m_errors += 1;
+		}
+    }
+	
+    private void processTestSuite(VoltXMLElementTestSuite aSuite) {
+    	for (Test t : aSuite.getTests().getTest()) {
+    		initializeState();
+    		processOneTest(t);
+    	}
+	}
+
+	private void initializeState() {
+		m_sqlSourceFolder = null;
+		m_className = null;
+		m_fullyQualifiedClassName = null;
+		m_outputStream = null;
+		m_packageName = null;
+		m_testTypes.clear();
+		m_testNames.clear();
+		m_sqlStrings.clear();
+		m_testComments.clear();
+		m_ddl.clear();
+	}
+
+	private void processOneTest(Test t) {
+		m_sqlSourceFolder = t.getSourcefolder();
+		m_fullyQualifiedClassName = t.getClassname();
+		m_ddl.addAll(t.getSchema().getDdl());
+		for (Testpoint tp : t.getTestpoint()) {
+			m_testComments.add(tp.getComment());
+			m_testNames.add(tp.getTestName());
+			m_sqlStrings.add(tp.getTestSQL());
+			String testKind = tp.getTestKind();
+			if ("DQL".equals(tp.getTestKind().toUpperCase())) {
+				m_testTypes.add(SQLKind.DQL);
+			} else if ("DDL".equals(tp.getTestKind().toUpperCase())) {
+				m_testTypes.add(SQLKind.DDL);
+			} else if ("DML".equals(tp.getTestKind().toUpperCase())) {
+				m_testTypes.add(SQLKind.DML);
+			} else {
+				throw new IllegalArgumentException(String.format("Unknown test type: %s", tp.getTestKind().toUpperCase()));
+			}
+		}
+		process();
+	}
+
+	public VoltXMLElementTestFromSQL(String[] args) throws JAXBException {
         int idx;
         String sqlComment;
+        /*
+         * This is actually goofy.  We should just traffic in
+         * the model elements.
+         */
         for (idx = 0; idx < args.length; idx += 1) {
             sqlComment = null;
             if ("--source-folder".equals(args[idx]) || "-o".equals(args[idx])) {
@@ -103,6 +176,8 @@ public class VoltXMLElementTestFromSQL {
                 idx = addSQLTest(args, idx, SQLKind.DML, sqlComment);
             } else if ("--comment".equals(args[idx])) {
                 sqlComment = args[++idx];
+            } else if ("--xml-file".equals(args[idx])) {
+            	m_xmlFile = args[++idx];
             } else {
                 System.err.printf("Unknown comand line parameter \"%s\"\n", args[idx]);
                 usage(args[0]);
@@ -144,10 +219,22 @@ public class VoltXMLElementTestFromSQL {
 
     }
 
+    private void processAll() {
+    	if (m_fullyQualifiedClassName != null) {
+    		process();
+    	}
+    	if (m_xmlFile != null) {
+    		VoltXMLElementTest();
+    	}
+	}
+
+
+    
     private void process() {
         if (m_fullyQualifiedClassName == null) {
             System.err.printf("No class name specified\n");
             m_errors += 1;
+            return;
         }
         int tnLoc = m_fullyQualifiedClassName.lastIndexOf(".");
         m_packageName = m_fullyQualifiedClassName.substring(0, tnLoc);
@@ -204,7 +291,6 @@ public class VoltXMLElementTestFromSQL {
         } catch (IOError ex) {
             ;
         }
-        System.exit((m_errors > 0) ? 100 : 0);
     }
 
     private String makeFileName() {

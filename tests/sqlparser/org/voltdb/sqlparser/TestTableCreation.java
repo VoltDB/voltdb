@@ -47,6 +47,11 @@ public class TestTableCreation {
     public TestTableCreation() {
         m_HSQLInterface = HSQLInterface.loadHsqldb();
     }
+    /**
+     * Test TINYINT type.
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
@@ -83,6 +88,11 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test SMALLINT type.
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
@@ -119,6 +129,11 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test INTEGER type.
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
@@ -155,6 +170,11 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test BIGINT type.
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
@@ -191,11 +211,16 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test DECIMAL type, default scale and precision.
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableWithDecimal() throws Exception {
-        String ddl    = "create table alpha ( id integer not null, beta Decimal not null)";
+        String ddl    = "create table alpha ( id integer not null, beta Decimal                 not null)";
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
@@ -227,11 +252,16 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test DECIMAL type with scale and precision.
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableWithDecimalScalePrecision() throws Exception {
-        String ddl    = "create table alpha ( id integer not null, beta Decimal (10, 100) not null)";
+        String ddl    = "create table alpha ( id integer not                 null, beta Decimal (10, 100) not null)";
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
@@ -263,6 +293,11 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test                 FLOAT type
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
@@ -299,6 +334,11 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test VARCHAR type
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
@@ -336,6 +376,11 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test VARBINARY type
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test
@@ -372,6 +417,11 @@ public class TestTableCreation {
                     withChildNamed("constraints",
                         withAttribute("name", "constraints"))));
     }
+    /**
+     * Test TIMESTAMP type
+     *
+     * Throws: Exception
+     */
 
     @SuppressWarnings("unchecked")
     @Test

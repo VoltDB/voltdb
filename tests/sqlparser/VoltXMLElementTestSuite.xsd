@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+           elementFormDefault="qualified" 
+           targetNamespace="http://www.voltdb.org" 
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+           xmlns:ns1="http://www.voltdb.org">
+    <xs:import namespace="http://www.w3.org/2001/XMLSchema-instance" />
+    <xs:element name="VoltXMLElementTestSuite">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="ns1:tests"/>
+            </xs:sequence>
+            <xs:attribute name="name" use="required" type="xs:NCName"/>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="tests">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element maxOccurs="unbounded" ref="ns1:test"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="test">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="ns1:schema"/>
+                <xs:element maxOccurs="unbounded" ref="ns1:testpoint"/>
+            </xs:sequence>
+            <xs:attribute name="classname" use="required"/>
+            <xs:attribute name="name" use="required" type="xs:NCName"/>
+            <xs:attribute name="sourcefolder" use="required"/>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="schema">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element maxOccurs="unbounded" ref="ns1:ddl"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="ddl" type="xs:string"/>
+    <xs:element name="testpoint">
+        <xs:complexType>
+        	<xs:attribute name="testKind" use="required"
+        		type="xs:NCName" />
+        	<xs:attribute name="testName" use="required"
+        		type="xs:NCName" />
+        	<xs:attribute name="comment" type="xs:string"></xs:attribute>
+        	<xs:attribute name="testSQL" use="required" />
+        </xs:complexType>
+    </xs:element>
+</xs:schema>

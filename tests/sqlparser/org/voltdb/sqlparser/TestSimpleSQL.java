@@ -85,21 +85,9 @@ public class TestSimpleSQL {
                             withAttribute("size", "10"),
                             withAttribute("valuetype", "INTEGER"))),
                     withChildNamed("indexes",
-                        withAttribute("name", "indexes"),
-                        withChildNamed("index",
-                                       "name", "VOLTDB_AUTOGEN_IDX_ALPHA",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("columns", ""),
-                            withAttribute("name", "VOLTDB_AUTOGEN_IDX_ALPHA"),
-                            withAttribute("unique", "true"))),
+                        withAttribute("name", "indexes")),
                     withChildNamed("constraints",
-                        withAttribute("name", "constraints"),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10017",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10017"),
-                            withAttribute("rowslimit", "2147483647")))));
+                        withAttribute("name", "constraints"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -133,21 +121,9 @@ public class TestSimpleSQL {
                             withAttribute("size", "100"),
                             withAttribute("valuetype", "DECIMAL"))),
                     withChildNamed("indexes",
-                        withAttribute("name", "indexes"),
-                        withChildNamed("index",
-                                       "name", "VOLTDB_AUTOGEN_IDX_ALPHA",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("columns", ""),
-                            withAttribute("name", "VOLTDB_AUTOGEN_IDX_ALPHA"),
-                            withAttribute("unique", "true"))),
+                        withAttribute("name", "indexes")),
                     withChildNamed("constraints",
-                        withAttribute("name", "constraints"),
-                        withChildNamed("constraint",
-                                       "name", "SYS_CT_10017",
-                            withAttribute("assumeunique", "false"),
-                            withAttribute("constrainttype", "NOT_NULL"),
-                            withAttribute("name", "SYS_CT_10017"),
-                            withAttribute("rowslimit", "2147483647")))));
+                        withAttribute("name", "constraints"))));
     }
 
     @SuppressWarnings("unchecked")
