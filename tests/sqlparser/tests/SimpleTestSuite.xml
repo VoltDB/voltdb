@@ -6,14 +6,30 @@
     <tests>
         <test name="TestArithmeticExpression" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestArithmeticExpressions">
             <schema>
-                <ddl>create table alpha ( id integer, beta integer )</ddl>
+                <ddl>create table alpha ( id integer, beta integer, gamma integer )</ddl>
                 <ddl>create table gamma ( id integer not null, zooba integer )</ddl>
                 <ddl>create table fargle ( id integer not null, dooba integer )</ddl>
             </schema>
-            <testpoint testKind="dql" testName="TestSum" testSQL="select * from alpha where id + id = 0"/>
-            <testpoint testKind="dql" testName="TestDiff" testSQL="select * from alpha where id - id = 0"/>
-            <testpoint testKind="dql" testName="TestProd" testSQL="select * from alpha where id * id = 0"/>
-            <testpoint testKind="dql" testName="TestDiv"  testSQL="select * from alpha where id / id = 0"/>
+            <testpoint testKind="dql" testName="TestSum"      testSQL="select * from alpha where id + id = 0"/>
+            <testpoint testKind="dql" testName="TestDiff"     testSQL="select * from alpha where id - id = 0"/>
+            <testpoint testKind="dql" testName="TestProd"     testSQL="select * from alpha where id * id = 0"/>
+            <testpoint testKind="dql" testName="TestDiv"      testSQL="select * from alpha where id / id = 0"/>
+            <testpoint testKind="dql" testName="TestSumProd"  testSQL="select * from alpha where id + beta * gamma = 0" />
+            <testpoint testKind="dql" testName="TestProdSum"  testSQL="select * from alpha where id * beta + gamma = 0" />
+            <testpoint testKind="dql" testName="TestSumDiv"   testSQL="select * from alpha where id + beta / gamma = 0" />
+            <testpoint testKind="dql" testName="TestDivSum"   testSQL="select * from alpha where id / beta + gamma = 0" />
+            <testpoint testKind="dql" testName="TestDiffProd" testSQL="select * from alpha where id - beta * gamma = 0" />
+            <testpoint testKind="dql" testName="TestProdDiff" testSQL="select * from alpha where id * beta - gamma = 0" />
+            <testpoint testKind="dql" testName="TestDiffDiv"  testSQL="select * from alpha where id - beta / gamma = 0" />
+            <testpoint testKind="dql" testName="TestDivDiff"  testSQL="select * from alpha where id / beta - gamma = 0" />
+            <testpoint testKind="dql" testName="TestSumDiff"  testSQL="select * from alpha where id + beta - gamma = 0" />
+            <testpoint testKind="dql" testName="TestDiffSum"  testSQL="select * from alpha where id - beta + gamma = 0" />
+            <testpoint testKind="dql" testName="TestProdDiv"  testSQL="select * from alpha where id * beta / gamma = 0" />
+            <testpoint testKind="dql" testName="TestDivProd"  testSQL="select * from alpha where id / beta * gamma = 0" />
+            <testpoint testKind="dql" testName="TestSumSum"   testSQL="select * from alpha where id + beta + gamma = 0" />
+            <testpoint testKind="dql" testName="TestDiffDiff" testSQL="select * from alpha where id - beta - gamma = 0" />
+            <testpoint testKind="dql" testName="TestProdProd" testSQL="select * from alpha where id * beta * gamma = 0" />
+            <testpoint testKind="dql" testName="TestDivDiv"   testSQL="select * from alpha where id / beta / gamma = 0" />
         </test>
         <test name="TestBooleanOperators" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestBooleanOperators">
             <schema>
