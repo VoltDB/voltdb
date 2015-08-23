@@ -262,7 +262,7 @@ public class TestTableCreation {
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableWithDecimalScalePrecision() throws Exception {
-        String ddl    = "create table alpha ( id integer not                 null, beta Decimal (10, 100) not null)";
+        String ddl    = "create table alpha ( id integer not null, beta Decimal (10, 100) not null)";
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
@@ -295,7 +295,7 @@ public class TestTableCreation {
                         withAttribute(22, "name", "constraints"))));
     }
     /**
-     * Test                 FLOAT type
+     * Test FLOAT type
      *
      * Throws: Exception
      */

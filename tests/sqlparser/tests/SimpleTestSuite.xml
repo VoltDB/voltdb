@@ -23,23 +23,19 @@
             </schema>
             <testpoint testKind="dql" testName="TestAnd" testSQL="select * from alpha where id = 0 and id = 1" />
             <testpoint testKind="dql" testName="TestOr" testSQL="select * from alpha where id != 0 or id = 1" />
-            <testpoint testKind="dql" testName="TestNot" testSQL="select * from alpha where not id &lt; 0" />
-            <testpoint testKind="dql" testName="TestPrecedenceNotAndL" testSQL='select * from alpha where not id &lt; 0 and beta &gt;
-                0' />
-            <testpoint testKind="dql" testName="TestPrecedenceNotOrL" testSQL='select * from alpha where not id &lt; 0 or beta &gt; 0'
-                />
-            <testpoint testKind="dql" testName="TestPrecedenceNotAndR" testSQL='select * from alpha where id &lt; 0 and not beta &gt;
-                0' />
-            <testpoint testKind="dql" testName="TestPrecedenceNotOrR" testSQL='select * from alpha where id &lt; 0 or not beta &gt; 0'
-                />
-            <testpoint testKind="dql" testName="TestPrecedenceOrOr" testSQL='select * from alpha where id &lt; 0 or beta &gt; 0 or beta
-                != 1' />
-            <testpoint testKind="dql" testName="TestPrecedenceOrAnd" testSQL='select * from alpha where id &lt; 0 or beta &gt; 0 and beta
-                != 1' />
-            <testpoint testKind="dql" testName="TestPrecedenceAndAnd" testSQL='select * from alpha where id &lt; 0 and beta &gt; 0 and
-                beta != 1' />
-            <testpoint testKind="dql" testName="TestPrecedenceAndOr" testSQL='select * from alpha where id &lt; 0 and beta &gt; 0 or beta
-                != 1' />
+            <testpoint testKind="dql" testName="TestNot" testSQL="select * from alpha where not id != 0" />
+            <testpoint testKind="dql" testName="TestPrecedenceNotAndL" testSQL='select * from alpha where not id != 0 and beta != 0' />
+            <testpoint testKind="dql" testName="TestPrecedenceNotOrL" testSQL='select * from alpha where not id != 0 or beta != 0' />
+            <testpoint testKind="dql" testName="TestPrecedenceNotAndR" testSQL='select * from alpha where id != 0 and not beta != 0' />
+            <testpoint testKind="dql" testName="TestPrecedenceNotOrR" testSQL='select * from alpha where id != 0 or not beta != 0' />
+            <testpoint testKind="dql" testName="TestPrecedenceOrOr" testSQL='select * from alpha where id != 0 or beta != 0 or beta !=  1' />
+            <testpoint testKind="dql" testName="TestPrecedenceOrAnd" testSQL='select * from alpha where id != 0 or beta != 0 and beta != 1' />
+            <!-- We need to be a bit careful here. HSQLDB seems to want to 
+                 rearrange the expressions so that equality tests are done first.
+                 This is mostly irrelevant to us, but it make our tests fail. We only use
+                 equality and inequality tests. -->
+            <testpoint testKind="dql" testName="TestPrecedenceAndAnd" testSQL='select * from alpha where id != 0 and beta != 0 and beta != 1' />
+            <testpoint testKind="dql" testName="TestPrecedenceAndOr" testSQL='select * from alpha where id != 0 and beta != 0 or beta != 1' />
         </test>
         <test name="TestRelationalOperators" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestRelationalOperators">
             <schema>
@@ -74,8 +70,7 @@
                 <ddl>create table fargle ( id integer not null, dooba integer )</ddl>
             </schema>
             <testpoint testKind="ddl" testName="testCreateTable" testSQL="create table alpha ( id integer not null, beta integer)" />
-            <testpoint testKind="ddl" testName="testCreateTableWithDecimal" testSQL="create table alpha ( id integer not null, beta Decimal)"
-                />
+            <testpoint testKind="ddl" testName="testCreateTableWithDecimal" testSQL="create table alpha ( id integer not null, beta Decimal)" />
             <testpoint testKind="dml" testName="testInsert1" testSQL="insert into alpha values (1, 1)" />
             <testpoint testKind="dml" testName="testInsert2" testSQL="insert into alpha (beta, id) values (100, 101)" />
             <testpoint testKind="dql" testName="testSelectId" testSQL="select id from alpha" />
@@ -96,16 +91,26 @@
                 comment="Test BIGINT type."/>
             <testpoint testKind="ddl" testName="testCreateTableWithDecimal" testSQL="create table alpha ( id integer not null, beta Decimal
                 not null)" comment="Test DECIMAL type, default scale and precision."/>
-            <testpoint testKind="ddl" testName="testCreateTableWithDecimalScalePrecision" testSQL="create table alpha ( id integer not
-                null, beta Decimal (10, 100) not null)" comment="Test DECIMAL type with scale and precision."/>
-            <testpoint testKind="ddl" testName="testCreateTableFloat" testSQL="create table alpha ( id BiGiNt not null, beta FlOaT)" comment="Test
-                FLOAT type"/>
-            <testpoint testKind="ddl" testName="testCreateTableVarchar" testSQL="create table alpha ( id BiGiNt not null, beta varchar(100))"
-                comment="Test VARCHAR type"/>
-            <testpoint testKind="ddl" testName="testCreateTableVarbinary" testSQL="create table alpha ( id BiGiNt not null, beta varbinary(100))"
-                comment="Test VARBINARY type"/>
-            <testpoint testKind="ddl" testName="testCreateTableTimestamp" testSQL="create table alpha ( id BiGiNt not null, beta timestamp)"
-                comment="Test TIMESTAMP type"/>
+            <testpoint testKind="ddl"
+                       testName="testCreateTableWithDecimalScalePrecision"
+                       testSQL="create table alpha ( id integer not null, beta Decimal (10, 100) not null)"
+                       comment="Test DECIMAL type with scale and precision."/>
+            <testpoint testKind="ddl" 
+                       testName="testCreateTableFloat" 
+                       testSQL="create table alpha ( id BiGiNt not null, beta FlOaT)" 
+                       comment="Test FLOAT type"/>
+            <testpoint testKind="ddl" 
+                       testName="testCreateTableVarchar"
+                       testSQL="create table alpha ( id BiGiNt not null, beta varchar(100))"
+                       comment="Test VARCHAR type"/>
+            <testpoint testKind="ddl" 
+                       testName="testCreateTableVarbinary"
+                       testSQL="create table alpha ( id BiGiNt not null, beta varbinary(100))"
+                       comment="Test VARBINARY type"/>
+            <testpoint testKind="ddl"
+                       testName="testCreateTableTimestamp" 
+                       testSQL="create table alpha ( id BiGiNt not null, beta timestamp)"
+                       comment="Test TIMESTAMP type"/>
         </test>
         <test name="TestWhereExpressions" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestWhereExpressions">
             <schema>

@@ -198,7 +198,7 @@ public class TestBooleanOperators {
     @SuppressWarnings("unchecked")
     @Test
     public void TestNot() throws Exception {
-        String sql    = "select * from alpha where not id < 0";
+        String sql    = "select * from alpha where not id != 0";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -232,9 +232,9 @@ public class TestBooleanOperators {
                                 withIdAttribute(20, idTable),
                                 withAttribute(21, "optype", "not"),
                                 withChildNamed(22, "operation",
-                                               "optype", "lessthan",
+                                               "optype", "notequal",
                                     withIdAttribute(23, idTable),
-                                    withAttribute(24, "optype", "lessthan"),
+                                    withAttribute(24, "optype", "notequal"),
                                     withChildNamed(25, "columnref",
                                                    "alias", "ID",
                                                    "column", "ID",
@@ -252,7 +252,7 @@ public class TestBooleanOperators {
     @SuppressWarnings("unchecked")
     @Test
     public void TestPrecedenceNotAndL() throws Exception {
-        String sql    = "select * from alpha where not id < 0 and beta >                 0";
+        String sql    = "select * from alpha where not id != 0 and beta != 0";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -290,9 +290,9 @@ public class TestBooleanOperators {
                                     withIdAttribute(23, idTable),
                                     withAttribute(24, "optype", "not"),
                                     withChildNamed(25, "operation",
-                                                   "optype", "lessthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(26, idTable),
-                                        withAttribute(27, "optype", "lessthan"),
+                                        withAttribute(27, "optype", "notequal"),
                                         withChildNamed(28, "columnref",
                                                        "alias", "ID",
                                                        "column", "ID",
@@ -306,9 +306,9 @@ public class TestBooleanOperators {
                                             withAttribute(35, "value", "0"),
                                             withAttribute(36, "valuetype", "INTEGER")))),
                                 withChildNamed(37, "operation",
-                                               "optype", "greaterthan",
+                                               "optype", "notequal",
                                     withIdAttribute(38, idTable),
-                                    withAttribute(39, "optype", "greaterthan"),
+                                    withAttribute(39, "optype", "notequal"),
                                     withChildNamed(40, "columnref",
                                                    "alias", "BETA",
                                                    "column", "BETA",
@@ -326,7 +326,7 @@ public class TestBooleanOperators {
     @SuppressWarnings("unchecked")
     @Test
     public void TestPrecedenceNotOrL() throws Exception {
-        String sql    = "select * from alpha where not id < 0 or beta > 0";
+        String sql    = "select * from alpha where not id != 0 or beta != 0";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -364,9 +364,9 @@ public class TestBooleanOperators {
                                     withIdAttribute(23, idTable),
                                     withAttribute(24, "optype", "not"),
                                     withChildNamed(25, "operation",
-                                                   "optype", "lessthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(26, idTable),
-                                        withAttribute(27, "optype", "lessthan"),
+                                        withAttribute(27, "optype", "notequal"),
                                         withChildNamed(28, "columnref",
                                                        "alias", "ID",
                                                        "column", "ID",
@@ -380,9 +380,9 @@ public class TestBooleanOperators {
                                             withAttribute(35, "value", "0"),
                                             withAttribute(36, "valuetype", "INTEGER")))),
                                 withChildNamed(37, "operation",
-                                               "optype", "greaterthan",
+                                               "optype", "notequal",
                                     withIdAttribute(38, idTable),
-                                    withAttribute(39, "optype", "greaterthan"),
+                                    withAttribute(39, "optype", "notequal"),
                                     withChildNamed(40, "columnref",
                                                    "alias", "BETA",
                                                    "column", "BETA",
@@ -400,7 +400,7 @@ public class TestBooleanOperators {
     @SuppressWarnings("unchecked")
     @Test
     public void TestPrecedenceNotAndR() throws Exception {
-        String sql    = "select * from alpha where id < 0 and not beta >                 0";
+        String sql    = "select * from alpha where id != 0 and not beta != 0";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -434,47 +434,47 @@ public class TestBooleanOperators {
                                 withIdAttribute(20, idTable),
                                 withAttribute(21, "optype", "and"),
                                 withChildNamed(22, "operation",
-                                               "optype", "not",
+                                               "optype", "notequal",
                                     withIdAttribute(23, idTable),
-                                    withAttribute(24, "optype", "not"),
-                                    withChildNamed(25, "operation",
-                                                   "optype", "greaterthan",
-                                        withIdAttribute(26, idTable),
-                                        withAttribute(27, "optype", "greaterthan"),
-                                        withChildNamed(28, "columnref",
-                                                       "alias", "BETA",
-                                                       "column", "BETA",
-                                                       "table", "ALPHA",
-                                            withAttribute(29, "alias", "BETA"),
-                                            withAttribute(30, "column", "BETA"),
-                                            withIdAttribute(31, idTable),
-                                            withAttribute(32, "table", "ALPHA")),
-                                        withChildNamed(33, "value",
-                                            withIdAttribute(34, idTable),
-                                            withAttribute(35, "value", "0"),
-                                            withAttribute(36, "valuetype", "INTEGER")))),
-                                withChildNamed(37, "operation",
-                                               "optype", "lessthan",
-                                    withIdAttribute(38, idTable),
-                                    withAttribute(39, "optype", "lessthan"),
-                                    withChildNamed(40, "columnref",
+                                    withAttribute(24, "optype", "notequal"),
+                                    withChildNamed(25, "columnref",
                                                    "alias", "ID",
                                                    "column", "ID",
                                                    "table", "ALPHA",
-                                        withAttribute(41, "alias", "ID"),
-                                        withAttribute(42, "column", "ID"),
-                                        withIdAttribute(43, idTable),
-                                        withAttribute(44, "table", "ALPHA")),
-                                    withChildNamed(45, "value",
-                                        withIdAttribute(46, idTable),
-                                        withAttribute(47, "value", "0"),
-                                        withAttribute(48, "valuetype", "INTEGER"))))))));
+                                        withAttribute(26, "alias", "ID"),
+                                        withAttribute(27, "column", "ID"),
+                                        withIdAttribute(28, idTable),
+                                        withAttribute(29, "table", "ALPHA")),
+                                    withChildNamed(30, "value",
+                                        withIdAttribute(31, idTable),
+                                        withAttribute(32, "value", "0"),
+                                        withAttribute(33, "valuetype", "INTEGER"))),
+                                withChildNamed(34, "operation",
+                                               "optype", "not",
+                                    withIdAttribute(35, idTable),
+                                    withAttribute(36, "optype", "not"),
+                                    withChildNamed(37, "operation",
+                                                   "optype", "notequal",
+                                        withIdAttribute(38, idTable),
+                                        withAttribute(39, "optype", "notequal"),
+                                        withChildNamed(40, "columnref",
+                                                       "alias", "BETA",
+                                                       "column", "BETA",
+                                                       "table", "ALPHA",
+                                            withAttribute(41, "alias", "BETA"),
+                                            withAttribute(42, "column", "BETA"),
+                                            withIdAttribute(43, idTable),
+                                            withAttribute(44, "table", "ALPHA")),
+                                        withChildNamed(45, "value",
+                                            withIdAttribute(46, idTable),
+                                            withAttribute(47, "value", "0"),
+                                            withAttribute(48, "valuetype", "INTEGER")))))))));
     }
 
     @SuppressWarnings("unchecked")
     @Test
     public void TestPrecedenceNotOrR() throws Exception {
-        String sql    = "select * from alpha where id < 0 or not beta > 0";
+        String sql    = "select * from alpha where id != 0 or not beta != 0";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -508,9 +508,9 @@ public class TestBooleanOperators {
                                 withIdAttribute(20, idTable),
                                 withAttribute(21, "optype", "or"),
                                 withChildNamed(22, "operation",
-                                               "optype", "lessthan",
+                                               "optype", "notequal",
                                     withIdAttribute(23, idTable),
-                                    withAttribute(24, "optype", "lessthan"),
+                                    withAttribute(24, "optype", "notequal"),
                                     withChildNamed(25, "columnref",
                                                    "alias", "ID",
                                                    "column", "ID",
@@ -528,9 +528,9 @@ public class TestBooleanOperators {
                                     withIdAttribute(35, idTable),
                                     withAttribute(36, "optype", "not"),
                                     withChildNamed(37, "operation",
-                                                   "optype", "greaterthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(38, idTable),
-                                        withAttribute(39, "optype", "greaterthan"),
+                                        withAttribute(39, "optype", "notequal"),
                                         withChildNamed(40, "columnref",
                                                        "alias", "BETA",
                                                        "column", "BETA",
@@ -548,7 +548,7 @@ public class TestBooleanOperators {
     @SuppressWarnings("unchecked")
     @Test
     public void TestPrecedenceOrOr() throws Exception {
-        String sql    = "select * from alpha where id < 0 or beta > 0 or beta                 != 1";
+        String sql    = "select * from alpha where id != 0 or beta != 0 or beta !=  1";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -586,9 +586,9 @@ public class TestBooleanOperators {
                                     withIdAttribute(23, idTable),
                                     withAttribute(24, "optype", "or"),
                                     withChildNamed(25, "operation",
-                                                   "optype", "lessthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(26, idTable),
-                                        withAttribute(27, "optype", "lessthan"),
+                                        withAttribute(27, "optype", "notequal"),
                                         withChildNamed(28, "columnref",
                                                        "alias", "ID",
                                                        "column", "ID",
@@ -602,9 +602,9 @@ public class TestBooleanOperators {
                                             withAttribute(35, "value", "0"),
                                             withAttribute(36, "valuetype", "INTEGER"))),
                                     withChildNamed(37, "operation",
-                                                   "optype", "greaterthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(38, idTable),
-                                        withAttribute(39, "optype", "greaterthan"),
+                                        withAttribute(39, "optype", "notequal"),
                                         withChildNamed(40, "columnref",
                                                        "alias", "BETA",
                                                        "column", "BETA",
@@ -638,7 +638,7 @@ public class TestBooleanOperators {
     @SuppressWarnings("unchecked")
     @Test
     public void TestPrecedenceOrAnd() throws Exception {
-        String sql    = "select * from alpha where id < 0 or beta > 0 and beta                 != 1";
+        String sql    = "select * from alpha where id != 0 or beta != 0 and beta != 1";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -672,9 +672,9 @@ public class TestBooleanOperators {
                                 withIdAttribute(20, idTable),
                                 withAttribute(21, "optype", "or"),
                                 withChildNamed(22, "operation",
-                                               "optype", "lessthan",
+                                               "optype", "notequal",
                                     withIdAttribute(23, idTable),
-                                    withAttribute(24, "optype", "lessthan"),
+                                    withAttribute(24, "optype", "notequal"),
                                     withChildNamed(25, "columnref",
                                                    "alias", "ID",
                                                    "column", "ID",
@@ -692,9 +692,9 @@ public class TestBooleanOperators {
                                     withIdAttribute(35, idTable),
                                     withAttribute(36, "optype", "and"),
                                     withChildNamed(37, "operation",
-                                                   "optype", "greaterthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(38, idTable),
-                                        withAttribute(39, "optype", "greaterthan"),
+                                        withAttribute(39, "optype", "notequal"),
                                         withChildNamed(40, "columnref",
                                                        "alias", "BETA",
                                                        "column", "BETA",
@@ -728,7 +728,7 @@ public class TestBooleanOperators {
     @SuppressWarnings("unchecked")
     @Test
     public void TestPrecedenceAndAnd() throws Exception {
-        String sql    = "select * from alpha where id < 0 and beta > 0 and                 beta != 1";
+        String sql    = "select * from alpha where id != 0 and beta != 0 and beta != 1";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -770,27 +770,27 @@ public class TestBooleanOperators {
                                         withIdAttribute(26, idTable),
                                         withAttribute(27, "optype", "notequal"),
                                         withChildNamed(28, "columnref",
-                                                       "alias", "BETA",
-                                                       "column", "BETA",
+                                                       "alias", "ID",
+                                                       "column", "ID",
                                                        "table", "ALPHA",
-                                            withAttribute(29, "alias", "BETA"),
-                                            withAttribute(30, "column", "BETA"),
+                                            withAttribute(29, "alias", "ID"),
+                                            withAttribute(30, "column", "ID"),
                                             withIdAttribute(31, idTable),
                                             withAttribute(32, "table", "ALPHA")),
                                         withChildNamed(33, "value",
                                             withIdAttribute(34, idTable),
-                                            withAttribute(35, "value", "1"),
+                                            withAttribute(35, "value", "0"),
                                             withAttribute(36, "valuetype", "INTEGER"))),
                                     withChildNamed(37, "operation",
-                                                   "optype", "lessthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(38, idTable),
-                                        withAttribute(39, "optype", "lessthan"),
+                                        withAttribute(39, "optype", "notequal"),
                                         withChildNamed(40, "columnref",
-                                                       "alias", "ID",
-                                                       "column", "ID",
+                                                       "alias", "BETA",
+                                                       "column", "BETA",
                                                        "table", "ALPHA",
-                                            withAttribute(41, "alias", "ID"),
-                                            withAttribute(42, "column", "ID"),
+                                            withAttribute(41, "alias", "BETA"),
+                                            withAttribute(42, "column", "BETA"),
                                             withIdAttribute(43, idTable),
                                             withAttribute(44, "table", "ALPHA")),
                                         withChildNamed(45, "value",
@@ -798,9 +798,9 @@ public class TestBooleanOperators {
                                             withAttribute(47, "value", "0"),
                                             withAttribute(48, "valuetype", "INTEGER")))),
                                 withChildNamed(49, "operation",
-                                               "optype", "greaterthan",
+                                               "optype", "notequal",
                                     withIdAttribute(50, idTable),
-                                    withAttribute(51, "optype", "greaterthan"),
+                                    withAttribute(51, "optype", "notequal"),
                                     withChildNamed(52, "columnref",
                                                    "alias", "BETA",
                                                    "column", "BETA",
@@ -811,14 +811,14 @@ public class TestBooleanOperators {
                                         withAttribute(56, "table", "ALPHA")),
                                     withChildNamed(57, "value",
                                         withIdAttribute(58, idTable),
-                                        withAttribute(59, "value", "0"),
+                                        withAttribute(59, "value", "1"),
                                         withAttribute(60, "valuetype", "INTEGER"))))))));
     }
 
     @SuppressWarnings("unchecked")
     @Test
     public void TestPrecedenceAndOr() throws Exception {
-        String sql    = "select * from alpha where id < 0 and beta > 0 or beta                 != 1";
+        String sql    = "select * from alpha where id != 0 and beta != 0 or beta != 1";
         IDTable idTable = new IDTable();
         VoltXMLElement element = m_HSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         assertThat(element)
@@ -856,9 +856,9 @@ public class TestBooleanOperators {
                                     withIdAttribute(23, idTable),
                                     withAttribute(24, "optype", "and"),
                                     withChildNamed(25, "operation",
-                                                   "optype", "lessthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(26, idTable),
-                                        withAttribute(27, "optype", "lessthan"),
+                                        withAttribute(27, "optype", "notequal"),
                                         withChildNamed(28, "columnref",
                                                        "alias", "ID",
                                                        "column", "ID",
@@ -872,9 +872,9 @@ public class TestBooleanOperators {
                                             withAttribute(35, "value", "0"),
                                             withAttribute(36, "valuetype", "INTEGER"))),
                                     withChildNamed(37, "operation",
-                                                   "optype", "greaterthan",
+                                                   "optype", "notequal",
                                         withIdAttribute(38, idTable),
-                                        withAttribute(39, "optype", "greaterthan"),
+                                        withAttribute(39, "optype", "notequal"),
                                         withChildNamed(40, "columnref",
                                                        "alias", "BETA",
                                                        "column", "BETA",
