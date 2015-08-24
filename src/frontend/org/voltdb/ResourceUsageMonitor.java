@@ -20,6 +20,7 @@ package org.voltdb;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
@@ -44,7 +45,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         ResourceMonitorType config = systemSettings.getResourcemonitor();
         if (config.getMemorylimit() != null) {
             // configured value is in GB. Convert it to bytes
-            double dblLimit = config.getMemorylimit().getSize().doubleValue()*1073741824;
+            double dblLimit = getMemoryLimitSize(config.getMemorylimit().getSize());
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
 
@@ -103,5 +104,33 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
     public void setBackPressure(boolean hasBackPressure)
     {
         // nothing to do here.
+    }
+
+    // package-private for junit
+    double getMemoryLimitSize(String sizeStr)
+    {
+        sizeStr = sizeStr.trim();
+        if (sizeStr==null || sizeStr.length()==0) {
+            return 0;
+        }
+
+        try {
+            if (sizeStr.charAt(sizeStr.length()-1)=='%') { // size as a percentage of total available memory
+                int perc = Integer.parseInt(sizeStr.substring(0, sizeStr.length()-1));
+                if (perc<0 || perc > 100) {
+                    throw new IllegalArgumentException("Invalid memory limit percentage: " + sizeStr);
+                }
+                return PlatformProperties.getPlatformProperties().ramInMegabytes*1048576L*perc/100.0;
+            } else { // size in GB
+                double size = Double.parseDouble(sizeStr)*1073741824L;
+                if (size<0) {
+                    throw new IllegalArgumentException("Invalid memory limit value: " + sizeStr);
+                }
+                return size;
+            }
+        } catch(NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid memory limit value " + sizeStr +
+                    ". Memory limit must be configued as a percentage of total available memory or as GB value");
+        }
     }
 }

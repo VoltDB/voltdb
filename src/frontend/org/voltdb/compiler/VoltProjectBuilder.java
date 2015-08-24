@@ -22,7 +22,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -286,7 +285,7 @@ public class VoltProjectBuilder {
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
-    private Double m_rssLimit = null;
+    private String m_rssLimit = null;
     private Integer m_resourceCheckInterval = null;
 
     private boolean m_useDDLSchema = false;
@@ -300,7 +299,7 @@ public class VoltProjectBuilder {
         return this;
     }
 
-    public VoltProjectBuilder setRssLimit(double limit) {
+    public VoltProjectBuilder setRssLimit(String limit) {
         m_rssLimit = limit;
         return this;
     }
@@ -1156,7 +1155,7 @@ public class VoltProjectBuilder {
         if (m_rssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
-            memoryLimit.setSize(new BigDecimal(m_rssLimit));
+            memoryLimit.setSize(m_rssLimit);
             monitorType.setMemorylimit(memoryLimit);
         }
 
