@@ -161,7 +161,7 @@ public class TestQueryTimeout extends RegressionSuite {
 
         try {
             client.callProcedure(procName, params);
-            fail(procName + " is suppose to timed out, but not actually!");
+            fail(procName + " is supposed to timed out, but not actually!");
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(ERRORMSG));
         }
@@ -170,14 +170,14 @@ public class TestQueryTimeout extends RegressionSuite {
 
         // increase the individual timeout value in order to succeed running this long procedure
         try {
-            if (sync) client.callProcedureWithTimeout(TIMEOUT*10, procName, params);
+            if (sync) client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
             else {
-                client.callProcedureWithTimeout(m_callback, TIMEOUT*10, procName, params);
+                client.callProcedureWithTimeout(m_callback, TIMEOUT*50, procName, params);
                 client.drain();
             }
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
-            fail(procName + " is suppose to succeed!");
+            fail(procName + " is supposed to succeed!");
         }
 
         // check the global timeout value again
@@ -186,7 +186,7 @@ public class TestQueryTimeout extends RegressionSuite {
         // run the same procedure again to verify the global timeout value still applies
         try {
             client.callProcedure(procName, params);
-            fail(procName + " is suppose to timed out, but not actually!");
+            fail(procName + " is supposed to timed out, but not actually!");
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(ERRORMSG));
         }
@@ -201,7 +201,7 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure(procName, params);
         } catch(Exception ex) {
-            fail(procName + " is suppose to succeed!");
+            fail(procName + " is supposed to succeed!");
         }
 
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
@@ -213,7 +213,7 @@ public class TestQueryTimeout extends RegressionSuite {
                 client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
                 client.drain();
             }
-            fail(procName + " is suppose to timed out, but not actually!");
+            fail(procName + " is supposed to timed out, but not actually!");
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(ERRORMSG));
         }
@@ -225,7 +225,7 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure(procName, params);
         } catch(Exception ex) {
-            fail(procName + " is suppose to succeed!");
+            fail(procName + " is supposed to succeed!");
         }
 
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
