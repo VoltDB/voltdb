@@ -71,9 +71,19 @@ public class ClientThread extends BenchmarkThread {
     static Random rn = new Random(31); // deterministic sequence
     final Random m_random = new Random();
     final Semaphore m_permits;
+    public long m_cnt = 0;
+    public boolean m_connected = false;
+
+    public static boolean m_synchronous;
+    public static byte currActiveClients = 0;
+    public static short numClientsMissingCmds = 0;
+    public static short numTotalClients = 0;
+    public static short maxMissingCmds = 0;
+    public static short totalMissingCmds = 0;
+    public static short leastMissingCmds = Short.MAX_VALUE;
 
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
-            boolean allowInProcAdhoc, float mpRatio)
+            boolean allowInProcAdhoc, float mpRatio, boolean isSync)
         throws Exception
     {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
@@ -83,6 +93,7 @@ public class ClientThread extends BenchmarkThread {
         m_processor = processor;
         m_txnsRun = txnsRun;
         m_permits = permits;
+        m_synchronous = isSync;
         log.info("ClientThread(CID=" + String.valueOf(cid) + ") " + m_type.toString());
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
@@ -106,6 +117,7 @@ public class ClientThread extends BenchmarkThread {
         long pNextRid = (t1.getRowCount() == 0) ? 1 : t1.fetchRow(0).getLong("rid") + 1;
         long rNextRid = (t2.getRowCount() == 0) ? 1 : t2.fetchRow(0).getLong("rid") + 1;
         m_nextRid = pNextRid > rNextRid ? pNextRid : rNextRid; // max
+        numTotalClients += 1;
     }
 
     class UserProcCallException extends Exception {
@@ -163,7 +175,15 @@ public class ClientThread extends BenchmarkThread {
                             ", payload: " + payload +
                             ", shouldRollback: " + shouldRollback);
                 }
-                throw e;
+                throw e; // Nothing makes it past this, right?
+            }
+            if (!m_connected) {
+                m_connected = true;
+                currActiveClients += 1;
+                if (m_cnt != 0) {
+                    //m_cnt += (long) m_random.nextInt(4); // simulate missing cmds
+                    log.info("Client "+m_cid+" reconnecting. ");
+                }
             }
 
             // fake a proc call exception if we think one should be thrown
@@ -173,6 +193,7 @@ public class ClientThread extends BenchmarkThread {
 
             VoltTable[] results = response.getResults();
 
+            VoltTable data = results[3];
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
@@ -180,8 +201,22 @@ public class ClientThread extends BenchmarkThread {
                         "Client cid %d procedure %s returned %d results instead of %d",
                         m_cid, procName, results.length, expectedTables), response);
             }
-            VoltTable data = results[3];
-            try {
+        if (m_synchronous) {
+                long cnt = data.fetchRow(0).getLong("cnt");
+                // check to see if the DB's last count matches with the last count reported by the server...
+                short dif = (short) (m_cnt-cnt);
+                if (dif > 0) {
+                    numClientsMissingCmds += 1;
+                    if (maxMissingCmds < dif) maxMissingCmds = dif;
+                    if (leastMissingCmds > dif) leastMissingCmds = dif;
+                    totalMissingCmds += dif;
+                    //m_shouldContinue.set(false);
+                    log.error("Last recieved client data for ClientThread:" + m_cid+" cnt:"+m_cnt+" does not match most recent cnt after recover:"
+                        +cnt+" dif: "+ dif);
+                }
+                m_cnt = cnt + 1;
+            }
+        try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }
             catch (VoltAbortException vae) {
@@ -221,6 +256,11 @@ public class ClientThread extends BenchmarkThread {
 
             // take a breather to avoid slamming the log (stay paused if no connections)
             do {
+                if (m_connected) {
+                    log.info("Client "+m_cid+" was disconnected. ");
+                    m_connected = false;
+                    currActiveClients -= 1;
+                }
                 try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
                 // bail on wakeup if we're supposed to bail
                 if (!m_shouldContinue.get()) {
