@@ -44,7 +44,9 @@ DRTupleStream::DRTupleStream()
     : TupleStreamBase(MAGIC_DR_TRANSACTION_PADDING),
       m_enabled(true),
       m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
-      m_opened(false)
+      m_opened(false),
+      m_rowTarget(-1),
+      m_txnRowCount(0)
 {}
 
 void DRTupleStream::setSecondaryCapacity(size_t capacity) {
@@ -113,6 +115,9 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
 
     // update uso.
     m_uso += io.position();
+
+    // update row count
+    m_txnRowCount += rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE);
 
     return startingUso;
 }
@@ -222,6 +227,9 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     m_uso += io.position();
 
+    // update row count
+    m_txnRowCount += rowCostForDRRecord(type);
+
 //    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
@@ -247,12 +255,16 @@ DRTupleStream::computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &ro
 // consider the transaction being rolled back as open.
 void DRTupleStream::rollbackTo(size_t mark) {
     m_opened = false;
+    m_txnRowCount = 0;
     TupleStreamBase::rollbackTo(mark);
 }
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
-    ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+    int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+    if (rowTarget >= 0) {
+        m_rowTarget = rowTarget;
+    }
 }
 
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
@@ -342,6 +354,12 @@ void DRTupleStream::endTransaction() {
      m_uso += io.position();
 
      m_opened = false;
+
+    size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
+    if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
+        extendBufferChain(0);
+    }
+    m_txnRowCount = 0;
 }
 
 // If partial transaction is going to span multiple buffer, first time move it to

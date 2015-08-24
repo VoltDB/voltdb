@@ -1866,7 +1866,7 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
     }
 }
 
-void VoltDBEngine::applyBinaryLog(int64_t txnId,
+int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int64_t spHandle,
                                   int64_t lastCommittedSpHandle,
                                   int64_t uniqueId,
@@ -1885,7 +1885,7 @@ void VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
-    m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this);
+    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this);
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
