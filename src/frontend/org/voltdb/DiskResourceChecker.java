@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
@@ -79,7 +78,7 @@ public class DiskResourceChecker
                 continue;
             }
             if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit)) {
-                m_logger.warn("Disk is over configred limits for feature " + config.m_featureName);
+                m_logger.warn("Disk is over configured limits for feature " + config.m_featureName);
                 return true;
             }
         }
@@ -144,13 +143,12 @@ public class DiskResourceChecker
         {
         case COMMANDLOG:
         case COMMANDLOGSNAPSHOT:
+        case SNAPSHOTS:
             return licenseApi.isCommandLoggingAllowed();
         case DROVERFLOW:
             return licenseApi.isDrReplicationAllowed();
         case EXPORTOVERFLOW:
             return MiscUtils.isPro();
-        case SNAPSHOTS:
-            return licenseApi.isCommandLoggingAllowed();
         default: return false;
         }
     }
@@ -159,7 +157,7 @@ public class DiskResourceChecker
     {
         boolean canWrite = (s_testFileCheck==null) ? filePath.canWrite() : s_testFileCheck.canWrite(filePath);
         if (!canWrite) {
-            m_logger.rateLimitedLog(60, Level.WARN, null, "Invalid or readonly file path " + filePath);
+            m_logger.warn("Invalid or readonly file path " + filePath);
             return false;
         }
 
