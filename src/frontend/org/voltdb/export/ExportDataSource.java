@@ -641,7 +641,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                          * which nulls out the field
                          */
                         if (m_pollFuture != null) {
-                            fut.setException(new RuntimeException("Should not poll more than once"));
+                            fut.set(null);
                             return;
                         }
                         if (!m_es.isShutdown()) {
