@@ -88,7 +88,8 @@ public class ImportManager implements ChannelChangeCallback {
         m_frameworkProps = ImmutableMap.<String,String>builder()
                 .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
                     + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0"
-                    + ",org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0")
+                    + ",org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0"
+                    + ",com.google_voltpatches.common.*;version=1.0.0")
                 .put("org.osgi.framework.storage.clean", "onFirstInit")
                 .put("felix.cache.rootdir", f.getAbsolutePath())
                 .put("felix.cache.locking", Boolean.FALSE.toString())
