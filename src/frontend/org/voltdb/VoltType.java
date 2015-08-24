@@ -720,51 +720,39 @@ public enum VoltType {
         boolean retval = false;
         if (obj == null)
         {
-            retval = true;
+            return true;
         }
         else if (obj == VoltType.NULL_TIMESTAMP ||
-                obj == VoltType.NULL_STRING_OR_VARBINARY ||
-                obj == VoltType.NULL_DECIMAL)
+                 obj == VoltType.NULL_STRING_OR_VARBINARY ||
+                 obj == VoltType.NULL_DECIMAL)
         {
-            retval = true;
+            return true;
         }
         else
         {
             switch(typeFromObject(obj))
             {
             case TINYINT:
-                retval = (((Number) obj).byteValue() == NULL_TINYINT);
-                break;
+                return (((Number) obj).byteValue() == NULL_TINYINT);
             case SMALLINT:
-                retval = (((Number) obj).shortValue() == NULL_SMALLINT);
-                break;
+                return (((Number) obj).shortValue() == NULL_SMALLINT);
             case INTEGER:
-                retval = (((Number) obj).intValue() == NULL_INTEGER);
-                break;
+                return (((Number) obj).intValue() == NULL_INTEGER);
             case BIGINT:
-                retval = (((Number) obj).longValue() == NULL_BIGINT);
-                break;
+                return (((Number) obj).longValue() == NULL_BIGINT);
             case FLOAT:
-                retval = (((Number) obj).doubleValue() == NULL_FLOAT);
-                break;
+                return (((Number) obj).doubleValue() == NULL_FLOAT);
             case TIMESTAMP:
-                retval = (obj == VoltType.NULL_TIMESTAMP);
-                break;
             case STRING:
-                retval = (obj == VoltType.NULL_STRING_OR_VARBINARY);
-                break;
             case VARBINARY:
-                retval = (obj == VoltType.NULL_STRING_OR_VARBINARY);
-                break;
             case DECIMAL:
-                retval = (obj == VoltType.NULL_DECIMAL);
-                break;
+                // already checked these above
+                return false;
             default:
                 throw new VoltTypeException("Unsupported type: " +
                                             typeFromObject(obj));
             }
         }
-        return retval;
     }
 
     /**
