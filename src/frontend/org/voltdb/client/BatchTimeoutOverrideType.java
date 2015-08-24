@@ -19,42 +19,39 @@ package org.voltdb.client;
 
 
 /**
- * The type is embedded in the version byte of procedure invocation when send
- * across the wire.
+ * The type is embedded in the version byte of procedure invocation when sent
+ * across the wire when its version is above 1.
  */
-public enum BatchTimeoutType {
-    NO_BATCH_TIMEOUT ((byte) -1),
-    HAS_BATCH_TIMEOUT ((byte) 1);
+public enum BatchTimeoutOverrideType {
+    NO_OVERRIDE_FOR_BATCH_TIMEOUT ((byte) -1),
+    HAS_OVERRIDE_FOR_BATCH_TIMEOUT ((byte) 1);
 
-    private final byte value;
+    private final byte m_value;
 
-    private BatchTimeoutType(byte val) {
-        value = val;
-    }
-
-    public byte getValue() {
-        return value;
+    private BatchTimeoutOverrideType(byte val) {
+        m_value = val;
     }
 
     public static final int BATCH_TIMEOUT_VERSION = 1;
-    public static final int NO_TIMEOUT = NO_BATCH_TIMEOUT.getValue(); // -1
+    public static final int NO_TIMEOUT = -1;
 
-    public static BatchTimeoutType typeFromByte(byte b) {
+    public byte getValue() {
+        return m_value;
+    }
+
+    public static BatchTimeoutOverrideType typeFromByte(byte b) {
         switch (b) {
         case -1:
-            return NO_BATCH_TIMEOUT;
+            return NO_OVERRIDE_FOR_BATCH_TIMEOUT;
         case 1:
-            return HAS_BATCH_TIMEOUT;
+            return HAS_OVERRIDE_FOR_BATCH_TIMEOUT;
         default:
-            throw new RuntimeException("Unkonwn BatchTimeoutType " + b);
+            throw new RuntimeException("Unknown BatchTimeoutType " + b);
         }
     }
 
     public static boolean isUserSetTimeout(int timeout) {
-        if (timeout >= 0) {
-            return true;
-        }
-        return false;
+        return timeout >= 0;
     }
 
     @Override
@@ -64,11 +61,11 @@ public enum BatchTimeoutType {
 
     public static String toString (int timeout) {
         if (timeout > 0) {
-            return HAS_BATCH_TIMEOUT.toString() + " with value(millis): " + timeout;
+            return HAS_OVERRIDE_FOR_BATCH_TIMEOUT.toString() + " with value(millis): " + timeout;
         } else if (timeout == 0) {
-
+            return HAS_OVERRIDE_FOR_BATCH_TIMEOUT.toString() + " with infinite time";
         }
-        return NO_BATCH_TIMEOUT.toString();
+        return NO_OVERRIDE_FOR_BATCH_TIMEOUT.toString();
     }
 
 }

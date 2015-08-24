@@ -1841,7 +1841,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                  * but doesn't initiate the invocation. It will fall through to
                  * the shared dispatch of sysprocs.
                  */
-                if (ProcedureInvocationType.isDRv1Type(task.getType())) {
+                if (ProcedureInvocationType.isDeprecatedInternalDRType(task.getType())) {
                     sendSentinelsToAllPartitions(task.getOriginalTxnId());
                 }
             }

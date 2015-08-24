@@ -51,7 +51,7 @@ public class ProcedureInvocation {
 
     ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
                         String procName, Object... parameters) {
-        this(originalTxnId, originalUniqueId, handle, BatchTimeoutType.NO_TIMEOUT, procName, parameters);
+        this(originalTxnId, originalUniqueId, handle, BatchTimeoutOverrideType.NO_TIMEOUT, procName, parameters);
     }
 
     ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
@@ -67,8 +67,8 @@ public class ProcedureInvocation {
 
         // auto-set the type if both txn IDs are set
         if (m_originalTxnId == -1 && m_originalUniqueId == -1) {
-            if (BatchTimeoutType.isUserSetTimeout(batchTimeout)) {
-                m_type = ProcedureInvocationType.SECOND;
+            if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
+                m_type = ProcedureInvocationType.VERSION1;
             } else {
                 m_type = ProcedureInvocationType.ORIGINAL;
             }
@@ -94,11 +94,15 @@ public class ProcedureInvocation {
         } catch (Exception e) {/*No UTF-8? Really?*/}
 
         int timeoutSize = 0;
-        if (m_type.getValue() >= BatchTimeoutType.BATCH_TIMEOUT_VERSION) {
-            timeoutSize = 1 + (m_batchTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4);
+        if (m_type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
+            // Adding 1 for NO_BATCH_TIMEOUT/HAS_BATCH_TIMEOUT flag.
+            // In the most common case, the default value, BatchTimeoutType.NO_BATCH_TIMEOUT, does not get serialized.
+            timeoutSize = 1 + (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4);
         }
+        // 16 is the size of the m_originalTxnId and m_originalUniqueId values
+        // that are required by DR internal invocations prior to DR v2.
         int size =
-            1 + (ProcedureInvocationType.isDRv1Type(m_type)? 16 : 0) +
+            1 + (ProcedureInvocationType.isDeprecatedInternalDRType(m_type)? 16 : 0) +
             timeoutSize +
             m_procNameBytes.length + 4 + 8 + m_parameters.getSerializedSize();
         return size;
@@ -114,16 +118,16 @@ public class ProcedureInvocation {
 
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(m_type.getValue());//Version
-        if (ProcedureInvocationType.isDRv1Type(m_type)) {
+        if (ProcedureInvocationType.isDeprecatedInternalDRType(m_type)) {
             buf.putLong(m_originalTxnId);
             buf.putLong(m_originalUniqueId);
         }
 
-        if (m_type.getValue() >= BatchTimeoutType.BATCH_TIMEOUT_VERSION) {
-            if (m_batchTimeout == BatchTimeoutType.NO_TIMEOUT) {
-                buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
+        if (m_type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
+            if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
+                buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
             } else {
-                buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
+                buf.put(BatchTimeoutOverrideType.HAS_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
                 buf.putInt(m_batchTimeout);
             }
         }

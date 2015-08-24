@@ -28,17 +28,17 @@ package org.voltdb.client;
  */
 public enum ProcedureInvocationType {
     ORIGINAL((byte) 0),
-    SECOND((byte) 1),              // verison with individual timeout support
-    REPLICATED ((byte) (1 << 7));  // -128
+    VERSION1((byte) 1),              // version with individual timeout support
+    REPLICATED ((byte) (1 << 7));    // -128
 
-    private final byte value;
+    private final byte m_value;
 
     private ProcedureInvocationType(byte val) {
-        value = val;
+        m_value = val;
     }
 
     public byte getValue() {
-        return value;
+        return m_value;
     }
 
     public static ProcedureInvocationType typeFromByte(byte b) {
@@ -46,7 +46,7 @@ public enum ProcedureInvocationType {
         case 0:
             return ORIGINAL;
         case 1:
-            return SECOND;
+            return VERSION1;
         case -128:
             return REPLICATED;
         default:
@@ -59,7 +59,7 @@ public enum ProcedureInvocationType {
         return "ProcedureInvocationType." + name();
     }
 
-    public static boolean isDRv1Type(ProcedureInvocationType type) {
+    public static boolean isDeprecatedInternalDRType(ProcedureInvocationType type) {
         if (type == REPLICATED) {
             return true;
         }

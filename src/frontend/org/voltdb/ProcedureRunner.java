@@ -233,7 +233,7 @@ public class ProcedureRunner {
      */
     long getTransactionId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && ProcedureInvocationType.isDRv1Type(invocation.getType())) {
+        if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             return invocation.getOriginalTxnId();
         } else {
             return m_txnState.txnId;
@@ -415,7 +415,7 @@ public class ProcedureRunner {
             }
             if ((m_txnState != null) && // may be null for tests
                 (m_txnState.getInvocation() != null) &&
-                (ProcedureInvocationType.isDRv1Type(m_txnState.getInvocation().getType())))
+                (ProcedureInvocationType.isDeprecatedInternalDRType(m_txnState.getInvocation().getType())))
             {
                 retval.convertResultsToHashForDeterminism();
             }
@@ -543,12 +543,7 @@ public class ProcedureRunner {
      * a pre-IV2 transaction id.
      */
     public Date getTransactionTime() {
-        StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && ProcedureInvocationType.isDRv1Type(invocation.getType())) {
-            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(invocation.getOriginalUniqueId()));
-        } else {
-            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(m_txnState.uniqueId));
-        }
+        return new Date(UniqueIdGenerator.getTimestampFromUniqueId(getUniqueId()));
     }
 
     /*
@@ -559,7 +554,7 @@ public class ProcedureRunner {
      */
     public long getUniqueId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && ProcedureInvocationType.isDRv1Type(invocation.getType())) {
+        if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             return invocation.getOriginalUniqueId();
         } else {
             return m_txnState.uniqueId;

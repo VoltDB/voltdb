@@ -33,7 +33,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
-import org.voltdb.client.BatchTimeoutType;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
@@ -150,7 +150,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     byte[] m_procedureName = null;
     int m_currentBatchIndex = 0;
 
-    int m_batchTimeout = BatchTimeoutType.NO_TIMEOUT;
+    int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
     public int getCurrentBatchIndex() {
         return m_currentBatchIndex;
@@ -592,7 +592,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // 1 byte for the timeout flag
         msgsize += 1;
 
-        msgsize += m_batchTimeout == BatchTimeoutType.NO_TIMEOUT ? 0 : 4;
+        msgsize += m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4;
 
         // Involved partitions
         msgsize += 2 + m_involvedPartitions.size() * 4;
@@ -746,10 +746,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.putInt(m_currentBatchIndex);
 
         // put byte flag for timeout value and 4 bytes int value if necessary
-        if (m_batchTimeout == BatchTimeoutType.NO_TIMEOUT) {
-            buf.put(BatchTimeoutType.NO_BATCH_TIMEOUT.getValue());
+        if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
+            buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
         } else {
-            buf.put(BatchTimeoutType.HAS_BATCH_TIMEOUT.getValue());
+            buf.put(BatchTimeoutOverrideType.HAS_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
             buf.putInt(m_batchTimeout);
         }
 
@@ -874,9 +874,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // ints for batch context
         m_currentBatchIndex = buf.getInt();
 
-        BatchTimeoutType batchTimeoutType = BatchTimeoutType.typeFromByte(buf.get());
-        if (batchTimeoutType == BatchTimeoutType.NO_BATCH_TIMEOUT) {
-            m_batchTimeout = BatchTimeoutType.NO_TIMEOUT;
+        BatchTimeoutOverrideType batchTimeoutType = BatchTimeoutOverrideType.typeFromByte(buf.get());
+        if (batchTimeoutType == BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT) {
+            m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
         } else {
             m_batchTimeout = buf.getInt();
         }

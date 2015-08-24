@@ -203,7 +203,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
-        return callProcedureWithClientTimeout(BatchTimeoutType.NO_TIMEOUT, procName,
+        return callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
 
@@ -221,7 +221,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         throws IOException, NoConnectionsException, ProcCallException
     {
         if (batchTimeout < 0) {
-            throw new RuntimeException("Timeout value can't be negative." );
+            throw new IllegalArgumentException("Timeout value can't be negative." );
         }
 
         return callProcedureWithClientTimeout(batchTimeout, procName,
@@ -311,7 +311,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
         //Time unit doesn't matter in this case since the timeout isn't being specified
-        return callProcedureWithClientTimeout(callback, BatchTimeoutType.NO_TIMEOUT, procName,
+        return callProcedureWithClientTimeout(callback, BatchTimeoutOverrideType.NO_TIMEOUT, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
     }
 
@@ -327,7 +327,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final boolean callProcedureWithTimeout(ProcedureCallback callback, int batchTimeout, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
         if (batchTimeout < 0) {
-            throw new RuntimeException("Timeout value can't be negative." );
+            throw new IllegalArgumentException("Timeout value can't be negative." );
         }
 
         //Time unit doesn't matter in this case since the timeout isn't being specified

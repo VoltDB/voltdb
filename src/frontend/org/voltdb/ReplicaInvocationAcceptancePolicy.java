@@ -36,7 +36,7 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
     private ClientResponseImpl shouldAcceptHelper(AuthUser user, StoredProcedureInvocation invocation,
                                  boolean isReadOnly) {
         // IS a dragent invocation
-        if (ProcedureInvocationType.isDRv1Type(invocation.getType())) {
+        if (ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             if (!isOn) {
                 return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0],
@@ -94,7 +94,7 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
             procName = "@UpdateApplicationCatalog";
         }
 
-        if (!ProcedureInvocationType.isDRv1Type(invocation.getType()) &&
+        if (!ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType()) &&
                 !procName.equalsIgnoreCase("@AdHoc")) {
             Config sysProc = SystemProcedureCatalog.listing.get(procName);
             if (sysProc != null && sysProc.allowedInReplica) {

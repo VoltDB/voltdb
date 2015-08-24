@@ -40,15 +40,26 @@ public class TestQueryTimeout extends RegressionSuite {
     // DEBUG build of EE runs much slower, so the timing part is not deterministic.
     private static String ERRORMSG = "A SQL query was terminated after";
 
+    private static final String INITIAL_STATUS = "";
+    private String m_errorStatusString;
+
     ProcedureCallback m_callback = new ProcedureCallback() {
         @Override
-        public void clientCallback(ClientResponse clientResponse)
-                throws Exception {
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            m_errorStatusString = INITIAL_STATUS;
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                m_errorStatusString = clientResponse.getStatusString();
             }
         }
     };
+
+    private void checkCallbackTimeoutError(String errorMsg) {
+        assertTrue(m_errorStatusString.contains(errorMsg));
+    }
+
+    private void checkCallbackSuccess() {
+        assertEquals(INITIAL_STATUS, m_errorStatusString);
+    }
 
     private void loadData(Client client, String tb, int scale)
             throws NoConnectionsException, IOException, ProcCallException {
@@ -169,15 +180,17 @@ public class TestQueryTimeout extends RegressionSuite {
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
 
         // increase the individual timeout value in order to succeed running this long procedure
-        try {
-            if (sync) client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
-            else {
-                client.callProcedureWithTimeout(m_callback, TIMEOUT*50, procName, params);
-                client.drain();
+        if (sync) {
+            try {
+                client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
+            } catch(Exception ex) {
+                System.err.println(ex.getMessage());
+                fail(procName + " is supposed to succeed!");
             }
-        } catch(Exception ex) {
-            System.err.println(ex.getMessage());
-            fail(procName + " is supposed to succeed!");
+        } else {
+            client.callProcedureWithTimeout(m_callback, TIMEOUT*50, procName, params);
+            client.drain();
+            checkCallbackSuccess();
         }
 
         // check the global timeout value again
@@ -207,15 +220,17 @@ public class TestQueryTimeout extends RegressionSuite {
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
 
         // increase the individual timeout value in order to succeed running this long procedure
-        try {
-            if (sync) client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
-            else {
-                client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
-                client.drain();
+        if (sync) {
+            try {
+                client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
+                fail(procName + " is supposed to timed out, but not actually!");
+            } catch(Exception ex) {
+                assertTrue(ex.getMessage().contains(ERRORMSG));
             }
-            fail(procName + " is supposed to timed out, but not actually!");
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(ERRORMSG));
+        } else {
+            client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
+            client.drain();
+            checkCallbackTimeoutError(ERRORMSG);;
         }
 
         // check the global timeout value again
@@ -253,13 +268,9 @@ public class TestQueryTimeout extends RegressionSuite {
             // load less data
             loadTables(client, 1000, 300);
 
-            // MP asynchronously call seems to return immediately
-            // Am I wrong? -xin
-            if (sync) {
-                checkTimeoutDecreaseProcFailed(sync, client, "SPPartitionReadOnlyProc", 1);
-                checkTimeoutDecreaseProcFailed(sync, client, "PartitionReadOnlyProc");
-                checkTimeoutDecreaseProcFailed(sync, client, "ReplicatedReadOnlyProc");
-            }
+            checkTimeoutDecreaseProcFailed(sync, client, "SPPartitionReadOnlyProc", 1);
+            checkTimeoutDecreaseProcFailed(sync, client, "PartitionReadOnlyProc");
+            checkTimeoutDecreaseProcFailed(sync, client, "ReplicatedReadOnlyProc");
 
             // truncate the data
             truncateTables(client);
