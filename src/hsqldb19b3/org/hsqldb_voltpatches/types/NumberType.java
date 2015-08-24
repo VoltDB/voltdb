@@ -1164,6 +1164,11 @@ public final class NumberType extends Type {
 
             case Types.SQL_REAL :
             case Types.SQL_DOUBLE :
+                // A VoltDB extension to avoid a crash when a is not an instance of Double
+                if (! (a instanceof Double)) {
+                    a = new Double(a.toString());
+                }
+                // End of VoltDB extension
                 double value = ((Double) a).doubleValue();
 
                 /** @todo - java 5 format change */
@@ -1258,6 +1263,11 @@ public final class NumberType extends Type {
 
             case Types.SQL_NUMERIC :
             case Types.SQL_DECIMAL :
+                // A VoltDB extension to avoid a crash when a is not an instance of BigDecimal
+                if (! (a instanceof BigDecimal)) {
+                    a = new BigDecimal(a.toString());
+                }
+                // End of VoltDB extension
                 return JavaSystem.toString((BigDecimal) a);
 
             default :

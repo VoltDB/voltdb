@@ -2792,19 +2792,33 @@ then:
         waitFor(waitTime) {
             page.overview.maxJavaHeap.text().equals("Max Java Heap")
             !page.overview.maxJavaHeapValue.text().equals("")
-
+        }
+        waitFor(waitTime){
             page.overview.heartbeatTimeout.text().equals("Heartbeat Timeout")
             !page.overview.heartbeatTimeoutValue.text().equals("")
-
+        }
+        waitFor(waitTime){
             page.overview.queryTimeout.text().equals("Query Timeout")
             !page.overview.queryTimeoutValue.text().equals("")
-
+        }
+        waitFor(waitTime){
             page.overview.maxTempTableMemory.text().equals("Max Temp Table Memory")
             !page.overview.maxTempTableMemoryValue.text().equals("")
-
+        }
+        waitFor(waitTime){
             page.overview.snapshotPriority.text().equals("Snapshot Priority")
             !page.overview.snapshotPriorityValue.text().equals("")
 
+        }
+        waitFor(waitTime){
+            page.overview.memoryLimitSize.text().equals("Memory Limit")
+            !page.overview.memoryLimitSizeValue.text().equals("")
+
+            if(page.overview.memoryLimitSizeValue.text() == "Not Enforced"){
+                page.overview.memoryLimitSizeUnit.text().equals("")
+            } else {
+                !page.overview.memoryLimitSizeUnit.text().equals("")
+            }
         }
     }
 

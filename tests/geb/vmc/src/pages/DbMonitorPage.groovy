@@ -60,6 +60,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clusterTransactions		        { $("#chartClusterTransactions") }
         partitionIdleTime		        { $("#chartPartitionIdleTime") }
         commandLogStatistics            { $("#chartCommandLogging") }
+        databaseReplication             { $("#ChartDrReplicationRate") }
         storedProcedures 		        { $("#tblStoredProcedures") }
         dataTables			            { $("#tblDataTables") }
 
@@ -68,6 +69,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clusterLatencyCheckbox		    { $("#ClusterLatency") }
         clusterTransactionsCheckbox	    { $("#ClusterTransactions") }
         partitionIdleTimeCheckbox	    { $("#PartitionIdleTime") }
+        commandLogStatisticsCheckbox    { $("#CommandLogStat") }
+        databaseReplicationCheckbox     { $("#DrReplicationRate") }
         storedProceduresCheckbox	    { $("#StoredProcedures") }
         dataTablesCheckbox		        { $("#DatabaseTables") }
 
@@ -157,6 +160,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         commandLogStatisticsMin         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
         commandLogStatisticsMax         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
         
+
+        //database replication graph
+        databaseReplicationMin          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
+        databaseReplicationMax          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
+
         partitionstatus			        { $("#visualisationPartitionIdleTime > g > g > g.nv-y.nv-axis > g > g:nth-child(1) > g:nth-child(2) > text")}
         localpartition			        { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(1)")}
         clusterwide			            { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(2)")}
@@ -168,9 +176,78 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         header          		        { module Header }
         footer          		        { module Footer }
 
-        //Database Replication
-        divDrReplication                { $("#divDrReplication") }
-        drMasterSection                 { $("#drMasterSection") }
+
+        //DR Section
+
+        showHideDrBlock {$("#showHideDrBlock")}
+
+        drSection {$("#drSection")}
+
+        divDrReplication {$("#divDrReplication")}
+
+        //DR Master Columns
+
+        partitionID {$("#partitionID")}
+
+        status {$("#status")}
+
+        mbOnDisk  {$("#mbOnDisk")}
+
+        replicaLatencyMs {$("#replicaLatencyMs")}
+
+        replicaLatencyTrans {$("#replicaLatencyTrans")}
+
+        ascendingDT		            { $(class:"sorting_asc") }
+        descendingDT	            { $(class:"sorting_desc") }
+
+        drMasterSection {$("#drMasterSection")}
+
+        dbDrMode {$("#dbDrMode")}
+
+
+        //Dr Replica Section
+
+        drReplicaSection {$("#drReplicaSection")}
+
+        replicaServer{$("#replicaServer")}
+        replicaStatus{$("#replicaStatus")}
+        replicationRate1 {$("#replicationRate1")}
+        replicationRate5 {$("#replicationRate5")}
+
+        // Command Log Table
+
+        showHideCLPBlock {$("#showHideCLPBlock")}
+        clpSection {$("#clpSection")}
+
+        cmdServer {$("#cmdServer")}
+        cmdPendingBytes {$("#cmdPendingBytes")}
+        cmdPendingTrans {$("#cmdPendingTrans")}
+        cmdTotalSegments {$("#cmdTotalSegments")}
+        cmdSegmentsInUse {$("#cmdSegmentsInUse")}
+        cmdFsyncInterval {$("#cmdFsyncInterval")}
+
+
+        drMasterTitle {$("#drMasterTitle")}
+        drReplicaTitle {$("#drReplicaTitle")}
+        drCLPTitle {$("#drCLPTitle")}
+
+        
+        // UAT 
+        drTableModeTypeText         { $("#dbDrMode") }
+        drTableBlock                { $("#showHideDrBlock") }
+        drTableCurrentPageReplica   { $("#tblDrReplica_paginate > div > span.pageIndex") }
+        drTableTotalPagesReplica    { $("#tblDrReplica_paginate > div > span.totalPages") }
+        drTableNextReplicaDisabled  { $("#tblDrReplica_paginate > span.paginate_disabled_next.paginate_button") }
+        drTablePrevReplicaDisabled  { $("#tblDrReplica_paginate > span.paginate_disabled_previous.paginate_button") }
+        drTableNextReplicaEnabled   { $("#tblDrReplica_paginate > span.paginate_enabled_next.paginate_button") }
+        drTablePrevReplicaEnabled   { $("#tblDrReplica_paginate > span.paginate_enabled_previous.paginate_button") }
+        
+        drTableCurrentPageMaster    { $("#tblDrMAster_paginate > div > span.pageIndex") }
+        drTableTotalPagesMaster     { $("#tblDrMAster_paginate > div > span.totalPages") }
+        drTableNextMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_next.paginate_button") }
+        drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_previous.paginate_button") }
+        drTableNextMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_next.paginate_button") }
+        drTablePrevMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_previous.paginate_button") }
     }
 
     static at = {
@@ -280,6 +357,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         waitFor { servName.last().displayed }
         waitFor { servMemory.last().displayed }
         return true
+    }
+
+    def boolean isDrSectionOpen(){
+        return divDrReplication.displayed
     }
 
     /**
@@ -395,6 +476,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return true
     }
 
+
+
     /**
      * Returns true if the "Data" area (containing Stored Procedures and
      * Database Tables info) is currently open (displayed).
@@ -404,12 +487,47 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return dataArea.displayed
     }
 
+    def boolean isDrAreaOpen() {
+        return drSection.displayed
+    }
+
+
+
+    def boolean isDrMasterSectionOpen() {
+        return drMasterSection.displayed
+    }
+
+    def boolean isDrReplicaSectionOpen() {
+        return drReplicaSection.displayed
+    }
+
+
+    def boolean isCmdLogSectionOpen() {
+        return showHideCLPBlock.displayed
+    }
+
+    def boolean isCLPAreaOpen() {
+        return clpSection.displayed
+    }
+
+
+
     /**
      * Opens the "Data" area (containing Stored Procedures and Database Tables
      * info), by clicking on "Show/Hide Data" (if it's not open already).
      */
     def boolean openDataArea() {
         clickToDisplay(showHideData, dataArea)
+        return true
+    }
+
+    def boolean openDrArea(){
+        clickToDisplay(showHideDrBlock, drSection)
+        return true
+    }
+
+    def boolean openCLPArea(){
+        clickToDisplay(showHideCLPBlock, clpSection)
         return true
     }
 
@@ -421,6 +539,19 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clickToNotDisplay(showHideData, dataArea)
         return true
     }
+
+
+    def boolean closeDrArea() {
+        clickToNotDisplay(showHideDrBlock, drSection)
+        return true
+    }
+
+
+    def boolean closeCLPArea() {
+        clickToNotDisplay(showHideCLPBlock, clpSection)
+        return true
+    }
+
 
     /**
      *	Edits from here
@@ -445,6 +576,18 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      */
     def boolean preferencesTitleDisplayed() {
         return preferencesTitle.displayed
+    }
+
+    def boolean drMasterTitleDisplayed(){
+        return drMasterTitle.displayed
+    }
+
+    def boolean drReplicaTitleDisplayed(){
+        return drReplicaTitle.displayed
+    }
+
+    def boolean drCLPTitleDisplayed(){
+        return drCLPTitle.displayed
     }
 
     /**
@@ -495,7 +638,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean partitionIdleTimeDisplayed() {
         return partitionIdleTime.displayed
     }
-
+    
     /**
      * Check if Stored Procedures is displayed
      */
@@ -544,7 +687,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean partitionIdleTimeCheckboxDisplayed() {
         return partitionIdleTimeCheckbox.displayed
     }
-
+    
     /*
      *	Returns true if Checkbox for Stored Procedures in preferences
      */
@@ -779,6 +922,28 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
     /*
+    *	return true if table is in ascending order
+    *  to check ascending order, check the class "sorting_asc" displayed
+    */
+    def boolean tableInAscendingOrderDT() {
+        if ( ascendingDT.displayed )
+            return true
+        else
+            return false
+    }
+
+    /*
+     *	return true if table is in descending order
+     *  to check descending order, check the class "sorting_desc" displayed
+     */
+    def boolean tableInDescendingOrderDT() {
+        if ( descendingDT.displayed )
+            return true
+        else
+            return false
+    }
+
+    /*
      *	click the table column in database table
      */
     def boolean clickTable() {
@@ -798,6 +963,116 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean clickMaxRows() {
         maxrows.click()
     }
+
+    /*
+     *	click the partitionID column in database table
+     */
+    def boolean clickPartitionID() {
+        partitionID.click()
+    }
+
+    /*
+     *	click the status column in DR MAster table
+     */
+    def boolean clickStatus() {
+        status.click()
+    }
+
+    /*
+     *	click the status column in DR MAster table
+     */
+    def boolean clickMbOnDisk() {
+        mbOnDisk.click()
+    }
+
+    /*
+     *	click the replicaLatencyMs column in DR MAster table
+     */
+    def boolean clickReplicaLatencyMs() {
+        replicaLatencyMs.click()
+    }
+
+    /*
+     *	click the replicaLatencyTrans column in DR MAster table
+     */
+    def boolean clickReplicaLatencyTrans() {
+        replicaLatencyTrans.click()
+    }
+
+    /*
+     *	click the server column in DR Replica table
+     */
+    def boolean clickReplicaServer() {
+        replicaServer.click()
+    }
+
+    /*
+     *	click the status column in DR Replica table
+     */
+    def boolean clickReplicaStatus() {
+        replicaStatus.click()
+    }
+
+    /*
+     *	click the status column in Replication Rate 1min table
+     */
+    def boolean clickReplicationRate1() {
+        replicationRate1.click()
+    }
+
+    /*
+     *	click the ReplicationRate5 column in DR Replica table
+     */
+    def boolean clickReplicationRate5() {
+        replicationRate5.click()
+    }
+
+/*
+     *	click the cmdServer column in  Command log table
+     */
+    def boolean clickCmdServer() {
+        cmdServer.click()
+    }
+
+    /*
+     *	click the CmdPendingBytes column in  Command log table
+     */
+    def boolean clickCmdPendingBytes() {
+        cmdPendingBytes.click()
+    }
+
+    /*
+     *	click the CmdPendingTrans column in  Command log table
+     */
+    def boolean clickCmdPendingTrans() {
+        cmdPendingTrans.click()
+    }
+
+    /*
+     *	click the TotalSegments column in  Command log table
+     */
+    def boolean clickCmdTotalSegments() {
+        cmdTotalSegments.click()
+    }
+
+    /*
+   *	click the SegmentsInUse column in  Command log table
+   */
+    def boolean clickCmdSegmentsInUse() {
+        cmdSegmentsInUse.click()
+    }
+
+
+    /*
+   *	click the FsyncInterval column in  Command log table
+   */
+    def boolean clickCmdFsyncInterval() {
+        cmdFsyncInterval.click()
+    }
+
+
+
+
 
     /*
      *	click the min rows column in database table
