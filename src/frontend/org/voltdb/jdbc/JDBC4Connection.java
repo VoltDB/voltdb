@@ -483,7 +483,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setReadOnly(boolean readOnly) throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        if (!Boolean.parseBoolean(props.getProperty("enableSetReadOnly","false"))){
+            throw SQLError.noSupport();
+        }
     }
 
     // Creates an unnamed savepoint in the current transaction and returns the new Savepoint object that represents it.

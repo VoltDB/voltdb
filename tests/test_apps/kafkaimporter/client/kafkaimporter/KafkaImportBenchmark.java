@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.*;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -58,6 +59,7 @@ import org.voltdb.client.ClientStatsContext;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
+import org.voltdb.VoltType;
 
 public class KafkaImportBenchmark {
 
@@ -194,7 +196,7 @@ public class KafkaImportBenchmark {
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
      */
-    public synchronized static void printStatistics() {
+    public synchronized void printStatistics() {
         try {
             ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
             long thrup;
@@ -209,7 +211,7 @@ public class KafkaImportBenchmark {
         }
     }
 
-    protected static void scheduleCheckTimer() {
+    protected void scheduleCheckTimer() {
 
         final Timer timer = new Timer("checkTimer", true);
         final long period = config.displayinterval;
@@ -257,13 +259,15 @@ public class KafkaImportBenchmark {
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database
             log.info("Running benchmark...");
-//            final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-//            while (benchmarkEndTime > System.currentTimeMillis()) {
-//                long value = System.currentTimeMillis();
-//                long key = icnt;
-//                exportProc.insertExport(key, value);
-//                icnt++;
-//            }
+            final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+            while (benchmarkEndTime > System.currentTimeMillis()) {
+                long value = System.currentTimeMillis();
+                long key = icnt;
+                exportProc.insertExport(key, value);
+                icnt++;
+            }
+            // check for export completion
+            //exportMon.waitForStreamedAllocatedMemoryZero();
         } catch (Exception e) {
             log.error("Exception in Benchmark", e);
         } finally {
@@ -329,9 +333,10 @@ public class KafkaImportBenchmark {
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
+        long count = 0;
         do {
             Thread.sleep(END_WAIT * 1000);
-            // importProgress is an array of sampled counts of the importcounts table, showing importProgress of import
+            // importProgress is an array of sampled counts of the importedcounts table, showing importProgressress of import
             // samples are recorded by the checkTimer thread
         } while (importProgress.size() < 4 || importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-2) ||
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
@@ -351,10 +356,10 @@ public class KafkaImportBenchmark {
             testResult = false;
         }
 
-//        if (importRowCount < exportRowCount) {
-//            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRowCount + "' test fails.");
-//            testResult = false;
-//        }
+        if (importRowCount < exportRowCount) {
+            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRowCount + "' test fails.");
+            testResult = false;
+        }
 
         client.drain();
         client.close();

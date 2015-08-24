@@ -42,6 +42,11 @@ public class InsertExport {
 
     public InsertExport(Client client, AtomicLong rowsAdded) {
 
+<<<<<<< HEAD
+=======
+    public InsertExport(Client client, AtomicLong rowsAdded) {
+
+>>>>>>> master
         m_client = client;
         m_rowsAdded = rowsAdded;
     }
