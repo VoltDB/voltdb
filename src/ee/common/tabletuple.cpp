@@ -105,5 +105,4 @@ std::string TableTuple::debugNoHeader() const {
     assert(m_data);
     return debug("");
 }
-
 }

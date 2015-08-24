@@ -47,6 +47,7 @@ using namespace std;
 using namespace voltdb;
 
 const int COLUMN_COUNT = 6;
+const int HIDDEN_COLUMN_COUNT = 1;
 
 static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
@@ -69,6 +70,8 @@ public:
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull(COLUMN_COUNT, true);
+        const std::vector<bool> columnInBytes (columnAllowNull.size(), false);
+
         columnTypes.push_back(VALUE_TYPE_TINYINT);   columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         columnTypes.push_back(VALUE_TYPE_BIGINT);    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
         columnTypes.push_back(VALUE_TYPE_DECIMAL);   columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
@@ -76,11 +79,19 @@ public:
         columnTypes.push_back(VALUE_TYPE_VARCHAR);   columnLengths.push_back(300);
         columnTypes.push_back(VALUE_TYPE_TIMESTAMP); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
 
-        m_replicatedSchema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
-        m_replicatedSchemaReplica = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
+        std::vector<ValueType> hiddenTypes;
+        std::vector<int32_t> hiddenColumnLengths;
+        std::vector<bool> hiddenColumnAllowNull(HIDDEN_COLUMN_COUNT, false);
+        const std::vector<bool> hiddenColumnInBytes (hiddenColumnAllowNull.size(), false);
+
+        hiddenTypes.push_back(VALUE_TYPE_BIGINT);    hiddenColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+
+
+        m_replicatedSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+        m_replicatedSchemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
         columnAllowNull[0] = false;
-        m_schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
-        m_schemaReplica = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
+        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+        m_schemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
 
         string columnNamesArray[COLUMN_COUNT] = {
             "C_TINYINT", "C_BIGINT", "C_DECIMAL",
@@ -344,6 +355,22 @@ protected:
 
     vector<NValue> m_cachedStringValues;//To free at the end of the test
 };
+
+TEST_F(DRBinaryLogTest, VerifyHiddenColumns) {
+    ASSERT_FALSE(flush(98));
+
+    // single row write transaction
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    endTxn(true);
+
+    flushAndApply(99);
+
+    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    NValue drTimestamp = tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
+    NValue drTimestampReplica = tuple.getHiddenNValue(m_tableReplica->getDRTimestampColumnIndex());
+    ASSERT_TRUE(drTimestamp.compare(drTimestampReplica) == 0);
+}
 
 TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     ASSERT_FALSE(flush(98));
