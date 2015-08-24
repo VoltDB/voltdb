@@ -15,10 +15,7 @@ echo '$1 is' $1
 echo '$2 is' $2
 echo 'lib is' obj/release/nativelibs/libvoltdb*
 
-
 OS=`uname`
-
-echo '++++obj/release/nativelibs/libvoltdb-$2.jnilib is:' obj/release/nativelibs/libvoltdb-$2.jnilib
 
 if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb-$2.jnilib ]
 then
