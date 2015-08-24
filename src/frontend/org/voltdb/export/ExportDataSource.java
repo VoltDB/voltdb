@@ -94,6 +94,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
+    private boolean m_runEveryWhere = false;
 
     /**
      * Create a new data source.
@@ -641,7 +642,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                          * which nulls out the field
                          */
                         if (m_pollFuture != null) {
-                            fut.set(null);
+                            //continue? backoff?
                             return;
                         }
                         if (!m_es.isShutdown()) {
@@ -766,6 +767,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void forwardAckToOtherReplicas(long uso) {
+        if (m_runEveryWhere) {
+            return;
+        }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
 
@@ -854,5 +858,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ExportFormat getExportFormat() {
         return m_format;
+    }
+
+    //Set it from client.
+    public void setRunEveryWhere(boolean runEveryWhere) {
+        m_runEveryWhere = runEveryWhere;
     }
 }
