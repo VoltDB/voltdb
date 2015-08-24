@@ -246,7 +246,9 @@ DRTupleStream::computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &ro
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
 void DRTupleStream::rollbackTo(size_t mark) {
-    m_opened = false;
+    if (mark == m_committedUso) {
+        m_opened = false;
+    }
     TupleStreamBase::rollbackTo(mark);
 }
 
