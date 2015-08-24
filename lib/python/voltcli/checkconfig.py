@@ -60,8 +60,8 @@ def _check_thp_config():
         return "The kernel is configured to use transparent huge pages (THP). " \
             "This is not supported when running VoltDB. Use the following commands " \
             "to disable this feature for the current session:\n\n" \
-            "bash -c \"echo never > /sys/kernel/mm/{0}transparent_hugepage/enabled\"\n" \
-            "bash -c \"echo never > /sys/kernel/mm/{0}transparent_hugepage/defrag\"\n\n" \
+            "sudo bash -c \"echo never > /sys/kernel/mm/{0}transparent_hugepage/enabled\"\n" \
+            "sudo bash -c \"echo never > /sys/kernel/mm/{0}transparent_hugepage/defrag\"\n\n" \
             "To disable THP on reboot, add the preceding commands to the /etc/rc.local file.".format(file_prefix)
 
 def _check_segmentation_offload():
