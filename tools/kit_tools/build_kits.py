@@ -78,7 +78,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK %s clean default dist" % build_args)
+        run("ant -Djmemcheck=NO_MEMCHECK -Dbuildkit=true %s clean default dist" % build_args)
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -89,7 +89,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d %s clean dist.pro" % (defaultlicensedays, build_args))
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d -Dbuildkit=true %s clean dist.pro" % (defaultlicensedays, build_args))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
