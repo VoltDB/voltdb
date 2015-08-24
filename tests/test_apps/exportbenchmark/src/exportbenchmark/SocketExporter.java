@@ -39,9 +39,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -71,6 +68,7 @@ public class SocketExporter extends ExportClientBase {
         host = config.getProperty("socket.dest", "localhost");
         port = Integer.parseInt(config.getProperty("socket.port", "5001"));
         statsDuration = Integer.parseInt(config.getProperty("stats.duration", "5"));
+        setRunEverywhere(Boolean.parseBoolean(config.getProperty("replicated", "false")));
 
         if ("localhost".equals(host)) {
             address = new InetSocketAddress(CoreUtils.getLocalAddress(), port);
