@@ -20,8 +20,8 @@
 
 #include "common/UndoAction.h"
 #include "common/NValue.hpp"
+#include "common/types.h"
 #include "storage/persistenttable.h"
-
 
 namespace voltdb {
 
@@ -45,7 +45,7 @@ public:
     {
         m_table->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes);
         NValue::freeObjectsFromTupleStorage(m_newUninlineableColumns);
-        m_table->DRRollback(m_drMark);
+        m_table->DRRollback(m_drMark, rowCostForDRRecord(DR_RECORD_UPDATE));
     }
 
     /*

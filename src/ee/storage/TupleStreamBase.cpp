@@ -207,10 +207,12 @@ void TupleStreamBase::pushPendingBlocks() {
 /*
  * Discard all data with a uso gte mark
  */
-void TupleStreamBase::rollbackTo(size_t mark)
+void TupleStreamBase::rollbackTo(size_t mark, size_t)
 {
     if (mark > m_uso) {
         throwFatalException("Truncating the future.");
+    } else if (mark < m_committedUso) {
+        throwFatalException("Truncating committed tuple data");
     }
 
     // back up the universal stream counter
@@ -243,9 +245,11 @@ void TupleStreamBase::rollbackTo(size_t mark)
         }
         m_currBlock->recordCompletedTxnForDR(m_committedSequenceNumber, m_committedUniqueId);
     }
-    m_openSequenceNumber = m_committedSequenceNumber;
-    m_openSpHandle = m_committedSpHandle;
-    m_openUniqueId = m_committedUniqueId;
+    if (m_uso == m_committedUso) {
+        m_openSequenceNumber = m_committedSequenceNumber;
+        m_openSpHandle = m_committedSpHandle;
+        m_openUniqueId = m_committedUniqueId;
+    }
 }
 
 /*
@@ -296,7 +300,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     }
 
     if (blockSize == 0) {
-        rollbackTo(uso);
+        rollbackTo(uso, SIZE_MAX);
         throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
     }
 
