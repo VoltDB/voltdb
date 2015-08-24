@@ -9,7 +9,7 @@ from fabric.utils import abort
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
-nativelibdir = "/libs/obj"  #  ~test/libs/... usually
+nativelibdir = "/nativelibs/obj"  #  ~test/libs/... usually
 defaultlicensedays = 45 #default trial license length
 
 ################################################

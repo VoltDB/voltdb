@@ -18,16 +18,18 @@ echo 'lib is' obj/release/nativelibs/libvoltdb*
 
 OS=`uname`
 
-if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb*.jnilib ]
+echo '++++obj/release/nativelibs/libvoltdb-$2.jnilib is:' obj/release/nativelibs/libvoltdb-$2.jnilib
+
+if [ "$OS" = "Darwin" -a -e obj/release/nativelibs/libvoltdb-$2.jnilib ]
 then
     # the Mac case...
     tar cf - obj/release/nativelibs/ | ssh volt0 "cd nativelibs; tar xf -"
     exit 0
 else
     # the Linux case...
-    if [ -e ~/nativelibs/obj/release/nativelibs/* ]; then
+    if [ -e ~/nativelibs/obj/release/nativelibs/libvoltdb-$2.jnilib ]; then
         mkdir -p $1
-        cp ~/nativelibs/obj/release/nativelibs/* $1
+        cp ~/nativelibs/obj/release/nativelibs/libvoltdb-$2.jnilib $1
         exit 0
     else
         echo "++++++++++++++nativelibs not found!"
