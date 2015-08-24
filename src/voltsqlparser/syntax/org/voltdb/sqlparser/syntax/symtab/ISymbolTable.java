@@ -68,5 +68,4 @@ public interface ISymbolTable {
      * @return
      */
     public ITable getTable(String tableAlias);
-
 }

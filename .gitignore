@@ -68,3 +68,4 @@ out
 bundles
 /target/generated-sources/antlr4
 /target/generated-sources/antlr4.touch
+/tests/sqlparser.sqlparserVoltXMLTests.touch

@@ -137,15 +137,11 @@ public abstract class ParserFactory implements IParserFactory {
     public IOperator getExpressionOperator(String aText) {
         return m_operatorMap.get(aText);
     }
-
-    private static Type hasSuperType(Type aLeftType, Type aRightType) {
-        if (aLeftType.getTypeKind() == aRightType.getTypeKind()) {
-            return aLeftType;
-        }
-        return null;
-    }
-
-    public Semantino[] tuac(ISemantino ileft, ISemantino iright) {
+    
+    @Override
+    public Semantino[] tuac(ISemantino ileft, ISemantino iright, ISymbolTable aSymbolTable) {
+    	assert aSymbolTable instanceof SymbolTable;
+    	SymbolTable context = (SymbolTable)aSymbolTable;
         Semantino left = (Semantino)ileft;
         Semantino right = (Semantino)iright;
         Type leftType = (Type) left.getType();
@@ -153,21 +149,31 @@ public abstract class ParserFactory implements IParserFactory {
         if (leftType.isEqualType(rightType)) {
                 return new Semantino[]{left,right};
         } else {
-            Type convertedType = hasSuperType(leftType, rightType);
+            Type convertedType = context.hasSuperType(leftType, rightType);
             if (convertedType != null) {
-                Semantino lconverted = new Semantino(convertedType,
-                                                  addTypeConversion(left.getAST(),
-                                                                    leftType,
-                                                                    convertedType));
-                Semantino rconverted = new Semantino(convertedType,
-                                                   addTypeConversion(right.getAST(),
-                                                                     rightType,
-                                                                     convertedType));
+                Semantino lconverted, rconverted;
+                if (convertedType.isEqualType(leftType)) {
+                	lconverted = left;
+                } else {
+                	lconverted = new Semantino(convertedType,
+                							   addTypeConversion(left.getAST(),
+                									    		 leftType,
+                									    		 convertedType));
+                }
+                if (convertedType.isEqualType(rightType)) {
+                	rconverted = right;
+                } else {
+                	rconverted = new Semantino(convertedType,
+                							   addTypeConversion(right.getAST(),
+                									   			 rightType,
+                									   			 convertedType));
+                }
                 return new Semantino[]{lconverted, rconverted};
             } else {
                 m_errorMessages.addError(-1, -1, "Can't convert type \"%s\" to \"%s\"",
                                          leftType, rightType);
-                return null;
+                return new Semantino[]{(Semantino) getErrorSemantino(),
+                		               (Semantino) getErrorSemantino()};
             }
         }
     }

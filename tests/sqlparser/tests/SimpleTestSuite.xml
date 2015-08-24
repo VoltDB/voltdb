@@ -138,5 +138,37 @@
             <testpoint testKind="dql" testName="TestColumnRefAliases" testSQL="select * from alpha as alef where alef.id = alef.beta"
                 />
         </test>
+        <test sourcefolder="tests/sqlparser/tests" name="TestTypeConversions" classname="org.voltdb.sqlparser.TestTypeConversions">
+          <schema>
+            <ddl>create table alltypes (ftinyint tinyint, fsmallint smallint, finteger integer, fbigint bigint, ffloat float, fdecimal decimal, ftimestamp timestamp)</ddl>
+          </schema>
+	  <!-- convert tinyint to other types -->
+          <testpoint testName="TestTISI" testKind="dql" testSQL="select * from alltypes where fsmallint + ftinyint  = 0" />
+          <testpoint testName="TestSITI" testKind="dql" testSQL="select * from alltypes where ftinyint  + fsmallint = 0" />
+          <testpoint testName="TestTII"  testKind="dql" testSQL="select * from alltypes where ftinyint  + finteger  = 0" />
+          <testpoint testName="TestITI"  testKind="dql" testSQL="select * from alltypes where finteger  + ftinyint  = 0" />
+          <testpoint testName="TestTIBI" testKind="dql" testSQL="select * from alltypes where fbigint   + ftinyint  = 0" />
+          <testpoint testName="TestBITI" testKind="dql" testSQL="select * from alltypes where ftinyint  + fbigint   = 0" />
+          <testpoint testName="TestTIF"  testKind="dql" testSQL="select * from alltypes where ffloat    + ftinyint  = 0" />
+          <testpoint testName="TestFTI"  testKind="dql" testSQL="select * from alltypes where ftinyint  + ffloat    = 0" />
+          <testpoint testName="TestTID"  testKind="dql" testSQL="select * from alltypes where fdecimal  + ftinyint  = 0" />
+          <testpoint testName="TestDTI"  testKind="dql" testSQL="select * from alltypes where ftinyint  + fdecimal  = 0" />
+	  <!-- convert smallint to other types -->
+          <testpoint testName="TestSII"  testKind="dql" testSQL="select * from alltypes where fsmallint + finteger  = 0" />
+          <testpoint testName="TestISI"  testKind="dql" testSQL="select * from alltypes where finteger  + fsmallint = 0" />
+          <testpoint testName="TestSIBI" testKind="dql" testSQL="select * from alltypes where fbigint   + fsmallint = 0" />
+          <testpoint testName="TestBISI" testKind="dql" testSQL="select * from alltypes where fsmallint + fbigint   = 0" />
+          <testpoint testName="TestSIF"  testKind="dql" testSQL="select * from alltypes where ffloat    + fsmallint = 0" />
+          <testpoint testName="TestFSI"  testKind="dql" testSQL="select * from alltypes where fsmallint + ffloat    = 0" />
+          <testpoint testName="TestSID"  testKind="dql" testSQL="select * from alltypes where fdecimal  + fsmallint = 0" />
+          <testpoint testName="TestDSI"  testKind="dql" testSQL="select * from alltypes where fsmallint + fdecimal  = 0" />
+	  <!-- convert integer to other types -->
+          <testpoint testName="TestIBI"  testKind="dql" testSQL="select * from alltypes where fbigint   + finteger  = 0" />
+          <testpoint testName="TestBII"  testKind="dql" testSQL="select * from alltypes where finteger  + fbigint   = 0" />
+          <testpoint testName="TestIF"   testKind="dql" testSQL="select * from alltypes where ffloat    + finteger  = 0" />
+          <testpoint testName="TestFI"   testKind="dql" testSQL="select * from alltypes where finteger  + ffloat    = 0" />
+          <testpoint testName="TestID"   testKind="dql" testSQL="select * from alltypes where fdecimal  + finteger  = 0" />
+          <testpoint testName="TestDI"   testKind="dql" testSQL="select * from alltypes where finteger  + fdecimal  = 0" />
+        </test>
     </tests>
 </VoltXMLElementTestSuite>

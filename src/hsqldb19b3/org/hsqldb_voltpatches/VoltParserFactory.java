@@ -77,10 +77,13 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
         throw new AssertionError("Unimplemented ParserFactory Method " + aFuncName);
     }
 
+    /**
+     * Apparently we don't need to do anything to convert
+     * types.  Who would have thought it.
+     */
     @Override
     public IAST addTypeConversion(IAST aNode, IType aSrcType, IType aTrgType) {
-        unimplementedOperation("addTypeConversion");
-        return null;
+        return aNode;
     }
 
     @Override
@@ -240,4 +243,5 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
 									 	  aQuery.getWhereCondition(),
 									 	  aQuery.getTables()));
 	}
+
 }

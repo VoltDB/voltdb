@@ -184,7 +184,7 @@ public interface IParserFactory {
      * @param aRightoperand
      * @return
      */
-    ISemantino[] tuac(ISemantino aLeftoperand, ISemantino aRightoperand);
+    ISemantino[] tuac(ISemantino aLeftoperand, ISemantino aRightoperand, ISymbolTable aSymbolTable);
 
     /**
      * Given a the pieces of a query, return the abstract syntax tree

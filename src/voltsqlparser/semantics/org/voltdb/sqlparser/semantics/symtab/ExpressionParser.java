@@ -39,7 +39,7 @@ public class ExpressionParser implements IExpressionParser {
     public Semantino getSemantinoMath(IOperator aOperator,
                                        ISemantino aLeftoperand,
                                        ISemantino aRightoperand) {
-        ISemantino[] converted = m_factory.tuac(aLeftoperand, aRightoperand);
+        ISemantino[] converted = m_factory.tuac(aLeftoperand, aRightoperand, m_symbolTable);
 
 
         return new Semantino((Type) converted[0].getType(),
@@ -81,7 +81,7 @@ public class ExpressionParser implements IExpressionParser {
     public ISemantino getSemantinoCompare(IOperator aOperator,
                                           ISemantino aLeftoperand,
                                           ISemantino aRightoperand) {
-        ISemantino[] converted = m_factory.tuac(aLeftoperand, aRightoperand);
+        ISemantino[] converted = m_factory.tuac(aLeftoperand, aRightoperand, m_symbolTable);
         if (converted == null) {
             return Semantino.getErrorSemantino();
         }

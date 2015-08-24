@@ -115,4 +115,8 @@ public enum TypeKind {
 	public final boolean isVoid() {
 		return m_isVoid;
 	}
+
+	public final boolean isUnicode() {
+		return m_isUnicode;
+	}
 }
