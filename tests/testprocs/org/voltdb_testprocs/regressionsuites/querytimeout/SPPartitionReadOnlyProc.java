@@ -35,13 +35,13 @@ import org.voltdb.VoltTable;
 )
 
 public class SPPartitionReadOnlyProc extends VoltProcedure {
-    public final SQLStmt selfJoinSelect = new SQLStmt
+    public final SQLStmt longRunningCrossJoinAgg = new SQLStmt
             ("SELECT t1.contestant_number, t2.state, COUNT(*) "
             + "FROM P1 t1, R1 t2 "
             + "GROUP BY t1.contestant_number, t2.state;");
 
     public VoltTable[] run(int partitionKey) {
-        voltQueueSQL(selfJoinSelect);
+        voltQueueSQL(longRunningCrossJoinAgg);
         return voltExecuteSQL(true);
     }
 }

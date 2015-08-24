@@ -745,7 +745,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // ints for batch context
         buf.putInt(m_currentBatchIndex);
 
-        // put byte flag for timeout value and 4 bytes int value if necessary
+        // put byte flag for timeout value and 4 bytes integer value if specified
         if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
             buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
         } else {
