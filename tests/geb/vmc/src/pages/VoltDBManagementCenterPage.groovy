@@ -109,7 +109,6 @@ class VoltDBManagementCenterPage extends Page {
         if (!atLeastOneIsDisplayed(displayElements)) {
             scrollIntoView(clickElement)
             clickElement.click()
-            waitFor(30){ displayElements.first().isDisplayed() }
             scrollIntoView(displayElements.first())
             waitFor { atLeastOneIsDisplayed(displayElements) }
         }
