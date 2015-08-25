@@ -799,8 +799,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
                 switch (columnType) {
                 case TINYINT:
-                    if (value instanceof BigDecimal)
+                    if (value instanceof BigDecimal) {
                         throw new ClassCastException();
+                    }
                     final Number n1 = (Number) value;
                     if (columnType.wouldCastOverflow(n1))
                     {
@@ -813,8 +814,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     m_buffer.put(n1.byteValue());
                     break;
                 case SMALLINT:
-                    if (value instanceof BigDecimal)
+                    if (value instanceof BigDecimal) {
                         throw new ClassCastException();
+                    }
                     final Number n2 = (Number) value;
                     if (columnType.wouldCastOverflow(n2))
                     {
@@ -825,8 +827,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     m_buffer.putShort(n2.shortValue());
                     break;
                 case INTEGER:
-                    if (value instanceof BigDecimal)
+                    if (value instanceof BigDecimal) {
                         throw new ClassCastException();
+                    }
                     final Number n3 = (Number) value;
                     if (columnType.wouldCastOverflow(n3))
                     {
@@ -837,8 +840,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     m_buffer.putInt(n3.intValue());
                     break;
                 case BIGINT:
-                    if (value instanceof BigDecimal)
+                    if (value instanceof BigDecimal) {
                         throw new ClassCastException();
+                    }
                     final Number n4 = (Number) value;
                     if (columnType.wouldCastOverflow(n4))
                     {
@@ -850,8 +854,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     break;
 
                 case FLOAT:
-                    if (value instanceof BigDecimal)
+                    if (value instanceof BigDecimal) {
                         throw new ClassCastException();
+                    }
                     final Number n5 = (Number) value;
                     if (columnType.wouldCastOverflow(n5))
                     {
@@ -896,6 +901,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                                     "Value in VoltTable.addRow(...) larger than allowed max " +
                                             VoltType.humanReadableSize(maxColSize));
                         writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
+                    }
+                    else {
+                        throw new ClassCastException();
                     }
                     break;
                 }
