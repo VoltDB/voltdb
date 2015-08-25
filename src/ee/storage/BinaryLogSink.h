@@ -34,8 +34,6 @@ public:
     int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine);
     int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine);
     void exportDRConflict(PersistentTable* srcTable, Table* dstTable, const DRRecordType &type, TableTuple &tuple);
-    static int8_t getClusterIdFromDRId(int64_t drId);
-    static int64_t getSequenceNumberFromDRId(int64_t drId);
 private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
 };

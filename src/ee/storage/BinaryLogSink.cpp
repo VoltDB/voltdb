@@ -32,9 +32,16 @@
 
 namespace voltdb {
 
-const std::string DR_CONFLICT_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
 const int8_t MAX_CLUSTER_ID = (1 << 8) - 1;
 const int64_t MAX_SEOUENCE_NUMBER = (1L << 55) - 1L;
+
+static uint8_t getClusterIdFromDRId(int64_t drId) {
+    return (uint8_t)((drId >> 55) & MAX_CLUSTER_ID);
+}
+
+static int64_t getSequenceNumberFromDRId(int64_t drId) {
+    return drId & MAX_SEOUENCE_NUMBER;
+}
 
 class CachedIndexKeyTuple {
 public:
@@ -69,13 +76,6 @@ private:
 
 BinaryLogSink::BinaryLogSink() {}
 
-int8_t BinaryLogSink::getClusterIdFromDRId(int64_t drId) {
-    return (int8_t)((drId >> 55) & MAX_CLUSTER_ID);
-}
-
-int64_t BinaryLogSink::getSequenceNumberFromDRId(int64_t drId) {
-    return drId & MAX_SEOUENCE_NUMBER;
-}
 
 int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
@@ -304,16 +304,6 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 }
 
 void BinaryLogSink::exportDRConflict(PersistentTable *drTable, Table *exportTable, const DRRecordType &type, TableTuple &exportTuple) {
-//    if (!engine) {
-//        return;
-//    }
-//    Table* exportTable = engine->getDRConflictTable(drTable);
-//    if (!exportTable) {
-//        std::string exportTableName = DR_CONFLICT_TABLE_PREFIX + drTable->name();
-//        exportTable = engine->getTable(exportTableName);  // cache table miss, back to full search
-//        engine->addToDRConflictTableMap(drTable, exportTable);
-//    }
-
     if (exportTable != NULL && exportTable->isExport()) {
         TableTuple tempTuple = exportTable->tempTuple();
         NValue hiddenColumn = exportTuple.getHiddenNValue(drTable->getDRTimestampColumnIndex());
@@ -324,12 +314,6 @@ void BinaryLogSink::exportDRConflict(PersistentTable *drTable, Table *exportTabl
         tempTuple.setNValue(2, ValueFactory::getBigIntValue(getSequenceNumberFromDRId(drId)));   // Timestamp
         tempTuple.setNValue(3, ValueFactory::getTinyIntValue(type));            // Type of Operation
         tempTuple.setNValues(4, exportTuple, 0, exportTuple.sizeInValues());    // rest of columns
-
-        /*************************Debug************************/
-        std::ostringstream os;
-        os << tempTuple.getSchema()->debug();
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, os.str().c_str());
-        /******************************************************/
 
         exportTable->insertTuple(tempTuple);
     }

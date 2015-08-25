@@ -166,6 +166,7 @@ public:
                                                                                                           tableHandle + 1, false, 0));
         m_singleColumnTable->setDR(true);
 
+        // create a export table has the same column of other_table_2, plus 4 additional columns for DR conflict resolution purpose.
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
         std::vector<bool> exportColumnAllowNull(6, false);
@@ -175,7 +176,6 @@ public:
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-
         m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
         string exportColumnNamesArray[6] = { "VOLTDB_AUTOGEN_TABLE_NAME", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
                                             "VOLTDB_AUTOGEN_OPERATION_TYPE", "C_TINYINT", "C_BIGINT"};
