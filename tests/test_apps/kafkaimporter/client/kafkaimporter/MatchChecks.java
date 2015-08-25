@@ -35,28 +35,6 @@ import org.voltdb.client.ProcCallException;
 
 public class MatchChecks {
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
-//    final static String DELETE_ROWS = "DeleteRows";
-//
-//    static class DeleteCallback implements ProcedureCallback {
-//        final String proc;
-//        final long key;
-//
-//        DeleteCallback(String proc, long key) {
-//            this.proc = proc;
-//            this.key = key;
-//        }
-//
-//        @Override
-//        public void clientCallback(ClientResponse clientResponse) {
-//
-//            // Make sure the procedure succeeded. If not,
-//            // report the error.
-//            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-//                String msg = String.format("%s k: %12d, callback fault: %s", proc, key, clientResponse.getStatusString());
-//                log.error(msg);
-//              }
-//         }
-//    }
 
     protected static long getMirrorTableRowCount(boolean allvalues, Client client) {
         // check row count in mirror table -- the "master" of what should come back
