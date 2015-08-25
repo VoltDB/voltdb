@@ -30,7 +30,12 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;
@@ -1684,9 +1689,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return orderByColumnsDetermineAllColumns(m_orderColumns, candidateColumns, outNonOrdered);
     }
 
-    static boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
-            List<ParsedColInfo> orderColumns,
-            List<AbstractExpression> nonOrdered)
+    boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
+                                                     List<ParsedColInfo> orderColumns,
+                                                     List<AbstractExpression> nonOrdered)
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : displayColumns) {
@@ -1710,7 +1715,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return orderByColumnsDetermineAllColumns(orderColumns, candidateColumns, null);
     }
 
-    private static boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
+    private boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
                                                       List<ParsedColInfo> candidateColumns,
                                                       List<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
@@ -1727,6 +1732,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 for (ParsedColInfo orderByCol : orderColumns) {
                     orderByExprs.add(orderByCol.expression);
                 }
+                addHonoraryOrderByExpressions(orderByExprs, candidateColumns);
             }
             if (orderByExprs.contains(candidateExpr)) {
                 continue;
