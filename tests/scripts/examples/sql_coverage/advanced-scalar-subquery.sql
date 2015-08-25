@@ -58,16 +58,16 @@ SELECT @idcol, (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE A2.__[#agg] 
 SELECT @idcol, (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE A3._variable[@comparabletype] _cmp2 _variable[@comparabletype]) FROM @fromtables    A3 _optionalorderbyidlimitoffset
 
 --- Queries with scalar subqueries in the WHERE clause (with optional ORDER BY, LIMIT, OFFSET, GROUP BY or HAVING clauses)
-SELECT _variable[#ord]         FROM @fromtables A11 WHERE __[#ord] _text[#cmp _cmp] (SELECT _text[#agfcn @agg](       __[#ord]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
-SELECT _variable[#ord numeric] FROM @fromtables A12 WHERE __[#ord] _text[#cmp _cmp] (SELECT _text[#agfcn @agg](_variable[#agg]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
+SELECT _variable[#ord]         FROM @fromtables A11 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](       __[#ord]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
+SELECT _variable[#ord numeric] FROM @fromtables A12 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
 --- TODO: uncomment, once ENG-8292 (NPE in Hsql for HAVING query, causing sqlCoverage mismatches) is fixed
---SELECT _variable[#ord]         FROM @fromtables A13 WHERE __[#ord] _text[#cmp _cmp] (SELECT _text[#agfcn @agg](       __[#ord]) FROM @fromtables WHERE     __[#ord] __[#cmp] A13.__[#ord])    _grouporderbyvarlimoffhaving
-SELECT _variable[#ord numeric] FROM @fromtables A14 WHERE __[#ord] _text[#cmp _cmp] (SELECT _text[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE A14.__[#agg] __[#cmp]     __[#agg])    _grouporderbyvarlimoffhaving
+--SELECT _variable[#ord]         FROM @fromtables A13 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](       __[#ord]) FROM @fromtables WHERE     __[#ord] __[#cmp] A13.__[#ord])    _grouporderbyvarlimoffhaving
+SELECT _variable[#ord numeric] FROM @fromtables A14 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE A14.__[#agg] __[#cmp]     __[#agg])    _grouporderbyvarlimoffhaving
 
 --- TODO: uncomment this, once ENG-8234 is fixed, so the mismatches disappear:
---SELECT _variable[#ord]         FROM @fromtables A15 WHERE __[#agg] _text[#cmp _cmp] (SELECT _text[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE _variable[#sub] __[#cmp] A15.__[#sub]) _grouporderbyvarlimoffhaving
+--SELECT _variable[#ord]         FROM @fromtables A15 WHERE __[#agg] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE _variable[#sub] __[#cmp] A15.__[#sub]) _grouporderbyvarlimoffhaving
 --- TODO: delete this, once ENG-8234 is fixed, so the above mismatches disappear:
-SELECT _variable[#ord]         FROM @fromtables A15 WHERE __[#agg] _text[#cmp _cmp] (SELECT _text[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE _variable[#sub] __[#cmp] A15.__[#sub]) _tempgrouporderbyvarlimoffhaving
+SELECT _variable[#ord]         FROM @fromtables A15 WHERE __[#agg] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE _variable[#sub] __[#cmp] A15.__[#sub]) _tempgrouporderbyvarlimoffhaving
 
 --- Queries with scalar subqueries in the ORDER BY clause (these currently return errors, but probably should not - see ENG-8239)
 --- TODO: uncomment out, if/when ENG-8239 is fixed (meanwhile, commented out to save execution time)
@@ -78,10 +78,10 @@ SELECT _variable[#ord]         FROM @fromtables A15 WHERE __[#agg] _text[#cmp _c
 --SELECT (SELECT @agg(_variable)       FROM @fromtables WHERE _variable[@comparabletype] _cmp A26._variable[@comparabletype]) C0 FROM @fromtables A26 ORDER BY C0  _sortorder _optionallimitoffset
 
 --- Queries with scalar subqueries in the GROUP BY or HAVING clause (these work)
-SELECT (SELECT _text[#agfcn @agg](_variable[#agg])                 FROM @fromtables WHERE _variable[@comparabletype]            _cmp  A31._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A31 GROUP BY C0
-SELECT (SELECT _text[#agfcn @agg](_variable[#agg @comparabletype]) FROM @fromtables WHERE _variable[@comparabletype] _text[#cmp _cmp] A32._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A32 GROUP BY C0 HAVING __[#agfcn](__[#agg]) __[#cmp] 12
-SELECT (SELECT _text[#agfcn _stringagg](_variable[#agg string])    FROM @fromtables WHERE _variable[@comparabletype] _text[#cmp _cmp] A33._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A33 GROUP BY C0 HAVING __[#agfcn](__[#agg]) __[#cmp] 'Z'
+SELECT (SELECT _symbol[#agfcn @agg](_variable[#agg])                 FROM @fromtables WHERE _variable[@comparabletype]            _cmp  A31._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A31 GROUP BY C0
+SELECT (SELECT _symbol[#agfcn @agg](_variable[#agg @comparabletype]) FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A32._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A32 GROUP BY C0 HAVING __[#agfcn](__[#agg]) __[#cmp] 12
+SELECT (SELECT _symbol[#agfcn _stringagg](_variable[#agg string])    FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A33._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A33 GROUP BY C0 HAVING __[#agfcn](__[#agg]) __[#cmp] 'Z'
 --- These do not currently work (meanwhile, commented out to save execution time)
---SELECT (SELECT _text[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _text[#cmp _cmp] A34._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A34 GROUP BY C0 HAVING C1 __[#cmp] 12
---SELECT _variable[#grp] C0, _text[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A35 GROUP BY C0 HAVING (SELECT __[#agfcn](_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _text[#cmp _cmp] A35._variable[@comparabletype]) __[#cmp] 12
---SELECT _variable[#grp] C0, _text[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A36 GROUP BY C0 HAVING __[#agfcn](__[#agg]) _text[#cmp _cmp] (SELECT __[#agfcn](__[#agg]) FROM @fromtables WHERE __[#grp] __[#cmp] A36.__[#grp])
+--SELECT (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A34._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A34 GROUP BY C0 HAVING C1 __[#cmp] 12
+--SELECT _variable[#grp] C0, _symbol[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A35 GROUP BY C0 HAVING (SELECT __[#agfcn](_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A35._variable[@comparabletype]) __[#cmp] 12
+--SELECT _variable[#grp] C0, _symbol[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A36 GROUP BY C0 HAVING __[#agfcn](__[#agg]) _symbol[#cmp _cmp] (SELECT __[#agfcn](__[#agg]) FROM @fromtables WHERE __[#grp] __[#cmp] A36.__[#grp])
