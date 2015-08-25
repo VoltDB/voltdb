@@ -103,6 +103,8 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
+// table name prefix of DR conflict table
+const std::string DR_CONFLICT_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
 
 namespace voltdb {
 
@@ -472,10 +474,19 @@ Table* VoltDBEngine::getTable(std::string name) const
     return findInMapOrNull(name, m_tablesByName);
 }
 
-Table* VoltDBEngine::getDRConflictTable(PersistentTable* drTable) const
+Table* VoltDBEngine::getDRConflictTable(PersistentTable* drTable)
 {
-    // Caller responsible for checking null return value.
-    return findInMapOrNull(drTable, m_cachedDRConflictLookupTable);
+    Table* exportTable;
+    boost::unordered_map<PersistentTable*, Table*>::iterator it = m_cachedDRConflictLookupTable.find(drTable);
+    if (it == m_cachedDRConflictLookupTable.end()) {
+        exportTable = getTable(DR_CONFLICT_TABLE_PREFIX + drTable->name());  // cache table miss, back to full search
+        if (exportTable) {
+            m_cachedDRConflictLookupTable[drTable] = exportTable;
+        }
+    } else {
+        exportTable = it->second;
+    }
+    return exportTable;
 }
 
 TableCatalogDelegate* VoltDBEngine::getTableDelegate(std::string name) const
@@ -1277,10 +1288,6 @@ void VoltDBEngine::rebuildTableCollections()
             }
         }
     }
-}
-
-void VoltDBEngine::addToDRConflictTableMap(PersistentTable* drTable, Table* exportTable) {
-    m_cachedDRConflictLookupTable[drTable] = exportTable;
 }
 
 void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
