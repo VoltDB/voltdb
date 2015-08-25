@@ -39,7 +39,6 @@
 package kafkaimporter.client.kafkaimporter;
 
 import java.io.OutputStream;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,10 +46,10 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.*;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -59,7 +58,6 @@ import org.voltdb.client.ClientStatsContext;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
-import org.voltdb.VoltType;
 
 public class KafkaImportBenchmark {
 
@@ -118,10 +116,13 @@ public class KafkaImportBenchmark {
         String servers = "localhost";
 
         @Option(desc = "Number of rows to expect to import from the Kafka topic")
-        long rows = 10_000_000;
+        long export_rows = 10_000_000;
 
         @Option(desc = "Report latency for kafka benchmark run.")
         boolean latencyreport = false;
+
+        @Option(desc = "Test using all VoltDB datatypes (except varbin).")
+        boolean allvalues = false;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -130,7 +131,7 @@ public class KafkaImportBenchmark {
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (rows <= 0) exitWithMessageAndUsage("row number must be > 0");
+            if (export_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             log.info("finished validating args");
         }
@@ -143,7 +144,6 @@ public class KafkaImportBenchmark {
      * @param config Parsed & validated CLI options.
      */
     public KafkaImportBenchmark(Config config) {
-        this.config = config;
         periodicStatsContext = client.createStatsContext();
 
         log.info(HORIZONTAL_RULE);
@@ -196,13 +196,15 @@ public class KafkaImportBenchmark {
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
      */
-    public synchronized void printStatistics() {
+    public synchronized static void printStatistics() {
         try {
             ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
             long thrup;
 
             thrup = stats.getTxnThroughput();
             long rows = MatchChecks.getExportRowCount(client);
+            if (rows == VoltType.NULL_BIGINT)
+                rows = 0;
             log.info(String.format("Export Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
                     thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
                     stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
@@ -211,7 +213,7 @@ public class KafkaImportBenchmark {
         }
     }
 
-    protected void scheduleCheckTimer() {
+    protected static void scheduleCheckTimer() {
 
         final Timer timer = new Timer("checkTimer", true);
         final long period = config.displayinterval;
@@ -220,8 +222,11 @@ public class KafkaImportBenchmark {
             @Override
             public void run() {
                 long count = MatchChecks.getImportRowCount(client);
+                if (count == VoltType.NULL_BIGINT)
+                    count = 0;
                 importProgress.add((int) count);
                 //log.info(importProgress.toString());
+
                 if (importProgress.size() > 1) {
                     log.info("Import Throughput " + (count - importProgress.get(importProgress.size() - 2)) / period + "/s, Total Rows: " + count);
                 }
@@ -246,8 +251,6 @@ public class KafkaImportBenchmark {
         log.info("Starting Benchmark");
         log.info(HORIZONTAL_RULE);
 
-        SecureRandom rnd = new SecureRandom();
-        rnd.setSeed(System.identityHashCode(Thread.currentThread()));
         long icnt = 0;
         try {
             // print periodic statistics to the console
@@ -268,8 +271,9 @@ public class KafkaImportBenchmark {
             }
             // check for export completion
             //exportMon.waitForStreamedAllocatedMemoryZero();
-        } catch (Exception e) {
-            log.error("Exception in Benchmark", e);
+        } catch (Exception ex) {
+            log.error("Exception in Benchmark", ex);
+            ex.printStackTrace();
         } finally {
             log.info("Benchmark ended, exported " + icnt + " rows.");
             // cancel periodic stats printing
@@ -288,11 +292,12 @@ public class KafkaImportBenchmark {
         @Override
         public void run() {
             try {
-            	schedulePeriodicStats();
-            	scheduleCheckTimer();
-                //benchmark.runBenchmark();
+                schedulePeriodicStats();
+                scheduleCheckTimer();
+                benchmark.runBenchmark();
             } catch (Exception ex) {
                 log.error("Exception in benchmark", ex);
+                ex.printStackTrace();
                 System.exit(-1);
             }
         }
@@ -303,7 +308,6 @@ public class KafkaImportBenchmark {
      *
      * @param args Command line arguments.
      * @throws Exception if anything goes wrong.
-     * @see {@link VoterConfig}
      */
     public static void main(String[] args) throws Exception {
         VoltLogger log = new VoltLogger("Benchmark.main");
@@ -315,7 +319,7 @@ public class KafkaImportBenchmark {
         dbconnect(config.servers, config.ratelimit);
 
         // instance handles inserts to Kafka export table and its mirror DB table
-        exportProc = new InsertExport(client, rowsAdded);
+        exportProc = new InsertExport(config.allvalues, client, rowsAdded);
 
         // get instances to track track export completion using @Statistics
         exportMon = new TableChangeMonitor(client, "StreamedTable", "KAFKAEXPORTTABLE1");
@@ -333,7 +337,6 @@ public class KafkaImportBenchmark {
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
-        long count = 0;
         do {
             Thread.sleep(END_WAIT * 1000);
             // importProgress is an array of sampled counts of the importedcounts table, showing importProgressress of import
@@ -342,8 +345,8 @@ public class KafkaImportBenchmark {
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
 
-        long mirrorRows = MatchChecks.getMirrorTableRowCount(client);
-        long importRows = MatchChecks.getImportTableRowCount(client);
+        long mirrorRows = MatchChecks.getMirrorTableRowCount(config.allvalues, client);
+        long importRows = MatchChecks.getImportTableRowCount(config.allvalues, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
 
         log.info("Total rows exported: " + finalInsertCount);

@@ -34,7 +34,6 @@ package kafkaimporter.db.procedures;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 
 //@ProcInfo(
@@ -56,7 +55,7 @@ public class InsertImport extends VoltProcedure {
         voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key, value);
         long deletedCount = voltExecuteSQL()[0].asScalarLong();
 
-        if (deletedCount > 0) {
+        if (deletedCount == 0) {
             voltQueueSQL(importInsert, key, value);
             voltExecuteSQL(true);
         } else {
