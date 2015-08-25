@@ -170,7 +170,7 @@ public:
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
         std::vector<bool> exportColumnAllowNull(6, false);
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(std::strlen("OTHER_TABLE_2"));
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(13); /* length of 'OTHER_TABLE_2' */
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
