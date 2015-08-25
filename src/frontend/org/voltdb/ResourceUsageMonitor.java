@@ -56,7 +56,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
 
     public boolean hasResourceLimitsConfigured()
     {
-        return ((m_rssLimit > 0 || m_diskLimitConfig.hasLimitsConfigured())
+        return ((m_rssLimit > 0 || (m_diskLimitConfig!=null && m_diskLimitConfig.hasLimitsConfigured()))
                 && m_resourceCheckInterval > 0);
     }
 
@@ -72,7 +72,9 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
             if (m_rssLimit > 0) {
                 m_logger.info("RSS limit: " + m_rssLimit + " bytes");
             }
-            m_diskLimitConfig.logConfiguredLimits();
+            if (m_diskLimitConfig!=null) {
+                m_diskLimitConfig.logConfiguredLimits();
+            }
         } else {
             m_logger.info("No resource usage limit monitoring configured");
         }
