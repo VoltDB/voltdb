@@ -32,9 +32,11 @@
 
 package kafkaimporter.db.procedures;
 
+import java.util.Date;
+
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
+import org.voltdb.types.TimestampType;
 
 //@ProcInfo(
 //        partitionInfo = "ALL_VALUES1.rowid:0",
@@ -42,35 +44,19 @@ import org.voltdb.VoltTable;
 //    )
 
 public class InsertImport extends VoltProcedure {
-    public final String sqlSuffix = "(key, value) VALUES (?, ?)";
+    public final String sqlSuffix = "(key, value, insert_time) VALUES (?, ?, ?)";
     public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable1 " + sqlSuffix);
-    public final SQLStmt deleteMirrorRow = new SQLStmt("DELETE FROM kafkamirrortable1 WHERE key = ? and value = ?");
-    public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM importcounts LIMIT 1");
-    public final SQLStmt insertCounts = new SQLStmt("INSERT INTO importcounts VALUES (?, ?)");
-    public final SQLStmt updateCounts = new SQLStmt("UPDATE importcounts SET total_rows_deleted=total_rows_deleted+? where key = ?");
+    public final SQLStmt deleteMirrorRow = new SQLStmt("DELETE FROM kafkamirrortable1 WHERE key = ?");
 
-    public long run(long key, long value)
+    public long run(long key, long value, TimestampType insert_time) throws VoltAbortException
     {
-
-        voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key, value);
+        voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key);
+        //voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key, value, insert_time);
         long deletedCount = voltExecuteSQL()[0].asScalarLong();
 
         if (deletedCount == 0) {
-            voltQueueSQL(importInsert, key, value);
+            voltQueueSQL(importInsert, key, value, insert_time);
             voltExecuteSQL(true);
-        } else {
-            voltQueueSQL(selectCounts);
-            VoltTable[] result = voltExecuteSQL();
-            VoltTable data = result[0];
-            long nrows = data.getRowCount();
-            if (nrows > 0) {
-                long ck = data.fetchRow(0).getLong(0);
-                voltQueueSQL(updateCounts, deletedCount, ck);
-                voltExecuteSQL(true);
-            } else {
-                voltQueueSQL(insertCounts, key, deletedCount);
-                voltExecuteSQL(true);
-            }
         }
         return 0;
     }

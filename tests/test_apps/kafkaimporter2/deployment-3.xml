@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <commandlog enabled="false" />
+    <import>
+        <configuration module="kafkastream.jar" type="custom" enabled="true">
+            <property name="brokers">volt8a:9092,volt8b:9092,volt8c:9092</property>
+            <property name="topics">T6_KAFKAEXPORTTABLE1</property>
+            <property name="groupid">def</property>
+            <property name="procedure">InsertImport</property>
+        </configuration>
+    </import>
+
+  <export>
+    <configuration enabled="true" stream="default" type="kafka">
+      <property name="bootstrap.servers">volt8a:9092,volt8b:9092,volt8c:9092</property>
+      <property name="request.required.acks">1</property>
+      <property name="producer.type">async</property>
+      <property name="skipinternals">true</property>
+      <property name="topic.prefix">T6_</property>
+    </configuration>
+  </export>
+
+</deployment>

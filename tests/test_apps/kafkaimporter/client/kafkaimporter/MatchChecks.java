@@ -24,52 +24,52 @@
 package kafkaimporter.client.kafkaimporter;
 
 import java.io.IOException;
-import java.lang.InterruptedException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 
 
 public class MatchChecks {
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
-    final static String DELETE_ROWS = "DeleteRows";
+//    final static String DELETE_ROWS = "DeleteRows";
+//
+//    static class DeleteCallback implements ProcedureCallback {
+//        final String proc;
+//        final long key;
+//
+//        DeleteCallback(String proc, long key) {
+//            this.proc = proc;
+//            this.key = key;
+//        }
+//
+//        @Override
+//        public void clientCallback(ClientResponse clientResponse) {
+//
+//            // Make sure the procedure succeeded. If not,
+//            // report the error.
+//            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+//                String msg = String.format("%s k: %12d, callback fault: %s", proc, key, clientResponse.getStatusString());
+//                log.error(msg);
+//              }
+//         }
+//    }
 
-    static class DeleteCallback implements ProcedureCallback {
-        final String proc;
-        final long key;
-
-        DeleteCallback(String proc, long key) {
-            this.proc = proc;
-            this.key = key;
-        }
-
-        @Override
-        public void clientCallback(ClientResponse clientResponse) {
-
-            // Make sure the procedure succeeded. If not,
-            // report the error.
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                String msg = String.format("%s k: %12d, callback fault: %s", proc, key, clientResponse.getStatusString());
-                log.error(msg);
-              }
-         }
-    }
-
-    protected static long getMirrorTableRowCount(Client client) {
+    protected static long getMirrorTableRowCount(boolean allvalues, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
         long mirrorRowCount = 0;
+        String countsp = allvalues ? "CountMirror2" : "CountMirror1";
+
 
         try {
-            VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
+            VoltTable[] countQueryResult = client.callProcedure(countsp).getResults();
             mirrorRowCount = countQueryResult[0].asScalarLong();
         } catch (Exception e) {
-            log.error("Exception from callProcedure", e);
+            log.error("Exception from callProcedure " + countsp, e);
             System.exit(-1);
         }
         return mirrorRowCount;
@@ -146,39 +146,16 @@ public class MatchChecks {
         return data.asScalarLong();
     }
 
-    protected static long findAndDeleteMatchingRows(Client client) {
-        long rows = 0;
-        VoltTable results = null;
-
-        try {
-            results = client.callProcedure("MatchRows").getResults()[0];
-        } catch (Exception e) {
-            log.error("Exception from callProcedure", e);
-            System.exit(-1);
-        }
-
-        log.info("getRowCount(): " + results.getRowCount());
-        while (results.advanceRow()) {
-            long key = results.getLong(0);
-            try {
-                client.callProcedure(new DeleteCallback(DELETE_ROWS, key), DELETE_ROWS, key);
-            } catch (Exception e) {
-                log.error("Exception from callProcedure", e);
-                System.exit(-1);
-            }
-            rows++;
-        }
-        return rows;
-    }
-
-    public static long getImportTableRowCount(Client client) {
+    public static long getImportTableRowCount(boolean allvalues, Client client) {
         // check row count in import table
         long importRowCount = 0;
+        String countsp = allvalues ? "CountImport2" : "CountImport1";
+
         try {
-            VoltTable[] countQueryResult = client.callProcedure("CountImport").getResults();
+            VoltTable[] countQueryResult = client.callProcedure(countsp).getResults();
             importRowCount = countQueryResult[0].asScalarLong();
         } catch (Exception e) {
-            log.error("Exception from callProcedure", e);
+            log.error("Exception from callProcedure " + countsp, e);
             System.exit(-1);
         }
         return importRowCount;

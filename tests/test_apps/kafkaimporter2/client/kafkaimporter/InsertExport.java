@@ -21,47 +21,40 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 package kafkaimporter.client.kafkaimporter;
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.voltcore.logging.VoltLogger;
+
+import java.io.IOException;
+
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
+
 
 public class InsertExport {
     static VoltLogger log = new VoltLogger("Benchmark.insertExport");
     final Client m_client;
-    static AtomicLong m_rowsAdded;
     final static String INSERT_PN = "InsertFinal";
-    static String m_export_sp;
+    final static String EXPORT_PN = "InsertExport";
 
-    public InsertExport(boolean allvalues, Client client, AtomicLong rowsAdded) {
+    public InsertExport(Client client) {
         m_client = client;
-        m_rowsAdded = rowsAdded;
-        m_export_sp = allvalues ? "InsertExport2" : "InsertExport";
-        log.info("Insert Export SP is: " + m_export_sp);
     }
 
     public void insertExport(long key, long value) {
         try {
-            m_client.callProcedure(new InsertCallback(m_export_sp, key, value), m_export_sp, key, value);
-        } catch (NoConnectionsException e) {
-            log.warn("NoConnectionsException calling stored procedure" + m_export_sp);
-            try {
-                Thread.sleep(3);
-            } catch (InterruptedException ex) { }
-        } catch (Exception e) {
-            log.warn("Exception calling stored procedure" + m_export_sp, e);
+            m_client.callProcedure(new InsertCallback(EXPORT_PN, key, value), EXPORT_PN, key, value);
+        } catch (IOException e) {
+            log.info("Exception calling stored procedure InsertExport");
+            e.printStackTrace();
         }
     }
 
     public void insertFinal(long key, long value) {
         try {
             m_client.callProcedure(new InsertCallback(INSERT_PN, key, value), INSERT_PN, key, value);
-        } catch (Exception e) {
-            log.info("Exception calling stored procedure InsertFinal", e);
-            System.exit(-1);
+        } catch (IOException e) {
+            log.info("Exception calling stored procedure InsertFinal");
+            e.printStackTrace();
         }
     }
 
@@ -80,13 +73,8 @@ public class InsertExport {
         public void clientCallback(ClientResponse clientResponse)
                 throws Exception {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                if (!clientResponse.getStatusString().contains("Server is paused and is available in read-only mode") &&
-                        !clientResponse.getStatusString().contains("was lost before a response was received")) {
-                    String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
-                    log.warn(msg);
-                }
-            } else {
-                m_rowsAdded.incrementAndGet();
+                String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
+                log.error(msg);
             }
         }
 

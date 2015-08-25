@@ -1,19 +1,6 @@
 -- This is the import table into which a single value will be pushed by kafkaimporter.
 
-LOAD classes sp.jar;
-
-file -inlinebatch END_OF_BATCH
-
-------- Kafka Importer Tables -------
-CREATE TABLE kafkaimporttable1
-     (
-                  KEY   BIGINT NOT NULL,
-                  value BIGINT NOT NULL,
-                  insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                  CONSTRAINT pk_kafka_import_table1 PRIMARY KEY ( KEY )
-     );
-
-PARTITION TABLE kafkaimporttable1 ON COLUMN KEY;
+-- file -inlinebatch END_OF_BATCH
 
 CREATE TABLE kafkaimporttable2
     (
@@ -44,16 +31,6 @@ CREATE TABLE kafkaimporttable2
     );
 PARTITION TABLE kafkaimporttable2 ON COLUMN key;
 
-CREATE TABLE kafkamirrortable1
-     (
-                  KEY   BIGINT NOT NULL ,
-                  value BIGINT NOT NULL ,
-                  insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                  CONSTRAINT pk_kafkamirrortable PRIMARY KEY ( KEY )
-     );
-
-PARTITION TABLE kafkamirrortable1 ON COLUMN KEY;
-
 CREATE TABLE kafkamirrortable2
     (
           key                     BIGINT        NOT NULL
@@ -80,18 +57,15 @@ CREATE TABLE kafkamirrortable2
         , type_null_varchar1024     VARCHAR(1024)
         , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
         , primary key(key)
+            
+            --, rowid, rowid_group, type_null_tinyint,type_not_null_tinyint,
+            --type_null_smallint,type_not_null_smallint,type_null_integer,type_null_bigint,
+            --type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,
+            --type_not_null_float,type_null_decimal,type_not_null_decimal,type_null_varchar25,
+            --type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,
+            --type_null_varchar1024, type_not_null_varchar1024)
     );
 PARTITION TABLE kafkamirrortable2 ON COLUMN key;
-
--- Export table
-CREATE TABLE kafkaexporttable1
-     (
-                  KEY   BIGINT NOT NULL ,
-                  value BIGINT NOT NULL
-     );
-
-PARTITION TABLE kafkaexporttable1 ON COLUMN KEY;
-EXPORT TABLE kafkaexporttable1;
 
 CREATE TABLE kafkaexporttable2
     (
@@ -139,19 +113,88 @@ CREATE TABLE exportcounts
 
 PARTITION TABLE exportcounts on COLUMN KEY;
 
-CREATE PROCEDURE PARTITION ON TABLE KafkaImportTable1 COLUMN key FROM class kafkaimporter.db.procedures.InsertImport;
-CREATE PROCEDURE PARTITION ON TABLE Kafkamirrortable1 COLUMN key FROM class kafkaimporter.db.procedures.InsertExport;
+
+
+-- Stored procedures
+LOAD classes sp.jar;
 
 CREATE PROCEDURE PARTITION ON TABLE KafkaImportTable2 COLUMN key FROM class kafkaimporter.db.procedures.InsertImport2;
 CREATE PROCEDURE PARTITION ON TABLE Kafkamirrortable2 COLUMN key FROM class kafkaimporter.db.procedures.InsertExport2;
 
-CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertFinal;
-CREATE PROCEDURE FROM class kafkaimporter.db.procedures.MatchRows;
-
-CREATE PROCEDURE CountMirror1 as select count(*) from kafkamirrortable1;
-CREATE PROCEDURE CountImport1 as select count(*) from kafkaimporttable1;
-
 CREATE PROCEDURE CountMirror2 as select count(*) from kafkamirrortable2;
 CREATE PROCEDURE CountImport2 as select count(*) from kafkaimporttable2;
 
-END_OF_BATCH
+-- and now for something completely different
+
+-- CREATE TABLE import_type_null_tinyint
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_tinyint         TINYINT
+--     );
+
+-- CREATE TABLE import_type_null_smallint
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_smallint        SMALLINT
+--     );
+
+-- CREATE TABLE import_type_null_integer
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_integer         INTEGER
+--     );
+
+-- CREATE TABLE import_type_null_bigint
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_bigint          BIGINT
+--     );
+
+-- CREATE TABLE import_type_null_timestamp
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_timestamp       TIMESTAMP
+--     );
+
+-- CREATE TABLE import_type_null_float
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_float           FLOAT
+--     );
+
+-- CREATE TABLE import_type_null_decimal
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_decimal         DECIMAL
+--     );
+
+-- CREATE TABLE import_type_null_varchar25
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_varchar25       VARCHAR(32)
+--     );
+
+-- CREATE TABLE import_type_null_varchar128
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_varchar128      VARCHAR(128)
+--     );
+
+-- CREATE TABLE import_type_null_varchar1024
+--     (
+--           key                       BIGINT        NOT NULL
+--         , value                     BIGINT        NOT NULL
+--         , type_null_varchar1024     VARCHAR(1024)
+--     );
+
+
+-- END_OF_BATCH
