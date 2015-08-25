@@ -36,11 +36,11 @@ import org.voltdb.client.ProcCallException;
 public class MatchChecks {
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
 
-    protected static long getMirrorTableRowCount(boolean allvalues, Client client) {
+    protected static long getMirrorTableRowCount(boolean alltypes, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
         long mirrorRowCount = 0;
-        String countsp = allvalues ? "CountMirror2" : "CountMirror1";
+        String countsp = alltypes ? "CountMirror2" : "CountMirror1";
 
 
         try {
@@ -124,10 +124,10 @@ public class MatchChecks {
         return data.asScalarLong();
     }
 
-    public static long getImportTableRowCount(boolean allvalues, Client client) {
+    public static long getImportTableRowCount(boolean alltypes, Client client) {
         // check row count in import table
         long importRowCount = 0;
-        String countsp = allvalues ? "CountImport2" : "CountImport1";
+        String countsp = alltypes ? "CountImport2" : "CountImport1";
 
         try {
             VoltTable[] countQueryResult = client.callProcedure(countsp).getResults();

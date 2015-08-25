@@ -122,7 +122,7 @@ public class KafkaImportBenchmark {
         boolean latencyreport = false;
 
         @Option(desc = "Test using all VoltDB datatypes (except varbin).")
-        boolean allvalues = false;
+        boolean alltypes = false;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -211,7 +211,6 @@ public class KafkaImportBenchmark {
                     stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
         } catch (Exception ex) {
             log.error("Exception in printStatistics", ex);
-            log.error(ex.getStackTrace());
         }
     }
 
@@ -274,7 +273,6 @@ public class KafkaImportBenchmark {
             //exportMon.waitForStreamedAllocatedMemoryZero();
         } catch (Exception ex) {
             log.error("Exception in Benchmark", ex);
-            log.error(ex.getStackTrace());
         } finally {
             log.info("Benchmark ended, exported " + icnt + " rows.");
             // cancel periodic stats printing
@@ -298,7 +296,6 @@ public class KafkaImportBenchmark {
                 benchmark.runBenchmark();
             } catch (Exception ex) {
                 log.error("Exception in benchmark", ex);
-                log.error(ex.getStackTrace());
                 System.exit(-1);
             }
         }
@@ -320,7 +317,7 @@ public class KafkaImportBenchmark {
         dbconnect(config.servers, config.ratelimit);
 
         // instance handles inserts to Kafka export table and its mirror DB table
-        exportProc = new InsertExport(config.allvalues, client, rowsAdded);
+        exportProc = new InsertExport(config.alltypes, client, rowsAdded);
 
         // get instances to track track export completion using @Statistics
         exportMon = new TableChangeMonitor(client, "StreamedTable", "KAFKAEXPORTTABLE1");
@@ -346,8 +343,8 @@ public class KafkaImportBenchmark {
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
 
-        long mirrorRows = MatchChecks.getMirrorTableRowCount(config.allvalues, client);
-        long importRows = MatchChecks.getImportTableRowCount(config.allvalues, client);
+        long mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
+        long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
 
         log.info("Total rows exported: " + finalInsertCount);

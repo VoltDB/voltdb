@@ -36,10 +36,10 @@ public class InsertExport {
     final static String INSERT_PN = "InsertFinal";
     static String m_export_sp;
 
-    public InsertExport(boolean allvalues, Client client, AtomicLong rowsAdded) {
+    public InsertExport(boolean alltypes, Client client, AtomicLong rowsAdded) {
         m_client = client;
         m_rowsAdded = rowsAdded;
-        m_export_sp = allvalues ? "InsertExport2" : "InsertExport";
+        m_export_sp = alltypes ? "InsertExport2" : "InsertExport";
         log.info("Insert Export SP is: " + m_export_sp);
     }
 
