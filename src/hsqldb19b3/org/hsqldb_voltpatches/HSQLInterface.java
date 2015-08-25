@@ -325,6 +325,9 @@ public class HSQLInterface {
     {
         VoltXMLElement xml = null;
         Statement cs = null;
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug("\nSQL: " + sql + "\n");
+        }
         if (!usingVoltSQLParser()) {
             // clear the expression node id set for determinism
             sessionProxy.resetVoltNodeIds();
@@ -361,17 +364,26 @@ public class HSQLInterface {
             xml = getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
         }
         if (m_logger.isDebugEnabled()) {
-            m_logger.debug("\nSQL: " + sql + "\n");
             if (cs != null) {
-                m_logger.debug("\nHSQLDB: " + cs.describe(sessionProxy) + "\n");
+            	try {
+            		m_logger.debug("\nHSQLDB: " + cs.describe(sessionProxy) + "\n");
+            	} catch (Exception ex) {
+            		System.err.printf("HSQL Describe Exception: %s\n", ex.getMessage());
+            	}
             } else {
-                m_logger.debug("\nHSQLDB: None\n");
+            	m_logger.debug("\nHSQLDB: None\n");
             }
-            if (xml != null) {
-                m_logger.debug("\nVoltDB: " + xml.toString() + "\n");
-            } else {
-                m_logger.debug("\nVoltDB: None\n");
-            }
+        }
+        if (m_logger.isDebugEnabled()) {
+        	try {
+	            if (xml != null) {
+	                m_logger.debug("\nVoltDB: " + xml.toString() + "\n");
+	            } else {
+	                m_logger.debug("\nVoltDB: None\n");
+	            }
+        	} catch (Exception ex) {
+        		System.err.printf("VoltDB xml toString exception: %s\n", ex.getMessage());
+        	}
         }
         assert(xml != null);
 
