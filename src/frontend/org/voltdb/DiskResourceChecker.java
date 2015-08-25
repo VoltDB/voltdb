@@ -19,9 +19,7 @@ package org.voltdb;
 
 import java.io.File;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
@@ -32,6 +30,8 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
+
 /**
  * Disk space monitoring related functionality of resource monitoring.
  */
@@ -40,7 +40,7 @@ public class DiskResourceChecker
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
     static FileCheckForTest s_testFileCheck; // used only for testing
-    private final Map<FeatureNameType, FeatureDiskLimitConfig> m_configuredLimits = new HashMap<>();
+    private ImmutableMap<FeatureNameType, FeatureDiskLimitConfig> m_configuredLimits;
 
     public DiskResourceChecker(SystemSettingsType systemSettings, PathsType pathsConfig)
     {
@@ -49,6 +49,10 @@ public class DiskResourceChecker
 
     public boolean hasLimitsConfigured()
     {
+        if (m_configuredLimits==null) {
+            return false;
+        }
+
         for (FeatureDiskLimitConfig config : m_configuredLimits.values())
         {
             if (config.m_diskSizeLimit > 0 || config.m_diskSizeLimitPerc > 0) {
@@ -61,6 +65,10 @@ public class DiskResourceChecker
 
     public void logConfiguredLimits()
     {
+        if (m_configuredLimits==null) {
+            return;
+        }
+
         for (FeatureDiskLimitConfig config : m_configuredLimits.values())
         {
             if (config.m_diskSizeLimit > 0 || config.m_diskSizeLimitPerc > 0) {
@@ -72,6 +80,10 @@ public class DiskResourceChecker
 
     public boolean isOverLimitConfiguration()
     {
+        if (m_configuredLimits==null) {
+            return false;
+        }
+
         for (FeatureDiskLimitConfig config : m_configuredLimits.values())
         {
             if (config.m_diskSizeLimit <= 0 && config.m_diskSizeLimitPerc <= 0) {
@@ -101,6 +113,7 @@ public class DiskResourceChecker
             return;
         }
 
+        ImmutableMap.Builder<FeatureNameType, FeatureDiskLimitConfig> builder = new ImmutableMap.Builder<>();
         EnumSet<FeatureNameType> configuredFeatures = EnumSet.noneOf(FeatureNameType.class);
         if (features!=null && !features.isEmpty())
         {
@@ -111,7 +124,7 @@ public class DiskResourceChecker
                     continue;
                 }
                 String size = feature.getSize();
-                m_configuredLimits.put(feature.getName(),
+                builder.put(feature.getName(),
                         new FeatureDiskLimitConfig(feature.getName(), pathsConfig, size));
                 if (m_logger.isDebugEnabled()) {
                     m_logger.debug("Added disk usage limit configuration " + size + " for feature " + feature.getName());
@@ -127,13 +140,15 @@ public class DiskResourceChecker
                 if (!isSupportedFeature(featureName)) {
                     continue;
                 }
-                m_configuredLimits.put(featureName,
+                builder.put(featureName,
                         new FeatureDiskLimitConfig(featureName, pathsConfig, defaultSize));
                 if (m_logger.isDebugEnabled()) {
                     m_logger.debug("Added disk usage limit configuration " + defaultSize + " for feature " + featureName);
                 }
             }
         }
+
+        m_configuredLimits = builder.build();
     }
 
     private boolean isSupportedFeature(FeatureNameType featureName)
