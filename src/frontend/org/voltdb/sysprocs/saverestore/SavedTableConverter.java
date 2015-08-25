@@ -23,7 +23,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.voltdb.*;
+import org.voltdb.ParameterConverter;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.utils.CatalogUtil;
@@ -35,15 +38,27 @@ public abstract class SavedTableConverter
     public static Boolean needsConversion(VoltTable inputTable,
                                           Table outputTableSchema,
                                           boolean shouldPreserveDRHiddenColumn) {
-        if (inputTable.getColumnCount() != outputTableSchema.getColumns().size()) {
-            return true;
+        int columnsToMatch;
+        if (shouldPreserveDRHiddenColumn) {
+            // We are expecting the hidden column in inputTable
+            columnsToMatch = inputTable.getColumnCount() - 1;
+            if (columnsToMatch != outputTableSchema.getColumns().size()) {
+                return true;
+            }
+            if (!inputTable.getColumnName(columnsToMatch).equalsIgnoreCase(CatalogUtil.DR_HIDDEN_COLUMN_NAME) ||
+                    inputTable.getColumnType(columnsToMatch) != VoltType.BIGINT) {
+                // Make sure input isn't using the reserved column name of the hidden column
+                // passive DR table to active DR table, must be converted
+                return true;
+            }
         }
-        if (shouldPreserveDRHiddenColumn &&
-            !inputTable.getColumnName(inputTable.getColumnCount() - 1).equalsIgnoreCase(CatalogUtil.DR_HIDDEN_COLUMN_NAME)) {
-            // passive DR table to active DR table, must be converted
-            return true;
+        else {
+            columnsToMatch = inputTable.getColumnCount();
+            if (columnsToMatch != outputTableSchema.getColumns().size()) {
+                return true;
+            }
         }
-        for (int ii = 0; ii < inputTable.getColumnCount(); ii++) {
+        for (int ii = 0; ii < columnsToMatch; ii++) {
             final String name = inputTable.getColumnName(ii);
             final VoltType type = inputTable.getColumnType(ii);
             final Column column = outputTableSchema.getColumns().get(name);
