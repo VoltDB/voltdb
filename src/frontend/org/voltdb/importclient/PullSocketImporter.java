@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,6 +69,7 @@ public class PullSocketImporter extends ImportHandlerProxy implements BundleActi
     private Map<URI,String> m_resources = ImmutableMap.of();
     private volatile Map<URI,ReadFromSocket> m_readers = ImmutableMap.of();
     private ListeningExecutorService m_es;
+    private final Semaphore m_completionGuard = new Semaphore(0);
 
     public PullSocketImporter() {
     }
@@ -120,6 +122,12 @@ public class PullSocketImporter extends ImportHandlerProxy implements BundleActi
     @Override
     public void readyForData() {
         info("importer " + getName() + " is ready for assignments for sockets " + m_resources);
+        try {
+            m_completionGuard.acquire();
+            m_completionGuard.release();
+        } catch (InterruptedException e) {
+            throw loggedException(e, "Interrupted while waiting for %s to complete", getName());
+        }
     }
 
     @Override
@@ -133,6 +141,8 @@ public class PullSocketImporter extends ImportHandlerProxy implements BundleActi
             m_es.awaitTermination(365, TimeUnit.DAYS);
         } catch (InterruptedException ex) {
             throw loggedException(ex, "failed to terminate executor for %s", getName());
+        } finally {
+            m_completionGuard.release();
         }
     }
 
@@ -307,7 +317,7 @@ public class PullSocketImporter extends ImportHandlerProxy implements BundleActi
                     String csv = null;
                     READER: while ((csv=br.readLine()) != null) {
                         while (m_onBackPressure.get()) {
-                            if (sleep(100)) break READER;
+                            if (sleep(10)) break READER;
                         }
                         CSVInvocation invocation = new CSVInvocation(m_procedure, csv);
                         if (!callProcedure(invocation)) {
