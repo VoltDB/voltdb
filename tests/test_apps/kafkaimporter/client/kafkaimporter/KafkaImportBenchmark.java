@@ -209,8 +209,9 @@ public class KafkaImportBenchmark {
             log.info(String.format("Export Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
                     thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
                     stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
-        } catch (Exception e) {
-            log.error("Exception in printStatistics", e);
+        } catch (Exception ex) {
+            log.error("Exception in printStatistics", ex);
+            log.error(ex.getStackTrace());
         }
     }
 
@@ -255,7 +256,6 @@ public class KafkaImportBenchmark {
         long icnt = 0;
         try {
             // print periodic statistics to the console
-//          benchmarkStartTS = System.currentTimeMillis();
             schedulePeriodicStats();
             scheduleCheckTimer();
 
@@ -274,7 +274,7 @@ public class KafkaImportBenchmark {
             //exportMon.waitForStreamedAllocatedMemoryZero();
         } catch (Exception ex) {
             log.error("Exception in Benchmark", ex);
-            ex.printStackTrace();
+            log.error(ex.getStackTrace());
         } finally {
             log.info("Benchmark ended, exported " + icnt + " rows.");
             // cancel periodic stats printing
@@ -298,7 +298,7 @@ public class KafkaImportBenchmark {
                 benchmark.runBenchmark();
             } catch (Exception ex) {
                 log.error("Exception in benchmark", ex);
-                ex.printStackTrace();
+                log.error(ex.getStackTrace());
                 System.exit(-1);
             }
         }
