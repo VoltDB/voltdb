@@ -22,6 +22,7 @@
 #include "common/serializeio.h"
 #include "common/tabletuple.h"
 #include "common/types.h"
+#include "common/ValueFactory.hpp"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
 #include "indexes/tableindex.h"
@@ -30,6 +31,17 @@
 #include<crc/crc32c.h>
 
 namespace voltdb {
+
+const int8_t MAX_CLUSTER_ID = (1 << 8) - 1;
+const int64_t MAX_SEOUENCE_NUMBER = (1L << 55) - 1L;
+
+static uint8_t getClusterIdFromDRId(int64_t drId) {
+    return static_cast<uint8_t>((drId >> 55) & MAX_CLUSTER_ID);
+}
+
+static int64_t getSequenceNumberFromDRId(int64_t drId) {
+    return drId & MAX_SEOUENCE_NUMBER;
+}
 
 class CachedIndexKeyTuple {
 public:
@@ -197,6 +209,22 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             throwFatalException("Unrecognized DR record type %d", type);
             break;
         }
+    }
+}
+
+void BinaryLogSink::exportDRConflict(PersistentTable *drTable, Table *exportTable, const DRRecordType &type, TableTuple &exportTuple) {
+    if (exportTable != NULL && exportTable->isExport()) {
+        TableTuple tempTuple = exportTable->tempTuple();
+        NValue hiddenColumn = exportTuple.getHiddenNValue(drTable->getDRTimestampColumnIndex());
+        int64_t drId = ValuePeeker::peekAsBigInt(hiddenColumn);
+
+        tempTuple.setNValue(0, ValueFactory::getStringValue(drTable->name()));  // Table Name
+        tempTuple.setNValue(1, ValueFactory::getTinyIntValue(getClusterIdFromDRId(drId)));       // Cluster Id
+        tempTuple.setNValue(2, ValueFactory::getBigIntValue(getSequenceNumberFromDRId(drId)));   // Timestamp
+        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(type));            // Type of Operation
+        tempTuple.setNValues(4, exportTuple, 0, exportTuple.sizeInValues());    // rest of columns
+
+        exportTable->insertTuple(tempTuple);
     }
 }
 
