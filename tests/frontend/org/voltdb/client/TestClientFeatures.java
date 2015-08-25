@@ -205,7 +205,8 @@ public class TestClientFeatures extends TestCase {
         boolean exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             assertEquals(ClientResponse.CONNECTION_TIMEOUT, ex.m_response.getStatus());
             exceptionCalled = true;
@@ -216,7 +217,8 @@ public class TestClientFeatures extends TestCase {
         exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -225,7 +227,8 @@ public class TestClientFeatures extends TestCase {
         //no timeout of 0
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, TimeUnit.SECONDS, 2000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 2000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -239,11 +242,11 @@ public class TestClientFeatures extends TestCase {
                 System.out.println("Async Query timeout called..");
                 latch.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
         //Async versions
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback(), "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         try {
             latch.await();
         } catch (InterruptedException ex) {
@@ -260,10 +263,10 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
                 latch2.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback2(), "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback2(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         try {
             latch2.await();
         } catch (InterruptedException ex) {
@@ -280,10 +283,10 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
                 latch3.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback3(), "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback3(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 6000);
         try {
             latch3.await();
         } catch (InterruptedException ex) {
@@ -299,13 +302,13 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.CONNECTION_TIMEOUT);
                 latch4.countDown();
             }
-
         }
 
         /*
          * Check that a super tiny timeout triggers fast
          */
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback4(), "ArbitraryDurationProc", 50, TimeUnit.NANOSECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback4(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 50, TimeUnit.NANOSECONDS, 6000);
         final long start = System.nanoTime();
         try {
             latch4.await();
