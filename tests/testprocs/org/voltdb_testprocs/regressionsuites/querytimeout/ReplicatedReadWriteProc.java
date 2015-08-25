@@ -28,7 +28,7 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 public class ReplicatedReadWriteProc extends VoltProcedure {
-    public final SQLStmt selfJoinSelect = new SQLStmt
+    public final SQLStmt longRunningCrossJoinAgg = new SQLStmt
             ("SELECT t1.contestant_number, t2.state, COUNT(*) "
             + "FROM R1 t1, R1 t2 "
             + "GROUP BY t1.contestant_number, t2.state;");
@@ -37,7 +37,7 @@ public class ReplicatedReadWriteProc extends VoltProcedure {
 
     public VoltTable[] run() {
         // read on replicated table first will make the MPI think it is read only procedure temporarily
-        voltQueueSQL(selfJoinSelect);
+        voltQueueSQL(longRunningCrossJoinAgg);
 
         voltQueueSQL(singleInsert);
         return voltExecuteSQL(true);
