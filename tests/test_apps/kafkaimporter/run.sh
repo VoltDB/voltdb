@@ -144,7 +144,7 @@ function async-benchmark() {
         --displayinterval=5 \
         --ratelimit=2000 \
         --duration=20 \
-        --allvalues=true \
+        --allvalues=false \
         --servers=localhost
 }
 

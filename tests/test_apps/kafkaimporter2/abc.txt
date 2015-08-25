@@ -1,9 +1,0 @@
-VOLTDB_LIB=~/voltdb/lib
-VOLTDB_VOLTDB=~/voltdb/voltdb/
-abc=$({ \
-    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/*.jar | grep -v log4j; \
-    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
-})
-
-echo $abc

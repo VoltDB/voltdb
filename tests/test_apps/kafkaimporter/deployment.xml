@@ -8,9 +8,9 @@
     <import>
         <configuration module="kafkastream.jar" type="custom" enabled="true">
             <property name="brokers">kafka2:9092</property>
-            <property name="topics">A7_KAFKAEXPORTTABLE2</property>
+            <property name="topics">A7_KAFKAEXPORTTABLE1</property>
             <property name="groupid">A7</property>
-            <property name="procedure">InsertImport2</property>
+            <property name="procedure">InsertImport</property>
         </configuration>
     </import>
 
