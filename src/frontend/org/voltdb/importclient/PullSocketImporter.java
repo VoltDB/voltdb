@@ -18,6 +18,7 @@
 package org.voltdb.importclient;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+import static com.google_voltpatches.common.base.Predicates.not;
 
 import java.io.BufferedReader;
 import java.io.Closeable;
@@ -103,14 +104,17 @@ public class PullSocketImporter extends ImportHandlerProxy implements BundleActi
                   );
         }
 
-        m_es = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(
-                2,
+        ThreadPoolExecutor tpe = new ThreadPoolExecutor(
+                2 + m_resources.size(),
                 2 + m_resources.size(),
                 5_000,
                 TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<Runnable>(),
                 getThreadFactory(getName(), getName()+"Reader", ImportHandlerProxy.MEDIUM_STACK_SIZE)
-                ));
+                );
+        tpe.allowCoreThreadTimeOut(true);
+
+        m_es = MoreExecutors.listeningDecorator(tpe);
     }
 
     @Override
@@ -147,7 +151,7 @@ public class PullSocketImporter extends ImportHandlerProxy implements BundleActi
         if (m_done.get()) return;
 
         ImmutableMap.Builder<URI,ReadFromSocket> mbldr = ImmutableMap.builder();
-        mbldr.putAll(Maps.filterKeys(m_readers, uriIn(ment.getRemoved())));
+        mbldr.putAll(Maps.filterKeys(m_readers, not(uriIn(ment.getRemoved()))));
 
         for (URI removed: ment.getRemoved()) {
             ReadFromSocket reader = m_readers.get(removed);
