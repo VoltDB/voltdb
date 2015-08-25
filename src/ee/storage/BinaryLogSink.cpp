@@ -32,11 +32,11 @@
 
 namespace voltdb {
 
-const int8_t MAX_CLUSTER_ID = (1 << 8) - 1;
+const uint8_t MAX_CLUSTER_ID = static_cast<uint8_t>((1 << 8) - 1);
 const int64_t MAX_SEOUENCE_NUMBER = (1L << 55) - 1L;
 
 static uint8_t getClusterIdFromDRId(int64_t drId) {
-    return (uint8_t)((drId >> 55) & MAX_CLUSTER_ID);
+    return static_cast<uint8_t>((drId >> 55) & MAX_CLUSTER_ID);
 }
 
 static int64_t getSequenceNumberFromDRId(int64_t drId) {
