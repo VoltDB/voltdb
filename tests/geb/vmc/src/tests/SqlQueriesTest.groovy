@@ -527,6 +527,10 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      * matches the expected list (for the 'genqa' test app).
      */
     def checkUserStoredProcs() {
+        when: 'click the SQL Query link (if needed)'
+        openSqlQueryPage()
+        then: 'should be on SQL Query page'
+        at SqlQueryPage
         expect: 'List of displayed User Stored Procedures should match expected list'
         printAndCompare('User Stored Procedures', USER_STORED_PROCS_FILE, isRunningGenqa(page),
                 userStoredProcLines, page.getUserStoredProcedures())
