@@ -46,7 +46,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         storedProcs { listsArea.find('#accordionProcedures') }
         systemStoredProcsHeader  { storedProcs.find('.systemHeader').first() }
         defaultStoredProcsHeader { systemStoredProcsHeader.next('.systemHeader') }
-        userStoredProcsHeader    { storedProcs.find('.systemHeader').last() }
+        userStoredProcsHeader    { $('#userDefinedStoredProcs') }
         systemStoredProcs   { storedProcs.find('#systemProcedure').find('h3') }
         defaultStoredProcs  { storedProcs.find('#defaultProcedure').find('h3') }
         userStoredProcs     { storedProcs.find('#userProcedure').find('h3') }
