@@ -231,7 +231,7 @@ public class DiskResourceChecker
                     if (str.charAt(str.length()-1) == '%') {
                         m_diskSizeLimit = 0;
                         m_diskSizeLimitPerc = Integer.parseInt(str.substring(0, str.length()-1));
-                        if (m_diskSizeLimitPerc > 100) {
+                        if (m_diskSizeLimitPerc > 100 || m_diskSizeLimitPerc < 0) {
                             throw new IllegalArgumentException(
                                     "Invalid percentage value " + sizeConfig + " configured for disk limit size for feature " + featureName);
                         }
