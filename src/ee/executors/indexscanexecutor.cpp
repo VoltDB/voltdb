@@ -386,6 +386,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     !(tuple = tableIndex->nextValueAtKey(indexCursor)).isNullTuple()) ||
                     ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
                             !(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()))) {
+        if (tuple.isPendingDelete()) {
+            continue;
+        }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
         pmp.countdownProgress();
         //

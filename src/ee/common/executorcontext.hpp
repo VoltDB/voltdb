@@ -206,6 +206,7 @@ class ExecutorContext {
 
     void cleanupAllExecutors();
 
+    void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
     DRTupleStream* drStream() {
