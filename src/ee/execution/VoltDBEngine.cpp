@@ -1940,19 +1940,10 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
 void VoltDBEngine::reportProgressToTopend() {
-    std::string tableName;
-    int64_t tableSize;
-
+    std::string tableName = "None";
+    int64_t tableSize = 0;
     assert(m_currExecutorVec);
 
-    if (m_lastAccessedTable == NULL) {
-        tableName = "None";
-        tableSize = 0;
-    }
-    else {
-        tableName = m_lastAccessedTable->name();
-        tableSize = m_lastAccessedTable->activeTupleCount();
-    }
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
