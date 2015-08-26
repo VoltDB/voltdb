@@ -240,6 +240,11 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
                                                               m_nextDependencyMID,
                                                               dependencyId));
 
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+
     if (!jbuf) {
         return 0;
     }
@@ -287,6 +292,12 @@ int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
     jlong nextStep = m_jniEnv->CallLongMethod(m_javaExecutionEngine,m_fragmentProgressUpdateMID,
                 batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesProcessed,
                 currMemoryInBytes, peakMemoryInBytes);
+
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+
     return (int64_t)nextStep;
 }
 
@@ -323,6 +334,11 @@ std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine,
                                                               m_planForFragmentIdMID,
                                                               fragmentId));
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+
     // jbuf might be NULL or might have 0 length here.  In that case
     // we'll return a 0-length string to the caller, who will return
     // an appropriate error.
@@ -345,6 +361,11 @@ std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
     jbyteArray jbuf = (jbyteArray)m_jniEnv->CallStaticObjectMethod(m_encoderClass,
                                                                    m_decodeBase64AndDecompressToBytesMID,
                                                                    jBase64Str);
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+
     return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
 }
 
@@ -402,7 +423,13 @@ int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
             m_getQueuedExportBytesMID,
             partitionId,
             signatureString);
+
     m_jniEnv->DeleteLocalRef(signatureString);
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+
     return retval;
 }
 
@@ -433,6 +460,11 @@ void JNITopend::pushExportBuffer(
                 sync ? JNI_TRUE : JNI_FALSE,
                 endOfStream ? JNI_TRUE : JNI_FALSE);
         m_jniEnv->DeleteLocalRef(buffer);
+        if (m_jniEnv->ExceptionCheck()) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+
     } else {
         //std::cout << "Block is null" << std::endl;
         m_jniEnv->CallStaticVoidMethod(
@@ -471,6 +503,10 @@ void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
                 block->lastUniqueId(),
                 buffer);
         m_jniEnv->DeleteLocalRef(buffer);
+        if (m_jniEnv->ExceptionCheck()) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
     }
 }
 }
