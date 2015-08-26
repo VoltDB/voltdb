@@ -63,8 +63,8 @@ public class Semantino implements ISemantino {
         return m_errorSemantino;
     }
 
-	@Override
-	public boolean isErrorSemantino() {
-		return getType().isErrorType();
-	}
+    @Override
+    public boolean isErrorSemantino() {
+        return getType().isErrorType();
+    }
 }

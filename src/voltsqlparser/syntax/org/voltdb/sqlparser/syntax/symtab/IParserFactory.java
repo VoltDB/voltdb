@@ -245,24 +245,24 @@ public interface IParserFactory {
     /**
      * When handling errors, we sometimes need a Semantino to represent
      * a value which is not in evidence.
-     * 
+     *
      * @return
      */
-	ISemantino getErrorSemantino();
-	
-	/**
-	 * Make a unary IAST for a Semantino.
-	 * @param type
-	 * @param aOperator
-	 * @param aOperand
-	 * @return
-	 */
-	IAST makeUnaryAST(IType type, IOperator aOperator, ISemantino aOperand);
-	/**
-	 * Make a Semantino for a query statement.
-	 * 
-	 * @param query
-	 * @return
-	 */
-	ISemantino makeQuerySemantino(ISelectQuery query);
+    ISemantino getErrorSemantino();
+
+    /**
+     * Make a unary IAST for a Semantino.
+     * @param type
+     * @param aOperator
+     * @param aOperand
+     * @return
+     */
+    IAST makeUnaryAST(IType type, IOperator aOperator, ISemantino aOperand);
+    /**
+     * Make a Semantino for a query statement.
+     *
+     * @param query
+     * @return
+     */
+    ISemantino makeQuerySemantino(ISelectQuery query);
 }

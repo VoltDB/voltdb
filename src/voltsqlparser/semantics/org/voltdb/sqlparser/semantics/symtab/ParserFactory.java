@@ -137,11 +137,11 @@ public abstract class ParserFactory implements IParserFactory {
     public IOperator getExpressionOperator(String aText) {
         return m_operatorMap.get(aText);
     }
-    
+
     @Override
     public Semantino[] tuac(ISemantino ileft, ISemantino iright, ISymbolTable aSymbolTable) {
-    	assert aSymbolTable instanceof SymbolTable;
-    	SymbolTable context = (SymbolTable)aSymbolTable;
+        assert aSymbolTable instanceof SymbolTable;
+        SymbolTable context = (SymbolTable)aSymbolTable;
         Semantino left = (Semantino)ileft;
         Semantino right = (Semantino)iright;
         Type leftType = (Type) left.getType();
@@ -153,27 +153,27 @@ public abstract class ParserFactory implements IParserFactory {
             if (convertedType != null) {
                 Semantino lconverted, rconverted;
                 if (convertedType.isEqualType(leftType)) {
-                	lconverted = left;
+                    lconverted = left;
                 } else {
-                	lconverted = new Semantino(convertedType,
-                							   addTypeConversion(left.getAST(),
-                									    		 leftType,
-                									    		 convertedType));
+                    lconverted = new Semantino(convertedType,
+                                               addTypeConversion(left.getAST(),
+                                                                 leftType,
+                                                                 convertedType));
                 }
                 if (convertedType.isEqualType(rightType)) {
-                	rconverted = right;
+                    rconverted = right;
                 } else {
-                	rconverted = new Semantino(convertedType,
-                							   addTypeConversion(right.getAST(),
-                									   			 rightType,
-                									   			 convertedType));
+                    rconverted = new Semantino(convertedType,
+                                               addTypeConversion(right.getAST(),
+                                                                 rightType,
+                                                                 convertedType));
                 }
                 return new Semantino[]{lconverted, rconverted};
             } else {
                 m_errorMessages.addError(-1, -1, "Can't convert type \"%s\" to \"%s\"",
                                          leftType, rightType);
                 return new Semantino[]{(Semantino) getErrorSemantino(),
-                		               (Semantino) getErrorSemantino()};
+                                       (Semantino) getErrorSemantino()};
             }
         }
     }
@@ -204,9 +204,9 @@ public abstract class ParserFactory implements IParserFactory {
     public IExpressionParser makeExpressionParser(ISymbolTable aSymbolTable) {
         return new ExpressionParser(this, aSymbolTable);
     }
-    
+
     @Override
     public ISemantino getErrorSemantino() {
-    	return Semantino.getErrorSemantino();
+        return Semantino.getErrorSemantino();
     }
 }

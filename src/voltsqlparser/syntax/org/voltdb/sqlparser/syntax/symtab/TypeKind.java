@@ -44,7 +44,7 @@ public enum TypeKind {
     VARCHAR    (false, false, false, true,  true,  false, false, false,   false, -1),
     VARBINARY  (false, false, false, true,  false, false, false, false,   false, -1),
     DECIMAL    (false, false, false, false, false, true,  false, false,   false,  8),
-    TIMESTAMP  (false, false, false, false, false, false, true,  false,   false,  8); 
+    TIMESTAMP  (false, false, false, false, false, false, true,  false,   false,  8);
     private boolean m_isBoolean;
     private boolean m_isInteger;
     private boolean m_isString;
@@ -112,11 +112,11 @@ public enum TypeKind {
         return getSizeInBytes() == 0;
     }
 
-	public final boolean isVoid() {
-		return m_isVoid;
-	}
+    public final boolean isVoid() {
+        return m_isVoid;
+    }
 
-	public final boolean isUnicode() {
-		return m_isUnicode;
-	}
+    public final boolean isUnicode() {
+        return m_isUnicode;
+    }
 }

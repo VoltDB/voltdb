@@ -90,74 +90,74 @@ public class VoltXMLElementTestFromSQL {
         elem.processAll();
         int errstat = 0;
         if (elem.getErrors() > 0) {
-        	System.err.printf("%d errors\n", elem.getErrors());
-        	errstat = 100;
+            System.err.printf("%d errors\n", elem.getErrors());
+            errstat = 100;
         }
         System.exit(errstat);
     }
 
-	private final int getErrors() {
-		return m_errors;
-	}
-
-	private void VoltXMLElementTest() {
-    	JAXBContext jc;
-		try {
-			jc = JAXBContext.newInstance( "org.voltdb.sqlparser.tools.model" );
-	    	Unmarshaller u = jc.createUnmarshaller();
-	    	Object o = u.unmarshal(new File(m_xmlFile));
-	    	assert(o instanceof VoltXMLElementTestSuite);
-	    	processTestSuite((VoltXMLElementTestSuite)o);
-		} catch (JAXBException e) {
-			System.err.printf("JAXB error: %s", e.getMessage());
-			e.printStackTrace();
-			m_errors += 1;
-		}
+    private final int getErrors() {
+        return m_errors;
     }
-	
+
+    private void VoltXMLElementTest() {
+        JAXBContext jc;
+        try {
+            jc = JAXBContext.newInstance( "org.voltdb.sqlparser.tools.model" );
+            Unmarshaller u = jc.createUnmarshaller();
+            Object o = u.unmarshal(new File(m_xmlFile));
+            assert(o instanceof VoltXMLElementTestSuite);
+            processTestSuite((VoltXMLElementTestSuite)o);
+        } catch (JAXBException e) {
+            System.err.printf("JAXB error: %s", e.getMessage());
+            e.printStackTrace();
+            m_errors += 1;
+        }
+    }
+
     private void processTestSuite(VoltXMLElementTestSuite aSuite) {
-    	for (Test t : aSuite.getTests().getTest()) {
-    		initializeState();
-    		processOneTest(t);
-    	}
-	}
+        for (Test t : aSuite.getTests().getTest()) {
+            initializeState();
+            processOneTest(t);
+        }
+    }
 
-	private void initializeState() {
-		m_sqlSourceFolder = null;
-		m_className = null;
-		m_fullyQualifiedClassName = null;
-		m_outputStream = null;
-		m_packageName = null;
-		m_testTypes.clear();
-		m_testNames.clear();
-		m_sqlStrings.clear();
-		m_testComments.clear();
-		m_ddl.clear();
-	}
+    private void initializeState() {
+        m_sqlSourceFolder = null;
+        m_className = null;
+        m_fullyQualifiedClassName = null;
+        m_outputStream = null;
+        m_packageName = null;
+        m_testTypes.clear();
+        m_testNames.clear();
+        m_sqlStrings.clear();
+        m_testComments.clear();
+        m_ddl.clear();
+    }
 
-	private void processOneTest(Test t) {
-		m_sqlSourceFolder = t.getSourcefolder();
-		m_fullyQualifiedClassName = t.getClassname();
-		m_ddl.addAll(t.getSchema().getDdl());
-		for (Testpoint tp : t.getTestpoint()) {
-			m_testComments.add(tp.getComment());
-			m_testNames.add(tp.getTestName());
-			m_sqlStrings.add(tp.getTestSQL());
-			String testKind = tp.getTestKind();
-			if ("DQL".equals(tp.getTestKind().toUpperCase())) {
-				m_testTypes.add(SQLKind.DQL);
-			} else if ("DDL".equals(tp.getTestKind().toUpperCase())) {
-				m_testTypes.add(SQLKind.DDL);
-			} else if ("DML".equals(tp.getTestKind().toUpperCase())) {
-				m_testTypes.add(SQLKind.DML);
-			} else {
-				throw new IllegalArgumentException(String.format("Unknown test type: %s", tp.getTestKind().toUpperCase()));
-			}
-		}
-		process();
-	}
+    private void processOneTest(Test t) {
+        m_sqlSourceFolder = t.getSourcefolder();
+        m_fullyQualifiedClassName = t.getClassname();
+        m_ddl.addAll(t.getSchema().getDdl());
+        for (Testpoint tp : t.getTestpoint()) {
+            m_testComments.add(tp.getComment());
+            m_testNames.add(tp.getTestName());
+            m_sqlStrings.add(tp.getTestSQL());
+            String testKind = tp.getTestKind();
+            if ("DQL".equals(tp.getTestKind().toUpperCase())) {
+                m_testTypes.add(SQLKind.DQL);
+            } else if ("DDL".equals(tp.getTestKind().toUpperCase())) {
+                m_testTypes.add(SQLKind.DDL);
+            } else if ("DML".equals(tp.getTestKind().toUpperCase())) {
+                m_testTypes.add(SQLKind.DML);
+            } else {
+                throw new IllegalArgumentException(String.format("Unknown test type: %s", tp.getTestKind().toUpperCase()));
+            }
+        }
+        process();
+    }
 
-	public VoltXMLElementTestFromSQL(String[] args) throws JAXBException {
+    public VoltXMLElementTestFromSQL(String[] args) throws JAXBException {
         int idx;
         String sqlComment;
         /*
@@ -183,7 +183,7 @@ public class VoltXMLElementTestFromSQL {
             } else if ("--comment".equals(args[idx])) {
                 sqlComment = args[++idx];
             } else if ("--xml-file".equals(args[idx])) {
-            	m_xmlFile = args[++idx];
+                m_xmlFile = args[++idx];
             } else {
                 System.err.printf("Unknown comand line parameter \"%s\"\n", args[idx]);
                 usage(args[0]);
@@ -226,16 +226,16 @@ public class VoltXMLElementTestFromSQL {
     }
 
     private void processAll() {
-    	if (m_fullyQualifiedClassName != null) {
-    		process();
-    	}
-    	if (m_xmlFile != null) {
-    		VoltXMLElementTest();
-    	}
-	}
+        if (m_fullyQualifiedClassName != null) {
+            process();
+        }
+        if (m_xmlFile != null) {
+            VoltXMLElementTest();
+        }
+    }
 
 
-    
+
     private void process() {
         if (m_fullyQualifiedClassName == null) {
             System.err.printf("No class name specified\n");
@@ -266,10 +266,10 @@ public class VoltXMLElementTestFromSQL {
         VoltXMLElement elem = null;
         writePrefix();
         for (int testIdx = 0; testIdx < m_sqlStrings.size(); testIdx += 1) {
-        	// Each test point gets a new set of test ids.  They
-        	// are just for debugging test failures, so having them
-        	// be unique in the entire suite is not helpful.
-        	resetTestId();
+            // Each test point gets a new set of test ids.  They
+            // are just for debugging test failures, so having them
+            // be unique in the entire suite is not helpful.
+            resetTestId();
             String sql = m_sqlStrings.get(testIdx);
             String testName = m_testNames.get(testIdx);
             SQLKind testKind = m_testTypes.get(testIdx);
@@ -438,7 +438,7 @@ public class VoltXMLElementTestFromSQL {
 
     }
 
-	private void writeDMLTestBody(String aSQL, String aTestName, VoltXMLElement aElem, String comment) {
+    private void writeDMLTestBody(String aSQL, String aTestName, VoltXMLElement aElem, String comment) {
         writeSQLTestBody(aSQL, aTestName, aElem, SQLKind.DML, comment);
     }
 
@@ -529,15 +529,15 @@ public class VoltXMLElementTestFromSQL {
             if (contextMatch(aContext, "databaseschema.table.columns.column")) {
                 attributes.add("name");
             } else if (contextMatch(aContext, "databaseschema.table.indexes.index")
-            		     || contextMatch(aContext, "databaseschema.table.constraints.constraint")) {
-            	// Some constraints are auto generated.  We want to ignore these.
-            	// But some constraints are user generated.  We want to include
-            	// these.
+                         || contextMatch(aContext, "databaseschema.table.constraints.constraint")) {
+                // Some constraints are auto generated.  We want to ignore these.
+                // But some constraints are user generated.  We want to include
+                // these.
                 String childName = child.attributes.get("name");
                 if (isAutoGeneratedName(childName)) {
-                	skipit = true;
+                    skipit = true;
                 } else {
-                	attributes.add("name");
+                    attributes.add("name");
                 }
             } else if (contextMatch(aContext, "columnref")) {
                 attributes.add("alias");
@@ -545,42 +545,42 @@ public class VoltXMLElementTestFromSQL {
                 attributes.add("table");
                 attributes.add("tablealias");
             } else if (contextMatch(aContext, "operation")) {
-            	attributes.add("optype");
+                attributes.add("optype");
             }
             if (skipit == false) {
                 aSb.append(aEOL);
                 aEOL = ",";
-	            indentStr(aSb, aIndent, true, false)
-	              .append(String.format("withChildNamed(%d, \"%s\"", getTestId(), child.name));
-	            if (attributes.size() > 0) {
-	            	for (String attribute : attributes) {
-	                    String value = child.attributes.get(attribute);
-	                    if (value != null) {
-		                    aSb.append(",");
-		                    indentStr(aSb, aIndent + 15, true, false)
-		                      .append(String.format("\"%s\", \"%s\"",
-		                    		  				attribute,
-		                    		  				value));
-	                    }
-	            	}
-	            }
-	            describeVoltXML(child, aContext, aSb, aIndent + 4, ",");
-	            //
-	            // We don't need the child name in the context anymore.
-	            //
-	            aSb.append(")");
+                indentStr(aSb, aIndent, true, false)
+                  .append(String.format("withChildNamed(%d, \"%s\"", getTestId(), child.name));
+                if (attributes.size() > 0) {
+                    for (String attribute : attributes) {
+                        String value = child.attributes.get(attribute);
+                        if (value != null) {
+                            aSb.append(",");
+                            indentStr(aSb, aIndent + 15, true, false)
+                              .append(String.format("\"%s\", \"%s\"",
+                                                    attribute,
+                                                    value));
+                        }
+                    }
+                }
+                describeVoltXML(child, aContext, aSb, aIndent + 4, ",");
+                //
+                // We don't need the child name in the context anymore.
+                //
+                aSb.append(")");
             }
             aContext.remove(aContext.size()-1);
         }
     }
 
     private boolean isAutoGeneratedName(String childName) {
-    	return (childName == null
-    			|| childName.startsWith("VOLTDB_AUTOGEN")
-    			|| childName.startsWith("SYS_CT"));
-	}
+        return (childName == null
+                || childName.startsWith("VOLTDB_AUTOGEN")
+                || childName.startsWith("SYS_CT"));
+    }
 
-	/**
+    /**
      * Return true iff the aMatch string describes the current
      * context.
      *
@@ -634,12 +634,12 @@ public class VoltXMLElementTestFromSQL {
     }
 
     private static int testIdCount = 1;
-    
+
     private static int getTestId() {
-		return testIdCount++;
-	}
-    
+        return testIdCount++;
+    }
+
     public static void resetTestId() {
-    	testIdCount = 1;
+        testIdCount = 1;
     }
 }

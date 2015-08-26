@@ -60,11 +60,11 @@ public class SymbolTable implements ISymbolTable {
     private static BooleanType m_booleanType;
     private static VoidType    m_voidType;
     public static VoidType getVoidType() {
-		if (m_voidType == null) {
-			m_voidType = new VoidType("$void", TypeKind.VOID);
-		}
-		return m_voidType;
-	}
+        if (m_voidType == null) {
+            m_voidType = new VoidType("$void", TypeKind.VOID);
+        }
+        return m_voidType;
+    }
 
     public static final ErrorType getErrorType() {
         if (m_errorType == null) {
@@ -241,65 +241,65 @@ public class SymbolTable implements ISymbolTable {
     }
 
     private static String m_conversions[][] = {
-	/*                 VOID      ERROR     BOOLEAN     TINYINT     SMALLINT     INTEGER     BIGINT     FLOAT     VARCHR     VARBINARY     DECIMAL     TIMESTAMP */
-	/* VOID      */   {"$VOID",  null,     null,       null,       null,        null,       null,      null,     null,      null,         null,       null},
-	/* ERROR     */   {null,     "$ERROR", null,       null,       null,        null,       null,      null,     null,      null,         null,       null},   
-	/* BOOLEAN   */   {null,     null,     "$BOOLEAN", null,       null,        null,       null,      null,     null,      null,         null,       null},   
-	/* TINYINT   */   {null,     null,     null,       "TINYINT",  "SMALLINT",  "INTEGER",  "BIGINT",  "FLOAT",  null,      null,         "DECIMAL",  null},   
-	/* SMALLINT  */   {null,     null,     null,       "SMALLINT", "SMALLINT",  "INTEGER",  "BIGINT",  "FLOAT",  null,      null,         "DECIMAL",  null},   
-	/* INTEGER   */   {null,     null,     null,       "INTEGER",  "INTEGER",   "INTEGER",  "BIGINT",  "FLOAT",  null,      null,         "DECIMAL",  null},   
-	/* BIGINT    */   {null,     null,     null,       "BIGINT",   "BIGINT",    "BIGINT",   "BIGINT",  null,     null,      null,         null     ,  null},   
-	/* FLOAT     */   {null,     null,     null,       "FLOAT",    "FLOAT",     "FLOAT",    null,      "FLOAT",  null,      null,         null,       null},   
-	/* VARCHAR   */   {null,     null,     null,       null,       null,        null,       null,      null,     "VARCHAR", null,         null,       null},   
-	/* VARBINARY */   {null,     null,     null,       null,       null,        null,       null,      null,     null,      "VARBINARY",  null,       null},   
-	/* DECIMAL   */   {null,     null,     null,       "DECIMAL",  "DECIMAL",   "DECIMAL",  null,      null,     null,      null,         "DECIMAL",  null},   
-	/* TIMESTAMP */   {null,     null,     null,       null,       null,        null,       null,      null,     null,      null,         null,       "TIMESTAMP"},   
+    /*                 VOID      ERROR     BOOLEAN     TINYINT     SMALLINT     INTEGER     BIGINT     FLOAT     VARCHR     VARBINARY     DECIMAL     TIMESTAMP */
+    /* VOID      */   {"$VOID",  null,     null,       null,       null,        null,       null,      null,     null,      null,         null,       null},
+    /* ERROR     */   {null,     "$ERROR", null,       null,       null,        null,       null,      null,     null,      null,         null,       null},
+    /* BOOLEAN   */   {null,     null,     "$BOOLEAN", null,       null,        null,       null,      null,     null,      null,         null,       null},
+    /* TINYINT   */   {null,     null,     null,       "TINYINT",  "SMALLINT",  "INTEGER",  "BIGINT",  "FLOAT",  null,      null,         "DECIMAL",  null},
+    /* SMALLINT  */   {null,     null,     null,       "SMALLINT", "SMALLINT",  "INTEGER",  "BIGINT",  "FLOAT",  null,      null,         "DECIMAL",  null},
+    /* INTEGER   */   {null,     null,     null,       "INTEGER",  "INTEGER",   "INTEGER",  "BIGINT",  "FLOAT",  null,      null,         "DECIMAL",  null},
+    /* BIGINT    */   {null,     null,     null,       "BIGINT",   "BIGINT",    "BIGINT",   "BIGINT",  null,     null,      null,         null     ,  null},
+    /* FLOAT     */   {null,     null,     null,       "FLOAT",    "FLOAT",     "FLOAT",    null,      "FLOAT",  null,      null,         null,       null},
+    /* VARCHAR   */   {null,     null,     null,       null,       null,        null,       null,      null,     "VARCHAR", null,         null,       null},
+    /* VARBINARY */   {null,     null,     null,       null,       null,        null,       null,      null,     null,      "VARBINARY",  null,       null},
+    /* DECIMAL   */   {null,     null,     null,       "DECIMAL",  "DECIMAL",   "DECIMAL",  null,      null,     null,      null,         "DECIMAL",  null},
+    /* TIMESTAMP */   {null,     null,     null,       null,       null,        null,       null,      null,     null,      null,         null,       "TIMESTAMP"},
     };
     /**
      * This calculates type conversions.
-     * 
+     *
      * @param leftType
      * @param rightType
      * @return
      */
-	public Type hasSuperType(Type aLeftType, Type aRightType) {
-		TypeKind leftKind = aLeftType.getTypeKind();
-		TypeKind rightKind = aRightType.getTypeKind();
-		// If one is a string.
-		if (leftKind.isString() || rightKind.isString()) {
-			// If both are a string.
-			if (leftKind.isString() && rightKind.isString()) {
-				// If both are varchar or both are varbinary
-				if (leftKind.isUnicode() == rightKind.isUnicode()) {
-					// Return the one with the largest maxsize.
-					assert(aLeftType instanceof StringType);
-					assert(aRightType instanceof StringType);
-					if (((StringType)aLeftType).getMaxSize() <= ((StringType)aRightType).getMaxSize()) {
-						return aRightType;
-					} else {
-						return aLeftType;
-					}
-				} else {
-					// One is varchar and one is varbinary.
-					return null;
-				}
-			} else {
-				// One is string but not both.
-				return null;
-			}
-		} else if (leftKind.isTimeStamp() || rightKind.isTimeStamp()) {
-			if (leftKind.isTimeStamp() && rightKind.isTimeStamp()) {
-				// Both are timestamp.
-				return aLeftType;
-			} else {
-				// One is timestamp and one is not.
-				return null;
-			}
-		}
-		String conversionName = m_conversions[leftKind.ordinal()][leftKind.ordinal()];
-		if (conversionName == null) {
-			return null;
-		}
-		return getType(conversionName);
-	}
+    public Type hasSuperType(Type aLeftType, Type aRightType) {
+        TypeKind leftKind = aLeftType.getTypeKind();
+        TypeKind rightKind = aRightType.getTypeKind();
+        // If one is a string.
+        if (leftKind.isString() || rightKind.isString()) {
+            // If both are a string.
+            if (leftKind.isString() && rightKind.isString()) {
+                // If both are varchar or both are varbinary
+                if (leftKind.isUnicode() == rightKind.isUnicode()) {
+                    // Return the one with the largest maxsize.
+                    assert(aLeftType instanceof StringType);
+                    assert(aRightType instanceof StringType);
+                    if (((StringType)aLeftType).getMaxSize() <= ((StringType)aRightType).getMaxSize()) {
+                        return aRightType;
+                    } else {
+                        return aLeftType;
+                    }
+                } else {
+                    // One is varchar and one is varbinary.
+                    return null;
+                }
+            } else {
+                // One is string but not both.
+                return null;
+            }
+        } else if (leftKind.isTimeStamp() || rightKind.isTimeStamp()) {
+            if (leftKind.isTimeStamp() && rightKind.isTimeStamp()) {
+                // Both are timestamp.
+                return aLeftType;
+            } else {
+                // One is timestamp and one is not.
+                return null;
+            }
+        }
+        String conversionName = m_conversions[leftKind.ordinal()][leftKind.ordinal()];
+        if (conversionName == null) {
+            return null;
+        }
+        return getType(conversionName);
+    }
 }

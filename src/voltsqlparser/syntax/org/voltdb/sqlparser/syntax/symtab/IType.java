@@ -28,8 +28,8 @@ public interface IType extends ITop {
 
     TypeKind getTypeKind();
 
-	boolean isErrorType();
+    boolean isErrorType();
 
-	boolean isVoidType();
+    boolean isVoidType();
 
 }

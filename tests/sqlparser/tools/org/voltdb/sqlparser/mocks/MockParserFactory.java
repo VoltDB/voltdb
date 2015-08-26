@@ -127,15 +127,15 @@ public class MockParserFactory extends ParserFactory implements
     public void processWhereExpression(Semantino aWhereExpression) {
             unimplementedOperation("processWhereExpression");
     }
-	@Override
-	public IAST makeUnaryAST(IType type, IOperator aOperator,
-			ISemantino aOperand) {
-		unimplementedOperation("makeUnaryAST");
-		return null;
-	}
-	@Override
-	public ISemantino makeQuerySemantino(ISelectQuery query) {
-		unimplementedOperation("makeQueryAST");
-		return null;
-	}
+    @Override
+    public IAST makeUnaryAST(IType type, IOperator aOperator,
+            ISemantino aOperand) {
+        unimplementedOperation("makeUnaryAST");
+        return null;
+    }
+    @Override
+    public ISemantino makeQuerySemantino(ISelectQuery query) {
+        unimplementedOperation("makeQueryAST");
+        return null;
+    }
 }

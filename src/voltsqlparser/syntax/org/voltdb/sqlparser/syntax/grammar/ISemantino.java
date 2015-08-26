@@ -43,22 +43,22 @@ import org.voltdb.sqlparser.syntax.symtab.IType;
  * @author bwhite
  */
 public interface ISemantino {
-	/**
-	 * Fetch the type of a Semantino.
-	 * @return
-	 */
-	public IType getType();
+    /**
+     * Fetch the type of a Semantino.
+     * @return
+     */
+    public IType getType();
 
-	/**
-	 * Fetch the Abstract Syntax Tree of a Semantino.
-	 * @return
-	 */
-	public IAST getAST();
-        
-	/**
-	 * Test if a Semantino is the error Semantino.
-	 * 
-	 * @return true only for the (unique) Semantino.
-	 */
-	public boolean isErrorSemantino();
+    /**
+     * Fetch the Abstract Syntax Tree of a Semantino.
+     * @return
+     */
+    public IAST getAST();
+
+    /**
+     * Test if a Semantino is the error Semantino.
+     *
+     * @return true only for the (unique) Semantino.
+     */
+    public boolean isErrorSemantino();
 }

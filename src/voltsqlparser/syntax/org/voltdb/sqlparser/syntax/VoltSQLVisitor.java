@@ -1,3 +1,19 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2015 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.voltdb.sqlparser.syntax;
 
 import java.util.ArrayList;
@@ -97,7 +113,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         m_isNullable         = true;
         m_isNull             = false;
         /*
-         * Walk the subtree. 
+         * Walk the subtree.
          */
         String colName = ctx.column_name().IDENTIFIER().getText();
         String type = ctx.type_expression().type_name().IDENTIFIER().getText();
@@ -157,23 +173,23 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         column.setIsNullable(m_isNullable);
         column.setIsNull(m_isNull);
         m_currentlyCreatedTable.addColumn(colName, column);
-    	return null;
+        return null;
     }
 
     /**
      * {@inheritDoc}
      */
     @Override public Void visitNullableColumnAttribute(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.NullableColumnAttributeContext ctx) {
-    	super.visitNullableColumnAttribute(ctx);
+        super.visitNullableColumnAttribute(ctx);
         m_isNullable = (ctx.NOT() == null);
-    	return null;
+        return null;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     @Override public Void visitDefaultValueColumnAttribute(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.DefaultValueColumnAttributeContext ctx) {
-    	super.visitDefaultValueColumnAttribute(ctx);
+        super.visitDefaultValueColumnAttribute(ctx);
         m_hasDefaultValue = true;
         m_defaultValue = ctx.literal_value().getText();
         return null;
@@ -183,7 +199,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * {@inheritDoc}
      */
     @Override public Void visitPrimaryKeyColumnAttribute(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.PrimaryKeyColumnAttributeContext ctx) {
-    	super.visitPrimaryKeyColumnAttribute(ctx);
+        super.visitPrimaryKeyColumnAttribute(ctx);
         m_isPrimaryKey = true;
         return null;
     };
@@ -192,7 +208,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * {@inheritDoc}
      */
     @Override public Void visitUniqueColumnAttribute(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.UniqueColumnAttributeContext ctx) {
-    	super.visitUniqueColumnAttribute(ctx);
+        super.visitUniqueColumnAttribute(ctx);
         m_isUniqueConstraint = true;
         return null;
     };
@@ -225,7 +241,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         visitTable_clause(ctx.table_clause());
         visitProjection_clause(ctx.projection_clause());
         if (ctx.where_clause() != null) {
-        	visitWhere_clause(ctx.where_clause());
+            visitWhere_clause(ctx.where_clause());
         }
         if (getTopSelectQuery().validate()) {
             m_factory.processQuery(getTopSelectQuery());
@@ -236,15 +252,15 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         return null;
     }
 
-	/**
+    /**
      * {@inheritDoc}
      */
     @Override public Void visitProjection(SQLParserParser.ProjectionContext ctx) {
-    	/*
-    	 * Walk the subtree.
-    	 */
-    	super.visitProjection(ctx);
-    	
+        /*
+         * Walk the subtree.
+         */
+        super.visitProjection(ctx);
+
         if (ctx.STAR() != null) {
             getTopSelectQuery().addProjection(ctx.STAR().getSymbol().getLine(),
                                               ctx.STAR().getSymbol().getCharPositionInLine());
@@ -271,11 +287,11 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      *
      */
     @Override public Void visitTable_clause(SQLParserParser.Table_clauseContext ctx) {
-    	/*
-    	 * Walk the subtree.
-    	 */
-    	super.visitTable_clause(ctx);
-    	
+        /*
+         * Walk the subtree.
+         */
+        super.visitTable_clause(ctx);
+
         for (SQLParserParser.Table_refContext tr : ctx.table_ref()) {
             String tableName = tr.table_name().get(0).IDENTIFIER().getText();
             String alias = tableName;
@@ -308,7 +324,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
          * Walk the subtree.
          */
         super.visitWhere_clause(ctx);
-        
+
         assert(m_expressionStack.size() > 0);
         expr = popExpressionStack();
         assert(expr == getTopSelectQuery().getExpressionParser());
@@ -325,7 +341,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         return null;
     }
 
-	private void binOp(String opString, int lineno, int colno) {
+    private void binOp(String opString, int lineno, int colno) {
         IOperator op = m_factory.getExpressionOperator(opString);
         if (op == null) {
             addError(lineno, colno,
@@ -333,7 +349,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
                      opString);
             return;
         }
-        
+
         //
         // Now, given the kind of operation, calculate the output.
         //
@@ -376,7 +392,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
                      aOpString);
             return;
         }
-        
+
         //
         // Now, given the kind of operation, calculate the output.
         //
@@ -392,7 +408,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
             answer = m_factory.getErrorSemantino();
         }
         getTopExpressionParser().pushSemantino(answer);
-	}
+    }
 
     /**
      * {@inheritDoc}
@@ -400,11 +416,11 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * <p>Combine two Semantinos with a product op.</p>
      */
     @Override public Void visitTimes_expr(SQLParserParser.Times_exprContext ctx) {
-    	/*
-    	 * Walk the subtree.
-    	 */
-    	super.visitTimes_expr(ctx);
-    	
+        /*
+         * Walk the subtree.
+         */
+        super.visitTimes_expr(ctx);
+
         binOp(ctx.op.start.getText(),
               ctx.op.start.getLine(),
               ctx.op.start.getCharPositionInLine());
@@ -416,10 +432,10 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * <p>Combine two Semantinos with an add op.</p>
      */
     @Override public Void visitAdd_expr(SQLParserParser.Add_exprContext ctx) {
-    	/*
-    	 * Walk the subtree.
-    	 */
-    	super.visitAdd_expr(ctx);
+        /*
+         * Walk the subtree.
+         */
+        super.visitAdd_expr(ctx);
         binOp(ctx.op.start.getText(),
               ctx.op.start.getLine(),
               ctx.op.start.getCharPositionInLine());
@@ -431,41 +447,41 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * <p>Combine two Semantinos with a relational op.</p>
      */
     @Override public Void visitRel_expr(SQLParserParser.Rel_exprContext ctx) {
-    	/*
-    	 * Walk the subtree.
-    	 */
-    	super.visitRel_expr(ctx);
-    	
+        /*
+         * Walk the subtree.
+         */
+        super.visitRel_expr(ctx);
+
         binOp(ctx.op.start.getText(),
               ctx.op.start.getLine(),
               ctx.op.start.getCharPositionInLine());
         return null;
     }
-	/**
-	 * {@inheritDoc}
-	 *
-	 */
-	@Override public Void visitDisjunction_expr(SQLParserParser.Disjunction_exprContext ctx) {
-    	/*
-    	 * Walk the subtree
-    	 */
-    	super.visitDisjunction_expr(ctx);
-    	
+    /**
+     * {@inheritDoc}
+     *
+     */
+    @Override public Void visitDisjunction_expr(SQLParserParser.Disjunction_exprContext ctx) {
+        /*
+         * Walk the subtree
+         */
+        super.visitDisjunction_expr(ctx);
+
         binOp(ctx.OR().getSymbol().getText(),
               ctx.OR().getSymbol().getLine(),
               ctx.OR().getSymbol().getCharPositionInLine());
         return null;
     }
-	/**
-	 * {@inheritDoc}
-	 *
-	 */
-	@Override public Void visitConjunction_expr(SQLParserParser.Conjunction_exprContext ctx) {
-    	/*
-    	 * Walk the subtree
-    	 */
-    	super.visitConjunction_expr(ctx);
-    	
+    /**
+     * {@inheritDoc}
+     *
+     */
+    @Override public Void visitConjunction_expr(SQLParserParser.Conjunction_exprContext ctx) {
+        /*
+         * Walk the subtree
+         */
+        super.visitConjunction_expr(ctx);
+
         binOp(ctx.AND().getSymbol().getText(),
               ctx.AND().getSymbol().getLine(),
               ctx.AND().getSymbol().getCharPositionInLine());
@@ -475,23 +491,23 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * {@inheritDoc}
      */
     @Override public Void visitNot_expr(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Not_exprContext ctx) {
-    	/*
-    	 * Walk the subtree.
-    	 */
-    	super.visitNot_expr(ctx);
-    	unaryOp(ctx.NOT().getText(),
-    			ctx.NOT().getSymbol().getLine(),
-    			ctx.NOT().getSymbol().getCharPositionInLine());
-    	return null;
+        /*
+         * Walk the subtree.
+         */
+        super.visitNot_expr(ctx);
+        unaryOp(ctx.NOT().getText(),
+                ctx.NOT().getSymbol().getLine(),
+                ctx.NOT().getSymbol().getCharPositionInLine());
+        return null;
     };
 
-	/**
+    /**
      * {@inheritDoc}
      *
      * <p>Push a true semantino</p>
      */
     @Override public Void visitTrue_expr(SQLParserParser.True_exprContext ctx) {
-    	super.visitTrue_expr(ctx);
+        super.visitTrue_expr(ctx);
         IType boolType = m_factory.getBooleanType();
         getTopExpressionParser().pushSemantino(getTopExpressionParser().getConstantSemantino(Boolean.valueOf(true), boolType));
         return null;
@@ -503,7 +519,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * <p>Push a False Semantino.</p>
      */
     @Override public Void visitFalse_expr(SQLParserParser.False_exprContext ctx) {
-    	super.visitFalse_expr(ctx);
+        super.visitFalse_expr(ctx);
         IType boolType = m_factory.getBooleanType();
         getTopSelectQuery().pushSemantino(getTopExpressionParser().getConstantSemantino(Boolean.valueOf(false), boolType));
         return null;
@@ -513,11 +529,11 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * {@inheritDoc}
      */
     @Override public Void visitColref_expr(SQLParserParser.Colref_exprContext ctx) {
-    	/*
-    	 * Walk the subtree.
-    	 */
-    	super.visitColref_expr(ctx);
-    	
+        /*
+         * Walk the subtree.
+         */
+        super.visitColref_expr(ctx);
+
         SQLParserParser.Column_refContext crctx = ctx.column_ref();
         String tableName = (crctx.table_name() != null) ? crctx.table_name().IDENTIFIER().getText() : null;
         String columnName = crctx.column_name().IDENTIFIER().getText();
@@ -529,7 +545,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * {@inheritDoc}
      */
     @Override public Void visitNumeric_expr(SQLParserParser.Numeric_exprContext ctx) {
-    	super.visitNumeric_expr(ctx);
+        super.visitNumeric_expr(ctx);
         IType intType = m_symbolTable.getType("integer");
         getTopExpressionParser().pushSemantino(getTopExpressionParser().getConstantSemantino(Integer.valueOf(ctx.NUMBER().getText()),
                                                                      intType));
@@ -540,11 +556,11 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
      * {@inheritDoc}
      */
     @Override public Void visitInsert_statement(SQLParserParser.Insert_statementContext ctx) {
-    	/*
-    	 * Walk the subtree.
-    	 */
-    	super.visitInsert_statement(ctx);
-    	
+        /*
+         * Walk the subtree.
+         */
+        super.visitInsert_statement(ctx);
+
         String tableName = ctx.table_name().IDENTIFIER().getText();
         ITable table = m_catalog.getTableByName(tableName);
         if (table == null) {
@@ -643,28 +659,28 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         return m_expressionStack.get(m_expressionStack.size() - 1);
     }
     private void pushExpressionStack(IExpressionParser aParser) {
-    	m_expressionStack.add(aParser);
+        m_expressionStack.add(aParser);
     }
     private IExpressionParser popExpressionStack() {
-    	assert(m_expressionStack.size() > 0);
-    	return m_expressionStack.remove(m_expressionStack.size() - 1);
-	}
+        assert(m_expressionStack.size() > 0);
+        return m_expressionStack.remove(m_expressionStack.size() - 1);
+    }
 
     private ISelectQuery getTopSelectQuery() {
-    	assert(m_selectQueryStack.size() > 0);
-    	return m_selectQueryStack.get(m_selectQueryStack.size() - 1);
-	}
+        assert(m_selectQueryStack.size() > 0);
+        return m_selectQueryStack.get(m_selectQueryStack.size() - 1);
+    }
     private void pushSelectQuery(ISelectQuery aQuery) {
-    	m_selectQueryStack.add(aQuery);
+        m_selectQueryStack.add(aQuery);
     }
     private ISelectQuery popSelectQueryStack() {
-    	assert(m_selectQueryStack.size() > 0);
-    	return m_selectQueryStack.remove(m_selectQueryStack.size() - 1);
+        assert(m_selectQueryStack.size() > 0);
+        return m_selectQueryStack.remove(m_selectQueryStack.size() - 1);
     }
 
     protected ISemantino getResultSemantino() {
-    	assert (m_selectQueryStack.size() == 0);
-    	assert (m_expressionStack.size() == 1);
-    	return (m_expressionStack.get(m_expressionStack.size() - 1).popSemantino());
+        assert (m_selectQueryStack.size() == 0);
+        assert (m_expressionStack.size() == 1);
+        return (m_expressionStack.get(m_expressionStack.size() - 1).popSemantino());
     }
 }

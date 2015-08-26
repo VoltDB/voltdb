@@ -25,9 +25,9 @@ public class ErrorType extends Type implements ITop {
         super(aName, aKind);
         // TODO Auto-generated constructor stub
     }
-    
+
     @Override
     public boolean isErrorType() {
-    	return true;
+        return true;
     }
 }
