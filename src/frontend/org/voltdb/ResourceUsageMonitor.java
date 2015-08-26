@@ -33,6 +33,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
 {
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
+    private String m_rssLimitStr;
     private long m_rssLimit;
     private int m_resourceCheckInterval;
     private DiskResourceChecker m_diskLimitConfig;
@@ -47,8 +48,9 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         m_resourceCheckInterval = config.getFrequency();
 
         if (config.getMemorylimit() != null) {
+            m_rssLimitStr = config.getMemorylimit().getSize().trim();
             // configured value is in GB. Convert it to bytes
-            double dblLimit = getMemoryLimitSize(config.getMemorylimit().getSize());
+            double dblLimit = getMemoryLimitSize(m_rssLimitStr);
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
 
@@ -71,7 +73,8 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         if (hasResourceLimitsConfigured()) {
             m_logger.info("Resource limit monitoring configured to run every " + m_resourceCheckInterval + " seconds");
             if (m_rssLimit > 0) {
-                m_logger.info("RSS limit: " + m_rssLimit + " bytes");
+                m_logger.info("RSS limit: "  + (m_rssLimitStr.endsWith("%") ?
+                        m_rssLimitStr + " (" + m_rssLimit + " bytes)" : m_rssLimitStr + " GB"));
             }
             if (m_diskLimitConfig!=null) {
                 m_diskLimitConfig.logConfiguredLimits();
