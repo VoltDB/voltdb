@@ -102,7 +102,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 
 static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
-const int64_t LONG_OP_THRESHOLD = 10000;
+const int64_t LONG_OP_THRESHOLD = 10;
 
 namespace voltdb {
 
