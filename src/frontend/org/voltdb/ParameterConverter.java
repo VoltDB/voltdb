@@ -27,6 +27,7 @@ import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
 import org.voltdb.parser.SQLParser;
+import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -490,6 +491,8 @@ public class ParameterConverter {
                 throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
                         inputClz.getName(), expectedClz.getName()));
             }
+        } else if (expectedClz == PointType.class && inputClz == PointType.class) {
+            return param;
         } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
         } else if (expectedClz == String.class) {

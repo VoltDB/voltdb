@@ -16,6 +16,7 @@
  */
 
 #include "expressions/functionexpression.h"
+#include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
 
 namespace voltdb {
@@ -335,6 +336,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_BIN:
             ret = new UnaryFunctionExpression<FUNC_VOLT_BIN>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINTFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINTFROMTEXT>((*arguments)[0]);
             break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);

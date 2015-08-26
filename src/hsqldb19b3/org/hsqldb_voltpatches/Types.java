@@ -110,6 +110,8 @@ public class Types {
     public static final int SQL_INTERVAL_HOUR_TO_SECOND   = 112;
     public static final int SQL_INTERVAL_MINUTE_TO_SECOND = 113;
 
+    public static final int VOLT_POINT                     = 150;
+
     // used where local defines are used in the same range as SQL type numbers
     public static final int SQL_TYPE_NUMBER_LIMIT = 256;
 
@@ -879,6 +881,9 @@ public class Types {
 
             case Types.SQL_XML :
                 return "XML";
+
+            case Types.VOLT_POINT :
+                return "POINT";
 
             default :
                 return null;

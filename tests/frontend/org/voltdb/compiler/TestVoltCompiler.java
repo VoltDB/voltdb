@@ -2750,6 +2750,82 @@ public class TestVoltCompiler extends TestCase {
         // in TestSQLFeaturesNewSuite
     }
 
+    public void testCreateTableWithPointType() throws Exception {
+        String ddl =
+                "create table points ("
+                + "  id integer,"
+                + "  pt point"
+                + ");";
+        Database db = goodDDLAgainstSimpleSchema(ddl);
+        assertNotNull(db);
+
+        Table pointTable = db.getTables().getIgnoreCase("points");
+        assertNotNull(pointTable);
+
+        Column pointCol = pointTable.getColumns().getIgnoreCase("pt");
+        assertEquals(VoltType.POINT.getValue(), pointCol.getType());
+    }
+
+    public void testPointTypeNegative() throws Exception {
+
+        // POINT cannot be a partition column
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
+                "create table pts ("
+                + "  pt point not null"
+                + ");"
+                + "partition table pts on column pt;"
+                );
+
+        // POINT columns cannot yet be indexed
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point not null"
+                + ");  "
+                + "create index ptidx on pts(pt);"
+                );
+
+        // POINT columns cannot use unique/pk constraints which
+        // are implemented as indexes.
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point primary key"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point, "
+                + "  primary key (pt)"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point, "
+                + "  constraint uniq_pt unique (pt)"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point unique, "
+                + ");  "
+                );
+
+        // Default values are not yet supported
+        badDDLAgainstSimpleSchema(".*incompatible data type in conversion.*",
+                "create table pts ("
+                + "  pt point default 'point(3.0 9.0)', "
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*unexpected token.*",
+                "create table pts ("
+                + "  pt point default pointfromtext('point(3.0 9.0)'), "
+                + ");  "
+                );
+    }
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";

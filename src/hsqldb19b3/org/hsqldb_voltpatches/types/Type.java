@@ -637,6 +637,8 @@ public abstract class Type implements SchemaObject, Cloneable {
                                      DTIType.maxIntervalPrecision,
                                      DTIType.maxFractionPrecision);
 
+    public static final VoltPointType VOLT_POINT = new VoltPointType();
+
     public static Type getDefaultType(int type) {
 
         try {
@@ -920,6 +922,9 @@ public abstract class Type implements SchemaObject, Cloneable {
             case Types.SQL_INTERVAL_SECOND :
                 return IntervalType.getIntervalType(type, precision, scale);
 
+            case Types.VOLT_POINT :
+                return VOLT_POINT;
+
             case Types.OTHER :
                 return OTHER;
 
@@ -958,6 +963,8 @@ public abstract class Type implements SchemaObject, Cloneable {
         typeNames.put("VARCHAR", Types.SQL_VARCHAR);
         typeNames.put("TIMESTAMP", Types.SQL_TIMESTAMP);
         typeNames.put("VARBINARY", Types.SQL_VARBINARY);
+
+        typeNames.put("POINT", Types.VOLT_POINT);
 
         typeAliases = new IntValueHashMap(64);
 

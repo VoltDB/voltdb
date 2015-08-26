@@ -29,6 +29,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.common.Constants;
+import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.SerializationHelper;
@@ -149,6 +150,9 @@ public class ParameterSet implements JSONString {
                             }
                         }
                         break;
+                    case POINT:
+                        size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck() * ((PointType[])obj).length;
+                        break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
                 }
@@ -166,6 +170,10 @@ public class ParameterSet implements JSONString {
             }
             else if (obj == VoltType.NULL_DECIMAL) {
                 size += 16;
+                continue;
+            }
+            else if (obj == VoltType.NULL_POINT) {
+                size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck();
                 continue;
             } else if (obj instanceof BBContainer) {
                 size += 4 + ((BBContainer)obj).b().remaining();
@@ -199,6 +207,9 @@ public class ParameterSet implements JSONString {
                     break;
                 case DECIMAL:
                     size += 16;
+                    break;
+                case POINT:
+                    size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck();
                     break;
                 case VOLTTABLE:
                     size += ((VoltTable) obj).getSerializedSize();
@@ -564,6 +575,9 @@ public class ParameterSet implements JSONString {
                     }
                     break;
                 }
+                case POINT :
+                    value = PointType.unflattenFromBuffer(in);
+                    break;
                 case BOOLEAN:
                     value = in.get();
                     break;
@@ -673,6 +687,9 @@ public class ParameterSet implements JSONString {
                     case VARBINARY:
                         SerializationHelper.writeArray((byte[][]) obj, buf);
                         break;
+                    case POINT:
+                        SerializationHelper.writeArray((PointType[]) obj, buf);
+                        break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
                 }
@@ -694,6 +711,11 @@ public class ParameterSet implements JSONString {
                 buf.put(VoltType.DECIMAL.getValue());
                 VoltDecimalHelper.serializeNull(buf);
                 continue;
+            }
+            else if (obj == VoltType.NULL_POINT) {
+                    buf.put(VoltType.POINT.getValue());
+                    PointType.serializeNull(buf);
+                    continue;
             } else if (obj instanceof BBContainer) {
                 final BBContainer cont = (BBContainer) obj;
                 final ByteBuffer paramBuf = cont.b();
@@ -742,6 +764,9 @@ public class ParameterSet implements JSONString {
                     break;
                 case VOLTTABLE:
                     ((VoltTable)obj).flattenToBuffer(buf);
+                    break;
+                case POINT:
+                    ((PointType)obj).flattenToBuffer(buf);
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);
