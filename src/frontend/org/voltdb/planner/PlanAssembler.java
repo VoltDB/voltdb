@@ -1699,8 +1699,7 @@ public class PlanAssembler {
      */
     static private boolean isInlineLimitPlanNodePossible(AbstractPlanNode pn) {
         if (pn instanceof OrderByPlanNode ||
-            pn.getPlanNodeType() == PlanNodeType.AGGREGATE)
-        {
+            pn.getPlanNodeType() == PlanNodeType.AGGREGATE) {
             return true;
         }
         return false;
@@ -1729,6 +1728,7 @@ public class PlanAssembler {
             assert(result);
         }
         reAggNode.addAndLinkChild(receiveNode);
+        reAggNode.m_isCoordinatingAggregator = true;
 
         assert(receiveNode instanceof ReceivePlanNode);
         AbstractPlanNode sendNode = receiveNode.getChild(0);
@@ -1853,13 +1853,27 @@ public class PlanAssembler {
      * For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
      * by the GROUP BY keys. This is a much bigger win if the aggregation can get pushed
      * down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node.
+     * If a candidate is already an indexscan simply calculate GROUP BY column coverage
+     *
      * @param candidate
      * @param gbInfo
      * @return true when planner can switch to index scan from a sequential scan,
-     * and when the index scan has no parent plan node.
+     * and when the index scan has no parent plan node or candidate is already an indexscan and
+     * covers all or some GROUP BY columns
      */
     private boolean switchToIndexScanForGroupBy(AbstractPlanNode candidate, IndexGroupByInfo gbInfo) {
         if (! m_parsedSelect.isGrouped()) {
+            return false;
+        }
+
+        if (candidate instanceof IndexScanPlanNode) {
+            calculateIndexGroupByInfo((IndexScanPlanNode) candidate, gbInfo);
+            if (gbInfo.m_coveredGroupByColumns != null && !gbInfo.m_coveredGroupByColumns.isEmpty()) {
+                // The candidate index does cover all or some of the GROUP BY columns
+                // and can be serialized
+                gbInfo.m_indexAccess = candidate;
+                return true;
+            }
             return false;
         }
 
@@ -2089,6 +2103,28 @@ public class PlanAssembler {
         }
 
         return handleDistinctWithGroupby(root);
+    }
+
+    // Sets IndexGroupByInfo for an IndexScan
+    private void calculateIndexGroupByInfo(IndexScanPlanNode root,
+            IndexGroupByInfo gbInfo) {
+        String fromTableAlias = root.getTargetTableAlias();
+        assert(fromTableAlias != null);
+
+        Index index = root.getCatalogIndex();
+        if ( ! IndexType.isScannable(index.getType())) {
+            return;
+        }
+        if (! index.getPredicatejson().isEmpty()) {
+            // do not try to look at Partial/Sparse index
+            return;
+        }
+
+        ArrayList<AbstractExpression> bindings = new ArrayList<>();
+        gbInfo.m_coveredGroupByColumns = calculateGroupbyColumnsCovered(
+                index, fromTableAlias, bindings);
+        gbInfo.m_canBeFullySerialized =
+                gbInfo.m_coveredGroupByColumns.size() == m_parsedSelect.m_groupByColumns.size();
     }
 
     // Turn sequential scan to index scan for group by if possible
