@@ -50,6 +50,9 @@ public class UpdateBaseProc extends VoltProcedure {
     public final SQLStmt p_export = new SQLStmt(
             "INSERT INTO partitioned_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
+    public final SQLStmt p_getViewData = new SQLStmt(
+            "SELECT * FROM partview WHERE cid=? ORDER BY cid DESC;");
+
     // PLEASE SEE ReplicatedUpdateBaseProc for the replicated procs
     // that can't be listed here (or SP procs wouldn't compile)
 
@@ -57,16 +60,18 @@ public class UpdateBaseProc extends VoltProcedure {
         return 0; // never called in base procedure
     }
 
-    protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt export, SQLStmt getAdHocData,
+    protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt export, SQLStmt getAdHocData, SQLStmt getViewData,
                                  byte cid, long rid, byte[] value, byte shouldRollback)
     {
         voltQueueSQL(getCIDData, cid);
         voltQueueSQL(getAdHocData);
         voltQueueSQL(d_getCount, cid);
+        voltQueueSQL(getViewData, cid);
         VoltTable[] results = voltExecuteSQL();
         VoltTable data = results[0];
         VoltTable adhoc = results[1];
         VoltTable dim = results[2];
+        VoltTable view = results[3];
 
         final long txnid = getUniqueId();
         final long ts = getTransactionTime().getTime();
@@ -91,7 +96,7 @@ public class UpdateBaseProc extends VoltProcedure {
             prevrid = row.getLong("rid");
         }
 
-        validateCIDData(data, getClass().getName());
+        validateCIDData(data, view, getClass().getName());
 
         // check the rids monotonically increase
         if (prevrid >= rid) {
@@ -105,12 +110,14 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
+        voltQueueSQL(getViewData, cid);
         assert dim.getRowCount() == 1;
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occuring.
         data = retval[3];
-        validateCIDData(data, getClass().getName());
+        view = retval[4];
+        validateCIDData(data, view, getClass().getName());
 
         VoltTableRow row = data.fetchRow(0);
         if (row.getVarbinary("value").length == 0)
@@ -127,9 +134,11 @@ public class UpdateBaseProc extends VoltProcedure {
     protected VoltTable[] doWorkInProcAdHoc(byte cid, long rid, byte[] value, byte shouldRollback) {
         voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
         voltQueueSQLExperimental("SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
+        voltQueueSQLExperimental("SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);
         VoltTable[] results = voltExecuteSQL();
         VoltTable data = results[0];
         VoltTable adhoc = results[1];
+        VoltTable view = results[2];
 
         final long txnid = getUniqueId();
         final long ts = getTransactionTime().getTime();
@@ -154,7 +163,7 @@ public class UpdateBaseProc extends VoltProcedure {
             prevrid = row.getLong("rid");
         }
 
-        validateCIDData(data, getClass().getName());
+        validateCIDData(data, view, getClass().getName());
 
         // check the rids monotonically increase
         if (prevrid >= rid) {
@@ -168,11 +177,13 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQLExperimental("INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
         voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
+        voltQueueSQLExperimental("SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occurring.
         data = retval[3];
-        validateCIDData(data, getClass().getName());
+        view = retval[4];
+        validateCIDData(data, view, getClass().getName());
 
         VoltTableRow row = data.fetchRow(0);
         if (row.getVarbinary("value").length == 0)
@@ -185,7 +196,7 @@ public class UpdateBaseProc extends VoltProcedure {
         return retval;
     }
 
-    public static void validateCIDData(VoltTable data, String callerId) {
+    public static void validateCIDData(VoltTable data, VoltTable view, String callerId) {
         // empty tables are lamely valid
         if (data.getRowCount() == 0) return;
 
@@ -193,6 +204,10 @@ public class UpdateBaseProc extends VoltProcedure {
 
         data.resetRowPosition();
         long prevCnt = 0;
+        long entries = 0;
+        long max = 0;
+        long min = Long.MAX_VALUE;
+        long sum = 0;
         while (data.advanceRow()) {
             // check that the inner join of partitioned and replicated tables
             // produce the expected result
@@ -210,7 +225,35 @@ public class UpdateBaseProc extends VoltProcedure {
                         " for cid " + cid + ". Got " + cntValue +
                         ", prev was: " + prevCnt);
             }
+            if (view != null) {
+                entries += 1;
+                max = Math.max(max, cntValue);
+                min = Math.min(min, cntValue);
+                sum += cntValue;
+            }
             prevCnt = cntValue;
+        }
+        if (view != null) {
+            if (view.getRowCount() != 1)
+                throw new VoltAbortException("View has multiple entries of the same cid, that should not happen.");
+            VoltTableRow row0 = view.fetchRow(0);
+            long v_entries = row0.getLong("entries");
+            long v_max = row0.getLong("maximum");
+            long v_min = row0.getLong("minimum");
+            long v_sum = row0.getLong("summation");
+
+            if (v_entries != entries)
+                throw new VoltAbortException(
+                        "The count(*):"+v_entries+" materialized view aggregation does not match the number of cnt entries:"+entries+" for cid:"+cid);
+            if (v_max != max)
+                throw new VoltAbortException(
+                        "The max(cnt):"+v_max+" materialized view aggregation does not match the max:"+max+" for cid:"+cid);
+            if (v_min != min)
+                throw new VoltAbortException(
+                        "The min(cnt):"+v_min+" materialized view aggregation does not match the min:"+min+" for cid:"+cid);
+            if (v_sum != sum)
+                throw new VoltAbortException(
+                        "The sum(cnt):"+v_sum+" materialized view aggregation does not match the sum:"+sum+" for cid:"+cid);
         }
     }
 }
