@@ -26,10 +26,12 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
+import java.util.Arrays;
 
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -346,6 +348,24 @@ public class TestClientPortChannel extends TestCase {
         runInvocationMessageTest(ClientAuthHashScheme.HASH_SHA256, m_adminPort);
     }
 
+    final int iVERSION = 0;
+    final int iLENGH = 1;
+    final byte VAR1[] = {
+        0,                       // Version (1 byte)
+        0, 0, 0, 5,              // procedure name string length (4 byte int)
+        '@', 'P', 'i', 'n', 'g', // procedure name
+        0, 0, 0, 0, 0, 0, 0, 0,  // Client Data (8 byte long)
+        0,                       // Fields byte
+        0                        // Status byte
+    };
+
+    private void updateLength(byte[] arr, int length) {
+        byte iarr[] = ByteBuffer.allocate(4).putInt(length).array();
+        for (int i = 0; i < 4; i++) {
+            arr[i + iLENGH] = iarr[i];
+        }
+    }
+
     public void runInvocationMessageTest(ClientAuthHashScheme scheme, int port) throws Exception {
         PortConnector channel = new PortConnector("localhost", port);
         channel.connect();
@@ -353,20 +373,14 @@ public class TestClientPortChannel extends TestCase {
         //Now start testing combinations of invocation messages.
         //Start with a good Ping procedure invocation.
         System.out.println("Testing good Ping invocation before login");
-        byte pingr[] = {0, //Version
-            0, 0, 0, 5,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
-        boolean failed = false;
+
+        byte pingr[] = VAR1.clone();
         try {
             verifyInvocation(pingr, channel, (byte) 1);
+            fail("Expect exception");
         } catch (Exception ioe) {
             System.out.println("Good that we could not execute a proc.");
-            failed = true;
         }
-        assertTrue(failed);
 
         //reconnect as we should have bombed.
         channel.connect();
@@ -381,75 +395,43 @@ public class TestClientPortChannel extends TestCase {
         System.out.println("Testing good Ping invocation");
         verifyInvocation(pingr, channel, (byte) 1);
 
+        final byte ERROR_CODE = -3;
+
         //With bad message length of various shapes and sizes
         //Procedure name length mismatch
         System.out.println("Testing Ping invocation with bad procname length");
-        byte bad_length[] = {0, //Version
-            0, 0, 0, 6,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
-        verifyInvocation(bad_length, channel, (byte) -3);
+        byte bad_length[] = VAR1.clone();
+        updateLength(bad_length, 6);
+        verifyInvocation(bad_length, channel, ERROR_CODE);
+
         //Procedure name length -ve long
         System.out.println("Testing Ping invocation with -1 procname length.");
-        byte neg1_length[] = {0, //Version
-            0, 0, 0, 0,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
-        byte iarr[] = ByteBuffer.allocate(4).putInt(-1).array();
-        for (int i = 0; i < 4; i++) {
-            neg1_length[i + 1] = iarr[i];
-        }
-        verifyInvocation(neg1_length, channel, (byte) -3);
+        byte neg1_length[] = VAR1.clone();
+        updateLength(neg1_length, -1);
+        verifyInvocation(neg1_length, channel, ERROR_CODE);
 
         System.out.println("Testing Ping invocation with -200 procname length.");
-        byte neg2_length[] = {0, //Version
-            0, 0, 0, 0,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
-        iarr = ByteBuffer.allocate(4).putInt(-200).array();
-        for (int i = 0; i < 4; i++) {
-            neg2_length[i + 1] = iarr[i];
-        }
-        verifyInvocation(neg2_length, channel, (byte) -3);
+        byte neg2_length[] = VAR1.clone();
+        updateLength(neg2_length, -200);
+        verifyInvocation(neg2_length, channel, ERROR_CODE);
 
         //Procedure name length too long
         System.out.println("Testing Ping invocation with looooong procname length.");
-        byte too_long_length[] = {0, //Version
-            0, 0, 0, 0,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
-        iarr = ByteBuffer.allocate(4).putInt(Integer.MAX_VALUE).array();
-        for (int i = 0; i < 4; i++) {
-            too_long_length[i + 1] = iarr[i];
-        }
-        verifyInvocation(too_long_length, channel, (byte) -3);
+        byte too_long_length[] = VAR1.clone();
+        updateLength(too_long_length, Integer.MAX_VALUE);
+        verifyInvocation(too_long_length, channel, ERROR_CODE);
 
         //Bad protocol version
         System.out.println("Testing good Ping invocation with bad protocol version.");
-        byte bad_proto[] = {1, //Version
-            0, 0, 0, 5,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
-        verifyInvocation(bad_proto, channel, (byte) 1);
+        byte bad_proto[] = VAR1.clone();
+        bad_proto[iVERSION] = StoredProcedureInvocation.CURRENT_MOST_RECENT_VERSION + 1;
+        verifyInvocation(bad_proto, channel, ERROR_CODE);
 
         //Client Data - Bad Data meaning invalid number of bytes.
         System.out.println("Testing good Ping invocation with incomplete client data");
-        byte bad_cl_data[] = {0, //Version
-            0, 0, 0, 5,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0 //Client Data
-        };
-        verifyInvocation(bad_cl_data, channel, (byte) -3);
+        byte bad_cl_data[] = Arrays.copyOfRange(VAR1, 0, 12);
+        verifyInvocation(bad_cl_data, channel, ERROR_CODE);
+
         System.out.println("Testing good Ping invocation Again");
         verifyInvocation(pingr, channel, (byte) 1);
         channel.close();
@@ -464,6 +446,29 @@ public class TestClientPortChannel extends TestCase {
         runInvocationParams(ClientAuthHashScheme.HASH_SHA256, m_adminPort);
     }
 
+    final byte VAR2[] = {
+        0,                       // Version (1 byte)
+        0, 0, 0, 8,              // procedure name string length (4 byte int)
+        'B', '.', 'i', 'n', 's', 'e', 'r', 't', // procedure name
+        0, 0, 0, 0, 0, 0, 0, 0,  // Client Data (8 byte long)
+        0,                       // Fields byte
+        0                        // Status byte
+    };
+    final int PIDX = VAR2.length - 2;
+
+    private void updateShortBytes(byte[] arr, short num) {
+        byte[] iarr = ByteBuffer.allocate(2).putShort(num).array();
+        arr[PIDX] = iarr[0];
+        arr[PIDX + 1] = iarr[1];
+    }
+
+    private void updateIntBytes(byte[] arr, int num, int ith) {
+        byte[] iarr = ByteBuffer.allocate(4).putInt(num).array();
+        for (int i = 0; i < 4; i++) {
+            arr[ith + i] = iarr[i];
+        }
+    }
+
     public void runInvocationParams(ClientAuthHashScheme scheme, int port) throws Exception {
         PortConnector channel = new PortConnector("localhost", port);
         channel.connect();
@@ -475,39 +480,28 @@ public class TestClientPortChannel extends TestCase {
             loginSha2(channel);
 
         //Now start testing combinations of invocation messages with invocation params.
+        final byte ERROR_CODE = (byte) -2;
+        //
         //no param
-        byte i1[] = {0, //Version
-            0, 0, 0, 8,
-            'B', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
-        int pidx = i1.length - 2;
-        verifyInvocation(i1, channel, (byte) -2);
-        byte i2[] = {0, //Version
-            0, 0, 0, 8,
-            'B', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
-        byte iarr[] = ByteBuffer.allocate(2).putShort(Short.MAX_VALUE).array();
-        i2[pidx] = iarr[0];
-        i2[pidx + 1] = iarr[1];
-        verifyInvocation(i2, channel, (byte) -2);
-        iarr = ByteBuffer.allocate(2).putShort((short) -1).array();
-        i2[pidx] = iarr[0];
-        i2[pidx + 1] = iarr[1];
-        verifyInvocation(i2, channel, (byte) -2);
+        //
+        byte i1[] = VAR2.clone();
+        verifyInvocation(i1, channel, ERROR_CODE);
+
+        byte i2[] = VAR2.clone();
+        updateShortBytes(i2, Short.MAX_VALUE);
+        verifyInvocation(i2, channel, ERROR_CODE);
+
+        updateShortBytes(i2, (short) -1);
+        verifyInvocation(i2, channel, ERROR_CODE);
+
         //Lie about param count.
-        iarr = ByteBuffer.allocate(2).putShort((short) 4).array();
-        i2[pidx] = iarr[0];
-        i2[pidx + 1] = iarr[1];
-        verifyInvocation(i2, channel, (byte) -2);
+        updateShortBytes(i2, (short) 4);
+        verifyInvocation(i2, channel, ERROR_CODE);
+
         //Put correct param count but no values
-        iarr = ByteBuffer.allocate(2).putShort((short) 9).array();
-        i2[pidx] = iarr[0];
-        i2[pidx + 1] = iarr[1];
-        verifyInvocation(i2, channel, (byte) -2);
+        updateShortBytes(i2, (short) 9);
+        verifyInvocation(i2, channel, ERROR_CODE);
+
         //Lie length of param string.
         byte i3[] = {0, //Version
             0, 0, 0, 8,
@@ -515,10 +509,8 @@ public class TestClientPortChannel extends TestCase {
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
             0, 0, 9, //9 is string type
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i3[21] = iarr[0];
-        i3[21 + 1] = iarr[1];
-        verifyInvocation(i3, channel, (byte) -2);
+        updateShortBytes(i3, (short) 1);
+        verifyInvocation(i3, channel, ERROR_CODE);
 
         //Pass string length of 8 but dont pass string.
         byte i4[] = {0, //Version
@@ -528,15 +520,9 @@ public class TestClientPortChannel extends TestCase {
             0, 0, 9, //9 is string type
             0, 0, 0, 0 //String length
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i4[21] = iarr[0];
-        i4[21 + 1] = iarr[1];
-        iarr = ByteBuffer.allocate(4).putInt(8).array();
-        i4[24] = iarr[0];
-        i4[24 + 1] = iarr[1];
-        i4[24 + 2] = iarr[2];
-        i4[24 + 3] = iarr[3];
-        verifyInvocation(i4, channel, (byte) -2);
+        updateShortBytes(i4, (short) 1);
+        updateIntBytes(i4, 8, 24);
+        verifyInvocation(i4, channel, ERROR_CODE);
 
         //Pass string length of 6 and pass 6 byte string this should succeed.
         byte i5[] = {0, //Version
@@ -547,27 +533,20 @@ public class TestClientPortChannel extends TestCase {
             0, 0, 0, 0, //String length
             'v', 'o', 'l', 't', 'd', 'b'
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i5[21] = iarr[0];
-        i5[21 + 1] = iarr[1];
-        iarr = ByteBuffer.allocate(4).putInt(6).array();
-        i5[24] = iarr[0];
-        i5[24 + 1] = iarr[1];
-        i5[24 + 2] = iarr[2];
-        i5[24 + 3] = iarr[3];
+        updateShortBytes(i5, (short) 1);
+        updateIntBytes(i5, 6, 24);
         verifyInvocation(i5, channel, (byte) 1);
 
         //Lie length of param  array.
-       byte i6[] = {0, //Version
+        byte i6[] = {0, //Version
             0, 0, 0, 8,
             'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
             0, 0, -99 //-99 is array
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i6[21] = iarr[0];
-        i6[21 + 1] = iarr[1];
-        verifyInvocation(i6, channel, (byte) -2);
+        updateShortBytes(i6, (short) 1);
+        verifyInvocation(i6, channel, ERROR_CODE);
+
         //Lie length of param  array.
         byte i61[] = {0, //Version
             0, 0, 0, 8,
@@ -576,10 +555,8 @@ public class TestClientPortChannel extends TestCase {
             0, 0, -99, //-99 is array
             70, //bad element type
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i61[21] = iarr[0];
-        i61[21 + 1] = iarr[1];
-        verifyInvocation(i61, channel, (byte) -2);
+        updateShortBytes(i61, (short) 1);
+        verifyInvocation(i61, channel, ERROR_CODE);
 
         //Array of Array not supported should not crash server.
         byte i62[] = {0, //Version
@@ -589,10 +566,8 @@ public class TestClientPortChannel extends TestCase {
             0, 0, -99, //-99 is array
             -99, //Array of Array
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i62[21] = iarr[0];
-        i62[21 + 1] = iarr[1];
-        verifyInvocation(i62, channel, (byte) -2);
+        updateShortBytes(i62, (short) 1);
+        verifyInvocation(i62, channel, ERROR_CODE);
 
         //Array of string but no data.
         byte i63[] = {0, //Version
@@ -602,10 +577,8 @@ public class TestClientPortChannel extends TestCase {
             0, 0, -99, //-99 is array
             9, //String with no data
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i63[21] = iarr[0];
-        i63[21 + 1] = iarr[1];
-        verifyInvocation(i63, channel, (byte) -2);
+        updateShortBytes(i63, (short) 1);
+        verifyInvocation(i63, channel, ERROR_CODE);
 
         //Array of string with bad length
         byte i631[] = {0, //Version
@@ -615,15 +588,9 @@ public class TestClientPortChannel extends TestCase {
             0, 0, -99, //-99 is array
             9, 0, 0, 0, 0//String with no data
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i631[21] = iarr[0];
-        i631[21 + 1] = iarr[1];
-        iarr = ByteBuffer.allocate(4).putInt(Integer.MAX_VALUE).array();
-        i631[i631.length - 4] = iarr[0];
-        i631[i631.length - 3] = iarr[1];
-        i631[i631.length - 2] = iarr[2];
-        i631[i631.length - 1] = iarr[3];
-        verifyInvocation(i631, channel, (byte) -2);
+        updateShortBytes(i631, (short) 1);
+        updateIntBytes(i631, Integer.MAX_VALUE, i631.length - 4);
+        verifyInvocation(i631, channel, ERROR_CODE);
 
         //Array of long but no data.
         byte i64[] = {0, //Version
@@ -633,10 +600,8 @@ public class TestClientPortChannel extends TestCase {
             0, 0, -99, //-99 is array
             6, //Long with no data
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i64[21] = iarr[0];
-        i64[21 + 1] = iarr[1];
-        verifyInvocation(i64, channel, (byte) -2);
+        updateShortBytes(i64, (short) 1);
+        verifyInvocation(i64, channel, ERROR_CODE);
 
         //Array of long with non parsable long
         byte i65[] = {0, //Version
@@ -647,10 +612,8 @@ public class TestClientPortChannel extends TestCase {
             6, //Long
             'A'
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i64[21] = iarr[0];
-        i64[21 + 1] = iarr[1];
-        verifyInvocation(i65, channel, (byte) -2);
+        updateShortBytes(i65, (short) 1);
+        verifyInvocation(i65, channel, ERROR_CODE);
 
         //Lie data type invaid data type.
         byte i7[] = {0, //Version
@@ -659,10 +622,8 @@ public class TestClientPortChannel extends TestCase {
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
             0, 0, 70, //98 bad
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i7[21] = iarr[0];
-        i7[21 + 1] = iarr[1];
-        verifyInvocation(i7, channel, (byte) -2);
+        updateShortBytes(i7, (short) 1);
+        verifyInvocation(i7, channel, ERROR_CODE);
 
         //Lie data type invaid data type.
         byte i71[] = {0, //Version
@@ -671,19 +632,12 @@ public class TestClientPortChannel extends TestCase {
             0, 0, 0, 0, 0, 0, 0, 0, //Client Data
             0, 0, 26, //98 bad
         };
-        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
-        i71[21] = iarr[0];
-        i71[21 + 1] = iarr[1];
-        verifyInvocation(i71, channel, (byte) -2);
+        updateShortBytes(i71, (short) 1);
+        verifyInvocation(i71, channel, ERROR_CODE);
 
         //Test Good Ping at end to ensure server is up.
         System.out.println("Testing good Ping invocation Again");
-        byte pingr[] = {0, //Version
-            0, 0, 0, 5,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0
-        };
+        byte pingr[] = VAR1.clone();
         verifyInvocation(pingr, channel, (byte) 1);
 
         //Test insert again

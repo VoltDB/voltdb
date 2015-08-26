@@ -23,7 +23,6 @@
 
 package vmcTest.tests
 
-
 import vmcTest.pages.*
 import java.io.*;
 import java.util.Date;
@@ -698,7 +697,6 @@ class DbMonitorTest extends TestBase {
         page.partitionIdleTimeDisplayed()
     }
 
-
     def "click display preferences remove Cluster Latency and again add Cluster Latency"() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
@@ -840,8 +838,6 @@ class DbMonitorTest extends TestBase {
         page.partitionIdleTimeDisplayed()
     }
 
-
-
     def "click display preferences remove Stored Procedures and again add Stored Procedures"() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
@@ -944,7 +940,6 @@ class DbMonitorTest extends TestBase {
         page.dataTablesDisplayed()
     }
 
-
     def "Add a table in Tables and check it"() {
 
         String createQuery = page.getQueryToCreateTable()
@@ -1011,7 +1006,6 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-
     def "check if Row Count is clickable"() {
         String before = ""
 		String after  = ""
@@ -1037,7 +1031,6 @@ class DbMonitorTest extends TestBase {
 			else
 				assert false
     }
-
 
     def "check if Max Rows is clickable"() {
         String before = ""
@@ -1196,7 +1189,6 @@ class DbMonitorTest extends TestBase {
 			else
 				assert false
     }
-
 
     def "check if Min Latency is clickable"() {
         String before = ""
@@ -1369,7 +1361,6 @@ class DbMonitorTest extends TestBase {
 			waitFor(40,20) { !page.alertCount.isDisplayed() }
 	}
 
-
     // server search
     def "check server search on dbmonitor matched"(){
 
@@ -1387,7 +1378,6 @@ class DbMonitorTest extends TestBase {
         println("server searched matched")
     }
 
-
     def "check server search on dbmonitor not matched"(){
 
         when:'clicked server button'
@@ -1403,7 +1393,6 @@ class DbMonitorTest extends TestBase {
         page.clusterserverbutton.click()
         println("server searched unmatched")
     }
-
 
     def "check server title on dbmonitor"(){
         when:
@@ -1458,18 +1447,22 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        println(intDateMax)
+        println(intDateMin)
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        printsln("FAIL: Date of Max is less than that of date of Min for same month")
 		        assert false
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -1520,8 +1513,11 @@ class DbMonitorTest extends TestBase {
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
 
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -1530,7 +1526,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -1582,7 +1578,6 @@ class DbMonitorTest extends TestBase {
 		    assert false
 		}
     }
-
 
     def "check max value in server cpu minutes"(){
         int count = 0
@@ -1755,8 +1750,11 @@ class DbMonitorTest extends TestBase {
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
 
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
@@ -1765,7 +1763,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -1815,9 +1813,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
+		
+		int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
 
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -1826,7 +1827,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -1878,7 +1879,6 @@ class DbMonitorTest extends TestBase {
 		    assert false
 		}
     }
-
 
     def "check max value in server ram minutes"(){
         int count = 0
@@ -2051,8 +2051,11 @@ class DbMonitorTest extends TestBase {
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
 
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
@@ -2061,7 +2064,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2111,9 +2114,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -2122,7 +2128,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2350,9 +2356,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
@@ -2361,7 +2370,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2420,9 +2429,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -2431,7 +2443,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2849,9 +2861,12 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
 		    }
 		    else {
@@ -2860,7 +2875,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2910,10 +2925,15 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
+        
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
 
+        println(intDateMax)
+        println(intDateMin)
 
 		if(monthMax.equals(monthMin)) {
-		    if(dateMax > dateMin) {
+		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
 		    }
 		    else {
@@ -2922,7 +2942,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
 		else {
-		    if (dateMax < dateMin) {
+		    if (intDateMax < intDateMin) {
 		        println("Success")
 		    }
 		    else {
@@ -2931,7 +2951,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
     }
-
+   
     def "Click display preferences remove Partition Idle Time and again Add Partition Idle Time"() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
@@ -3019,5 +3039,4 @@ class DbMonitorTest extends TestBase {
 
         page.runQuery()
     }
-
 }

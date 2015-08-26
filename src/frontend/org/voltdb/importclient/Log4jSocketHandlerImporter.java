@@ -128,7 +128,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
 
 
     @Override
-    public void hasBackPressure(boolean flag) {
+    public void setBackPressure(boolean flag) {
         if (m_reader != null) {
             m_reader.m_hasBackPressure = flag;
         }

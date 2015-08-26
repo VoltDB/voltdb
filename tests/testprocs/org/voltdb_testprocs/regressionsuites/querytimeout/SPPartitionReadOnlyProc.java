@@ -20,25 +20,28 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package kafkaimporter.client.kafkaimporter;
 
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.client.Client;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.client.Client;
+package org.voltdb_testprocs.regressionsuites.querytimeout;
 
-public class FinalCheck {
-    static VoltLogger log = new VoltLogger("Benchmark.finalCheck");
-    static boolean check(Client client) {
-        long mirrorRows = MatchChecks.getMirrorTableRowCount(client);
-        long importRows = MatchChecks.getImportTableRowCount(client);
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-        log.info("Total rows exported: " + KafkaImportBenchmark.finalInsertCount);
-        log.info("Rows remaining in the Mirror Table: " + mirrorRows);
-        log.info("Rows remaining in the Import Table: " + importRows);
-        if (importRows != 0 || mirrorRows != 0) {
-            return false;
-        }
-        return true;
+@ProcInfo
+(
+    singlePartition = true,
+    partitionInfo = "P1.PHONE_NUMBER: 0"
+)
+
+public class SPPartitionReadOnlyProc extends VoltProcedure {
+    public final SQLStmt longRunningCrossJoinAgg = new SQLStmt
+            ("SELECT t1.contestant_number, t2.state, COUNT(*) "
+            + "FROM P1 t1, R1 t2 "
+            + "GROUP BY t1.contestant_number, t2.state;");
+
+    public VoltTable[] run(int partitionKey) {
+        voltQueueSQL(longRunningCrossJoinAgg);
+        return voltExecuteSQL(true);
     }
 }

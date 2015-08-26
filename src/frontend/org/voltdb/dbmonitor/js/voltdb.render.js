@@ -738,6 +738,12 @@ function alertNodeClicked(obj) {
 
                     if (data.systemsettings.snapshot != null)
                         adminConfigValues['snapshotPriority'] = data.systemsettings.snapshot.priority;
+
+                    if (data.systemsettings.resourcemonitor != null) {
+                        if (data.systemsettings.resourcemonitor.memorylimit != null) {
+                            adminConfigValues['memorylimit'] = data.systemsettings.resourcemonitor.memorylimit.size;
+                        }
+                    }
                 }
 
                 //Directory

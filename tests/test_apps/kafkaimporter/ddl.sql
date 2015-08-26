@@ -1,6 +1,8 @@
 -- This is the import table into which a single value will be pushed by kafkaimporter.
 
--- file -inlinebatch END_OF_BATCH
+LOAD classes sp.jar;
+
+file -inlinebatch END_OF_BATCH
 
 ------- kafka Importer Table -------
 CREATE TABLE importtable
@@ -45,8 +47,22 @@ CREATE TABLE kafkaexporttable1
 PARTITION TABLE kafkaexporttable1 ON COLUMN KEY;
 EXPORT TABLE kafkaexporttable1;
 
--- Stored procedures
-LOAD classes sp.jar;
+CREATE TABLE importcounts
+    (
+                    KEY BIGINT NOT NULL,
+                    TOTAL_ROWS_DELETED BIGINT NOT NULL
+    );
+
+PARTITION TABLE importcounts on COLUMN KEY;
+
+CREATE TABLE exportcounts
+    (
+                    KEY BIGINT NOT NULL,
+                    TOTAL_ROWS_EXPORTED BIGINT NOT NULL
+    );
+
+PARTITION TABLE exportcounts on COLUMN KEY;
+
 
 CREATE PROCEDURE PARTITION ON TABLE KafkaImportTable1 COLUMN key FROM class kafkaimporter.db.procedures.InsertImport;
 CREATE PROCEDURE PARTITION ON TABLE Kafkamirrortable1 COLUMN key FROM class kafkaimporter.db.procedures.InsertExport;
@@ -58,4 +74,4 @@ CREATE PROCEDURE FROM class kafkaimporter.db.procedures.MatchRows;
 CREATE PROCEDURE CountMirror as select count(*) from kafkamirrortable1;
 CREATE PROCEDURE CountImport as select count(*) from kafkaimporttable1;
 
--- END_OF_BATCH
+END_OF_BATCH
