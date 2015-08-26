@@ -207,13 +207,17 @@ void ExecutorContext::cleanupAllExecutors()
     m_subqueryContextMap.clear();
 }
 
-void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
-{
-    const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
+void ExecutorContext::cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const {
     BOOST_FOREACH (AbstractExecutor *executor, executorList) {
         assert(executor);
         executor->cleanupTempOutputTable();
     }
+}
+
+void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
+{
+    const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
+    cleanupExecutorsForSubquery(executorList);
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {

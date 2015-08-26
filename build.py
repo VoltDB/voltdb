@@ -219,6 +219,7 @@ CTX.INPUT['execution'] = """
  FragmentManager.cpp
  JNITopend.cpp
  VoltDBEngine.cpp
+ ExecutorVector.cpp
 """
 
 CTX.INPUT['executors'] = """
