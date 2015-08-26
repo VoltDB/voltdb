@@ -2750,6 +2750,14 @@ public class TestVoltCompiler extends TestCase {
         // in TestSQLFeaturesNewSuite
     }
 
+    public void testCreateTableWithPointType() {
+        String ddl =
+                "create table t ("
+                + "  pt point"
+                + ");";
+        checkDDLErrorMessage(ddl, null);
+    }
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
