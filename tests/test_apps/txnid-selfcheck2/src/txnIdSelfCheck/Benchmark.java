@@ -782,34 +782,31 @@ public class Benchmark {
                 int exitcode = 0;
 
                 // check if loaders are done or still working
-                if (partBiglt != null) {
-                    int lpcc = partBiglt.getPercentLoadComplete();
-                    if (!partBiglt.isAlive() && lpcc < 100) {
-                        exitcode = reportDeadThread(partBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
-                    } else
-                        log.info(partBiglt + " was at " + lpcc + "% of rows loaded");
-                } if (replBiglt != null) {
-                    int lpcc = replBiglt.getPercentLoadComplete();
-                    if (!replBiglt.isAlive() && lpcc < 100) {
-                        exitcode = reportDeadThread(replBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
-                    } else
-                        log.info(replBiglt + " was at " + lpcc + "% of rows loaded");
-                }
+                int lpcc = partBiglt.getPercentLoadComplete();
+                if (!partBiglt.isAlive() && lpcc < 100) {
+                    exitcode = reportDeadThread(partBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+                } else
+                    log.info(partBiglt + " was at " + lpcc + "% of rows loaded");
+                lpcc = replBiglt.getPercentLoadComplete();
+                if (!replBiglt.isAlive() && lpcc < 100) {
+                    exitcode = reportDeadThread(replBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+                } else
+                    log.info(replBiglt + " was at " + lpcc + "% of rows loaded");
                 // check if all threads still alive
-                if (partTrunclt != null && !partTrunclt.isAlive())
+                if (!partTrunclt.isAlive())
                     exitcode = reportDeadThread(partTrunclt);
-                if (replTrunclt != null && !replTrunclt.isAlive())
+                if (!replTrunclt.isAlive())
                     exitcode = reportDeadThread(replTrunclt);
                 /* XXX if (! partLoadlt.isAlive())
                     exitcode = reportDeadThread(partLoadlt);
                 if (! replLoadlt.isAlive())
                     exitcode = reportDeadThread(replLoadlt);
                 */
-                if (readThread != null && !readThread.isAlive())
+                if (!readThread.isAlive())
                     exitcode = reportDeadThread(readThread);
-                if (adHocMayhemThread != null && !config.disableadhoc && !adHocMayhemThread.isAlive())
+                if (!config.disableadhoc && !adHocMayhemThread.isAlive())
                     exitcode = reportDeadThread(adHocMayhemThread);
-                if (idpt != null && !idpt.isAlive())
+                if (!idpt.isAlive())
                     exitcode = reportDeadThread(idpt);
                 /* XXX if (! ddlt.isAlive())
                     exitcode = reportDeadThread(ddlt);*/
