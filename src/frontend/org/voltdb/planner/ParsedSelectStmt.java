@@ -30,12 +30,7 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;

@@ -1,3 +1,7 @@
+create table tonecolumn (
+  a bigint not null primary key
+);
+
 create table ttree (
   a bigint not null,
   b bigint not null,

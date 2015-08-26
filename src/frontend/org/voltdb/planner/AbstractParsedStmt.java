@@ -1522,7 +1522,14 @@ public abstract class AbstractParsedStmt {
     protected void addHonoraryOrderByExpressions(
             HashSet<AbstractExpression> orderByExprs,
             List<ParsedColInfo> candidateColumns) {
-         HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
+        // If there is not exactly one table scan we will not proceed.
+        // We don't really know how to make indices work with joins,
+        // and there is nothing more to do with subqueries.  The processing
+        // of joins is the content of ticket ENG-8677.
+        if (m_tableAliasMap.size() != 1) {
+            return;
+        }
+        HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
         for (ParsedColInfo colInfo : candidateColumns) {
             AbstractExpression colExpr = colInfo.expression;
             if (colExpr instanceof TupleValueExpression) {
@@ -1537,13 +1544,6 @@ public abstract class AbstractParsedStmt {
                     }
                 }
             }
-        }
-        // If there is not exactly one table scan we will not proceed.
-        // We don't really know how to make indices work with joins,
-        // and there is nothing more to do with subqueries.  The processing
-        // of joins is the content of ticket ENG-8677.
-        if (m_tableAliasMap.size() != 1) {
-            return;
         }
         // We know there's exactly one.
         StmtTableScan scan = m_tableAliasMap.values().iterator().next();
