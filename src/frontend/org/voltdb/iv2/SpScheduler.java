@@ -151,6 +151,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
+    // The DurabilityListener is not thread-safe. Access it only on the Site thread.
     private final DurabilityListener m_durabilityListener;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
@@ -182,8 +183,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     @Override
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
-        m_durabilityListener.setUniqueIdListener(listener);
+    public void setDurableUniqueIdListener(final DurableUniqueIdListener listener) {
+        m_tasks.offer(new SiteTaskerRunnable() {
+            @Override
+            void run()
+            {
+                m_durabilityListener.setUniqueIdListener(listener);
+            }
+        });
     }
 
     public void setDRGateway(PartitionDRGateway gateway)
