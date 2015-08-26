@@ -745,19 +745,25 @@ public class Benchmark {
             // XXX/PSR ddlt.start();
         }
 
-        log.info("All threads started in "+(System.currentTimeMillis() - connectTime)+" ms ...");
+        log.info("All threads started...");
         // waiting for things to initialize
         Thread.sleep(5000);
         while (true) {
-            while (!isSynchronous || ClientThread.currActiveClients > 0) {
+            // Sleeps forever if 1. the db is async (in which case missing cmd logs after recovery are not relevant)
+            // 2. the client threads are disabled. 
+            // otherwise, waits for all clients to disconnect. 
+            while (!isSynchronous || disabledThreads.contains("clients") || ClientThread.currActiveClients > 0) {
                 Thread.sleep(1000);
-            }
-            while (ClientThread.currActiveClients < ClientThread.numTotalClients || ClientThread.numTotalClients == 0) {
+            } // Once all clients disconnect, this loop waits for all clients to reconnect. 
+            while (ClientThread.currActiveClients < ClientThread.numTotalClients) {
                 Thread.sleep(1000);
-            }
-            if (ClientThread.numClientsMissingCmds > 0)
-                ClientThread.numResets += 1;
+            } // after all clients have disconnected and then reconnected, check client stats and start over
+            ClientThread.numResets += 1;
+            if (ClientThread.numClientsMissingCmds > 0) {
                 printClientStats();
+                // comment the below line out to take stats over multiple runs.
+                hardStop("Commands were missing from client threads after recovery, see above client statistics.");
+            }
         }
     }
 
