@@ -42,9 +42,10 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
-public class TestResourceMonitor extends TestCase
+public class TestMemoryResourceMonitor extends TestCase
 {
     private static final int MONITORING_INTERVAL = 2;
+    private static final int DEFAULT_MONITORING_INTERVAL = 60;
 
     private ServerThread m_localServer;
     private VoltDB.Configuration m_config;
@@ -97,7 +98,7 @@ public class TestResourceMonitor extends TestCase
                 "-20",
                 "abc"
         };
-        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null);
+        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null, null);
         for (int i=0; i<badValues.length; i++) {
             try {
                 monitor.getMemoryLimitSize(badValues[i]);
@@ -116,7 +117,7 @@ public class TestResourceMonitor extends TestCase
         configToExpectedRss.put("15%", totalSize*15/100.0);
         configToExpectedRss.put("40", 40.0*1073741824L);
         configToExpectedRss.put("1.5", 1.5*1073741824L);
-        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null);
+        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null, null);
         for (String str : configToExpectedRss.keySet()) {
             Assert.assertEquals(configToExpectedRss.get(str), monitor.getMemoryLimitSize(str));
         }
@@ -139,7 +140,7 @@ public class TestResourceMonitor extends TestCase
 
         // Wait for monitoring interval time and verify server is still in running mode
         m_mockStatsProducer.m_rss = 2048L*1024*1024;
-        resumeAndWait(ResourceUsageMonitor.DEFAULT_MONITORING_INTERVAL+1);
+        resumeAndWait(DEFAULT_MONITORING_INTERVAL+1);
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
     }
 
