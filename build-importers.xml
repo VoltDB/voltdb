@@ -5,22 +5,55 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="socketstream, log4jsocketimporter, kafkastream"/>
+    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream"/>
+
+    <resources id="default.imports.resource">
+        <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
+        <string>org.voltcore.network</string>
+        <string>org.voltdb.importer</string>
+        <string>org.apache.log4j</string>
+        <string>org.slf4j</string>
+        <string>org.voltcore.utils</string>
+        <string>com.google_voltpatches.common.base</string>
+        <string>com.google_voltpatches.common.collect</string>
+        <string>com.google_voltpatches.common.net</string>
+        <string>com.google_voltpatches.common.io</string>
+        <string>com.google_voltpatches.common.util.concurrent</string>
+    </resources>
+
+    <pathconvert property="default.imports" refid="default.imports.resource" pathsep=","/>
 
     <target name="socketstream">
         <antcall target="osgibundle">
-	    <param name="bundle.name" value="socketstream"/>
-	    <param name="activator" value="org.voltdb.importclient.SocketStreamImporter"/>
-	    <param name="bundle.displayname" value="SocketStreamImporter"/>
+            <param name="bundle.name" value="socketstream"/>
+            <param name="activator" value="org.voltdb.importclient.SocketStreamImporter"/>
+            <param name="bundle.displayname" value="SocketStreamImporter"/>
             <param name="include.classpattern" value="SocketStream*.class"/>
         </antcall>
     </target>
 
+    <target name="pullsocketimporter">
+        <mkdir dir="${bundles.dir}" />
+        <jar destfile="${bundles.dir}/pullsocketimporter.jar" basedir="${build.prod.dir}">
+            <include name="org/voltdb/importclient/PullSocketImporter*.class"/>
+            <include name="org/voltdb/importclient/ImportBaseException.class"/>
+            <manifest>
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.PullSocketImporter" />
+                <attribute name="Bundle-ManifestVersion" value="2" />
+                <attribute name="Bundle-Name" value="PullSocketImporter OSGi Bundle" />
+                <attribute name="Bundle-SymbolicName" value="PullSocketImporter" />
+                <attribute name="Bundle-Version" value="1.0.0" />
+                <attribute name="DynamicImport-Package" value="*" />
+                <attribute name="Import-Package" value="${default.imports}" />
+            </manifest>
+        </jar>
+    </target>
+
     <target name="log4jsocketimporter">
         <antcall target="osgibundle">
-	    <param name="bundle.name" value="log4jsocketimporter"/>
-	    <param name="activator" value="org.voltdb.importclient.Log4jSocketHandlerImporter"/>
-	    <param name="bundle.displayname" value="Log4jSocketImporter"/>
+            <param name="bundle.name" value="log4jsocketimporter"/>
+            <param name="activator" value="org.voltdb.importclient.Log4jSocketHandlerImporter"/>
+            <param name="bundle.displayname" value="Log4jSocketImporter"/>
             <param name="include.classpattern" value="Log4jSocket*.class"/>
         </antcall>
     </target>
@@ -28,9 +61,9 @@
     <target name="kafkastream">
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/kafkastream.jar" basedir="${build.prod.dir}">
-	    <include name="org/voltdb/importclient/kafka/*.class"/>
-	    <include name="org/voltdb/importclient/ImportBaseException.class"/>
-	    <zipgroupfileset dir="${base.dir}/lib/" includes="metrics-core-2.2.0.jar" />
+            <include name="org/voltdb/importclient/kafka/*.class"/>
+            <include name="org/voltdb/importclient/ImportBaseException.class"/>
+            <zipgroupfileset dir="${base.dir}/lib/" includes="metrics-core-2.2.0.jar" />
         <zipgroupfileset dir="${base.dir}/lib/" includes="scala-library-2.10.4.jar" />
         <zipgroupfileset dir="${base.dir}/lib" includes="kafka_2.10-0.8.2.1.jar" />
             <manifest>
@@ -56,7 +89,8 @@
                 <attribute name="Bundle-Name" value="${bundle.displayname} OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="${bundle.displayname}" />
                 <attribute name="Bundle-Version" value="1.0.0" />
-                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.apache.log4j,org.voltdb.importer,org.voltcore.network" />
+                <attribute name="DynamicImport-Package" value="*" />
+                <attribute name="Import-Package" value="${default.imports}" />
             </manifest>
         </jar>
     </target>
