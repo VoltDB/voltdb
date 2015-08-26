@@ -520,7 +520,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_mpDrGateway != null);
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializedCatalog);
-            eeTemp.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").
+            eeTemp.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getQuerytimeout());
         }
         // just print error info an bail if we run into an error here
@@ -1195,7 +1195,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         m_context = context;
-        m_ee.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").
+        m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
@@ -1318,5 +1318,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.put(log);
         m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
                             getNextUndoToken(m_currentTxnId));
+    }
+
+    @Override
+    public void setBatchTimeout(int batchTimeout) {
+        m_ee.setBatchTimeout(batchTimeout);
+    }
+
+    @Override
+    public int getBatchTimeout() {
+        return m_ee.getBatchTimeout();
     }
 }
