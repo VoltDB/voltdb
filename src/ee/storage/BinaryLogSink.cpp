@@ -309,13 +309,15 @@ void BinaryLogSink::exportDRConflict(PersistentTable *drTable, Table *exportTabl
         NValue hiddenColumn = exportTuple.getHiddenNValue(drTable->getDRTimestampColumnIndex());
         int64_t drId = ValuePeeker::peekAsBigInt(hiddenColumn);
 
-        tempTuple.setNValue(0, ValueFactory::getStringValue(drTable->name()));  // Table Name
+        NValue tableName = ValueFactory::getStringValue(drTable->name());
+        tempTuple.setNValue(0, tableName);  // Table Name
         tempTuple.setNValue(1, ValueFactory::getTinyIntValue(getClusterIdFromDRId(drId)));       // Cluster Id
         tempTuple.setNValue(2, ValueFactory::getBigIntValue(getSequenceNumberFromDRId(drId)));   // Timestamp
         tempTuple.setNValue(3, ValueFactory::getTinyIntValue(type));            // Type of Operation
         tempTuple.setNValues(4, exportTuple, 0, exportTuple.sizeInValues());    // rest of columns
 
         exportTable->insertTuple(tempTuple);
+        tableName.free();
     }
 }
 
