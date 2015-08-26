@@ -92,7 +92,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         }
 
         if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
-            m_logger.warn("Pausing the server");
+            m_logger.error("Resource monitor detected limit reached. Pausing the server.");
             VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(this, 0, "@Pause");
         }
     }
@@ -113,7 +113,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
             m_logger.debug("RSS=" + datum.rss + " Configured rss limit=" + m_rssLimit);
         }
         if (datum.rss >= m_rssLimit) {
-            m_logger.warn(String.format("RSS %d is over configured limit value %d.", datum.rss, m_rssLimit));
+            m_logger.error(String.format("RSS %d is over configured limit value %d.", datum.rss, m_rssLimit));
             return true;
         } else {
             return false;

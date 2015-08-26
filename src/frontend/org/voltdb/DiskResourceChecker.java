@@ -90,7 +90,7 @@ public class DiskResourceChecker
                 continue;
             }
             if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit)) {
-                m_logger.warn("Disk is over configured limits for feature " + config.m_featureName);
+                m_logger.error("Disk is over configured limits for feature " + config.m_featureName);
                 return true;
             }
         }
