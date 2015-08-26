@@ -592,6 +592,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
+    abstract public void setViewsUpdateEnabled(boolean enabled);
+
     /**
      * Set the log levels to be used when logging in this engine
      * @param logLevels Levels to set
@@ -811,6 +813,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
             long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
             long undoToken);
+
+    /**
+     * This method is called to enable / disable the materialized view update on all tables.
+     * @param pointer the VoltDBEngine pointer
+     * @param boolean value to be set
+     */
+    protected native void nativeSetViewsUpdateEnabled(long pointer, boolean enabled);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

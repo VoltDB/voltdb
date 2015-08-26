@@ -26,6 +26,8 @@
 #include "catalog/columnref.h"
 #include "catalog/column.h"
 #include "catalog/table.h"
+#include "catalog/planfragment.h"
+#include "catalog/statement.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "expressions/constantvalueexpression.h"
@@ -33,9 +35,19 @@
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
+#include "execution/VoltDBEngine.h"
+#include "execution/ExecutorVector.h"
+#include "plannodes/indexscannode.h"
+#include "executors/abstractexecutor.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
 
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
+typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(PlanFragment);
+typedef std::pair<std::string, catalog::PlanFragment*> LabeledFragment;
+
+using namespace std;
 namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
@@ -72,17 +84,15 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 
     // handle index for min / max support
     setIndexForMinMax(mvInfo->indexForMinMax());
+    // set up build up query executors for catching up with pre-existing rows (ENG-8840)
+    setBuildUpExecutorVector(mvInfo->buildUpQueryStmt());
+    // set up fallback query executors for min/max recalculation (ENG-8641)
+    // must be set after indexForMinMax
+    setFallbackExecutorVectors(mvInfo->fallbackQueryStmts());
 
     allocateBackedTuples();
+    populateViewFromDefinition();
 
-    // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
-        TableTuple scannedTuple(srcTable->schema());
-        TableIterator &iterator = srcTable->iterator();
-        while (iterator.next(scannedTuple)) {
-            processTupleInsert(scannedTuple, false);
-        }
-    }
     /* If there is no group by column and the target table is still empty
      * even after catching up with pre-existing source tuples, we should initialize the
      * target table with a row of default values.
@@ -121,6 +131,109 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     allocateBackedTuples();
 
     oldTarget->decrementRefcount();
+}
+
+string hexDecodeToString(const string hexString) {
+    size_t len = hexString.length();
+    string retval;
+    for(int i=0; i<len; i+=2) {
+        string byte = hexString.substr(i,2);
+        char chr = (char) (int)strtol(byte.c_str(), NULL, 16);
+        retval.push_back(chr);
+    }
+    return retval;
+}
+
+void MaterializedViewMetadata::setBuildUpExecutorVector(const catalog::CatalogMap<catalog::Statement> &buildUpQueryStmts) {
+    m_buildUpExecutorVectors.clear();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    BOOST_FOREACH (LabeledStatement labeledStatement, buildUpQueryStmts) {
+        catalog::Statement *stmt = labeledStatement.second;
+        // The build up query normally looks like "INSERT INTO SELECT ..."
+        // So for most of the cases we will get 2 plan fragments.
+        // The first fragment ususally is SEND and RECEIVE (maybe also LIMIT)
+        // The second fragment is the real fragment for INSERT INTO SELECT...
+        // In current case we only execute the second fragment. (ENG-8840, Ethan)
+        BOOST_FOREACH (LabeledFragment labeledFragment, stmt->fragments()) {
+            const string b64plan = labeledFragment.second->plannodetree();
+            string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
+            boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
+            m_buildUpExecutorVectors.push_back(execVec);
+        }
+        string explanation = hexDecodeToString(stmt->explainplan());
+        // For debug:
+        // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        //     cout << "Build up query plan:" << endl;
+        //     cout << explanation << endl;
+        // }
+    }
+}
+
+// Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
+void MaterializedViewMetadata::populateViewFromDefinition() {
+    if (( ! m_srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
+        ExecutorContext* context = ExecutorContext::getExecutorContext();
+        // executing the stored plan to build up the view.
+        // Note we ignore m_buildUpExecutorVectors[0] it's just send / receive.
+        vector<AbstractExecutor*> executorList = m_buildUpExecutorVectors[1]->getExecutorList();
+        context->executeExecutors(executorList, 0);
+        context->cleanupExecutorsForSubquery(executorList);
+    }
+}
+
+void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts) {
+    m_fallbackExecutorVectors.clear();
+    m_usePlanForAgg.clear();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    int idx = 0;
+    BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
+        catalog::Statement *stmt = labeledStatement.second;
+        // Here we use stmt->fragments().begin()->second assuming the plan has only one fragment.
+        // This might not be still true in the future if we want to add view of table joins. (ENG-8840, Ethan)
+        const string b64plan = stmt->fragments().begin()->second->plannodetree();
+        string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
+        string explanation = hexDecodeToString(stmt->explainplan());
+
+        boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
+        // We don't need the send executor.
+        execVec->getRidOfSendExecutor();
+        m_fallbackExecutorVectors.push_back(execVec);
+
+        /* Decide if we should use the plan or still stick to the hard coded function. -- yzhang
+         * For now, we only use the plan to refresh the materialzied view when:
+         *     - the generated plan is an index scan plan
+         *     AND
+         *     - the index that the plan chose is different from the index our hard-coded function chose.
+         *       (If the plan uses index scan but our hard-coded function uses sequential scan,
+         *        we should also go with the plan.)
+         * Things will get different when we add join table materialzied view or CUBE view.
+         */
+        vector<AbstractExecutor*> executorList = execVec->getExecutorList();
+        AbstractPlanNode* apn = executorList[0]->getPlanNode();
+        if ( apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN ) {
+            if ( m_indexForMinMax[idx] ) {
+                // For debug:
+                // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+                //     cout << "hard-coded function uses: " << m_indexForMinMax[idx]->getName() << endl;
+                //     cout << "plan uses: " << ((IndexScanPlanNode *)apn)->getTargetIndexName() << endl;
+                // }
+                m_usePlanForAgg.push_back( m_indexForMinMax[idx]->getName().compare( ((IndexScanPlanNode *)apn)->getTargetIndexName() ) != 0 );
+            }
+            else {
+                m_usePlanForAgg.push_back(true);
+            }
+        }
+        else {
+            m_usePlanForAgg.push_back(false);
+        }
+        // For debug:
+        // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        //     cout << "Aggregation " << idx << endl;
+        //     cout << explanation << endl;
+        //     cout << "Uses " << (m_usePlanForAgg[idx] ? "plan." : "hard-coded function.") << endl << endl;
+        // }
+        ++ idx;
+    }
 }
 
 void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax)
@@ -427,7 +540,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
     }
     NValue newVal = initialNull;
     // loop through tuples to find the MIN / MAX
-    bool skippedOne = false;
     TableTuple tuple(m_srcTable->schema());
     TableIterator &iterator = m_srcTable->iterator();
     VOLT_TRACE("Starting iteration on: %s\n", m_srcTable->debug().c_str());
@@ -455,11 +567,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
             continue;
         }
         if (current.compare(existingValue) == 0) {
-            if (!skippedOne) {
-                VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
-                skippedOne = true;
-                continue;
-            }
             VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
             newVal = current;
             break;
@@ -471,6 +578,48 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
         }
     }
     VOLT_TRACE("\tFinal: new best %s\n", newVal.debug().c_str());
+    return newVal;
+}
+
+NValue MaterializedViewMetadata::findFallbackValueUsingPlan(const TableTuple& oldTuple,
+                                                            const NValue &initialNull,
+                                                            int aggIndex,
+                                                            int minMaxAggIdx) {
+    // build parameters.
+    // the parameters are the groupby columns and the aggregation column.
+    ExecutorContext* context = ExecutorContext::getExecutorContext();
+    NValueArray &params = *context->getParameterContainer();
+    vector<NValue> backups(m_groupByColumnCount+1);
+    NValue newVal = initialNull;
+    NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
+    int colindex = 0;
+    for (; colindex < m_groupByColumnCount; colindex++) {
+        backups[colindex] = params[colindex];
+        params[colindex] = getGroupByValueFromSrcTuple(colindex, oldTuple);
+    }
+    backups[colindex] = params[colindex];
+    params[colindex] = oldValue;
+    // executing the stored plan.
+    vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
+    Table *tbl = context->executeExecutors(executorList, 0);
+    assert(tbl);
+    // get the fallback value from the returned table.
+    TableIterator iterator = tbl->iterator();
+    TableTuple tuple(tbl->schema());
+    if (iterator.next(tuple)) {
+        newVal = tuple.getNValue(0);
+    }
+    // For debug:
+    // if (context->m_siteId == 0) {
+    //     cout << "oldTuple: " << oldTuple.debugNoHeader() << endl;
+    //     cout << "Return table: " << endl << tbl->debug() << endl;
+    //     cout << "newValue: " << newValue.debug() << endl;
+    // }
+    // restore
+    for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
+        params[colindex] = backups[colindex];
+    }
+    context->cleanupExecutorsForSubquery(executorList);
     return newVal;
 }
 
@@ -655,12 +804,15 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 if (oldValue.compare(existingValue) == 0) {
                     // re-calculate MIN / MAX
                     newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
-
+                    if (m_usePlanForAgg[minMaxAggIdx]) {
+                        newValue = findFallbackValueUsingPlan(oldTuple, newValue, aggIndex, minMaxAggIdx);
+                    }
                     // indexscan if an index is available, otherwise tablescan
-                    if (m_indexForMinMax[minMaxAggIdx]) {
+                    else if (m_indexForMinMax[minMaxAggIdx]) {
                         newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
                                                                   reversedForMin, aggIndex, minMaxAggIdx);
-                    } else {
+                    }
+                    else {
                         VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
                         newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
                                                                      reversedForMin, aggIndex);

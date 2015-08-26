@@ -142,6 +142,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public void setViewsUpdateEnabled(final boolean enabled) {
+    }
+
+    @Override
     public void release() throws EEException {
     }
 

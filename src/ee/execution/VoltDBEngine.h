@@ -88,7 +88,7 @@ class AbstractPlanNode;
 class CatalogDelegate;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
-class ExecutorVector; // Locally defined in VoltDBEngine.cpp
+class ExecutorVector;
 class PersistentTable;
 class RecoveryProtoMsg;
 class Table;
@@ -194,6 +194,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t uniqueId,
                        bool returnUniqueViolations,
                        bool shouldDRStream);
+
+        void setViewsUpdateEnabled(bool enabled);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }

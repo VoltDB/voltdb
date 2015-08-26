@@ -91,6 +91,8 @@ public interface SiteProcedureConnection {
             boolean shouldDRStream,
             boolean undo);
 
+    public void setViewsUpdateEnabled(boolean enabled);
+
     /**
      * Execute a set of plan fragments.
      * Note: it's ok to pass null for inputDepIds if the fragments

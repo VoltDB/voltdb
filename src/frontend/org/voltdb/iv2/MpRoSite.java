@@ -359,6 +359,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public void setViewsUpdateEnabled(boolean enabled) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
     public void updateBackendLogLevels()
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
