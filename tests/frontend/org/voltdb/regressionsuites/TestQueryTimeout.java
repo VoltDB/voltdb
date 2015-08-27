@@ -255,13 +255,26 @@ public class TestQueryTimeout extends RegressionSuite {
         // negative tests on the timeout value
         subtestNegativeIndividualProcTimeout(client);
 
-        boolean syncs[] = {true, false};
+        final String longRunningCrossJoinAggReplicated =
+                "SELECT t1.contestant_number, t2.state, COUNT(*) "
+                + "FROM R1 t1, R1 t2 "
+                + "GROUP BY t1.contestant_number, t2.state;";
+
+        final String longRunningCrossJoinAggPartitioned =
+                "SELECT t1.contestant_number, t2.state, COUNT(*) "
+                + "FROM P1 t1, R1 t2 "
+                + "GROUP BY t1.contestant_number, t2.state;";
+
+
+        boolean syncs[] = {true};
         for (boolean sync : syncs) {
             System.out.println("Testing " + (sync ? "synchronously": "asynchronously") + "  call");
             loadTables(client, 10000, 3000);
             checkTimeoutIncreasedProcSucceed(sync, client, "SPPartitionReadOnlyProc", 1);
             checkTimeoutIncreasedProcSucceed(sync, client, "PartitionReadOnlyProc");
             checkTimeoutIncreasedProcSucceed(sync, client, "ReplicatedReadOnlyProc");
+            checkTimeoutIncreasedProcSucceed(sync, client, "@AdHoc", longRunningCrossJoinAggReplicated);
+            checkTimeoutIncreasedProcSucceed(sync, client, "@AdHoc", longRunningCrossJoinAggPartitioned);
 
             // truncate the data
             truncateTables(client);
@@ -271,6 +284,8 @@ public class TestQueryTimeout extends RegressionSuite {
             checkTimeoutDecreaseProcFailed(sync, client, "SPPartitionReadOnlyProc", 1);
             checkTimeoutDecreaseProcFailed(sync, client, "PartitionReadOnlyProc");
             checkTimeoutDecreaseProcFailed(sync, client, "ReplicatedReadOnlyProc");
+            checkTimeoutDecreaseProcFailed(sync, client, "@AdHoc", longRunningCrossJoinAggReplicated);
+            checkTimeoutDecreaseProcFailed(sync, client, "@AdHoc", longRunningCrossJoinAggPartitioned);
 
             // truncate the data
             truncateTables(client);
