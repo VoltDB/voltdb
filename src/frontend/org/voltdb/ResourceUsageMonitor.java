@@ -21,6 +21,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
@@ -32,6 +33,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
 {
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
+    private String m_rssLimitStr;
     private long m_rssLimit;
     private int m_resourceCheckInterval;
     private DiskResourceChecker m_diskLimitConfig;
@@ -46,8 +48,9 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         m_resourceCheckInterval = config.getFrequency();
 
         if (config.getMemorylimit() != null) {
+            m_rssLimitStr = config.getMemorylimit().getSize().trim();
             // configured value is in GB. Convert it to bytes
-            double dblLimit = config.getMemorylimit().getSize().doubleValue()*1073741824;
+            double dblLimit = getMemoryLimitSize(m_rssLimitStr);
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
 
@@ -70,7 +73,8 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         if (hasResourceLimitsConfigured()) {
             m_logger.info("Resource limit monitoring configured to run every " + m_resourceCheckInterval + " seconds");
             if (m_rssLimit > 0) {
-                m_logger.info("RSS limit: " + m_rssLimit + " bytes");
+                m_logger.info("RSS limit: "  + (m_rssLimitStr.endsWith("%") ?
+                        m_rssLimitStr + " (" + m_rssLimit + " bytes)" : m_rssLimitStr + " GB"));
             }
             if (m_diskLimitConfig!=null) {
                 m_diskLimitConfig.logConfiguredLimits();
@@ -88,7 +92,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         }
 
         if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
-            m_logger.warn("Pausing the server");
+            m_logger.error("Resource monitor detected limit reached. Pausing the server.");
             VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(this, 0, "@Pause");
         }
     }
@@ -109,7 +113,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
             m_logger.debug("RSS=" + datum.rss + " Configured rss limit=" + m_rssLimit);
         }
         if (datum.rss >= m_rssLimit) {
-            m_logger.warn(String.format("RSS %d is over configured limit value %d.", datum.rss, m_rssLimit));
+            m_logger.error(String.format("RSS %d is over configured limit value %d.", datum.rss, m_rssLimit));
             return true;
         } else {
             return false;
@@ -126,5 +130,32 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
     public void setBackPressure(boolean hasBackPressure)
     {
         // nothing to do here.
+    }
+
+    // package-private for junit
+    double getMemoryLimitSize(String sizeStr)
+    {
+        if (sizeStr==null || sizeStr.length()==0) {
+            return 0;
+        }
+
+        try {
+            if (sizeStr.charAt(sizeStr.length()-1)=='%') { // size as a percentage of total available memory
+                int perc = Integer.parseInt(sizeStr.substring(0, sizeStr.length()-1));
+                if (perc<0 || perc > 99) {
+                    throw new IllegalArgumentException("Invalid memory limit percentage: " + sizeStr);
+                }
+                return PlatformProperties.getPlatformProperties().ramInMegabytes*1048576L*perc/100.0;
+            } else { // size in GB
+                double size = Double.parseDouble(sizeStr)*1073741824L;
+                if (size<0) {
+                    throw new IllegalArgumentException("Invalid memory limit value: " + sizeStr);
+                }
+                return size;
+            }
+        } catch(NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid memory limit value " + sizeStr +
+                    ". Memory limit must be configued as a percentage of total available memory or as GB value");
+        }
     }
 }

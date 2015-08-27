@@ -90,7 +90,7 @@ public class DiskResourceChecker
                 continue;
             }
             if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit)) {
-                m_logger.warn("Disk is over configured limits for feature " + config.m_featureName);
+                m_logger.error("Disk is over configured limits for feature " + config.m_featureName);
                 return true;
             }
         }
@@ -246,7 +246,7 @@ public class DiskResourceChecker
                     if (str.charAt(str.length()-1) == '%') {
                         m_diskSizeLimit = 0;
                         m_diskSizeLimitPerc = Integer.parseInt(str.substring(0, str.length()-1));
-                        if (m_diskSizeLimitPerc > 100 || m_diskSizeLimitPerc < 0) {
+                        if (m_diskSizeLimitPerc > 99 || m_diskSizeLimitPerc < 0) {
                             throw new IllegalArgumentException(
                                     "Invalid percentage value " + sizeConfig + " configured for disk limit size for feature " + featureName);
                         }
