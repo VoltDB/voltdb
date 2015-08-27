@@ -717,41 +717,35 @@ public enum VoltType {
 
     public static boolean isNullVoltType(Object obj)
     {
-        boolean retval = false;
-        if (obj == null)
+        if ((obj == null) ||
+            (obj == VoltType.NULL_TIMESTAMP) ||
+            (obj == VoltType.NULL_STRING_OR_VARBINARY) ||
+            (obj == VoltType.NULL_DECIMAL))
         {
             return true;
         }
-        else if (obj == VoltType.NULL_TIMESTAMP ||
-                 obj == VoltType.NULL_STRING_OR_VARBINARY ||
-                 obj == VoltType.NULL_DECIMAL)
+
+        switch(typeFromObject(obj))
         {
-            return true;
-        }
-        else
-        {
-            switch(typeFromObject(obj))
-            {
-            case TINYINT:
-                return (((Number) obj).byteValue() == NULL_TINYINT);
-            case SMALLINT:
-                return (((Number) obj).shortValue() == NULL_SMALLINT);
-            case INTEGER:
-                return (((Number) obj).intValue() == NULL_INTEGER);
-            case BIGINT:
-                return (((Number) obj).longValue() == NULL_BIGINT);
-            case FLOAT:
-                return (((Number) obj).doubleValue() == NULL_FLOAT);
-            case TIMESTAMP:
-            case STRING:
-            case VARBINARY:
-            case DECIMAL:
-                // already checked these above
-                return false;
-            default:
-                throw new VoltTypeException("Unsupported type: " +
-                                            typeFromObject(obj));
-            }
+        case TINYINT:
+            return (((Number) obj).byteValue() == NULL_TINYINT);
+        case SMALLINT:
+            return (((Number) obj).shortValue() == NULL_SMALLINT);
+        case INTEGER:
+            return (((Number) obj).intValue() == NULL_INTEGER);
+        case BIGINT:
+            return (((Number) obj).longValue() == NULL_BIGINT);
+        case FLOAT:
+            return (((Number) obj).doubleValue() == NULL_FLOAT);
+        case TIMESTAMP:
+        case STRING:
+        case VARBINARY:
+        case DECIMAL:
+            // already checked these above
+            return false;
+        default:
+            throw new VoltTypeException("Unsupported type: " +
+                                        typeFromObject(obj));
         }
     }
 

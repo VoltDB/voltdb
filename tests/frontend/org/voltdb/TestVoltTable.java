@@ -1081,10 +1081,10 @@ public class TestVoltTable extends TestCase {
     }
 
     public void testBadAddRow() {
-        int rowCount = 100;
+        int rowCount = 10;
         Random r = new Random(0);
 
-        for (int j = 0; j < 100; j++) {
+        for (int j = 0; j < 75; j++) {
             TableHelper th = new TableHelper();
             VoltTable t1 = th.getTotallyRandomTable("foo", true).table;
             th.randomFill(t1, rowCount, 500);
@@ -1111,6 +1111,13 @@ public class TestVoltTable extends TestCase {
             t1.resetRowPosition();
             while (t1.advanceRow()) {
                 try {
+                    // add a random row successfully every other row
+                    th.randomFill(t2, 1, 10);
+                    // - except small chance of overflow too due to large string
+                    if (r.nextInt(20) == 0) {
+                        th.randomFill(t2, 1, 2048 * 1024);
+                    }
+                    // add a bad row from t1
                     t2.add(t1);
 
                     // only check if the twiddled column was non-null
@@ -1120,9 +1127,15 @@ public class TestVoltTable extends TestCase {
                     }
                 }
                 catch (Exception e) {
-                    assertTrue(t1.get(randCol, t1.getColumnType(randCol)) != null);
+                    // two cases where we might fail and it's ok
+                    boolean tooBig = e instanceof VoltOverflowException;
+                    boolean nonNull = t1.get(randCol, t1.getColumnType(randCol)) != null;
+                    assertTrue(tooBig || nonNull);
                 }
             }
+
+            // this should bomb if the data is invalid because it scans every value
+            t2.toJSONString();
         }
     }
 }

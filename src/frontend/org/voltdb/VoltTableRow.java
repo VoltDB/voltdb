@@ -411,7 +411,7 @@ public abstract class VoltTableRow {
      */
     final byte[] getRaw(int columnIndex) {
         byte[] retval;
-        int pos;
+        int pos = m_buffer.position();
         int offset = getOffset(columnIndex);
         VoltType type = getColumnType(columnIndex);
 
@@ -428,21 +428,19 @@ public abstract class VoltTableRow {
         case DECIMAL:
             // all of these types are fixed length, so easy to get raw type
             retval = new byte[length];
-            pos = m_buffer.position();
             m_buffer.position(offset);
             m_buffer.get(retval);
             m_buffer.position(pos);
             return retval;
         case STRING:
         case VARBINARY:
-            // all of these types are variable lenght with a prefix
+            // all of these types are variable length with a prefix
             length = m_buffer.getInt(offset);
             if (length == VoltTable.NULL_STRING_INDICATOR) {
                 length = 0;
             }
             length += 4;
             retval = new byte[length];
-            pos = m_buffer.position();
             m_buffer.position(offset);
             m_buffer.get(retval);
             m_buffer.position(pos);
