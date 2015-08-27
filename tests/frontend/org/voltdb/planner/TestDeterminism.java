@@ -465,6 +465,97 @@ public class TestDeterminism extends PlannerTestCase {
         assertMPPlanDeterminism("select a, z from ppk where a = 1 and b < 10", "order by z, a");
     }
 
+    public void testMPDeterminismImpliedByParameter() {
+        assertPlanDeterminismCore("select * from ttree_with_key where b = ? order by a, c limit 1;",
+                                  true,
+                                  true,
+                                  DeterminismMode.FASTER);
+        assertPlanDeterminismCore("select d, e, id from ttree_with_key order by a, b, c limit 1;",
+                                  true,
+                                  true,
+                                  DeterminismMode.FASTER);
+        // We could have ? = 1, ttree_with_key = [(1, 1, 1, 2, 3), (1, -1, 1, 2, 3)].
+        // Then the order evaluation has the single value [(1, 1)] and all rows are
+        // selected by the where clause.  This means both rows are listed, but
+        // we don't know in which order they will be listed.  The limit makes it
+        // not content deterministic as well.
+        assertPlanDeterminismCore("select * from ttree_with_key where abs(b) = ? order by a, c limit 1;",
+                                  false,
+                                  false,
+                                  DeterminismMode.FASTER);
+        // If ENG-8677 and follow on tickets are closed,
+        // we can reenable these tests.
+        final boolean ENG8677IsFixed = false;
+        // Two tables.  Actually, this is a self join as well.  That
+        // may be a reason to not allow it here.
+        assertPlanDeterminismCore("select tleft.* from ttree_with_key as tleft join ttree_with_key as tright on tleft.id = tright.id where b = ? order by a, c limit 1;",
+                                  ENG8677IsFixed,
+                                  ENG8677IsFixed,
+                                  DeterminismMode.FASTER);
+        // Functions of order by expressions should be ok, whether they.
+        // are deterministic or not.
+        assertPlanDeterminismCore("select abs(a) + abs(b) from ttree_with_key order by a+1, b+1, c+2 limit 1;",
+                                  ENG8677IsFixed,
+                                  ENG8677IsFixed,
+                                  DeterminismMode.FASTER);
+        // Since these functions (x->x + 1 and x->x + 2) are one-to-one, these
+        // functions are ok.
+        assertPlanDeterminismCore("select * from ttree_with_key order by a+1, b+1, c+2 limit 1;",
+                                  ENG8677IsFixed,
+                                  ENG8677IsFixed,
+                                  DeterminismMode.FASTER);
+        // It seems like this should be deterministic.  There
+        // are two copies of the table ttree_with_key.  The a, b and c
+        // columns of both are constrained to be equal.  These form a
+        // primary unique key.  If we have two rows:
+        //      r1 = <la1, lb1, lc1, ld1, le1, lid1, ra1, rb1, rc1, rd1, re1, rid1>
+        //      r2 = <la2, lb2, lc2, ld2, le2, lid2, ra2, rb2, rc2, rd2, re2, rid2>
+        // we know from the join conditions:
+        //      la1 = ra1, la2 = ra2
+        //      lb1 = rb1, lb2 = rb2
+        //      lc1 = rc1, lc2 = rc2
+        // If the ordering of r1 and r2 is the same, then
+        //      la1 = la2, rb1 = rb2, lc1 = lc2
+        // So, all the columns are equal: xay = x'ay', xby = x'by' and xcy = x'cy'.
+        // Since a, b, c is unique primary key,
+        //      ld1 = ld2, le1 = le2, lid1 = lid2
+        //      rd1 = rd2, re1 = re2, rid1 = rid2
+        // Since the two tables are copies on of the other,
+        //      ld1 = rd1, le1 = re1, lid1 = rid1
+        //      ld2 = rd2, le2 = re2, lid2 = rid2
+        // so everything is equal, and there is really only one column.  In particular,
+        // the selected columns are equal.
+        // Note: This argument depends on the Determinism Theorem.  See the attachment to
+        //       ENG-8677.
+        assertPlanDeterminismCore("select r.d, l.e, r.id from ttree_with_key as l join ttree_with_key as r on l.a = r.a and l.b = r.b and l.c = r.c order by l.a, r.b, l.c limit 1;",
+                                  ENG8677IsFixed,
+                                  ENG8677IsFixed,
+                                  DeterminismMode.FASTER);
+        // This is probably not possible. Let A be the matrix
+        //          | 1  1  1 |
+        //     A =  | 1  1 -1 |
+        //          | 1 -1  1 |
+        // Then det(A) = -3 != 0, and A is invertible.  If A*[a, b, c]' = A*[aa, bb, cc]', then
+        // [a, b, c]' = [aa, bb, cc]'.  Since (a, b, c) is a primary key, this means
+        // all the values are determined.
+        assertPlanDeterminismCore("select * from ttree_with_key order by a + b + c, a + b - c, a - b + c limit 1;",
+                                  ENG8677IsFixed,
+                                  ENG8677IsFixed,
+                                  DeterminismMode.FASTER);
+    }
+
+    public void testUnionDeterminism() throws Exception {
+        final boolean ENG8790IsFixed = false;
+        //
+        // These two queries should be nearly identical. However, they are not.  The
+        // problem, described in ENG-8790, is that in a union statement we only look
+        // at the left-most select statement.
+        //
+        assertPlanDeterminismCore("(select a, b, c from ttree_with_key order by a, b, c limit 1) union (select a, b, c from ttree_with_key);", !ENG8790IsFixed, true, DeterminismMode.FASTER);
+        assertPlanDeterminismCore("(select a, b, c from ttree_with_key) union (select a, b, c from ttree_with_key order by a, b, c limit 1);", ENG8790IsFixed, true, DeterminismMode.FASTER);
+        assertPlanDeterminismCore("select a from tonecolumn order by abs(a)", false, true, DeterminismMode.FASTER);
+    }
+
     private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content,
             DeterminismMode detMode)
     {
