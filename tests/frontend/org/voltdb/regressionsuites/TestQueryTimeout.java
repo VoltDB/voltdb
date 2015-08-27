@@ -339,13 +339,13 @@ public class TestQueryTimeout extends RegressionSuite {
 
         if (sync) {
             try {
-                client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
+                client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
             } catch(Exception ex) {
                 System.err.println(ex.getMessage());
                 fail(procName + " is supposed to succeed!");
             }
         } else {
-            client.callProcedureWithTimeout(m_callback, TIMEOUT*50, procName, params);
+            client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
             client.drain();
             checkCallbackSuccess();
         }
