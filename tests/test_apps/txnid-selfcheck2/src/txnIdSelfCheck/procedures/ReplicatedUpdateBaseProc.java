@@ -32,7 +32,7 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
             "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
 
     public final SQLStmt r_cleanUp = new SQLStmt(
-            "DELETE FROM replicated WHERE cid = ? and cnt < ?;");
+            "DELETE FROM replicated WHERE cid = ? and cnt <= ?;");
 
     public final SQLStmt r_getAdhocData = new SQLStmt(
             "SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
@@ -42,6 +42,9 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
 
     public final SQLStmt r_export = new SQLStmt(
             "INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
+    public final SQLStmt r_getViewData = new SQLStmt(
+            "SELECT * FROM replview WHERE cid=? ORDER BY cid DESC;");
 
     // This is for DR. Make sure that the MP transaction gets inserted into the same place in the txn stream
     // at the master and replica.  If they differ, we should get a hash mismatch at the Doctor Agent since we've

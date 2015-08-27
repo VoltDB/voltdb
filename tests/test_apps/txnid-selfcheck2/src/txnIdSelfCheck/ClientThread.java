@@ -32,6 +32,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -123,26 +125,26 @@ public class ClientThread extends BenchmarkThread {
 
         try {
             String procName = null;
-            int expectedTables = 4;
+            int expectedTables = 5;
             switch (m_type) {
             case PARTITIONED_SP:
                 procName = "UpdatePartitionedSP";
                 break;
             case PARTITIONED_MP:
                 procName = "UpdatePartitionedMP";
-                expectedTables = 5;
+                expectedTables = 6;
                 break;
             case REPLICATED:
                 procName = "UpdateReplicatedMP";
-                expectedTables = 5;
+                expectedTables = 6;
                 break;
             case HYBRID:
                 procName = "UpdateBothMP";
-                expectedTables = 5;
+                expectedTables = 6;
                 break;
             case ADHOC_MP:
                 procName = "UpdateReplicatedMPInProcAdHoc";
-                expectedTables = 5;
+                expectedTables = 6;
                 break;
             }
 
@@ -189,6 +191,37 @@ public class ClientThread extends BenchmarkThread {
                         shouldRollback + " data: " + data);
                 throw vae;
             }
+            // check on mat views
+            VoltTable view = results[4];
+            VoltTableRow row0 = view.fetchRow(0);
+            long cnt = data.fetchRow(0).getLong("cnt");
+
+            // number of entries in table should be 10 unless total count < 10
+            int entries = (cnt < 10) ? ((byte) cnt) + 1 : 10;
+            long min = (cnt < 10) ? 0 : cnt-9; // min = 0 if cnt < 10
+            long sum = 0;
+            if (cnt < 10) // sum for less than 10 rows in the table for this cid
+                for (int i=1; i<=cnt; i++)
+                    sum += i;
+            else sum = cnt*10-45; 
+            // sum of all the counts for 10 or more rows in the table for this cid
+
+            byte v_cid = (byte) row0.get(0, VoltType.TINYINT);
+            byte v_entries = (byte) row0.get(1, VoltType.TINYINT);
+            long v_max = (long) row0.get(2, VoltType.BIGINT);
+            long v_min = (long) row0.get(3, VoltType.BIGINT);
+            long v_sum = (long) row0.get(4, VoltType.BIGINT);
+
+            if (v_cid != m_cid)
+                hardStop("View cid:"+v_cid+" does not match the client cid for client:"+m_cid);
+            if (v_entries != entries)
+                hardStop("The count(*):"+v_entries+" aggregation from view X does not match the number of cnt entries:"+entries+" for client:"+m_cid);
+            if (v_max != cnt)
+                hardStop("The max(cnt):"+v_max+" aggregation from view X does not match the max:"+cnt+" for client:"+m_cid);
+            if (v_min != min)
+                hardStop("The min(cnt):"+v_min+" aggregation from view X does not match the min:"+min+" for client:"+m_cid);
+            if (v_sum != sum)
+                hardStop("The sum(cnt):"+v_sum+" aggregation from view X does not match the sum:"+sum+" for client:"+m_cid);
         }
         finally {
             // ensure rid is incremented (if not rolled back intentionally)
