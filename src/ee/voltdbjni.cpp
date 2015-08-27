@@ -452,6 +452,14 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
 
+// This method is called to enable / disable the materialized view update on all tables.
+SHAREDLIB_JNIEXPORT void JNICALL
+Java_org_voltdb_jni_ExecutionEngine_nativeSetViewsUpdateEnabled (
+    JNIEnv *env, jobject obj, jlong engine_ptr, jboolean enabled)
+{
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    engine->setViewsUpdateEnabled(enabled);
+}
 
 ////////////////////////////////////////////////////////////////////////////
 // PlanNode Execution

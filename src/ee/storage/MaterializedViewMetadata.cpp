@@ -44,6 +44,8 @@
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
 typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(PlanFragment);
+typedef std::pair<std::string, catalog::PlanFragment*> LabeledFragment;
 
 using namespace std;
 namespace voltdb {
@@ -82,20 +84,15 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 
     // handle index for min / max support
     setIndexForMinMax(mvInfo->indexForMinMax());
+    // set up build up query executors for catching up with pre-existing rows (ENG-8840)
+    setBuildUpExecutorVector(mvInfo->buildUpQueryStmt());
     // set up fallback query executors for min/max recalculation (ENG-8641)
     // must be set after indexForMinMax
     setFallbackExecutorVectors(mvInfo->fallbackQueryStmts());
 
     allocateBackedTuples();
+    populateViewFromDefinition();
 
-    // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
-        TableTuple scannedTuple(srcTable->schema());
-        TableIterator &iterator = srcTable->iterator();
-        while (iterator.next(scannedTuple)) {
-            processTupleInsert(scannedTuple, false);
-        }
-    }
     /* If there is no group by column and the target table is still empty
      * even after catching up with pre-existing source tuples, we should initialize the
      * target table with a row of default values.
@@ -147,6 +144,43 @@ string hexDecodeToString(const string hexString) {
     return retval;
 }
 
+void MaterializedViewMetadata::setBuildUpExecutorVector(const catalog::CatalogMap<catalog::Statement> &buildUpQueryStmts) {
+    m_buildUpExecutorVectors.clear();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    BOOST_FOREACH (LabeledStatement labeledStatement, buildUpQueryStmts) {
+        catalog::Statement *stmt = labeledStatement.second;
+        // The build up query normally looks like "INSERT INTO SELECT ..."
+        // So for most of the cases we will get 2 plan fragments.
+        // The first fragment ususally is SEND and RECEIVE (maybe also LIMIT)
+        // The second fragment is the real fragment for INSERT INTO SELECT...
+        // In current case we only execute the second fragment. (ENG-8840, Ethan)
+        BOOST_FOREACH (LabeledFragment labeledFragment, stmt->fragments()) {
+            const string b64plan = labeledFragment.second->plannodetree();
+            string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
+            boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
+            m_buildUpExecutorVectors.push_back(execVec);
+        }
+        string explanation = hexDecodeToString(stmt->explainplan());
+        // For debug:
+        // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        //     cout << "Build up query plan:" << endl;
+        //     cout << explanation << endl;
+        // }
+    }
+}
+
+// Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
+void MaterializedViewMetadata::populateViewFromDefinition() {
+    if (( ! m_srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
+        ExecutorContext* context = ExecutorContext::getExecutorContext();
+        // executing the stored plan to build up the view.
+        // Note we ignore m_buildUpExecutorVectors[0] it's just send / receive.
+        vector<AbstractExecutor*> executorList = m_buildUpExecutorVectors[1]->getExecutorList();
+        context->executeExecutors(executorList, 0);
+        context->cleanupExecutorsForSubquery(executorList);
+    }
+}
+
 void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts) {
     m_fallbackExecutorVectors.clear();
     m_usePlanForAgg.clear();
@@ -154,6 +188,8 @@ void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::Catalog
     int idx = 0;
     BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
         catalog::Statement *stmt = labeledStatement.second;
+        // Here we use stmt->fragments().begin()->second assuming the plan has only one fragment.
+        // This might not be still true in the future if we want to add view of table joins. (ENG-8840, Ethan)
         const string b64plan = stmt->fragments().begin()->second->plannodetree();
         string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
         string explanation = hexDecodeToString(stmt->explainplan());
@@ -176,10 +212,11 @@ void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::Catalog
         AbstractPlanNode* apn = executorList[0]->getPlanNode();
         if ( apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN ) {
             if ( m_indexForMinMax[idx] ) {
-                if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-                    cout << "hard-coded function uses: " << m_indexForMinMax[idx]->getName() << endl;
-                    cout << "plan uses: " << ((IndexScanPlanNode *)apn)->getTargetIndexName() << endl;
-                }
+                // For debug:
+                // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+                //     cout << "hard-coded function uses: " << m_indexForMinMax[idx]->getName() << endl;
+                //     cout << "plan uses: " << ((IndexScanPlanNode *)apn)->getTargetIndexName() << endl;
+                // }
                 m_usePlanForAgg.push_back( m_indexForMinMax[idx]->getName().compare( ((IndexScanPlanNode *)apn)->getTargetIndexName() ) != 0 );
             }
             else {
@@ -190,11 +227,11 @@ void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::Catalog
             m_usePlanForAgg.push_back(false);
         }
         // For debug:
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-            cout << "Aggregation " << idx << endl;
-            cout << explanation << endl;
-            cout << "Uses " << (m_usePlanForAgg[idx] ? "plan." : "hard-coded function.") << endl << endl;
-        }
+        // if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        //     cout << "Aggregation " << idx << endl;
+        //     cout << explanation << endl;
+        //     cout << "Uses " << (m_usePlanForAgg[idx] ? "plan." : "hard-coded function.") << endl << endl;
+        // }
         ++ idx;
     }
 }

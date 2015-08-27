@@ -195,6 +195,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        bool returnUniqueViolations,
                        bool shouldDRStream);
 
+        void setViewsUpdateEnabled(bool enabled);
+
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
         void setBuffers(char *parameter_buffer, int m_parameterBuffercapacity,

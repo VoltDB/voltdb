@@ -95,6 +95,7 @@
 
 #include <sstream>
 #include <locale>
+#include <iostream>
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -1042,6 +1043,18 @@ VoltDBEngine::loadTable(int32_t tableId,
     return true;
 }
 
+void VoltDBEngine::setViewsUpdateEnabled(bool enabled) {
+    BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
+        catalog::Table *catalogTable = labeledTable.second;
+        Table *table = m_tables[catalogTable->relativeIndex()];
+        // Only persistent tables
+        PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
+        if (pTable != NULL) {
+            pTable->setViewsUpdateEnabled(enabled);
+        }
+    }
+}
+
 /*
  * Delete and rebuild id based table collections. Does not affect
  * any currently stored tuples.
@@ -1418,7 +1431,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             char *resultBuffer = getReusedResultBuffer();
             assert(resultBuffer != NULL);
             int resultBufferCapacity = getReusedResultBufferCapacity();
-            if (resultBufferCapacity < sizeof(jint) * positions.size()) {
+            if (resultBufferCapacity < sizeof(int32_t) * positions.size()) {
                 throwFatalException("tableStreamSerializeMore: result buffer not large enough");
             }
             ReferenceSerializeOutput results(resultBuffer, resultBufferCapacity);
@@ -1780,6 +1793,11 @@ void VoltDBEngine::reportProgressToTopend() {
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {
     assert(m_tuplesModifiedStack.size() > 0);
+    if (m_tuplesModifiedStack.size() == 0) {
+        // Usually because we are internally executing some plan fragments.
+        // In that case we just ignore this **tuple modified** thing.
+        return;
+    }
     m_tuplesModifiedStack.top() += amount;
 }
 

@@ -124,7 +124,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         GetUSOs(25),
         updateHashinator(27),
         executeTask(28),
-        applyBinaryLog(29);
+        applyBinaryLog(29),
+        SetViewUpdateEnabled(30);
         Commands(final int id) {
             m_id = id;
         }
@@ -996,6 +997,24 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         if (responseBuffer != null) return responseBuffer.array();
         return null;
+    }
+
+    @Override
+    public void setViewsUpdateEnabled(final boolean enabled) {
+        m_data.clear();
+        m_data.putInt(Commands.SetViewUpdateEnabled.m_id);
+        if (enabled) {
+            m_data.put((byte)1);
+        } else {
+            m_data.put((byte)0);
+        }
+        try {
+            m_data.flip();
+            m_connection.write();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

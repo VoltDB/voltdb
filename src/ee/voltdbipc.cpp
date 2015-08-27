@@ -160,6 +160,8 @@ private:
 
     int8_t loadTable(struct ipc_command *cmd);
 
+    void setViewsUpdateEnabled(struct ipc_command *cmd);
+
     int8_t processRecoveryMessage( struct ipc_command *cmd);
 
     void tableHashCode( struct ipc_command *cmd);
@@ -341,6 +343,11 @@ typedef struct {
     char log[0];
 }__attribute__((packed)) apply_binary_log;
 
+typedef struct {
+    struct ipc_command cmd;
+    int8_t enabled;
+}__attribute__((packed)) set_views_update_enabled;
+
 
 using namespace voltdb;
 
@@ -484,6 +491,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 29:
           applyBinaryLog(cmd);
+          result = kErrorCode_None;
+          break;
+      case 30:
+          setViewsUpdateEnabled(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -1544,6 +1555,20 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
         response[0] = kErrorCode_Success;
         *reinterpret_cast<int64_t*>(&response[1]) = htonll(rows);
         writeOrDie(m_fd, (unsigned char*)response, 9);
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    }
+}
+
+// This method is called to enable / disable the materialized view update on all tables.
+void VoltDBIPC::setViewsUpdateEnabled(struct ipc_command *cmd) {
+    try {
+        set_views_update_enabled *params = (set_views_update_enabled*)cmd;
+        bool enabled = false;
+        if (params->enabled != 0) {
+            enabled = true;
+        }
+        m_engine->setViewsUpdateEnabled(enabled);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }

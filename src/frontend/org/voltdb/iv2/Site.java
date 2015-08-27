@@ -821,6 +821,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public void setViewsUpdateEnabled(boolean enabled) {
+        m_ee.setViewsUpdateEnabled(enabled);
+    }
+
+    @Override
     public void updateBackendLogLevels()
     {
         m_ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
