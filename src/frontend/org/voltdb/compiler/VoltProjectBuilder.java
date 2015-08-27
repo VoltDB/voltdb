@@ -22,7 +22,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -49,9 +48,11 @@ import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.FeatureNameType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
@@ -286,8 +287,10 @@ public class VoltProjectBuilder {
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
-    private Double m_rssLimit = null;
+    private String m_rssLimit = null;
     private Integer m_resourceCheckInterval = null;
+    private String m_defaultDiskLimitSize;
+    private Map<FeatureNameType, String> m_featureDiskLimits;
 
     private boolean m_useDDLSchema = false;
 
@@ -300,13 +303,23 @@ public class VoltProjectBuilder {
         return this;
     }
 
-    public VoltProjectBuilder setRssLimit(double limit) {
+    public VoltProjectBuilder setRssLimit(String limit) {
         m_rssLimit = limit;
         return this;
     }
 
     public VoltProjectBuilder setResourceCheckInterval(int seconds) {
         m_resourceCheckInterval = seconds;
+        return this;
+    }
+
+    public VoltProjectBuilder setDefaultDiskLimitSize(String defaultDiskLimitSize) {
+        m_defaultDiskLimitSize = defaultDiskLimitSize;
+        return this;
+    }
+
+    public VoltProjectBuilder setFeatureDiskLimits(Map<FeatureNameType, String> featureDiskLimits) {
+        m_featureDiskLimits = featureDiskLimits;
         return this;
     }
 
@@ -1156,7 +1169,7 @@ public class VoltProjectBuilder {
         if (m_rssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
-            memoryLimit.setSize(new BigDecimal(m_rssLimit));
+            memoryLimit.setSize(m_rssLimit);
             monitorType.setMemorylimit(memoryLimit);
         }
 
@@ -1165,7 +1178,31 @@ public class VoltProjectBuilder {
             monitorType.setFrequency(m_resourceCheckInterval);
         }
 
+        setupDiskLimitType(systemSettingType, factory);
+
         return systemSettingType;
+    }
+
+    private void setupDiskLimitType(SystemSettingsType systemSettingsType,
+            org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
+
+        if (m_defaultDiskLimitSize == null && (m_featureDiskLimits==null || m_featureDiskLimits.isEmpty())) {
+            return;
+        }
+
+        DiskLimitType diskLimit = factory.createDiskLimitType();
+        diskLimit.setSize(m_defaultDiskLimitSize);
+        if (m_featureDiskLimits!=null && !m_featureDiskLimits.isEmpty()) {
+            for (FeatureNameType featureName : m_featureDiskLimits.keySet()) {
+                DiskLimitType.Feature feature = factory.createDiskLimitTypeFeature();
+                feature.setName(featureName);
+                feature.setSize(m_featureDiskLimits.get(featureName));
+                diskLimit.getFeature().add(feature);
+            }
+        }
+
+        ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingsType, factory);
+        monitorType.setDisklimit(diskLimit);
     }
 
     private ResourceMonitorType initializeResourceMonitorType(SystemSettingsType systemSettingType,
