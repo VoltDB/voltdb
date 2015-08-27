@@ -369,6 +369,7 @@ public class ExportGeneration {
             if (m_partitionsIKnowIAmTheLeader.add(partition)) {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
                     try {
+                        eds.setMaster();
                         eds.acceptMastership();
                     } catch (Exception e) {
                         exportLog.error("Unable to start exporting", e);
@@ -835,6 +836,7 @@ public class ExportGeneration {
         exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
+                eds.setMaster();
                 eds.acceptMastership();
             } catch (Exception e) {
                 exportLog.error("Unable to start exporting", e);

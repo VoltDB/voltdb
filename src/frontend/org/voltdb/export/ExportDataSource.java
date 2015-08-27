@@ -94,7 +94,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
+    private long m_lastAckUSO = -1;
     private boolean m_runEveryWhere = false;
+    private boolean m_isMaster = false;
 
     /**
      * Create a new data source.
@@ -301,7 +303,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
 
-        long lastUso = m_firstUnpolledUso;
+        long lastUso = getFirstUnpolledUso();
         while (!m_committedBuffers.isEmpty()
                 && releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
@@ -319,7 +321,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         m_lastReleaseOffset = releaseOffset;
-        m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
+        m_firstUnpolledUso = Math.max(getFirstUnpolledUso(), lastUso);
     }
 
     public String getDatabase() {
@@ -662,6 +664,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return fut;
     }
 
+    private long getFirstUnpolledUso() {
+        if (m_isMaster) {
+            return m_firstUnpolledUso;
+        }
+        exportLog.info("I am replica must poll from last acked: " + m_lastAckUSO);
+        return m_lastAckUSO;
+    }
+
     private void pollImpl(SettableFuture<BBContainer> fut) {
         if (fut == null) {
             return;
@@ -689,7 +699,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data
-                    if (m_firstUnpolledUso < block.uso() + block.totalUso()) {
+                    if (getFirstUnpolledUso() < block.uso() + block.totalUso()) {
                         first_unpolled_block = block;
                         m_firstUnpolledUso = block.uso() + block.totalUso();
                         break;
@@ -767,13 +777,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void forwardAckToOtherReplicas(long uso) {
-        if (m_runEveryWhere) {
+        if (m_runEveryWhere && !m_isMaster) {
             return;
         }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
 
-        if (mbx != null) {
+        if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
             // signaturesBytes.length + ackUSO:long(8)
             final int msgLen = 4 + 4 + m_signatureBytes.length + 8;
@@ -793,6 +803,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso) {
+        if (m_runEveryWhere && !m_isMaster) {
+            m_lastAckUSO = uso;
+            exportLog.info("Export generation " + this.getGeneration() + " accepting mastership for partition " + this.getPartitionId() + " As REPLICA");
+            acceptMastership();
+        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
@@ -800,6 +815,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (!m_es.isShutdown()) {
                         ackImpl(uso);
                     }
+                    m_lastAckUSO = uso;
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
                 } catch (Error e) {
@@ -825,6 +841,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return;
             }
         }
+    }
+
+    public void setMaster() {
+        m_isMaster = true;
     }
 
     /**
