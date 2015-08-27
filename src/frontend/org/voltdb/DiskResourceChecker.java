@@ -89,7 +89,7 @@ public class DiskResourceChecker
             if (config.m_diskSizeLimit <= 0 && config.m_diskSizeLimitPerc <= 0) {
                 continue;
             }
-            if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit)) {
+            if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit, config.m_featureName)) {
                 m_logger.error("Disk is over configured limits for feature " + config.m_featureName);
                 return true;
             }
@@ -168,11 +168,13 @@ public class DiskResourceChecker
         }
     }
 
-    private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold)
+    private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold, FeatureNameType featureName)
     {
         boolean canWrite = (s_testFileCheck==null) ? filePath.canWrite() : s_testFileCheck.canWrite(filePath);
         if (!canWrite) {
-            m_logger.warn("Invalid or readonly file path " + filePath);
+            m_logger.error(String.format("Invalid or readonly file path %s (%s). Setting database to read-only. " +
+                    "Use voltadmin resume command once resource constraint is corrected.",
+                    filePath, featureName.value()));
             return false;
         }
 
@@ -190,9 +192,13 @@ public class DiskResourceChecker
         }
 
         if (usedSpace >= calculatedThreshold) {
-            m_logger.warn(String.format("Disk space usage on %s is >= the threshold value of %s. Total space=%d, Used space=%d",
-                    filePath,
-                    (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+"GB"), total, usedSpace));
+            m_logger.error(String.format(
+                    "Resource limit exceeded. Disk for path %s (%s) limit %s. Setting database to read-only. " +
+                    "Use voltadmin resume command once resource constraint is corrected.",
+                    filePath, featureName.value(),
+                    (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+" GB")));
+            m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
+                    filePath, featureName.value(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
             return false;
         } else {
             return true;
