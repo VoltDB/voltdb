@@ -28,8 +28,8 @@ public class PointType {
 
     public PointType() {
         m_isNull = true;
-        m_latitude = 0.0f;
-        m_longitude = 0.0f;
+        m_latitude = Float.MIN_VALUE;
+        m_longitude = Float.MIN_VALUE;
     }
 
     public boolean isNull() {
@@ -44,4 +44,17 @@ public class PointType {
         return m_longitude;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof PointType)) {
+            return false;
+        }
+
+        PointType that = (PointType)o;
+        if (that.getLatitude() != getLatitude()) {
+            return false;
+        }
+
+        return that.getLongitude() == getLongitude();
+    }
 }

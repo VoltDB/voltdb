@@ -30,8 +30,10 @@ public class TestPointType extends TestCase {
     public void testBasic() {
         PointType point = new PointType();
         assertTrue(point.isNull());
-        assertEquals(0.0f, point.getLatitude(), 0.000001);
-        assertEquals(0.0f, point.getLongitude(), 0.000001);
 
+        PointType otherPoint = new PointType();
+        assertTrue(point.equals(otherPoint));
+
+        assertFalse(point.equals(6));
     }
 }
