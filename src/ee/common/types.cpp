@@ -162,6 +162,9 @@ string getTypeName(ValueType type) {
         case (VALUE_TYPE_ARRAY):
             ret = "array";
             break;
+        case (VALUE_TYPE_POINT):
+            ret = "point";
+            break;
         default: {
             char buffer[32];
             snprintf(buffer, 32, "UNKNOWN[%d]", type);

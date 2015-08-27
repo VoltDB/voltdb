@@ -2417,6 +2417,8 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(TTInt);
       case VALUE_TYPE_BOOLEAN:
         return sizeof(bool);
+      case VALUE_TYPE_POINT:
+        return sizeof(int64_t);
       default:
           char message[128];
           snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
@@ -3098,6 +3100,7 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
      case VALUE_TYPE_BOOLEAN:
      case VALUE_TYPE_ADDRESS:
      case VALUE_TYPE_ARRAY:
+     case VALUE_TYPE_POINT:
      case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
          char message[128];
          snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
