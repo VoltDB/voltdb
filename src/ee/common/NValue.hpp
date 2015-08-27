@@ -2677,7 +2677,9 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     }
     case VALUE_TYPE_POINT:
     {
-        ::memcpy(retval.m_data, storage, sizeof(int64_t));
+        if ((retval.getPoint() = *reinterpret_cast<const int64_t*>(storage)) == INT64_NULL) {
+            retval.tagAsNull();
+        }
         break;
     }
     default:

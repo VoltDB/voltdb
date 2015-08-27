@@ -63,6 +63,13 @@ public class TestPointType extends RegressionSuite {
         PointType ptByColumnName = vt.getPoint("pt");
         assertTrue(vt.wasNull());
         assertTrue(ptByColumnName.isNull());
+
+        assertFalse(vt.advanceRow());
+
+        vt = client.callProcedure("@AdHoc", "select pt from t where pt is null;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        ptByIndex = vt.getPoint(0);
+        assert(vt.wasNull());
     }
 
     static public junit.framework.Test suite() {
