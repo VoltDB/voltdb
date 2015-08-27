@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -741,12 +742,22 @@ class Distributer {
                     !m_ex.isShutdown()) {
                     //Don't subscribe to a new node immediately
                     //to somewhat prevent a thundering herd
-                    m_ex.schedule(new Runnable() {
-                        @Override
-                        public void run() {
-                            subscribeToNewNode();
-                        }
-                    }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS), TimeUnit.MILLISECONDS);
+                    try
+                    {
+                        m_ex.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                subscribeToNewNode();
+                            }
+                        }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS),
+                                TimeUnit.MILLISECONDS);
+                    } catch (RejectedExecutionException ree)
+                    {
+                        // this is for race if m_ex shuts down in the middle of schedule
+                        ree.printStackTrace(); // for testing
+                        return;
+                    }
+
                 }
             }
 
