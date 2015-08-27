@@ -41,7 +41,7 @@ public class InsertExport2 extends VoltProcedure {
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     public final SQLStmt exportInsert = new SQLStmt("INSERT INTO kafkaExportTable2 " + sqlSuffix);
     public final SQLStmt mirrorInsert = new SQLStmt("INSERT INTO kafkaMirrorTable2 " + sqlSuffix);
-    public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM exportcounts LIMIT 1");
+    public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM exportcounts ORDER BY key LIMIT 1");
     public final SQLStmt insertCounts = new SQLStmt("INSERT INTO exportcounts VALUES (?, ?)");
     public final SQLStmt updateCounts = new SQLStmt("UPDATE exportcounts SET total_rows_exported=total_rows_exported+? where key = ?");
 

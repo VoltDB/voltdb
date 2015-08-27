@@ -41,7 +41,7 @@ import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
 public class InsertImport2 extends VoltProcedure {
-    public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM importcounts LIMIT 1");
+    public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM importcounts ORDER BY key LIMIT 1");
     public final SQLStmt insertCounts = new SQLStmt("INSERT INTO importcounts VALUES (?, ?)");
     public final SQLStmt updateCounts = new SQLStmt("UPDATE importcounts SET total_rows_deleted=total_rows_deleted+? where key = ?");
     public final SQLStmt selectMirrorRow = new SQLStmt("SELECT * FROM kafkamirrortable2 WHERE key = ? AND value = ? LIMIT 1");
