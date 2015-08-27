@@ -28,6 +28,7 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.PointType;
@@ -70,6 +71,22 @@ public class TestPointType extends RegressionSuite {
         assertTrue(vt.advanceRow());
         ptByIndex = vt.getPoint(0);
         assert(vt.wasNull());
+    }
+
+    public void testGeomFromText() throws Exception {
+        Client client = getClient();
+
+        validateTableOfScalarLongs(client,
+                "insert into t (pk) values (1);",
+                new long[] {1});
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select st_geomfromtext('point (42.5047 71.1961)') from t;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        PointType pt = vt.getPoint(0);
+        assertFalse(vt.wasNull());
+        assertEquals(42.5047, pt.getLatitude(), 0.000001);
+        assertEquals(71.1961, pt.getLongitude(), 0.000001);
     }
 
     static public junit.framework.Test suite() {

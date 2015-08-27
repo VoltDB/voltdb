@@ -129,6 +129,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_HEX                    = 20029;
         static final int FUNC_VOLT_BIN                    = 20030;
 
+        static final int FUNC_VOLT_ST_GEOMFROMTEXT        = 20031;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -224,7 +226,9 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-
+            new FunctionId("st_geomfromtext", Type.VOLT_POINT, FUNC_VOLT_ST_GEOMFROMTEXT, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET })
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
