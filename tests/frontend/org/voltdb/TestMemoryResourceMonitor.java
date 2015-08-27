@@ -93,6 +93,7 @@ public class TestMemoryResourceMonitor extends TestCase
     public void testBadRssValues() throws Exception {
         String[] badValues = { "xx%",
                 "-1%",
+                "100%",
                 "150%",
                 "40.3%",
                 "-20",

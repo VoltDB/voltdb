@@ -135,7 +135,6 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
     // package-private for junit
     double getMemoryLimitSize(String sizeStr)
     {
-        sizeStr = sizeStr.trim();
         if (sizeStr==null || sizeStr.length()==0) {
             return 0;
         }
@@ -143,7 +142,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         try {
             if (sizeStr.charAt(sizeStr.length()-1)=='%') { // size as a percentage of total available memory
                 int perc = Integer.parseInt(sizeStr.substring(0, sizeStr.length()-1));
-                if (perc<0 || perc > 100) {
+                if (perc<0 || perc > 99) {
                     throw new IllegalArgumentException("Invalid memory limit percentage: " + sizeStr);
                 }
                 return PlatformProperties.getPlatformProperties().ramInMegabytes*1048576L*perc/100.0;
