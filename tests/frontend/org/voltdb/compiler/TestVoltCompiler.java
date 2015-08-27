@@ -2750,12 +2750,20 @@ public class TestVoltCompiler extends TestCase {
         // in TestSQLFeaturesNewSuite
     }
 
-    public void testCreateTableWithPointType() {
+    public void testCreateTableWithPointType() throws Exception {
         String ddl =
-                "create table t ("
+                "create table points ("
+                + "  id integer,"
                 + "  pt point"
                 + ");";
-        checkDDLErrorMessage(ddl, null);
+        Database db = goodDDLAgainstSimpleSchema(ddl);
+        assertNotNull(db);
+
+        Table pointTable = db.getTables().getIgnoreCase("points");
+        assertNotNull(pointTable);
+
+        Column pointCol = pointTable.getColumns().getIgnoreCase("pt");
+        assertEquals(VoltType.POINT.getValue(), pointCol.getType());
     }
 
     public void testPartitionOnBadType() {

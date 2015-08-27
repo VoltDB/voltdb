@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -228,7 +229,17 @@ public enum VoltType {
             false, // unsigned?
             0, // minimum scale
             0, // maximum scale
-            "java.lang.Boolean"); // getObject return type
+            "java.lang.Boolean"), // getObject return type
+
+    /**
+     * Point type, for a geographical point (lat, long)
+     */
+    POINT ((byte)26,
+            8, // length in bytes
+            "POINT",
+            new Class[] {PointType.class},
+            PointType[].class,
+            'P'); // hope this is allowed!!
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
@@ -360,7 +371,7 @@ public enum VoltType {
 
     private final static ImmutableMap<Class<?>, VoltType> s_classes;
     //Update this if you add a type.
-    private final static VoltType s_types[] = new VoltType[26];
+    private final static VoltType s_types[] = new VoltType[27];
     static {
         ImmutableMap.Builder<Class<?>, VoltType> b = ImmutableMap.builder();
         HashMap<Class<?>, VoltType> validation = new HashMap<Class<?>, VoltType>();
