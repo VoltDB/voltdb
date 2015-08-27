@@ -32,6 +32,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
+import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -1142,6 +1143,16 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         assert (bd == null);
                     } else {
                         buffer.append(bd.toString());
+                    }
+                    break;
+                case POINT:
+                    PointType pt = r.getPoint(i);
+                    assert(r.wasNull());
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append("some value");
                     }
                     break;
                 default:

@@ -23,6 +23,7 @@ import java.nio.charset.Charset;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -281,6 +282,9 @@ public abstract class VoltTableRow {
         case DECIMAL:
             ret = getDecimalAsBigDecimal(columnIndex);
             break;
+        case POINT:
+            ret = getPoint(columnIndex);
+            break;
         default:
             throw new IllegalArgumentException("Invalid type '" + type + "'");
         }
@@ -531,6 +535,16 @@ public abstract class VoltTableRow {
     public final byte[] getVarbinary(String columnName) {
         final int colIndex = getColumnIndex(columnName);
         return getVarbinary(colIndex);
+    }
+
+    public final PointType getPoint(int columnIndex) {
+        m_wasNull = true;
+        return new PointType();
+    }
+
+    public final PointType getPoint(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getPoint(colIndex);
     }
 
     /**

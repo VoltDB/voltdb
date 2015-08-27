@@ -945,6 +945,16 @@ private:
         return *reinterpret_cast<bool*>(m_data);
     }
 
+    int64_t& getPoint() {
+        assert(getValueType() == VALUE_TYPE_POINT);
+        return *reinterpret_cast<int64_t*>(m_data);
+    }
+
+    const int64_t& getPoint() const {
+        assert(getValueType() == VALUE_TYPE_POINT);
+        return *reinterpret_cast<const int64_t*>(m_data);
+    }
+
     bool isBooleanNULL() const ;
 
     std::size_t getAllocationSizeForObject() const;
@@ -2540,6 +2550,9 @@ inline void NValue::setNull() {
     case VALUE_TYPE_DECIMAL:
         getDecimal().SetMin();
         break;
+    case VALUE_TYPE_POINT:
+        getPoint() = INT64_NULL;
+        break;
     default: {
         throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
     }
@@ -2662,6 +2675,11 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
         ::memcpy(retval.m_data, storage, sizeof(TTInt));
         break;
     }
+    case VALUE_TYPE_POINT:
+    {
+        ::memcpy(retval.m_data, storage, sizeof(int64_t));
+        break;
+    }
     default:
         throwDynamicSQLException("NValue::initFromTupleStorage() invalid column type '%s'",
                                  getTypeName(type).c_str());
@@ -2702,6 +2720,9 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         break;
     case VALUE_TYPE_DECIMAL:
         ::memcpy(storage, m_data, sizeof(TTInt));
+        break;
+    case VALUE_TYPE_POINT:
+        ::memcpy(storage, m_data, sizeof(int64_t));
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -2769,6 +2790,9 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         break;
     case VALUE_TYPE_DECIMAL:
         ::memcpy( storage, m_data, sizeof(TTInt));
+        break;
+    case VALUE_TYPE_POINT:
+        ::memcpy( storage, m_data, sizeof(int64_t));
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -3045,6 +3069,10 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
     case VALUE_TYPE_DECIMAL: {
         output.writeLong(getDecimal().table[1]);
         output.writeLong(getDecimal().table[0]);
+        break;
+    }
+    case VALUE_TYPE_POINT: {
+        output.writeLong(getPoint());
         break;
     }
     default:
