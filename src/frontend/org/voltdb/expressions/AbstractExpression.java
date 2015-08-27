@@ -289,8 +289,18 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     private static final String INDENT = "  | ";
 
+    /**
+     * Return a node name to help out toString.  Subclasses
+     * can chime in if they have a notion to.  See TupleValueExpression,
+     * for example.
+     */
+    protected String getExpressionNodeNameForToString() {
+        return this.getClass().getSimpleName();
+    }
+
     private void toStringHelper(String linePrefix, StringBuilder sb) {
-        String header = this.getClass().getSimpleName() + "[" + getExpressionType().toString() + "] : ";
+        String nodeName = getExpressionNodeNameForToString();
+        String header = getExpressionNodeNameForToString() + "[" + getExpressionType().toString() + "] : ";
         if (m_valueType != null) {
             header += m_valueType.toSQLString();
         }
