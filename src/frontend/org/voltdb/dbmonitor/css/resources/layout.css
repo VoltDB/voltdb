@@ -2749,7 +2749,7 @@ td.pauseCursorDefault a {
     font-weight: bold;
 }
 
-td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix, td.tdSnapshotFrequency, td.tdSnapshotRetained, td.snapshottd, td.tdDrConfig, td.memorySize {
+td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix, td.tdSnapshotFrequency, td.tdSnapshotRetained, td.snapshottd, td.tdDrConfig, td.memorySize , td.diskSize{
     position: relative;
 }
 
