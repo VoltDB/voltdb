@@ -59,6 +59,7 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -94,9 +95,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
-    private long m_lastAckUSO = -1;
+    private long m_lastAckUSO = 0;
     private boolean m_runEveryWhere = false;
     private boolean m_isMaster = false;
+    private AtomicBoolean m_replicaRunning = new AtomicBoolean(false);
 
     /**
      * Create a new data source.
@@ -668,8 +670,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_isMaster) {
             return m_firstUnpolledUso;
         }
-        exportLog.info("I am replica must poll from last acked: " + m_lastAckUSO);
-        return m_lastAckUSO;
+        //TODO: Think of ahead and behind cases....
+        long auso = Math.min(m_lastAckUSO, m_firstUnpolledUso);
+        return auso;
     }
 
     private void pollImpl(SettableFuture<BBContainer> fut) {
@@ -805,8 +808,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void ack(final long uso) {
         if (m_runEveryWhere && !m_isMaster) {
             m_lastAckUSO = uso;
-            exportLog.info("Export generation " + this.getGeneration() + " accepting mastership for partition " + this.getPartitionId() + " As REPLICA");
-            acceptMastership();
+            if (!m_replicaRunning.get()) {
+                exportLog.info("Export generation " + this.getGeneration() + " accepting mastership for partition " + this.getPartitionId() + " As REPLICA");
+                synchronized (m_replicaRunning) {
+                    if (m_replicaRunning.compareAndSet(false, true)) {
+                        acceptMastership();
+                    }
+                }
+            }
+            //We got this USO just to kick of replica processing.
+            if (uso == -1) {
+                return;
+            }
         }
         m_es.execute(new Runnable() {
             @Override
@@ -847,12 +860,21 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isMaster = true;
     }
 
+    //Is this a run everywhere source
+    public boolean isRunEveryWhere() {
+        return m_runEveryWhere;
+    }
+
     /**
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
+        if (m_runEveryWhere && m_isMaster) {
+            //Kick off replicas
+            forwardAckToOtherReplicas(0);
+        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {

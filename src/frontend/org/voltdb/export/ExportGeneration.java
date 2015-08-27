@@ -370,7 +370,9 @@ public class ExportGeneration {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
                     try {
                         eds.setMaster();
-                        eds.acceptMastership();
+                        if (!eds.isRunEveryWhere()) {
+                            eds.acceptMastership();
+                        }
                     } catch (Exception e) {
                         exportLog.error("Unable to start exporting", e);
                     }
