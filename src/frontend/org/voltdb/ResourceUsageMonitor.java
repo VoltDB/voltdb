@@ -73,8 +73,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         if (hasResourceLimitsConfigured()) {
             m_logger.info("Resource limit monitoring configured to run every " + m_resourceCheckInterval + " seconds");
             if (m_rssLimit > 0) {
-                m_logger.info("RSS limit: "  + (m_rssLimitStr.endsWith("%") ?
-                        m_rssLimitStr + " (" + m_rssLimit + " bytes)" : m_rssLimitStr + " GB"));
+                m_logger.info("RSS limit: "  + getRssLimitLogString());
             }
             if (m_diskLimitConfig!=null) {
                 m_diskLimitConfig.logConfiguredLimits();
@@ -82,6 +81,12 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         } else {
             m_logger.info("No resource usage limit monitoring configured");
         }
+    }
+
+    private String getRssLimitLogString()
+    {
+        return (m_rssLimitStr.endsWith("%") ?
+                m_rssLimitStr + " (" + m_rssLimit + " bytes)" : m_rssLimitStr + " GB");
     }
 
     @Override
@@ -92,7 +97,6 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         }
 
         if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
-            m_logger.error("Resource monitor detected limit reached. Pausing the server.");
             VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(this, 0, "@Pause");
         }
     }
@@ -113,10 +117,23 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
             m_logger.debug("RSS=" + datum.rss + " Configured rss limit=" + m_rssLimit);
         }
         if (datum.rss >= m_rssLimit) {
-            m_logger.error(String.format("RSS %d is over configured limit value %d.", datum.rss, m_rssLimit));
+            m_logger.error(String.format(
+                    "Resource limit exceeded. RSS limit %s. Setting database to read-only. " +
+                    "Use voltadmin resume command once resource constraint is corrected.",
+                    getRssLimitLogString()));
+            m_logger.error(String.format("Resource limit exceeded. Current RSS size %s.", getValueWithUnit(datum.rss)));
             return true;
         } else {
             return false;
+        }
+    }
+
+    public static String getValueWithUnit(long value)
+    {
+        if (value >= 1073741824L) {
+            return String.format("%.2f GB", (value/1073741824.0));
+        } else {
+            return value + " bytes";
         }
     }
 
