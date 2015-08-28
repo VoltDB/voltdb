@@ -3199,7 +3199,6 @@ class AdminTest extends TestBase {
                 page.overview.memoryLimitPopupCancel.isDisplayed()
             }
 
-
             waitFor(waitTime) {
                 try {
                     page.overview.memoryLimitPopupOk.click()
@@ -3208,7 +3207,7 @@ class AdminTest extends TestBase {
                 }
 
                 page.overview.memoryLimitEdit.isDisplayed()
-                page.overview.memoryLimitField.text().equals(initialHeartTimeout)
+                page.overview.memoryLimitValue.text().equals(initialMemoryLimit)
                 !page.overview.memoryLimitPopupOk.isDisplayed()
                 !page.overview.memoryLimitPopupCancel.isDisplayed()
             }
