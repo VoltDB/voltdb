@@ -694,6 +694,65 @@ TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
     EXPECT_EQ(results->offset(),MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE * (tuples_to_fill + 1));
 }
 
+TEST_F(DRTupleStreamTest, BufferEnforcesRowLimit) {
+    m_topend.pushDRBufferRetval = 25;
+
+    appendTuple(1, 2);
+    m_wrapper.endTransaction();
+
+    m_wrapper.periodicFlush(-1, addPartitionId(2));
+
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
+
+    m_topend.blocks.pop_front();
+    m_topend.receivedDRBuffer = false;
+    for (int i = 0; i < 25; i++) {
+        appendTuple(2, 3);
+    }
+    m_wrapper.endTransaction();
+
+    appendTuple(3, 4);
+
+    m_wrapper.periodicFlush(-1, addPartitionId(3));
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+
+    results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE);
+    EXPECT_EQ(results->offset(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE * 25);
+}
+
+TEST_F(DRTupleStreamTest, BufferAllowsAtLeastOneTxn) {
+    m_topend.pushDRBufferRetval = 0;
+
+    appendTuple(1, 2);
+    m_wrapper.endTransaction();
+
+    m_wrapper.periodicFlush(-1, addPartitionId(2));
+
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
+
+    m_topend.blocks.pop_front();
+    m_topend.receivedDRBuffer = false;
+
+    appendTuple(2, 3);
+    m_wrapper.endTransaction();
+
+    m_wrapper.periodicFlush(-1, addPartitionId(3));
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+
+    results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE);
+    EXPECT_EQ(results->offset(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE);
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
