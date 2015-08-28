@@ -84,9 +84,10 @@ public class TestPointType extends RegressionSuite {
                 "select st_geomfromtext('point (42.5047 71.1961)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
         PointType pt = vt.getPoint(0);
+        System.out.println(pt);
         assertFalse(vt.wasNull());
-        assertEquals(42.5047, pt.getLatitude(), 0.000001);
-        assertEquals(71.1961, pt.getLongitude(), 0.000001);
+        assertEquals(42.5047, pt.getLatitude(), 0.001);
+        assertEquals(71.1961, pt.getLongitude(), 0.001);
     }
 
     static public junit.framework.Test suite() {

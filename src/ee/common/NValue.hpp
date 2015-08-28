@@ -36,6 +36,7 @@
 
 #include "common/ExportSerializeIo.h"
 #include "common/FatalException.hpp"
+#include "common/PointType.hpp"
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
 #include "common/StringRef.h"
@@ -945,14 +946,16 @@ private:
         return *reinterpret_cast<bool*>(m_data);
     }
 
-    int64_t& getPoint() {
+    PointType& getPoint() {
         assert(getValueType() == VALUE_TYPE_POINT);
-        return *reinterpret_cast<int64_t*>(m_data);
+        assert(sizeof(PointType) == 8); // 2*sizeof(float)
+        return *reinterpret_cast<PointType*>(m_data);
     }
 
-    const int64_t& getPoint() const {
+    const PointType& getPoint() const {
         assert(getValueType() == VALUE_TYPE_POINT);
-        return *reinterpret_cast<const int64_t*>(m_data);
+        assert(sizeof(PointType) == 8); // 2*sizeof(float)
+        return *reinterpret_cast<const PointType*>(m_data);
     }
 
     bool isBooleanNULL() const ;
@@ -2428,7 +2431,7 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
       case VALUE_TYPE_BOOLEAN:
         return sizeof(bool);
       case VALUE_TYPE_POINT:
-        return sizeof(int64_t);
+        return sizeof(PointType);
       default:
           char message[128];
           snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
@@ -2551,7 +2554,7 @@ inline void NValue::setNull() {
         getDecimal().SetMin();
         break;
     case VALUE_TYPE_POINT:
-        getPoint() = INT64_NULL;
+        getPoint() = PointType();
         break;
     default: {
         throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
@@ -2677,7 +2680,8 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     }
     case VALUE_TYPE_POINT:
     {
-        if ((retval.getPoint() = *reinterpret_cast<const int64_t*>(storage)) == INT64_NULL) {
+        retval.getPoint() = *reinterpret_cast<const PointType*>(storage);
+        if (retval.getPoint().isNull()) {
             retval.tagAsNull();
         }
         break;
@@ -2724,7 +2728,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         ::memcpy(storage, m_data, sizeof(TTInt));
         break;
     case VALUE_TYPE_POINT:
-        ::memcpy(storage, m_data, sizeof(int64_t));
+        ::memcpy(storage, m_data, sizeof(PointType));
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -2794,7 +2798,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         ::memcpy( storage, m_data, sizeof(TTInt));
         break;
     case VALUE_TYPE_POINT:
-        ::memcpy( storage, m_data, sizeof(int64_t));
+        ::memcpy( storage, m_data, sizeof(PointType));
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -3074,7 +3078,10 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         break;
     }
     case VALUE_TYPE_POINT: {
-        output.writeLong(getPoint());
+        float lat = getPoint().getLatitude();
+        float lng = getPoint().getLongitude();
+        output.writeInt(*reinterpret_cast<int32_t*>(&lat));
+        output.writeInt(*reinterpret_cast<int32_t*>(&lng));
         break;
     }
     default:

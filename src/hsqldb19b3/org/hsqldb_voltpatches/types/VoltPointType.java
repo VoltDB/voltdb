@@ -33,8 +33,7 @@ public class VoltPointType extends Type {
 
     @Override
     public String getNameString() {
-        // TODO Auto-generated method stub
-        return null;
+        return "POINT";
     }
 
     @Override

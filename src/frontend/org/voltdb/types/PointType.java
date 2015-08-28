@@ -19,21 +19,23 @@ package org.voltdb.types;
 
 public class PointType {
 
-    private final boolean m_isNull;
-
     // Internal representation of a geospatial point
     // is subject to change.  For now, just use two doubles.
     private final double m_latitude;
     private final double m_longitude;
 
     public PointType() {
-        m_isNull = true;
-        m_latitude = Float.MIN_VALUE;
-        m_longitude = Float.MIN_VALUE;
+        m_latitude = Double.NaN;
+        m_longitude = Double.NaN;
+    }
+
+    public PointType(double latitude, double longitude) {
+        m_latitude = latitude;
+        m_longitude = longitude;
     }
 
     public boolean isNull() {
-        return m_isNull;
+        return Double.isNaN(m_latitude) || Double.isNaN(m_longitude);
     }
 
     public double getLatitude() {
@@ -44,6 +46,16 @@ public class PointType {
         return m_longitude;
     }
 
+    public String toString() {
+        if (isNull()) {
+            return "NULL";
+        }
+
+        return "POINT (" + m_latitude + " " + m_longitude + ")";
+    }
+
+    // Always returns false for null points (either lat or long NaN)
+    // Consider alternatives?
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof PointType)) {
