@@ -26,6 +26,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ST_GEOMFROMTEXT>() const {
 
     NValue returnValue(VALUE_TYPE_POINT);
     returnValue.getPoint() = 0;
+
+    return returnValue;
 }
 
 }
