@@ -1872,12 +1872,7 @@ void VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int64_t uniqueId,
                                   int64_t undoToken,
                                   const char *log) {
-    if (m_database->isActiveActiveDRed()) {
-        DRTupleStreamDisableGuard guard(m_drStream);
-        if (m_drReplicatedStream) {
-            DRTupleStreamDisableGuard guardReplicated(m_drReplicatedStream);
-        }
-    }
+    DRTupleStreamDisableGuard guard(m_drStream, m_drReplicatedStream, !m_database->isActiveActiveDRed());
     setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,
@@ -1940,19 +1935,13 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
 void VoltDBEngine::reportProgressToTopend() {
-    std::string tableName;
-    int64_t tableSize;
-
+    // TableName and tableSize are not really used in the JNI call
+    // Very low risk fix is make them constants
+    // TODO: refer ENG-8903 to deal with them
+    std::string tableName = "None";
+    int64_t tableSize = 0;
     assert(m_currExecutorVec);
 
-    if (m_lastAccessedTable == NULL) {
-        tableName = "None";
-        tableSize = 0;
-    }
-    else {
-        tableName = m_lastAccessedTable->name();
-        tableSize = m_lastAccessedTable->activeTupleCount();
-    }
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
