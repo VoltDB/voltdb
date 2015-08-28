@@ -22,7 +22,7 @@ class AdminTest extends TestBase {
 
     static String initialHeartTimeout
     static String initialQueryTimeout
-    static String initialMemoryLimit = -1
+    static String initialMemoryLimit = "-1"
 
     static boolean revertAutosnapshots = false
     static boolean revertHeartTimeout = false
@@ -1296,7 +1296,7 @@ class AdminTest extends TestBase {
         waitFor(waitTime) {
             page.overview.memoryLimitValue.isDisplayed()
         }
-        if(initialMemoryLimit == -1){
+        if(initialMemoryLimit == "-1"){
             initialMemoryLimit = page.overview.memoryLimitValue.text()
             revertMemorySize = true
         }
@@ -3189,6 +3189,8 @@ class AdminTest extends TestBase {
             }
 
             when:
+            if(initialMemoryLimit == "Not Enforced")
+                initialMemoryLimit = ""
             page.overview.memoryLimitField.value(initialMemoryLimit)
             waitFor(waitTime) {
                 page.overview.memoryLimitOk.click()
@@ -3207,6 +3209,8 @@ class AdminTest extends TestBase {
                 }
 
                 page.overview.memoryLimitEdit.isDisplayed()
+                if(initialMemoryLimit == "")
+                    initialMemoryLimit = "Not Enforced"
                 page.overview.memoryLimitValue.text().equals(initialMemoryLimit)
                 !page.overview.memoryLimitPopupOk.isDisplayed()
                 !page.overview.memoryLimitPopupCancel.isDisplayed()
