@@ -223,6 +223,14 @@
     <patternset refid='junit.exclusions'/>
 </patternset>
 
+<!-- patternsets specific for testStatisticsSuite per ENG-8540 -->
+<patternset id='junit.regression.teststatistics.path'>
+    <!-- Standard junit fileset -->
+    <include name='org/voltdb/regressionsuites/TestStatisticsSuite.class' />
+    <!-- Exclude tests -->
+    <patternset refid='junit.exclusions'/>
+</patternset>
+
 <!-- 6 new patternsets which will be used after Docker deployed in testing -->
 <patternset id='junit.regression.p1.path'>
     <!-- Standard junit fileset -->
@@ -1840,6 +1848,17 @@ TEST CASES
             <fileset dir='${build.test.dir}'>
                 <patternset refid="junit.all.path" />
                 <patternset refid="junit.exclude.regression.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name="junit_regression_teststatistics"
+    description="Execute JUnit test suites specific for testStatistics per ENG-8540">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.teststatistics.path" />
             </fileset>
         </tests>
     </run_junit>
