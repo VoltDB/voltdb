@@ -151,7 +151,6 @@
              </xs:complexType>
           </xs:element>
       </xs:sequence>
-      <xs:attribute name="size" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="resourceMonitorType">

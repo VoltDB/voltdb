@@ -289,7 +289,6 @@ public class VoltProjectBuilder {
     private Integer m_queryTimeout = null;
     private String m_rssLimit = null;
     private Integer m_resourceCheckInterval = null;
-    private String m_defaultDiskLimitSize;
     private Map<FeatureNameType, String> m_featureDiskLimits;
 
     private boolean m_useDDLSchema = false;
@@ -310,11 +309,6 @@ public class VoltProjectBuilder {
 
     public VoltProjectBuilder setResourceCheckInterval(int seconds) {
         m_resourceCheckInterval = seconds;
-        return this;
-    }
-
-    public VoltProjectBuilder setDefaultDiskLimitSize(String defaultDiskLimitSize) {
-        m_defaultDiskLimitSize = defaultDiskLimitSize;
         return this;
     }
 
@@ -1186,12 +1180,11 @@ public class VoltProjectBuilder {
     private void setupDiskLimitType(SystemSettingsType systemSettingsType,
             org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
 
-        if (m_defaultDiskLimitSize == null && (m_featureDiskLimits==null || m_featureDiskLimits.isEmpty())) {
+        if (m_featureDiskLimits==null || m_featureDiskLimits.isEmpty()) {
             return;
         }
 
         DiskLimitType diskLimit = factory.createDiskLimitType();
-        diskLimit.setSize(m_defaultDiskLimitSize);
         if (m_featureDiskLimits!=null && !m_featureDiskLimits.isEmpty()) {
             for (FeatureNameType featureName : m_featureDiskLimits.keySet()) {
                 DiskLimitType.Feature feature = factory.createDiskLimitTypeFeature();
