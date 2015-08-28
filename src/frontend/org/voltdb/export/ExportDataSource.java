@@ -59,7 +59,6 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -98,7 +97,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private long m_lastAckUSO = 0;
     private boolean m_runEveryWhere = false;
     private boolean m_isMaster = false;
-    private AtomicBoolean m_replicaRunning = new AtomicBoolean(false);
+    private boolean m_replicaRunning = false;
+    private boolean m_replicaKicked = false;
 
     /**
      * Create a new data source.
@@ -646,7 +646,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                          * which nulls out the field
                          */
                         if (m_pollFuture != null) {
-                            //continue? backoff?
+                            fut.setException(new RuntimeException("Should not poll more than once"));
                             return;
                         }
                         if (!m_es.isShutdown()) {
@@ -808,17 +808,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void ack(final long uso) {
         if (m_runEveryWhere && !m_isMaster) {
             m_lastAckUSO = uso;
-            if (!m_replicaRunning.get()) {
-                exportLog.info("Export generation " + this.getGeneration() + " accepting mastership for partition " + this.getPartitionId() + " As REPLICA");
-                synchronized (m_replicaRunning) {
-                    if (m_replicaRunning.compareAndSet(false, true)) {
-                        acceptMastership();
-                    }
-                }
-            }
-            //We got this USO just to kick of replica processing.
-            if (uso == -1) {
-                return;
+            //These are single threaded so no need to lock.
+            if (!m_replicaRunning) {
+                exportLog.info("Export generation " + this.getGeneration() + " accepting mastership for partition " + this.getPartitionId() + " as replica");
+                acceptMastership();
+                m_replicaRunning = true;
             }
         }
         m_es.execute(new Runnable() {
@@ -871,9 +865,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
-        if (m_runEveryWhere && m_isMaster) {
+        if (m_runEveryWhere && m_isMaster && !m_replicaKicked) {
             //Kick off replicas
             forwardAckToOtherReplicas(0);
+        }
+        if (m_runEveryWhere && m_replicaRunning) {
+            exportLog.info("Export generation " + this.getGeneration() + " mastership for replica partition " + this.getPartitionId() + " already accepted.");
+            return;
         }
         m_es.execute(new Runnable() {
             @Override
