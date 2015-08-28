@@ -14,8 +14,11 @@
 --{_stringfun |= "LOWER"}
 --{_stringfun |= "UPPER"}
 
-{_genericagg |= "MIN"}
-{_genericagg |= "MAX"}
+-- Aggregate functions that accept a string (or numeric) column and return the same type
+{_stringagg |= "MIN"}
+{_stringagg |= "MAX"}
+
+{_genericagg |= "_stringagg"}
 {_genericagg |= "COUNT"}
 
 {_numagg |= "SUM"}
