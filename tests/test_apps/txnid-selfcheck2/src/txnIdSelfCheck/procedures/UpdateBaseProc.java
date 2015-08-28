@@ -244,16 +244,16 @@ public class UpdateBaseProc extends VoltProcedure {
 
             if (v_entries != entries)
                 throw new VoltAbortException(
-                        "The count(*):"+v_entries+" materialized view aggregation does not match the number of cnt entries:"+entries+" for client:"+cid);
+                        "The count(*):"+v_entries+" materialized view aggregation does not match the number of cnt entries:"+entries+" for cid:"+cid);
             if (v_max != max)
                 throw new VoltAbortException(
-                        "The max(cnt):"+v_max+" materialized view aggregation does not match the max:"+max+" for client:"+cid);
+                        "The max(cnt):"+v_max+" materialized view aggregation does not match the max:"+max+" for cid:"+cid);
             if (v_min != min)
                 throw new VoltAbortException(
-                        "The min(cnt):"+v_min+" materialized view aggregation does not match the min:"+min+" for client:"+cid);
+                        "The min(cnt):"+v_min+" materialized view aggregation does not match the min:"+min+" for cid:"+cid);
             if (v_sum != sum)
                 throw new VoltAbortException(
-                        "The sum(cnt):"+v_sum+" materialized view aggregation does not match the sum:"+sum+" for client:"+cid);
+                        "The sum(cnt):"+v_sum+" materialized view aggregation does not match the sum:"+sum+" for cid:"+cid);
         }
     }
 }
