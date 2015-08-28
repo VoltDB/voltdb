@@ -1141,6 +1141,7 @@ JAR BUILDING
     <jar destfile="voltdb/voltdb-${dist.version}.jar" duplicate="preserve">
         <fileset dir="${build.client.dir}" defaultexcludes="yes">
             <include name="**"/>
+            <exclude name="org/voltdb/jdbc/"/>
         </fileset>
         <fileset dir="${build.prod.dir}" defaultexcludes="yes">
             <include name="org/voltdb/**"/>
@@ -1162,6 +1163,7 @@ JAR BUILDING
             <include name="org/HdrHistogram_voltpatches/**" />
             <include name="org/mindrot/**" />
             <include name="org/spearce_voltpatches/**" />
+            <exclude name="org/voltdb/jdbc/"/>
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
