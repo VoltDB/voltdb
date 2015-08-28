@@ -24,6 +24,7 @@
 package txnIdSelfCheck;
 
 import java.text.SimpleDateFormat;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -67,6 +68,7 @@ public class Benchmark {
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------";
+    final DecimalFormat twoDForm = new DecimalFormat("#.##");
 
     // validated command line configuration
     final Config config;
@@ -94,6 +96,8 @@ public class Benchmark {
     public static AtomicLong txnCount = new AtomicLong();
     private long txnCountAtLastCheck;
     private long lastProgressTimestamp = System.currentTimeMillis();
+    private VoltTable sysinfo;
+    private boolean isSynchronous = false;
 
     // For retry connections
     private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
@@ -521,6 +525,19 @@ public class Benchmark {
         }
     };
 
+    private void printClientStats() {
+        int least = ClientThread.leastMissingCmds;
+        log.info("Starting stats output for client threads.  \n"
+                + "Number of Running Client Threads --------------- : "+ClientThread.numTotalClients+"\n"
+                + "Number of Resets: ------------------------------ : "+ClientThread.numResets+"\n"
+                + "Clients Missing Transactions After Recover ----- : "+ClientThread.numClientsMissingCmds+"\n"
+                + "Max Missing Transactions For One Client -------- : "+ClientThread.maxMissingCmds+"\n"
+                + "Min Missing Transactions For One Client -------- : "+(least == Short.MAX_VALUE ? 0 : least)+"\n"
+                + "Total Missing Transactions For All Clients ----- : "+ClientThread.totalMissingCmds+"\n"
+                + "Avg Missing Transactions Per Client Missing Data : "+(least == Short.MAX_VALUE ? "n/a" :
+                    Double.valueOf(twoDForm.format((double) ClientThread.totalMissingCmds/ClientThread.numClientsMissingCmds))));
+    }
+
     BigTableLoader partBiglt = null;
     BigTableLoader replBiglt = null;
     TruncateTableLoader partTrunclt = null;
@@ -559,6 +576,25 @@ public class Benchmark {
 
         // connect to one or more servers, loop until success
         connect();
+        long connectTime = System.currentTimeMillis();
+
+        sysinfo = client.callProcedure("@SystemInformation", "deployment").getResults()[0];
+        while (sysinfo.advanceRow()) {
+            String property = sysinfo.getString(0);
+            if (property.equals("commandlogmode")) {
+                String value = sysinfo.getString(1);
+                if (value.equals("sync"))
+                    isSynchronous = true;
+            }
+        }
+
+    Runtime.getRuntime().addShutdownHook(new Thread() {
+            public void run() {
+                if (isSynchronous)
+                    printClientStats();
+            }
+        });
+
 
         // get partition count
         int partitionCount = 0;
@@ -601,7 +637,7 @@ public class Benchmark {
         if (!config.disabledThreads.contains("clients")) {
             for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
                 ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
-                        config.allowinprocadhoc, config.mpratio);
+                        config.allowinprocadhoc, config.mpratio, isSynchronous);
                 //clientThread.start(); # started after preload is complete
                 clientThreads.add(clientThread);
             }
@@ -710,9 +746,24 @@ public class Benchmark {
         }
 
         log.info("All threads started...");
-
+        // waiting for things to initialize
+        Thread.sleep(5000);
         while (true) {
-            Thread.sleep(Integer.MAX_VALUE);
+            // Sleeps forever if 1. the db is async (in which case missing cmd logs after recovery are not relevant)
+            // 2. the client threads are disabled. 
+            // otherwise, waits for all clients to disconnect. 
+            while (!isSynchronous || disabledThreads.contains("clients") || ClientThread.currActiveClients > 0) {
+                Thread.sleep(1000);
+            } // Once all clients disconnect, this loop waits for all clients to reconnect. 
+            while (ClientThread.currActiveClients < ClientThread.numTotalClients) {
+                Thread.sleep(1000);
+            } // after all clients have disconnected and then reconnected, check client stats and start over
+            ClientThread.numResets += 1;
+            if (ClientThread.numClientsMissingCmds > 0) {
+                printClientStats();
+                // comment the below line out to take stats over multiple runs.
+                hardStop("Commands were missing from client threads after recovery, see above client statistics.");
+            }
         }
     }
 
@@ -816,9 +867,9 @@ public class Benchmark {
                 }
                 System.exit(exitcode);
             }
-    };
-    runTimer.schedule(runEndTask, config.duration * 1000);
-}
+        };
+        runTimer.schedule(runEndTask, config.duration * 1000);
+    }
 
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
