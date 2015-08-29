@@ -93,16 +93,12 @@ Table* TableFactory::getPersistentTable(
     configureStats(databaseId, name, table);
 
     if(!exportOnly) {
-        PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
-        assert(persistentTable);
-        if(persistentTable) {
-            TBPtr block = persistentTable->allocateNextBlock();
-            if (block->hasFreeTuples()) {
-                persistentTable->m_blocksWithSpace.insert(block);
-            }
-        }
+        PersistentTable *persistentTable = static_cast<PersistentTable*>(table);
+        TBPtr block = persistentTable->allocateNextBlock();
+        assert(block->hasFreeTuples());
+        persistentTable->m_blocksWithSpace.insert(block);
     }
-    return dynamic_cast<Table*>(table);
+    return table;
 }
 
 TempTable* TableFactory::getTempTable(
