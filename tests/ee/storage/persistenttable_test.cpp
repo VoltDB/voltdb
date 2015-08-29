@@ -290,7 +290,8 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
         engine->getTable("T"));
     ASSERT_NE(NULL, table);
 
-    int tuplesToInsert = 10;
+    const int tuplesToInsert = 10;
+    (void) tuplesToInsert;  // to make compiler happy
     ASSERT_EQ(1, table->allocatedBlockCount());
     assert(tableutil::addRandomTuples(table, tuplesToInsert));
     size_t blockCount = table->allocatedBlockCount();
