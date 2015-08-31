@@ -93,8 +93,9 @@ Table* TableFactory::getPersistentTable(
     configureStats(databaseId, name, table);
 
     if(!exportOnly) {
-        // allocate tuple storage block ahead of time instead of waiting till first tuple insertion.
-        // Intend of allocating tuple block storage ahead is to improve performance on first tuple insertion.
+        // allocate tuple storage block for the persistent table ahead of time
+        // instead of waiting till first tuple insertion. Intend of allocating tuple
+        // block storage ahead is to improve performance on first tuple insertion.
         PersistentTable *persistentTable = static_cast<PersistentTable*>(table);
         TBPtr block = persistentTable->allocateNextBlock();
         assert(block->hasFreeTuples());
