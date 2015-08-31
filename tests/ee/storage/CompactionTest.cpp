@@ -364,8 +364,8 @@ TEST_F(CompactionTest, BasicCompaction) {
         m_table->deleteTuple(tuple, true);
     }
     m_table->doForcedCompaction();
-    // ENG-8872: at any given point, persistent table will have atleast one block available with m_data
-    // even if that block is empty
+    // At any given point, persistent table will have atleast one block available
+    // with m_data even if that block is empty
     ASSERT_EQ( m_table->m_data.size(), 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }
