@@ -584,9 +584,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT A3, B3, COUNT(*) FROM T3 GROUP BY A3, B3 LIMIT 5");
         checkGroupByOnlyPlanWithLimit(true, false, true, true);
 
-        // In future, it may use the serial aggregate: ENG-6586
         pns = compileToFragments("SELECT A3, B3, COUNT(*) FROM T3 WHERE A3 > 1 GROUP BY A3, B3 LIMIT 5");
-        checkGroupByOnlyPlanWithLimit(true, true, true, false);
+        checkGroupByOnlyPlanWithLimit(true, false, true, true);
 
         //
         // negative tests
