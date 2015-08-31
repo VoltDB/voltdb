@@ -902,8 +902,12 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, 
         }
     }
 
-    // if the current block is empty and there are more than one blocks, release the existing
-    // empty block.
+    // if the current block is empty and there are more than one storage blocks, release the
+    // existing empty block. If there is only tuple block storage block remaining and is empty,
+    // if and caller has not requested to release the last remaining storage block, don't release
+    // the last empty tuple storage block. Intend of not releasing the last remaining empty block
+    // is to improve performance at time of inserting first tuple in the table next time by
+    // avoiding to fetch new storage tuple block for storing tuples at time of insertion
     if (block->isEmpty() && (m_data.size() > 1 || deleteLastEmptyBlock)) {
         m_data.erase(block->address());
         m_blocksWithSpace.erase(block);
