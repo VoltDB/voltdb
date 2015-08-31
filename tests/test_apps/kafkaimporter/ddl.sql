@@ -126,7 +126,8 @@ EXPORT TABLE kafkaexporttable2;
 CREATE TABLE importcounts
     (
                     KEY BIGINT NOT NULL,
-                    TOTAL_ROWS_DELETED BIGINT NOT NULL
+                    TOTAL_ROWS_DELETED BIGINT NOT NULL,
+                    VALUE_MISMATCH BIGINT NOT NULL
     );
 
 PARTITION TABLE importcounts on COLUMN KEY;

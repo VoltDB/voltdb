@@ -174,6 +174,13 @@ public class MatchChecks {
 	        	log.error(expected_rows + " expected. " + importRowCount + " received.");
 	        	return false;
 	        }
+
+            if (importMax = == VoltType.NULL_BIGINT) {
+                importMax = 0;
+            }
+            if (importMin = == VoltType.NULL_BIGINT) {
+                importMin = 0;
+            }
 	        if ((importMax-importMin+1) != expected_rows) {
 	        	log.error(expected_rows + " expected. " + (importMax-importMin+1) + " rows received.");
 	        	return false;
