@@ -1536,6 +1536,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sql, stmtsArray, userParams, null, explainMode,
                 userPartitionKey == null, userPartitionKey,
                 task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                task.getBatchTimeout(),
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                 VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
                 m_adhocCompletionHandler, user);
@@ -2180,6 +2181,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         task.type = plannedStmtBatch.work.invocationType;
         task.originalTxnId = plannedStmtBatch.work.originalTxnId;
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
+        task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
