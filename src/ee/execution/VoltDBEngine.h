@@ -368,7 +368,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void updateHashinator(HashinatorType type, const char *config,
                               int32_t *configPtr, uint32_t numTokens);
 
-        void applyBinaryLog(int64_t txnId,
+        int64_t applyBinaryLog(int64_t txnId,
                             int64_t spHandle,
                             int64_t lastCommittedSpHandle,
                             int64_t uniqueId,

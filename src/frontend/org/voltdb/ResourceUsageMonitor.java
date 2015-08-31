@@ -85,8 +85,9 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
 
     private String getRssLimitLogString()
     {
+        String rssWithUnit = getValueWithUnit(m_rssLimit);
         return (m_rssLimitStr.endsWith("%") ?
-                m_rssLimitStr + " (" + m_rssLimit + " bytes)" : m_rssLimitStr + " GB");
+                m_rssLimitStr + " (" +  rssWithUnit + ")" : rssWithUnit);
     }
 
     @Override
@@ -132,6 +133,8 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
     {
         if (value >= 1073741824L) {
             return String.format("%.2f GB", (value/1073741824.0));
+        } else if (value >= 1048576) {
+            return String.format("%.2f MB", (value/1048576.0));
         } else {
             return value + " bytes";
         }

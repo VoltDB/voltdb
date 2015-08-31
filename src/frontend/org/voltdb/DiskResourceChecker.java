@@ -208,7 +208,7 @@ public class DiskResourceChecker
     private static File getPathForFeature(FeatureNameType featureName, PathsType pathsConfig)
     {
         // pathsConfig will never be null or something is really wrong
-        File voltDbRoot = CatalogUtil.getVoltDbRoot(pathsConfig);
+        File voltDbRoot = CatalogUtil.getVoltDbRoot(pathsConfig).getAbsoluteFile();
         switch(featureName) {
         case COMMANDLOG :
             return CatalogUtil.getCommandLog(pathsConfig.getCommandlog(), voltDbRoot);
