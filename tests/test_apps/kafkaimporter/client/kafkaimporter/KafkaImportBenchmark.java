@@ -226,11 +226,16 @@ public class KafkaImportBenchmark {
                 if (count == VoltType.NULL_BIGINT)
                     count = 0;
                 importProgress.add((int) count);
-                //log.info(importProgress.toString());
 
-                if (importProgress.size() > 1) {
-                    log.info("Import Throughput " + (count - importProgress.get(importProgress.size() - 2)) / period + "/s, Total Rows: " + count);
+                // for alltypes, if a column in mirror doesn't match import, key will be a row key, and non-zero
+                long key = MatchChecks.checkRowMismatch(client);
+                if (key != 0) {
+                    log.error("Import value mismatch at row " + key + ". Exiting.");
+                    System.exit(-1);
                 }
+
+                if (importProgress.size() > 1)
+                    log.info("Import Throughput " + (count - importProgress.get(importProgress.size() - 2)) / period + "/s, Total Rows: " + count);
             }
         },
             config.displayinterval * 1000,

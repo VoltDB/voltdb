@@ -27,6 +27,7 @@ import java.io.IOException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -113,6 +114,8 @@ public class MatchChecks {
         ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_EXPORTED) from exportcounts order by 1;");
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
         return data.asScalarLong();
     }
 
@@ -121,7 +124,18 @@ public class MatchChecks {
         ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_DELETED) from importcounts order by 1;");
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
         return data.asScalarLong();
+    }
+
+    protected static long checkRowMismatch(Client client) {
+        // check if any rows failed column by colunn comparison so we can fail fast
+        ClientResponse response = doAdHoc(client, "select key from importcounts where value_mismatch = 1 limit 1;");
+        VoltTable[] result = response.getResults();
+        if (result[0].getRowCount() == 0 || result[0].asScalarLong() == 0)
+            return 0;
+        return result[0].asScalarLong();
     }
 
     public static long getImportTableRowCount(boolean alltypes, Client client) {

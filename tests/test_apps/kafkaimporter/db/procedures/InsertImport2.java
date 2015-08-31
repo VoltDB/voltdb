@@ -42,8 +42,9 @@ import org.voltdb.types.TimestampType;
 
 public class InsertImport2 extends VoltProcedure {
     public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM importcounts ORDER BY key LIMIT 1");
-    public final SQLStmt insertCounts = new SQLStmt("INSERT INTO importcounts VALUES (?, ?)");
+    public final SQLStmt insertCounts = new SQLStmt("INSERT INTO importcounts(KEY, TOTAL_ROWS_DELETED) VALUES (?, ?)");
     public final SQLStmt updateCounts = new SQLStmt("UPDATE importcounts SET total_rows_deleted=total_rows_deleted+? where key = ?");
+    public final SQLStmt updateMismatch = new SQLStmt("INSERT INTO importcounts VALUES(?, ?, ?)");
     public final SQLStmt selectMirrorRow = new SQLStmt("SELECT * FROM kafkamirrortable2 WHERE key = ? AND value = ? LIMIT 1");
     public final String sqlSuffix =
             "(key, value, rowid_group, type_null_tinyint, type_not_null_tinyint, " +
@@ -208,6 +209,10 @@ public class InsertImport2 extends VoltProcedure {
             if (rowCheckOk) {  // delete the row
                 voltQueueSQL(deleteMirrorRow, EXPECT_SCALAR_LONG, key, value);
                 deletedCount = voltExecuteSQL()[0].asScalarLong();
+            } else { // there was a data mismatch; set VALUE_MISMATCH, which will be noticed by client
+                voltQueueSQL(updateMismatch, key, value, 1);
+                voltExecuteSQL();
+                return 0;
             }
 
             if (deletedCount != 1) {
@@ -247,7 +252,7 @@ public class InsertImport2 extends VoltProcedure {
     }
 
     private boolean reportMismatch(String typeName, String mirrorVal, String importVal) {
-        System.out.println("Mirror " + typeName + "not equal to import " + typeName + ":" + mirrorVal + " != " + importVal);
+        System.out.println("Mirror " + typeName + " not equal to import " + typeName + ":" + mirrorVal + " != " + importVal);
         return false;
     }
 }
