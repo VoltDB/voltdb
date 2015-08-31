@@ -565,7 +565,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL), bool deleteLastEmptyBlock=false);
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -854,7 +854,7 @@ inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
 }
 
 
-inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, bool deleteLastEmptyBlock)
 {
     // May not delete an already deleted tuple.
     assert(tuple.isActive());
@@ -901,7 +901,9 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
         }
     }
 
-    if (block->isEmpty()) {
+    // if the current block is empty and there are more than one blocks, release the existing
+    // empty block.
+    if (block->isEmpty() && (m_data.size() > 1 || deleteLastEmptyBlock)) {
         m_data.erase(block->address());
         m_blocksWithSpace.erase(block);
         m_blocksNotPendingSnapshot.erase(block);
