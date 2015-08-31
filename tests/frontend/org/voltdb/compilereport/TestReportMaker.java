@@ -143,7 +143,7 @@ public class TestReportMaker extends TestCase {
                 "SET DR=ACTIVE;";
         String report = compileAndGenerateCatalogReport(ddl);
 
-        assertTrue(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans and may become slower as table grow."));
+        assertTrue(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
     }
 
     // Under active/active DR, create a DRed table without index will trigger warning
@@ -159,7 +159,7 @@ public class TestReportMaker extends TestCase {
                 "DR TABLE " + tableName + ";" +
                 "SET DR=ACTIVE;";
         String report = compileAndGenerateCatalogReport(indexDDL);
-        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans and may become slower as table grow."));
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String primayKeyDDL =
                 "CREATE TABLE " + tableName +" ( " +
@@ -171,7 +171,7 @@ public class TestReportMaker extends TestCase {
                 "DR TABLE " + tableName + ";" +
                 "SET DR=ACTIVE;";
         report = compileAndGenerateCatalogReport(primayKeyDDL);
-        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans and may become slower as table grow."));
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String constaintDDL =
                 "CREATE TABLE " + tableName +" ( " +
@@ -183,7 +183,7 @@ public class TestReportMaker extends TestCase {
                 "DR TABLE " + tableName + ";" +
                 "SET DR=ACTIVE;";
         report = compileAndGenerateCatalogReport(constaintDDL);
-        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans and may become slower as table grow."));
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String uniqueDDL =
                 "CREATE TABLE " + tableName +" ( " +
@@ -194,7 +194,7 @@ public class TestReportMaker extends TestCase {
                 "DR TABLE " + tableName + ";" +
                 "SET DR=ACTIVE;";
         report = compileAndGenerateCatalogReport(uniqueDDL);
-        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans and may become slower as table grow."));
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String assumeUniqueDDL =
                 "CREATE TABLE " + tableName +" ( " +
@@ -205,6 +205,6 @@ public class TestReportMaker extends TestCase {
                 "DR TABLE " + tableName + ";" +
                 "SET DR=ACTIVE;";
         report = compileAndGenerateCatalogReport(assumeUniqueDDL);
-        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans and may become slower as table grow."));
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
     }
 }
