@@ -494,6 +494,19 @@ enum DRRecordType {
     DR_RECORD_DELETE_BY_INDEX = 6
 };
 
+inline size_t rowCostForDRRecord(DRRecordType type) {
+    switch (type) {
+    case DR_RECORD_INSERT:
+    case DR_RECORD_DELETE:
+    case DR_RECORD_DELETE_BY_INDEX:
+        return 1;
+    case DR_RECORD_TRUNCATE_TABLE:
+        return 100;
+    default:
+        return 0;
+    }
+}
+
 // ------------------------------------------------------------------
 // Tuple serialization formats
 // ------------------------------------------------------------------

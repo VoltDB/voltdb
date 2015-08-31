@@ -21,16 +21,20 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package txnIdSelfCheck.procedures;
+package org.voltdb_testprocs.regressionsuites.querytimeout;
 
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class UpdateReplicatedMP extends ReplicatedUpdateBaseProc {
+public class AdHocPartitionReadOnlyProc extends VoltProcedure {
+    public String longRunningCrossJoinAgg =
+            "SELECT t1.contestant_number, t2.state, COUNT(*) "
+            + "FROM P1 t1, R1 t2 "
+            + "GROUP BY t1.contestant_number, t2.state;";
 
-    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        VoltTable[] results = doWork(r_getCIDData, r_cleanUp, r_insert, r_export, r_getAdhocData,
-                cid, rid, value, rollback);
-
-        return doSummaryAndCombineResults(results);
+    @SuppressWarnings("deprecation")
+    public VoltTable[] run() {
+        voltQueueSQLExperimental(longRunningCrossJoinAgg);
+        return voltExecuteSQL(true);
     }
 }

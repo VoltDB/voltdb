@@ -25,6 +25,10 @@ import java.util.Set;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 
+/**
+ * An object of class TableLeafNode is a leaf in a join expression tree.  It
+ * represents a table reference.
+ */
 public class TableLeafNode extends JoinNode {
     private StmtTargetTableScan m_tableScan;
     /**
