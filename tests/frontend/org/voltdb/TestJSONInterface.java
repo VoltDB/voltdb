@@ -1614,12 +1614,18 @@ public class TestJSONInterface extends TestCase {
             params.put("deployment", ndeptype);
             String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
+            assertEquals("10", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
             memLimit.setSize("90%25");
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            gotValue = mapper.readValue(jdep, DeploymentType.class);
+            assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
         } finally {
             if (server != null) {
