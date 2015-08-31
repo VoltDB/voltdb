@@ -189,7 +189,6 @@ public:
         for (vector<NValue>::const_iterator cit = m_cachedStringValues.begin(); cit != m_cachedStringValues.end(); ++cit) {
             (*cit).free();
         }
-        delete m_engine;
         delete m_table;
         delete m_replicatedTable;
         delete m_tableReplica;
@@ -399,8 +398,6 @@ public:
     }
 
 protected:
-    VoltDBEngine* m_engine;
-
     DRTupleStream m_drStream;
     DRTupleStream m_drReplicatedStream;
 
