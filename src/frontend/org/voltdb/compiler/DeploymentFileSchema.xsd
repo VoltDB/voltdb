@@ -144,7 +144,7 @@
 
   <xs:complexType name="diskLimitType">
       <xs:sequence>
-          <xs:element name="feature" minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="feature" minOccurs="1" maxOccurs="unbounded">
              <xs:complexType>
                 <xs:attribute name="name" type="featureNameType"/>
                 <xs:attribute name="size" type="xs:string"/>
