@@ -31,7 +31,6 @@ set_quantifier:
         ALL
     ;
     
-
 select_list:
        ASTERISK
     |
@@ -45,9 +44,13 @@ select_sublist:
     ;
 
 derived_column:
-        table_name 
+        value_expression ( as_clause )? 
     ;
     
+as_clause:
+        AS column_name
+    ;
+
 qualified_asterisk:
         asterisked_identifier_chain DOT ASTERISK
     ;
@@ -73,7 +76,7 @@ from_clause:
     ;
 
 table_reference:
-        table_primary_or_joined_table ( sample_clause )*
+        table_primary_or_joined_table
     ;
     
 table_primary_or_joined_table:
@@ -83,12 +86,8 @@ table_primary_or_joined_table:
     ;   
 
 table_primary:
-        table_or_query_name ( ( AS )? correlation_name ( '(' derived_column_list ')' )* )*
+        table_or_query_name ( ( AS )? correlation_name ( '(' derived_column_list ')' ) )?
      |     derived_table ( AS )* correlation_name ( '(' derived_column_list ')' )*
-     |     lateral_derived_table ( AS )* correlation_name ( '(' derived_column_list ')' )*
-     |     collection_derived_table ( AS )* correlation_name ( '(' derived_column_list ')' )*
-     |     table_function_derived_table ( AS )* correlation_name ( '(' derived_column_list ')' )*
-     |     only_spec ( ( AS )* correlation_name ( '(' derived_column_list ')' )* )*
      |     '(' joined_table ')'
      ;
 
@@ -110,44 +109,332 @@ table_subquery:
         subquery
     ;
 
-lateral_derived_table:
-        LATERAL table_subquery
-    ;
-
-collection_derived_table:
-        UNNEST '(' collection_value_expression ')' ( WITH ORDINALITY )*
-    ;
-
-table_function_derived_table:
-        TABLE '(' collection_value_expression ')'
-    ;
-
-only_spec:
-        ONLY '(' table_or_query_name ')'
-    ;
-
-collection_value_expression:
-        array_value_expression
+/*************************************************************************
+ * Expressions.
+ *************************************************************************/
+value_expression:
+        common_value_expression
     |
-        multiset_value_expression
+        boolean_value_expression
+    |
+        row_value_expression
+    ;
+        
+common_value_expression:
+        numeric_value_expression
+    |
+        string_value_expression
+    |
+        datetime_value_expression
+    |
+        interval_value_expression
+    |
+        reference_value_expression
     ;
 
-array_value_expression:
-        array_factor ( array_concatenation_operator array_factor )*
+numeric_value_expression:
+        <assoc=right> numeric_value_expression '*' numeric_value_expression
+    |
+        <assoc=right> numeric_value_expression '/' numeric_value_expression
+    |
+        <assoc=right>numeric_value_expression '+' numeric_value_expression
+    |
+        <assoc=right> numeric_value_expression '-' numeric_value_expression
+    |
+        term
     ;
 
-array_concatenation_operator:
-        BARBARA
+term:
+        sign numeric_primary
     ;
 
-array_factor:
-        value_primary_expression
+numeric_primary:
+        value_expression_primary
+    |
+        numeric_value_function
     ;
 
-value_primary_expression:
+numeric_value_function:
+        position_expression
+    |
+        extract_expression
+    |
+        length_expression
+    |
+        absolute_value_expression
+    |
+        modulus_expression
+    |
+        natural_logarithm
+    |
+        exponential_function
+    |
+        power_function
+    |
+        square_root
+    |
+        floor_function
+    |
+        ceiling_function
+    ;
+
+position_expression:
+        string_position_expression
+    |
+        blob_position_expression
+    ;
+
+string_position_expression:
+        POSITION '(' string_value_expression IN string_value_expression [ USING char_length_units ] ')'
+    ;
+
+blob_position_expression:
+        POSITION '(' blob_value_expression IN blob_value_expression ')'
+    ;
+
+length_expression:
+        char_length_expression
+    |
+        octet_length_expression
+    ;
+
+char_length_expression:
+         ( CHAR_LENGTH | CHARACTER_LENGTH ) '(' string_value_expression ( USING char_length_units )? ')'
+
+octet_length_expression:
+        OCTET_LENGTH '(' string_value_expression ')'
+    ;
+
+extract_expression:
+        EXTRACT '(' extract_field FROM extract_source ')'
+    ;
+
+extract_field:
+        primary_datetime_field | time_zone_field
+    ;
+
+time_zone_field:
+        TIMEZONE_HOUR
+    |
+        TIMEZONE_MINUTE
+    ;
+
+extract_source:
+        datetime_value_expression
+    |
+        interval_value_expression
+    ;
+
+absolute_value_expression:
+        ABS '(' numeric_value_expression ')'
+    ;
+
+modulus_expression:
+        MOD '(' numeric_value_expression_dividend ',' numeric_value_expression_divisor ')'
+    ;
+
+natural_logarithm:
+        LN '(' numeric_value_expression ')'
+    ;
+
+exponential_function:
+        EXP '(' numeric_value_expression ')'
+    ;
+
+power_function:
+        POWER '(' numeric_value_expression_base ',' numeric_value_expression_exponent ')'
+    ;
+
+numeric_value_expression_base:
+        numeric_value_expression
+    ;
+
+numeric_value_expression_exponent:
+        numeric_value_expression
+    ;
+
+square_root:
+        SQRT '(' numeric_value_expression ')'
+    ;
+
+floor_function:
+        FLOOR '(' numeric_value_expression ')'
+    ;
+
+ceiling_function:
+        { CEIL | CEILING } '(' numeric_value_expression ')'
+    ;
+
+string_value_expression:
+        character_value_expression
+    |
+        blob_value_expression
+    ;
+
+character_value_expression:
+        concatenation
+    |
+        character_factor
+    ;
+
+concatenation:
+        character_value_expression concatenation_operator character_factor
+    ;
+
+character_factor:
+        character_primary
+    ;
+
+character_primary:
+        value_expression_primary
+    |
+        string_value_function
+    ;
+
+blob_value_expression:
+        blob_concatenation
+    |
+        blob_factor
+    ;
+
+blob_factor:
+        blob_primary
+    ;
+
+blob_primary:
+        value_expression_primary
+    |
+        string_value_function
+    ;
+
+blob_concatenation:
+        blob_value_expression concatenation_operator blob_factor
+    ;
+
+datetime_value_expression:
+        datetime_term
+    |
+        interval_value_expression plus_sign datetime_term
+    |
+        datetime_value_expression plus_sign interval_term
+    |
+        datetime_value_expression minus_sign interval_term
+
+datetime_term:
+        datetime_factor
+    ;
+
+datetime_factor:
+        datetime_primary [ time_zone ]
+    ;
+
+datetime_primary:
+        value_expression_primary
+    |
+        datetime_value_function
+    ;
+
+time_zone:
+        AT time_zone_specifier
+    ;
+
+time_zone_specifier:
+        LOCAL
+    |
+        TIME ZONE interval_primary
+    ;
+
+datetime_value_function:
+        current_date_value_function
+    |
+        current_time_value_function
+    |
+        current_timestamp_value_function
+    |
+        current_local_time_value_function
+    |
+        current_local_timestamp_value_function
+    ;
+
+current_date_value_function:
+        CURRENT_DATE
+
+current_time_value_function:
+        CURRENT_TIME ( '(' time_precision ')' )?
+    ;
+
+current_local_time_value_function:
+        LOCALTIME ( '(' time_precision ')' )?
+    ;
+
+current_timestamp_value_function:
+        CURRENT_TIMESTAMP ( '(' timestamp_precision ')' )?
+    ;
+
+current_local_timestamp_value_function:
+        LOCALTIMESTAMP ( '(' timestamp_precision ')' )?
+    ;
+
+
+
+interval_value_expression:
+        interval_term
+    |
+        interval_value_expression_1 plus_sign interval_term_1
+    |
+        interval_value_expression_1 minus_sign interval_term_1
+    |
+        left_paren datetime_value_expression minus_sign datetime_term right_paren interval_qualifier
+    ;
+
+interval_term:
+        interval_factor
+    |
+        interval_term_ asterisk factor
+    |
+        interval_term_ solidus factor
+    |
+        term asterisk interval_factor
+    ;
+
+interval_factor:
+        [ sign ] interval_primary
+    ;
+
+interval_primary:
+         value_expression_primary ( interval_qualifier )?
+     |
+         interval_value_function
+     ;
+
+interval_value_expression_1:
+        interval_value_expression
+    ;
+
+interval_term_1:
+        interval_term
+    ;
+
+interval_term_2:
+        interval_term
+    ;
+
+value_expression_primary:
         '(' value_expression ')'
     |
         nonparenthesized_value_expression
+    ;
+
+time_precision:
+        time_fractional_seconds_precision
+    ;
+
+timestamp_precision:
+        time_fractional_seconds_precision
+    ;
+
+time_fractional_seconds_precision:
+        unsigned_integer
     ;
 
 nonparenthesized_value_expression:
@@ -156,9 +443,7 @@ nonparenthesized_value_expression:
     |
         column_reference
     |
-        set_function_specification
-    |
-        window_function %%%
+        window_function
     |
         scalar_subquery
     |
@@ -429,24 +714,6 @@ unsigned_value_specification:
     ;
 
 general_value_specification:
-        host_parameter_specification
-    |
-        SQL_parameter_reference
-    |
-        dynamic_parameter_specification
-    |
-        embedded_variable_specification
-    |
-        current_collation_specification
-    |
-        CURRENT_DEFAULT_TRANSFORM_GROUP
-    |
-        CURRENT_PATH
-    |
-        CURRENT_ROLE
-    |
-        CURRENT_TRANSFORM_GROUP_FOR_TYPE path_resolved_user_defined_type_name
-    |
         CURRENT_USER
     |
         SESSION_USER
@@ -460,29 +727,6 @@ general_value_specification:
 
 subquery:
         '(' query_expression ')'
-    ;
-
-sample_clause:
-         TABLESAMPLE sample_ method '(' sample_percentage ')' ( repeatable_clause )*
-    ;
-
-
-sample_method:
-        BERNOULLI
-    |
-        SYSTEM
-    ;
-
-sample_percentage:
-        numeric_value_expression
-    ;
-    
-repeatable_clause:
-        REPEATABLE '(' repeat_argument ')'
-    ;
-
-repeat_argument:
-        numeric_value_expression
     ;
 
 where_clause:
@@ -596,12 +840,19 @@ correlation_name: IDENTIFIER;
 
 qualified_identifier: IDENTIFIER;
 
+unsigned_integer: NUMBER;
+
+signed_integer: ( '-' | '+' )? NUMBER;
+
 NUMBER: ( NZDIGIT ( DIGIT )* ) | ZERODIGIT;
 
 /*
- * Note: I think this is wrong.  I think single quotes are doubled in the input.
+ * Note: I think this is wrong.  I think double quotes may
+ *       work somehow.
  */
-STRING_LITERAL: '\'' (~('\'' | '\\' | '\r' | '\n') | '\\' ('\'' | '\\'))* '\'';
+SQ_STRING_LITERAL: '\'' (~('\'' | '\r' | '\n') | ('\'' '\'') )* '\'';
+DQ_STRING_LITERAL: '"'  (~('\"' | '\r' | '\n') | ('\"' '\"') )* '\'';
+STRING_LITERAL: SQ_STRING_LITERAL | DQ_STRING_LITERAL;
 CREATE:      C R E A T E;
 TABLE:       T A B L E;
 INSERT:      I N S E R T;
@@ -626,10 +877,6 @@ ASTERISK:    '*';
 DISTINCT:    D I S T I N C T;
 ALL:         A L L;
 DOT:         '.';
-TABLESAMPLE: T A B L E S A M P L E;
-BERNOULLI:   B E R N O U L L I;
-SYSTEM:      S Y S T E M;
-BARBARA:      '||';
 
 IDENTIFIER: LETTER ( LETTER | DIGIT )*;
 
