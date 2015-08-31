@@ -22,7 +22,7 @@
 #define GEOFUNCTIONS_H
 
 namespace voltdb {
-template<> NValue NValue::callUnary<FUNC_VOLT_ST_GEOMFROMTEXT>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const;
 }
 
 #endif

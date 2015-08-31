@@ -27,7 +27,7 @@ namespace voltdb {
 static void throwInvalidWKT(const std::string& input)
 {
     std::ostringstream oss;
-    oss << "Invalid input to ST_GEOMFROMTEXT: ";
+    oss << "Invalid input to POINTFROMTEXT: ";
     oss << "'" << input << "', ";
     oss << "expected input of the form 'POINT(<lat> <lng>)'";
     throw SQLException(SQLException::data_exception_invalid_parameter,
@@ -48,7 +48,7 @@ static float stringToFloat(const std::string& input,
     return f;
 }
 
-template<> NValue NValue::callUnary<FUNC_VOLT_ST_GEOMFROMTEXT>() const
+template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
 {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_POINT);

@@ -337,8 +337,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_BIN:
             ret = new UnaryFunctionExpression<FUNC_VOLT_BIN>((*arguments)[0]);
             break;
-        case FUNC_VOLT_ST_GEOMFROMTEXT:
-            ret = new UnaryFunctionExpression<FUNC_VOLT_ST_GEOMFROMTEXT>((*arguments)[0]);
+        case FUNC_VOLT_POINTFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINTFROMTEXT>((*arguments)[0]);
             break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);

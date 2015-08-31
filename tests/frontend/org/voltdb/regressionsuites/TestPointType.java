@@ -73,7 +73,7 @@ public class TestPointType extends RegressionSuite {
         assert(vt.wasNull());
     }
 
-    public void testGeomFromText() throws Exception {
+    public void testPointFromText() throws Exception {
         Client client = getClient();
 
         validateTableOfScalarLongs(client,
@@ -81,7 +81,7 @@ public class TestPointType extends RegressionSuite {
                 new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc",
-                "select st_geomfromtext('point (42.5047 71.1961)') from t;").getResults()[0];
+                "select pointfromtext('point (42.5047 71.1961)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
         PointType pt = vt.getPoint(0);
         System.out.println(pt);
