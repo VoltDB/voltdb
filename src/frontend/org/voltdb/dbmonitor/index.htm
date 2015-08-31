@@ -345,7 +345,7 @@
                             <div id="drMasterSection" class="masterWrapper" style="display:block;">
                                 <div id="tblMAster_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
-                                        <div class="drTitle icon-master">Master</div>
+                                        <div class="drTitle icon-master" id="drMasterTitle">Master</div>
                                         <div class="filter"><input name="filter" id="filterPartitionId" type="text" class="search-box" onblur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
@@ -375,7 +375,7 @@
                             <div id="drReplicaSection" class="replicaWrapper" style="display:block">
                                 <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
-                                        <div class="drTitle icon-replica">Replica</div>
+                                        <div class="drTitle icon-replica" id="drReplicaTitle">Replica</div>
                                         <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
@@ -417,7 +417,7 @@
                             <!--<div id="drMasterSection" class="masterWrapper" style="display:block;">-->
                             <div id="tblCmdLog_wrapper" class="dataTables_wrapper no-footer">
                                 <div class="tabs-filter-wrapperDR">
-                                    <div class="drTitle icon-command">Command Log</div>
+                                    <div class="drTitle icon-command" id="drCLPTitle">Command Log</div>
                                     <div class="filter"><input name="filter" id="filterServer" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchServer" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                     <div class="clear"></div>
                                 </div>
@@ -774,6 +774,41 @@
                                     <td id="snapshotpriority" align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow" id="memorySizeTimeout">
+                                    <td class="configLabel">Memory Limit</td>
+                                    <td align="right" class="memorySize">
+                                        <form id="formMemoryLimit" method="get" action="">
+                                            <div id="loadingMemoryLimit" class="loading-small" style="display: none;"></div>
+                                            <span id="memoryLimitSize"></span>
+                                            <input id="txtMemoryLimitSize" name="txtMemoryLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
+                                            <span id="memoryLimitSizeUnit"></span>
+                                            <label id="errorMemorySize" for="txtMemoryLimitSize" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td><a id="btnEditMemorySizeOk" href="#MemoryLimitPopup" class="editOk" title="Save" style="">Ok</a> 
+                                        <a id="btnEditMemorySizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> 
+                                        <a id="btnEditMemorySize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                    </td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow" id="diskSizeTimeout">
+                                    <td class="configLabel">Disk Limit</td>
+                                    <td align="right" class="diskSize">
+                                        <form id="formDiskLimit" method="get" action="">
+                                            <div id="loadingDiskLimit" class="loading-small" style="display: none;"></div>
+                                            <span id="diskLimitSize"></span>
+                                            <input id="txtDiskLimitSize" name="txtDiskLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
+                                            <span id="diskLimitSizeUnit"></span>
+                                            <label id="errorDiskSize" for="txtDiskLimitSize" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>
+                                        <a id="btnEditDiskSizeOk" href="#diskLimitPopup" class="editOk" title="Save" style="">Ok</a>
+                                        <a id="btnEditDiskSizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                                        <a id="btnEditDiskSize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                    </td>
                                 </tr>
                             </table>
                         </div>
@@ -1460,6 +1495,28 @@
         <div class="overlay-btns"><a class="btn" id="btnPopupQueryTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupQueryTimeoutCancel">Cancel</a> </div>
     </div>
     <!-- POPUP Query timeout Popup -->
+    <!-- POPUP Memory Limit -->
+    <div id="MemoryLimitPopup" style="display: none">
+        <div class="overlay-title icon-alert">Memory Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupMemoryLimitCancel">Cancel</a> </div>
+    </div>
+    
+    <!-- POPUP Query timeout Popup -->
+    <!-- POPUP Memory Limit -->
+    <div id="diskLimitPopup" style="display: none">
+        <div class="overlay-title icon-alert">Disk Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupDiskLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupDiskLimitCancel">Cancel</a> </div>
+    </div>
+
+    <!-- POPUP Memory Limit -->
     <!-- POPUP saveConfirmationPopup -->
     <div id="Div2" style="display: none">
         <div class="overlay-title icon-alert">Save Confirmation</div>
@@ -1580,6 +1637,42 @@
                 </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnQueryTimeoutUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update Memory Limit error Popup-->
+    <div style="display: none"><a href="#memorySizeUpdateErrorPopup" id="memorySizeUpdateErrorPopupLink">Update Error</a></div>
+    <div id="memorySizeUpdateErrorPopup" style="display: none">
+        <div id="memorySizeUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="memorySizeUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnMemorySizeUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update Disk Limit error Popup-->
+    <div style="display: none"><a href="#diskSizeUpdateErrorPopup" id="diskSizeUpdateErrorPopupLink">Update Error</a></div>
+    <div id="diskSizeUpdateErrorPopup" style="display: none">
+        <div id="diskSizeUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="diskSizeUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnDiskSizeUpdateErrorOk">Ok</a></div>
             </div>
         </div>
     </div>

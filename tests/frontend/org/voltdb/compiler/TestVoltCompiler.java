@@ -1909,7 +1909,8 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_ft_unique on t(abs(id+num));\n" +
-                "create index idx_ft on t(abs(num));";
+                "create index idx_ft on t(abs(num));\n" +
+                "create index poweridx on t(power(id, 2));";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());
         Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");

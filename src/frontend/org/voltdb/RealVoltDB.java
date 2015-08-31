@@ -173,9 +173,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.5";
+    static final String m_defaultVersionString = "5.6";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.5\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.6\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -788,33 +788,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath();
             }
 
-            // Configure consumer-side DR if relevant
-            if (m_config.m_isEnterprise &&
-                    (m_config.m_replicationRole == ReplicationRole.REPLICA ||
-                     m_catalogContext.database.getIsactiveactivedred())) {
-                String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
-                byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
-                if (m_catalogContext.cluster.getDrconsumerenabled() &&
-                        (drProducerHost == null || drProducerHost.isEmpty())) {
-                    VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
-                }
-                try {
-                    Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
-                    Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
-                            int.class,
-                            String.class,
-                            ClientInterface.class,
-                            byte.class);
-                    m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
-                            m_messenger.getHostId(),
-                            drProducerHost,
-                            m_clientInterface,
-                            drConsumerClusterId);
-                    m_globalServiceElector.registerService(m_consumerDRGateway);
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
-                }
-            }
+            createDRConsumerIfNeeded();
 
             /*
              * Configure and start all the IV2 sites
@@ -1357,7 +1331,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             } catch(Exception e) { } // Ignore exceptions because we don't really care about the result here.
             m_periodicWorks.remove(resMonitorWork);
         }
-        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
+        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings(),
+                m_catalogContext.getDeployment().getPaths());
         resMonitor.logResourceLimitConfigurationInfo();
         if (resMonitor.hasResourceLimitsConfigured()) {
             resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
@@ -2253,12 +2228,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
 
-            // 6. If we are a DR replica, we may care about a
+            // 6. Perform updates required by the DR subsystem
+
+            // 6.1. Create the DR consumer if we've just enabled active-active.
+            // Perform any actions that would have been taken during the ordinary
+            // initialization path
+            if (createDRConsumerIfNeeded()) {
+                for (Initiator iv2init : m_iv2Initiators.values()) {
+                    iv2init.setConsumerDRGateway(m_consumerDRGateway);
+                }
+                m_consumerDRGateway.initialize(false);
+            }
+            // 6.2. If we are a DR replica, we may care about a
             // deployment update
             if (m_consumerDRGateway != null) {
                 m_consumerDRGateway.updateCatalog(m_catalogContext);
             }
-            // 6.1. If we are a DR master, update the DR table signature hash
+            // 6.3. If we are a DR master, update the DR table signature hash
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.updateCatalog(m_catalogContext,
                         VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
@@ -2703,6 +2689,40 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             MiscUtils.printPortsInUse(hostLog);
             VoltDB.crashLocalVoltDB("Failed to initialize DR", false, ex);
         }
+    }
+
+    private boolean createDRConsumerIfNeeded() {
+        if (!m_config.m_isEnterprise ||
+                !(m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway)) {
+            return false;
+        }
+        if (m_config.m_replicationRole == ReplicationRole.REPLICA ||
+                 m_catalogContext.database.getIsactiveactivedred()) {
+            String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
+            byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
+            if (m_catalogContext.cluster.getDrconsumerenabled() &&
+                    (drProducerHost == null || drProducerHost.isEmpty())) {
+                VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
+            }
+            try {
+                Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
+                Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
+                        int.class,
+                        String.class,
+                        ClientInterface.class,
+                        byte.class);
+                m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
+                        m_messenger.getHostId(),
+                        drProducerHost,
+                        m_clientInterface,
+                        drConsumerClusterId);
+                m_globalServiceElector.registerService(m_consumerDRGateway);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
+            }
+            return true;
+        }
+        return false;
     }
 
     @Override

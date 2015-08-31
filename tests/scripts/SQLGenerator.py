@@ -31,6 +31,11 @@ import datetime
 from sys import maxint
 from voltdbclient import * # for VoltDB types
 from optparse import OptionParser # for use in standalone test mode
+# Need these to print non-ascii characters:
+import codecs
+import sys
+UTF8Writer = codecs.getwriter('utf8')
+sys.stdout = UTF8Writer(sys.stdout)
 
 COUNT = 2                       # number of random values to generate by default
 ALLOW_SELF_JOIN = True
@@ -144,7 +149,31 @@ class StringValueGenerator:
     """This generates strings.
     """
 
+    # Define the ASCII-only alphabet, to be used to generate strings
     ALPHABET = u"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    # For the extended, non-ASCII alphabet, add the letter e with various accents
+    EXTENDED_ALPHABET = ALPHABET + u'\u00e9\u00e8\u00ea\u00eb'
+    # Add some (upper & lower case) Greek characters (that do not resemble Latin letters)
+    EXTENDED_ALPHABET += u'\u0393\u0394\u03b1\u03b2'
+    # Add some (upper & lower case) Cyrillic (e.g. Russian) characters (that do not resemble Latin letters)
+    EXTENDED_ALPHABET += u'\u0429\u042F\u0449\u044F'
+    # Add some Japanese characters (which together mean 'frog')
+    EXTENDED_ALPHABET += u'\u30ab\u30a8\u30eb'
+    # Add some (simplified) Chinese characters (which together mean 'frog')
+    EXTENDED_ALPHABET += u'\u9752\u86d9'
+    # Initial, default value
+    __ascii_only = False
+
+    @staticmethod
+    def set_ascii_only(ascii_only):
+        StringValueGenerator.__ascii_only = ascii_only
+
+    @staticmethod
+    def get_alphabet():
+        if StringValueGenerator.__ascii_only:
+            return StringValueGenerator.ALPHABET
+        else:
+            return StringValueGenerator.EXTENDED_ALPHABET
 
     def __init__(self):
         self.__nullpct = 0
@@ -154,7 +183,7 @@ class StringValueGenerator:
 
     def generate_values(self, count, length = 14):
         for i in xrange(count):
-            list = [random.choice(StringValueGenerator.ALPHABET) for y in xrange(length)]
+            list = [random.choice(StringValueGenerator.get_alphabet()) for y in xrange(length)]
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
                 yield None
             else:
@@ -252,7 +281,7 @@ class BaseGenerator:
     #                   |       |             |
     TYPE_PATTERN_GROUP  =                                           "type" # optional type for columns, values
     #                   |       |             |                      |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+)?\s*" \
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+|[=<>!]{1,2})?\s*" \
                       r"(:(?P<min>(-?\d*)),(?P<max>(-?\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
     #                         |                |                             |                   |
     #                         |                |                             |       end of [] attribute section
@@ -446,11 +475,37 @@ class ColumnGenerator(BaseGenerator):
             self.__supertype = ""
 
     def configure_from_schema(self, schema, prior_generators):
-        """ Get matcing column values fom schema
+        """ Get matching column values from schema
         """
         self.values = schema.get_typed_columns(self.__supertype)
         self.prior_generator = prior_generators.get("variable")
         prior_generators["variable"] = self # new variable generator at the head of the chain
+        return prior_generators
+
+
+class SymbolGenerator(BaseGenerator):
+    """This replaces occurrences of token _symbol with a piece of text, such as a function name
+       or a comparison operator.
+       Within a statement, intended occurrences of the same symbol must use the same '#label'.
+       Attributes only matter on the first occurrence of "_symbol" for a given label.
+       As a convenience, forward references can use the __[#label] syntax instead of _symbol[#label]
+       to defer locking in attribute settings until a later _symbol occurrence.
+    """
+
+    def __init__(self):
+        BaseGenerator.__init__(self, "_symbol")
+
+    def prepare_params(self, attribute_groups):
+        self.__symbol = attribute_groups[BaseGenerator.TYPE_PATTERN_GROUP]
+        if not self.__symbol:
+            self.__symbol = ""
+
+    def configure_from_schema(self, schema, prior_generators):
+        """ Get matching text values; does not actually use the schema.
+        """
+        self.values.append(self.__symbol)
+        self.prior_generator = prior_generators.get("symbol")
+        prior_generators["symbol"] = self # new symbol generator at the head of the chain
         return prior_generators
 
 
@@ -775,7 +830,8 @@ class Template:
 
 
 class SQLGenerator:
-    def __init__(self, catalog, template, subversion_generation):
+    def __init__(self, catalog, template, subversion_generation, ascii_only):
+        StringValueGenerator.set_ascii_only(ascii_only)
         self.__subversion_generation = subversion_generation
         # Reset the counters
         IdGenerator.initialize(0)
@@ -793,10 +849,10 @@ class SQLGenerator:
         self.__statements = self.__template.get_statements()
 
         self.__min_statements_per_pattern = sys.maxint
-        self.__max_statements_per_pattern = 0
+        self.__max_statements_per_pattern = -1
         self.__num_insert_statements      = 0
 
-    GENERATOR_TYPES = (TableGenerator, ColumnGenerator, ConstantGenerator, IdGenerator)
+    GENERATOR_TYPES = (TableGenerator, ColumnGenerator, SymbolGenerator, ConstantGenerator, IdGenerator)
 
     UNRESOLVED_PUNCTUATION = re.compile(r'[][#@]') # Literally, ']', '[', '#', or '@'.
     UNRESOLVED_GENERATOR = re.compile(r'(^|\W)[_]')

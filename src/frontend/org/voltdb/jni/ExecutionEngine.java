@@ -98,7 +98,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private static long INITIAL_LOG_DURATION = 1000; // in milliseconds,
                                                      // not final to allow unit testing
     private static final long LONG_OP_THRESHOLD = 10000;
-    private static int TIME_OUT_MILLIS = 0; // No time out
+
+    public final int INITIAL_BATCH_TIMEOUT_VALUE = 0;
+    /** Fragment or batch time out in milliseconds.
+     *  By default 0 means no time out setting.
+     */
+    private int m_batchTimeout = INITIAL_BATCH_TIMEOUT_VALUE;
 
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
@@ -124,12 +129,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         return m_dirty;
     }
 
-    public void setTimeoutLatency(int newLatency) {
-        TIME_OUT_MILLIS = newLatency;
+    public void setBatchTimeout(int batchTimeout) {
+        m_batchTimeout = batchTimeout;
     }
 
-    public int getTimeoutLatency() {
-        return TIME_OUT_MILLIS;
+    public int getBatchTimeout() {
+        return m_batchTimeout;
+    }
+
+    private boolean shouldTimedOut (long latency) {
+        if (m_readOnly
+                && m_batchTimeout > INITIAL_BATCH_TIMEOUT_VALUE
+                && m_batchTimeout < latency) {
+            return true;
+        }
+        return false;
     }
 
     /** Utility method to verify return code and throw as required */
@@ -359,7 +373,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
         long latency = currentTime - m_startTime;
 
-        if (m_readOnly && TIME_OUT_MILLIS > 0 && latency > TIME_OUT_MILLIS) {
+        if (shouldTimedOut(latency)) {
             String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeName, true);
             log.info(msg);
 
@@ -462,7 +476,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         // track cache misses
         m_cacheMisses++;
         // estimate the cache size by the number of misses
-        m_eeCacheSize = Math.max(EE_PLAN_CACHE_SIZE, m_eeCacheSize + 1);
+        if (m_eeCacheSize < EE_PLAN_CACHE_SIZE) {
+            m_eeCacheSize++;
+        }
         // get the plan for realz
         return ActivePlanRepository.planForFragmentId(fragmentId);
     }
@@ -678,7 +694,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken                For undo
      * @throws EEException
      */
-    public abstract void applyBinaryLog(ByteBuffer log,
+    public abstract long applyBinaryLog(ByteBuffer log,
                                         long txnId,
                                         long spHandle,
                                         long lastCommittedSpHandle,
@@ -944,12 +960,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native long nativeTableHashCode(long pointer, int tableId);
 
-    protected native int nativeApplyBinaryLog(long pointer,
-                                              long txnId,
-                                              long spHandle,
-                                              long lastCommittedSpHandle,
-                                              long uniqueId,
-                                              long undoToken);
+    protected native long nativeApplyBinaryLog(long pointer,
+                                               long txnId,
+                                               long spHandle,
+                                               long lastCommittedSpHandle,
+                                               long uniqueId,
+                                               long undoToken);
 
     /**
      * Execute an arbitrary task based on the task ID and serialized task parameters.

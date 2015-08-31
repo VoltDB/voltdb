@@ -24,52 +24,31 @@
 package kafkaimporter.client.kafkaimporter;
 
 import java.io.IOException;
-import java.lang.InterruptedException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 
 
 public class MatchChecks {
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
-    final static String DELETE_ROWS = "DeleteRows";
 
-    static class DeleteCallback implements ProcedureCallback {
-        final String proc;
-        final long key;
-
-        DeleteCallback(String proc, long key) {
-            this.proc = proc;
-            this.key = key;
-        }
-
-        @Override
-        public void clientCallback(ClientResponse clientResponse) {
-
-            // Make sure the procedure succeeded. If not,
-            // report the error.
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                String msg = String.format("%s k: %12d, callback fault: %s", proc, key, clientResponse.getStatusString());
-                log.error(msg);
-              }
-         }
-    }
-
-    protected static long getMirrorTableRowCount(Client client) {
+    protected static long getMirrorTableRowCount(boolean alltypes, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
         long mirrorRowCount = 0;
+        String countsp = alltypes ? "CountMirror2" : "CountMirror1";
+
 
         try {
-            VoltTable[] countQueryResult = client.callProcedure("CountMirror2").getResults();
+            VoltTable[] countQueryResult = client.callProcedure(countsp).getResults();
             mirrorRowCount = countQueryResult[0].asScalarLong();
         } catch (Exception e) {
-            log.error("Exception from callProcedure", e);
+            log.error("Exception from callProcedure " + countsp, e);
             System.exit(-1);
         }
         return mirrorRowCount;
@@ -135,6 +114,8 @@ public class MatchChecks {
         ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_EXPORTED) from exportcounts order by 1;");
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
         return data.asScalarLong();
     }
 
@@ -143,42 +124,30 @@ public class MatchChecks {
         ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_DELETED) from importcounts order by 1;");
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
         return data.asScalarLong();
     }
 
-    protected static long findAndDeleteMatchingRows(Client client) {
-        long rows = 0;
-        VoltTable results = null;
-
-        try {
-            results = client.callProcedure("MatchRows").getResults()[0];
-        } catch (Exception e) {
-            log.error("Exception from callProcedure", e);
-            System.exit(-1);
-        }
-
-        log.info("getRowCount(): " + results.getRowCount());
-        while (results.advanceRow()) {
-            long key = results.getLong(0);
-            try {
-                client.callProcedure(new DeleteCallback(DELETE_ROWS, key), DELETE_ROWS, key);
-            } catch (Exception e) {
-                log.error("Exception from callProcedure", e);
-                System.exit(-1);
-            }
-            rows++;
-        }
-        return rows;
+    protected static long checkRowMismatch(Client client) {
+        // check if any rows failed column by colunn comparison so we can fail fast
+        ClientResponse response = doAdHoc(client, "select key from importcounts where value_mismatch = 1 limit 1;");
+        VoltTable[] result = response.getResults();
+        if (result[0].getRowCount() == 0 || result[0].asScalarLong() == 0)
+            return 0;
+        return result[0].asScalarLong();
     }
 
-    public static long getImportTableRowCount(Client client) {
+    public static long getImportTableRowCount(boolean alltypes, Client client) {
         // check row count in import table
         long importRowCount = 0;
+        String countsp = alltypes ? "CountImport2" : "CountImport1";
+
         try {
-            VoltTable[] countQueryResult = client.callProcedure("CountImport2").getResults();
+            VoltTable[] countQueryResult = client.callProcedure(countsp).getResults();
             importRowCount = countQueryResult[0].asScalarLong();
         } catch (Exception e) {
-            log.error("Exception from callProcedure", e);
+            log.error("Exception from callProcedure " + countsp, e);
             System.exit(-1);
         }
         return importRowCount;

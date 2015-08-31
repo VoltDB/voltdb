@@ -824,61 +824,7 @@ class AdminTest extends TestBase {
         }
     }
 
-    // export expansion
-
-    def "Overview:Export-Expand and check configurations"() {
-
-        when:
-
-        int count = 0
-        testStatus = false
-then:
-        while(count<numberOfTrials) {
-            count ++
-            try {
-                when:
-                page.overview.export.click()
-                then:
-                if(waitFor(20) {page.overview.exportNoConfigAvailable.isDisplayed()})
-                {
-                    println(page.overview.exportNoConfigAvailable.text())
-                }
-                else
-                {
-                    waitFor(20) { page.overview.exportConfig.isDisplayed() }
-                    println("The export configuration")
-                }
-                testStatus = true
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-                println("RETRYING: WaitTimeoutException occured")
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                println("RETRYING: StaleElementReferenceException occured")
-            }
-        }
-        if(testStatus == true) {
-            println("PASS")
-        }
-        else {
-            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
-            assert false
-        }
-
-
-
-//        try {
-//            waitFor(waitTime) { page.overview.exportNoConfigAvailable.isDisplayed() }
-//            println(page.overview.exportNoConfigAvailable.text())
-//        } catch(geb.error.RequiredPageContentNotPresent e ) {
-//            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
-//            println("The export configuration")
-//            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
-//        } catch (geb.waiting.WaitTimeoutException e ) {
-//            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
-//            println("The export configuration")
-//            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
-//        }
-    }
+  
 
     // overview: advanced expansion-Edits
 
@@ -2792,19 +2738,33 @@ then:
         waitFor(waitTime) {
             page.overview.maxJavaHeap.text().equals("Max Java Heap")
             !page.overview.maxJavaHeapValue.text().equals("")
-
+        }
+        waitFor(waitTime){
             page.overview.heartbeatTimeout.text().equals("Heartbeat Timeout")
             !page.overview.heartbeatTimeoutValue.text().equals("")
-
+        }
+        waitFor(waitTime){
             page.overview.queryTimeout.text().equals("Query Timeout")
             !page.overview.queryTimeoutValue.text().equals("")
-
+        }
+        waitFor(waitTime){
             page.overview.maxTempTableMemory.text().equals("Max Temp Table Memory")
             !page.overview.maxTempTableMemoryValue.text().equals("")
-
+        }
+        waitFor(waitTime){
             page.overview.snapshotPriority.text().equals("Snapshot Priority")
             !page.overview.snapshotPriorityValue.text().equals("")
 
+        }
+        waitFor(waitTime){
+            page.overview.memoryLimitSize.text().equals("Memory Limit")
+            !page.overview.memoryLimitSizeValue.text().equals("")
+
+            if(page.overview.memoryLimitSizeValue.text() == "Not Enforced"){
+                page.overview.memoryLimitSizeUnit.text().equals("")
+            } else {
+                !page.overview.memoryLimitSizeUnit.text().equals("")
+            }
         }
     }
 

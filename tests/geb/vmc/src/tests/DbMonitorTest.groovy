@@ -1341,29 +1341,45 @@ class DbMonitorTest extends TestBase {
     // ALERT
 
 	def "set alert and replace trigger alert"() {
+		int count = 0
+		
 		when: 'set alert threshold to zero'
-			page.setAlertThreshold(00)
+	    page.setAlertThreshold(00)
 		then: 'check at least one alert'
-			waitFor(40, 2) { page.alertCount.isDisplayed() }
-			int alert = page.getAlert()
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) { page.alertCount.isDisplayed() }
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    }
+		}
+		
+		int alert = page.getAlert()
 
-			if ( alert != 0 ) {
-				println("PASS:There is at least one server on alert")
-			}
-			else {
-				println("FAIL:There are no server on alert")
-				assert false
-			}
+		if ( alert != 0 ) {
+			println("PASS:There is at least one server on alert")
+		}
+		else {
+			println("FAIL:There are no server on alert")
+			assert false
+		}
 
 		when: 'set alert threshold to hundred'
-			page.setAlertThreshold(100)
+		page.setAlertThreshold(100)
 		then: 'check no alert'
-			waitFor(40,20) { !page.alertCount.isDisplayed() }
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) { !page.alertCount.isDisplayed() }
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    }
+		}
 	}
 
     // server search
     def "check server search on dbmonitor matched"(){
-
         when:'clicked server button'
         at DbMonitorPage
         String serverNamevalid = page.getValidPath()  // taking local server valid name from serversearch.txt file ("/src/resources/serversearch.txt")
@@ -2951,241 +2967,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
     }
-    
-    // Command Log Statistics
-    def "Verify Max and Min values in Command Log Statistics days"(){
-        expect: 'at DbMonitorPage'
-        at DbMonitorPage
-        
-        when:
-        println("Test Start: Verify Max and Min values in Command Log Statistics days")
-        int count = 0
-        
-        while(count<numberOfTrials) {
-            count ++
-            try {
-                waitFor(waitTime) { page.commandLogStatistics.isDisplayed() }
-                println("Success")
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        
-        if(page.commandLogStatistics.isDisplayed()) {
-            // This loop is used to gain time.
-            count = 0
-            while(count<numberOfTrials) {
-                count++
-                page.chooseGraphView("Seconds")
-                page.chooseGraphView("Seconds")
-                page.chooseGraphView("Days")
-                if(graphView.text().equals("")) {
-                    break
-                }
-		    }
-		    count = 0
-		    String stringMax = ""
-		    String stringMin = ""
-            
-		    while(count<numberOfTrials) {
-		        count++
-		        try {
-		            waitFor(waitTime) {
-		                page.commandLogStatisticsMax.isDisplayed()
-		                page.commandLogStatisticsMin.isDisplayed()
-		            }
-		            stringMax = page.commandLogStatisticsMax.text()
-		            stringMin = page.commandLogStatisticsMin.text()
-
-		            println(stringMax)
-		            println(stringMin)
-
-		            if(stringMax.length()<10 || stringMax.length()<10) {
-		                println("Not fixed")
-		                continue
-		            }
-
-		            break
-		        } catch(geb.waiting.WaitTimeoutException e) {
-		            println("WaitTimeoutException")
-		        }
-		    }
-
-		    String monthMax = page.changeToMonth(stringMax)
-		    String monthMin = page.changeToMonth(stringMin)
-
-		    String dateMax = page.changeToDate(stringMax)
-		    String dateMin = page.changeToDate(stringMin)
-            
-            int intDateMax = Integer.parseInt(dateMax)
-            int intDateMin = Integer.parseInt(dateMin)
-            
-		    if(monthMax.equals(monthMin)) {
-		        if(intDateMax > intDateMin) {
-		            println("The maximum and minimum values are " + stringMax + " and " + stringMin + " and the time is in Days")
-		        }
-		        else {
-		            println("FAIL: Date of Max is less than that of date of Min for same month")
-		            println("Test End: Verify Max and Min valuess in Command Log Statistics days")
-		            assert false
-		        }
-		    }
-		    else {
-		        if (intDateMax < intDateMin) {
-		            println("Success")
-		        }
-		        else {
-		            println("FAIL: Date of Max is more than that of date of Min for new month")
-		            println("Test End: Verify Max and Min valuess in Command Log Statistics days")
-		            assert false
-		        }
-		    }
-		}
-		else {
-		    println("The Command Log Statistics graph is not visible")
-		    println("Test End: Verify Max and Min valuess in Command Log Statistics days")
-		}
-		then:
-		println("")
-    }
-
-    def "Verify Max and Min values in Command Log Statistics minutes"(){
-        expect: 'at DbMonitorPage'
-        at DbMonitorPage
-        
-        when:
-        println("Test Start: Verify Max and Min values in Command Log Statistics minutes")
-        
-        int count = 0
-        while(count<numberOfTrials) {
-            count ++
-            try {
-                waitFor(waitTime) { page.commandLogStatistics.isDisplayed() }
-                println("Success")
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        
-        if(page.commandLogStatistics.isDisplayed()) {
-            // This loop is used to gain time.
-            count = 0
-            while(count<numberOfTrials) {
-                count++
-                page.chooseGraphView("Minutes")
-                if(graphView.text().equals("")) {
-                    break
-                }
-		    }
-		    count = 0
-		    String stringMax
-		    String stringMin
-
-		    while(count<numberOfTrials) {
-		        count++
-		        try {
-		            waitFor(waitTime) {
-		                page.commandLogStatisticsMax.isDisplayed()
-		                page.commandLogStatisticsMin.isDisplayed()
-		            }
-		            stringMax = page.commandLogStatisticsMax.text()
-		            stringMin = page.commandLogStatisticsMin.text()
-		            break
-		        } catch(geb.waiting.WaitTimeoutException e) {
-		            println("WaitTimeoutException")
-		        }
-		    }
-
-		    String result = page.compareTime(stringMax, stringMin)
-
-		    if(result.equals("minutes")) {
-		        println("The maximum and minimum values are " + stringMax + " and " + stringMin + " and the time is in " + result )
-		        println("Test End: Verify Max and Min values in Command Log Statistics minutes")
-		        assert true
-		    }
-		    else {
-		        println("FAIL: It is not in minutes")
-		        println("Test End: Verify Max and Min values in Command Log Statistics minutes")
-		        assert false
-		    }
-		}
-		else {
-		    println("The Command Log Statistics graph is not visible")
-		    println("Test End: Verify Max and Min valuess in Command Log Statistics minutes")
-		}
-		then:
-		println("")
-    }
-
-    def "Verify Max and Min values in Command Log Statistics seconds"(){
-        expect: 'at DbMonitorPage'
-        at DbMonitorPage
-        
-        when:
-        println("Test Start: Verify Max and Min values in Command Log Statistics seconds")
-        
-        int count = 0
-        while(count<numberOfTrials) {
-            count ++
-            try {
-                waitFor(waitTime) { page.commandLogStatistics.isDisplayed() }
-                println("Success")
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        
-        if(page.commandLogStatistics.isDisplayed()) {
-            // This loop is used to gain time.
-            count = 0
-            while(count<numberOfTrials) {
-                count++
-                page.chooseGraphView("Seconds")
-                if(graphView.text().equals("")) {
-                    break
-                }
-		    }
-		    count = 0
-		    String stringMax
-		    String stringMin
-
-		    while(count<numberOfTrials) {
-		        count++
-		        try {
-		            waitFor(waitTime) {
-		                page.commandLogStatisticsMax.isDisplayed()
-		                page.commandLogStatisticsMin.isDisplayed()
-		            }
-		            stringMax = page.commandLogStatisticsMax.text()
-		            stringMin = page.commandLogStatisticsMin.text()
-		            break
-		        } catch(geb.waiting.WaitTimeoutException e) {
-		            println("WaitTimeoutException")
-		        }
-		    }
-
-		    String result = page.compareTime(stringMax, stringMin)
-
-		    if(result.equals("seconds")) {
-		        println("The maximum and minimum values are " + stringMax + " and " + stringMin + " and the time is in " + result )
-		        println("Test End: Verify Max and Min values in Command Log Statistics seconds")
-		        assert true
-		    }
-		    else {
-		        println("FAIL: It is not in seconds")
-		        println("Test End: Verify Max and Min values in Command Log Statistics seconds")
-		        assert false
-		    }
-		}
-		else {
-		    println("The Command Log Statistics graph is not visible")
-		    println("Test End: Verify Max and Min valuess in Command Log Statistics seconds")
-		}
-		then:
-		println("")
-    }   
-    // end of Command Log Statistics
-
+   
     def "Click display preferences remove Partition Idle Time and again Add Partition Idle Time"() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
@@ -3273,5 +3055,4 @@ class DbMonitorTest extends TestBase {
 
         page.runQuery()
     }
-
 }
