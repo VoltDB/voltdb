@@ -100,9 +100,9 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 
-static const size_t PLAN_CACHE_SIZE = 1000;
+static const size_t PLAN_CACHE_SIZE = 1;
 // how many initial tuples to scan before calling into java
-const int64_t LONG_OP_THRESHOLD = 10000;
+const int64_t LONG_OP_THRESHOLD = 5;
 
 namespace voltdb {
 
