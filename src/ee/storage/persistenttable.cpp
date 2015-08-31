@@ -855,7 +855,7 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
  */
 void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
     TBPtr block = findBlock(target.address(), m_data, m_tableAllocationSize);
-    deleteTupleStorage(target, block, true); // also frees object columns
+    deleteTupleStorage(target, block, true); // also frees object columns along with empty tuple block storage
 }
 
 /*
