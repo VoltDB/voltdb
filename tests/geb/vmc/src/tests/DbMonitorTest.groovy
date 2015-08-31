@@ -1341,29 +1341,45 @@ class DbMonitorTest extends TestBase {
     // ALERT
 
 	def "set alert and replace trigger alert"() {
+		int count = 0
+		
 		when: 'set alert threshold to zero'
-			page.setAlertThreshold(00)
+	    page.setAlertThreshold(00)
 		then: 'check at least one alert'
-			waitFor(40, 2) { page.alertCount.isDisplayed() }
-			int alert = page.getAlert()
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) { page.alertCount.isDisplayed() }
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    }
+		}
+		
+		int alert = page.getAlert()
 
-			if ( alert != 0 ) {
-				println("PASS:There is at least one server on alert")
-			}
-			else {
-				println("FAIL:There are no server on alert")
-				assert false
-			}
+		if ( alert != 0 ) {
+			println("PASS:There is at least one server on alert")
+		}
+		else {
+			println("FAIL:There are no server on alert")
+			assert false
+		}
 
 		when: 'set alert threshold to hundred'
-			page.setAlertThreshold(100)
+		page.setAlertThreshold(100)
 		then: 'check no alert'
-			waitFor(40,20) { !page.alertCount.isDisplayed() }
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) { !page.alertCount.isDisplayed() }
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    }
+		}
 	}
 
     // server search
     def "check server search on dbmonitor matched"(){
-
         when:'clicked server button'
         at DbMonitorPage
         String serverNamevalid = page.getValidPath()  // taking local server valid name from serversearch.txt file ("/src/resources/serversearch.txt")

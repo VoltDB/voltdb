@@ -2580,6 +2580,11 @@ input.exitableFilePrefix {
     padding: 2px 3px;
 }
 
+input.exitableMemoryLimit {
+    width: 90px; /*position:relative; top:6px;*/
+    padding: 2px 3px;
+}
+
 .tblSave {
     border: none;
 }
@@ -2744,7 +2749,7 @@ td.pauseCursorDefault a {
     font-weight: bold;
 }
 
-td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix, td.tdSnapshotFrequency, td.tdSnapshotRetained, td.snapshottd, td.tdDrConfig {
+td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix, td.tdSnapshotFrequency, td.tdSnapshotRetained, td.snapshottd, td.tdDrConfig, td.memorySize , td.diskSize{
     position: relative;
 }
 

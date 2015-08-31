@@ -775,14 +775,40 @@
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="child-row-6 subLabelRow">
+                                <tr class="child-row-6 subLabelRow" id="memorySizeTimeout">
                                     <td class="configLabel">Memory Limit</td>
-                                    <td align="right">
-                                        <span id="memoryLimitSize"></span>
-                                        <span id="memoryLimitSizeUnit"></span>
+                                    <td align="right" class="memorySize">
+                                        <form id="formMemoryLimit" method="get" action="">
+                                            <div id="loadingMemoryLimit" class="loading-small" style="display: none;"></div>
+                                            <span id="memoryLimitSize"></span>
+                                            <input id="txtMemoryLimitSize" name="txtMemoryLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
+                                            <span id="memoryLimitSizeUnit"></span>
+                                            <label id="errorMemorySize" for="txtMemoryLimitSize" class="error" style="display: none;"></label>
+                                        </form>
                                     </td>
                                     <td>&nbsp;</td>
+                                    <td><a id="btnEditMemorySizeOk" href="#MemoryLimitPopup" class="editOk" title="Save" style="">Ok</a> 
+                                        <a id="btnEditMemorySizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> 
+                                        <a id="btnEditMemorySize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                    </td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow" id="diskSizeTimeout">
+                                    <td class="configLabel">Disk Limit</td>
+                                    <td align="right" class="diskSize">
+                                        <form id="formDiskLimit" method="get" action="">
+                                            <div id="loadingDiskLimit" class="loading-small" style="display: none;"></div>
+                                            <span id="diskLimitSize"></span>
+                                            <input id="txtDiskLimitSize" name="txtDiskLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
+                                            <span id="diskLimitSizeUnit"></span>
+                                            <label id="errorDiskSize" for="txtDiskLimitSize" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
                                     <td>&nbsp;</td>
+                                    <td>
+                                        <a id="btnEditDiskSizeOk" href="#diskLimitPopup" class="editOk" title="Save" style="">Ok</a>
+                                        <a id="btnEditDiskSizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                                        <a id="btnEditDiskSize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                    </td>
                                 </tr>
                             </table>
                         </div>
@@ -1469,6 +1495,28 @@
         <div class="overlay-btns"><a class="btn" id="btnPopupQueryTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupQueryTimeoutCancel">Cancel</a> </div>
     </div>
     <!-- POPUP Query timeout Popup -->
+    <!-- POPUP Memory Limit -->
+    <div id="MemoryLimitPopup" style="display: none">
+        <div class="overlay-title icon-alert">Memory Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupMemoryLimitCancel">Cancel</a> </div>
+    </div>
+    
+    <!-- POPUP Query timeout Popup -->
+    <!-- POPUP Memory Limit -->
+    <div id="diskLimitPopup" style="display: none">
+        <div class="overlay-title icon-alert">Disk Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupDiskLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupDiskLimitCancel">Cancel</a> </div>
+    </div>
+
+    <!-- POPUP Memory Limit -->
     <!-- POPUP saveConfirmationPopup -->
     <div id="Div2" style="display: none">
         <div class="overlay-title icon-alert">Save Confirmation</div>
@@ -1589,6 +1637,42 @@
                 </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnQueryTimeoutUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update Memory Limit error Popup-->
+    <div style="display: none"><a href="#memorySizeUpdateErrorPopup" id="memorySizeUpdateErrorPopupLink">Update Error</a></div>
+    <div id="memorySizeUpdateErrorPopup" style="display: none">
+        <div id="memorySizeUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="memorySizeUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnMemorySizeUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update Disk Limit error Popup-->
+    <div style="display: none"><a href="#diskSizeUpdateErrorPopup" id="diskSizeUpdateErrorPopupLink">Update Error</a></div>
+    <div id="diskSizeUpdateErrorPopup" style="display: none">
+        <div id="diskSizeUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="diskSizeUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnDiskSizeUpdateErrorOk">Ok</a></div>
             </div>
         </div>
     </div>

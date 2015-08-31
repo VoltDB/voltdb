@@ -744,6 +744,12 @@ function alertNodeClicked(obj) {
                             adminConfigValues['memorylimit'] = data.systemsettings.resourcemonitor.memorylimit.size;
                         }
                     }
+                    
+                    if (data.systemsettings.resourcemonitor != null) {
+                        if (data.systemsettings.resourcemonitor.disklimit != null) {
+                            adminConfigValues['disklimit'] = data.systemsettings.resourcemonitor.disklimit.size;
+                        }
+                    }
                 }
 
                 //Directory

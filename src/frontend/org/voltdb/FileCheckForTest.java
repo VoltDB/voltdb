@@ -14,27 +14,21 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef BINARYLOGSINK_H
-#define BINARYLOGSINK_H
-#include <boost/unordered_map.hpp>
 
-namespace voltdb {
+package org.voltdb;
 
-class PersistentTable;
-class Pool;
-class VoltDBEngine;
-/*
- * Responsible for applying binary logs to table data
+import java.io.File;
+
+
+/**
+ * Interface with methods to mock out disk space checking from DiskReResourceChecker class.
+ * This is implemented by junits to fake disk running out of space.
  */
-class BinaryLogSink {
-public:
-    BinaryLogSink();
-    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine);
-private:
-    void validateChecksum(uint32_t expected, const char *start, const char *end);
-};
+public interface FileCheckForTest
+{
+    public boolean canWrite(File file);
 
+    public long getTotalSpace(File file);
 
+    public long getUsableSpace(File File);
 }
-#endif
-
