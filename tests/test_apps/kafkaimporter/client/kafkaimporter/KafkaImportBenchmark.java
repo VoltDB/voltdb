@@ -34,6 +34,10 @@
  * If there are rows left in the mirror table, then not all exported
  * rows have made the round trip back to the import table, or there might
  * be data corruption causing the match process to fail.
+ *
+ * 8/31: add option to populate topic externally, called "pounder" since
+ * pounder (pounder.groovy) is a simple script commonly used to populate
+ * a topic quickly.
  */
 
 package kafkaimporter.client.kafkaimporter;
@@ -116,13 +120,16 @@ public class KafkaImportBenchmark {
         String servers = "localhost";
 
         @Option(desc = "Number of rows to expect to import from the Kafka topic")
-        long export_rows = 10_000_000;
+        long expected_rows = 10_000_000;
 
         @Option(desc = "Report latency for kafka benchmark run.")
         boolean latencyreport = false;
 
         @Option(desc = "Test using all VoltDB datatypes (except varbin).")
         boolean alltypes = false;
+
+        @Option(desc = "Test using pounder to populate export topic.")
+        boolean pounder = false;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -131,7 +138,8 @@ public class KafkaImportBenchmark {
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (export_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
+            if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
+            if (pounder && alltypes) exitWithMessageAndUsage("pounder only works with simple schema");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             log.info("finished validating args");
         }
@@ -227,11 +235,13 @@ public class KafkaImportBenchmark {
                     count = 0;
                 importProgress.add((int) count);
 
-                // for alltypes, if a column in mirror doesn't match import, key will be a row key, and non-zero
-                long key = MatchChecks.checkRowMismatch(client);
-                if (key != 0) {
-                    log.error("Import value mismatch at row " + key + ". Exiting.");
-                    System.exit(-1);
+                if (config.alltypes) {
+                	// for alltypes, if a column in mirror doesn't match import, key will be a row key, and non-zero
+                	long key = MatchChecks.checkRowMismatch(client);
+                	if (key != 0) {
+                		log.error("Import value mismatch at row " + key + ". Exiting.");
+                		System.exit(-1);
+                	}
                 }
 
                 if (importProgress.size() > 1)
@@ -268,14 +278,16 @@ public class KafkaImportBenchmark {
             // Save the key/value pairs so they can be verified through the database
             log.info("Running benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-            while (benchmarkEndTime > System.currentTimeMillis()) {
-                long value = System.currentTimeMillis();
-                long key = icnt;
-                exportProc.insertExport(key, value);
-                icnt++;
+            if (!config.pounder) {
+            	while (benchmarkEndTime > System.currentTimeMillis()) {
+            		long value = System.currentTimeMillis();
+            		long key = icnt;
+            		exportProc.insertExport(key, value);
+            		icnt++;
+            	}
+            } else {
+            	return;
             }
-            // check for export completion
-            //exportMon.waitForStreamedAllocatedMemoryZero();
         } catch (Exception ex) {
             log.error("Exception in Benchmark", ex);
         } finally {
@@ -325,8 +337,8 @@ public class KafkaImportBenchmark {
         exportProc = new InsertExport(config.alltypes, client, rowsAdded);
 
         // get instances to track track export completion using @Statistics
-        exportMon = new TableChangeMonitor(client, "StreamedTable", "KAFKAEXPORTTABLE1");
-        importMon = new TableChangeMonitor(client, "PersistentTable", "KAFKAIMPORTTABLE1");
+        // exportMon = new TableChangeMonitor(client, "StreamedTable", "KAFKAEXPORTTABLE1");
+        // importMon = new TableChangeMonitor(client, "PersistentTable", "KAFKAIMPORTTABLE1");
 
         log.info("Starting KafkaImportBenchmark...");
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
@@ -354,17 +366,22 @@ public class KafkaImportBenchmark {
 
         log.info("Total rows exported: " + finalInsertCount);
         log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorRows);
-        log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
-
+        if (!config.pounder) {
+        	log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
+        }
         boolean testResult = true;
         if (mirrorRows != 0) {
             log.error(mirrorRows + " Rows are missing from the import stream, failing test");
             testResult = false;
         }
 
-        if (importRowCount < exportRowCount) {
+        if (importRowCount < exportRowCount && !config.pounder) {
             log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRowCount + "' test fails.");
             testResult = false;
+        }
+
+        if (config.pounder) {
+        	testResult = MatchChecks.checkPounderResults(config.expected_rows, client);
         }
 
         client.drain();

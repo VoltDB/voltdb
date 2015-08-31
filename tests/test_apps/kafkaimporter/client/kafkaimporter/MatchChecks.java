@@ -152,5 +152,33 @@ public class MatchChecks {
         }
         return importRowCount;
     }
+
+	public static boolean checkPounderResults(long expected_rows, Client client) {
+		// make sure import table has expected number of rows, and without gaps
+		// we check the row count, then use min & max to infer the range is complete
+
+	       long importRowCount = 0;
+	       long importMax = 0;
+	       long importMin = 0;
+
+	        try {
+	            VoltTable[] countQueryResult = client.callProcedure("ImportCountMinMax").getResults();
+	            importRowCount = (long) countQueryResult[0].get(0,  VoltType.BIGINT);
+	            importMin = (long) countQueryResult[0].get(1,  VoltType.BIGINT);
+	            importMax = (long) countQueryResult[0].get(2,  VoltType.BIGINT);
+	        } catch (Exception e) {
+	            log.error("Exception from callProcedure ImportMinMax", e);
+	            System.exit(-1);
+	        }
+	        if (importRowCount != expected_rows) {
+	        	log.error(expected_rows + " expected. " + importRowCount + " received.");
+	        	return false;
+	        }
+	        if ((importMax-importMin+1) != expected_rows) {
+	        	log.error(expected_rows + " expected. " + (importMax-importMin+1) + " rows received.");
+	        	return false;
+	        }
+	        return true;
+	}
 }
 
