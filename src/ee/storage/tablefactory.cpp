@@ -92,7 +92,13 @@ Table* TableFactory::getPersistentTable(
     // initialize stats for the table
     configureStats(databaseId, name, table);
 
-    return dynamic_cast<Table*>(table);
+    if(!exportOnly) {
+        PersistentTable *persistentTable = static_cast<PersistentTable*>(table);
+        TBPtr block = persistentTable->allocateNextBlock();
+        assert(block->hasFreeTuples());
+        persistentTable->m_blocksWithSpace.insert(block);
+    }
+    return table;
 }
 
 TempTable* TableFactory::getTempTable(

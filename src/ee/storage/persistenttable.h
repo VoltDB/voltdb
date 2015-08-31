@@ -886,7 +886,9 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 
     bool transitioningToBlockWithSpace = !block->hasFreeTuples();
 
+    //uint32_t activeTuples = block->activeTuples();
     int retval = block->freeTuple(tuple.address());
+    //std::cout<<"Active Tuples: before free: "<< activeTuples << " after free: "<<block->activeTuples() << " number of blocks: " << m_data.size()<<std::endl;
     if (retval != -1) {
         //Check if if the block is currently pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
@@ -901,7 +903,10 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
         }
     }
 
-    if (block->isEmpty()) {
+    // if the current block is empty and there are more than one blocks, release the existing
+    // empty block.
+    if (block->isEmpty() && m_data.size() > 1) {
+        //std::cout<<"release the block"<<std::endl;
         m_data.erase(block->address());
         m_blocksWithSpace.erase(block);
         m_blocksNotPendingSnapshot.erase(block);
