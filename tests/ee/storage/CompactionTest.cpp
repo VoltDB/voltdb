@@ -334,23 +334,22 @@ TEST_F(CompactionTest, BasicCompaction) {
         pkeysFoundAfterDelete.insert(pkey);
     }
 
-    // std::vector<int32_t> diff;
-    // std::insert_iterator<std::vector<int32_t> > ii( diff, diff.begin());
-    // std::set_difference(pkeysNotDeleted.begin(), pkeysNotDeleted.end(), pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), ii);
-    // for (int ii = 0; ii < diff.size(); ii++) {
-    //     printf("Key that was not deleted, but wasn't found is %d\n", diff[ii]);
-    // }
+    std::vector<int32_t> diff;
+    std::insert_iterator<std::vector<int32_t> > ii( diff, diff.begin());
+    std::set_difference(pkeysNotDeleted.begin(), pkeysNotDeleted.end(), pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), ii);
+    for (int ii = 0; ii < diff.size(); ii++) {
+        printf("Key that was not deleted, but wasn't found is %d\n", diff[ii]);
+    }
 
-    // diff.clear();
-    // ii = std::insert_iterator<std::vector<int32_t> >(diff, diff.begin());
-    // std::set_difference( pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), pkeysNotDeleted.begin(), pkeysNotDeleted.end(), ii);
-    // for (int ii = 0; ii < diff.size(); ii++) {
-    //     printf("Key that was found after deletes, but shouldn't have been there was %d\n", diff[ii]);
-    // }
+    diff.clear();
+    ii = std::insert_iterator<std::vector<int32_t> >(diff, diff.begin());
+    std::set_difference( pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), pkeysNotDeleted.begin(), pkeysNotDeleted.end(), ii);
+    for (int ii = 0; ii < diff.size(); ii++) {
+        printf("Key that was found after deletes, but shouldn't have been there was %d\n", diff[ii]);
+    }
 
     ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
     ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
-    //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
 #ifdef MEMCHECK
     ASSERT_EQ( m_table->m_data.size(), 500);
 #else
@@ -491,19 +490,6 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         for (int ii = 0; ii < diff.size(); ii++) {
             printf("Key that was found after deletes, but shouldn't have been there was %d\n", diff[ii]);
         }
-
-        //        ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
-        //        ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
-        //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
-        //        ASSERT_EQ( m_table->m_data.size(), 13);
-        //
-        //        for (CompactingSet<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
-        //            key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-        //            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        //            TableTuple tuple = pkeyIndex->nextValueAtKey();
-        //            m_table->deleteTuple(tuple, true);
-        //        }
-
     }
     m_table->doForcedCompaction();
     ASSERT_EQ( m_table->m_data.size(), 0);

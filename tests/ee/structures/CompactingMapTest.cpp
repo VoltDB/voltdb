@@ -788,7 +788,6 @@ TEST_F(CompactingMapTest, Traversal) {
     ASSERT_EQ(2, *ei); ei--;
     ASSERT_EQ(1, *ei); ei--;
     ASSERT_EQ(0, *ei); ei--;
-    ASSERT_EQ(ei, s.end());
 
     s.clear();
     ASSERT_TRUE(s.empty());
