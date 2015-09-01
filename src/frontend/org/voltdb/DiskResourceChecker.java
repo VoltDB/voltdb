@@ -118,13 +118,14 @@ public class DiskResourceChecker
         {
             for (DiskLimitType.Feature feature : features) {
                 configuredFeatures.add(feature.getName());
+                FeatureDiskLimitConfig aConfig =
+                        new FeatureDiskLimitConfig(feature.getName(), pathsConfig, feature.getSize());
                 if (!isSupportedFeature(feature.getName())) {
                     m_logger.warn("Ignoring unsupported feature " + feature.getName());
                     continue;
                 }
                 String size = feature.getSize();
-                builder.put(feature.getName(),
-                        new FeatureDiskLimitConfig(feature.getName(), pathsConfig, size));
+                builder.put(feature.getName(), aConfig);
                 if (m_logger.isDebugEnabled()) {
                     m_logger.debug("Added disk usage limit configuration " + size + " for feature " + feature.getName());
                 }
@@ -137,6 +138,10 @@ public class DiskResourceChecker
     private boolean isSupportedFeature(FeatureNameType featureName)
     {
         LicenseApi licenseApi = VoltDB.instance().getLicenseApi();
+        if (licenseApi==null) { // this is null when compile deployment is called at startup.
+                                // Ignore at that point. This will be checked later.
+            return true;
+        }
         switch(featureName)
         {
         case COMMANDLOG:
