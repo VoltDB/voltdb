@@ -17,6 +17,8 @@
 
 package org.voltdb.types;
 
+import java.nio.ByteBuffer;
+
 public class PointType {
 
     // Internal representation of a geospatial point
@@ -55,7 +57,10 @@ public class PointType {
     }
 
     // Always returns false for null points (either lat or long NaN)
-    // Consider alternatives?
+    // What's the right thing to do here?
+    //    In SQL semantics, null values should not compare equal to eachother.
+    //    In Java, an instance should be equal to itself.
+    //    For inserting into a hash table in Java, we'd want nulls to compare as equal.
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof PointType)) {
@@ -68,5 +73,25 @@ public class PointType {
         }
 
         return that.getLongitude() == getLongitude();
+    }
+
+    /**
+     * Serialize this instance to a byte buffer.
+     * For now we serialize as a single-precision float (subject to change)
+     * @param buffer
+     */
+    public void flattenToBuffer(ByteBuffer buffer) {
+        buffer.putFloat((float)getLatitude());
+        buffer.putFloat((float)getLongitude());
+    }
+
+
+    /**
+     * Serialize the null point to a byte buffer
+     * @param buffer
+     */
+    public static void serializeNull(ByteBuffer buffer) {
+        buffer.putFloat(Float.NaN);
+        buffer.putFloat(Float.NaN);
     }
 }

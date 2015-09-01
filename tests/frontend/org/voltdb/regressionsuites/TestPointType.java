@@ -80,23 +80,27 @@ public class TestPointType extends RegressionSuite {
                 new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc",
-                "select pointfromtext('point (42.5047 -71.1961)') from t;").getResults()[0];
+                "select pointfromtext('point (42.4906 -71.2767)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
         PointType pt = vt.getPoint(0);
         assertFalse(vt.wasNull());
-        assertEquals(42.5047, pt.getLatitude(), 0.001);
-        assertEquals(-71.1961, pt.getLongitude(), 0.001);
+        assertEquals(42.4906, pt.getLatitude(), 0.001);
+        assertEquals(-71.2767, pt.getLongitude(), 0.001);
     }
 
     public void testPointEquality() throws Exception {
         Client client = getClient();
 
         validateTableOfScalarLongs(client,
-                "insert into t values (0, 'Bedford', pointfromtext('point (42.5047 -71.1961)'));",
+                "insert into t values (0, 'Bedford', pointfromtext('point (42.4906 -71.2767)'));",
                 new long[] {1});
         validateTableOfScalarLongs(client,
                 "insert into t values (1, 'Santa Clara', pointfromtext('point (37.3544 -121.9692)'));",
                 new long[] {1});
+        validateTableOfScalarLongs(client,
+                "insert into t values (2, 'Atlantis', null);",
+                new long[] {1});
+
 
         // Self join to test EQ operator
         VoltTable vt = client.callProcedure("@AdHoc",
@@ -109,8 +113,8 @@ public class TestPointType extends RegressionSuite {
         assertEquals(0, vt.getLong(0));
         assertEquals("Bedford", vt.getString(1));
         PointType pt = vt.getPoint(2);
-        assertEquals(42.5047, pt.getLatitude(), 0.001);
-        assertEquals(-71.1961, pt.getLongitude(), 0.001);
+        assertEquals(42.4906, pt.getLatitude(), 0.001);
+        assertEquals(-71.2767, pt.getLongitude(), 0.001);
 
         assertTrue(vt.advanceRow());
         assertEquals(1, vt.getLong(0));

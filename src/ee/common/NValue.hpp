@@ -3051,6 +3051,12 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         getDecimal().table[0] = input.readLong();
         break;
     }
+    case VALUE_TYPE_POINT: {
+        float lat = input.readFloat();
+        float lng = input.readFloat();
+        getPoint() = PointType(lat, lng);
+        break;
+    }
     case VALUE_TYPE_NULL: {
         setNull();
         break;
@@ -3119,10 +3125,8 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         break;
     }
     case VALUE_TYPE_POINT: {
-        float lat = getPoint().getLatitude();
-        float lng = getPoint().getLongitude();
-        output.writeInt(*reinterpret_cast<int32_t*>(&lat));
-        output.writeInt(*reinterpret_cast<int32_t*>(&lng));
+        output.writeFloat(getPoint().getLatitude());
+        output.writeFloat(getPoint().getLongitude());
         break;
     }
     default:

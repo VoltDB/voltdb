@@ -982,4 +982,7 @@ public enum VoltType {
     /** Null value for <code>DECIMAL</code>.  */
     public static final NullDecimalSigil NULL_DECIMAL = new NullDecimalSigil();
 
+    private static final class NullPointSigil{}
+    /** Null value for <code>POINT</code>. */
+    public static final NullPointSigil NULL_POINT = new NullPointSigil();
 }
