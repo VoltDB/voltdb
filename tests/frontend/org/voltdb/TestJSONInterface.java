@@ -1627,6 +1627,16 @@ public class TestJSONInterface extends TestCase {
             gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
+            // decimal values not allowed for percentages
+            memLimit.setSize("90.5%25");
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            gotValue = mapper.readValue(jdep, DeploymentType.class);
+            // must be still the old value
+            assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
+
         } finally {
             if (server != null) {
                 server.shutdown();

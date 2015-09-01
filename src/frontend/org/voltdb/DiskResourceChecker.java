@@ -137,6 +137,10 @@ public class DiskResourceChecker
     private boolean isSupportedFeature(FeatureNameType featureName)
     {
         LicenseApi licenseApi = VoltDB.instance().getLicenseApi();
+        if (licenseApi==null) { // this is null when compile deployment is called at startup.
+                                // Ignore at that point. This will be checked later.
+            return true;
+        }
         switch(featureName)
         {
         case COMMANDLOG:
