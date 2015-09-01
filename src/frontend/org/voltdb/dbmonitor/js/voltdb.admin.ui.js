@@ -1825,7 +1825,6 @@ function loadAdminPage() {
     });
     
     adminEditObjects.btnEditDiskSizeOk.on("click", function (e) {
-        debugger;
         if (!$("#formDiskLimit").valid()) {
             e.preventDefault();
             e.stopPropagation();
@@ -3115,10 +3114,11 @@ function loadAdminPage() {
         this.orgTypeValue = "";
         this.exportTypes = [];
 
-        this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
+        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
+            this.ipAddress = ipAddress;
         };
 
         this.stoppedServer = function (hostIdvalue, serverNameValue) {
