@@ -239,6 +239,7 @@ public class ExportGeneration {
      *
      */
     public void kickOffLeaderElection() {
+        exportLog.info("Kicking off leader election for: " + m_timestamp);
         m_childUpdatingThread.submit(new Runnable() {
             @Override
             public void run() {
@@ -370,9 +371,7 @@ public class ExportGeneration {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
                     try {
                         eds.setMaster();
-                        if (!eds.isRunEveryWhere()) {
-                            eds.acceptMastership();
-                        }
+                        eds.acceptMastership();
                     } catch (Exception e) {
                         exportLog.error("Unable to start exporting", e);
                     }
@@ -508,7 +507,6 @@ public class ExportGeneration {
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
-
                     for( ExportDataSource eds:
                         m_dataSourcesByPartition.get( partition).values()) {
                         eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
@@ -835,7 +833,6 @@ public class ExportGeneration {
             return;
         }
 
-        exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
                 eds.setMaster();

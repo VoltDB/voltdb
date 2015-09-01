@@ -98,7 +98,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private boolean m_runEveryWhere = false;
     private boolean m_isMaster = false;
     private boolean m_replicaRunning = false;
-    private boolean m_replicaKicked = false;
+    private final int m_numberOfReplicas;
+    private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
 
     /**
      * Create a new data source.
@@ -120,7 +121,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             ) throws IOException
             {
         checkNotNull( onDrain, "onDrain runnable is null");
-
+        m_numberOfReplicas = VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor();
         m_format = ExportFormat.FOURDOTFOUR;
         m_generation = generation;
         m_onDrain = new Runnable() {
@@ -231,6 +232,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
+        m_numberOfReplicas = VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor();
 
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
@@ -295,8 +297,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public void updateAckMailboxes( final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
+    public synchronized void updateAckMailboxes( final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         m_ackMailboxRefs.set( ackMailboxes);
+        boolean kickReplica = false;
+        if (m_ackMailboxRefs.get().getSecond().size() == m_numberOfReplicas) {
+            exportLog.info("All replicas seen For partition " + getPartitionId() + " Allow mastership.");
+            m_allowAcceptingMastership.release();
+            kickReplica = true;
+        }
+        if (m_runEveryWhere && kickReplica && m_isMaster) {
+            //Kick off replicas keep kicking as we dont know when they will start looking.
+            forwardAckToOtherReplicas(-2);
+        }
     }
 
     private void releaseExportBytes(long releaseOffset) throws IOException {
@@ -670,7 +682,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_isMaster) {
             return m_firstUnpolledUso;
         }
-        //TODO: Think of ahead and behind cases....
         long auso = Math.min(m_lastAckUSO, m_firstUnpolledUso);
         return auso;
     }
@@ -761,6 +772,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     ackImpl(m_uso);
                                 }
                             } finally {
+                                if (m_runEveryWhere && m_isMaster) {
+                                    //Kick off replicas keep kicking as we dont know when they will start looking.
+                                    forwardAckToOtherReplicas(-2);
+                                }
                                 forwardAckToOtherReplicas(m_uso);
                             }
                         } catch (Exception e) {
@@ -780,9 +795,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void forwardAckToOtherReplicas(long uso) {
-        if (m_runEveryWhere && !m_isMaster) {
-            return;
-        }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
 
@@ -806,15 +818,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso) {
-        if (m_runEveryWhere && !m_isMaster) {
-            m_lastAckUSO = uso;
+        if (m_runEveryWhere && !m_isMaster && uso == -2) {
             //These are single threaded so no need to lock.
+            exportLog.info("Export generation " + this.getGeneration() + " replica run request for " + this.getPartitionId());
             if (!m_replicaRunning) {
                 exportLog.info("Export generation " + this.getGeneration() + " accepting mastership for partition " + this.getPartitionId() + " as replica");
                 acceptMastership();
                 m_replicaRunning = true;
             }
+            return;
         }
+
+        m_lastAckUSO = uso;
         m_es.execute(new Runnable() {
             @Override
             public void run() {
@@ -865,18 +880,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
-        if (m_runEveryWhere && m_isMaster && !m_replicaKicked) {
-            //Kick off replicas
-            forwardAckToOtherReplicas(0);
-        }
-        if (m_runEveryWhere && m_replicaRunning) {
-            exportLog.info("Export generation " + this.getGeneration() + " mastership for replica partition " + this.getPartitionId() + " already accepted.");
-            return;
-        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
+                    m_allowAcceptingMastership.acquire();
+                    exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId());
                     if (!m_es.isShutdown()) {
                         m_onMastership.run();
                     }
