@@ -125,9 +125,9 @@ EXPORT TABLE kafkaexporttable2;
 
 CREATE TABLE importcounts
     (
-                    KEY BIGINT NOT NULL,
-                    TOTAL_ROWS_DELETED BIGINT NOT NULL,
-                    VALUE_MISMATCH BIGINT NOT NULL
+                    KEY BIGINT DEFAULT 0 NOT NULL,
+                    TOTAL_ROWS_DELETED BIGINT  DEFAULT 0 NOT NULL,
+                    VALUE_MISMATCH BIGINT DEFAULT 0 NOT NULL
     );
 
 PARTITION TABLE importcounts on COLUMN KEY;
@@ -154,6 +154,6 @@ CREATE PROCEDURE CountImport1 as select count(*) from kafkaimporttable1;
 
 CREATE PROCEDURE CountMirror2 as select count(*) from kafkamirrortable2;
 CREATE PROCEDURE CountImport2 as select count(*) from kafkaimporttable2;
-CREATE PROCEDURE ImportMinMax as select count(key), min(key), max(key) from kafkaimporttable1;
+CREATE PROCEDURE ImportCountMinMax as select count(key), min(key), max(key) from kafkaimporttable1;
 
 END_OF_BATCH

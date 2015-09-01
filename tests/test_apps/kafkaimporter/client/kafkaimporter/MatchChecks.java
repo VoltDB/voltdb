@@ -162,10 +162,11 @@ public class MatchChecks {
 	       long importMin = 0;
 
 	        try {
-	            VoltTable[] countQueryResult = client.callProcedure("ImportCountMinMax").getResults();
-	            importRowCount = (long) countQueryResult[0].get(0,  VoltType.BIGINT);
-	            importMin = (long) countQueryResult[0].get(1,  VoltType.BIGINT);
-	            importMax = (long) countQueryResult[0].get(2,  VoltType.BIGINT);
+	            VoltTable countQueryResult = client.callProcedure("ImportCountMinMax").getResults()[0];
+	            countQueryResult.advanceRow();
+	            importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
+	            importMin = (long) countQueryResult.get(1, VoltType.BIGINT);
+	            importMax = (long) countQueryResult.get(2, VoltType.BIGINT);
 	        } catch (Exception e) {
 	            log.error("Exception from callProcedure ImportMinMax", e);
 	            System.exit(-1);
@@ -175,10 +176,10 @@ public class MatchChecks {
 	        	return false;
 	        }
 
-            if (importMax = == VoltType.NULL_BIGINT) {
+            if (importMax == VoltType.NULL_BIGINT) {
                 importMax = 0;
             }
-            if (importMin = == VoltType.NULL_BIGINT) {
+            if (importMin == VoltType.NULL_BIGINT) {
                 importMin = 0;
             }
 	        if ((importMax-importMin+1) != expected_rows) {
