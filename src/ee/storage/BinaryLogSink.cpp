@@ -63,12 +63,13 @@ private:
 
 BinaryLogSink::BinaryLogSink() {}
 
-void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
+int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
 
+    size_t rowCount = 0;
     CachedIndexKeyTuple indexKeyTuple;
     while (taskInfo.hasRemaining()) {
         pool->purge();
@@ -78,6 +79,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             throwFatalException("Unsupported DR version %d", drVersion);
         }
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
+        rowCount += rowCostForDRRecord(type);
 
         int64_t tableHandle = 0;
 
@@ -190,6 +192,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             PersistentTable *table = tableIter->second;
 
             table->truncateTable(engine, true);
+
             break;
         }
         case DR_RECORD_UPDATE:
@@ -198,6 +201,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             break;
         }
     }
+    return static_cast<int64_t>(rowCount);
 }
 
 void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const char *end) {
