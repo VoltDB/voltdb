@@ -28,7 +28,6 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.PointType;
@@ -48,7 +47,7 @@ public class TestPointType extends RegressionSuite {
                 new long[] {1});
 
 
-        VoltTable vt = client.callProcedure("@AdHoc", "select * from t;").getResults()[0];
+        VoltTable vt = client.callProcedure("@AdHoc", "select pk, pt from t;").getResults()[0];
         String actual = vt.toString();
         String expectedPart = "NULL";
         assertTrue(actual + " does not contain " + expectedPart,
@@ -81,13 +80,46 @@ public class TestPointType extends RegressionSuite {
                 new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc",
-                "select pointfromtext('point (42.5047 71.1961)') from t;").getResults()[0];
+                "select pointfromtext('point (42.5047 -71.1961)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
         PointType pt = vt.getPoint(0);
-        System.out.println(pt);
         assertFalse(vt.wasNull());
         assertEquals(42.5047, pt.getLatitude(), 0.001);
-        assertEquals(71.1961, pt.getLongitude(), 0.001);
+        assertEquals(-71.1961, pt.getLongitude(), 0.001);
+    }
+
+    public void testPointEquality() throws Exception {
+        Client client = getClient();
+
+        validateTableOfScalarLongs(client,
+                "insert into t values (0, 'Bedford', pointfromtext('point (42.5047 -71.1961)'));",
+                new long[] {1});
+        validateTableOfScalarLongs(client,
+                "insert into t values (1, 'Santa Clara', pointfromtext('point (37.3544 -121.9692)'));",
+                new long[] {1});
+
+        // Self join to test EQ operator
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select t1.pk, t1.name, t1.pt "
+                + "from t as t1, t as t2 "
+                + "where t1.pt = t2.pt "
+                + "order by pk;").getResults()[0];
+
+        assertTrue(vt.advanceRow());
+        assertEquals(0, vt.getLong(0));
+        assertEquals("Bedford", vt.getString(1));
+        PointType pt = vt.getPoint(2);
+        assertEquals(42.5047, pt.getLatitude(), 0.001);
+        assertEquals(-71.1961, pt.getLongitude(), 0.001);
+
+        assertTrue(vt.advanceRow());
+        assertEquals(1, vt.getLong(0));
+        assertEquals("Santa Clara", vt.getString(1));
+        pt = vt.getPoint(2);
+        assertEquals(37.3544, pt.getLatitude(), 0.001);
+        assertEquals(-121.9692, pt.getLongitude(), 0.001);
+
+        assertFalse(vt.advanceRow());
     }
 
     static public junit.framework.Test suite() {
@@ -102,6 +134,7 @@ public class TestPointType extends RegressionSuite {
         String literalSchema =
                 "CREATE TABLE T (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
+                + "  NAME VARCHAR(32),\n"
                 + "  PT POINT\n"
                 + ");\n"
                 ;

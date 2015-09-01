@@ -1295,12 +1295,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     break;
                 case POINT:
                     PointType pt = r.getPoint(i);
-                    assert(r.wasNull());
                     if (r.wasNull()) {
                         buffer.append("NULL");
                     }
                     else {
-                        buffer.append("some value");
+                        buffer.append(pt.toString());
                     }
                     break;
                 default:

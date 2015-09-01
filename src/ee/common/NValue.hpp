@@ -1953,6 +1953,45 @@ private:
         }
     }
 
+    int comparePointValue (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_POINT);
+        switch (rhs.getValueType()) {
+        case VALUE_TYPE_POINT: {
+            float lhsLat = reinterpret_cast<const float*>(m_data)[0];
+            float rhsLat = reinterpret_cast<const float*>(rhs.m_data)[0];
+            if (lhsLat < rhsLat) {
+                return VALUE_COMPARE_LESSTHAN;
+            }
+
+            if (lhsLat > rhsLat) {
+                return VALUE_COMPARE_GREATERTHAN;
+            }
+
+            // latitude is equal; compare longitude
+            float lhsLng = reinterpret_cast<const float*>(m_data)[1];
+            float rhsLng = reinterpret_cast<const float*>(rhs.m_data)[1];
+            if (lhsLng < rhsLng) {
+                return VALUE_COMPARE_LESSTHAN;
+            }
+
+            if (lhsLng > rhsLng) {
+                return VALUE_COMPARE_GREATERTHAN;
+            }
+
+            return VALUE_COMPARE_EQUAL;
+        }
+        default:
+            std::ostringstream oss;
+            oss << "Type " << valueToString(rhs.getValueType())
+                << " cannot be cast for comparison to type "
+                << valueToString(getValueType());
+            throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                               oss.str().c_str());
+            // Not reached
+            return 0;
+        }
+    }
+
     NValue opAddBigInts(const int64_t lhs, const int64_t rhs) const {
         //Scary overflow check from https://www.securecoding.cert.org/confluence/display/cplusplus/INT32-CPP.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
         if ( ((lhs^rhs)
@@ -2490,6 +2529,8 @@ inline int NValue::compare_withoutNull(const NValue rhs) const {
         return compareBinaryValue(rhs);
     case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
+    case VALUE_TYPE_POINT:
+        return comparePointValue(rhs);
     default: {
         throwDynamicSQLException(
                 "non comparable types lhs '%s' rhs '%s'",
