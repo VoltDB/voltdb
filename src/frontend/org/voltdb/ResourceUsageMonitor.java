@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
@@ -119,9 +120,9 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         }
         if (datum.rss >= m_rssLimit) {
             m_logger.error(String.format(
-                    "Resource limit exceeded. RSS limit %s. Setting database to read-only. " +
-                    "Use voltadmin resume command once resource constraint is corrected.",
-                    getRssLimitLogString()));
+                    "Resource limit exceeded. RSS limit %s on %s. Setting database to read-only. " +
+                    "Use \"voltadmin resume\" command once resource constraint is corrected.",
+                    getRssLimitLogString(), CoreUtils.getHostnameOrAddress()));
             m_logger.error(String.format("Resource limit exceeded. Current RSS size %s.", getValueWithUnit(datum.rss)));
             return true;
         } else {

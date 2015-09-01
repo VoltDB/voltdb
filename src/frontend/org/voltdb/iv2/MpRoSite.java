@@ -545,7 +545,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void applyBinaryLog(long txnId, long spHandle, long uniqueId, byte log[]) {
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 

@@ -984,7 +984,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 m_schemaString = inboundSchemaString;
 
                 // raw blit the row (assume the row is valid with proper length)
-                byte[] rawRow = row.getRawRow();
+                ByteBuffer rawRow = row.getRawRow();
                 m_buffer.put(rawRow);
             }
             else {

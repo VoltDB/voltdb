@@ -386,18 +386,18 @@ public abstract class VoltTableRow {
     }
 
     /**
-     * @return A byte string containing the raw data of a row in a format that
-     * can be blindly copied into a VoltDB with sufficient space and the exact
-     * same schema.
+     * @return A slice of the underlying buffer containing the raw data of a row
+     * in a format that can be blindly copied into a VoltDB with sufficient space
+     * and the exact same schema.
      */
-    final byte[] getRawRow() {
-        long rowSize = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
-        byte[] fullRow = new byte[(int) (ROW_HEADER_SIZE + rowSize)];
+    final ByteBuffer getRawRow() {
+        int rowSize = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
         int pos = m_buffer.position();
         m_buffer.position(m_position - ROW_HEADER_SIZE);
-        m_buffer.get(fullRow);
+        ByteBuffer retval = m_buffer.slice();
         m_buffer.position(pos);
-        return fullRow;
+        retval.limit(ROW_HEADER_SIZE + rowSize);
+        return retval;
     }
 
     /**
