@@ -1608,8 +1608,8 @@ function loadAdminPage() {
                 adminEditObjects.spanMemoryLimitSizeUnit.text("");
         }
     };
-    
-    var setMemoryLimitValidation = function () {
+
+    var setMemoryLimitValidation = function() {
         $("#errorMemorySize").val("");
         $("#errorMemorySize").hide();
         $("#txtMemoryLimitSize").rules("remove");
@@ -1635,7 +1635,7 @@ function loadAdminPage() {
                 }
             });
         }
-    }
+    };
 
     //Disk Limit
     var toggleDiskSizeEdit = function (state) {
