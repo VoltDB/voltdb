@@ -1819,6 +1819,36 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(msg.contains("Invalid memory limit"));
     }
 
+    public void testDiskLimitNegative() throws Exception {
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "  <cluster hostcount=\"1\" kfactor=\"0\" />"
+                + "  <httpd enabled=\"true\">"
+                + "    <jsonapi enabled=\"true\" />"
+                + "  </httpd>"
+                + "  <systemsettings>"
+                + "    <resourcemonitor>"
+                + "      <disklimit>"
+                + "        <feature name=\"commandlog\" size=\"xx\"/>"
+                + "      </disklimit>"
+                + "    </resourcemonitor>"
+                + "  </systemsettings>"
+                + "</deployment>";
+        final String ddl =
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+        assertTrue(msg.contains("Invalid value"));
+    }
+
     public void testOverrideDRConflictTableExportSetting() throws Exception {
         if (!MiscUtils.isPro()) { return; } // not supported in community
 
