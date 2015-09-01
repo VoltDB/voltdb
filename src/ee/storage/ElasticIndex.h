@@ -97,9 +97,6 @@ class ElasticIndexComparator
     int operator()(const ElasticIndexKey &a, const ElasticIndexKey &b) const;
 };
 
-struct vdb_empty_struct {};
-typedef struct vdb_empty_struct data_type;
-
 /**
  * The elastic index (set)
  */
