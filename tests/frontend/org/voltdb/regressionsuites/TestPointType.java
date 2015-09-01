@@ -88,19 +88,26 @@ public class TestPointType extends RegressionSuite {
         assertEquals(-71.2767, pt.getLongitude(), 0.001);
     }
 
+    private int fillTable(Client client, int startPk) throws Exception {
+        validateTableOfScalarLongs(client,
+                "insert into t values (" + startPk + ", 'Bedford', pointfromtext('point (42.4906 -71.2767)'));",
+                new long[] {1});
+        startPk++;
+        validateTableOfScalarLongs(client,
+                "insert into t values (" + startPk + ", 'Santa Clara', pointfromtext('point (37.3544 -121.9692)'));",
+                new long[] {1});
+        startPk++;
+        validateTableOfScalarLongs(client,
+                "insert into t values (" + startPk + ", 'Atlantis', null);",
+                new long[] {1});
+        startPk++;
+        return startPk;
+    }
+
     public void testPointEquality() throws Exception {
         Client client = getClient();
 
-        validateTableOfScalarLongs(client,
-                "insert into t values (0, 'Bedford', pointfromtext('point (42.4906 -71.2767)'));",
-                new long[] {1});
-        validateTableOfScalarLongs(client,
-                "insert into t values (1, 'Santa Clara', pointfromtext('point (37.3544 -121.9692)'));",
-                new long[] {1});
-        validateTableOfScalarLongs(client,
-                "insert into t values (2, 'Atlantis', null);",
-                new long[] {1});
-
+        fillTable(client, 0);
 
         // Self join to test EQ operator
         VoltTable vt = client.callProcedure("@AdHoc",
@@ -124,6 +131,43 @@ public class TestPointType extends RegressionSuite {
         assertEquals(-121.9692, pt.getLongitude(), 0.001);
 
         assertFalse(vt.advanceRow());
+    }
+
+    public void testPointGroupBy() throws Exception {
+        Client client = getClient();
+
+        int pk = 0;
+        pk = fillTable(client, pk);
+        pk = fillTable(client, pk);
+        pk = fillTable(client, pk);
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select pt, count(*) "
+                + "from t "
+                + "group by pt "
+                + "order by pt asc")
+                .getResults()[0];
+
+        PointType expectedPoints[] = {
+          null,
+          new PointType(37.3544, -121.9692),
+          new PointType(42.4906, -71.2767)
+        };
+
+        int i = 0;
+        while (vt.advanceRow()) {
+            PointType actualPoint = vt.getPoint(0);
+            if (expectedPoints[i] == null) {
+                assertTrue(vt.wasNull());
+            }
+            else {
+                assertEquals(expectedPoints[i].getLatitude(), actualPoint.getLatitude(), 0.001);
+                assertEquals(expectedPoints[i].getLongitude(), actualPoint.getLongitude(), 0.001);
+            }
+
+            assertEquals(3, vt.getLong(1));
+            ++i;
+        }
     }
 
     static public junit.framework.Test suite() {

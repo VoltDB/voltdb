@@ -3402,6 +3402,8 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       }
       case VALUE_TYPE_DECIMAL:
           getDecimal().hash(seed); break;
+      case VALUE_TYPE_POINT:
+          boost::hash_combine(seed, getPoint().toString()); break;
       default:
           throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
     }

@@ -20,6 +20,7 @@
  */
 
 #include <limits>
+#include <sstream>
 
 #ifndef EE_COMMON_POINTTYPE_HPP
 #define EE_COMMON_POINTTYPE_HPP
@@ -49,6 +50,12 @@ public:
 
     float getLongitude() const {
         return m_longitude;
+    }
+
+    std::string toString() const {
+        std::ostringstream oss;
+        oss << "point(" << m_latitude << " " << m_longitude << ")";
+        return oss.str();
     }
 
 private:
