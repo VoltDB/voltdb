@@ -145,6 +145,8 @@ function async-benchmark() {
         --ratelimit=20000 \
         --duration=60 \
         --alltypes=false \
+        --externalexport=false \
+        --expected_rows=1000000 \
         --servers=localhost
 }
 
