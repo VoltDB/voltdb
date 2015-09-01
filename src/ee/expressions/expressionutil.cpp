@@ -142,6 +142,8 @@ subqueryComparisonFactory(PlannerDomValue obj,
             return new VectorComparisonExpression<CmpLte, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
         case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
             return new VectorComparisonExpression<CmpGte, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+            return new VectorComparisonExpression<CmpNotDistinct, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
         default:
             char message[256];
             snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -163,6 +165,8 @@ subqueryComparisonFactory(PlannerDomValue obj,
             return new VectorComparisonExpression<CmpLte, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
         case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
             return new VectorComparisonExpression<CmpGte, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+            return new VectorComparisonExpression<CmpNotDistinct, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
         default:
             char message[256];
             snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -185,6 +189,8 @@ subqueryComparisonFactory(PlannerDomValue obj,
             return new VectorComparisonExpression<CmpLte, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
         case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
             return new VectorComparisonExpression<CmpGte, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+                return new VectorComparisonExpression<CmpNotDistinct, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
         default:
             char message[256];
             snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -219,6 +225,8 @@ getGeneral(ExpressionType c,
         return new ComparisonExpression<CmpLike>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new ComparisonExpression<CmpIn>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+        return new ComparisonExpression<CmpNotDistinct>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -252,6 +260,8 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpLike, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new InlinedComparisonExpression<CmpIn, L, R>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+        return new InlinedComparisonExpression<CmpNotDistinct, L, R>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"
@@ -558,6 +568,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_LIKE):
     case (EXPRESSION_TYPE_COMPARE_IN):
+    case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
         ret = comparisonFactory(obj, et, lc, rc);
     break;
 

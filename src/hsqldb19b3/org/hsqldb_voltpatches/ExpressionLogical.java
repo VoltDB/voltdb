@@ -697,6 +697,11 @@ public class ExpressionLogical extends Expression {
 
     private void resolveRowTypes() {
 
+        // NOTE: in hsql upgrade the logic below takes in account if the left
+        // or right had data types are null or not. if they are it picks the
+        // either side which is available and after that performs operation
+        // below. So code fix corresponding to it is not yet brought from
+        // hsql upgrade is distinct operator branch
         for (int i = 0; i < nodes[LEFT].nodeDataTypes.length; i++) {
             Type leftType  = nodes[LEFT].nodeDataTypes[i];
             Type rightType = nodes[RIGHT].nodeDataTypes[i];
