@@ -228,6 +228,12 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     public boolean isValgrind() {
         return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
+
+    @Override
+    public boolean isDebug() {
+        return LocalCluster.isDebugDefined();
+    }
+
     @Override
     public void startUp() {
         startUp(true);

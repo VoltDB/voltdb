@@ -89,8 +89,8 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     public void testReplicatedProcTimeout() throws IOException, ProcCallException, InterruptedException {
-        if (isValgrind()) {
-            // Disable the memcheck for this test, it takes too long
+        if (isValgrind() || isDebug()) {
+            // Disable the memcheck/debug for this test, it takes too long
             return;
         }
         System.out.println("test replicated table procedures timeout...");
@@ -128,8 +128,8 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     public void testPartitionedProcTimeout() throws IOException, ProcCallException, InterruptedException {
-        if (isValgrind()) {
-            // Disable the memcheck for this test, it takes too long
+        if (isValgrind() || isDebug()) {
+            // Disable the memcheck/debug for this test, it takes too long
             return;
         }
 
@@ -247,8 +247,8 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     public void testIndividualProcTimeout() throws IOException, ProcCallException, InterruptedException {
-        if (isValgrind()) {
-            // Disable the memcheck for this test, it takes too long
+        if (isValgrind() || isDebug()) {
+            // Disable the memcheck/debug for this test, it takes too long
             return;
         }
         Client client = this.getClient();
