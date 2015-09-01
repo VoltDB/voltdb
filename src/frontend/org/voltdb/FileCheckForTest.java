@@ -15,11 +15,20 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.common;
+package org.voltdb;
 
-public class Constants
+import java.io.File;
+
+
+/**
+ * Interface with methods to mock out disk space checking from DiskReResourceChecker class.
+ * This is implemented by junits to fake disk running out of space.
+ */
+public interface FileCheckForTest
 {
-    // The default heartbeat timeout value
-    public static final int DEFAULT_HEARTBEAT_TIMEOUT_SECONDS = 90;
-    public static final String VOLT_TMP_DIR = "volt.tmpdir";
+    public boolean canWrite(File file);
+
+    public long getTotalSpace(File file);
+
+    public long getUsableSpace(File File);
 }

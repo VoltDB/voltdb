@@ -39,7 +39,7 @@ public class OnDemandBinaryLogger {
         ByteBuffer count;
     }
 
-    public static ConcurrentHashMap<String, Stuff> m_files = new ConcurrentHashMap<String, Stuff>();
+    public static final ConcurrentHashMap<String, Stuff> m_files = new ConcurrentHashMap<String, Stuff>();
     public static String path;
 
     public static void flush() {

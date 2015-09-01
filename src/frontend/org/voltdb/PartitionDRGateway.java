@@ -120,10 +120,11 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
-    public void onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber, long lastUniqueId, ByteBuffer buf) {
+    public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber, long lastUniqueId, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
+        return -1;
     }
 
     @Override
@@ -143,7 +144,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     };
 
-    public static synchronized void pushDRBuffer(
+    public static synchronized long pushDRBuffer(
             int partitionId,
             long startSequenceNumber,
             long lastSequenceNumber,
@@ -237,7 +238,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber, lastUniqueId, buf);
+        return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber, lastUniqueId, buf);
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
