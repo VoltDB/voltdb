@@ -256,11 +256,13 @@ function loadAdminPage() {
         },
         memoryLimitRules: {
             min: 0,
+            max: 99,
             digits: true
             //regex: /[^0-9\.]/ // "^[0-9]+(\.[0-9]{0,4})?$"
         },
         memoryLimitMessages: {
             min: "Please enter a positive number.",
+            max: "Please enter a positive number less than 100.",
             digits: "Please enter a positive number without any decimal." //"Only four digits are allowed after decimal."
         },
         diskLimitRules: {
@@ -1565,6 +1567,7 @@ function loadAdminPage() {
         else {
             adminEditObjects.ddlMemoryLimitSizeUnit.val("GB");
         }
+        setMemoryLimitValidation();
         VoltDbAdminConfig.isMemoryLimitEditMode = false;
         if (state == editStates.ShowLoading) {
             adminEditObjects.spanMemoryLimitSizeUnit.hide();
@@ -1606,6 +1609,34 @@ function loadAdminPage() {
         }
     };
     
+    var setMemoryLimitValidation = function () {
+        $("#errorMemorySize").val("");
+        $("#errorMemorySize").hide();
+        $("#txtMemoryLimitSize").rules("remove");
+        var unit = $('#ddlMemoryLimitUnit').val();
+        if (unit == "%") {
+            $("#txtMemoryLimitSize").rules("add", {
+                min: 0,
+                max: 99,
+                digits: true,
+                messages: {
+                    min: "Please enter a positive number.",
+                    max: "Maximum value of percentage cannot be greater than 99.",
+                    digits: "Please enter a positive number without any decimal."
+                }
+            });
+        } else if (unit == "GB") {
+            $("#txtMemoryLimitSize").rules("add", {
+                min: 0,
+                digits: true,
+                messages: {
+                    min: "Please enter a positive number.",
+                    digits: "Please enter a positive number without any decimal."
+                }
+            });
+        }
+    }
+
     //Disk Limit
     var toggleDiskSizeEdit = function (state) {
 
@@ -1732,7 +1763,13 @@ function loadAdminPage() {
         }
     });
 
-    //Memory Limit
+    //Memory Limit 
+    $('#ddlMemoryLimitUnit').change(function() {
+        setMemoryLimitValidation();
+    });
+    
+    
+
     adminEditObjects.btnEditMemorySize.on("click", function () {
         toggleMemorySizeEdit(editStates.ShowOkCancel);
         $("td.memorySize span").toggleClass("unit");
@@ -3665,6 +3702,7 @@ function loadAdminPage() {
                 }
             }
         };
+        
     });
     window.VoltDbAdminConfig = VoltDbAdminConfig = new iVoltDbAdminConfig();
 
