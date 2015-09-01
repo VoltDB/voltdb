@@ -68,6 +68,7 @@
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
 #include "storage/CopyOnWriteIterator.h"
+#include "structures/CompactingSet.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -627,7 +628,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // Set of blocks with non-empty free lists or available tuples
     // that have never been allocated
-    stx::btree_set<TBPtr > m_blocksWithSpace;
+    CompactingSet<TBPtr> m_blocksWithSpace;
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
@@ -915,20 +916,20 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 
 inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSize) {
     if (!blocks.empty()) {
-        TBMapI i = blocks.lower_bound(tuple);
+        TBMapI i = blocks.lowerBound(tuple);
 
         // Not the first tuple of any known block, move back a block, see if it
         // belongs to the previous block
-        if (i == blocks.end() || i.key() != tuple) {
+        if (i.isEnd() || i.key() != tuple) {
             i--;
         }
 
         // If the tuple is within the block boundaries, we found the block
         if (i.key() <= tuple && tuple < i.key() + blockSize) {
-            if (i.data().get() == NULL) {
+            if (i.value().get() == NULL) {
                 throwFatalException("A block has gone missing in the tuple block map.");
             }
-            return i.data();
+            return i.value();
         }
     }
 
