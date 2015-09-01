@@ -24,6 +24,10 @@ namespace voltdb {
 class ReferenceSerializeOutput;
 class TupleSchema;
 
+/**
+ * DefaultTupleSerializer provides delegate methods to serialize only visible columns
+ * of the given tuple. It also gives corresponding max serialization size for buffer allocation.
+ */
 class DefaultTupleSerializer : public TupleSerializer {
 public:
     /**

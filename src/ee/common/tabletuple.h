@@ -320,8 +320,6 @@ public:
     void serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns = false);
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
-    void serializeAllColumnsToDR(ExportSerializeOutput &io,
-                          int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
                        int colOffset, uint8_t *nullArray,
                        const std::vector<int>* interestingColumns);
@@ -796,13 +794,22 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
     }
 
-    for (int j = 0; j < hiddenColumnCount; ++j) {
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
+        for (int j = 0; j < hiddenColumnCount; ++j) {
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
 
-        char *dataPtr = getWritableDataPtr(columnInfo);
-        NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
-                columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
-    }
+            // tupleIn may not have hidden column
+            if (!tupleIn.hasRemaining()) {
+                std::ostringstream message;
+                message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
+                        << "(index=" << j << ")"
+                        << std::endl;
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
+            }
+
+            char *dataPtr = getWritableDataPtr(columnInfo);
+            NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
+                    columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
+        }
 }
 
 inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Pool *dataPool) {
@@ -863,9 +870,7 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
     output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
 }
 
-inline
-void
-TableTuple::serializeToExport(ExportSerializeOutput &io,
+inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
                               int colOffset, uint8_t *nullArray)
 {
     int columnCount = sizeInValues();
@@ -874,20 +879,12 @@ TableTuple::serializeToExport(ExportSerializeOutput &io,
     }
 }
 
-inline void TableTuple::serializeAllColumnsToDR(ExportSerializeOutput &io,
-                                    int colOffset, uint8_t *nullArray) {
-    int columnCount = sizeInValues();
-    for (int i = 0; i < columnCount; i++) {
-        serializeColumnToExport(io, colOffset, i, nullArray);
-    }
-    serializeHiddenColumnsToDR(io);
-}
-
 inline void TableTuple::serializeToDR(ExportSerializeOutput &io,
                               int colOffset, uint8_t *nullArray,
                               const std::vector<int>* interestingColumns) {
     if (!interestingColumns) {
-        serializeAllColumnsToDR(io, colOffset, nullArray);
+        serializeToExport(io, colOffset, nullArray);
+        serializeHiddenColumnsToDR(io);
     } else {
         std::vector<int> cols = *interestingColumns;
         for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {

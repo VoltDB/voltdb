@@ -384,9 +384,10 @@ void setSearchKeyFromTuple(TableTuple &source) {
 
 void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple) {
     assert(hasDRTimestampColumn());
-    const int64_t drTimestamp = ec->currentDRTimestamp();
-    tuple.setHiddenNValue(getDRTimestampColumnIndex(),
-                          ValueFactory::getBigIntValue(drTimestamp));
+    if (tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
+        const int64_t drTimestamp = ec->currentDRTimestamp();
+        tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
+    }
 }
 
 /*
@@ -421,12 +422,6 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     // Then copy the source into the target
     //
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
-
-    // should not set if restoring snapshot by processLoadedTuple(), so move it outside insertTupleCommon()
-    if (hasDRTimestampColumn()) {
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
-        setDRTimestampForTuple(ec, target);
-    }
 
     try {
         insertTupleCommon(source, target, fallible);
@@ -471,6 +466,10 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, target);
+    }
+
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
@@ -1156,13 +1155,6 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
     try {
-        // if the value passed from fronted is NULL, it means it's not yet initialized,
-        // so fill it with current DR timestamp
-        if (hasDRTimestampColumn() && tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
-            ExecutorContext *ec = ExecutorContext::getExecutorContext();
-            setDRTimestampForTuple(ec, tuple);
-        }
-
         insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
