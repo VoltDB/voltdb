@@ -170,6 +170,52 @@ public class TestPointType extends RegressionSuite {
         }
     }
 
+    public void testPointUpdate() throws Exception {
+        Client client = getClient();
+
+        fillTable(client, 0);
+
+        validateTableOfScalarLongs(client,
+                "update t set "
+                + "name = 'Cambridge', "
+                + "pt = pointfromtext('point(42.3736 -71.1106)') "
+                + "where pk = 0",
+                new long[] {1});
+
+        validateTableOfScalarLongs(client,
+                "update t set "
+                + "name = 'San Jose', "
+                + "pt = pointfromtext('point(37.3362 -121.8906)') "
+                + "where pk = 1",
+                new long[] {1});
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select pk, name, pt from t order by pk")
+                .getResults()[0];
+
+        assertTrue(vt.advanceRow());
+        assertEquals(0, vt.getLong(0));
+        assertEquals("Cambridge", vt.getString(1));
+        PointType pt = vt.getPoint(2);
+        assertEquals(42.3736, pt.getLatitude(), 0.001);
+        assertEquals(-71.1106, pt.getLongitude(), 0.001);
+
+        assertTrue(vt.advanceRow());
+        assertEquals(1, vt.getLong(0));
+        assertEquals("San Jose", vt.getString(1));
+        pt = vt.getPoint(2);
+        assertEquals(37.3362, pt.getLatitude(), 0.001);
+        assertEquals(-121.8906, pt.getLongitude(), 0.001);
+
+        assertTrue(vt.advanceRow());
+        assertEquals(2, vt.getLong(0));
+        assertEquals("Atlantis", vt.getString(1));
+        pt = vt.getPoint(2);
+        assertTrue(vt.wasNull());
+
+        assertFalse(vt.advanceRow());
+    }
+
     static public junit.framework.Test suite() {
 
         VoltServerConfig config = null;
