@@ -2965,6 +2965,7 @@ class AdminTest extends TestBase {
         page.overview.commandLogging.click()
         then:
         while(count<numberOfTrials) {
+            count++
             try {
                 waitFor(waitTime) {
                     page.overview.logFrequencyTime.text().equals("Log Frequency Time")
@@ -2976,6 +2977,7 @@ class AdminTest extends TestBase {
                     page.overview.logSize.text().equals("Log Size")
                     !page.overview.logSizeValue.text().equals("")
                 }
+                break
             } catch(geb.waiting.WaitTimeoutException e) {
             }
         }
