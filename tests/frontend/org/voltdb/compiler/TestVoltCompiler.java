@@ -2766,6 +2766,25 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(VoltType.POINT.getValue(), pointCol.getType());
     }
 
+    public void testPointTypeNegative() throws Exception {
+
+        // POINT cannot be a partition column
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
+                "create table pts ("
+                + "  pt point not null"
+                + ");"
+                + "partition table pts on column pt;"
+                );
+
+        // POINT columns cannot yet be indexed
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point not null"
+                + ");  "
+                + "create index ptidx on pts(pt);"
+                );
+    }
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";

@@ -1824,14 +1824,15 @@ public class DDLCompiler {
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
+
+                if (! VoltType.isIndexable(colType)) {
+                    String emsg = colType.getName() + " values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw this.m_compiler.new VoltCompilerException(emsg);
+                }
+
                 if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
-                }
-                // disallow columns from VARBINARYs
-                if (colType == VoltType.VARBINARY) {
-                    String emsg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
-                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         } else {

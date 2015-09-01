@@ -760,6 +760,14 @@ public enum VoltType {
         }
     }
 
+    public static boolean isIndexable(VoltType vt) {
+        if (vt == VARBINARY || vt == POINT) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Is the type a number and is it an exact value (no rounding errors)?
      * @return true for integers and decimals. False for floats and strings
