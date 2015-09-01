@@ -66,6 +66,7 @@ import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.ResourceUsageMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -600,6 +601,8 @@ public abstract class CatalogUtil {
             setCommandLogInfo( catalog, deployment.getCommandlog());
 
             setDrInfo(catalog, deployment.getDr());
+
+            validateResourceMonitorInfo(deployment);
         }
         catch (Exception e) {
             // Anything that goes wrong anywhere in trying to handle the deployment file
@@ -612,6 +615,12 @@ public abstract class CatalogUtil {
 
         return null;
     }
+
+    private static void validateResourceMonitorInfo(DeploymentType deployment) {
+        // call resource monitor ctor so that it does all validations.
+        new ResourceUsageMonitor(deployment.getSystemsettings(), deployment.getPaths());
+    }
+
 
     /*
      * Command log element is created in setPathsInfo

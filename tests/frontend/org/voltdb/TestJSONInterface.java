@@ -93,6 +93,8 @@ import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType.Memorylimit;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Query;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -197,11 +199,11 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    private static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
+    public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
         return httpUrlOverJSON("GET", url, user, password, scheme, expectedCode, expectedCt, null);
     }
 
-    private static String postUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+    public static String postUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         return httpUrlOverJSON("POST", url, user, password, scheme, expectedCode, expectedCt, params);
     }
 
@@ -1553,6 +1555,87 @@ public class TestJSONInterface extends TestCase {
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
             assertEquals(88, nto);
+
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testUpdateDeploymentMemoryLimit() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment
+            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            Map<String,String> params = new HashMap<>();
+
+            ObjectMapper mapper = new ObjectMapper();
+            DeploymentType deptype = mapper.readValue(jdep, DeploymentType.class);
+
+            SystemSettingsType ss = deptype.getSystemsettings();
+            if (ss == null) {
+                ss = new SystemSettingsType();
+                deptype.setSystemsettings(ss);
+            }
+
+            ResourceMonitorType resourceMonitor = new ResourceMonitorType();
+            Memorylimit memLimit = new Memorylimit();
+            memLimit.setSize("10");
+            resourceMonitor.setMemorylimit(memLimit);
+            ss.setResourcemonitor(resourceMonitor);
+            String ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
+            assertEquals("10", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
+
+            memLimit.setSize("90%25");
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            gotValue = mapper.readValue(jdep, DeploymentType.class);
+            assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
+
+            // decimal values not allowed for percentages
+            memLimit.setSize("90.5%25");
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            gotValue = mapper.readValue(jdep, DeploymentType.class);
+            // must be still the old value
+            assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
         } finally {
             if (server != null) {
