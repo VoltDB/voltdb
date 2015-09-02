@@ -36,8 +36,10 @@ public class TestPointType extends RegressionSuite {
 
     public TestPointType(String name) {
         super(name);
-        // TODO Auto-generated constructor stub
     }
+
+    private static final PointType BEDFORD_PT = new PointType(42.4906, -71.2767);
+    private static final PointType SANTA_CLARA_PT = new PointType(37.3544, -121.9692);
 
     public void testInsertDefaultNull() throws IOException, ProcCallException {
         Client client = getClient();
@@ -45,7 +47,6 @@ public class TestPointType extends RegressionSuite {
         validateTableOfScalarLongs(client,
                 "insert into t (pk) values (1);",
                 new long[] {1});
-
 
         VoltTable vt = client.callProcedure("@AdHoc", "select pk, pt from t;").getResults()[0];
         String actual = vt.toString();
@@ -90,11 +91,17 @@ public class TestPointType extends RegressionSuite {
 
     private int fillTable(Client client, int startPk) throws Exception {
         validateTableOfScalarLongs(client,
-                "insert into t values (" + startPk + ", 'Bedford', pointfromtext('point (42.4906 -71.2767)'));",
+                "insert into t values "
+                        + "(" + startPk + ", "
+                        + "'Bedford', "
+                        + "pointfromtext('" + BEDFORD_PT.toString() + "'));",
                 new long[] {1});
         startPk++;
         validateTableOfScalarLongs(client,
-                "insert into t values (" + startPk + ", 'Santa Clara', pointfromtext('point (37.3544 -121.9692)'));",
+                "insert into t values "
+                + "(" + startPk + ", "
+                        + "'Santa Clara', "
+                        + "pointfromtext('" + SANTA_CLARA_PT.toString() + "'));",
                 new long[] {1});
         startPk++;
         validateTableOfScalarLongs(client,
@@ -102,6 +109,11 @@ public class TestPointType extends RegressionSuite {
                 new long[] {1});
         startPk++;
         return startPk;
+    }
+
+    private static void assertEquals(PointType expected, PointType actual) {
+        assertEquals(expected.getLatitude(), actual.getLatitude(), 0.001);
+        assertEquals(expected.getLongitude(), actual.getLongitude(), 0.001);
     }
 
     public void testPointEquality() throws Exception {
@@ -114,21 +126,36 @@ public class TestPointType extends RegressionSuite {
                 "select t1.pk, t1.name, t1.pt "
                 + "from t as t1, t as t2 "
                 + "where t1.pt = t2.pt "
-                + "order by pk;").getResults()[0];
+                + "order by t1.pk;").getResults()[0];
 
         assertTrue(vt.advanceRow());
         assertEquals(0, vt.getLong(0));
         assertEquals("Bedford", vt.getString(1));
-        PointType pt = vt.getPoint(2);
-        assertEquals(42.4906, pt.getLatitude(), 0.001);
-        assertEquals(-71.2767, pt.getLongitude(), 0.001);
+        assertEquals(BEDFORD_PT, vt.getPoint(2));
 
         assertTrue(vt.advanceRow());
         assertEquals(1, vt.getLong(0));
         assertEquals("Santa Clara", vt.getString(1));
-        pt = vt.getPoint(2);
-        assertEquals(37.3544, pt.getLatitude(), 0.001);
-        assertEquals(-121.9692, pt.getLongitude(), 0.001);
+        assertEquals(SANTA_CLARA_PT, vt.getPoint(2));
+
+        assertFalse(vt.advanceRow());
+
+        // Self join to test not equals operator
+        vt = client.callProcedure("@AdHoc",
+                "select t1.pk, t1.pt, t2.pt "
+                + "from t as t1, t as t2 "
+                + "where t1.pt <> t2.pt "
+                + "order by t1.pk, t1.pt;").getResults()[0];
+
+        assertTrue(vt.advanceRow());
+        assertEquals(0, vt.getLong(0));
+        assertEquals(BEDFORD_PT, vt.getPoint(1));
+        assertEquals(SANTA_CLARA_PT, vt.getPoint(2));
+
+        assertTrue(vt.advanceRow());
+        assertEquals(1, vt.getLong(0));
+        assertEquals(SANTA_CLARA_PT, vt.getPoint(1));
+        assertEquals(BEDFORD_PT, vt.getPoint(2));
 
         assertFalse(vt.advanceRow());
     }
@@ -150,8 +177,8 @@ public class TestPointType extends RegressionSuite {
 
         PointType expectedPoints[] = {
           null,
-          new PointType(37.3544, -121.9692),
-          new PointType(42.4906, -71.2767)
+          SANTA_CLARA_PT,
+          BEDFORD_PT
         };
 
         int i = 0;
@@ -161,8 +188,7 @@ public class TestPointType extends RegressionSuite {
                 assertTrue(vt.wasNull());
             }
             else {
-                assertEquals(expectedPoints[i].getLatitude(), actualPoint.getLatitude(), 0.001);
-                assertEquals(expectedPoints[i].getLongitude(), actualPoint.getLongitude(), 0.001);
+                assertEquals(expectedPoints[i], actualPoint);
             }
 
             assertEquals(3, vt.getLong(1));
@@ -175,17 +201,20 @@ public class TestPointType extends RegressionSuite {
 
         fillTable(client, 0);
 
+        final PointType CAMBRIDGE_PT = new PointType(2.3736, -71.1106);
+        final PointType SAN_JOSE_PT = new PointType(37.3362, -121.8906);
+
         validateTableOfScalarLongs(client,
                 "update t set "
                 + "name = 'Cambridge', "
-                + "pt = pointfromtext('point(42.3736 -71.1106)') "
+                + "pt = pointfromtext('" + CAMBRIDGE_PT + "') "
                 + "where pk = 0",
                 new long[] {1});
 
         validateTableOfScalarLongs(client,
                 "update t set "
                 + "name = 'San Jose', "
-                + "pt = pointfromtext('point(37.3362 -121.8906)') "
+                + "pt = pointfromtext('" + SAN_JOSE_PT + "') "
                 + "where pk = 1",
                 new long[] {1});
 
@@ -196,21 +225,17 @@ public class TestPointType extends RegressionSuite {
         assertTrue(vt.advanceRow());
         assertEquals(0, vt.getLong(0));
         assertEquals("Cambridge", vt.getString(1));
-        PointType pt = vt.getPoint(2);
-        assertEquals(42.3736, pt.getLatitude(), 0.001);
-        assertEquals(-71.1106, pt.getLongitude(), 0.001);
+        assertEquals(CAMBRIDGE_PT, vt.getPoint(2));
 
         assertTrue(vt.advanceRow());
         assertEquals(1, vt.getLong(0));
         assertEquals("San Jose", vt.getString(1));
-        pt = vt.getPoint(2);
-        assertEquals(37.3362, pt.getLatitude(), 0.001);
-        assertEquals(-121.8906, pt.getLongitude(), 0.001);
+        assertEquals(SAN_JOSE_PT, vt.getPoint(2));
 
         assertTrue(vt.advanceRow());
         assertEquals(2, vt.getLong(0));
         assertEquals("Atlantis", vt.getString(1));
-        pt = vt.getPoint(2);
+        vt.getPoint(2);
         assertTrue(vt.wasNull());
 
         assertFalse(vt.advanceRow());
