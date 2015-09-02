@@ -1773,7 +1773,9 @@ function loadAdminPage() {
                 //Set the new value to be saved.
                 var memoryLimitSize = "";
                 
-                memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + adminEditObjects.ddlMemoryLimitSizeUnit.val();
+                memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + (adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? "%" : "");
+                    //adminEditObjects.txtMemoryLimitSize.val() + adminEditObjects.ddlMemoryLimitSizeUnit.val();
+                
                 if (adminEditObjects.txtMemoryLimitSize.val() != "") {
                     adminConfigurations.systemsettings.resourcemonitor.memorylimit.size = memoryLimitSize;
                 } else {
