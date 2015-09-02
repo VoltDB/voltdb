@@ -1221,10 +1221,10 @@ var loadPage = function (serverName, portid) {
     var replicationWarning = function (count) {
         if (count == 0 || count == undefined) {
             $('#drWarning').hide();
-            $('.alertIcon').hide();
+            $('#drAlertWarning').hide();
         } else {
             $('#drWarning').show();
-            $('.alertIcon').show();
+            $('#drAlertWarning').show();
             if (count == 1) {
                 $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
             } else {
