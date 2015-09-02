@@ -648,7 +648,11 @@
         //Update admin configuration
         this.UpdateAdminConfiguration = function (updatedData, onConnectionAdded) {
             try {
-                updatedData.systemsettings.resourcemonitor.memorylimit.size = encodeURIComponent(updatedData.systemsettings.resourcemonitor.memorylimit.size);
+                if (updatedData.systemsettings.resourcemonitor != null) {
+                    if (updatedData.systemsettings.resourcemonitor.memorylimit != null) {
+                           updatedData.systemsettings.resourcemonitor.memorylimit.size = encodeURIComponent(updatedData.systemsettings.resourcemonitor.memorylimit.size);
+                       }
+                }
 
                 var features = [];
 
