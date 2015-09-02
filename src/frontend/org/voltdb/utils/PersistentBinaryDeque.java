@@ -417,28 +417,30 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return new BBContainer(retcont.b()) {
             @Override
             public void discard() {
-                checkDoubleFree();
-                retcont.discard();
-                assert(m_closed || m_segments.contains(segment));
+                synchronized(PersistentBinaryDeque.this) {
+                    checkDoubleFree();
+                    retcont.discard();
+                    assert(m_closed || m_segments.contains(segment));
 
-                //Don't do anything else if we are closed
-                if (m_closed) {
-                    return;
-                }
-
-                //Segment is potentially ready for deletion
-                try {
-                    if (segment.isEmpty()) {
-                        if (segment != m_segments.peekLast()) {
-                            m_segments.remove(segment);
-                            if (m_usageSpecificLog.isDebugEnabled()) {
-                                m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted after discarding last buffer");
-                            }
-                            segment.closeAndDelete();
-                        }
+                    //Don't do anything else if we are closed
+                    if (m_closed) {
+                        return;
                     }
-                } catch (IOException e) {
-                    LOG.error("Exception closing and deleting PBD segment", e);
+
+                    //Segment is potentially ready for deletion
+                    try {
+                        if (segment.isEmpty()) {
+                            if (segment != m_segments.peekLast()) {
+                                m_segments.remove(segment);
+                                if (m_usageSpecificLog.isDebugEnabled()) {
+                                    m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted after discarding last buffer");
+                                }
+                                segment.closeAndDelete();
+                            }
+                        }
+                    } catch (IOException e) {
+                        LOG.error("Exception closing and deleting PBD segment", e);
+                    }
                 }
             }
         };
@@ -495,7 +497,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * although incredibly unlikely
      */
     @Override
-    public long sizeInBytes() throws IOException {
+    public synchronized long sizeInBytes() throws IOException {
         assertions();
         long size = 0;
         for (PBDSegment segment : m_segments) {
