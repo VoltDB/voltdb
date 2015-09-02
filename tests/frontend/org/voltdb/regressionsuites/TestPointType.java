@@ -312,6 +312,20 @@ public class TestPointType extends RegressionSuite {
                 vt);
     }
 
+    public void testPointArithmetic() throws Exception {
+        Client client = getClient();
+
+        fillTable(client, 0);
+
+        verifyStmtFails(client,
+                "select pk, pt + pt from t order by pk",
+                "incompatible data type in conversion");
+
+        verifyStmtFails(client,
+                "select pk, pt + 1 from t order by pk",
+                "incompatible data type in conversion");
+    }
+
     static public junit.framework.Test suite() {
 
         VoltServerConfig config = null;

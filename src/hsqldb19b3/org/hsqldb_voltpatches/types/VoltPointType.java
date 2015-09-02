@@ -1,7 +1,10 @@
 package org.hsqldb_voltpatches.types;
 
+import org.hsqldb_voltpatches.Error;
+import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.OpTypes;
 
 public class VoltPointType extends Type {
 
@@ -13,10 +16,12 @@ public class VoltPointType extends Type {
                 8); // scale
     }
 
+    // The length of "point(<double value> <double value>)"
+    private static final int DISPLAY_SIZE = String.valueOf(-Double.MAX_VALUE).length() * 2 + 8;
+
     @Override
     public int displaySize() {
-        // TODO Auto-generated method stub
-        return 0;
+        return DISPLAY_SIZE;
     }
 
     @Override
@@ -38,8 +43,7 @@ public class VoltPointType extends Type {
 
     @Override
     String getDefinition() {
-        // TODO Auto-generated method stub
-        return null;
+        return getNameString();
     }
 
     @Override
@@ -69,14 +73,12 @@ public class VoltPointType extends Type {
 
     @Override
     public String convertToString(Object a) {
-        // TODO Auto-generated method stub
-        return null;
+        return getNameString();
     }
 
     @Override
     public String convertToSQLString(Object a) {
-        // TODO Auto-generated method stub
-        return null;
+        return getNameString();
     }
 
     @Override
@@ -93,8 +95,19 @@ public class VoltPointType extends Type {
 
     @Override
     public Type getCombinedType(Type other, int operation) {
-        // TODO Auto-generated method stub
-        return null;
+        switch (operation) {
+        case OpTypes.EQUAL :
+        case OpTypes.GREATER :
+        case OpTypes.GREATER_EQUAL :
+        case OpTypes.SMALLER_EQUAL :
+        case OpTypes.SMALLER :
+        case OpTypes.NOT_EQUAL :
+            if (other instanceof VoltPointType)
+                return this;
+            // else, fall through
+        default:
+            // incompatible types
+            throw Error.error(ErrorCode.X_42561);
+        }
     }
-
 }
