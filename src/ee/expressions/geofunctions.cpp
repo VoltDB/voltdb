@@ -37,7 +37,7 @@ static void throwInvalidWKT(const std::string& input)
 static float stringToFloat(const std::string& input,
                            const std::string& val)
 {
-    float f;
+    float f = 0.0;
     try {
         f = boost::lexical_cast<float>(val);
     }
