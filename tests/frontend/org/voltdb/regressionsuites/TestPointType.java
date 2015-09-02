@@ -27,6 +27,7 @@ import java.io.IOException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -40,6 +41,71 @@ public class TestPointType extends RegressionSuite {
 
     private static final PointType BEDFORD_PT = new PointType(42.4906, -71.2767);
     private static final PointType SANTA_CLARA_PT = new PointType(37.3544, -121.9692);
+
+    private int fillTable(Client client, int startPk) throws Exception {
+        validateTableOfScalarLongs(client,
+                "insert into t values "
+                        + "(" + startPk + ", "
+                        + "'Bedford', "
+                        + "pointfromtext('" + BEDFORD_PT.toString() + "'));",
+                new long[] {1});
+        startPk++;
+        validateTableOfScalarLongs(client,
+                "insert into t values "
+                + "(" + startPk + ", "
+                        + "'Santa Clara', "
+                        + "pointfromtext('" + SANTA_CLARA_PT.toString() + "'));",
+                new long[] {1});
+        startPk++;
+        validateTableOfScalarLongs(client,
+                "insert into t values (" + startPk + ", 'Atlantis', null);",
+                new long[] {1});
+        startPk++;
+        return startPk;
+    }
+
+    private static void assertEquals(String msg, PointType expected, PointType actual) {
+        assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), 0.001);
+        assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), 0.001);
+    }
+
+    private static void assertRowEquals(int row, Object[] expectedRow, VoltTable actualRow) {
+        for (int i = 0; i < expectedRow.length; ++i) {
+            String msg = "Row " + row + ", col " + i + ": ";
+            Object expectedObj = expectedRow[i];
+            if (expectedObj == null) {
+                VoltType vt = actualRow.getColumnType(i);
+                actualRow.get(i,  vt);
+                assertTrue(msg, actualRow.wasNull());
+            }
+            else if (expectedObj instanceof PointType) {
+                assertEquals(msg, (PointType)expectedObj, actualRow.getPoint(i));
+            }
+            else if (expectedObj instanceof Long) {
+                long val = ((Long)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
+            else if (expectedObj instanceof Integer) {
+                long val = ((Integer)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
+            else if (expectedObj instanceof String) {
+                String val = (String)expectedObj;
+                assertEquals(msg, val, actualRow.getString(i));
+            }
+            else {
+                fail("Unexpected type in expected row: " + expectedObj.getClass().getSimpleName());
+            }
+        }
+    }
+
+    private static void assertTableEquals(Object[][] expectedTable, VoltTable actualTable) {
+        for (int i = 0; i < expectedTable.length; ++i) {
+            assertTrue(actualTable.advanceRow());
+            assertRowEquals(i, expectedTable[i], actualTable);
+        }
+        assertFalse(actualTable.advanceRow());
+    }
 
     public void testInsertDefaultNull() throws IOException, ProcCallException {
         Client client = getClient();
@@ -89,34 +155,8 @@ public class TestPointType extends RegressionSuite {
         assertEquals(-71.2767, pt.getLongitude(), 0.001);
     }
 
-    private int fillTable(Client client, int startPk) throws Exception {
-        validateTableOfScalarLongs(client,
-                "insert into t values "
-                        + "(" + startPk + ", "
-                        + "'Bedford', "
-                        + "pointfromtext('" + BEDFORD_PT.toString() + "'));",
-                new long[] {1});
-        startPk++;
-        validateTableOfScalarLongs(client,
-                "insert into t values "
-                + "(" + startPk + ", "
-                        + "'Santa Clara', "
-                        + "pointfromtext('" + SANTA_CLARA_PT.toString() + "'));",
-                new long[] {1});
-        startPk++;
-        validateTableOfScalarLongs(client,
-                "insert into t values (" + startPk + ", 'Atlantis', null);",
-                new long[] {1});
-        startPk++;
-        return startPk;
-    }
 
-    private static void assertEquals(PointType expected, PointType actual) {
-        assertEquals(expected.getLatitude(), actual.getLatitude(), 0.001);
-        assertEquals(expected.getLongitude(), actual.getLongitude(), 0.001);
-    }
-
-    public void testPointEquality() throws Exception {
+    public void testPointComparison() throws Exception {
         Client client = getClient();
 
         fillTable(client, 0);
@@ -128,17 +168,10 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt = t2.pt "
                 + "order by t1.pk;").getResults()[0];
 
-        assertTrue(vt.advanceRow());
-        assertEquals(0, vt.getLong(0));
-        assertEquals("Bedford", vt.getString(1));
-        assertEquals(BEDFORD_PT, vt.getPoint(2));
-
-        assertTrue(vt.advanceRow());
-        assertEquals(1, vt.getLong(0));
-        assertEquals("Santa Clara", vt.getString(1));
-        assertEquals(SANTA_CLARA_PT, vt.getPoint(2));
-
-        assertFalse(vt.advanceRow());
+        assertTableEquals(new Object[][] {
+                {0, "Bedford", BEDFORD_PT},
+                {1, "Santa Clara", SANTA_CLARA_PT}},
+                vt);
 
         // Self join to test not equals operator
         vt = client.callProcedure("@AdHoc",
@@ -147,17 +180,81 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt <> t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTrue(vt.advanceRow());
-        assertEquals(0, vt.getLong(0));
-        assertEquals(BEDFORD_PT, vt.getPoint(1));
-        assertEquals(SANTA_CLARA_PT, vt.getPoint(2));
+        assertTableEquals(new Object[][] {
+                {0, BEDFORD_PT, SANTA_CLARA_PT},
+                {1, SANTA_CLARA_PT, BEDFORD_PT}},
+                vt);
 
-        assertTrue(vt.advanceRow());
-        assertEquals(1, vt.getLong(0));
-        assertEquals(SANTA_CLARA_PT, vt.getPoint(1));
-        assertEquals(BEDFORD_PT, vt.getPoint(2));
+        // Self join to test < operator
+        vt = client.callProcedure("@AdHoc",
+                "select t1.pk, t1.pt, t2.pt "
+                + "from t as t1, t as t2 "
+                + "where t1.pt < t2.pt "
+                + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertFalse(vt.advanceRow());
+        assertTableEquals(new Object[][] {
+                {1, SANTA_CLARA_PT, BEDFORD_PT}},
+                vt);
+
+        // Self join to test <= operator
+        vt = client.callProcedure("@AdHoc",
+                "select t1.pk, t1.pt, t2.pt "
+                + "from t as t1, t as t2 "
+                + "where t1.pt <= t2.pt "
+                + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
+
+        assertTableEquals(new Object[][] {
+                {0, BEDFORD_PT, BEDFORD_PT},
+                {1, SANTA_CLARA_PT, SANTA_CLARA_PT},
+                {1, SANTA_CLARA_PT, BEDFORD_PT}},
+                vt);
+
+        // Self join to test > operator
+        vt = client.callProcedure("@AdHoc",
+                "select t1.pk, t1.pt, t2.pt "
+                + "from t as t1, t as t2 "
+                + "where t1.pt > t2.pt "
+                + "order by t1.pk, t1.pt;").getResults()[0];
+
+        assertTableEquals(new Object[][] {
+                {0, BEDFORD_PT, SANTA_CLARA_PT}},
+                vt);
+
+        // Self join to test >= operator
+        vt = client.callProcedure("@AdHoc",
+                "select t1.pk, t1.pt, t2.pt "
+                + "from t as t1, t as t2 "
+                + "where t1.pt >= t2.pt "
+                + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
+
+        assertTableEquals(new Object[][] {
+                {0, BEDFORD_PT, SANTA_CLARA_PT},
+                {0, BEDFORD_PT, BEDFORD_PT},
+                {1, SANTA_CLARA_PT, SANTA_CLARA_PT}},
+                vt);
+
+        // Test IS NULL
+        vt = client.callProcedure("@AdHoc",
+                "select t1.pk, t1.name, t1.pt "
+                + "from t as t1 "
+                + "where t1.pt is null "
+                + "order by t1.pk, t1.pt;").getResults()[0];
+
+        assertTableEquals(new Object[][] {
+                {2, "Atlantis", null}},
+                vt);
+
+        // Test IS NOT NULL
+        vt = client.callProcedure("@AdHoc",
+                "select t1.pk, t1.name, t1.pt "
+                + "from t as t1 "
+                + "where t1.pt is not null "
+                + "order by t1.pk, t1.pt;").getResults()[0];
+
+        assertTableEquals(new Object[][] {
+                {0, "Bedford", BEDFORD_PT},
+                {1, "Santa Clara", SANTA_CLARA_PT}},
+                vt);
     }
 
     public void testPointGroupBy() throws Exception {
@@ -175,25 +272,11 @@ public class TestPointType extends RegressionSuite {
                 + "order by pt asc")
                 .getResults()[0];
 
-        PointType expectedPoints[] = {
-          null,
-          SANTA_CLARA_PT,
-          BEDFORD_PT
-        };
-
-        int i = 0;
-        while (vt.advanceRow()) {
-            PointType actualPoint = vt.getPoint(0);
-            if (expectedPoints[i] == null) {
-                assertTrue(vt.wasNull());
-            }
-            else {
-                assertEquals(expectedPoints[i], actualPoint);
-            }
-
-            assertEquals(3, vt.getLong(1));
-            ++i;
-        }
+        assertTableEquals(new Object[][] {
+                {null, 3},
+                {SANTA_CLARA_PT, 3},
+                {BEDFORD_PT, 3}},
+                vt);
     }
 
     public void testPointUpdate() throws Exception {
@@ -201,7 +284,7 @@ public class TestPointType extends RegressionSuite {
 
         fillTable(client, 0);
 
-        final PointType CAMBRIDGE_PT = new PointType(2.3736, -71.1106);
+        final PointType CAMBRIDGE_PT = new PointType(42.3736, -71.1106);
         final PointType SAN_JOSE_PT = new PointType(37.3362, -121.8906);
 
         validateTableOfScalarLongs(client,
@@ -222,23 +305,11 @@ public class TestPointType extends RegressionSuite {
                 "select pk, name, pt from t order by pk")
                 .getResults()[0];
 
-        assertTrue(vt.advanceRow());
-        assertEquals(0, vt.getLong(0));
-        assertEquals("Cambridge", vt.getString(1));
-        assertEquals(CAMBRIDGE_PT, vt.getPoint(2));
-
-        assertTrue(vt.advanceRow());
-        assertEquals(1, vt.getLong(0));
-        assertEquals("San Jose", vt.getString(1));
-        assertEquals(SAN_JOSE_PT, vt.getPoint(2));
-
-        assertTrue(vt.advanceRow());
-        assertEquals(2, vt.getLong(0));
-        assertEquals("Atlantis", vt.getString(1));
-        vt.getPoint(2);
-        assertTrue(vt.wasNull());
-
-        assertFalse(vt.advanceRow());
+        assertTableEquals(new Object[][] {
+                {0, "Cambridge", CAMBRIDGE_PT},
+                {1, "San Jose", SAN_JOSE_PT},
+                {2, "Atlantis", null}},
+                vt);
     }
 
     static public junit.framework.Test suite() {
@@ -257,7 +328,6 @@ public class TestPointType extends RegressionSuite {
                 + "  PT POINT\n"
                 + ");\n"
                 ;
-
         try {
             project.addLiteralSchema(literalSchema);
         }
