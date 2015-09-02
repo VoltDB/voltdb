@@ -902,6 +902,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, 
         }
     }
 
+
     // If the current block is empty and there are more than one storage blocks, release the
     // existing empty block. If there is only 1 tuple block storage block remaining, which is empty,
     // and if caller has not requested to release the last remaining storage block, don't release
