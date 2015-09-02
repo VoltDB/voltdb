@@ -119,6 +119,11 @@ public interface VoltServerConfig {
      */
     public boolean isValgrind();
 
+    /**
+     * @return Is the underlying instance of VoltDB running DEBUG mode
+     */
+    public boolean isDebug();
+
     boolean compileWithPartitionDetection(VoltProjectBuilder builder,
             String snapshotPath,
             String ppdPrefix);
