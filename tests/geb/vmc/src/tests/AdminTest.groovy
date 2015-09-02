@@ -2959,18 +2959,27 @@ class AdminTest extends TestBase {
     }
 
     def "Command Logging Expand:Check Text"() {
+        int count = 0
+        
         when:
         page.overview.commandLogging.click()
         then:
-        waitFor(waitTime) {
-            page.overview.logFrequencyTime.text().equals("Log Frequency Time")
-            !page.overview.logFrequencyTimeValue.text().equals("")
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.overview.logFrequencyTime.text().equals("Log Frequency Time")
+                    !page.overview.logFrequencyTimeValue.text().equals("")
 
-            page.overview.logFrequencyTransactions.text().equals("Log Frequency Transactions")
-            !page.overview.logFrequencyTransactionsValue.text().equals("")
+                    page.overview.logFrequencyTransactions.text().equals("Log Frequency Transactions")
+                    !page.overview.logFrequencyTransactionsValue.text().equals("")
 
-            page.overview.logSize.text().equals("Log Size")
-            !page.overview.logSizeValue.text().equals("")
+                    page.overview.logSize.text().equals("Log Size")
+                    !page.overview.logSizeValue.text().equals("")
+                }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
         }
     }
 

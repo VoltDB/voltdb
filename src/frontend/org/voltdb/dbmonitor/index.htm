@@ -149,11 +149,15 @@
                                 </div>
                                 <div class="slide-pop-content">
                                     <div class="server-info-heading">
-                                        <span class="server">Server Name</span> <span class="memory-use">Memory Usage</span>
+                                        <span class="server">Server Name</span>
+                                        <span class="servIp">IP Address</span>
+                                        <span class="memory-use">Memory Usage</span>
                                         <div class="clear"></div>
                                     </div>
                                     <div id="serverListWrapper">
-                                        <ul class="servers-list" id="serversList"></ul>
+                                        <ul class="servers-list" id="serversList">
+
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
@@ -779,6 +783,10 @@
                                             <span id="memoryLimitSize"></span>
                                             <input id="txtMemoryLimitSize" name="txtMemoryLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
                                             <span id="memoryLimitSizeUnit"></span>
+                                            <select id="ddlMemoryLimitUnit" style="display: none;">
+                                                <option>GB</option>
+                                                <option>%</option>
+                                            </select>
                                             <label id="errorMemorySize" for="txtMemoryLimitSize" class="error" style="display: none;"></label>
                                         </form>
                                     </td>
