@@ -1439,6 +1439,9 @@ private:
             streamTimestamp(value);
             break;
         }
+        case VALUE_TYPE_POINT: {
+            value << getPoint().toString(); break;
+        }
         default:
             throwCastSQLException(type, VALUE_TYPE_VARCHAR);
         }
@@ -2909,6 +2912,10 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
     case VALUE_TYPE_DOUBLE:
         *reinterpret_cast<double* >(storage) = input.readDouble();
         break;
+    case VALUE_TYPE_POINT:
+        reinterpret_cast<float*>(storage)[0] = input.readFloat();
+        reinterpret_cast<float*>(storage)[1] = input.readFloat();
+        break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
     {
@@ -3177,12 +3184,16 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
          io.writeLong(htonll(getDecimal().table[0]));
          return;
      }
+     case VALUE_TYPE_POINT: {
+         io.writeFloat(getPoint().getLatitude());
+         io.writeFloat(getPoint().getLongitude());
+         return;
+     }
      case VALUE_TYPE_INVALID:
      case VALUE_TYPE_NULL:
      case VALUE_TYPE_BOOLEAN:
      case VALUE_TYPE_ADDRESS:
      case VALUE_TYPE_ARRAY:
-     case VALUE_TYPE_POINT:
      case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
          char message[128];
          snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
@@ -3700,6 +3711,7 @@ inline int32_t NValue::murmurHash3() const {
     case VALUE_TYPE_INTEGER:
     case VALUE_TYPE_SMALLINT:
     case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_POINT:
         return MurmurHash3_x64_128( m_data, 8, 0);
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_VARCHAR:
