@@ -149,15 +149,11 @@
                                 </div>
                                 <div class="slide-pop-content">
                                     <div class="server-info-heading">
-                                        <span class="server">Server Name</span>
-                                        <span class="servIp">IP Address</span>
-                                        <span class="memory-use">Memory Usage</span>
+                                        <span class="server">Server Name</span> <span class="memory-use">Memory Usage</span>
                                         <div class="clear"></div>
                                     </div>
                                     <div id="serverListWrapper">
-                                        <ul class="servers-list" id="serversList">
-
-                                        </ul>
+                                        <ul class="servers-list" id="serversList"></ul>
                                     </div>
                                 </div>
                             </div>
@@ -713,6 +709,7 @@
                                     <td align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>
+                                        <!--<a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>-->
                                         <div id="loadingImportConfig" class="loading-small loadImport" style="display: none"></div>
                                     </td>
                                 </tr>
@@ -783,10 +780,6 @@
                                             <span id="memoryLimitSize"></span>
                                             <input id="txtMemoryLimitSize" name="txtMemoryLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
                                             <span id="memoryLimitSizeUnit"></span>
-                                            <select id="ddlMemoryLimitUnit" style="display: none;">
-                                                <option>GB</option>
-                                                <option>%</option>
-                                            </select>
                                             <label id="errorMemorySize" for="txtMemoryLimitSize" class="error" style="display: none;"></label>
                                         </form>
                                     </td>
@@ -795,9 +788,12 @@
                                         <a id="btnEditMemorySizeOk" href="#MemoryLimitPopup" class="editOk" title="Save" style="">Ok</a>
                                         <a id="btnEditMemorySizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
                                         <a id="btnEditMemorySize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                        <a href="#addDiskLimitPopup" id="addDiskLimitPopupLink" data-id="-1" title="Add Disk Limit" style="display: none">Add Disk Limit</a>
                                     </td>
+
                                 </tr>
                                 <tbody id="diskLimitConfiguration" data-status="value" style="display: none;"></tbody>
+
                             </table>
                         </div>
                         <div class="drWrapperAdmin" id="divDrWrapperAdmin" style="display:none">
