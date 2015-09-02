@@ -587,7 +587,7 @@ var loadPage = function (serverName, portid) {
 
             $('.tblshutdown  >tbody > tr.activeHost > td:first-child > a').click(function () {
                 var clickedServer = $(this).html();
-                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').find("a").attr('data-hostid'));
+                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').next().find("a").attr('data-hostid'));
                 var currentUrl = window.location.href.split('?')[0];
                 var urlArray = currentUrl.split('/');
                 var newUrl = '';
@@ -1221,10 +1221,10 @@ var loadPage = function (serverName, portid) {
     var replicationWarning = function (count) {
         if (count == 0 || count == undefined) {
             $('#drWarning').hide();
-            $('.alertIcon').hide();
+            $('#drAlertWarning').hide();
         } else {
             $('#drWarning').show();
-            $('.alertIcon').show();
+            $('#drAlertWarning').show();
             if (count == 1) {
                 $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
             } else {
