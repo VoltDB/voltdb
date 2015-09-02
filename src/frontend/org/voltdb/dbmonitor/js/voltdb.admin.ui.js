@@ -2467,7 +2467,7 @@ function loadAdminPage() {
                         for (var i = 0; i < newFeatureNames.length; i++) {
                             if (newFeatureNames[i].value == duplicateValue) {
                                 $('#error_' + newFeatureNames[i].id).show();
-                                $('#error_' + newFeatureNames[i].id).html("Duplicate Feature names are not allowed");
+                                $('#error_' + newFeatureNames[i].id).html("Duplicate feature names are not allowed.");
                             }
                         }
                         e.preventDefault();
