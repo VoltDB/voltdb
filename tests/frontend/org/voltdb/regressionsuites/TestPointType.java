@@ -101,10 +101,16 @@ public class TestPointType extends RegressionSuite {
 
     private static void assertTableEquals(Object[][] expectedTable, VoltTable actualTable) {
         for (int i = 0; i < expectedTable.length; ++i) {
-            assertTrue(actualTable.advanceRow());
+            assertTrue("Fewer rows than expected: "
+                    + "expected: " + expectedTable.length + ", "
+                    + "actual: " + i,
+                    actualTable.advanceRow());
             assertRowEquals(i, expectedTable[i], actualTable);
         }
-        assertFalse(actualTable.advanceRow());
+        assertFalse("More rows than expected: "
+                + "expected " + expectedTable.length + ", "
+                + "actual: " + actualTable.getRowCount(),
+                actualTable.advanceRow());
     }
 
     public void testInsertDefaultNull() throws IOException, ProcCallException {
@@ -326,6 +332,30 @@ public class TestPointType extends RegressionSuite {
                 "incompatible data type in conversion");
     }
 
+    public void testPointNotNull() throws Exception {
+        Client client = getClient();
+
+        verifyStmtFails(client,
+                "insert into t_not_null (pk, name) values (0, 'Westchester')",
+                "Column PT has no default and is not nullable");
+
+        verifyStmtFails(client,
+                "insert into t_not_null (pk, name, pt) values (0, 'Westchester', null)",
+                "CONSTRAINT VIOLATION");
+
+        validateTableOfScalarLongs(client,
+                "insert into t_not_null (pk, name, pt) values (0, 'Singapore', pointfromtext('point(1.2905 103.8521)'))",
+                new long[] {1});
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select pk, name, pt from t_not_null order by pk")
+                .getResults()[0];
+
+        assertTableEquals(new Object[][] {
+                {0, "Singapore", new PointType(1.2905, 103.8521)}},
+                vt);
+    }
+
     static public junit.framework.Test suite() {
 
         VoltServerConfig config = null;
@@ -340,6 +370,11 @@ public class TestPointType extends RegressionSuite {
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  NAME VARCHAR(32),\n"
                 + "  PT POINT\n"
+                + ");\n"
+                + "CREATE TABLE T_NOT_NULL (\n"
+                + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
+                + "  NAME VARCHAR(32),\n"
+                + "  PT POINT NOT NULL\n"
                 + ");\n"
                 ;
         try {
