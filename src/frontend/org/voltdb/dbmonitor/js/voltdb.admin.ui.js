@@ -3791,8 +3791,8 @@ function loadAdminPage() {
 
             if (result == "") {
                 result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
-                      '   <td class="configLabel" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
-                      '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"">Disk Limit</a>  ' +
+                      '   <td class="configLabel" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer">' +
+                      '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"" ;">Disk Limit</a>  ' +
                       '   </td>' +
                       '   <td align="right">' +
                       '   </td>' +
