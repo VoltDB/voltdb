@@ -361,16 +361,17 @@ public class KafkaImportBenchmark {
         long mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
         long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
-
-        log.info("Total rows exported: " + finalInsertCount);
-        log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorRows);
-        if (!config.externalexport) {
-            log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
-        }
         boolean testResult = true;
-        if (mirrorRows != 0) {
-            log.error(mirrorRows + " Rows are missing from the import stream, failing test");
-            testResult = false;
+
+        if (!config.externalexport) {
+        	log.info("Total rows exported: " + finalInsertCount);
+        	log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorRows);
+        	log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
+
+        	if (mirrorRows != 0) {
+        		log.error(mirrorRows + " Rows are missing from the import stream, failing test");
+        		testResult = false;
+        	}
         }
 
         if (importRowCount < exportRowCount && !config.externalexport) {
