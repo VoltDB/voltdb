@@ -80,24 +80,18 @@ li.joiningIcon,
 li.missingIcon,
 li.alertIcon,
 a.alertIcon,
+
 input.icon-search,
 a.save-search,
 a.icon-search,
-ul.servers-list li.active,
-ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
-ul.servers-list li.active,
-ul.servers-list li.pauseMonitoring,
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
+a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
 
-ul.servers-list li.pauseActiveMonitoring {
-    background-image: url(images/voltdb-icon-sprite.png) !important;
-    background-repeat: no-repeat;
-    background-color: #f0f3f4;
-}
+
+
 
 .user {
     background-position: left -209px;
@@ -148,9 +142,6 @@ a.alertIcon {
 .showhideIcon {
     height: 25px;
 }
-
-
-
 
 /******sprite Ends*************/
 
@@ -1082,22 +1073,45 @@ a.setVal {
         color: #fff;
     }
 
+
+
+ul.servers-list li.active {background-image: url(images/servIcons.png) !important;
+    background-repeat: no-repeat;}
+
+ul.servers-list li.joining{background-image: url(images/servIcons.png) !important;
+    background-repeat: no-repeat;}
+
+ul.servers-list li.pauseMonitoring {background-image: url(images/pauseMonitoring.png) !important;
+    background-repeat: no-repeat;}
+
+.alertIconServ{background-image: url(images/alertServ.png) !important;
+    background-repeat: no-repeat;}
+
+
+ul.servers-list li.pauseActiveMonitoring {
+    background-image: url(images/pauseMonitoring.png) !important;
+    background-repeat: no-repeat;
+    background-color: #f0f3f4;
+}
+
 ul.servers-list li.active {
-    background-position: 4px -298px;
+    background-position: 5px 16px;
+
 }
 
 ul.servers-list li.pauseMonitoring {
-    background-position: 4px -1458px;
+    background-position:5px 16px;
 }
 
 ul.servers-list li.pauseActiveMonitoring {
-    background-position: 4px -1458px;
+    background-position: 5px 16px ;
 }
 
 ul.servers-list li.joining {
-    background-position: 2px -350px;
+    background-position:5px 16px ;
     color: #a3a3a3;
 }
+.alertIconServ {background-position:0 5px ;text-indent: 20px;line-height: 17px;}
 
 ul.servers-list li:hover {
     background-color: #f0f3f4;
@@ -1115,11 +1129,13 @@ ul.servers-list li.monitoring {
 
     .serverNameAlign { float: left;width: 30%; word-break: break-all;}
 
+
 ul.servers-list li span.memory-status {
     float: right;
     color: #111;
     margin-top: 4px;
 }
+
 
 ul.servers-list li span.alert {
     color: #ea151d;
@@ -3601,7 +3617,9 @@ a:hover.changePsd {
   width: 30px;
   line-height: 18px;
   margin-top: 5px;}
-    ul.servers-list li span.servIpNum {margin-left: 3%;}
+    ul.servers-list li span.servIpNum {margin-left: 10%;}
+    .serverNameAlign { width: 22%;}
+
 }
 @media (max-width: 360px) {
     .headerAdminContent {
@@ -3684,7 +3702,8 @@ a:hover.changePsd {
     }
     /*admin*/   
     .server-info-heading .servIp {margin-left: 10%;margin-top: 0;}
-    ul.servers-list li span.servIpNum {margin-left: 4%;}
+    ul.servers-list li span.servIpNum {margin-left: 8%;}
+    .serverNameAlign { width: 26%;}
 
 }
 
@@ -4016,7 +4035,7 @@ a:hover.changePsd {
         height: 364px;
     }
     .server-info-heading .servIp {margin-left: 18%;}
-    ul.servers-list li span.servIpNum {margin-left: 5%;}
+    ul.servers-list li span.servIpNum {margin-left: 6%;}
     .tblshutdown tr th {
         padding: 20px 19px 20px 8px;
     }
@@ -4201,7 +4220,7 @@ a:hover.changePsd {
 
 @media (min-width: 768px) and (max-width: 800px) {
      .server-info-heading .servIp{margin-left: 14%;}
-    ul.servers-list li span.servIpNum {margin-left: 4%;}
+    ul.servers-list li span.servIpNum {margin-left: 3%;}
 }
 
 @media (max-width: 980px) {
