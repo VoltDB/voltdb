@@ -587,7 +587,7 @@ var loadPage = function (serverName, portid) {
 
             $('.tblshutdown  >tbody > tr.activeHost > td:first-child > a').click(function () {
                 var clickedServer = $(this).html();
-                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').find("a").attr('data-hostid'));
+                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').next().find("a").attr('data-hostid'));
                 var currentUrl = window.location.href.split('?')[0];
                 var urlArray = currentUrl.split('/');
                 var newUrl = '';
