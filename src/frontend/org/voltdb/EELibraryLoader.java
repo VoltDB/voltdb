@@ -22,13 +22,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
-import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 
 import org.voltcore.logging.VoltLogger;
 
 public class EELibraryLoader {
 
     public static final String USE_JAVA_LIBRARY_PATH = "use.javalib";
+    public static final String LIB_TEMP_DIR = "temp/jnilib";
+    private static final String SNAPPY_TEMP_DIR_PROP = "org.xerial.snappy.tempdir";
     private static boolean voltSharedLibraryLoaded = false;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -73,6 +74,7 @@ public class EELibraryLoader {
                     voltSharedLibraryLoaded = true;
                     hostLog.info("Successfully loaded native VoltDB library " + libname + ".");
                 } catch (Throwable e) {
+                    hostLog.error("Failed to load library", e);
                     if (mustSuccede) {
                         String msg = "Library VOLTDB JNI shared library loading failed. Library path " +
                                 System.getProperty("java.library.path") + "\n";
@@ -122,13 +124,45 @@ public class EELibraryLoader {
             }
         }
 
-        File tmpFilePath = new File(System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir")));
+        File tmpFilePath = getTempFilePath();
+        // set the temp dir for snappy also. Unless it is set already to override what we are doing here.
+        String currSnappyTempValue = System.getProperty(SNAPPY_TEMP_DIR_PROP);
+        if (currSnappyTempValue == null) {
+            System.setProperty(SNAPPY_TEMP_DIR_PROP, tmpFilePath.getAbsolutePath());
+        }
+
         try {
             return loadLibraryFile(libPath, libFileName, tmpFilePath.getAbsolutePath());
         } catch(IOException e) {
             hostLog.error("Error loading Volt library file from jar", e);
             throw new RuntimeException(e);
         }
+    }
+
+    private static File getTempFilePath() {
+        File voltdbroot = new File(VoltDB.instance().getCatalogContext().getCluster().getVoltroot());
+        if (!voltdbroot.exists()) {
+            String msg = "Voltdb root directory does not exist: " + voltdbroot.getAbsolutePath();
+            hostLog.error(msg);
+            throw new RuntimeException(msg);
+        }
+
+        File tmpFilePath = new File(voltdbroot, LIB_TEMP_DIR);
+        if (!tmpFilePath.exists()) {
+            if (!tmpFilePath.mkdirs()) { // voltdbroot must exist if we got here. This will make the sub-dirs
+                String msg = "Could not create temp directory for jnilibraries: " + tmpFilePath.getAbsolutePath();
+                hostLog.error(msg);
+                throw new RuntimeException(msg);
+            }
+        }
+
+        if (!tmpFilePath.isDirectory()) {
+                String msg = "Invalid temp directory for jnilibraries: " + tmpFilePath.getAbsolutePath();
+                hostLog.error(msg);
+                throw new RuntimeException(msg);
+        }
+
+        return tmpFilePath;
     }
 
     private static File loadLibraryFile(String libFolder, String libFileName, String tmpFolder) throws IOException {
