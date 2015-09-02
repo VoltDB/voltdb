@@ -2783,6 +2783,47 @@ public class TestVoltCompiler extends TestCase {
                 + ");  "
                 + "create index ptidx on pts(pt);"
                 );
+
+        // POINT columns cannot use unique/pk constraints which
+        // are implemented as indexes.
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point primary key"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point, "
+                + "  primary key (pt)"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point, "
+                + "  constraint uniq_pt unique (pt)"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt point unique, "
+                + ");  "
+                );
+
+        // Default values are not yet supported
+        badDDLAgainstSimpleSchema(".*incompatible data type in conversion.*",
+                "create table pts ("
+                + "  pt point default 'point(3.0 9.0)', "
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*unexpected token.*",
+                "create table pts ("
+                + "  pt point default pointfromtext('point(3.0 9.0)'), "
+                + ");  "
+                );
     }
 
     public void testPartitionOnBadType() {

@@ -60,15 +60,22 @@ public class VoltPointType extends Type {
 
     @Override
     public Object convertToType(SessionInterface session, Object a, Type type) {
-        // TODO Auto-generated method stub
-        return null;
+        // We come here when parsing default values.
+        if (type instanceof VoltPointType) {
+            // This is currently unreachable, since there's no way to
+            // create a POINT object in a DEFAULT clause given allowable syntax.
+            assert(false);
+        }
+
+        // incompatible types
+        throw Error.error(ErrorCode.X_42561);
     }
 
     @Override
     public Object convertToDefaultType(SessionInterface sessionInterface,
             Object o) {
-        // TODO Auto-generated method stub
-        return null;
+        // incompatible types
+        throw Error.error(ErrorCode.X_42561);
     }
 
     @Override
