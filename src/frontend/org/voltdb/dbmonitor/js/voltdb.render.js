@@ -747,7 +747,7 @@ function alertNodeClicked(obj) {
                     
                     if (data.systemsettings.resourcemonitor != null) {
                         if (data.systemsettings.resourcemonitor.disklimit != null) {
-                            adminConfigValues['disklimit'] = data.systemsettings.resourcemonitor.disklimit.size;
+                            adminConfigValues['disklimit'] = data.systemsettings.resourcemonitor.disklimit;
                         }
                     }
                 }

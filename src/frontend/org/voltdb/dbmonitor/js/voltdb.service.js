@@ -648,6 +648,28 @@
         //Update admin configuration
         this.UpdateAdminConfiguration = function (updatedData, onConnectionAdded) {
             try {
+                if (updatedData.systemsettings.resourcemonitor != null) {
+                    if (updatedData.systemsettings.resourcemonitor.memorylimit != null) {
+                           updatedData.systemsettings.resourcemonitor.memorylimit.size = encodeURIComponent(updatedData.systemsettings.resourcemonitor.memorylimit.size);
+                       }
+                }
+
+                var features = [];
+
+                if (updatedData.systemsettings.resourcemonitor != null) {
+                    if (updatedData.systemsettings.resourcemonitor.disklimit != null) {
+                        for (var i = 0; i < updatedData.systemsettings.resourcemonitor.disklimit.feature.length; i++) {
+                            features.push({
+                                name: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].name,
+                                size: encodeURIComponent(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size)
+                            });
+                        }
+                        updatedData.systemsettings.resourcemonitor.disklimit.feature = features;
+                    }
+                    
+                }
+
+
                 var processName = "SHORTAPI_UPDATEDEPLOYMENT";
                 var procedureNames = [];
                 var parameters = [];

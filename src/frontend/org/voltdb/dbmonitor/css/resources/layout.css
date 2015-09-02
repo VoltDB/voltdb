@@ -2144,7 +2144,8 @@ label.error {
     display: block;
     line-height: 0px;
     font-size: 11px;
-    padding: 10px 5px 0 7px;
+    /*padding: 10px 5px 0 7px;*/
+    padding: 10px 5px 0 0;
     margin: 0 0 6px 0;
     height: 10px;
 }
@@ -3138,6 +3139,9 @@ a.restoreBtn {
     border-top: 1px solid #CCCCCC;
     padding: 20px 0 10px 0;
 }
+.featuresAlign {
+   padding: 0 0 10px 0;
+}
 
 .addConfigProperWrapper {
     overflow: auto;
@@ -3567,6 +3571,9 @@ a:hover.changePsd {
        width: 90%;
     height: 364px;
 }
+
+/*add idsk limit*/
+table.diskLimitTbl tr td { border: none;}
 
 
 
