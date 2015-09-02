@@ -1772,7 +1772,8 @@ function loadAdminPage() {
                 }
                 //Set the new value to be saved.
                 var memoryLimitSize = "";
-                memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + (adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? encodeURIComponent("%") : "");
+                
+                memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + adminEditObjects.ddlMemoryLimitSizeUnit.val();
                 if (adminEditObjects.txtMemoryLimitSize.val() != "") {
                     adminConfigurations.systemsettings.resourcemonitor.memorylimit.size = memoryLimitSize;
                 } else {
@@ -2529,7 +2530,7 @@ function loadAdminPage() {
                         feature.push(
                           {
                               name: newFeatureNames[i].value,
-                              size: newFeatureValues[i].value + encodeURIComponent(newFeatureUnits[i].value)
+                              size: newFeatureValues[i].value + newFeatureUnits[i].value
                           }
                       );
 
