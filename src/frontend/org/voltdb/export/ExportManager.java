@@ -51,6 +51,9 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.voltcore.zk.SynchronizedStatesManager;
+import org.voltdb.VoltZK;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -354,6 +357,7 @@ public class ExportManager
         return db.getConnectors();
     }
 
+    SynchronizedStatesManager m_exportStatesManager;
     /**
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
@@ -379,6 +383,12 @@ public class ExportManager
                 exportLog.info("Export is disabled by user configuration.");
                 return;
             }
+        }
+        String hostIdStr = "ExportHost_" + messenger.getHostId();
+        try {
+            m_exportStatesManager = new SynchronizedStatesManager(messenger.getZK(), VoltZK.syncStateMachine, "PER_HOST_EXPORT_STATES", hostIdStr);
+        } catch (KeeperException | InterruptedException e) {
+            m_exportStatesManager = null;
         }
 
         updateProcessorConfig(connectors);
