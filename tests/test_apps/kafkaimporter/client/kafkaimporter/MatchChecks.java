@@ -40,18 +40,13 @@ public class MatchChecks {
     protected static long getMirrorTableRowCount(boolean alltypes, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        long mirrorRowCount = 0;
-        String countsp = alltypes ? "CountMirror2" : "CountMirror1";
-
-
-        try {
-            VoltTable[] countQueryResult = client.callProcedure(countsp).getResults();
-            mirrorRowCount = countQueryResult[0].asScalarLong();
-        } catch (Exception e) {
-            log.error("Exception from callProcedure " + countsp, e);
-            System.exit(-1);
-        }
-        return mirrorRowCount;
+        String table = alltypes ? "KafkaMirrorTable1" : "KafkaMirrorTable2";
+        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+        VoltTable[] countQueryResult = response.getResults();
+        VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
+        return data.asScalarLong();
     }
 
     static ClientResponse doAdHoc(Client client, String query) {
@@ -133,60 +128,52 @@ public class MatchChecks {
         // check if any rows failed column by colunn comparison so we can fail fast
         ClientResponse response = doAdHoc(client, "select key from importcounts where value_mismatch = 1 limit 1;");
         VoltTable[] result = response.getResults();
-        if (result[0].getRowCount() == 0 || result[0].asScalarLong() == 0)
+        if (result[0].getRowCount() == 0) // || result[0].asScalarLong() == 0)
             return 0;
         return result[0].asScalarLong();
     }
 
     public static long getImportTableRowCount(boolean alltypes, Client client) {
         // check row count in import table
-        long importRowCount = 0;
-        String countsp = alltypes ? "CountImport2" : "CountImport1";
-
-        try {
-            VoltTable[] countQueryResult = client.callProcedure(countsp).getResults();
-            importRowCount = countQueryResult[0].asScalarLong();
-        } catch (Exception e) {
-            log.error("Exception from callProcedure " + countsp, e);
-            System.exit(-1);
-        }
-        return importRowCount;
+        String table = alltypes ? "KafkaImportTable1" : "KafkaImportTable2";
+        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+        VoltTable[] countQueryResult = response.getResults();
+        VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
+        return data.asScalarLong();
     }
 
-	public static boolean checkPounderResults(long expected_rows, Client client) {
-		// make sure import table has expected number of rows, and without gaps
-		// we check the row count, then use min & max to infer the range is complete
+    public static boolean checkPounderResults(long expected_rows, Client client) {
+    	// make sure import table has expected number of rows, and without gaps
+    	// we check the row count, then use min & max to infer the range is complete
+    	long importRowCount = 0;
+    	long importMax = 0;
+    	long importMin = 0;
 
-	       long importRowCount = 0;
-	       long importMax = 0;
-	       long importMin = 0;
+    	ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable1");
+    	VoltTable countQueryResult = response.getResults()[0];
+    	countQueryResult.advanceRow();
+    	importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
+    	importMin = (long) countQueryResult.get(1, VoltType.BIGINT);
+    	importMax = (long) countQueryResult.get(2, VoltType.BIGINT);
 
-	        try {
-	            VoltTable countQueryResult = client.callProcedure("ImportCountMinMax").getResults()[0];
-	            countQueryResult.advanceRow();
-	            importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
-	            importMin = (long) countQueryResult.get(1, VoltType.BIGINT);
-	            importMax = (long) countQueryResult.get(2, VoltType.BIGINT);
-	        } catch (Exception e) {
-	            log.error("Exception from callProcedure ImportMinMax", e);
-	            System.exit(-1);
-	        }
-	        if (importRowCount != expected_rows) {
-	        	log.error(expected_rows + " expected. " + importRowCount + " received.");
-	        	return false;
-	        }
+    	if (importRowCount != expected_rows) {
+    		log.error(expected_rows + " expected. " + importRowCount + " received.");
+    		return false;
+    	}
 
-            if (importMax == VoltType.NULL_BIGINT) {
-                importMax = 0;
-            }
-            if (importMin == VoltType.NULL_BIGINT) {
-                importMin = 0;
-            }
-	        if ((importMax-importMin+1) != expected_rows) {
-	        	log.error(expected_rows + " expected. " + (importMax-importMin+1) + " rows received.");
-	        	return false;
-	        }
-	        return true;
-	}
+    	if (importMax == VoltType.NULL_BIGINT) {
+    		importMax = 0;
+    	}
+    	if (importMin == VoltType.NULL_BIGINT) {
+    		importMin = 0;
+    	}
+    	if ((importMax-importMin+1) != expected_rows) {
+    		log.error(expected_rows + " expected. " + (importMax-importMin+1) + " rows received.");
+    		return false;
+    	}
+    	return true;
+    }
 }
 
