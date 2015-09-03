@@ -1838,14 +1838,15 @@ public class DDLCompiler {
         } else {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
+
+                if (! VoltType.isIndexable(colType)) {
+                    String emsg = colType.getName() + " expressions are not currently supported as index keys.";
+                    throw this.m_compiler.new VoltCompilerException(emsg);
+                }
+
                 if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
-                }
-                // disallow expressions of type VARBINARY
-                if (colType == VoltType.VARBINARY) {
-                    String emsg = "VARBINARY expressions are not currently supported as index keys.";
-                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         }
