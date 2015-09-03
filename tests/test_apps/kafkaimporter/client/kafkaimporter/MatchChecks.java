@@ -135,7 +135,7 @@ public class MatchChecks {
 
     public static long getImportTableRowCount(boolean alltypes, Client client) {
         // check row count in import table
-        String table = alltypes ? "KafkaImportTable1" : "KafkaImportTable2";
+        String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
         ClientResponse response = doAdHoc(client, "select count(*) from " + table);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
