@@ -22,29 +22,29 @@ import java.nio.ByteBuffer;
 public class PointType {
 
     // Internal representation of a geospatial point
-    // is subject to change.  For now, just use two doubles.
-    private final double m_latitude;
-    private final double m_longitude;
+    // is subject to change.  For now, just use two floats.
+    private final float m_latitude;
+    private final float m_longitude;
 
     public PointType() {
-        m_latitude = Double.NaN;
-        m_longitude = Double.NaN;
+        m_latitude = Float.NaN;
+        m_longitude = Float.NaN;
     }
 
-    public PointType(double latitude, double longitude) {
+    public PointType(float latitude, float longitude) {
         m_latitude = latitude;
         m_longitude = longitude;
     }
 
     public boolean isNull() {
-        return Double.isNaN(m_latitude) || Double.isNaN(m_longitude);
+        return Float.isNaN(m_latitude) || Float.isNaN(m_longitude);
     }
 
-    public double getLatitude() {
+    public float getLatitude() {
         return m_latitude;
     }
 
-    public double getLongitude() {
+    public float getLongitude() {
         return m_longitude;
     }
 

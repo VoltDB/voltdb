@@ -205,6 +205,9 @@ public class ParameterSet implements JSONString {
                 case DECIMAL:
                     size += 16;
                     break;
+                case POINT:
+                    size += 8; // two floats
+                    break;
                 case VOLTTABLE:
                     size += ((VoltTable) obj).getSerializedSize();
                     break;

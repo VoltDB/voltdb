@@ -39,8 +39,8 @@ public class TestPointType extends RegressionSuite {
         super(name);
     }
 
-    private static final PointType BEDFORD_PT = new PointType(42.4906, -71.2767);
-    private static final PointType SANTA_CLARA_PT = new PointType(37.3544, -121.9692);
+    private static final PointType BEDFORD_PT = new PointType(42.4906f, -71.2767f);
+    private static final PointType SANTA_CLARA_PT = new PointType(37.3544f, -121.9692f);
 
     private int fillTable(Client client, int startPk) throws Exception {
         validateTableOfScalarLongs(client,
@@ -50,12 +50,12 @@ public class TestPointType extends RegressionSuite {
                         + "pointfromtext('" + BEDFORD_PT.toString() + "'));",
                 new long[] {1});
         startPk++;
-        validateTableOfScalarLongs(client,
-                "insert into t values "
-                + "(" + startPk + ", "
-                        + "'Santa Clara', "
-                        + "pointfromtext('" + SANTA_CLARA_PT.toString() + "'));",
-                new long[] {1});
+
+        // To exercise parameters, execute the insert with
+        // a PointType instance.
+        VoltTable vt = client.callProcedure("t.Insert", startPk, "Santa Clara", SANTA_CLARA_PT)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
         startPk++;
         validateTableOfScalarLongs(client,
                 "insert into t values (" + startPk + ", 'Atlantis', null);",
@@ -290,8 +290,8 @@ public class TestPointType extends RegressionSuite {
 
         fillTable(client, 0);
 
-        final PointType CAMBRIDGE_PT = new PointType(42.3736, -71.1106);
-        final PointType SAN_JOSE_PT = new PointType(37.3362, -121.8906);
+        final PointType CAMBRIDGE_PT = new PointType(42.3736f, -71.1106f);
+        final PointType SAN_JOSE_PT = new PointType(37.3362f, -121.8906f);
 
         validateTableOfScalarLongs(client,
                 "update t set "
@@ -352,7 +352,7 @@ public class TestPointType extends RegressionSuite {
                 .getResults()[0];
 
         assertTableEquals(new Object[][] {
-                {0, "Singapore", new PointType(1.2905, 103.8521)}},
+                {0, "Singapore", new PointType(1.2905f, 103.8521f)}},
                 vt);
     }
 
