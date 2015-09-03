@@ -145,35 +145,35 @@ public class MatchChecks {
     }
 
     public static boolean checkPounderResults(long expected_rows, Client client) {
-    	// make sure import table has expected number of rows, and without gaps
-    	// we check the row count, then use min & max to infer the range is complete
-    	long importRowCount = 0;
-    	long importMax = 0;
-    	long importMin = 0;
+        // make sure import table has expected number of rows, and without gaps
+        // we check the row count, then use min & max to infer the range is complete
+        long importRowCount = 0;
+        long importMax = 0;
+        long importMin = 0;
 
-    	ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable1");
-    	VoltTable countQueryResult = response.getResults()[0];
-    	countQueryResult.advanceRow();
-    	importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
-    	importMin = (long) countQueryResult.get(1, VoltType.BIGINT);
-    	importMax = (long) countQueryResult.get(2, VoltType.BIGINT);
+        ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable1");
+        VoltTable countQueryResult = response.getResults()[0];
+        countQueryResult.advanceRow();
+        importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
+        importMin = (long) countQueryResult.get(1, VoltType.BIGINT);
+        importMax = (long) countQueryResult.get(2, VoltType.BIGINT);
 
-    	if (importRowCount != expected_rows) {
-    		log.error(expected_rows + " expected. " + importRowCount + " received.");
-    		return false;
-    	}
+        if (importRowCount != expected_rows) {
+            log.error(expected_rows + " expected. " + importRowCount + " received.");
+            return false;
+        }
 
-    	if (importMax == VoltType.NULL_BIGINT) {
-    		importMax = 0;
-    	}
-    	if (importMin == VoltType.NULL_BIGINT) {
-    		importMin = 0;
-    	}
-    	if ((importMax-importMin+1) != expected_rows) {
-    		log.error(expected_rows + " expected. " + (importMax-importMin+1) + " rows received.");
-    		return false;
-    	}
-    	return true;
+        if (importMax == VoltType.NULL_BIGINT) {
+            importMax = 0;
+        }
+        if (importMin == VoltType.NULL_BIGINT) {
+            importMin = 0;
+        }
+        if ((importMax-importMin+1) != expected_rows) {
+            log.error(expected_rows + " expected. " + (importMax-importMin+1) + " rows received.");
+            return false;
+        }
+        return true;
     }
 }
 
