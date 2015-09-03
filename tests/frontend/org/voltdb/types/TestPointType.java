@@ -36,4 +36,15 @@ public class TestPointType extends TestCase {
 
         assertFalse(point.equals(6));
     }
+
+    public void testPointCtor() {
+        PointType point = new PointType(10.333f, 20.666f);
+        assertEquals(10.333f, point.getLatitude(), 0.001);
+        assertEquals(20.666f, point.getLongitude(), 0.001);
+
+        assertTrue(point.equals(point));
+        assertFalse(point.isNull());
+
+        assertEquals("POINT (10.333 20.666)", point.toString());
+    }
 }

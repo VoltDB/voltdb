@@ -68,6 +68,14 @@ public class PointType {
         }
 
         PointType that = (PointType)o;
+
+        // Points that are both null are considered equal,
+        // which breaks SQL semantics, but seems to make more
+        // sense in Java.
+        if (isNull() && that.isNull()) {
+            return true;
+        }
+
         if (that.getLatitude() != getLatitude()) {
             return false;
         }
