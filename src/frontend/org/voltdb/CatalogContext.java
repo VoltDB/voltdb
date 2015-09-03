@@ -148,6 +148,10 @@ public class CatalogContext {
         }
     }
 
+    public Cluster getCluster() {
+        return cluster;
+    }
+
     public CatalogContext update(
             long txnId,
             long uniqueId,
