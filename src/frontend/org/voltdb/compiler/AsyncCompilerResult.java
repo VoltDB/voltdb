@@ -26,6 +26,7 @@ public class AsyncCompilerResult implements Serializable, Cloneable {
 
     public long clientHandle = -1;
     public String errorMsg = null;
+    public byte errorCode = Byte.MIN_VALUE;
     public long connectionId = -1;
     public String hostname = "";
     public boolean adminConnection = false;
@@ -46,6 +47,13 @@ public class AsyncCompilerResult implements Serializable, Cloneable {
         result.clientData = work.clientData;
         result.errorMsg = errMsg;
         result.user = work.user;
+        return result;
+    }
+
+    public static AsyncCompilerResult makeErrorResult(AsyncCompilerWork work, String errMsg, byte errorCode)
+    {
+        AsyncCompilerResult result = makeErrorResult(work, errMsg);
+        result.errorCode = errorCode;
         return result;
     }
 
