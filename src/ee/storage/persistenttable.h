@@ -589,7 +589,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         }
     }
 
-    void setDRTimestampForTuple(ExecutorContext* ec, TableTuple &tuple);
+    void setDRTimestampForTuple(ExecutorContext* ec, TableTuple &tuple, bool update);
 
     void computeSmallestUniqueIndex();
 

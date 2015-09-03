@@ -382,9 +382,9 @@ void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(1, source.getNValue(2));
 }
 
-void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple) {
+void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update) {
     assert(hasDRTimestampColumn());
-    if (tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
+    if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
         const int64_t drTimestamp = ec->currentDRTimestamp();
         tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
     }
@@ -467,7 +467,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     if (hasDRTimestampColumn()) {
-        setDRTimestampForTuple(ec, target);
+        setDRTimestampForTuple(ec, target, false);
     }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
@@ -611,7 +611,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     if (hasDRTimestampColumn()) {
-        setDRTimestampForTuple(ec, sourceTupleWithNewValues);
+        setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
