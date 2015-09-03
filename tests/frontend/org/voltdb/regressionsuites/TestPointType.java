@@ -41,6 +41,7 @@ public class TestPointType extends RegressionSuite {
 
     private static final PointType BEDFORD_PT = new PointType(42.4906f, -71.2767f);
     private static final PointType SANTA_CLARA_PT = new PointType(37.3544f, -121.9692f);
+    private static final PointType LOWELL_PT = new PointType(42.6200f, -71.3273f);
 
     private int fillTable(Client client, int startPk) throws Exception {
         validateTableOfScalarLongs(client,
@@ -356,6 +357,20 @@ public class TestPointType extends RegressionSuite {
                 vt);
     }
 
+    public void testPointIn() throws Exception {
+        Client client = getClient();
+
+        fillTable(client, 0);
+
+        Object listParam = new PointType[] {SANTA_CLARA_PT, LOWELL_PT};
+        VoltTable vt = client.callProcedure("sel_in", listParam)
+                .getResults()[0];
+
+        assertTableEquals(new Object[][] {
+                {1, SANTA_CLARA_PT}},
+                vt);
+    }
+
     static public junit.framework.Test suite() {
 
         VoltServerConfig config = null;
@@ -376,6 +391,11 @@ public class TestPointType extends RegressionSuite {
                 + "  NAME VARCHAR(32),\n"
                 + "  PT POINT NOT NULL\n"
                 + ");\n"
+                + "\n"
+                + "CREATE PROCEDURE sel_in AS"
+                + "  SELECT pk, pt \n"
+                + "  FROM t \n"
+                + "  WHERE pt IN ?;\n"
                 ;
         try {
             project.addLiteralSchema(literalSchema);

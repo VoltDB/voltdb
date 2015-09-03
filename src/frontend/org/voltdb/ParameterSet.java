@@ -150,6 +150,9 @@ public class ParameterSet implements JSONString {
                             }
                         }
                         break;
+                    case POINT:
+                        size += 8 * ((PointType[])obj).length;
+                        break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
                 }
@@ -685,6 +688,9 @@ public class ParameterSet implements JSONString {
                         break;
                     case VARBINARY:
                         SerializationHelper.writeArray((byte[][]) obj, buf);
+                        break;
+                    case POINT:
+                        SerializationHelper.writeArray((PointType[]) obj, buf);
                         break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);

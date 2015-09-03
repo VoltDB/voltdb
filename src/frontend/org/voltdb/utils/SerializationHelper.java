@@ -25,6 +25,7 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
+import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -187,6 +188,15 @@ public class SerializationHelper {
             }
             return retval;
         }
+        else if (type == PointType.class) {
+            final PointType[] retval = new PointType[count];
+            for (int i = 0; i < count; ++i) {
+                float lat = buf.getFloat();
+                float lng = buf.getFloat();
+                retval[i] = new PointType(lat, lng);
+            }
+            return retval;
+        }
         else if (type == VoltTable.class) {
             final VoltTable[] retval = new VoltTable[count];
             for (int i = 0; i < count; ++i) {
@@ -331,6 +341,22 @@ public class SerializationHelper {
             }
             else {
                 writeArray(values[i], buf);
+            }
+        }
+    }
+
+    public static void writeArray(PointType[] values, ByteBuffer buf) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        buf.putShort((short) values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                PointType.serializeNull(buf);
+            }
+            else {
+                values[i].flattenToBuffer(buf);
             }
         }
     }
