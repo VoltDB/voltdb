@@ -23,10 +23,11 @@ import org.voltdb.AuthSystem;
 
 public class AsyncCompilerResult implements Serializable, Cloneable {
     private static final long serialVersionUID = -1538141431615585812L;
+    public static final byte UNINITIALIZED_ERROR_CODE = Byte.MIN_VALUE;
 
     public long clientHandle = -1;
     public String errorMsg = null;
-    public byte errorCode = Byte.MIN_VALUE;
+    public byte errorCode = UNINITIALIZED_ERROR_CODE;
     public long connectionId = -1;
     public String hostname = "";
     public boolean adminConnection = false;
