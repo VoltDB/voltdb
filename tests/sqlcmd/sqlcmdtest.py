@@ -278,8 +278,8 @@ def do_main():
                 prompt = "Running " + os.path.join(parent, inpath)
                 if os.path.isfile(os.path.join(parent, prefix + '.config')):
                     with open (os.path.join(parent, prefix + '.config'), "r") as configFile:
-                        config_params=configFile.read().replace('\n', '')
-                        prompt += " with configuration:" + config_params
+                        config_params=configFile.read().strip()
+                    prompt += " with configuration:" + config_params.replace('\n', ' ')
                 print prompt
 
                 childin = open(os.path.join(parent, inpath))
@@ -289,8 +289,9 @@ def do_main():
                 childout = open(os.path.join(parent, prefix + '.out'), 'w+')
                 childerr = open(os.path.join(parent, prefix + '.err'), 'w+')
 
+
                 if config_params:
-                    subprocess.call(['../../bin/sqlcmd', config_params],
+                    subprocess.call(['../../bin/sqlcmd'] + config_params.split("\n"),
                         stdin=childin, stdout=childout, stderr=childerr)
                 else:
                     subprocess.call(['../../bin/sqlcmd'],
