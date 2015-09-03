@@ -25,14 +25,17 @@ package org.voltdb;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.junit.Test;
+import org.voltdb.catalog.Cluster;
 
 public class TestEELibraryLoader
 {
     @Test
     public void testLoader() {
-        final VoltDB.Configuration configuration = new VoltDB.Configuration();
+        VoltDB.Configuration configuration = new VoltDB.Configuration();
         configuration.m_noLoadLibVOLTDB = true;
         MockVoltDB mockvolt = new MockVoltDB();
         VoltDB.ignoreCrash = true;
@@ -53,5 +56,24 @@ public class TestEELibraryLoader
         VoltDB.initialize(configuration);
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));
         assertFalse(VoltDB.wasCrashCalled);
+
+        // Now test SUCCESS case
+        configuration = new VoltDB.Configuration();
+        VoltDBInterface mockitovolt = mock(VoltDBInterface.class);
+        VoltDBInterface realvolt = new RealVoltDB();
+        when(mockitovolt.getEELibraryVersionString())
+            .thenReturn(realvolt.getEELibraryVersionString());
+        CatalogContext catContext = mock(CatalogContext.class);
+        Cluster cluster = mock(Cluster.class);
+        when(cluster.getVoltroot())
+            .thenReturn(System.getProperty("java.io.tmpdir"));
+        when(catContext.getCluster())
+            .thenReturn(cluster);
+        when(mockitovolt.getCatalogContext())
+            .thenReturn(catContext);
+
+        VoltDB.replaceVoltDBInstanceForTest(mockitovolt);
+        VoltDB.initialize(configuration);
+        assertTrue(EELibraryLoader.loadExecutionEngineLibrary(true));
     }
 }
