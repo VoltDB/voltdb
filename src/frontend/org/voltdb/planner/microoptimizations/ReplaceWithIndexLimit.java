@@ -208,34 +208,88 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         }
         int numberOfExprs = exprs.size();
 
-        // If there is only 1 difference between searchkeyExprs and endExprs,
-        // 1. trivial filters can be discarded, 2 possibilities:
-        //      a. SELECT MIN(X) FROM T WHERE [other prefix filters] X < / <= ?
-        //         <=> SELECT MIN(X) FROM T WHERE [other prefix filters] && the X < / <= ? filter
-        //      b. SELECT MAX(X) FROM T WHERE X > / >= ?
-        //         <=> SELECT MAX(X) FROM T with post-filter
-        // 2. filter should act as equality filter, 2 possibilities
-        //      SELECT MIN(X) FROM T WHERE [other prefix filters] X > / >= ?
-        //      SELECT MAX(X) FROM T WHERE [other prefix filters] X < / <= ?
-
-        // check if there is other filters for SELECT MAX(X) FROM T WHERE [other prefix filter AND ] X > / >= ?
-        // but we should allow SELECT MAX(X) FROM T WHERE X = ?
-        if (sortDirection == SortDirectionType.DESC && ispn.getSortDirection() == SortDirectionType.INVALID) {
-            if (numberOfExprs > 1 ||
-                    (numberOfExprs == 1 && aggExpr.bindingToIndexedExpression(exprs.get(0).getLeft()) == null)) {
+        /* Retrieve the index expressions from the target index. (ENG-8819, Ethan)
+         * This is because we found that for the following two queries:
+         *     #1: explain select max(c2/2) from t where c1=1 and c2/2<=3;
+         *     #2: explain select max(c2/2) from t where c1=1 and c2/2<=?;
+         * We can get an inline limit 1 for #2 but not for #1. This is because all constants in #1 got parameterized.
+         * The result is that the query cannot pass the bindingToIndexedExpression() tests below
+         * because we lost all the constant value expressions (cannot attempt to bind a pve to a pve!).
+         * Those constant values expressions can only be accessed from the idnex.
+         * We will not add those bindings to the ispn.getBindings() here because they will be added anyway in checkIndex().
+         * PS: For this case (i.e. index on expressions), checkIndex() will call checkExpressionIndex(),
+         * where bindings will be added.
+         */
+        Index indexToUse = ispn.getCatalogIndex();
+        List<AbstractExpression> indexedExprs = null;
+        if ( ! indexToUse.getExpressionsjson().isEmpty() ) {
+            StmtTableScan tableScan = m_parsedStmt.m_tableAliasMap.get(ispn.getTargetTableAlias());
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(indexToUse.getExpressionsjson(), tableScan);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
                 return plan;
+            }
+        }
+
+        /* If there is only 1 difference between searchkeyExprs and endExprs,
+         * 1. trivial filters can be discarded, 2 possibilities:
+         *      a. SELECT MIN(X) FROM T WHERE [other prefix filters] X < / <= ?
+         *         <=> SELECT MIN(X) FROM T WHERE [other prefix filters] && the X < / <= ? filter
+         *      b. SELECT MAX(X) FROM T WHERE X > / >= ?
+         *         <=> SELECT MAX(X) FROM T with post-filter
+         * 2. filter should act as equality filter, 2 possibilities
+         *      SELECT MIN(X) FROM T WHERE [other prefix filters] X > / >= ?
+         *      SELECT MAX(X) FROM T WHERE [other prefix filters] X < / <= ?
+
+         * check if there is other filters for SELECT MAX(X) FROM T WHERE [other prefix filter AND ] X > / >= ?
+         * but we should allow SELECT MAX(X) FROM T WHERE X = ?
+
+         * This is for queries having MAX() but no ORDER BY. (ENG-8819, Ethan)
+         * sortDirection == DESC if max, ASC if min. ispn.getSortDirection() == INVALID if no ORDER BY. */
+        if (sortDirection == SortDirectionType.DESC && ispn.getSortDirection() == SortDirectionType.INVALID) {
+            /* numberOfExprs = exprs.size(), exprs are initial expressions for reversed index scans (lookupType LT, LTE),
+             * are end expressions for forward index scans (lookupType GT, GTE, EQ).
+             * Note, lookupType doesn't decide the scan direction for sure. MIN(X) where X < ? is still a forward scan.
+             * X < ? will be a post filter for the scan rather than an initial expression. */
+            if (numberOfExprs == 1) {
+                // e.g.: explain select max(c2/2) from t where c2/2<=3;
+                // In this case, as long as the where condition (exprs.get(0)) matches the aggregation argument, continue.
+                AbstractExpression exprToBind = indexedExprs == null ? exprs.get(0).getLeft() : indexedExprs.get(0);
+                if ( aggExpr.bindingToIndexedExpression(exprToBind) == null ) {
+                    return plan;
+                }
+            }
+            else if (numberOfExprs > 1) {
+                // ENG-4016: Optimization for query SELECT MAX(X) FROM T WHERE [other prefix filters] X < / <= ?
+                // Just keep trying, don't return early.
+                boolean earlyReturn = true;
+                for (int i=0; i<numberOfExprs; ++i) {
+                    AbstractExpression expr = exprs.get(i);
+                    AbstractExpression indexedExpr = indexedExprs == null ? expr.getLeft() : indexedExprs.get(i);
+                    if ( aggExpr.bindingToIndexedExpression(indexedExpr) != null &&
+                            (expr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO ||
+                             expr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN ||
+                             expr.getExpressionType() == ExpressionType.COMPARE_EQUAL) ) {
+                        earlyReturn = false;
+                        break;
+                    }
+                }
+                if (earlyReturn) { return plan; }
             }
         }
 
         // have an upper bound: # of endingExpr is more than # of searchExpr
         if (numberOfExprs > numOfSearchKeys) {
+            AbstractExpression lastEndExpr = exprs.get(numberOfExprs - 1);
             // check last ending condition, see whether it is
             //      SELECT MIN(X) FROM T WHERE [other prefix filters] X < / <= ? or
             // other filters will be checked later
-            AbstractExpression lastEndExpr = exprs.get(numberOfExprs - 1);
+            AbstractExpression exprToBind = indexedExprs == null ? lastEndExpr.getLeft() : indexedExprs.get(numberOfExprs - 1);
             if ((lastEndExpr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN ||
                  lastEndExpr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO)
-                    && lastEndExpr.getLeft().equals(aggExpr)) {
+                    && aggExpr.bindingToIndexedExpression(exprToBind) != null) {
                 exprs.remove(lastEndExpr);
             }
         }
@@ -273,16 +327,10 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             ispn.addInlinePlanNode(lpn);
 
             // ENG-1565: For SELECT MAX(X) FROM T WHERE X > / >= ?, turn the pre-filter to post filter.
-            // There are two choices:
-            // AggregatePlanNode                AggregatePlanNode
-            //  |__ IndexScanPlanNode       =>      |__FilterPlanNode
-            //                                              |__IndexScanPlanNode with no filter
-            //                                                      |__LimitPlanNode
-            //                          OR
+            // The current approach is:
             // AggregatePlanNode                AggregatePlanNode with filter
             //  |__ IndexScanPlanNode       =>      |__IndexScanPlanNode with no filter
             //                                              |__LimitPlanNode
-            // For now, we take the second approach.
             if (sortDirection == SortDirectionType.DESC &&
                     !ispn.getSearchKeyExpressions().isEmpty() &&
                     exprs.isEmpty() &&
