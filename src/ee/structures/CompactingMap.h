@@ -355,7 +355,7 @@ protected:
         void *memory = m_allocator.alloc();
         assert(memory);
         // placement new
-        TreeNode *z = new(memory) TreeNode();
+        TreeNode *z = new(memory) TreeNode;
         z->left = z->right = z->parent = &NIL;
         if (hasRank) {
             z->subct = 1;
@@ -463,7 +463,9 @@ void CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::copyRecursive(
     to->setKey(from->key());
     to->setValue(from->value());
     to->color = from->color;
-    to->subct = from->subct;
+    if (hasRank) {
+        to->subct = from->subct;
+    }
 
     if (from->left != fromNIL) {
         to->left = newNode();
@@ -494,6 +496,8 @@ void CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::clear()
 
     m_root = &NIL;
     m_count = 0;
+    m_allocator.clear();
+    assert(m_allocator.count() == 0);
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank, typename ValueType>
