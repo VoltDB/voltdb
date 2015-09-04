@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -50,6 +51,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -89,6 +91,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
@@ -110,7 +113,9 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -1728,6 +1733,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
+    private class ClientInterfaceConnectionContext implements InternalConnectionContext{
+
+        @Override
+        public String getName() {
+            return "ClientInterfaceConnectionContext";
+        }
+
+        @Override
+        public void setBackPressure(boolean hasBackPressure) {
+            // nothing to do here.
+        }}
+
     /**
      *
      * @param port
@@ -1898,6 +1915,40 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
                 if (retval != null) {
                     return retval;
+                }
+                if (catalogContext.database.getTables().size() == 0) {
+                    if (!VoltDB.instance().getCatalogContext().cluster.getUseddlschema()) {
+                        return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                new VoltTable[0],
+                                "Cannot restore catalog from snapshot when schema is set to catalog in the deployment.",
+                                task.clientHandle);
+                    }
+                    log.warn("@SnapshotRestore called on an empty database, attempting to restore catalog from snapshot.");
+                    try {
+                        JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
+                        final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
+                        final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
+                        final byte[] catalog = MiscUtils.fileToBytes(new File(path, nonce + ".jar"));
+                        final String dep = new String(catalogContext.getDeploymentBytes(), "UTF-8");
+
+                        SyncCallback cb = new SyncCallback();
+                        VoltDB.instance().getClientInterface().getInternalConnectionHandler().
+                        callProcedure(new ClientInterfaceConnectionContext(), 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
+                        cb.waitForResponse();
+
+                        m_catalogContext.set(VoltDB.instance().getCatalogContext());
+                        catProc = getProcedureFromName(task.procName, m_catalogContext.get());
+                    } catch (JSONException e) {
+                        return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0],
+                                "Unable to parse parameters.",
+                                task.clientHandle);
+                    } catch (InterruptedException e) {
+                        return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0],
+                                "Unexpected failure while restoring catalog from snapshot.",
+                                task.clientHandle);
+                    }
                 }
             }
 
