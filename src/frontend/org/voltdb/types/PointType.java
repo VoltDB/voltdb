@@ -23,9 +23,12 @@ public class PointType {
 
     // Internal representation of a geospatial point
     // is subject to change.  For now, just use two floats.
+    // This matches the EE representation.
     private final float m_latitude;
     private final float m_longitude;
 
+    // In the default constructor, initialize to the null point
+    // (defined as either value being NaN)
     public PointType() {
         m_latitude = Float.NaN;
         m_longitude = Float.NaN;
@@ -48,6 +51,7 @@ public class PointType {
         return m_longitude;
     }
 
+    @Override
     public String toString() {
         if (isNull()) {
             return "NULL";
@@ -56,11 +60,13 @@ public class PointType {
         return "POINT (" + m_latitude + " " + m_longitude + ")";
     }
 
-    // Always returns false for null points (either lat or long NaN)
-    // What's the right thing to do here?
-    //    In SQL semantics, null values should not compare equal to eachother.
-    //    In Java, an instance should be equal to itself.
-    //    For inserting into a hash table in Java, we'd want nulls to compare as equal.
+    // Returns true for two points that have the same latitude and
+    // longitude.  For NULL points (defined as either lat or lng being NaN),
+    // Return true if both points are null.
+    //
+    // In SQL two null values should not compare as equal, but in Java
+    // (say for inserting unique values into a hash table), we really want
+    // any two null points to be considered as equal.
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof PointType)) {
@@ -69,9 +75,6 @@ public class PointType {
 
         PointType that = (PointType)o;
 
-        // Points that are both null are considered equal,
-        // which breaks SQL semantics, but seems to make more
-        // sense in Java.
         if (isNull() && that.isNull()) {
             return true;
         }
@@ -85,12 +88,11 @@ public class PointType {
 
     /**
      * Serialize this instance to a byte buffer.
-     * For now we serialize as a single-precision float (subject to change)
      * @param buffer
      */
     public void flattenToBuffer(ByteBuffer buffer) {
-        buffer.putFloat((float)getLatitude());
-        buffer.putFloat((float)getLongitude());
+        buffer.putFloat(getLatitude());
+        buffer.putFloat(getLongitude());
     }
 
 

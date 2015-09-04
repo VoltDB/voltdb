@@ -239,7 +239,7 @@ public enum VoltType {
             "POINT",
             new Class[] {PointType.class},
             PointType[].class,
-            'P'); // hope this is allowed!!
+            'P'); // 'p' was taken by timestamp
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a

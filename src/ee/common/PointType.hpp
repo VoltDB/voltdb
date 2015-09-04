@@ -22,8 +22,14 @@
 #include <sstream>
 
 namespace voltdb {
+/**
+ * A class for representing instances of geo-spatial points.
+ * Stored as a pair of floats, so it fits into an 8-byte word.
+ */
 class PointType {
 public:
+    /** Constructor for a null point,
+     * with both lat and lng init'd to NaN */
     PointType() {
         m_latitude = std::numeric_limits<float>::quiet_NaN();
         m_longitude = std::numeric_limits<float>::quiet_NaN();
@@ -35,7 +41,9 @@ public:
     {
     }
 
+    /** Null values are represented as either lat or lng being NaN. */
     bool isNull() const {
+        // NaN will not compare equal to itself.
         return (m_latitude != m_latitude) ||
             (m_longitude != m_longitude);
     }

@@ -9,31 +9,18 @@ import org.hsqldb_voltpatches.OpTypes;
 public class VoltPointType extends Type {
 
     VoltPointType() {
-        // These settings are copied from SQL_BIGINT.
         super(Types.VOLT_POINT, // comparison group
                 Types.VOLT_POINT,  // type
-                NumberType.bigintPrecision, // precision
-                8); // scale
+                0, // precision
+                0); // scale
     }
 
-    // The length of "point(<double value> <double value>)"
-    private static final int DISPLAY_SIZE = String.valueOf(-Double.MAX_VALUE).length() * 2 + 8;
+    // The length of "point(<float value> <float value>)"
+    private static final int DISPLAY_SIZE = String.valueOf(-Float.MAX_VALUE).length() * 2 + 8;
 
     @Override
     public int displaySize() {
         return DISPLAY_SIZE;
-    }
-
-    @Override
-    public int getJDBCTypeCode() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    @Override
-    public String getJDBCClassName() {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     @Override
@@ -48,14 +35,8 @@ public class VoltPointType extends Type {
 
     @Override
     public int compare(Object a, Object b) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    @Override
-    public Object convertToTypeLimits(SessionInterface session, Object a) {
-        // TODO Auto-generated method stub
-        return null;
+        // Incompatible type in operation
+        throw Error.error(ErrorCode.X_42565);
     }
 
     @Override
@@ -90,31 +71,48 @@ public class VoltPointType extends Type {
 
     @Override
     public boolean canConvertFrom(Type otherType) {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public Type getAggregateType(Type other) {
+        // incompatible types in operation
+        throw Error.error(ErrorCode.X_42561);
+    }
+
+    @Override
+    public Type getCombinedType(Type other, int operation) {
+        // The 'combined type' seems to refer to operators other than
+        // comparisons, which always return BOOLEAN, and are valid
+        // for POINTs.
+        //
+        // We don't allow any non-comparison operators on POINTs, so
+        // just throw here if anyone tries.
+        //
+        // incompatible types in operation
+        throw Error.error(ErrorCode.X_42561);
+    }
+
+    // *********
+    // Below are methods that are stubs that have not been filled in:
+    //   - JDBC attributes (TODO)
+    //   - Methods that define runtime behavior in HSQL
+
+    @Override
+    public int getJDBCTypeCode() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public String getJDBCClassName() {
         // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public Type getCombinedType(Type other, int operation) {
-        switch (operation) {
-        case OpTypes.EQUAL :
-        case OpTypes.GREATER :
-        case OpTypes.GREATER_EQUAL :
-        case OpTypes.SMALLER_EQUAL :
-        case OpTypes.SMALLER :
-        case OpTypes.NOT_EQUAL :
-            if (other instanceof VoltPointType)
-                return this;
-            // else, fall through
-        default:
-            // incompatible types
-            throw Error.error(ErrorCode.X_42561);
-        }
+    public Object convertToTypeLimits(SessionInterface session, Object a) {
+        // TODO Auto-generated method stub
+        return null;
     }
 }
