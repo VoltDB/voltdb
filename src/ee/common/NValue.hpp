@@ -1960,8 +1960,8 @@ private:
         assert(m_valueType == VALUE_TYPE_POINT);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_POINT: {
-            float lhsLat = reinterpret_cast<const float*>(m_data)[0];
-            float rhsLat = reinterpret_cast<const float*>(rhs.m_data)[0];
+            float lhsLat = getPoint().getLatitude();
+            float rhsLat = rhs.getPoint().getLatitude();
             if (lhsLat < rhsLat) {
                 return VALUE_COMPARE_LESSTHAN;
             }
@@ -1971,8 +1971,8 @@ private:
             }
 
             // latitude is equal; compare longitude
-            float lhsLng = reinterpret_cast<const float*>(m_data)[1];
-            float rhsLng = reinterpret_cast<const float*>(rhs.m_data)[1];
+            float lhsLng = getPoint().getLongitude();
+            float rhsLng = rhs.getPoint().getLongitude();
             if (lhsLng < rhsLng) {
                 return VALUE_COMPARE_LESSTHAN;
             }
@@ -3414,6 +3414,12 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_DECIMAL:
           getDecimal().hash(seed); break;
       case VALUE_TYPE_POINT:
+          // This might not be a good enough.
+          // See notes on hashing DOUBLE above.
+          // Since we expect internal representation to change,
+          // it's good enough for now.  If we decide to use
+          // floating point numbers to store lat/lng long term,
+          // we'll need to revisit this.
           boost::hash_combine(seed, getPoint().toString()); break;
       default:
           throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
