@@ -219,8 +219,6 @@ public class ImportManager implements ChannelChangeCallback {
             return;
         }
 
-        System.out.println("*****readyForDataInternal*****");
-        Thread.dumpStack();
         //If we dont have any processors we dont have any import configured.
         if (m_processor.get() == null) {
             return;
