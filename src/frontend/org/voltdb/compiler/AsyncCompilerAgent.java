@@ -38,6 +38,7 @@ import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.parser.SQLLexer;
@@ -268,7 +269,8 @@ public class AsyncCompilerAgent {
             if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
-                            "Server is paused and is available in read-only mode - please try again later.");
+                            "Server is paused and is available in read-only mode - please try again later.",
+                            ClientResponse.SERVER_UNAVAILABLE);
                 w.completionHandler.onCompletion(errResult);
                 return;
             }
@@ -281,7 +283,8 @@ public class AsyncCompilerAgent {
         if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
             AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
-                            "Server is paused and is available in read-only mode - please try again later.");
+                            "Server is paused and is available in read-only mode - please try again later.",
+                            ClientResponse.SERVER_UNAVAILABLE);
             w.completionHandler.onCompletion(errResult);
             return;
         }

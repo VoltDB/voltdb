@@ -149,7 +149,7 @@
                                 </div>
                                 <div class="slide-pop-content">
                                     <div class="server-info-heading">
-                                        <span class="server">Server Name</span> <span class="memory-use">Memory Usage</span>
+                                        <span class="server">Server Name</span> <span class="servIp">IP Address</span> <span class="memory-use">Memory Usage</span>
                                         <div class="clear"></div>
                                     </div>
                                     <div id="serverListWrapper">
@@ -331,7 +331,7 @@
                                 <ul class="drList">
                                     <!-- <li>State</li>
                                         <li class="drArrow">On</li>-->
-                                    <li class="alertIcon warningDr" style="display: none">
+                                    <li class="alertIcon warningDr" id="drAlertWarning" style="display: none">
                                         <a id="drWarning" href="#drPartitionWarning" class="drWarning">
                                             <span style="margin:0 0 0 24px">Warning</span>
                                         </a>
@@ -666,7 +666,6 @@
                                     </td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-3 subLabelRow">
                                     <td class="configLabel">Log Frequency Transactions </td>
@@ -712,7 +711,6 @@
                                     <td>
                                         <!--<a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>-->
                                         <div id="loadingImportConfig" class="loading-small loadImport" style="display: none"></div>
-                                        <!--<a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>-->
                                     </td>
                                 </tr>
                                 <tbody id="importConfiguration" data-status="value" style="display: none;"></tbody>
@@ -728,7 +726,6 @@
                                         <span id="maxJavaHeap"></span>
                                         <span id="maxJavaHeapUnit"></span>
                                     </td>
-                                    <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
@@ -783,33 +780,24 @@
                                             <span id="memoryLimitSize"></span>
                                             <input id="txtMemoryLimitSize" name="txtMemoryLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
                                             <span id="memoryLimitSizeUnit"></span>
+                                            <select id="ddlMemoryLimitUnit" style="display: none;">
+                                                <option>GB</option>
+                                                <option>%</option>
+                                            </select>
                                             <label id="errorMemorySize" for="txtMemoryLimitSize" class="error" style="display: none;"></label>
                                         </form>
                                     </td>
                                     <td>&nbsp;</td>
-                                    <td><a id="btnEditMemorySizeOk" href="#MemoryLimitPopup" class="editOk" title="Save" style="">Ok</a> 
-                                        <a id="btnEditMemorySizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> 
-                                        <a id="btnEditMemorySize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
-                                    </td>
-                                </tr>
-                                <tr class="child-row-6 subLabelRow" id="diskSizeTimeout">
-                                    <td class="configLabel">Disk Limit</td>
-                                    <td align="right" class="diskSize">
-                                        <form id="formDiskLimit" method="get" action="">
-                                            <div id="loadingDiskLimit" class="loading-small" style="display: none;"></div>
-                                            <span id="diskLimitSize"></span>
-                                            <input id="txtDiskLimitSize" name="txtDiskLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
-                                            <span id="diskLimitSizeUnit"></span>
-                                            <label id="errorDiskSize" for="txtDiskLimitSize" class="error" style="display: none;"></label>
-                                        </form>
-                                    </td>
-                                    <td>&nbsp;</td>
                                     <td>
-                                        <a id="btnEditDiskSizeOk" href="#diskLimitPopup" class="editOk" title="Save" style="">Ok</a>
-                                        <a id="btnEditDiskSizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
-                                        <a id="btnEditDiskSize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                        <a id="btnEditMemorySizeOk" href="#MemoryLimitPopup" class="editOk" title="Save" style="">Ok</a>
+                                        <a id="btnEditMemorySizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                                        <a id="btnEditMemorySize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                        <a href="#addDiskLimitPopup" id="addDiskLimitPopupLink" data-id="-1" title="Add Disk Limit" style="display: none">Add Disk Limit</a>
                                     </td>
+
                                 </tr>
+                                <tbody id="diskLimitConfiguration" data-status="value" style="display: none;"></tbody>
+
                             </table>
                         </div>
                         <div class="drWrapperAdmin" id="divDrWrapperAdmin" style="display:none">
@@ -1278,7 +1266,7 @@
             </div>
         </div>
     </div>
-    
+
     <!--help popup ends-->
     <!-- POPUP shutDownConfirmationPop -->
     <div id="shutDownConfirmationPop" style="display: none">
@@ -1504,7 +1492,7 @@
         </div>
         <div class="overlay-btns"><a class="btn" id="btnPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupMemoryLimitCancel">Cancel</a> </div>
     </div>
-    
+
     <!-- POPUP Query timeout Popup -->
     <!-- POPUP Memory Limit -->
     <div id="diskLimitPopup" style="display: none">
@@ -1515,7 +1503,6 @@
         </div>
         <div class="overlay-btns"><a class="btn" id="btnPopupDiskLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupDiskLimitCancel">Cancel</a> </div>
     </div>
-
     <!-- POPUP Memory Limit -->
     <!-- POPUP saveConfirmationPopup -->
     <div id="Div2" style="display: none">
@@ -1727,6 +1714,31 @@
                     <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveConfigText">save</span>?</div>
                 </div>
                 <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+
+    <!--Add Disk Limit Popup-->
+    <div id="addDiskLimitPopup" style="display: none">
+        <div id="addDiskLimitInnerPopup">
+            <div class="overlay-title icon-alert">
+                <div id="addDiskLimitHeader" class="addConfigHeader">Add Disk Limit</div>
+                <div class="clear"></div>
+            </div>
+            <div id="addDiskLimitControls">
+                <div class="clear"></div>
+                <form id="formAddDiskLimit" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addDiskLimitWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddDiskLimitSave" class="btn">Save</a> <a id="btnAddDiskLimitCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveDiskLimitConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveDiskLimitText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveDiskLimitOk" class="btn closeBtn">Yes</a> <a id="btnSaveDiskLimitCancel" class="btn btn-gray confirmNoSave">No</a> </div>
             </div>
         </div>
     </div>
