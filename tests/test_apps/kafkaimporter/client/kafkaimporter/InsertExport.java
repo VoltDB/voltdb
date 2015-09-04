@@ -21,41 +21,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 package kafkaimporter.client.kafkaimporter;
-import org.voltcore.logging.VoltLogger;
-
-import java.lang.InterruptedException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.io.IOException;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.NoConnectionsException;
-
+import org.voltdb.client.ProcedureCallback;
 
 public class InsertExport {
     static VoltLogger log = new VoltLogger("Benchmark.insertExport");
     final Client m_client;
     static AtomicLong m_rowsAdded;
     final static String INSERT_PN = "InsertFinal";
-    final static String EXPORT_PN = "InsertExport";
+    static String m_export_sp;
 
-    public InsertExport(Client client, AtomicLong rowsAdded) {
-
+    public InsertExport(boolean alltypes, Client client, AtomicLong rowsAdded) {
         m_client = client;
         m_rowsAdded = rowsAdded;
+        m_export_sp = alltypes ? "InsertExport2" : "InsertExport";
+        log.info("Insert Export SP is: " + m_export_sp);
     }
 
     public void insertExport(long key, long value) {
         try {
-            m_client.callProcedure(new InsertCallback(EXPORT_PN, key, value), EXPORT_PN, key, value);
+            m_client.callProcedure(new InsertCallback(m_export_sp, key, value), m_export_sp, key, value);
         } catch (NoConnectionsException e) {
-            log.warn("NoConnectionsException calling stored procedure InsertExport");
+            log.warn("NoConnectionsException calling stored procedure" + m_export_sp);
             try {
                 Thread.sleep(3);
             } catch (InterruptedException ex) { }
         } catch (Exception e) {
-            log.warn("Exception calling stored procedure InsertExport", e);
+            log.warn("Exception calling stored procedure" + m_export_sp, e);
         }
     }
 
