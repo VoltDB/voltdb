@@ -135,6 +135,8 @@ public:
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
 
+    size_t getMaxSerializedTupleSize(bool includeHiddenColumns = false) const;
+
     /** Get a string representation of this schema for debugging */
     std::string debug() const;
 
