@@ -343,10 +343,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (15, 'ebWfhdmIZfYhRC', 23926, 3.61291695704730075889e-01); ");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        String selectStmt = "select NUM from R1 where NUM in (select NUM from R1 where NUM <> 12 order by NUM limit 4);";
-        cr = client.callProcedure("@AdHoc", selectStmt);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
+        String selectStmt = "select NUM from R1 where NUM in (select NUM from R1 where NUM <> 12 order by NUM limit 4) ORDER BY NUM;";
         VoltTable tbl;
         cr = client.callProcedure("@AdHoc", selectStmt);
         tbl = cr.getResults()[0];
