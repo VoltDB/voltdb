@@ -89,8 +89,9 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
 
     public void testIsDistinctFrom() throws Exception
     {
-        // is Distinct from operator does not work on HSQL backend based on HSQL 1.9.2/3.
-        // So currently is distinct from junit against HSQL backend
+        // is Distinct from operator does not work on HSQL-backend based. It results
+        // in run time exception with message "unsupported internal operation: Expression"
+        // So do not run "is distinct from" against HSQL backend
         if(!isHSQL()) {
             System.out.println("\nSTARTING test is Distinct from ...");
             Client client = getClient();
@@ -119,9 +120,12 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
     private void subTestIsDistinctFrom(Client client)
             throws Exception
     {
-        // results for HSQL backend below are based on HSQL 2.3.2/3 upgrade branch.
-        // is Distinct from operator does not on HSQL backend based on 1.9.2/3. So
-        // assert in case if these test cases are executed on HSQL backend
+        // 'is Distinct from' operator does not work on HSQL-backend - it's missing end-to-end
+        // support. It results in runt time exception "unsupported internal operation: Expression"
+        // So assert in case if these test cases are executed on HSQL backend
+        // Once support for 'is distinct from' is available on HSQL-backend, remove the assert below.
+        // results for HSQL backend below are HSQL 2.3.2/3 version and also verified against postgresql.
+        // so it come handy and have left them in there.
         assert(!isHSQL());
 
         String sql;
@@ -195,9 +199,12 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
 
     private void subTestIsDistinctFromUsingSubqueries(Client client) throws Exception
     {
-        // results for HSQL backend below are based on HSQL 2.3.2/3 upgrade branch.
-        // is Distinct from operator does not on HSQL backend based on 1.9.2/3. So
-        // assert in case if these test cases are executed on HSQL backend
+        // 'is Distinct from' operator does not work on HSQL-backend - it's missing end-to-end
+        // support. It results in runt time exception "unsupported internal operation: Expression"
+        // So assert in case if these test cases are executed on HSQL backend
+        // Once support for 'is distinct from' is available on HSQL-backend, remove the assert below.
+        // results for HSQL backend below are HSQL 2.3.2/3 version and also verified against postgresql.
+        // so it come handy and have left them in there.
         assert(!isHSQL());
 
         String sql;
@@ -344,7 +351,8 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         assertEquals(vt.getLong(0), 2);
         if (isHSQL()) {
             assertTrue(vt.getString(1).contains("Bad"));
-        } else {
+        }
+        else {
             assertTrue(vt.getString(1).equals("Bad"));
         }
 
@@ -360,7 +368,8 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         assertEquals(vt.getLong(0), 2);
         if (isHSQL()) {
             assertTrue(vt.getString(1).contains("Memsql:Bad"));
-        } else {
+        }
+        else {
             assertTrue(vt.getString(1).equals("Memsql:Bad"));
         }
 
@@ -455,7 +464,8 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
             assertTrue(success);
             builder.addServerConfig(config);
 
-        } catch(IOException excp) {
+        }
+        catch(IOException excp) {
             assertFalse(true);
         }
         // no clustering tests for functions

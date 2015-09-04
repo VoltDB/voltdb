@@ -164,14 +164,6 @@ class ParameterizationInfo {
             String idStr = node.attributes.get("id");
             assert(idStr != null);
 
-            // handle parameter value type
-            String typeStr = node.attributes.get("valuetype");
-            VoltType vt = VoltType.typeFromString(typeStr);
-            // don't parameterize the plan for NULL constants of type "VoltType.NULL"
-            if (vt == VoltType.NULL) {
-                return;
-            }
-
             // A value id is currently a "string-formatted long", but there's no need to commit
             // to that format in this early processing -- here, the id just needs to be a unique
             // string for each parsed value. It allows hsql to replicate a parameter reference
@@ -189,7 +181,14 @@ class ParameterizationInfo {
                 paramIndexNode.attributes.put("id", idStr);
                 paramsNode.children.add(paramIndexNode);
 
-                String value = node.attributes.get("value");
+                // handle parameter value type
+                String typeStr = node.attributes.get("valuetype");
+                VoltType vt = VoltType.typeFromString(typeStr);
+
+                String value = null;
+                if (vt != VoltType.NULL) {
+                    value = node.attributes.get("value");
+                }
                 paramValues.add(value);
 
                 // If the type is NUMERIC from hsqldb, VoltDB has to decide its real type.
