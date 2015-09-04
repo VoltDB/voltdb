@@ -37,7 +37,6 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
@@ -70,38 +69,24 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     private class InternalCallback implements Callback {
 
-        private DBBPool.BBContainer m_cont;
-        @SuppressWarnings("unused")
-        private final long m_id;
         private final ProcedureCallback m_cb;
         private final String m_procedure;
         private final int m_partition;
         private final InternalConnectionContext m_context;
+        private final StoredProcedureInvocation m_task;
 
-        public InternalCallback(final InternalConnectionContext context, final DBBPool.BBContainer cont, String proc, int partition, ProcedureCallback cb, long id) {
+        public InternalCallback(final InternalConnectionContext context, StoredProcedureInvocation task, String proc, int partition, ProcedureCallback cb, long id) {
             m_context = context;
-            m_cont = cont;
+            m_task = task;
             m_cb = cb;
-            m_id = id;
             m_procedure = proc;
             m_partition = partition;
         }
 
-        public void discard() {
-            if (m_cont != null) {
-                m_cont.discard();
-                m_cont = null;
-            }
-        }
-
         @Override
         public void handleResponse(ClientResponse response) throws Exception {
-            try {
-                if (m_cb != null) {
-                    m_cb.clientCallback(response);
-                }
-            } finally {
-                discard();
+            if (m_cb != null) {
+                m_cb.clientCallback(response);
             }
         }
 
@@ -139,7 +124,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final Procedure catProc,
             final ProcedureCallback proccb,
             final StoredProcedureInvocation task,
-            final DBBPool.BBContainer tcont,
             final int partition, final long nowNanos) {
 
         if (!m_partitionExecutor.containsKey(partition)) {
@@ -156,7 +140,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 public boolean submitTransaction() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final InternalCallback cb = new InternalCallback(context, tcont, procName, partition, proccb, handle);
+                    final InternalCallback cb = new InternalCallback(context, task, procName, partition, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
@@ -165,7 +149,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             task.getSerializedSize(), nowNanos);
                     if (!bval) {
                         m_logger.error("Failed to submit transaction.");
-                        cb.discard();
                         m_callbacks.remove(handle);
                     }
                     return bval;
