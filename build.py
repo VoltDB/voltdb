@@ -27,7 +27,6 @@ from buildtools import *
 ###############################################################################
 
 CTX = BuildContext(sys.argv)
-
 # CTX is an instance of BuildContext, which is declared in buildtools.py
 # BuildContext contains vars that determine how the makefile will be built
 #  and how the build will go down. It also checks the platform and parses
@@ -352,6 +351,61 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
  sha1.cpp
 """
 
+CTX.THIRD_PARTY_INPUT['s2-google-library'] = """
+base/int128.cc
+base/logging.cc
+base/stringprintf.cc
+base/strtoint.cc
+s1angle.cc
+s1interval.cc
+s2.cc
+s2cap.cc
+s2cell.cc
+s2cellid.cc
+s2cellunion.cc
+s2edgeindex.cc
+s2edgeutil.cc
+s2latlng.cc
+s2latlngrect.cc
+s2loop.cc
+s2pointregion.cc
+s2polygon.cc
+s2polygonbuilder.cc
+s2polyline.cc
+s2r2rect.cc
+s2region.cc
+s2regioncoverer.cc
+s2regionintersection.cc
+s2regionunion.cc
+strings/ascii_ctype.cc
+strings/split.cc
+strings/stringprintf.cc
+strings/strutil.cc
+util/coding/coder.cc
+util/coding/varint.cc
+util/math/exactfloat/exactfloat.cc
+util/math/mathlimits.cc
+util/math/mathutil.cc
+"""
+
+# The S2 library uses OpenSSL for arbitrary precision
+# arithmetic.  This is arguably a mistake, but there you
+# have it.  Apple deprecated openssl in OS X version 10.7,
+# and refuses to compile it in version 10.9 and later.  We
+# currently have version 10.10, so we need to finesse
+# this.  The problem is not with the heartbleed bug.  The
+# problem is entirely administrative.  There is much discussion
+# on the intertubes.
+if CTX.PLATFORM == 'Darwin':
+    CTX.THIRD_PARTY_CPPFLAGS['s2-google-library'] = "-Wno-deprecated-declarations -DNDEBUG"
+elif CTX.PLATFORM == 'Linux':
+    CTX.THIRD_PARTY_CPPFLAGS['s2-google-library'] = "-DNDEBUG"
+
+CTX.THIRD_PARTY_INCLUDES['s2-google-library'] = [
+"third_party/cpp/s2-google-library"
+]
+
+CTX.THIRD_PARTY_LIBS += "-lssl -lcrypto "
 
 ###############################################################################
 # SPECIFY THE TESTS

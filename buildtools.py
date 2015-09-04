@@ -17,7 +17,13 @@ class BuildContext:
         self.OUTPUT_PREFIX = ""
         self.TEST_PREFIX = ""
         self.INPUT = {}
+        self.INPUT_INCLUDES = {}
+        self.INPUT_CPPFLAGS = {}
+        self.INPUT_LIBS = ""
         self.THIRD_PARTY_INPUT = {}
+        self.THIRD_PARTY_INCLUDES = {}
+        self.THIRD_PARTY_CPPFLAGS = {}
+        self.THIRD_PARTY_LIBS = ""
         self.TESTS = {}
         self.PLATFORM = os.uname()[0]
         self.LEVEL = "DEBUG"
@@ -85,7 +91,6 @@ def startsWithFromTuple(strValue, prefixes):
 
 def getDependencies(filename, cppflags, sysprefixes):
     command = "g++ %s -MM %s" % (cppflags, filename)
-
     pipe = Popen(args=command, shell=True, bufsize=-1, stdout=PIPE, stderr=PIPE)
     out = pipe.stdout.readlines()
     out_err = pipe.stderr.readlines()
@@ -104,17 +109,28 @@ def getDependencies(filename, cppflags, sysprefixes):
     out = [x for x in out if not startsWithFromTuple(x, tuple(sysprefixes))]
     return out
 
+# Replace the extenstion of filename with the
+# new extension.  If the filename does not
+# have an extension, the new extension is just
+# appended.
+def replaceExtension(filename, newExtension):
+    pos = filename.rfind(".")
+    if pos == -1:
+        return filename + newExtension
+    else:
+        return filename[0:pos] + newExtension
+    
 def outputNamesForSource(filename):
     relativepath = "/".join(filename.split("/")[2:])
-    jni_objname = "objects/" + relativepath[:-2] + "o"
-    static_objname = "static_objects/" + relativepath[:-2] + "o"
+    jni_objname = replaceExtension("objects/" + relativepath, ".o")
+    static_objname = replaceExtension("static_objects/" + relativepath, ".o")
     return jni_objname, static_objname
 
 def namesForTestCode(filename):
     relativepath = "/".join(filename.split("/")[2:])
     binname = "cpptests/" + relativepath
     sourcename = filename + ".cpp"
-    objectname = "static_objects/" + filename.split("/")[-1] + ".o"
+    objectname = replaceExtension("static_objects/" + filename.split("/")[-1], ".o")
     return binname, objectname, sourcename
 
 def buildMakefile(CTX):
@@ -141,7 +157,7 @@ def buildMakefile(CTX):
     JNIEXT = CTX.JNIEXT.strip()
     NM = CTX.NM
     NMFLAGS = CTX.NMFLAGS
-
+    LIBS = " " + CTX.INPUT_LIBS + " " + CTX.THIRD_PARTY_LIBS
     # create directories for output if they don't exist
     os.system("mkdir -p %s" % (OUTPUT_PREFIX))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
@@ -150,16 +166,35 @@ def buildMakefile(CTX):
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/cpptests"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/prod"))
 
+    # Calculate the input_paths and third_party_input_paths.
+    # For each source directory, we have a set of file names,
+    # perhaps a set of source directory specific CPPFLAGS and
+    # perhaps a set of source directory specific include
+    # directories.  We calculate the actual file name,
+    # the final CPPFLAGS value and remember the list of
+    # include directories.
     input_paths = []
     for dir in CTX.INPUT.keys():
         input = CTX.INPUT[dir].split()
-        input_paths += [INPUT_PREFIX + "/" + dir + "/" + x for x in input]
-
+        cppflags = ""
+        includes = []
+        if dir in CTX.INPUT_CPPFLAGS:
+            cppflags += (" " + CTX.INPUT_CPPFLAGS[dir])
+        if dir in CTX.INPUT_INCLUDES:
+            includes += CTX.INPUT_INCLUDES
+        input_paths += [{'filename': INPUT_PREFIX + "/" + dir + "/" + x, 'cppflags':cppflags, 'includes': includes} for x in input]
     third_party_input_paths = []
     for dir in CTX.THIRD_PARTY_INPUT.keys():
+        # Calculate the per-third-party cpp flags
+        # and include files.
+        flags = ""
+        includes = []
+        if dir in CTX.THIRD_PARTY_CPPFLAGS:
+            flags += (" " + CTX.THIRD_PARTY_CPPFLAGS[dir])
+        if dir in CTX.THIRD_PARTY_INCLUDES:
+            includes += CTX.THIRD_PARTY_INCLUDES[dir]
         input = CTX.THIRD_PARTY_INPUT[dir].split()
-        third_party_input_paths += [THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x for x in input]
-
+        third_party_input_paths += [{'filename': THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x, 'cppflags': flags, 'includes': includes} for x in input]
     tests = []
     for dir in CTX.TESTS.keys():
         input = CTX.TESTS[dir].split()
@@ -177,6 +212,7 @@ def buildMakefile(CTX):
     makefile.write("THIRD_PARTY_SRC = ../../%s\n" % (THIRD_PARTY_INPUT_PREFIX))
     makefile.write("NM = %s\n" % (NM))
     makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
+    makefile.write("LIBS = %s\n" % (LIBS))
     makefile.write("\n")
 
     if CTX.TARGET == "CLEAN":
@@ -197,11 +233,13 @@ def buildMakefile(CTX):
 
     jni_objects = []
     static_objects = []
-    for filename in input_paths:
+    for file_descr in input_paths:
+        filename = file_descr['filename']
         jni, static = outputNamesForSource(filename)
         jni_objects.append(jni)
         static_objects.append(static)
-    for filename in third_party_input_paths:
+    for file_descr in third_party_input_paths:
+        filename = file_descr['filename']
         jni, static = outputNamesForSource(filename)
         jni_objects.append(jni)
         static_objects.append(static)
@@ -213,12 +251,12 @@ def buildMakefile(CTX):
 
     makefile.write("# main jnilib target\n")
     makefile.write("nativelibs/libvoltdb-%s.$(JNIEXT): " % version + " ".join(jni_objects) + "\n")
-    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^\n")
+    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ $(LIBS)\n")
     makefile.write("\n")
 
     makefile.write("# voltdb instance that loads the jvm from C++\n")
     makefile.write("prod/voltrun: $(SRC)/voltrun.cpp " + " ".join(static_objects) + "\n")
-    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^\n")
+    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ $(LIBS)\n")
     makefile.write("\n")
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
@@ -245,44 +283,65 @@ def buildMakefile(CTX):
     makefile.write("\n")
 
     LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
+    # This is a list of pairs (filename, cppflags) for all files
+    # we will compile.  This is only used to generate dependence
+    # lists.
     allsources = []
-    for filename in input_paths:
-        allsources += [(filename, LOCALCPPFLAGS, IGNORE_SYS_PREFIXES)]
-    for filename in third_party_input_paths:
-        allsources += [(filename, LOCALCPPFLAGS, IGNORE_SYS_PREFIXES)]
+    # The elements, of input_paths will be file descriptions.
+    # A file description, file_descr_ is a dictionary containing
+    # the actual name, as file_descr['filename'],
+    # the cpp flags, as file_descr['cppflags'], and
+    # the list of include files, as file_descr['includes'].
+    for file_descr in input_paths:
+        filename = file_descr['filename']
+        cppflags = file_descr['cppflags']
+        includes = " ".join(["-I %s" % includename for includename in file_descr['includes']])
+        allsources += [(filename, LOCALCPPFLAGS + " " + cppflags + includes, IGNORE_SYS_PREFIXES)]
+    # The third_parth_input_paths also are file descriptions.
+    for file_descr in third_party_input_paths:
+        filename = file_descr['filename']
+        cppflags = file_descr['cppflags']
+        includes = " ".join(["-I %s" % includename for includename in file_descr['includes']])
+        allsources += [(filename, LOCALCPPFLAGS + cppflags + " " + includes, IGNORE_SYS_PREFIXES)]
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
         allsources += [(sourcename, LOCALTESTCPPFLAGS, IGNORE_SYS_PREFIXES)]
-    deps = getAllDependencies(allsources, 1)
+    # deps = getAllDependencies(allsources, 1)
 
-    for filename in input_paths:
-        mydeps = deps[filename]
-        mydeps = [x.replace(INPUT_PREFIX, "$(SRC)") for x in mydeps]
+    for file_descr in input_paths:
+        filename = file_descr['filename']
+        cppflags = file_descr['cppflags']
+        includes = " ".join([ "-I ../../%s" % include_name for include_name in file_descr['includes']])
         jni_objname, static_objname = outputNamesForSource(filename)
         filename = filename.replace(INPUT_PREFIX, "$(SRC)")
         jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
         static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
-        makefile.write(jni_objname + ": " + filename + " " + " ".join(mydeps) + "\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write(static_objname + ": " + filename + " " + " ".join(mydeps) + "\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("\n-include %s\n" % replaceExtension(jni_objname, ".d"))
+        makefile.write(jni_objname + ":\n")
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
+        makefile.write("\n-include %s\n" % replaceExtension(static_objname, ".d"))
+        makefile.write(static_objname + ":\n")
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
     makefile.write("\n")
 
-    for filename in third_party_input_paths:
-        mydeps = deps[filename]
-        mydeps = [x.replace(THIRD_PARTY_INPUT_PREFIX, "$(THIRD_PARTY_SRC)") for x in mydeps]
+    for file_descr in third_party_input_paths:
+        filename = file_descr['filename']
+        cppflags = file_descr['cppflags']
+        includes = " ".join([ "-I ../../%s" % include_name for include_name in file_descr['includes']])
         jni_objname, static_objname = outputNamesForSource(filename)
         filename = filename.replace(THIRD_PARTY_INPUT_PREFIX, "$(THIRD_PARTY_SRC)")
         jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
         static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
-        makefile.write(jni_objname + ": " + filename + " " + " ".join(mydeps) + "\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write(static_objname + ": " + filename + " " + " ".join(mydeps) + "\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("\n-include %s\n" % replaceExtension(jni_objname, ".d"))
+        makefile.write(jni_objname + ":\n")
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
+        makefile.write("\n-include %s\n" % replaceExtension(static_objname, ".d"))
+        makefile.write(static_objname + ":\n")
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
     makefile.write("\n")
 
     for test in tests:
@@ -290,9 +349,9 @@ def buildMakefile(CTX):
 
         # build the object file
         makefile.write("%s: ../../%s" % (objectname, sourcename))
-        mydeps = deps[sourcename]
-        for dep in mydeps:
-            makefile.write(" ../../%s" % (dep))
+        # mydeps = deps[sourcename]
+        # for dep in mydeps:
+        #    makefile.write(" ../../%s" % (dep))
         makefile.write("\n")
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -o $@ ../../%s\n" % (TEST_PREFIX, sourcename))
 
