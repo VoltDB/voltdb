@@ -694,7 +694,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken                For undo
      * @throws EEException
      */
-    public abstract void applyBinaryLog(ByteBuffer log,
+    public abstract long applyBinaryLog(ByteBuffer log,
                                         long txnId,
                                         long spHandle,
                                         long lastCommittedSpHandle,
@@ -960,12 +960,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native long nativeTableHashCode(long pointer, int tableId);
 
-    protected native int nativeApplyBinaryLog(long pointer,
-                                              long txnId,
-                                              long spHandle,
-                                              long lastCommittedSpHandle,
-                                              long uniqueId,
-                                              long undoToken);
+    protected native long nativeApplyBinaryLog(long pointer,
+                                               long txnId,
+                                               long spHandle,
+                                               long lastCommittedSpHandle,
+                                               long uniqueId,
+                                               long undoToken);
 
     /**
      * Execute an arbitrary task based on the task ID and serialized task parameters.

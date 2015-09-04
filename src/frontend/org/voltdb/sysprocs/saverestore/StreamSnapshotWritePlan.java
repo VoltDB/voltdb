@@ -34,15 +34,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltdb.PostSnapshotTask;
-import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SnapshotDataFilter;
-import org.voltdb.SnapshotFormat;
-import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.SnapshotTableTask;
-import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.rejoin.StreamSnapshotAckReceiver;
@@ -137,7 +129,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // table schemas for all the tables we'll snapshot on this partition
         Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
         for (final Table table : config.tables) {
-            VoltTable schemaTable = CatalogUtil.getVoltTable(table);
+            VoltTable schemaTable;
+            if (context.getDatabase().getIsactiveactivedred() && table.getIsdred()) {
+                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+            }
+            else {
+                schemaTable = CatalogUtil.getVoltTable(table);
+            }
+
             schemas.put(table.getRelativeIndex(), PrivateVoltTableFactory.getSchemaBytes(schemaTable));
         }
 

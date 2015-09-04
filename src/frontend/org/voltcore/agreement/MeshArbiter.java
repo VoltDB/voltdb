@@ -45,7 +45,7 @@ import com.google_voltpatches.common.primitives.Longs;
 
 public class MeshArbiter {
 
-    protected static int FORWARD_STALL_COUNT = 20 * 5; // 5 seconds
+    protected static final int FORWARD_STALL_COUNT = 20 * 5; // 5 seconds
 
     protected static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
 

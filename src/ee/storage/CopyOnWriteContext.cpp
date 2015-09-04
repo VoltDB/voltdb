@@ -364,7 +364,7 @@ void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     m_blocksCompacted++;
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
     if (iter->m_blockIterator != m_blocks.end()) {
-        TBPtr nextBlock = iter->m_blockIterator.data();
+        TBPtr nextBlock = iter->m_blockIterator.value();
         //The next block is the one that was compacted away
         //Need to move the iterator forward to skip it
         if (nextBlock == block) {
@@ -372,7 +372,7 @@ void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
 
             //There is another block after the one that was compacted away
             if (iter->m_blockIterator != m_blocks.end()) {
-                TBPtr newNextBlock = iter->m_blockIterator.data();
+                TBPtr newNextBlock = iter->m_blockIterator.value();
                 m_blocks.erase(block->address());
                 iter->m_blockIterator = m_blocks.find(newNextBlock->address());
                 iter->m_end = m_blocks.end();

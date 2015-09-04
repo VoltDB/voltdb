@@ -420,7 +420,8 @@ public class SocketJoiner {
             for (ServerSocketChannel ssc : m_listenerSockets) {
                 try {
                     ssc.close();
-                } catch (Exception e) {}
+                } catch (IOException e) {
+                }
             }
             m_listenerSockets.clear();
             try {
@@ -698,20 +699,23 @@ public class SocketJoiner {
         if (m_selector != null) {
             try {
                 m_selector.close();
-            } catch (Exception e) {}
+            } catch (IOException e) {
+            }
         }
         m_es.shutdownNow();
         m_es.awaitTermination(356, TimeUnit.DAYS);
         for (ServerSocketChannel ssc : m_listenerSockets) {
             try {
                 ssc.close();
-            } catch (Exception e) {}
+            } catch (IOException e) {
+            }
         }
         m_listenerSockets.clear();
         if (m_selector != null) {
             try {
                 m_selector.close();
-            } catch (Exception e) {}
+            } catch (IOException e) {
+            }
             m_selector = null;
         }
     }

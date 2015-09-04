@@ -70,7 +70,7 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     private void truncateData(Client client, String tb)
-             throws NoConnectionsException, IOException, ProcCallException {
+            throws NoConnectionsException, IOException, ProcCallException {
         client.callProcedure("@AdHoc", "Truncate table " + tb);
         validateTableOfScalarLongs(client, "Select count(*) from " + tb, new long[]{0});
     }
@@ -89,8 +89,8 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     public void testReplicatedProcTimeout() throws IOException, ProcCallException, InterruptedException {
-        if (isValgrind()) {
-            // Disable the memcheck for this test, it takes too long
+        if (isValgrind() || isDebug()) {
+            // Disable the memcheck/debug for this test, it takes too long
             return;
         }
         System.out.println("test replicated table procedures timeout...");
@@ -128,8 +128,8 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     public void testPartitionedProcTimeout() throws IOException, ProcCallException, InterruptedException {
-        if (isValgrind()) {
-            // Disable the memcheck for this test, it takes too long
+        if (isValgrind() || isDebug()) {
+            // Disable the memcheck/debug for this test, it takes too long
             return;
         }
 
@@ -247,13 +247,24 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     public void testIndividualProcTimeout() throws IOException, ProcCallException, InterruptedException {
-        if (isValgrind()) {
-            // Disable the memcheck for this test, it takes too long
+        if (isValgrind() || isDebug()) {
+            // Disable the memcheck/debug for this test, it takes too long
             return;
         }
         Client client = this.getClient();
         // negative tests on the timeout value
         subtestNegativeIndividualProcTimeout(client);
+
+        final String longRunningCrossJoinAggReplicated =
+                "SELECT t1.contestant_number, t2.state, COUNT(*) "
+                        + "FROM R1 t1, R1 t2 "
+                        + "GROUP BY t1.contestant_number, t2.state;";
+
+        final String longRunningCrossJoinAggPartitioned =
+                "SELECT t1.contestant_number, t2.state, COUNT(*) "
+                        + "FROM P1 t1, R1 t2 "
+                        + "GROUP BY t1.contestant_number, t2.state;";
+
 
         boolean syncs[] = {true, false};
         for (boolean sync : syncs) {
@@ -262,6 +273,17 @@ public class TestQueryTimeout extends RegressionSuite {
             checkTimeoutIncreasedProcSucceed(sync, client, "SPPartitionReadOnlyProc", 1);
             checkTimeoutIncreasedProcSucceed(sync, client, "PartitionReadOnlyProc");
             checkTimeoutIncreasedProcSucceed(sync, client, "ReplicatedReadOnlyProc");
+            checkTimeoutIncreasedProcSucceed(sync, client, "@AdHoc", longRunningCrossJoinAggReplicated);
+            checkTimeoutIncreasedProcSucceed(sync, client, "@AdHoc", longRunningCrossJoinAggPartitioned);
+            checkTimeoutIncreasedProcSucceed(sync, client, "AdHocPartitionReadOnlyProc");
+
+            // first replicated read will be treated as READ ONLY
+            checkTimeoutIncreasedProcSucceed(sync, client, "ReplicatedReadWriteProc");
+
+            // write procedure no timing out
+            checkNoTimingOutWriteProcedure(sync, client, "ReplicatedWriteReadProc");
+            checkNoTimingOutWriteProcedure(sync, client, "PartitionReadWriteProc");
+            checkNoTimingOutWriteProcedure(sync, client, "PartitionWriteReadProc");
 
             // truncate the data
             truncateTables(client);
@@ -271,6 +293,17 @@ public class TestQueryTimeout extends RegressionSuite {
             checkTimeoutDecreaseProcFailed(sync, client, "SPPartitionReadOnlyProc", 1);
             checkTimeoutDecreaseProcFailed(sync, client, "PartitionReadOnlyProc");
             checkTimeoutDecreaseProcFailed(sync, client, "ReplicatedReadOnlyProc");
+            checkTimeoutDecreaseProcFailed(sync, client, "@AdHoc", longRunningCrossJoinAggReplicated);
+            checkTimeoutDecreaseProcFailed(sync, client, "@AdHoc", longRunningCrossJoinAggPartitioned);
+            checkTimeoutDecreaseProcFailed(sync, client, "AdHocPartitionReadOnlyProc");
+
+            // first replicated read will be treated as READ ONLY
+            checkTimeoutDecreaseProcFailed(sync, client, "ReplicatedReadWriteProc");
+
+            // write procedure no timing out
+            checkNoTimingOutWriteProcedure(sync, client, "ReplicatedWriteReadProc");
+            checkNoTimingOutWriteProcedure(sync, client, "PartitionReadWriteProc");
+            checkNoTimingOutWriteProcedure(sync, client, "PartitionWriteReadProc");
 
             // truncate the data
             truncateTables(client);
@@ -305,6 +338,23 @@ public class TestQueryTimeout extends RegressionSuite {
         // underflow, asynchronously should be on the same path...
     }
 
+    private void checkNoTimingOutWriteProcedure(boolean sync, Client client, String procName, Object...params)
+            throws IOException, ProcCallException, InterruptedException {
+
+        if (sync) {
+            try {
+                client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
+            } catch(Exception ex) {
+                System.err.println(ex.getMessage());
+                fail(procName + " is supposed to succeed!");
+            }
+        } else {
+            client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
+            client.drain();
+            checkCallbackSuccess();
+        }
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -319,7 +369,8 @@ public class TestQueryTimeout extends RegressionSuite {
         org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadOnlyProc.class,
         org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadWriteProc.class,
         org.voltdb_testprocs.regressionsuites.querytimeout.PartitionWriteReadProc.class,
-        org.voltdb_testprocs.regressionsuites.querytimeout.SPPartitionReadOnlyProc.class
+        org.voltdb_testprocs.regressionsuites.querytimeout.SPPartitionReadOnlyProc.class,
+        org.voltdb_testprocs.regressionsuites.querytimeout.AdHocPartitionReadOnlyProc.class
     };
 
     static public junit.framework.Test suite() {
@@ -329,9 +380,9 @@ public class TestQueryTimeout extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
-                "phone_number INTEGER NOT NULL, " +
-                "state VARCHAR(2) NOT NULL, " +
-                "contestant_number INTEGER NOT NULL);" +
+                        "phone_number INTEGER NOT NULL, " +
+                        "state VARCHAR(2) NOT NULL, " +
+                        "contestant_number INTEGER NOT NULL);" +
 
                 "CREATE TABLE P1 ( " +
                 "phone_number INTEGER NOT NULL, " +

@@ -174,7 +174,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushDRBuffer",
-            "(IJJJLjava/nio/ByteBuffer;)V");
+            "(IJJJLjava/nio/ByteBuffer;)J");
     if (m_pushDRBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushDRBufferMID != NULL);
@@ -486,7 +486,8 @@ void JNITopend::pushExportBuffer(
     }
 }
 
-void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+    int64_t retval = -1;
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
@@ -494,7 +495,7 @@ void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
             throw std::exception();
         }
         //std::cout << "Block is length " << block->rawLength() << std::endl;
-        m_jniEnv->CallStaticVoidMethod(
+        retval = m_jniEnv->CallStaticLongMethod(
                 m_partitionDRGatewayClass,
                 m_pushDRBufferMID,
                 partitionId,
@@ -508,5 +509,6 @@ void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
             throw std::exception();
         }
     }
+    return retval;
 }
 }

@@ -46,7 +46,7 @@ public:
             bool sync,
             bool endOfStream);
 
-    void pushDRBuffer(int32_t partitionId, StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 

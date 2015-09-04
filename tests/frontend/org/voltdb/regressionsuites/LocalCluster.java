@@ -1360,6 +1360,19 @@ public class LocalCluster implements VoltServerConfig {
         return templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
 
+    public static boolean isDebugDefined() {
+        final String buildType = System.getenv().get("BUILD");
+        if (buildType == null) {
+            return false;
+        }
+        return buildType.toLowerCase().startsWith("debug");
+    }
+
+    @Override
+    public boolean isDebug() {
+        return isDebugDefined();
+    }
+
     @Override
     public void createDirectory(File path) throws IOException {
         for (File root : m_subRoots) {

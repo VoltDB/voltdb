@@ -22,7 +22,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -288,9 +287,8 @@ public class VoltProjectBuilder {
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
-    private Double m_rssLimit = null;
+    private String m_rssLimit = null;
     private Integer m_resourceCheckInterval = null;
-    private String m_defaultDiskLimitSize;
     private Map<FeatureNameType, String> m_featureDiskLimits;
 
     private boolean m_useDDLSchema = false;
@@ -304,18 +302,13 @@ public class VoltProjectBuilder {
         return this;
     }
 
-    public VoltProjectBuilder setRssLimit(double limit) {
+    public VoltProjectBuilder setRssLimit(String limit) {
         m_rssLimit = limit;
         return this;
     }
 
     public VoltProjectBuilder setResourceCheckInterval(int seconds) {
         m_resourceCheckInterval = seconds;
-        return this;
-    }
-
-    public VoltProjectBuilder setDefaultDiskLimitSize(String defaultDiskLimitSize) {
-        m_defaultDiskLimitSize = defaultDiskLimitSize;
         return this;
     }
 
@@ -1170,7 +1163,7 @@ public class VoltProjectBuilder {
         if (m_rssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
-            memoryLimit.setSize(new BigDecimal(m_rssLimit));
+            memoryLimit.setSize(m_rssLimit);
             monitorType.setMemorylimit(memoryLimit);
         }
 
@@ -1187,12 +1180,11 @@ public class VoltProjectBuilder {
     private void setupDiskLimitType(SystemSettingsType systemSettingsType,
             org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
 
-        if (m_defaultDiskLimitSize == null && (m_featureDiskLimits==null || m_featureDiskLimits.isEmpty())) {
+        if (m_featureDiskLimits==null || m_featureDiskLimits.isEmpty()) {
             return;
         }
 
         DiskLimitType diskLimit = factory.createDiskLimitType();
-        diskLimit.setSize(m_defaultDiskLimitSize);
         if (m_featureDiskLimits!=null && !m_featureDiskLimits.isEmpty()) {
             for (FeatureNameType featureName : m_featureDiskLimits.keySet()) {
                 DiskLimitType.Feature feature = factory.createDiskLimitTypeFeature();

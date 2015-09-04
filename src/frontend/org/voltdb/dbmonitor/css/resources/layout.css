@@ -80,24 +80,18 @@ li.joiningIcon,
 li.missingIcon,
 li.alertIcon,
 a.alertIcon,
+
 input.icon-search,
 a.save-search,
 a.icon-search,
-ul.servers-list li.active,
-ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
-ul.servers-list li.active,
-ul.servers-list li.pauseMonitoring,
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
+a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
 
-ul.servers-list li.pauseActiveMonitoring {
-    background-image: url(images/voltdb-icon-sprite.png) !important;
-    background-repeat: no-repeat;
-    background-color: #f0f3f4;
-}
+
+
 
 .user {
     background-position: left -209px;
@@ -148,9 +142,6 @@ a.alertIcon {
 .showhideIcon {
     height: 25px;
 }
-
-
-
 
 /******sprite Ends*************/
 
@@ -817,7 +808,7 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
     }
 
     .storeTbl th, td, .dbTbl th, td {
-        padding: 10px 25px 10px 10px;
+        padding: 10px 19px 10px 10px;
         border-right: 1px solid #CCCCCC;
         border-bottom: 1px solid #CCCCCC;
     }
@@ -1082,22 +1073,45 @@ a.setVal {
         color: #fff;
     }
 
+
+
+ul.servers-list li.active {background-image: url(images/servIcons.png) !important;
+    background-repeat: no-repeat;}
+
+ul.servers-list li.joining{background-image: url(images/servIcons.png) !important;
+    background-repeat: no-repeat;}
+
+ul.servers-list li.pauseMonitoring {background-image: url(images/pauseMonitoring.png) !important;
+    background-repeat: no-repeat;}
+
+.alertIconServ{background-image: url(images/alertServ.png) !important;
+    background-repeat: no-repeat;}
+
+
+ul.servers-list li.pauseActiveMonitoring {
+    background-image: url(images/pauseMonitoring.png) !important;
+    background-repeat: no-repeat;
+    background-color: #f0f3f4;
+}
+
 ul.servers-list li.active {
-    background-position: 4px -298px;
+    background-position: 5px 16px;
+
 }
 
 ul.servers-list li.pauseMonitoring {
-    background-position: 4px -1458px;
+    background-position:5px 16px;
 }
 
 ul.servers-list li.pauseActiveMonitoring {
-    background-position: 4px -1458px;
+    background-position: 5px 16px ;
 }
 
 ul.servers-list li.joining {
-    background-position: 2px -350px;
+    background-position:5px 16px ;
     color: #a3a3a3;
 }
+.alertIconServ {background-position:0 5px ;text-indent: 20px;line-height: 17px;}
 
 ul.servers-list li:hover {
     background-color: #f0f3f4;
@@ -1110,12 +1124,18 @@ ul.servers-list li.monitoring {
     ul.servers-list li.monitoring a {
         font-weight: bold;
         color: #76bd1d;
+        
     }
+
+    .serverNameAlign { float: left;width: 30%; word-break: break-all;}
+
 
 ul.servers-list li span.memory-status {
     float: right;
     color: #111;
+    margin-top: 4px;
 }
+
 
 ul.servers-list li span.alert {
     color: #ea151d;
@@ -1133,7 +1153,7 @@ ul.servers-list li a {
 
 .server-info-heading {
     margin-bottom: 15px;
-    background: #f0f3f4;
+    background: #dee0e0;
     font-weight: bold;
     min-height: 50px;
     line-height: 50px;
@@ -1144,6 +1164,8 @@ ul.servers-list li a {
         display: block;
         padding-left: 10px;
     }
+    .server-info-heading .servIp{ float: left;margin-left: 34%;}
+    ul.servers-list li span.servIpNum { float: left;margin-left: 15%;margin-top: 4px;}
 
     .server-info-heading .memory-use {
         float: right;
@@ -2122,7 +2144,8 @@ label.error {
     display: block;
     line-height: 0px;
     font-size: 11px;
-    padding: 10px 5px 0 7px;
+    /*padding: 10px 5px 0 7px;*/
+    padding: 10px 5px 0 0;
     margin: 0 0 6px 0;
     height: 10px;
 }
@@ -2316,6 +2339,8 @@ ul.adminClusterList li a.shutdown {
     padding: 0 0 0 8px;
 }
 
+
+
 .setServer { /*float:left;*/
     float: right;
 }
@@ -2481,6 +2506,11 @@ ul.adminClusterList li a.shutdown {
     font-weight: normal;
 }
 
+.serNameTruncate{
+
+    word-break: break-all;
+}
+
 .propertiesTbl {
     margin: 0 !important;
     padding: 0 !important;
@@ -2580,6 +2610,11 @@ input.exitableFilePrefix {
     padding: 2px 3px;
 }
 
+input.exitableMemoryLimit {
+    width: 90px; /*position:relative; top:6px;*/
+    padding: 2px 3px;
+}
+
 .tblSave {
     border: none;
 }
@@ -2660,6 +2695,12 @@ input.exitableFilePrefix {
     border: 1px solid #CCCCCC;
 }
 
+.serverHeader { background: #dee0e0; }
+.serverHeader:hover  {  
+    background: #dee0e0 !important;
+}
+tr.serverHeader:hover {background: #dee0e0;}
+
     .tblshutdown tr:hover, .tblshutdown tr.activeHostMonitoring {
         background: #F0F3F4;
     }
@@ -2667,7 +2708,8 @@ input.exitableFilePrefix {
         .tblshutdown tr.activeHostMonitoring td a {
             color: #76bd1d;
         }
-
+        .tblshutdown tr th {  padding: 20px 19px 20px 0;font-weight: bold;}
+        .tblshutdown tr th:first-child { text-align: left;padding-left: 10px;}
 
     .tblshutdown tr td {
         border: none;
@@ -2744,7 +2786,7 @@ td.pauseCursorDefault a {
     font-weight: bold;
 }
 
-td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix, td.tdSnapshotFrequency, td.tdSnapshotRetained, td.snapshottd, td.tdDrConfig {
+td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix, td.tdSnapshotFrequency, td.tdSnapshotRetained, td.snapshottd, td.tdDrConfig, td.memorySize , td.diskSize{
     position: relative;
 }
 
@@ -3096,6 +3138,9 @@ a.restoreBtn {
     margin: 10px 0 0 0;
     border-top: 1px solid #CCCCCC;
     padding: 20px 0 10px 0;
+}
+.featuresAlign {
+   padding: 0 0 10px 0;
 }
 
 .addConfigProperWrapper {
@@ -3527,6 +3572,9 @@ a:hover.changePsd {
     height: 364px;
 }
 
+/*add idsk limit*/
+table.diskLimitTbl tr td { border: none;}
+
 
 
 /*********************************************media Qu********************/
@@ -3550,6 +3598,35 @@ a:hover.changePsd {
     ul.topRightList li {
         padding:12px 0 0 2px;
     }
+
+  
+}
+
+@media (min-width: 320px) and (max-width:360px) {
+
+      .server-info-heading .server {
+  float: left;
+  display: block;
+  padding: 7px 0 0 10px;
+  width: 30px;
+  line-height: 18px;
+}
+
+    .server-info-heading .memory-use {
+  float: right;
+  display: block;
+  padding: 6px 28px 0 0;
+  width: 30px;
+  line-height: 18px;
+}
+
+    .server-info-heading .servIp{  margin-left: 25%;
+  width: 30px;
+  line-height: 18px;
+  margin-top: 5px;}
+    ul.servers-list li span.servIpNum {margin-left: 10%;}
+    .serverNameAlign { width: 22%;}
+
 }
 @media (max-width: 360px) {
     .headerAdminContent {
@@ -3630,7 +3707,10 @@ a:hover.changePsd {
     .tabs-filter-wrapperDR {
         width: 560px;
     }
-    /*admin*/
+    /*admin*/   
+    .server-info-heading .servIp {margin-left: 10%;margin-top: 0;}
+    ul.servers-list li span.servIpNum {margin-left: 8%;}
+    .serverNameAlign { width: 26%;}
 
 }
 
@@ -3961,6 +4041,12 @@ a:hover.changePsd {
     .logHeight {
         height: 364px;
     }
+    .server-info-heading .servIp {margin-left: 18%;}
+    ul.servers-list li span.servIpNum {margin-left: 6%;}
+    .tblshutdown tr th {
+        padding: 20px 19px 20px 8px;
+    }
+
 }
 
 @media (min-width: 320px) and (max-width: 479px) {
@@ -3979,8 +4065,6 @@ a:hover.changePsd {
         height: 330px;
 
     }
-
-
 
     .rightShowhideList li a {
         margin: 0 0 0 46px;
@@ -4137,9 +4221,14 @@ a:hover.changePsd {
     .drHeightIndividual {
         min-height: 150px;
     }
+
+
 }
 
-
+@media (min-width: 768px) and (max-width: 800px) {
+     .server-info-heading .servIp{margin-left: 14%;}
+    ul.servers-list li span.servIpNum {margin-left: 3%;}
+}
 
 @media (max-width: 980px) {
 
@@ -4225,6 +4314,10 @@ a:hover.changePsd {
         position: relative;
         top: -7px;
      }
+
+    .server-info-heading .servIp {
+  margin-left: 30%;
+}
 }
 
 

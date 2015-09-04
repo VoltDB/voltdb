@@ -250,6 +250,17 @@ class Overview extends Module {
         queryTimeoutPopupOk		{ $("#btnPopupQueryTimeoutOk") }
         queryTimeoutPopupCancel	{ $("#btnPopupQueryTimeoutCancel") }
 
+        //Memory Limit
+        memoryLimitEdit         { $("#btnEditMemorySize") }
+        memoryLimitValue        { $("#memoryLimitSize") }
+        memoryLimitField        { $("#txtMemoryLimitSize") }
+        memoryLimitUnit         { $("#memoryLimitSizeUnit") }
+        memoryLimitError        { $("#errorMemorySize") }
+        memoryLimitOk           { $("#btnEditMemorySizeOk") }
+        memoryLimitCancel       { $("#btnEditMemorySizeCancel") }
+        memoryLimitPopupOk      { $("#btnPopupMemoryLimitOk") }
+        memoryLimitPopupCancel  { $("#btnPopupMemoryLimitCancel") }
+
         // error message
         errorMsgHeartbeat		{ $("#errorHeartbeatTimeout") }
         errorQuery				{ $("#errorQueryTimeout") }
