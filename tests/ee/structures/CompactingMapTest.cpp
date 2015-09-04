@@ -759,7 +759,6 @@ TEST_F(CompactingMapTest, RandomMulti) {
 TEST_F(CompactingMapTest, Traversal) {
     CompactingSet<int> s;
     for (int i = 0; i < 10; i++) {
-        std::cout << "Inserting " << i << std::endl;
         ASSERT_TRUE(s.insert(i));
     }
 
@@ -791,6 +790,32 @@ TEST_F(CompactingMapTest, Traversal) {
 
     s.clear();
     ASSERT_TRUE(s.empty());
+}
+
+TEST_F(CompactingMapTest, CopyMap) {
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> a(true, IntComparator());
+    for (int i = 0; i < 10001; i++) {
+        a.insert(std::pair<int, int>(i, i + 1));
+    }
+
+    // Make a deep copy of map a
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> b(a);
+    ASSERT_EQ(a, b);
+
+    // Clearing map a shouldn't affect map b
+    a.clear();
+
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator>::iterator i = b.begin();
+    int expected = 0;
+    while (i != b.end()) {
+        ASSERT_EQ(expected, i.key());
+        ASSERT_EQ(expected + 1, i.value());
+        expected++; i++;
+    }
+    ASSERT_EQ(10001, expected);
+
+    b.clear();
+    ASSERT_TRUE(b.empty());
 }
 
 // ENG-1057

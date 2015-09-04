@@ -438,18 +438,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             fail("AdHoc create did not fail in pause mode");
         } catch(ProcCallException e) {
             assertTrue(e.getMessage().contains("Server is paused"));
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
         }
         try {
             client.callProcedure("@AdHoc", "DROP TABLE pause_test_tbl;");
             fail("AdHoc drop did not fail in pause mode");
         } catch(ProcCallException e) {
             assertTrue(e.getMessage().contains("Server is paused"));
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
         }
         try {
             client.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
             fail("AdHoc create proc did not fail in pause mode");
         } catch(ProcCallException e) {
             assertTrue(e.getMessage().contains("Server is paused"));
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
         }
 
         // admin should work fine
