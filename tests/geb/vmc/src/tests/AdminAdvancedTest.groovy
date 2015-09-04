@@ -666,9 +666,12 @@ class AdminAdvancedTest extends TestBase {
    // Disk Limit
 
     def "Check Disk Limit Click and check its value"() {
-        when:
+        when:"Open Advanced"
+        page.advanced.click()
+        then:
         waitFor(waitTime) { page.overview.diskLimit.isDisplayed() }
-        page.diskLimit.click()
+        when:
+        page.overview.diskLimit.click()
         then:
         waitFor(waitTime) { page.noFeaturestxt.isDisplayed() }
         if(page.noFeaturestxt.text()=="No features available.") {
@@ -676,7 +679,7 @@ class AdminAdvancedTest extends TestBase {
         } else {
             println("Early presence of Features settings detected!")
         }
-        page.diskLimit.click()
+        page.overview.diskLimit.click()
     }
 
     def "Verify Add Disk Limit for SNAPSHOTS feature"(){

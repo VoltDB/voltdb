@@ -223,7 +223,8 @@ class Overview extends Module {
 		maxTempTableMemory		{ $(class:"configLabel", text:"Max Temp Table Memory") }
 		snapshotPriority		{ $(class:"configLabel", text:"Snapshot Priority") }
         memoryLimitSize         { $(class:"configLabel", text:"Memory Limit") }
-        diskLimit               {$("#diskLimit")}
+        diskLimit               {$("#diskLimitConfiguration tr.child-row-6 td.configlabel").first()}
+
 
 		maxJavaHeapValue		{ $("#maxJavaHeap") }
 		heartbeatTimeoutValue	{ $("#formHeartbeatTimeout") }
