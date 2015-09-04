@@ -17,6 +17,7 @@
 
 package org.voltdb.importer;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.isNull;
@@ -722,6 +723,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<DistributerException> fault = Optional.absent();
 
         CreateNode(String path, byte [] data, CreateMode cmode) {
+            checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             m_zk.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, cmode, this, null);
         }
 
@@ -764,6 +766,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<Code> callbackCode = Optional.absent();
 
         DeleteNode(String path) {
+            checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             this.path = path;
             m_zk.delete(path, -1, this, null);
         }
@@ -817,6 +820,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<DistributerException> fault = Optional.absent();
 
         GetChildren(String path) {
+            checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             this.path = path;
             m_zk.getChildren(path, this, this, null);
         }
@@ -933,6 +937,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<DistributerException> fault = Optional.absent();
 
         GetData(String path) {
+            checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             this.path = path;
             m_zk.getData(path, this, this, null);
         }
@@ -1001,6 +1006,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
         public GetHostChannels(String path) {
             super(path);
             this.host = basename.apply(path);
+            checkArgument(
+                    host != null && !host.trim().isEmpty(),
+                    "path has undiscernable basename: %s", path
+                    );
             this.thisHost = hostValueIs(this.host, ChannelSpec.class);
         }
 
