@@ -71,7 +71,7 @@ public class SynchronizedStatesManager {
     final AtomicBoolean m_done = new AtomicBoolean(false);
     public final static String MEMBERS = "MEMBERS";
     private Set<String> m_groupMembers = new HashSet<String>();
-    private final StateMachineInstance m_registeredStateMachines [];
+    private StateMachineInstance m_registeredStateMachines[];
     private int m_registeredStateMachineInstances = 0;
     static final ListeningExecutorService m_shared_es = CoreUtils.getListeningExecutorService("SSM Daemon", 1);
     // We assume that we are far enough along that the HostMessenger is up and running. Otherwise add to constructor.
@@ -90,33 +90,29 @@ public class SynchronizedStatesManager {
         return m_memberId;
     }
 
-    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId)
-            throws KeeperException, InterruptedException {
-        this(zk, rootPath, ssmNodeName, memberId, 1);
+    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId) {
+        m_zk = zk;
+        // We will not add ourselves as members in ZooKeeper until all StateMachineInstances have registered
+        m_ssmRootNode = ssmNodeName;
+        m_stateMachineRoot = ZKUtil.joinZKPath(rootPath, ssmNodeName);
+        m_stateMachineMemberPath = ZKUtil.joinZKPath(m_stateMachineRoot, MEMBERS);
+        m_memberId = memberId;
     }
 
     // Used only for Mocking StateMachineInstance
     public SynchronizedStatesManager() {
         m_zk = null;
-        m_registeredStateMachines = null;
         m_ssmRootNode = "MockRootForZooKeeper";
         m_stateMachineRoot = "MockRootForSSM";
         m_stateMachineMemberPath = "MockRootMembershipNode";
         m_memberId = "MockMemberId";
     }
 
-    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId, int registeredInstances)
-            throws KeeperException, InterruptedException {
-        m_zk = zk;
-        // We will not add ourselves as members in ZooKeeper until all StateMachineInstances have registered
-        m_registeredStateMachines = new StateMachineInstance[registeredInstances];
-        m_ssmRootNode = ssmNodeName;
-        m_stateMachineRoot = ZKUtil.joinZKPath(rootPath, ssmNodeName);
+    public void initialize(int registeredInstances) throws KeeperException, InterruptedException {
         ByteBuffer numberOfInstances = ByteBuffer.allocate(4);
         numberOfInstances.putInt(registeredInstances);
+        m_registeredStateMachines = new StateMachineInstance[registeredInstances];
         addIfMissing(m_stateMachineRoot, CreateMode.PERSISTENT, numberOfInstances.array());
-        m_stateMachineMemberPath = ZKUtil.joinZKPath(m_stateMachineRoot, MEMBERS);
-        m_memberId = memberId;
     }
 
     public void ShutdownSynchronizedStatesManager() throws InterruptedException {

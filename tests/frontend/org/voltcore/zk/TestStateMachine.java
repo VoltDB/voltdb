@@ -92,7 +92,8 @@ public class TestStateMachine extends ZKTestBase {
 
             // Create a SynchronizedStatesManager to manage both a BooleanStateMachine and ByteStateMachine
             SynchronizedStatesManager ssm2 = new SynchronizedStatesManager(m_messengers.get(Site).getZK(),
-                    stateMachineManagerRoot, "ssm2", siteString, stateMachines.values().length);
+                    stateMachineManagerRoot, "ssm2", siteString);
+            ssm2.initialize(stateMachines.values().length);
             m_stateMachineGroup2[Site] = ssm2;
             BooleanStateMachine bsm2 = new BooleanStateMachine(ssm2, "bool");
             m_booleanStateMachinesForGroup2[Site] = bsm2;

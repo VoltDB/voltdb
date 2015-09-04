@@ -78,7 +78,8 @@ public class StateMachineSnipits extends ZKTestBase {
             assert(siteId < NUM_AGREEMENT_SITES);
             ssm = new SynchronizedStatesManager(m_messengers.get(siteId).getZK(),
                     stateMachineManagerRoot, communityName,
-                    managerId, numberOfStateMachines);
+                    managerId);
+            ssm.initialize(numberOfStateMachines);
         }
         catch (KeeperException | InterruptedException e) {
         }

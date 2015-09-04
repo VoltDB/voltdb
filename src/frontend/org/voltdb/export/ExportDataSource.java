@@ -59,6 +59,7 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.export.ExportGeneration.Task;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -218,7 +219,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ExportDataSource(final Runnable onDrain, File adFile, boolean isContinueingGeneration) throws IOException {
-
         /*
          * Certainly no more data coming if this is coming off of disk
          */
@@ -298,17 +298,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public synchronized void updateAckMailboxes( final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
+    public void allowMastership() {
+        m_allowAcceptingMastership.release();
+        exportLog.info("All replicas seen For partition " + getPartitionId() + " Allow mastership NOW complete");
+    }
+
+    public synchronized void updateAckMailboxes(Task task, final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         m_ackMailboxRefs.set( ackMailboxes);
         boolean kickReplica = false;
         if (m_ackMailboxRefs.get().getSecond().size() == m_numberOfReplicas) {
-            exportLog.info("All replicas seen For partition " + getPartitionId() + " Allow mastership.");
-            m_allowAcceptingMastership.release();
+            exportLog.info("All replicas seen For partition " + getPartitionId() + " Allow mastership after task is complete.");
             ImmutableList<Long> p = m_ackMailboxRefs.get().getSecond();
             for (Long l : p) {
                 exportLog.info("Replicas seen For partition " + getPartitionId() + " On " + CoreUtils.hsIdToString(l));
             }
             kickReplica = true;
+            task.setCompleted(getPartitionId());
         }
         if (m_runEveryWhere && kickReplica && m_isMaster) {
             //Kick off replicas keep kicking as we dont know when they will start looking.

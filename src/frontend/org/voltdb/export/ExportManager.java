@@ -385,10 +385,11 @@ public class ExportManager
             }
         }
         String hostIdStr = "ExportHost_" + messenger.getHostId();
+        m_exportStatesManager = new SynchronizedStatesManager(messenger.getZK(), VoltZK.syncStateMachine, "PER_HOST_EXPORT_STATES", hostIdStr);
         try {
-            m_exportStatesManager = new SynchronizedStatesManager(messenger.getZK(), VoltZK.syncStateMachine, "PER_HOST_EXPORT_STATES", hostIdStr);
-        } catch (KeeperException | InterruptedException e) {
-            m_exportStatesManager = null;
+            m_exportStatesManager.initialize(1);
+        } catch (KeeperException ex) {
+        } catch (InterruptedException ex) {
         }
 
         updateProcessorConfig(connectors);
@@ -429,7 +430,7 @@ public class ExportManager
              */
             if (startup) {
                 if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
-                    final ExportGeneration currentGeneration = new ExportGeneration(
+                    final ExportGeneration currentGeneration = new ExportGeneration(m_exportStatesManager,
                             catalogContext.m_uniqueId,
                             exportOverflowDirectory, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
@@ -441,6 +442,7 @@ public class ExportManager
                     currentGeneration.initializeMissingPartitionsFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 }
             }
+            //I know all generations.
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
             /*
              * For the newly constructed processor, provide it the oldest known generation
@@ -508,7 +510,7 @@ public class ExportManager
 
         //Only give the processor to the oldest generation
         for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_uniqueId);
+            ExportGeneration generation = new ExportGeneration(m_exportStatesManager, generationDirectory, catalogContext.m_uniqueId);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
@@ -582,11 +584,23 @@ public class ExportManager
             return;
         }
 
+
+        if (m_exportStatesManager == null) {
+            HostMessenger messenger = VoltDB.instance().getHostMessenger();
+            String hostIdStr = "ExportHost_" + messenger.getHostId();
+            m_exportStatesManager = new SynchronizedStatesManager(messenger.getZK(), VoltZK.syncStateMachine, "PER_HOST_EXPORT_STATES", hostIdStr);
+            try {
+                m_exportStatesManager.initialize(1);
+            } catch (KeeperException ex) {
+            } catch (InterruptedException ex) {
+            }
+        }
+
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 
         ExportGeneration newGeneration = null;
         try {
-            newGeneration = new ExportGeneration(
+            newGeneration = new ExportGeneration(m_exportStatesManager,
                     catalogContext.m_uniqueId, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
             newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
