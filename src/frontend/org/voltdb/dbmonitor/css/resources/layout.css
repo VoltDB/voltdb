@@ -1020,6 +1020,23 @@ ul.servers-list li {
     padding: 15px 10px 15px 30px;
 }
 
+
+.alertWrap { height: 300px;overflow: auto;}
+
+.serversListTbl { width: 100%;}
+.serversListTbl tr th,.serversListTbl tr td { border-right: none;border-bottom: 1px solid #CCCCCC;}
+.serversListTbl tr th {  padding: 20px 19px 20px 0;font-weight: bold;}
+.serversListTbl tr td {padding: 20px 19px 20px 0;}
+.serversListTbl tr td:nth-child(1){ text-align: left;padding-left: 30px;}
+.serversListTbl tr th:nth-child(2),.serversListTbl tr td:nth-child(2){ text-align: center;}
+.serversListTbl tr th:nth-child(3), .serversListTbl tr td:nth-child(3){ text-align: right;}
+.serversListTbl tr th:first-child { text-align: left;padding-left: 10px;}
+.serversListTbl tr:hover { background: #f0f3f4;}
+.alertAlign {width: 200px; word-break: break-all;}
+.serversListTbl tr td span.alert {
+    color: #ea151d;
+}
+
 .searchLeft {
     float: left;
     width: 20%;
@@ -1075,7 +1092,9 @@ a.setVal {
 
 
 
-ul.servers-list li.active {background-image: url(images/servIcons.png) !important;
+ul.servers-list li.active, table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
+    background-repeat: no-repeat;}
+table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
     background-repeat: no-repeat;}
 
 ul.servers-list li.joining{background-image: url(images/servIcons.png) !important;
@@ -1094,8 +1113,13 @@ ul.servers-list li.pauseActiveMonitoring {
     background-color: #f0f3f4;
 }
 
-ul.servers-list li.active {
+ul.servers-list li.active{
     background-position: 5px 16px;
+
+}
+
+table.serversListTbl tr td.active {
+    background-position: 5px 20px;
 
 }
 

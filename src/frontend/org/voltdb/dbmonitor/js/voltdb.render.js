@@ -1,6 +1,5 @@
 
 function alertNodeClicked(obj) {
-
     var clickedServer = $(obj).html();
 
     if ($('#activeServerName').html() != clickedServer) {
@@ -611,20 +610,31 @@ function alertNodeClicked(obj) {
                     '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
 
             var alertHtml = "";
-
-            jQuery.each(systemMemory, function (id, val) {
+            var alertHeader = '<tr class="serverHeader">' +
+                        '<th width="40%">Server Name</th>' +
+                        '<th  width="30%">IP Address</th>' +
+                        '<th  width="30%">Memory Usage</th>' +
+                        '</tr>';
+            
+            jQuery.each(systemOverview, function(id, val) {
+                var hostName;
+                var hostIp;
+                hostName = val["HOSTNAME"];
+                hostIp = val["IPADDRESS"];
                 var threshold = VoltDbUI.getCookie("alert-threshold") != undefined ? VoltDbUI.getCookie("alert-threshold") : 70;
-                if (val["MEMORYUSAGE"] * 1 >= threshold) {
-                    alertHtml += '<li class="active"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick=\"alertNodeClicked(this);\" href=\"#\">' + val['HOSTNAME'] + '</a> <span class=\"memory-status alert\">' + val['MEMORYUSAGE'] + '%</span></li>';
+                if (systemMemory[hostName]["MEMORYUSAGE"] >= threshold) {
+                    alertHtml += '<tr><td class="active alertAlign"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick="alertNodeClicked(this);" href="#">' + hostName + '</a> </td>' +
+                        '<td>' + hostIp + '</td>' +
+                        '<td><span class="alert">' + systemMemory[hostName]["MEMORYUSAGE"] + '%</span></td></tr>';
                     alertCount++;
                 }
+                
             });
-
             if (alertCount > 0) {
                 html += '<li class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>(' + alertCount + ')</span></a></li>';
             }
 
-            callback(html, alertHtml);
+            callback(html, alertHeader + alertHtml);
         };
 
         var configureRequestedHost = function (hostName) {
