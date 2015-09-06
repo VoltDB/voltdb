@@ -73,7 +73,8 @@ typedef std::vector<TableTuple>::const_iterator tuple_iterator;
 typedef std::pair<tuple_iterator, tuple_iterator> tuple_range;
 typedef std::vector<tuple_range>::iterator range_iterator;
 
-struct TupleRangeComparer
+// Functor to compare two non-empty tuple ranges by comparing their first tuples using provided TupleComparer
+struct TupleRangeComparer : std::binary_function<tuple_range, tuple_range, bool>
 {
     TupleRangeComparer(AbstractExecutor::TupleComparer comp) :
         m_comp(comp)
@@ -84,8 +85,7 @@ struct TupleRangeComparer
         // Assert both ranges are not empty
         assert(ta.first != ta.second);
         assert(tb.first != tb.second);
-        // We need the range with a first min tuple
-        return !m_comp(*ta.first, *tb.first);
+        return m_comp(*ta.first, *tb.first);
     }
     AbstractExecutor::TupleComparer m_comp;
 };
@@ -113,49 +113,46 @@ void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
     partitions.reserve(nonEmptyPartitions);
     tuple_iterator begin = tuples.begin();
     for (size_t i = 0; i < nonEmptyPartitions; ++i) {
+        // Partitions are supposed to be non-empty
+        assert(partitionTupleCounts[i] > 0);
         tuple_iterator end = begin + partitionTupleCounts[i];
         partitions.push_back(std::make_pair(begin, end));
         begin = end;
         assert( i != nonEmptyPartitions -1 || end == tuples.end());
     }
 
-    // make a heap out of partitions
+    // Make a heap out of partitions where the partition with a tuple with a minimal value is on top
     TupleRangeComparer tupleRangeComp(comp);
-    std::make_heap(partitions.begin(), partitions.end(), tupleRangeComp);
+    std::binary_negate<TupleRangeComparer> reversedTupleRangeComp = std::not2(TupleRangeComparer(comp));
+    std::make_heap(partitions.begin(), partitions.end(), reversedTupleRangeComp);
 
     int tupleCnt = 0;
     int tupleSkipped = 0;
 
     while ((limit == -1 || tupleCnt < limit) && !partitions.empty()) {
-        // Find the range that has the next tuple to be inserted
-        // and remove from the heap
-        assert(!partitions.empty());
-        TableTuple tuple;
-        if (partitions.size() == 1) {
-            range_iterator rangeIt = partitions.begin();
-            if (rangeIt->first != rangeIt->second) {
-                tuple = *rangeIt->first;
-                ++rangeIt->first;
-            } else {
-                // the last partition is empty
-                return;
-            }
-        } else {
-            // Pop the top of the heap with the minimal tuple
-            std::pop_heap(partitions.begin(), partitions.end(), tupleRangeComp);
-            tuple_range nextPartition = partitions.back();
+        // A sanity check
+        assert(tupleCnt < tuples.size());
+
+        // Get the first partition from the heap that has the next tuple to be inserted
+        range_iterator rangeIt = partitions.begin();
+        assert(rangeIt->first != rangeIt->second);
+        TableTuple tuple = *rangeIt->first;
+        ++rangeIt->first;
+
+        if (partitions.size() == 1 && rangeIt->first == rangeIt->second) {
+            // The last partition is empty. Done.
             partitions.pop_back();
-
-            // Get the first tuple from that partition
-            assert(nextPartition.first != nextPartition.second);
-            tuple = *nextPartition.first;
-
-            // advance the partition iterator
-            ++nextPartition.first;
+        } else if (partitions.size() > 1) {
+            // There are more than one partition left. Remove the current top partition from the heap
+            // Dereferencing the iterator must be done prior to the std::pop_heap which would
+            // change the tuple_range this iterator points to.
+            tuple_range nextPartition = *rangeIt;
+            std::pop_heap(partitions.begin(), partitions.end(), reversedTupleRangeComp);
+            partitions.pop_back();
             if (nextPartition.first != nextPartition.second) {
-                // put the range back to the heap
+                // The partition is not empty yet. Reinsert it back to the heap.
                 partitions.push_back(nextPartition);
-                std::push_heap(partitions.begin(), partitions.end(), tupleRangeComp);
+                std::push_heap(partitions.begin(), partitions.end(), reversedTupleRangeComp);
             }
         }
 
@@ -174,6 +171,7 @@ void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
 
         ++tupleCnt;
         if (pmp != NULL) {
+            // Should only be NULL when unit testing
             pmp->countdownProgress();
         }
     }

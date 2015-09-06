@@ -35,6 +35,7 @@ import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class TestPlansOrderBy extends PlannerTestCase {
     @Override
@@ -364,7 +365,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
-            // NLIJ with index outer table scan (PK). ORDER BY column T.T_D0 is the first the first index column
+            // NLIJ with index outer table scan (PK). ORDER BY column T.T_D0 is the first index column
             // Merge RECEIVE
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by T.T_D0 limit 3");
@@ -478,74 +479,51 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     public void testOrderByMPSubquery() {
         {
-            // Select from an ordered subquery. The subquery SeqScanPlanNode.isOutputOrdered
-            // unconditionally returns FALSE even if the parent sort expressions and order matches
-            // its own ones. The parent ORDER BY is not converted to MERGERECEIVE
-            // The subquery MERGERECEIVE node is removed
+            // Select from an ordered subquery. The subquery SEND/MERGERECEIVE is always preserved
+            // during the subquery post-processing that would remove the SEND/RECEIVE pair
+            // from this subquery without the MERGE-RECEIVE optimization.
+            // Removing the subquery MERGERECEIVE node together with its inline ORDER BY noe
+            // would result in the invalid plan
             List<AbstractPlanNode> frags =  compileToFragments(
-                    "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1) P_T order by PT_D1;");
+                    "select PT_D1 from (select P_D1 as PT_D1 from P order by P_D1) P_T limit 4;");
 
             assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+            assertEquals("P_T", ((SeqScanPlanNode) pn).getTargetTableAlias());
             // Subquery
-            pn = frags.get(1).getChild(0);
-            assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
-            assertEquals("P_T", ((SeqScanPlanNode) pn).getTargetTableAlias());
-        }
-        {
-            // Same SQL as above but with subquery LIMIT. The MERGERECEIVE node is preserved
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1 limit 4) P_T order by PT_D1;");
-
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
-            pn = pn.getChild(0);
-            assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
-            assertEquals("P_T", ((SeqScanPlanNode) pn).getTargetTableAlias());
             pn = pn.getChild(0).getChild(0);
-            validateMergeReceive(pn, true, new int[1]);
-            // Subquery
+            validateMergeReceive(pn, false, new int[] {0});
             pn = frags.get(1).getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
             assertEquals("P", ((IndexScanPlanNode) pn).getTargetTableAlias());
         }
         {
-            // The subquery with non-partition GROUP BY column - The MERGERECEIVE node is preserved
+            // The subquery SEND/MERGERECEIVE is preserved during the subquery post-processing
+            // resulting in the multi-partitioned join that gets rejected.
+            // In this case, the subquery MERGERECEIVE node is techically redundant but at the moment,
+            // the subquery post-processing still keeps it.
+            failToCompile(
+                    "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1) P_T, P where P.P_D0 = P_T.PT_D0;",
+                    "Join of multiple partitioned tables has insufficient join criteria.");
+        }
+        {
+            // The subquery with partition column (P_D0) in the GROUP BY columns.
+            // The subquery SEND/MERGERECEIVE is preserved even though without the MERGE-RECEIVE optimization
+            // the SEND/RECEIVE pair would be removed
             List<AbstractPlanNode> frags =  compileToFragments(
-                "select PT_D1, MP_D3 from (select P_D1 as PT_D1, max(P_D3) as MP_D3 from P group by P_D1 order by P_D1 limit 4) P_T order by PT_D1");
+                "select PT_D1, MP_D3 from (select P_D0  as PT_D0, P_D1 as PT_D1, max(P_D3) as MP_D3 from P group by P_D0, P_D1 order by P_D0) P_T");
 
             assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
-            pn = pn.getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
             assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
             assertEquals("P_T", ((SeqScanPlanNode) pn).getTargetTableAlias());
-            pn = pn.getChild(0).getChild(0);
-            validateAggregatedMergeReceive(pn, true, false, false, true);
-
             // Subquery
+            pn = pn.getChild(0).getChild(0);
+            validateMergeReceive(pn, false, new int[] {0});
             pn = frags.get(1).getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
             assertEquals("P", ((IndexScanPlanNode) pn).getTargetTableAlias());
-        }
-        {
-            // The subquery with partition GROUP BY - The subquery MERGERECEIVE node is removed
-            // The parent query qualifies for the optimization because of the pushed down ORDER BY PT_D1
-            List<AbstractPlanNode> frags =  compileToFragments(
-                "select PT_D1, MP_D3 from (select P_D0  as PT_D0, P_D1 as PT_D1, max(P_D3) as MP_D3 from P group by P_D0, P_D1 order by P_D0) P_T order by PT_D1 limit 5");
-
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateMergeReceive(pn, true, new int[1]);
-
-            // Subquery
-            pn = frags.get(1).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
-            pn = pn.getChild(0);
-            assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
-            assertEquals("P_T", ((SeqScanPlanNode) pn).getTargetTableAlias());
         }
     }
 
@@ -558,10 +536,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
         {
             // Merge Receive with Serial aggregation
-            //            select indexed_non_partition_key, max(col)
+            //            select indexed_non_partition_key(P_D1), max(col)
             //            from partitioned
-            //            group by indexed_non_partition_key
-            //            order by indexed_non_partition_key;"
+            //            group by indexed_non_partition_key (P_D1)
+            //            order by indexed_non_partition_key (P_D1);"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
@@ -572,22 +550,66 @@ public class TestPlansOrderBy extends PlannerTestCase {
             assertTrue(ipn.getPredicate() == null);;
         }
         {
-            // Merge Receive with Partial aggregation
-            //            select indexed_non_partition_key, col, max(col)
+            // Merge Receive with Serial aggregation
+            //            select indexed_non_partition_key(P_D3, P_D2), col, max(col)
             //            from partitioned
-            //            group by indexed_non_partition_key, col
-            //            order by indexed_non_partition_key;"
+            //            group by indexed_non_partition_key (P_D3, P_D2)
+            //            order by indexed_non_partition_key(P_D3, P_D2);"
+            List<AbstractPlanNode> frags =  compileToFragments(
+                  "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateAggregatedMergeReceive(pn, true, false, false, false);
+        }
+        {
+            // Merge Receive with Serial aggregation
+            //            select indexed_non_partition_key(P_D3, P_D2), col, max(col)
+            //            from partitioned
+            //            group by indexed_non_partition_key (P_D2, P_D3) permutation
+            //            order by indexed_non_partition_key(P_D3, P_D2);"
+            List<AbstractPlanNode> frags =  compileToFragments(
+                  "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D3 order by P_D3, P_D2");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateAggregatedMergeReceive(pn, true, false, false, false);
+        }
+        {
+            // Merge Receive with Partial aggregation
+            //            select indexed_non_partition_key(P_D1), col, max(col)
+            //            from partitioned
+            //            group by indexed_non_partition_key(P_D1), col
+            //            order by indexed_non_partition_key(P_D1);"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1, P_D2, max(P_D2) from P group by P_D1, P_D2 order by P_D1");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             validateAggregatedMergeReceive(pn, false, true, false, false);
         }
         {
+            // Merge Receive with Partial aggregation
+            //            select indexed_non_partition_key(P_D3, P_D2), col, max(col)
+            //            from partitioned
+            //            group by indexed_non_partition_key , col (permutation)
+            //            order by indexed_non_partition_key(P_D3, P_D2);"
+            List<AbstractPlanNode> frags =  compileToFragments(
+                  "select P_D1, P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D1, P_D3 order by P_D3, P_D2");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateAggregatedMergeReceive(pn, false, true, false, false);
+        }
+        {
+            // Merge Receive with Partial aggregation
+            //            select indexed_non_partition_key(P_D3, P_D2), col, max(col)
+            //            from partitioned
+            //            group by indexed_non_partition_key , col (permutation)
+            //            order by part of indexed_non_partition_key (P_D3);"
+            List<AbstractPlanNode> frags =  compileToFragments(
+                  "select P_D1, P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D1, P_D3 order by P_D3");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateAggregatedMergeReceive(pn, false, true, false, false);
+        }
+        {
             // No aggregation at coordinator
-            //          select indexed_partition_key, max(col)
+            //          select indexed_partition_key(P_D0), max(col)
             //          from partitioned
-            //          group by indexed_partition_key
-            //          order by indexed_partition_key;"
+            //          group by indexed_partition_key(P_D0)
+            //          order by indexed_partition_key(P_D0);"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select max(P_D2), P_D0 from P group by P_D0  order by P_D0");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
@@ -595,42 +617,43 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
         {
             // No aggregation at coordinator
-            //          select indexed_non_partition_key, max(col)
+            //          select non_partition_col(P_D1), max(col)
             //          from partitioned
-            //          group by indexed_non_partition_key, indexed_partition_key
-            //          order by indexed_partition_key;"
+            //          group by non_partition_col, indexed_partition_key(P_D0)
+            //          order by indexed_partition_key(P_D0);"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select max(P_D2), P_D1 from P group by P_D1, P_D0 order by P_D0");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             validateAggregatedMergeReceive(pn, false, false, false, false);
         }
         {
-            // Merge Receive with Serial aggregation
-            //            select indexed_non_partition_key1, indexed_non_partition_key2, max(col)
+            // Merge Receive without aggregation at coordinator because of
+            // the partition column (P_D0) being part of the GROUP BY/ORDER BY columns
+            //            select indexed_non_partition_key1, indexed_non_partition_key2, partition_col, max(col)
             //            from partitioned
-            //            group by indexed_non_partition_key1, indexed_non_partition_key2
+            //            group by indexed_non_partition_key1, indexed_non_partition_key2, partition_col
             //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
             List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateAggregatedMergeReceive(pn, true, false, false, false);
-        }
-        {
-            // Merge Receive without aggregation at coordinator
-            //            select indexed_non_partition_key1, indexed_non_partition_key2, col, max(col)
-            //            from partitioned
-            //            group by indexed_non_partition_key1, indexed_non_partition_key2, col
-            //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D3, P_D2, P_D0, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2");
+                    "select P_D3, P_D2, P_D0, max (P_D1) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             validateAggregatedMergeReceive(pn, false, false, false, false);
+        }
+        {
+            // Two aggregation but a single aggregate node at the coordinator.
+            //            select aggr1(col), aggr2(col), indexed_non_partition_key(P_D1)
+            //            from partitioned
+            //            group by indexed_non_partition_key
+            //            order by indexed_non_partition_key;"
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "SELECT min(P_D2), max(P_D2), P_D1 from P where P_D1 > 0 group by P_D1 order by P_D1;");
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            validateAggregatedMergeReceive(pn, true, false, false, false);
         }
     }
 
     public void testOrderByMPAggregateNonOptimized() {
         {
-            // Two aggregate nodes at the coordinator. ORDER BY
+            // Select from a VIEW. Two aggregate nodes at the coordinator. ORDER BY
             // RETURN RESULTS TO STORED PROCEDURE
             //  ORDER BY (SORT)
             //   Hash AGGREGATION ops: SUM(V_P1_ABS.V_CNT), MAX(V_P1_ABS.V_SUM_AGE)
@@ -639,6 +662,27 @@ public class TestPlansOrderBy extends PlannerTestCase {
             List<AbstractPlanNode> frags =  compileToFragments("Select V_G1, sum(V_CNT), max(v_sum_age) from V_P1_ABS GROUP BY V_G1 ORDER BY V_G1");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+        {
+            // Select from a table. Two hash aggregate nodes at the coordinator. The optimization is impossible for two reasons:
+            // - GROUP BY and ORDER BY columns don't overlap preventing the hash aggregate to be converted to a Serial/Partial aggr
+            // - Two aggregate nodes
+            // The partition output is ordered
+            // by index scan (P_D1PLUS3_IDX index)
+            // RETURN RESULTS TO STORED PROCEDURE
+            //  Hash AGGREGATION ops
+            //   ORDER BY (SORT)
+            //    Hash AGGREGATION ops: MAX(VOLT_TEMP_TABLE.column#0)
+            //     RECEIVE FROM ALL PARTITIONS
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select distinct max(P_D2), P_D1 + 3 from P where P_D1 + 3 > 0 group by P_D1 order by P_D1 + 3;");
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            assertEquals(PlanNodeType.HASHAGGREGATE, pn.getPlanNodeType());
+            // Partition fragment
+            pn = frags.get(1).getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertEquals(SortDirectionType.ASC, ipn.getSortDirection());
         }
         {
             // Coordinator HASH aggregate not convertible to Serial or Partial aggregation
@@ -657,7 +701,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //  PROJECTION
             //   Hash AGGREGATION ops: SUM(VOLT_TEMP_TABLE.column#0)
             //    RECEIVE FROM ALL PARTITIONS
-            // Not supported yet
+            // Not supported yet because we do not support inlining a projection before
+            // the order by into the MergeReceive AND we don't recognize cases like this
+            // where we could defer the projection to be applied after the order by node and
+            // so after the mergereceive OR as a final inlined step of the mergereceive.
             //            select indexed_non_partition_key, sum(col), sum(col)+1
             //            from partitioned
             //            group by indexed_non_partition_key
@@ -689,14 +736,20 @@ public class TestPlansOrderBy extends PlannerTestCase {
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
-            // The Index Scan (P_D32_IDX) does not cover the first column (P_D1) from the ORDER BY
+            // ORDER BY column P_D1 is not covered by the P_D32_IDX index
+            // and its sort direction is invalid. Partition outputs are unordered
+            //            select indexed_non_partition_key1, non_indexed_non_partition_col2, max(col)
+            //            from partitioned
+            //            group by indexed_non_partition_key1, non_indexed_non_partition_col2
+            //            order by indexed_non_partition_key1, non_indexed_non_partition_col2;"
             List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1, P_D3, max (P_D0) from p where P_D3 = 0 group by P_D1, P_D3 order by P_D3, P_D1;");
+                    "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D1, P_D3");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
             // ORDER BY column P_D1 is not covered by the P_D32_IDX index
+            // and its sort direction is invalid. Partition outputs are unordered
             //            select indexed_non_partition_key1, non_indexed_non_partition_col2, max(col)
             //            from partitioned
             //            group by indexed_non_partition_key1, non_indexed_non_partition_col2

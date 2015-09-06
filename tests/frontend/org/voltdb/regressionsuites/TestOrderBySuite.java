@@ -877,7 +877,7 @@ public class TestOrderBySuite extends RegressionSuite {
         expected = new long[][] {{1}, {0}, {2}, {3}};
         validateTableOfLongs(vt, expected);
         vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertTrue(!vt.toString().contains("MERGE RECEIVE"));
+        assertFalse(vt.toString().contains("MERGE RECEIVE"));
         assertTrue(vt.toString().contains("P_D32_10_IDX"));
 
         // P_D0 is a partition column for P. All rows are from a single partition.
@@ -1020,30 +1020,23 @@ public class TestOrderBySuite extends RegressionSuite {
         long[][] expected;
         // Select from an ordered subquery. The subquery SeqScanPlanNode.isOutputOrdered
         // unconditionally returns FALSE even if the parent sort expressions and order matches
-        // its own ones. The parent ORDER BY is not converted to MERGERECEIVE
-        // The subquery MERGERECEIVE node is removed
+        // its own ones.
         sql = "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1) P_T order by PT_D1;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {1}, {4}, {6}, {6}, {11}, {11}};
         validateTableOfLongs(vt, expected);
 
-        // Same SQL as above but with subquery LIMIT. The MERGERECEIVE node is preserved
-        sql = "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1 limit 4) P_T order by PT_D1;";
+        // Select from an ordered subquery with LIMIT. The subquery MERGERECEIVE node is preserved to guarantee
+        // its determinism
+        sql = "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1) P_T limit 4;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {1}, {4}, {6}};
         validateTableOfLongs(vt, expected);
 
-        // The subquery with non-partition GROUP BY column - The MERGERECEIVE node is preserved
+        // The subquery with non-partition GROUP BY column - The subquery MERGERECEIVE node is preserved
         sql = "select PT_D1, MP_D3 from (select P_D1 as PT_D1, max(P_D3) as MP_D3 from P group by P_D1 order by P_D1 limit 4) P_T order by PT_D1";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {4}, {6}, {11}};
-        validateTableOfLongs(vt, expected);
-
-        // The subquery with partition GROUP BY - The subquery MERGERECEIVE node is removed
-        // The parent query qualifies for the optimization because of the pushed down ORDER BY PT_D1
-        sql = "select PT_D1, MP_D3 from (select P_D0  as PT_D0, P_D1 as PT_D1, max(P_D3) as MP_D3 from P group by P_D0, P_D1 order by P_D0, P_D1) P_T order by PT_D1 limit 5";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        expected = new long[][] {{1}, {1}, {4}, {6}, {6}};
         validateTableOfLongs(vt, expected);
 }
 
