@@ -219,7 +219,7 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     std::vector<std::string> column_names(pre_agg_schema->columnCount());
     m_tmpInputTable.reset(TableFactory::getTempTable(m_abstractNode->databaseId(),
                                                          "tempInput",
-                                                         m_abstractNode->generateTupleSchema(),
+                                                         pre_agg_schema,
                                                          column_names,
                                                          limits));
     return true;
