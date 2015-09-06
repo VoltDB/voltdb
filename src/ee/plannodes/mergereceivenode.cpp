@@ -67,7 +67,6 @@ PlanNodeType MergeReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TY
 std::string MergeReceivePlanNode::debugInfo(const std::string& spacer) const
 {
     std::ostringstream buffer;
-    buffer << spacer << "Merge Receive\n";
     if (m_outputSchemaPreAgg.empty()) {
         buffer << spacer << "Incoming Table effectively the same as Outgoing\n";
     } else {

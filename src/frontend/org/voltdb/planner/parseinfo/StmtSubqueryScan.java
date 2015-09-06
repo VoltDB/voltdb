@@ -36,6 +36,7 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 
@@ -313,6 +314,21 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         m_hasReceiveNode = true;
+
+        if (root.hasAnyNodeOfClass(MergeReceivePlanNode.class)) {
+            // The MergeReceivePlanNode always has an inline ORDER BY node and may have
+            // LIMIT/OFFSET and aggregation node(s). Removing the MergeReceivePlanNode will
+            // also remove its inline node(s) which may produce an invalid access plan. For example
+            // SELECT TC1 FROM (SELECT C1 AS TC1 FROM P ORDER BY C1) PT LIMIT 4;
+            // where P is partitioned and C1 is a non-partitioned index column.
+            // Removing the subquery MergeReceivePlnaNode and its ORDER BY node results
+            // in the invalid access plan - the subquery result order is significant in this case
+            // The concern with generally keeping the (Merge)Receive node in the subquery is
+            // that it would needlessly generate more-than-2-fragment plans in cases
+            // where 2 fragments could have done the job.
+            return root;
+        }
+
         if (m_subqueryStmt instanceof ParsedUnionStmt) {
             // Union are just returned
             assert(m_subqueryStmt instanceof ParsedUnionStmt);
