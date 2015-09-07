@@ -262,6 +262,7 @@ class Overview extends Module {
         memoryLimitCancel       { $("#btnEditMemorySizeCancel") }
         memoryLimitPopupOk      { $("#btnPopupMemoryLimitOk") }
         memoryLimitPopupCancel  { $("#btnPopupMemoryLimitCancel") }
+        memoryLimitDdlUnit      { $("#ddlMemoryLimitUnit") }
 
         //Disk Limit
 
