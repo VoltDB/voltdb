@@ -115,7 +115,7 @@ $(document).ready(function () {
     // Pop Slide Server Search
     $('#popServerSearch').keyup(function () {
         var searchText = $(this).val().toLowerCase();
-        $('ul.servers-list > li').each(function () {
+        $('#serversList > tbody > tr.filterClass').each(function () {
             var currentLiText = $(this).text().toLowerCase(),
                 showCurrentLi = currentLiText.indexOf(searchText) !== -1;
             $(this).toggle(showCurrentLi);
@@ -530,7 +530,7 @@ var loadPage = function (serverName, portid) {
             //hide loading icon
             $("#overlay").hide();
 
-            $('#serversList > li.active > a').click(function () {
+            $('#serversList >  tbody > tr > td.active > a').click(function () {
                 var clickedServer = $(this).html();
                 $('.activeServerName').html(clickedServer).attr('title', clickedServer);
 

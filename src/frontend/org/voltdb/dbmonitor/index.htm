@@ -148,12 +148,28 @@
                                     <div class="clear"></div>
                                 </div>
                                 <div class="slide-pop-content">
-                                    <div class="server-info-heading">
+                                   <!-- <div class="server-info-heading">
                                         <span class="server">Server Name</span> <span class="servIp">IP Address</span> <span class="memory-use">Memory Usage</span>
                                         <div class="clear"></div>
-                                    </div>
-                                    <div id="serverListWrapper">
-                                        <ul class="servers-list" id="serversList"></ul>
+                                    </div>-->
+                                    <div class="slimScrollDiv" style="position: relative; overflow: hidden; width: auto; ">
+                                        <div id="serverListWrapper">
+                                            <table class="serversTbl">
+                                                <tr >
+                                                    <th width="40%">Server Name</th>
+                                                    <th width="30%">IP Address</th>
+                                                    <th width="30%">Memory Usage</th>
+
+                                                </tr>
+                                            </table>
+                                            <div style="overflow:auto; width: auto; height: 225px;">
+                                                
+                                            <table class="serversTbl" id="serversList">
+                                               
+                                            </table>
+                                            </div>
+                                            </div>
+                                        <div class="slimScrollBar" style="width: 14px; position: absolute; top: 0px; opacity: 0.8; display: none; border-radius: 0px; z-index: 99; right: 1px; height: 255px; background: rgb(63, 83, 100);"></div><div class="slimScrollRail" style="width: 14px; height: 100%; position: absolute; top: 0px; display: none; border-radius: 0px; opacity: 0.2; z-index: 90; right: 1px; background: rgb(63, 83, 100);"></div>
                                     </div>
                                 </div>
                             </div>
@@ -489,12 +505,22 @@
                                         <div class="clear"></div>
                                     </div>
                                     <div class="slide-pop-content" style="padding: 0 0 15px 0;">
-                                        <div id="serverListWrapperAdmin">
+                                        <div style="padding: 15px 16px 0 15px;">
                                             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
-                                                <tbody></tbody>
-                                            </table>
+                                               <tr class="serverHeader">
+                                                   <th class="configLabel" width="40%"> Server Name </th> 
+                                                   <th align="center">IP Address</th>
+                                                   <th align="right"> State</th>
+                                               </tr>
+                                           </table>
+                                            <div id="serverListWrapperAdmin" style="height:220px; overflow: auto;">
+                                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                                                    <tbody> </tbody>
+                                                </table>
+                                            </div>
+                                            
+                                             </div>
                                         </div>
-                                    </div>
                                 </div>
                             </div>
                             <!-- server list -->
@@ -1092,11 +1118,24 @@
     <div id="memoryAlerts" style="display: none">
         <div class="overlay-title">Memory Usage Alerts</div>
         <div class="clear"></div>
-        <div class="overlay-content">
+        <div class="overlay-content overlayAlert"> <!--style="display:block;height: auto !important"-->
+            <div class="mainContentAlert">
+            <table class="serversListTbl">
+                   <tr class="serverHeader">
+                    <th width="40%">Server Name</th>
+                    <th width="30%">IP Address</th>
+                    <th width="30%">Memory Usage</th>
+                </tr>
+            </table>
+                
             <div class="alertWrap">
                 <table class="serversListTbl" id="memoryAlertsList">
+                   
                 </table>
             </div>
+
+            </div>
+
         </div>
     </div>
     <!-- POPUP Alerts -->
