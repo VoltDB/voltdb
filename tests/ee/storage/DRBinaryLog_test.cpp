@@ -370,7 +370,7 @@ TEST_F(DRBinaryLogTest, VerifyHiddenColumns) {
     NValue drTimestamp = tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
     NValue drTimestampReplica = tuple.getHiddenNValue(m_tableReplica->getDRTimestampColumnIndex());
     EXPECT_EQ(ValuePeeker::peekAsBigInt(drTimestamp), 70);
-    ASSERT_TRUE(drTimestamp.compare(drTimestampReplica) == 0);
+    EXPECT_EQ(0, drTimestamp.compare(drTimestampReplica));
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
