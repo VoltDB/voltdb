@@ -24,7 +24,6 @@ class AdminAdvancedTest extends TestBase {
     static String initialQueryTimeout
     static String initialMemoryLimit = "-1"
 
-    static boolean revertAutosnapshots = false
     static boolean revertHeartTimeout = false
     static boolean revertQueryTimeout = false
     static boolean revertMemorySize =false
@@ -425,32 +424,32 @@ class AdminAdvancedTest extends TestBase {
     }
 
     //Memory Limit
-    def "Check the memory limit ddit button and then Cancel button"() {
-        when:
-        page.advanced.click()
-        then:
-        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
-
-        when:
-        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
-        then:
-        waitFor(waitTime) {
-            page.overview.memoryLimitField.isDisplayed()
-            page.overview.memoryLimitUnit.isDisplayed()
-            page.overview.memoryLimitOk.isDisplayed()
-            page.overview.memoryLimitCancel.isDisplayed()
-        }
-
-        when:
-        waitFor(waitTime) { page.overview.memoryLimitCancel.click() }
-        then:
-        waitFor(waitTime) {
-            !page.overview.memoryLimitField.isDisplayed()
-            !page.overview.memoryLimitOk.isDisplayed()
-            !page.overview.memoryLimitCancel.isDisplayed()
-            page.overview.memoryLimitEdit.isDisplayed()
-        }
-    }
+//    def "Check the memory limit edit button and then Cancel button"() {
+//        when:
+//        page.advanced.click()
+//        then:
+//        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+//
+//        when:
+//        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+//        then:
+//        waitFor(waitTime) {
+//            page.overview.memoryLimitField.isDisplayed()
+//            page.overview.memoryLimitUnit.isDisplayed()
+//            page.overview.memoryLimitOk.isDisplayed()
+//            page.overview.memoryLimitCancel.isDisplayed()
+//        }
+//
+//        when:
+//        waitFor(waitTime) { page.overview.memoryLimitCancel.click() }
+//        then:
+//        waitFor(waitTime) {
+//            !page.overview.memoryLimitField.isDisplayed()
+//            !page.overview.memoryLimitOk.isDisplayed()
+//            !page.overview.memoryLimitCancel.isDisplayed()
+//            page.overview.memoryLimitEdit.isDisplayed()
+//        }
+//    }
 
     def "Check memory limit edit and then click Ok and Cancel"() {
         when:
@@ -596,39 +595,39 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check the error message for memory Limit when more than 4 digits are placed after decimal"() {
-        when:
-        String invalidMemoryLimit = "20.12345"
-        String validMemoryLimit ="20.1234"
-        page.advanced.click()
-        then:
-        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
-
-        when:
-        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
-        then:
-        waitFor(waitTime) {
-            page.overview.memoryLimitField.isDisplayed()
-            page.overview.memoryLimitOk.isDisplayed()
-            page.overview.memoryLimitCancel.isDisplayed()
-        }
-
-        when:
-        page.overview.memoryLimitField.value(invalidMemoryLimit)
-        waitFor(waitTime) {
-            page.overview.memoryLimitOk.click()
-        }
-        then:
-        waitFor(waitTime) {
-            page.overview.memoryLimitError.isDisplayed()
-            page.overview.memoryLimitError.text().equals("Only four digits are allowed after decimal.")
-        }
-
-        when:
-        page.overview.memoryLimitField.value(validMemoryLimit)
-        then:
-        !page.overview.memoryLimitError.isDisplayed()
-    }
+//    def "Check the error message for memory Limit when more than 4 digits are placed after decimal"() {
+//        when:
+//        String invalidMemoryLimit = "20.12345"
+//        String validMemoryLimit ="20.1234"
+//        page.advanced.click()
+//        then:
+//        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+//
+//        when:
+//        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+//        then:
+//        waitFor(waitTime) {
+//            page.overview.memoryLimitField.isDisplayed()
+//            page.overview.memoryLimitOk.isDisplayed()
+//            page.overview.memoryLimitCancel.isDisplayed()
+//        }
+//
+//        when:
+//        page.overview.memoryLimitField.value(invalidMemoryLimit)
+//        waitFor(waitTime) {
+//            page.overview.memoryLimitOk.click()
+//        }
+//        then:
+//        waitFor(waitTime) {
+//            page.overview.memoryLimitError.isDisplayed()
+//            page.overview.memoryLimitError.text().equals("Only four digits are allowed after decimal.")
+//        }
+//
+//        when:
+//        page.overview.memoryLimitField.value(validMemoryLimit)
+//        then:
+//        !page.overview.memoryLimitError.isDisplayed()
+//    }
 
     def "Check the error message for memory limit when value is less than 0"() {
         when:
@@ -662,8 +661,477 @@ class AdminAdvancedTest extends TestBase {
         then:
         !page.overview.memoryLimitError.isDisplayed()
     }
-    //
 
+
+   // Disk Limit
+
+    def "Check Disk Limit Click and check its value"() {
+        when:"Open Advanced"
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.diskLimit.isDisplayed() }
+        when:
+        page.overview.diskLimit.click()
+        then:
+        waitFor(waitTime) { page.noFeaturestxt.isDisplayed() }
+        if(page.noFeaturestxt.text()=="No features available.") {
+            println("Currently, No Features are available in Disk Limit")
+        } else {
+            println("Early presence of Features settings detected!")
+        }
+        page.overview.diskLimit.click()
+    }
+
+    def "Verify Add Disk Limit for SNAPSHOTS feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+         waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+    waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+    def "Verify Add Disk Limit for COMMANDLOG feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("COMMANDLOG")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+        waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+    def "Verify Add Disk Limit for EXPORTOVERFLOW feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("EXPORTOVERFLOW")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+        waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+    def "Verify Add Disk Limit for DROVERFLOW feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("DROVERFLOW")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+        waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+    def "Verify Add Disk Limit for COMMANDLOGSNAPSHOT feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("COMMANDLOGSNAPSHOT")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+        waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+
+
+    def "Verify Error message for  Duplicate Features"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements and add values"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+
+        then:"Add another SNAPSHOT feature"
+        page.overview.featureName2.isDisplayed()
+        page.overview.featureValue2.isDisplayed()
+        page.overview.featureUnit2.isDisplayed()
+        page.overview.featureName2.value("SNAPSHOTS")
+        page.overview.featureValue2.value("13")
+        page.overview.featureUnit2.value("GB")
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        then: "Check for validation"
+        page.overview.errortxtName1.isDisplayed()
+        page.overview.errortxtName2.isDisplayed()
+    }
+
+    def "Verify Error Message for Features size"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        then: "Check for validation"
+        page.overview.errorValue1.isDisplayed()
+        page.overview.errorValue1.text().equals("This field is required")
+    }
+
+    def "Verify Error Message for Features unit"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements and add values"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("130")
+        page.overview.featureUnit1.value("%")
+
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        then: "Check for validation"
+        page.overview.errorValue1.isDisplayed()
+        page.overview.errorValue1.text().equals("Maximum value of percentage cannot be greater than 99.")
+    }
+
+    def "Verify Error Message for Feature's invalid Decimal value"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements and add values"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("13.33")
+        page.overview.featureUnit1.value("%")
+
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        then: "Check for validation"
+        page.overview.errorValue1.isDisplayed()
+        page.overview.errorValue1.text().equals("Please enter a positive number without any decimal.")
+
+    }
+
+    def "Verify Add Disk Limit Cancel"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements and add values"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("%")
+
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitCancel.isDisplayed()
+        page.overview.btnSaveDiskLimitCancel.click()
+
+        then: "Cancelled"
+       println("Confirmation popup has been cancelled")
+    }
 
     def "Advanced Expand:Check Text"() {
         when:

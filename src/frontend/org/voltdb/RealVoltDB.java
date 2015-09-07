@@ -2420,6 +2420,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
             VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
+        // Allow export datasources to start consuming their binary deques safely
+        // as at this juncture the initial truncation snapshot is already complete
+        ExportManager.instance().startPolling(m_catalogContext);
 
         //Tell import processors that they can start ingesting data.
         ImportManager.instance().readyForData(m_catalogContext, m_messenger);
@@ -2587,6 +2590,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Start listening on the DR ports
             prepareReplication();
             startResourceUsageMonitor();
+
+            // Allow export datasources to start consuming their binary deques safely
+            // as at this juncture the initial truncation snapshot is already complete
+            ExportManager.instance().startPolling(m_catalogContext);
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData(m_catalogContext, m_messenger);

@@ -3752,7 +3752,7 @@ function loadAdminPage() {
                     '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div>';
 
                 result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
-                       '   <td class="configLabel" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer;">' +
+                       '   <td class="configLabel" id="diskLimit" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer;">' +
                        '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '">  Disk Limit</a>  ' +
                        '   </td>' +
                        '   <td align="right"></td>' +
@@ -3793,7 +3793,7 @@ function loadAdminPage() {
 
             if (result == "") {
                 result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
-                      '   <td class="configLabel" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer">' +
+                      '   <td id="diskLimit" class="configLabel" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer">' +
                       '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"" ;">Disk Limit</a>  ' +
                       '   </td>' +
                       '   <td align="right">' +

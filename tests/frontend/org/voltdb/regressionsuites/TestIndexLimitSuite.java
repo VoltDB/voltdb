@@ -49,7 +49,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
         super(name);
     }
 
-    void callWithExpectedResult(Client client, int ret, String procName, Object... params)
+    void callWithExpectedResult(Client client, Integer ret, String procName, Object... params)
             throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = client.callProcedure(procName, params);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -57,7 +57,13 @@ public class TestIndexLimitSuite extends RegressionSuite {
         VoltTable result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals(ret, result.getLong(0));
+        if (ret == null) {
+            long unexpected = result.getLong(0);
+            assertTrue("Unexpected non-null value: " + unexpected, result.wasNull());
+        }
+        else {
+            assertEquals(ret.intValue(), result.getLong(0));
+        }
     }
 
     void callWithExpectedResult(Client client, String ret, String procName, Object... params)
@@ -169,6 +175,22 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, 3, "EDGE_TU2_MAX_POINTS1", "thea", 1);
         callWithExpectedResult(client, -1, "EDGE_TU2_MIN_POINTS2", 5, "jim");
         callWithExpectedResult(client, 3, "EDGE_TU2_MAX_POINTS2", 1, "thea");
+        callWithExpectedResult(client, 2, "EDGE_TU2_MIN_POINTS3", -1, "jim");
+        callWithExpectedResult(client, 2, "EDGE_TU2_MAX_POINTS3", 3, "jim");
+        callWithExpectedResult(client, -1, "EDGE_TU2_MIN_POINTS3", -2, "jim");
+        callWithExpectedResult(client, 3, "EDGE_TU2_MAX_POINTS3", 4, "jim");
+        callWithExpectedResult(client, (Integer)null, "EDGE_TU2_MIN_POINTS3", 4, "jim");
+        callWithExpectedResult(client, (Integer)null, "EDGE_TU2_MAX_POINTS3", -1, "jim");
+        callWithExpectedResult(client, -1, "EDGE_TU2_MIN_POINTS4", -2, "jim");
+        callWithExpectedResult(client, 3, "EDGE_TU2_MAX_POINTS4", 4, "jim");
+        callWithExpectedResult(client, -1, "EDGE_TU2_MIN_POINTS4", -1, "jim");
+        callWithExpectedResult(client, 3, "EDGE_TU2_MAX_POINTS4", 3, "jim");
+        callWithExpectedResult(client, (Integer)null, "EDGE_TU2_MIN_POINTS4", 4, "jim");
+        callWithExpectedResult(client, -1, "EDGE_TU2_MAX_POINTS4", -1, "jim");
+        callWithExpectedResult(client, (Integer)null, "EDGE_TU2_MIN_POINTS5", 4, "jim");
+        callWithExpectedResult(client, -1, "EDGE_TU2_MAX_POINTS5", -1, "jim");
+        callWithExpectedResult(client, (Integer)null, "EDGE_TU2_MIN_POINTS6", "betty");
+        callWithExpectedResult(client, (Integer)null, "EDGE_TU2_MAX_POINTS6", "jim");
         callWithExpectedResult(client, 9, "EDGE_TU2_MIN_POINTS_EXPR", "jim", 5);
         callWithExpectedResult(client, 13, "EDGE_TU2_MAX_POINTS_EXPR", "betty", 7);
     }
@@ -393,6 +415,14 @@ public class TestIndexLimitSuite extends RegressionSuite {
         project.addStmtProcedure("EDGE_TU2_MAX_POINTS1", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = ? AND POINTS > ?");
         project.addStmtProcedure("EDGE_TU2_MIN_POINTS2", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < ? AND UNAME = ?");
         project.addStmtProcedure("EDGE_TU2_MAX_POINTS2", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS > ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MIN_POINTS3", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS > ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MAX_POINTS3", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS < ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MIN_POINTS4", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS >= ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MAX_POINTS4", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS <= ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MIN_POINTS5", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS = ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MAX_POINTS5", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS = ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MIN_POINTS6", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS IS NULL AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MAX_POINTS6", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS IS NULL AND UNAME = ?");
         project.addStmtProcedure("EDGE_TU2_MIN_POINTS_EXPR", "SELECT MIN(POINTS + 10) FROM TU2 WHERE UNAME = ? AND POINTS + 10 > ?");
         project.addStmtProcedure("EDGE_TU2_MAX_POINTS_EXPR", "SELECT MAX(POINTS + 10) FROM TU2 WHERE UNAME = ? AND POINTS + 10 > ?");
 

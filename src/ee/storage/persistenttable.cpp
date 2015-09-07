@@ -382,11 +382,12 @@ void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(1, source.getNValue(2));
 }
 
-void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple) {
+void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update) {
     assert(hasDRTimestampColumn());
-    const int64_t drTimestamp = ec->currentDRTimestamp();
-    tuple.setHiddenNValue(getDRTimestampColumnIndex(),
-                          ValueFactory::getBigIntValue(drTimestamp));
+    if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
+        const int64_t drTimestamp = ec->currentDRTimestamp();
+        tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
+    }
 }
 
 /*
@@ -465,8 +466,9 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn())
-        setDRTimestampForTuple(ec, target);
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, target, false);
+    }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
@@ -608,8 +610,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn())
-        setDRTimestampForTuple(ec, sourceTupleWithNewValues);
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
+    }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
@@ -854,7 +857,8 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
  *  Indexes and views have been destroyed first.
  */
 void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
-    deleteTupleStorage(target); // also frees object columns
+    TBPtr block = findBlock(target.address(), m_data, m_tableAllocationSize);
+    deleteTupleStorage(target, block, true); // also frees object columns along with empty tuple block storage
 }
 
 /*

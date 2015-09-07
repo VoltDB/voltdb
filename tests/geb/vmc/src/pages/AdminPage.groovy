@@ -242,6 +242,12 @@ class AdminPage extends VoltDBManagementCenterPage {
         btnPopupDrMasterCancel      { $("#btnPopupDrMasterCancel") }
         drTablePopup                { $(class:"overlay-title icon-alert", text:"DR Tables") }
         chkDrMaster                 { $("#row-DrConfig > td.tdDrConfig > div.icheckbox_square-aero.checked.customCheckbox > ins") }
+
+        diskLimitEdit { $("#btnEditDiskLimit") }
+        diskLimitExpanded              {$("#diskLimitConfiguration").find(".configLabel").first()}
+        snapShotName {$("#diskLimitConfiguration").find(".configLabe2").first()}
+        noFeaturestxt			{ $("#diskLimitConfiguration > tr.childprop-row-60 > td.configLabel")}
+
     }
     static at = {
         adminTab.displayed

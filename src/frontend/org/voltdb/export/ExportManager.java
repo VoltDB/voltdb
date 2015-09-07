@@ -216,7 +216,7 @@ public class ExportManager
                         newProcessor.addLogger(exportLog);
                         newProcessor.setExportGeneration(nextGeneration);
                         newProcessor.setProcessorConfig(m_processorConfig);
-                        newProcessor.readyForData();
+                        newProcessor.readyForData(false);
                     } else {
                         //Just set the next generation.
                         m_processor.get().setExportGeneration(nextGeneration);
@@ -386,6 +386,17 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
     }
 
+    public void startPolling(CatalogContext catalogContext) {
+        final CatalogMap<Connector> connectors = getConnectors(catalogContext);
+
+        if(!hasEnabledConnectors(connectors)) return;
+
+        ExportDataProcessor processor = m_processor.get();
+        Preconditions.checkState(processor != null, "guest processor is not set");
+
+        processor.startPolling();
+    }
+
     private synchronized void createInitialExportProcessor(
             CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
@@ -436,7 +447,7 @@ public class ExportManager
              * For the newly constructed processor, provide it the oldest known generation
              */
             newProcessor.setExportGeneration(nextGeneration);
-            newProcessor.readyForData();
+            newProcessor.readyForData(startup);
 
             if (startup) {
                 /*

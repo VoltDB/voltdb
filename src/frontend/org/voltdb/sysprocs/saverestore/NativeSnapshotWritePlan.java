@@ -222,6 +222,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
                             context.getHostId(), context.getCluster().getTypeName(),
                             context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
+                            context.getDatabase().getIsactiveactivedred(),
                             tracker, timestamp, numTables, snapshotRecord);
                     m_createdTargets.put(task.m_table.getRelativeIndex(), target);
                 }
@@ -238,6 +239,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                         String clusterName,
                                                         String databaseName,
                                                         int partitionCount,
+                                                        boolean isActiveActiveDRed,
                                                         SiteTracker tracker,
                                                         long timestamp,
                                                         AtomicInteger numTables,
@@ -253,17 +255,32 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 SnapshotFormat.NATIVE,
                 hostId);
 
-        sdt = new DefaultSnapshotDataTarget(saveFilePath,
-                hostId,
-                clusterName,
-                databaseName,
-                table.getTypeName(),
-                partitionCount,
-                table.getIsreplicated(),
-                tracker.getPartitionsForHost(hostId),
-                CatalogUtil.getVoltTable(table),
-                txnId,
-                timestamp);
+        if (isActiveActiveDRed && table.getIsdred()) {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO),
+                    txnId,
+                    timestamp);
+        }
+        else {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table),
+                    txnId,
+                    timestamp);
+        }
 
         m_targets.add(sdt);
         final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);
