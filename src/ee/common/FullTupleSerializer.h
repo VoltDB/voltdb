@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DEFAULTTUPLESERIALIZER_H_
-#define DEFAULTTUPLESERIALIZER_H_
+#ifndef FULLTUPLESERIALIZER_H_
+#define FULLTUPLESERIALIZER_H_
 #include "common/TupleSerializer.h"
 #include "common/tabletuple.h"
 
@@ -25,10 +25,10 @@ class ReferenceSerializeOutput;
 class TupleSchema;
 
 /**
- * DefaultTupleSerializer provides delegate methods to serialize only visible columns
+ * FullTupleSerializer provides delegate methods to serialize visible and hidden columns
  * of the given tuple. It also gives corresponding max serialization size for buffer allocation.
  */
-class DefaultTupleSerializer : public TupleSerializer {
+class FullTupleSerializer : public TupleSerializer {
 public:
     /**
      * Serialize the provided tuple to the provide serialize output
@@ -40,8 +40,8 @@ public:
      */
     size_t getMaxSerializedTupleSize(const TupleSchema *schema);
 
-    virtual ~DefaultTupleSerializer() {}
+    virtual ~FullTupleSerializer() {}
 };
 }
 
-#endif /* DEFAULTTUPLESERIALIZER_H_ */
+#endif /* FULLTUPLESERIALIZER_H_ */
