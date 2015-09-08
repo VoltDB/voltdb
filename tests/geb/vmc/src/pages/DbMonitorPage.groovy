@@ -48,7 +48,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         serverList     			        { $('#popServerList') }
         servers         		        { serverList.find('.active') }
         servName        		        { servers.find('a') }
-        servMemory      		        { servers.find('.memory-status') }
+        servMemory      		        { servers.next().next().find('.memory-status') }
         showHideGraph  		 	        { $('#showHideGraphBlock') }
         graphsArea      		        { $('#graphChart') }
         showHideData    		        { $('#ShowHideBlock') }
@@ -283,6 +283,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         //
         tablesPrev                  { $("#previousTables") }
         tablesNext                  { $("#nextTables") }
+
+        serverListHeader            { $("#tblServerListHeader") }
+        serverNameHeader            { $("#thServerName") }
+        serverIpAddressHeader       { $("#thIpAddress") }
+        serverMemoryUsageHeader     { $("#thMemoryUsage") }
     }
 
     static at = {
@@ -465,8 +470,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      */
     def String getMemoryUsage(String serverName) {
         openServerList()
-        waitFor { servName.filter(text: serverName).next('.memory-status').displayed }
-        String text = servName.filter(text: serverName).next('.memory-status').text()
+        waitFor { servName.filter(text: serverName).parent().next().next().find('.memory-status').displayed }
+        String text = servName.filter(text: serverName).parent().next().next().find('.memory-status').text()
         closeServerList()
         return text
     }
