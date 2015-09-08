@@ -27,7 +27,6 @@
 
 #include "common/FatalException.hpp"
 #include "common/types.h"
-#include "common/NValue.hpp"
 
 #define UNINLINEABLE_OBJECT_LENGTH 64
 #define UNINLINEABLE_CHARACTER_LENGTH 16
@@ -337,7 +336,6 @@ inline uint16_t TupleSchema::getUninlinedObjectColumnInfoIndex(const int objectC
 inline void TupleSchema::setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex) {
     reinterpret_cast<uint16_t*>(m_data)[objectColumnIndex] = objectColumnInfoIndex;
 }
-
 } // namespace voltdb
 
 #endif // TUPLESCHEMA_H_

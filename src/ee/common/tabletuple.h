@@ -164,12 +164,12 @@ public:
         return bytes;
     }
 
-    // return the number of bytes when serialized for regular usage
+    // return the number of bytes when serialized for regular usage (other
+    // than export and DR).
     size_t serializationSize() const {
         size_t bytes = sizeof(int32_t);
-        int cols = sizeInValues();
-        for (int i = 0; i < cols; ++i) {
-            bytes += serializedColumnSize(i);
+        for (int colIdx = 0; colIdx < sizeInValues(); ++colIdx) {
+            bytes += maxSerializedColumnSize(colIdx);
         }
         return bytes;
     }
@@ -453,38 +453,23 @@ private:
         }
     }
 
-    inline size_t serializedColumnSize(int colIndex) const {
+    inline size_t maxSerializedColumnSize(int colIndex) const {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
         voltdb::ValueType columnType = columnInfo->getVoltType();
-        switch (columnType) {
-          case VALUE_TYPE_TINYINT:
-              return sizeof (int8_t);
-          case VALUE_TYPE_SMALLINT:
-              return sizeof (int16_t);
-          case VALUE_TYPE_INTEGER:
-              return sizeof (int32_t);
-          case VALUE_TYPE_BIGINT:
-          case VALUE_TYPE_TIMESTAMP:
-          case VALUE_TYPE_DOUBLE:
-              return sizeof (int64_t);
-          case VALUE_TYPE_DECIMAL:
-              return 16;
-          case VALUE_TYPE_VARCHAR:
-          case VALUE_TYPE_VARBINARY:
-              // 32 bit length preceding value and
-              // actual character data without null string terminator.
-              if (!isNull(colIndex))
-              {
-                  return (sizeof(int32_t) + ValuePeeker::peekObjectLength_withoutNull(getNValue(colIndex)));
-              }
-              return sizeof(int32_t);
-          default:
-            // let caller handle this error
-            throwDynamicSQLException(
-                    "Unknown ValueType %s found during Export serialization.",
-                    valueToString(columnType).c_str() );
-            return (size_t)0;
+
+        if (columnType == VALUE_TYPE_VARCHAR && columnType == VALUE_TYPE_VARBINARY) {
+            // Null variable length value doesn't take any bytes in
+            // export table, so here needs a special handle for VARCHAR
+            // and VARBINARY
+            if (isNull(colIndex)) {
+                return sizeof(int32_t);
+            }
+        } else if (columnType == VALUE_TYPE_DECIMAL) {
+            // Other than export and DR table, decimal column in regular table
+            // doesn't contain scale and precision bytes.
+            return 16;
         }
+        return maxExportSerializedColumnSize(colIndex);
     }
 };
 

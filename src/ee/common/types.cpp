@@ -71,7 +71,7 @@ bool isIntegralType(ValueType type) {
     throw exception();
 }
 
-NValue getRandomValue(ValueType type) {
+NValue getRandomValue(ValueType type, uint32_t maxLength) {
     switch (type) {
         case VALUE_TYPE_TIMESTAMP:
             return ValueFactory::getTimestampValue(static_cast<int64_t>(time(NULL)));
@@ -99,8 +99,8 @@ NValue getRandomValue(ValueType type) {
         case VALUE_TYPE_DOUBLE:
             return ValueFactory::getDoubleValue((rand() % 10000) / (double)(rand() % 10000));
         case VALUE_TYPE_VARCHAR: {
-            int length = (rand() % 8);
-            char characters[9];
+            int length = (rand() % maxLength);
+            char characters[maxLength];
             for (int ii = 0; ii < length; ii++) {
                 characters[ii] = (char)(32 + (rand() % 94)); //printable characters
             }
@@ -109,8 +109,8 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getStringValue(string(characters));
         }
         case VALUE_TYPE_VARBINARY: {
-            int length = (rand() % 8);
-            unsigned char bytes[9];
+            int length = (rand() % maxLength);
+            unsigned char bytes[maxLength];
             for (int ii = 0; ii < length; ii++) {
                 bytes[ii] = (unsigned char)rand() % 256; //printable characters
             }

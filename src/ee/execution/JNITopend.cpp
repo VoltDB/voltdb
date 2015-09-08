@@ -73,8 +73,6 @@ class JNILocalFrameBarrier {
 JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecutionEngine(caller) {
     // Cache the method id for better performance. It is valid until the JVM unloads the class:
     // http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/design.html#wp17074
-    jclass tmpClass = NULL;
-
     jclass jniClass = m_jniEnv->GetObjectClass(m_javaExecutionEngine);
     VOLT_TRACE("found class: %d", jniClass == NULL);
     if (jniClass == NULL) {
@@ -133,14 +131,12 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    tmpClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_exportManagerClass));
-    m_jniEnv->DeleteLocalRef(m_exportManagerClass);
-    if (tmpClass == NULL) {
+    m_exportManagerClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_exportManagerClass));
+    if (m_exportManagerClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(tmpClass != NULL);
+        assert(m_exportManagerClass != NULL);
         throw std::exception();
     }
-    m_exportManagerClass = tmpClass;
 
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
@@ -169,14 +165,12 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    tmpClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_partitionDRGatewayClass));
-    m_jniEnv->DeleteLocalRef(m_partitionDRGatewayClass);
-    if (tmpClass == NULL) {
+    m_partitionDRGatewayClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_partitionDRGatewayClass));
+    if (m_partitionDRGatewayClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(tmpClass != NULL);
+        assert(m_partitionDRGatewayClass != NULL);
         throw std::exception();
     }
-    m_partitionDRGatewayClass = tmpClass;
 
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
@@ -205,14 +199,12 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    tmpClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_encoderClass));
-    m_jniEnv->DeleteLocalRef(m_encoderClass);
-    if (tmpClass == NULL) {
+    m_encoderClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_encoderClass));
+    if (m_encoderClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(tmpClass != NULL);
+        assert(m_encoderClass != NULL);
         throw std::exception();
     }
-    m_encoderClass = tmpClass;
 
     m_decodeBase64AndDecompressToBytesMID = m_jniEnv->GetStaticMethodID(
             m_encoderClass,

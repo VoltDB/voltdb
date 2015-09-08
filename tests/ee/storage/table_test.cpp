@@ -73,7 +73,7 @@ using namespace std;
 using namespace voltdb;
 
 #define NUM_OF_COLUMNS 9
-#define NUM_OF_TUPLES 10000
+#define NUM_OF_TUPLES 5000
 
 ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_TINYINT,
                                             VALUE_TYPE_SMALLINT,
@@ -87,15 +87,16 @@ ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_TINYINT,
 
 int32_t COLUMN_SIZES[NUM_OF_COLUMNS] =
     {
-        NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),
-        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL),
-        NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE),
-        NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP),
-        NValue::getTupleStorageSize(VALUE_TYPE_VARCHAR),
-        NValue::getTupleStorageSize(VALUE_TYPE_VARBINARY)
+        NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),    // 1
+        NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),   // 2
+        NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),    // 4
+        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),     // 8
+        NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL),    // 16
+        NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE),     // 8
+        NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP),  // 8
+        10,    /* The test uses getRandomValue() to generate random value,
+                  make sure the column size not conflict with the value it generates. */
+        16     /* same as above */
     };
 bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { true, true, true, true, true, true, true, true, true };
 
