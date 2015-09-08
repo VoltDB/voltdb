@@ -936,7 +936,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<byte[]> data = Optional.absent();
         volatile Optional<DistributerException> fault = Optional.absent();
 
-        GetData(String path) {
+        GetData(final String path) {
             checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             this.path = path;
             m_zk.getData(path, this, this, null);
@@ -1003,14 +1003,18 @@ public class ChannelDistributer implements ChannelChangeCallback {
         final String host;
         final Predicate<Map.Entry<ChannelSpec,String>> thisHost;
 
-        public GetHostChannels(String path) {
+        public GetHostChannels(final String path) {
             super(path);
             this.host = basename.apply(path);
             checkArgument(
-                    host != null && !host.trim().isEmpty(),
+                    this.host != null && !this.host.trim().isEmpty(),
                     "path has undiscernable basename: %s", path
                     );
-            this.thisHost = hostValueIs(this.host, ChannelSpec.class);
+            this.thisHost = checkNotNull(
+                    hostValueIs(this.host, ChannelSpec.class),
+                    "predicate factory for \"hostValueIs\" returned a null instance for host %s",
+                    this.host
+                    );
         }
 
         @Override
