@@ -9,7 +9,7 @@ from fabric.utils import abort
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
-nativelibdir = "/libs/obj"  #  ~test/libs/... usually
+nativelibdir = "/nativelibs/obj"  #  ~test/libs/... usually
 defaultlicensedays = 45 #default trial license length
 
 ################################################
@@ -78,7 +78,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK %s clean default dist" % build_args)
+        run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=true %s clean default dist" % build_args)
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -89,7 +89,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d %s clean dist.pro" % (defaultlicensedays, build_args))
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d -Dkitbuild=true %s clean dist.pro" % (defaultlicensedays, build_args))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR

@@ -10,6 +10,7 @@ message UUID {
 message Ack {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
+    optional fixed64 averageRowLatencyNanos = 3;
 }
 
 message SnapshotReq {

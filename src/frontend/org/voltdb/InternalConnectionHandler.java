@@ -19,19 +19,15 @@ package org.voltdb;
 
 import static org.voltdb.ClientInterface.getPartitionForProcedure;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -52,11 +48,6 @@ public class InternalConnectionHandler {
 
     public InternalConnectionHandler(InternalClientResponseAdapter adapter) {
         m_adapter = adapter;
-    }
-
-    //Allocate and pool similar row sizes will reuse the buffers.
-    private BBContainer getBuffer(int sz) {
-        return DBBPool.allocateDirectAndPool(sz);
     }
 
     /**
@@ -92,7 +83,7 @@ public class InternalConnectionHandler {
             return false;
         }
 
-      //Indicate backpressure or not.
+        //Indicate backpressure or not.
         boolean b = m_adapter.hasBackPressure();
         caller.setBackPressure(b);
         if (b) {
@@ -102,29 +93,19 @@ public class InternalConnectionHandler {
             }
         }
 
-        final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
-        ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
-        //type + procname(len + name) + connectionId (long) + params
-        int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
-        //This is released in callback from adapter side.
-        final BBContainer tcont = getBuffer(sz);
-        final ByteBuffer taskbuf = tcont.b();
+
+        task.setProcName(proc);
+        task.setParams(fieldList);
         try {
-            taskbuf.put(ProcedureInvocationType.ORIGINAL.getValue());
-            taskbuf.putInt(proc.length());
-            taskbuf.put(proc.getBytes());
-            taskbuf.putLong(m_adapter.connectionId());
-            pset.flattenToBuffer(taskbuf);
-            taskbuf.flip();
-            task.initFromBuffer(taskbuf);
-        } catch (IOException ex) {
+            task = MiscUtils.roundTripForCL(task);
+            task.setClientHandle(m_adapter.connectionId());
+        } catch (Exception e) {
+            String fmt = "Cannot invoke procedure %s from streaming interface %s. failed to create task.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
             m_failedCount.incrementAndGet();
-            m_logger.error("Failed to serialize parameters for stream: " + proc, ex);
-            tcont.discard();
             return false;
         }
-
         int partition = -1;
         try {
             partition = getPartitionForProcedure(catProc, task);
@@ -132,23 +113,19 @@ public class InternalConnectionHandler {
             String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);
             m_failedCount.incrementAndGet();
-            tcont.discard();
             return false;
         }
 
         if (task.procName.equals("@UpdateApplicationCatalog")) {
-            return m_adapter.dispatchUpdateApplicationCatalog(task, m_user, caller, procCallback, tcont);
+            return m_adapter.dispatchUpdateApplicationCatalog(task, m_user, caller, procCallback);
         }
 
-        boolean success = m_adapter.createTransaction(caller, proc, catProc, procCallback, task, tcont, partition, nowNanos);
-        if (!success) {
-            tcont.discard();
+        if (!m_adapter.createTransaction(caller, proc, catProc, procCallback, task, partition, System.nanoTime())) {
             m_failedCount.incrementAndGet();
-        } else {
-            m_submitSuccessCount.incrementAndGet();
+            return false;
         }
-
-        return success;
+        m_submitSuccessCount.incrementAndGet();
+        return true;
     }
 
     public boolean hasBackPressure() {

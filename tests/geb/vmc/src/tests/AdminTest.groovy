@@ -22,10 +22,12 @@ class AdminTest extends TestBase {
 
     static String initialHeartTimeout
     static String initialQueryTimeout
+    static String initialMemoryLimit = "-1"
 
     static boolean revertAutosnapshots = false
     static boolean revertHeartTimeout = false
     static boolean revertQueryTimeout = false
+    static boolean revertMemorySize =false
 
 	int count = 0
     def setup() { // called before each test
@@ -824,61 +826,7 @@ class AdminTest extends TestBase {
         }
     }
 
-    // export expansion
-
-    def "Overview:Export-Expand and check configurations"() {
-
-        when:
-
-        int count = 0
-        testStatus = false
-then:
-        while(count<numberOfTrials) {
-            count ++
-            try {
-                when:
-                page.overview.export.click()
-                then:
-                if(waitFor(20) {page.overview.exportNoConfigAvailable.isDisplayed()})
-                {
-                    println(page.overview.exportNoConfigAvailable.text())
-                }
-                else
-                {
-                    waitFor(20) { page.overview.exportConfig.isDisplayed() }
-                    println("The export configuration")
-                }
-                testStatus = true
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-                println("RETRYING: WaitTimeoutException occured")
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                println("RETRYING: StaleElementReferenceException occured")
-            }
-        }
-        if(testStatus == true) {
-            println("PASS")
-        }
-        else {
-            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
-            assert false
-        }
-
-
-
-//        try {
-//            waitFor(waitTime) { page.overview.exportNoConfigAvailable.isDisplayed() }
-//            println(page.overview.exportNoConfigAvailable.text())
-//        } catch(geb.error.RequiredPageContentNotPresent e ) {
-//            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
-//            println("The export configuration")
-//            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
-//        } catch (geb.waiting.WaitTimeoutException e ) {
-//            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
-//            println("The export configuration")
-//            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
-//        }
-    }
+  
 
     // overview: advanced expansion-Edits
 
@@ -1215,6 +1163,247 @@ then:
         }
 
     }
+
+
+    //Memory Limit
+    def "Check the memory limit ddit button and then Cancel button"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitCancel.click() }
+        then:
+        waitFor(waitTime) {
+            !page.overview.memoryLimitField.isDisplayed()
+            !page.overview.memoryLimitOk.isDisplayed()
+            !page.overview.memoryLimitCancel.isDisplayed()
+            page.overview.memoryLimitEdit.isDisplayed()
+        }
+    }
+
+    def "Check memory limit edit and then click Ok and Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value("10")
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitPopupOk.isDisplayed()
+            page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+
+        int count = 0
+        while(count<numberOfTrials) {
+            count++
+            println("Try")
+            try {
+                try {
+                    page.overview.memoryLimitPopupCancel.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("MemoryLimitPopupCancel button clicked.")
+                    break
+                }
+                page.overview.memoryLimitEdit.isDisplayed()
+                !page.overview.memoryLimitPopupOk.isDisplayed()
+                !page.overview.memoryLimitPopupCancel.isDisplayed()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException, trying again.")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("StaleElementReferenceException, trying again.")
+            }
+        }
+    }
+
+    def "Check memory limit edit and then click Ok and confirm Ok"() {
+        when:
+        String memoryLimit = 20
+        page.advanced.click()
+        waitFor(waitTime) {
+            page.overview.memoryLimitValue.isDisplayed()
+        }
+        initialMemoryLimit = page.overview.memoryLimitValue.text()
+        println("Initial value of memory limit "+ initialMemoryLimit)
+        revertMemorySize = true
+
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(memoryLimit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitPopupOk.isDisplayed()
+            page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+
+        waitFor(waitTime) {
+            try {
+                page.overview.memoryLimitPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("Retrying")
+            }
+
+            page.overview.memoryLimitEdit.isDisplayed()
+            page.overview.memoryLimitValue.text().equals(memoryLimit)
+            !page.overview.memoryLimitPopupOk.isDisplayed()
+            !page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Check whether 'Not Enforced' and no unit are displayed when blank value is saved"(){
+        when:
+        String memoryLimit = ""
+        page.advanced.click()
+        waitFor(waitTime) {
+            page.overview.memoryLimitValue.isDisplayed()
+        }
+        if(initialMemoryLimit == "-1"){
+            initialMemoryLimit = page.overview.memoryLimitValue.text()
+            revertMemorySize = true
+        }
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(memoryLimit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitPopupOk.isDisplayed()
+            page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+
+        waitFor(waitTime) {
+            try {
+                page.overview.memoryLimitPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException, Retrying")
+            }
+            page.overview.memoryLimitEdit.isDisplayed()
+            page.overview.memoryLimitValue.text().equals("Not Enforced")
+            page.overview.memoryLimitUnit.text().equals("")
+            !page.overview.memoryLimitPopupOk.isDisplayed()
+            !page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Check the error message for memory Limit when more than 4 digits are placed after decimal"() {
+        when:
+        String invalidMemoryLimit = "20.12345"
+        String validMemoryLimit ="20.1234"
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(invalidMemoryLimit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitError.isDisplayed()
+            page.overview.memoryLimitError.text().equals("Only four digits are allowed after decimal.")
+        }
+
+        when:
+        page.overview.memoryLimitField.value(validMemoryLimit)
+        then:
+        !page.overview.memoryLimitError.isDisplayed()
+    }
+
+    def "Check the error message for memory limit when value is less than 0"() {
+        when:
+        String invalidMemoryLimit = "-1"
+        String validMemoryLimit = "1"
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(invalidMemoryLimit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitError.isDisplayed()
+            page.overview.memoryLimitError.text().equals("Please enter a positive number.")
+        }
+        when:
+        page.overview.memoryLimitField.value(validMemoryLimit)
+        then:
+        !page.overview.memoryLimitError.isDisplayed()
+    }
+    //
 
 //    // SECURITY
 //
@@ -2770,18 +2959,27 @@ then:
     }
 
     def "Command Logging Expand:Check Text"() {
+        int count = 0
+        
         when:
         page.overview.commandLogging.click()
         then:
-        waitFor(waitTime) {
-            page.overview.logFrequencyTime.text().equals("Log Frequency Time")
-            !page.overview.logFrequencyTimeValue.text().equals("")
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.overview.logFrequencyTime.text().equals("Log Frequency Time")
+                    !page.overview.logFrequencyTimeValue.text().equals("")
 
-            page.overview.logFrequencyTransactions.text().equals("Log Frequency Transactions")
-            !page.overview.logFrequencyTransactionsValue.text().equals("")
+                    page.overview.logFrequencyTransactions.text().equals("Log Frequency Transactions")
+                    !page.overview.logFrequencyTransactionsValue.text().equals("")
 
-            page.overview.logSize.text().equals("Log Size")
-            !page.overview.logSizeValue.text().equals("")
+                    page.overview.logSize.text().equals("Log Size")
+                    !page.overview.logSizeValue.text().equals("")
+                }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
         }
     }
 
@@ -2980,6 +3178,51 @@ then:
                 page.overview.queryTimeoutValue.text().equals(initialQueryTimeout)
                 !page.overview.queryTimeoutPopupOk.isDisplayed()
                 !page.overview.queryTimeoutPopupCancel.isDisplayed()
+            }
+        }
+
+        //memory limit revert
+        if(revertMemorySize == true){
+            when:
+            page.advanced.click()
+            then:
+            waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+            when:
+            waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+            then:
+            waitFor(waitTime) {
+                page.overview.memoryLimitField.isDisplayed()
+                page.overview.memoryLimitOk.isDisplayed()
+                page.overview.memoryLimitCancel.isDisplayed()
+            }
+
+            when:
+            if(initialMemoryLimit == "Not Enforced")
+                initialMemoryLimit = ""
+            page.overview.memoryLimitField.value(initialMemoryLimit)
+            waitFor(waitTime) {
+                page.overview.memoryLimitOk.click()
+            }
+            then:
+            waitFor(waitTime) {
+                page.overview.memoryLimitPopupOk.isDisplayed()
+                page.overview.memoryLimitPopupCancel.isDisplayed()
+            }
+
+            waitFor(waitTime) {
+                try {
+                    page.overview.memoryLimitPopupOk.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("retrying")
+                }
+
+                page.overview.memoryLimitEdit.isDisplayed()
+                if(initialMemoryLimit == "")
+                    initialMemoryLimit = "Not Enforced"
+                page.overview.memoryLimitValue.text().equals(initialMemoryLimit)
+                !page.overview.memoryLimitPopupOk.isDisplayed()
+                !page.overview.memoryLimitPopupCancel.isDisplayed()
             }
         }
     }

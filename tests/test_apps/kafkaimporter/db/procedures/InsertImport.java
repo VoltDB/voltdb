@@ -46,7 +46,7 @@ public class InsertImport extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
     public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable1 " + sqlSuffix);
     public final SQLStmt deleteMirrorRow = new SQLStmt("DELETE FROM kafkamirrortable1 WHERE key = ? and value = ?");
-    public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM importcounts LIMIT 1");
+    public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM importcounts ORDER BY key LIMIT 1");
     public final SQLStmt insertCounts = new SQLStmt("INSERT INTO importcounts VALUES (?, ?)");
     public final SQLStmt updateCounts = new SQLStmt("UPDATE importcounts SET total_rows_deleted=total_rows_deleted+? where key = ?");
 

@@ -123,6 +123,9 @@
     <not><isset property="verifycatalogdebug"/></not>
 </condition>
 
+<!-- Property "kitbuild" is true if we're pulling in both Mac and Linux native libraries -->
+<property name="kitbuild" value="false"/>
+
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
 <property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
@@ -292,7 +295,7 @@
 <patternset id='junit.regression.p3.path'>
     <!-- Standard junit fileset -->
     <include name="org/voltdb/regressionsuites/Test*.class"/>
-    
+
     <!-- Exclude tests -->
     <invert>
         <patternset refid="junit.regression.p1.path"/>
@@ -961,11 +964,12 @@ DISTRIBUTION
     </copy>
 
     <!-- Call shell script that handles copying native libs so they can be packaged together -->
-    <exec dir='.' executable="/usr/bin/env" failonerror='false'>
+    <exec dir='.' executable="/usr/bin/env" failonerror='true'>
         <arg value='bash' />
         <arg value='tools/copy-lib.sh'/>
         <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
         <arg value='${dist.version}'/>
+        <arg value='${kitbuild}'/>
     </exec>
 </target>
 
@@ -1686,7 +1690,11 @@ TEST CASES
         >
             <classpath refid='project.classpath' />
             <jvmarg value="-server" />
-            <jvmarg value="-Xcheck:jni" />
+            <!-- Following option is commented out because
+                 it introduces enough overhead to JNI calls
+                 that some tests time out with Java 8.
+                 See ENG-8730. -->
+            <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
             <jvmarg value="-XX:-UseSplitVerifier"/>
@@ -1874,7 +1882,7 @@ TEST CASES
         </tests>
     </run_junit>
 </target>
-    
+
 <target name="junit_other_p1"
     description="Execute part 1 of other JUnit test suites.">
     <run_junit>
@@ -1885,7 +1893,7 @@ TEST CASES
         </tests>
     </run_junit>
 </target>
-    
+
 <target name="junit_other_p2"
     description="Execute part 2 of other JUnit test suites.">
     <run_junit>

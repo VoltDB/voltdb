@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
-import com.google_voltpatches.common.collect.ImmutableList;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -65,6 +64,7 @@ import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -77,7 +77,7 @@ class Distributer {
     static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
-    static final long USE_DEFAULT_TIMEOUT = 0;
+    static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
@@ -371,7 +371,7 @@ class Distributer {
             assert(callback != null);
 
             //How long from the starting point in time to wait to get this stuff done
-            timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
+            timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
 
             //Trigger the timeout at this point in time no matter what
             final long timeoutTime = nowNanos + timeoutNanos;
@@ -889,7 +889,6 @@ class Distributer {
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
             ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
-        InetSocketAddress address = new InetSocketAddress(host, port);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
@@ -969,7 +968,7 @@ class Distributer {
                     serializeSPI(spi),
                     new SubscribeCallback(),
                     true,
-                    USE_DEFAULT_TIMEOUT);
+                    USE_DEFAULT_CLIENT_TIMEOUT);
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special cased handling
@@ -979,7 +978,7 @@ class Distributer {
                     serializeSPI(spi),
                     new TopoUpdateCallback(),
                     true,
-                    USE_DEFAULT_TIMEOUT);
+                    USE_DEFAULT_CLIENT_TIMEOUT);
 
             //Don't need to retrieve procedure updates every time we do a new subscription
             //since catalog changes aren't correlated with node failure the same way topo is
@@ -992,7 +991,7 @@ class Distributer {
                         serializeSPI(spi),
                         new ProcUpdateCallback(),
                         true,
-                        USE_DEFAULT_TIMEOUT);
+                        USE_DEFAULT_CLIENT_TIMEOUT);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -1388,7 +1387,6 @@ class Distributer {
         pi.flattenToBuffer(buf);
         buf.flip();
         return buf;
-
     }
 
     long getProcedureTimeoutNanos() {

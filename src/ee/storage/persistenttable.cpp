@@ -98,6 +98,7 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_tupleLimit(tupleLimit),
     m_purgeExecutorVector(),
     stats_(this),
+    m_data(true, comp<char*>()),
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
@@ -172,8 +173,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     // In the memcheck it uses the heap instead of a free list to help Valgrind.
     if (!m_blocksWithSpace.empty()) {
         VOLT_TRACE("GRABBED FREE TUPLE!\n");
-        stx::btree_set<TBPtr >::iterator begin = m_blocksWithSpace.begin();
-        TBPtr block = (*begin);
+        TBPtr block = m_blocksWithSpace.begin().key();
         std::pair<char*, int> retval = block->nextFreeTuple();
 
         /**
@@ -382,11 +382,12 @@ void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(1, source.getNValue(2));
 }
 
-void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple) {
+void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update) {
     assert(hasDRTimestampColumn());
-    const int64_t drTimestamp = ec->currentDRTimestamp();
-    tuple.setHiddenNValue(getDRTimestampColumnIndex(),
-                          ValueFactory::getBigIntValue(drTimestamp));
+    if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
+        const int64_t drTimestamp = ec->currentDRTimestamp();
+        tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
+    }
 }
 
 /*
@@ -465,8 +466,9 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn())
-        setDRTimestampForTuple(ec, target);
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, target, false);
+    }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
@@ -608,8 +610,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn())
-        setDRTimestampForTuple(ec, sourceTupleWithNewValues);
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
+    }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
@@ -854,7 +857,8 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
  *  Indexes and views have been destroyed first.
  */
 void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
-    deleteTupleStorage(target); // also frees object columns
+    TBPtr block = findBlock(target.address(), m_data, m_tableAllocationSize);
+    deleteTupleStorage(target, block, true); // also frees object columns along with empty tuple block storage
 }
 
 /*
@@ -1358,7 +1362,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
         fullestIterator = (*bucketMap)[ii]->begin();
         if (fullestIterator != (*bucketMap)[ii]->end()) {
             foundFullest = true;
-            fullest = *fullestIterator;
+            fullest = fullestIterator.key();
             break;
         }
     }
@@ -1376,14 +1380,14 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
         for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
             lightestIterator = (*bucketMap)[ii]->begin();
             if (lightestIterator != (*bucketMap)[ii]->end()) {
-                lightest = *lightestIterator;
+                lightest = lightestIterator.key();
                 if (lightest != fullest) {
                     foundLightest = true;
                     break;
                 } else {
                     lightestIterator++;
                     if (lightestIterator != (*bucketMap)[ii]->end()) {
-                        lightest = *lightestIterator;
+                        lightest = lightestIterator.key();
                         foundLightest = true;
                         break;
                     }
@@ -1530,10 +1534,10 @@ void PersistentTable::printBucketInfo() {
     std::cout << std::endl;
     TBMapI iter = m_data.begin();
     while (iter != m_data.end()) {
-        std::cout << "Block " << static_cast<void*>(iter.data()->address()) << " has " <<
-                iter.data()->activeTuples() << " active tuples and " << iter.data()->lastCompactionOffset()
+        std::cout << "Block " << static_cast<void*>(iter.value()->address()) << " has " <<
+                iter.value()->activeTuples() << " active tuples and " << iter.value()->lastCompactionOffset()
                 << " last compaction offset and is in bucket " <<
-                static_cast<void*>(iter.data()->currentBucket().get()) <<
+                static_cast<void*>(iter.value()->currentBucket().get()) <<
                 std::endl;
         iter++;
     }
@@ -1552,7 +1556,7 @@ void PersistentTable::printBucketInfo() {
         std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksNotPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksNotPendingSnapshotLoad[ii]->size() << std::endl;
         TBBucketI bucketIter = m_blocksNotPendingSnapshotLoad[ii]->begin();
         while (bucketIter != m_blocksNotPendingSnapshotLoad[ii]->end()) {
-            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
+            std::cout << "\t" << static_cast<void*>(bucketIter.key()->address()) << std::endl;
             bucketIter++;
         }
     }
@@ -1571,7 +1575,7 @@ void PersistentTable::printBucketInfo() {
         std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksPendingSnapshotLoad[ii]->size() << std::endl;
         TBBucketI bucketIter = m_blocksPendingSnapshotLoad[ii]->begin();
         while (bucketIter != m_blocksPendingSnapshotLoad[ii]->end()) {
-            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
+            std::cout << "\t" << static_cast<void*>(bucketIter.key()->address()) << std::endl;
             bucketIter++;
         }
     }

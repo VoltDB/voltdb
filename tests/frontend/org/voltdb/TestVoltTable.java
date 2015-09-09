@@ -27,14 +27,15 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-
-import junit.framework.TestCase;
+import java.util.Random;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
+
+import junit.framework.TestCase;
 
 public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
@@ -998,4 +999,143 @@ public class TestVoltTable extends TestCase {
                 .getLong(schema.length - 1));
     }
 
+    @SuppressWarnings("deprecation")
+    public void testBlittingAddRowSuccess() throws IOException {
+        int rowCount = 100;
+        int numberOfPartitions = 20;
+        Random r = new Random(0);
+
+        for (int j = 0; j < 10; j++) {
+            TableHelper th = new TableHelper();
+            VoltTable t = th.getTotallyRandomTable("foo", true).table;
+            th.randomFill(t, rowCount, 500);
+
+            t.resetRowPosition();
+            // create a table for each partition
+            VoltTable[] partitioned_tables = new VoltTable[numberOfPartitions];
+            for (int i = 0; i < partitioned_tables.length; i++) {
+                partitioned_tables[i] =
+                        t.clone((int) ((PrivateVoltTableFactory.getUnderlyingBufferSize(t) /
+                                numberOfPartitions) * 1.5));
+            }
+
+            // split the input table into per-partition units
+            while (t.advanceRow()) {
+                int partition = 0;
+                partition = r.nextInt(numberOfPartitions);
+                // this adds the active row of loadedTable
+                //partitioned_tables[partition].addRowIdenticalSchema(t);
+                partitioned_tables[partition].add(t);
+            }
+
+            // merge the tables
+            VoltTable t2 = t.clone(100);
+            for (VoltTable pt : partitioned_tables) {
+                pt.resetRowPosition();
+                while (pt.advanceRow()) {
+                    t2.add(pt);
+                }
+            }
+
+            assertTrue(t2.equals(t));
+        }
+    }
+
+    public void testSchemaChangeAddRow() {
+        int rowCount = 100;
+        Random r = new Random(0);
+
+        for (int j = 0; j < 100; j++) {
+            TableHelper th = new TableHelper();
+            VoltTable t1 = th.getTotallyRandomTable("foo", true).table;
+            th.randomFill(t1, rowCount, 500);
+
+            // get the schema of the first table
+            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[t1.getColumnCount()];
+            for (int i = 0; i < columns.length; i++) {
+                columns[i] = new VoltTable.ColumnInfo(t1.getColumnName(i), t1.getColumnType(i));
+            }
+
+            // make a few random column changes that are compatible (numbers only)
+            for (int i = 0; i < 5; i++) {
+                int randCol = r.nextInt(columns.length);
+                VoltType ct1 = t1.getColumnType(randCol);
+                if ((ct1 == VoltType.TINYINT) || (ct1 == VoltType.INTEGER) || (ct1 == VoltType.SMALLINT)) {
+                    columns[randCol] = new VoltTable.ColumnInfo(columns[randCol].name, VoltType.BIGINT);
+                }
+            }
+
+            // make a second empty table with the incompatible schema
+            VoltTable t2 = new VoltTable(columns);
+
+            t1.resetRowPosition();
+            while (t1.advanceRow()) {
+                t2.add(t1);
+            }
+
+            // compare formatted strings (imperfect)
+            String t1s = t1.toFormattedString();
+            String t2s = t2.toFormattedString();
+            assertTrue(t1s.equals(t2s));
+        }
+    }
+
+    public void testBadAddRow() {
+        int rowCount = 10;
+        Random r = new Random(0);
+
+        for (int j = 0; j < 75; j++) {
+            TableHelper th = new TableHelper();
+            VoltTable t1 = th.getTotallyRandomTable("foo", true).table;
+            th.randomFill(t1, rowCount, 500);
+
+            // get the schema of the first table
+            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[t1.getColumnCount()];
+            for (int i = 0; i < columns.length; i++) {
+                columns[i] = new VoltTable.ColumnInfo(t1.getColumnName(i), t1.getColumnType(i));
+            }
+
+            // make a random column incompatible
+            int randCol = r.nextInt(columns.length);
+            VoltType ct1 = t1.getColumnType(randCol);
+            if ((ct1 == VoltType.VARBINARY) || (ct1 == VoltType.STRING)) {
+                columns[randCol] = new VoltTable.ColumnInfo(columns[randCol].name, VoltType.TINYINT);
+            }
+            else {
+                columns[randCol] = new VoltTable.ColumnInfo(columns[randCol].name, VoltType.VARBINARY);
+            }
+
+            // make a second empty table with the incompatible schema
+            VoltTable t2 = new VoltTable(columns);
+
+            t1.resetRowPosition();
+            while (t1.advanceRow()) {
+                try {
+                    // add a random row successfully every other row
+                    th.randomFill(t2, 1, 10);
+                    // - except small chance of overflow too due to large string
+                    if (r.nextInt(20) == 0) {
+                        th.randomFill(t2, 1, 2048 * 1024);
+                    }
+                    // add a bad row from t1
+                    t2.add(t1);
+
+                    // only check if the twiddled column was non-null
+                    Object valueOfInterest = t1.get(randCol, t1.getColumnType(randCol));
+                    if ((valueOfInterest != null) && (t1.wasNull() == false)) {
+                        fail();
+                    }
+                }
+                catch (Exception e) {
+                    // two cases where we might fail and it's ok
+                    boolean tooBig = e instanceof VoltOverflowException;
+                    boolean nonNull = t1.get(randCol, t1.getColumnType(randCol)) != null;
+                    assertTrue(tooBig || nonNull);
+                }
+            }
+
+            // this should bomb if the data is invalid because it scans every value
+            t2.toJSONString();
+        }
+    }
 }

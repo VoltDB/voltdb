@@ -461,7 +461,7 @@ class ServerBundle(JavaBundle):
 
     def go(self, verb, runner):
         if self.check_environment_config:
-            incompatible_options = checkconfig.check_config()
+            incompatible_options = checkconfig.test_hard_requirements()
             if incompatible_options is not None:
                 utility.abort(incompatible_options)
         final_args = None

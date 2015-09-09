@@ -19,7 +19,6 @@
 #include <vector>
 #include "common/tabletuple.h"
 #include "storage/TupleIterator.h"
-#include "stx/btree_map.h"
 #include "storage/TupleBlock.h"
 
 namespace voltdb {

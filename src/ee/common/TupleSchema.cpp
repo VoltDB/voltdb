@@ -286,6 +286,25 @@ std::string TupleSchema::ColumnInfo::debug() const {
     return buffer.str();
 }
 
+size_t TupleSchema::getMaxSerializedTupleSize(bool includeHiddenColumns) const {
+    size_t bytes = sizeof(int32_t); // placeholder for tuple length
+    int serializeColumnCount = m_columnCount;
+    if (includeHiddenColumns) {
+        serializeColumnCount += m_hiddenColumnCount;
+    }
+
+    for (int i = 0;i < serializeColumnCount; ++i) {
+        const TupleSchema::ColumnInfo* columnInfo = getColumnInfoPrivate(i);
+        int32_t factor = (columnInfo->type == VALUE_TYPE_VARCHAR && !columnInfo->inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
+        if (columnInfo->type == VALUE_TYPE_VARCHAR || columnInfo->type == VALUE_TYPE_VARBINARY) {
+            bytes += sizeof(int32_t); // value length placeholder for variable length columns
+        }
+        bytes += columnInfo->length * factor;
+    }
+
+    return bytes;
+}
+
 std::string TupleSchema::debug() const {
     std::ostringstream buffer;
 

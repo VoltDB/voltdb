@@ -20,7 +20,6 @@
 #include "storage/tableiterator.h"
 #include "storage/TableStreamer.h"
 #include "storage/TableStreamerContext.h"
-#include "common/DefaultTupleSerializer.h"
 
 /*
  * A log of changes to tuple data that has already been sent to a recovering
@@ -90,8 +89,6 @@ private:
      * Phase 3 is to ship deletes
      */
     RecoveryMsgType m_recoveryPhase;
-
-    DefaultTupleSerializer m_serializer;
 };
 }
 #endif /* RECOVERYCONTEXT_H_ */

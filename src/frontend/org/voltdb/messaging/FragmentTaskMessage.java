@@ -33,6 +33,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
@@ -149,6 +150,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     byte[] m_procedureName = null;
     int m_currentBatchIndex = 0;
 
+    int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+
     public int getCurrentBatchIndex() {
         return m_currentBatchIndex;
     }
@@ -203,6 +206,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_currentBatchIndex = ftask.m_currentBatchIndex;
         m_involvedPartitions = ftask.m_involvedPartitions;
         m_procNameToLoad = ftask.m_procNameToLoad;
+        m_batchTimeout = ftask.m_batchTimeout;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -376,6 +380,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         else {
             return null;
         }
+    }
+
+    public int getBatchTimeout() {
+        return m_batchTimeout;
+    }
+
+    public void setBatchTimeout(int batchTimeout) {
+        m_batchTimeout = batchTimeout;
     }
 
     public boolean isFinalTask() {
@@ -577,6 +589,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // int for which batch (4)
         msgsize += 4;
 
+        // 1 byte for the timeout flag
+        msgsize += 1;
+
+        msgsize += m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4;
+
         // Involved partitions
         msgsize += 2 + m_involvedPartitions.size() * 4;
 
@@ -728,6 +745,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // ints for batch context
         buf.putInt(m_currentBatchIndex);
 
+        // put byte flag for timeout value and 4 bytes integer value if specified
+        if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
+            buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
+        } else {
+            buf.put(BatchTimeoutOverrideType.HAS_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
+            buf.putInt(m_batchTimeout);
+        }
+
         buf.putShort((short) m_involvedPartitions.size());
         for (int pid : m_involvedPartitions) {
             buf.putInt(pid);
@@ -848,6 +873,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // ints for batch context
         m_currentBatchIndex = buf.getInt();
+
+        BatchTimeoutOverrideType batchTimeoutType = BatchTimeoutOverrideType.typeFromByte(buf.get());
+        if (batchTimeoutType == BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT) {
+            m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+        } else {
+            m_batchTimeout = buf.getInt();
+        }
 
         // Involved partition
         short involvedPartitionCount = buf.getShort();
