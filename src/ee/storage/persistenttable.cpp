@@ -344,7 +344,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = 0;
+    size_t drMark = SIZE_MAX;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
@@ -469,7 +469,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         setDRTimestampForTuple(ec, target);
 
     DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = 0;
+    size_t drMark = SIZE_MAX;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
@@ -612,7 +612,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         setDRTimestampForTuple(ec, sourceTupleWithNewValues);
 
     DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = 0;
+    size_t drMark = SIZE_MAX;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
@@ -771,7 +771,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = 0;
+    size_t drMark = SIZE_MAX;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();

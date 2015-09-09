@@ -432,6 +432,8 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
+    m_singleColumnTable->setDR(false);
+
     beginTxn(99, 99, 98, 70);
     TableTuple source_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
     endTxn(false);
@@ -450,6 +452,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
 
     // Roll back a txn that hasn't applied any binary log data
     beginTxn(101, 101, 100, 72);
+    TableTuple temp_tuple = m_singleColumnTable->tempTuple();
+    temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(1));
+    insertTuple(m_singleColumnTable, temp_tuple);
     endTxn(false);
 
     flushAndApply(101);
