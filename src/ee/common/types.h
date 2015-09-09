@@ -527,7 +527,7 @@ bool isNumeric(ValueType type);
 bool isIntegralType(ValueType type);
 
 // for testing, obtain a random instance of the specified type
-NValue getRandomValue(ValueType type);
+NValue getRandomValue(ValueType type, uint32_t maxLength);
 
 std::string valueToString(ValueType type);
 ValueType stringToValue(std::string str );
