@@ -946,14 +946,16 @@ private:
         return *reinterpret_cast<bool*>(m_data);
     }
 
-    BOOST_STATIC_ASSERT(sizeof(Point) < sizeof(m_data));
-
     Point& getPoint() {
         assert(getValueType() == VALUE_TYPE_POINT);
         return *reinterpret_cast<Point*>(m_data);
     }
 
     const Point& getPoint() const {
+
+        BOOST_STATIC_ASSERT_MSG(sizeof(Point) <= sizeof(m_data),
+                                "Size of Point is too large for NValue m_data");
+
         assert(getValueType() == VALUE_TYPE_POINT);
         return *reinterpret_cast<const Point*>(m_data);
     }
@@ -2331,6 +2333,8 @@ private:
     static NValue trimWithOptions(const std::vector<NValue>& arguments, bool leading, bool trailing);
 
 };
+
+
 
 /**
  * Public constructor that initializes to an NValue that is unusable
