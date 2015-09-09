@@ -3459,7 +3459,7 @@ tr.drSubSection td {
 
     .tabs-filter-wrapperDR .filter {
         float: left;
-        width: 40%;
+        width: 45%;
     }
 
 .drTitle {
@@ -3712,14 +3712,14 @@ table.diskLimitTbl tr td { border: none;}
         float: left;
         padding-top: 15px;
     }
-
+    
     .tabs-filter-wrapperDR .filter {
         float: none;
         width: auto;
     }
 
     .tabs-filter-wrapperDR {
-        width: 250px;
+        width: 250px!important;
     }
 
 
