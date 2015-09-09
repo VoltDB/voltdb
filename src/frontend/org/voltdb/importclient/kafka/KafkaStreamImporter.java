@@ -32,10 +32,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -68,7 +66,6 @@ import kafka.network.BlockingChannel;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
-import org.voltdb.InternalClientResponseAdapter;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -118,7 +115,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     //topic partition leader
     private final Map<String, HostAndPort> m_topicPartitionLeader = new HashMap<String, HostAndPort>();
     private final Map<String, TopicPartitionFetcher> m_fetchers = new HashMap<String, TopicPartitionFetcher>();
-    private final BlockingQueue<TopicPartitionInvocationCallback> m_resubmitInvocation = new LinkedBlockingQueue<TopicPartitionInvocationCallback>();
 
     private ExecutorService m_es = null;
 
@@ -399,35 +395,25 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final Gap m_tracker;
         private final AtomicBoolean m_dontCommit;
         private final Invocation m_invocation;
-        private final BlockingQueue<TopicPartitionInvocationCallback> m_resubmitQueue;
 
         public TopicPartitionInvocationCallback(
                 final long offset,
                 final AtomicLong cbcnt,
                 final Gap tracker,
                 final AtomicBoolean dontCommit,
-                final Invocation invocation,
-                final BlockingQueue<TopicPartitionInvocationCallback> resubmitQueue
-         ) {
+                final Invocation invocation) {
             m_offset = offset;
             m_cbcnt = cbcnt;
             m_tracker = tracker;
             m_dontCommit = dontCommit;
             m_tracker.submit(m_offset);
             m_invocation = invocation;
-            m_resubmitQueue = resubmitQueue;
         }
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
 
             m_cbcnt.incrementAndGet();
-            //We dont know lets submit again
-            if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN && getInvocation() != null) {
-                m_resubmitQueue.offer(this);
-                //This is not considered seen
-                return;
-            }
             if (!m_dontCommit.get()) {
                 m_tracker.commit(m_offset);
             }
@@ -724,27 +710,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     );
         }
 
-        public int submitBouncedTransactions() {
-            int submitCount = 0;
-            if (m_resubmitInvocation.peek() != null) {
-                ArrayList<TopicPartitionInvocationCallback>pendingQueue = new ArrayList<TopicPartitionInvocationCallback>();
-                String msg = "Bounced pending transaction queue is: " + m_resubmitInvocation.size() + " Resubmitting... ";
-                //Dont kill ourself by submitting too many
-                m_resubmitInvocation.drainTo(pendingQueue, (int )InternalClientResponseAdapter.MAX_PENDING_TRANSACTIONS_PER_PARTITION - 1);
-                info(msg + pendingQueue.size());
-                for (TopicPartitionInvocationCallback cb : pendingQueue) {
-                    final Invocation invocation = cb.getInvocation();
-                    if (!callProcedure(cb, invocation)) {
-                        if (isDebugEnabled()) {
-                            debug("Failed to process Invocation possibly bad data: " + invocation);
-                        }
-                    }
-                    submitCount++;
-                }
-            }
-            return submitCount;
-        }
-
         @Override
         public void run() {
             info("Starting partition fetcher for " + m_topicAndPartition);
@@ -831,8 +796,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
-                                invocation, m_resubmitInvocation
-                                );
+                                invocation);
                         if (!callProcedure(cb, invocation)) {
                             if (isDebugEnabled()) {
                                 debug("Failed to process Invocation possibly bad data: " + line);
@@ -845,8 +809,6 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             break;
                         }
                     }
-                    //Submit any bounced transactions. We only submit once if it bounces again tough luck.
-                    submitCount += submitBouncedTransactions();
                     if (m_shutdown) {
                         break;
                     }
