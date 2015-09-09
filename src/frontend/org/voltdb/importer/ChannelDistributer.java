@@ -301,11 +301,11 @@ public class ChannelDistributer implements ChannelChangeCallback {
         mkdirs(zk, MASTER_DN, EMPTY_ARRAY);
 
         GetOperationMode opMode = new GetOperationMode(VoltZK.operationMode);
-        MonitorHostNodes monitor = new MonitorHostNodes(HOST_DN);
         CreateNode createHostNode = new CreateNode(
                 joinZKPath(HOST_DN, hostId),
                 EMPTY_ARRAY, CreateMode.EPHEMERAL
                 );
+        MonitorHostNodes monitor = new MonitorHostNodes(HOST_DN);
         CreateNode electionCandidate = new CreateNode(
                 CANDIDATE_PN,
                 EMPTY_ARRAY, CreateMode.EPHEMERAL_SEQUENTIAL
@@ -1043,16 +1043,27 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     return;
                 }
 
+                final String hval = basename.apply(path);
+                if (hval == null || hval.trim().isEmpty()) {
+                    IllegalArgumentException e = new IllegalArgumentException(
+                            "path has undiscernable basename: \"" + path + "\""
+                            );
+                    fault = Optional.of(
+                            loggedDistributerException(e, "could not derive host from %s", path)
+                            );
+                    return;
+                }
+
                 Predicate<Map.Entry<ChannelSpec,String>> inSpecs =
                         ChannelSpec.specKeyIn(nodespecs.get(), String.class);
                 Predicate<Map.Entry<ChannelSpec,String>> thisHost =
-                        hostValueIs(this.host, ChannelSpec.class);
+                        hostValueIs(hval, ChannelSpec.class);
 
                 int [] sstamp = new int[]{0};
-                AtomicInteger dstamp = m_hosts.getReference().get(host);
+                AtomicInteger dstamp = m_hosts.getReference().get(hval);
                 if (dstamp == null) {
                     LOG.warn("(" + m_hostId + ") has no data stamp for "
-                            + host + ", host registry contains: " + m_hosts.getReference()
+                            + hval + ", host registry contains: " + m_hosts.getReference()
                             );
                     dstamp = new AtomicInteger(0);
                 }
@@ -1078,16 +1089,17 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         mbldr = ImmutableSortedMap.naturalOrder();
                         mbldr.putAll(Maps.filterEntries(prev, not(or(thisHost, inSpecs))));
                         for (ChannelSpec spec: nodespecs.get()) {
-                            mbldr.put(spec, host);
+                            mbldr.put(spec, hval);
                         }
                     } catch (NullPointerException e) {
-                        LOG.error("STEBUG host is " + host + ", predicate is " + thisHost
+                        LOG.error("STEBUG host is \"" + hval + "\", predicate is " + thisHost
+                                + ", path is \"" + path + "\""
                                 + "\nSpecs are: " + prev + "\ninSpecs are: " + inSpecs);
                         throw e;
                     }
                 } while (!m_specs.compareAndSet(prev, mbldr.build(), sstamp[0], sstamp[0]+1));
 
-                if (host.equals(m_hostId) && !m_done.get()) {
+                if (hval.equals(m_hostId) && !m_done.get()) {
                     ChannelAssignment assignment = new ChannelAssignment(
                             oldspecs, nodespecs.get(), stat.getVersion()
                             );
@@ -1413,7 +1425,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             }
             @Override
             public String toString() {
-                return "Predicate.hostValueIs[host: \"" + s + "\" ]";
+                return "Predicate.hostValueIs[Map.Entry.getValue() is \"" + s + "\" ]";
             }
         };
     }
