@@ -293,13 +293,19 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     const int tuplesToInsert = 10;
     (void) tuplesToInsert;  // to make compiler happy
     ASSERT_EQ(1, table->allocatedBlockCount());
-    assert(tableutil::addRandomTuples(table, tuplesToInsert));
+    bool addTuples = tableutil::addRandomTuples(table, tuplesToInsert);
+    if(!addTuples) {
+        assert(!"Failed adding random tuples");
+    }
     size_t blockCount = table->allocatedBlockCount();
 
     table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(blockCount, table->allocatedBlockCount());
-    assert(tableutil::addRandomTuples(table, tuplesToInsert));
+    addTuples = tableutil::addRandomTuples(table, tuplesToInsert);
+    if(!addTuples) {
+        assert(!"Failed adding random tuples");
+    }
     table->truncateTable(engine);
 
     // refresh table pointer by fetching the table from catalog as in truncate old table
