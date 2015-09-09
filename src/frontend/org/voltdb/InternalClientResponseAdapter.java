@@ -145,7 +145,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                                     ClientResponseImpl.SUCCESS,
                                     new VoltTable[0], "Catalog update with no changes was skipped.",
                                     result.clientHandle);
-                    //writeResponseToConnection(shortcutResponse);
                 }
                 else {
                     // create the execution site task
@@ -172,8 +171,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                      */
                     try {
                         task = MiscUtils.roundTripForCL(task);
-                    } catch (Exception e) {
-                        //hostLog.fatal(e);
+                    } catch (IOException e) {
                         VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                     }
 

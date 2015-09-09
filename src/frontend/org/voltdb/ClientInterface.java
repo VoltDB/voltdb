@@ -1738,7 +1738,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public String getName() {
-            return "ClientInterfaceConnectionContext";
+            return getClass().getSimpleName();
         }
 
         @Override
@@ -1930,11 +1930,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
                         final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
                         final byte[] catalog = MiscUtils.fileToBytes(new File(path, nonce + ".jar"));
-                        final String dep = new String(catalogContext.getDeploymentBytes(), "UTF-8");
+                        final String dep = new String(catalogContext.getDeploymentBytes(), java.nio.charset.StandardCharsets.UTF_8);
 
                         SyncCallback cb = new SyncCallback();
-                        VoltDB.instance().getClientInterface().getInternalConnectionHandler().
-                        callProcedure(new ClientInterfaceConnectionContext(), 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
+                        getInternalConnectionHandler().callProcedure(
+                                new ClientInterfaceConnectionContext(), 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
                         cb.waitForResponse();
 
                         m_catalogContext.set(VoltDB.instance().getCatalogContext());
