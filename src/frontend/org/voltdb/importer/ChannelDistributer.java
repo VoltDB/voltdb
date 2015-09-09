@@ -1071,13 +1071,19 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         return;
                     }
 
-                    prev = m_specs.get(sstamp);
-                    oldspecs = Maps.filterEntries(prev, thisHost).navigableKeySet();
-                    // rebuild the assigned channel spec list
-                    mbldr = ImmutableSortedMap.naturalOrder();
-                    mbldr.putAll(Maps.filterEntries(prev, not(or(thisHost, inSpecs))));
-                    for (ChannelSpec spec: nodespecs.get()) {
-                        mbldr.put(spec, host);
+                    try {
+                        prev = m_specs.get(sstamp);
+                        oldspecs = Maps.filterEntries(prev, thisHost).navigableKeySet();
+                        // rebuild the assigned channel spec list
+                        mbldr = ImmutableSortedMap.naturalOrder();
+                        mbldr.putAll(Maps.filterEntries(prev, not(or(thisHost, inSpecs))));
+                        for (ChannelSpec spec: nodespecs.get()) {
+                            mbldr.put(spec, host);
+                        }
+                    } catch (NullPointerException e) {
+                        LOG.error("STEBUG host is " + host + ", predicate is " + thisHost
+                                + "\nSpecs are: " + prev + "\ninSpecs are: " + inSpecs);
+                        throw e;
                     }
                 } while (!m_specs.compareAndSet(prev, mbldr.build(), sstamp[0], sstamp[0]+1));
 
@@ -1404,6 +1410,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
             @Override
             public boolean apply(Entry<K, String> e) {
                 return s.equals(e.getValue());
+            }
+            @Override
+            public String toString() {
+                return "Predicate.hostValueIs[host: \"" + s + "\" ]";
             }
         };
     }
