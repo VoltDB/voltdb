@@ -87,6 +87,9 @@ public enum ExpressionType {
         // LIKE operator (left LIKE right). both children must be string.
     COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
         // IN operator. left IN right. right must be VectorValue
+    // value 18 is assigned to OPERATOR_EXISTS
+    COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT"),
+        // Not distinct operator between left and right
 
     // ----------------------------
     // Conjunction Operator

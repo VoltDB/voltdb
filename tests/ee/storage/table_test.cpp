@@ -136,7 +136,11 @@ protected:
             temp_table = TableFactory::getTempTable(database_id, "test_temp_table", schema, columnNames, &limits);
             m_table = temp_table;
         }
-        ASSERT_TRUE(tableutil::addRandomTuples(m_table, NUM_OF_TUPLES));
+
+        bool addTuples = tableutil::addRandomTuples(m_table, NUM_OF_TUPLES);
+        if(!addTuples) {
+            assert(!"Failed adding random tuples");
+        }
     }
 
     Table* m_table;
