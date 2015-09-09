@@ -187,17 +187,11 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
 
 
         // left join on column that has null values
-        sql = "Select S2.wage, S2.ID, count (*) from S1 left Join S2 On S2.WAGE is not distinct from S2.wage group by S2.wage, S2.ID;";
-        if(isHSQL()) {
-            validateTableOfLongs(client, sql, new long[][] {{1000,              1,   6},
-                                                            {Long.MIN_VALUE,    4,   6},
-                                                            {5253,              5,   6}});
-        }
-        else {
-            validateTableOfLongs(client, sql, new long[][] {{5253,              5,   6},
-                                                            {Long.MIN_VALUE,    4,   6},
-                                                            {1000,              1,   6}});
-        }
+        sql = "Select S2.wage, S2.ID, count (*) from S1 left Join S2 On " +
+                "S2.WAGE is not distinct from S2.wage group by S2.wage, S2.ID order by s2.wage;";
+        validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    4,   6},
+                                                        {1000,              1,   6},
+                                                        {5253,              5,   6}});
     }
 
     private void subTestIsDistinctFromUsingSubqueries(Client client) throws Exception
@@ -214,53 +208,42 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
 
         // test cases below test different subquery condition paths in EE like LHS NULL, RHS NOT NULL and so forth
         sql = "SELECT wage salary, count(*) from S2 "+
-                "WHERE WAGE is distinct from  " +
-                "(SELECT SUM(WAGE) FROM S2 where WAGE is not distinct from 1000) " +
-                "GROUP BY WAGE HAVING COUNT(*) is distinct from 7;";
-        if(isHSQL()) {
-            validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    1},
-                                                            {5253,              1}});
-        }
-        else {
-            validateTableOfLongs(client, sql, new long[][] {{5253,              1},
-                                                            {Long.MIN_VALUE,    1}});
-        }
+                "WHERE wage is distinct from  " +
+                "(SELECT MIN(wage) FROM S1 where wage is distinct from 2553) " +
+                "GROUP BY wage " +
+                "HAVING COUNT(*) is distinct from 7 " +
+                "ORDER BY wage";
+        validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    1},
+                                                        {5253,              1}});
 
-        sql = "SELECT wage salary, count(*) from S2 "+
-                "WHERE WAGE is distinct from  " +
-                "(SELECT SUM(WAGE) FROM S2 where WAGE is distinct from 1000) " +
-                "GROUP BY WAGE HAVING COUNT(*) is distinct from 7;";
-        if(isHSQL()) {
-            validateTableOfLongs(client, sql, new long[][] {{1000,              1},
-                                                            {Long.MIN_VALUE,    1}});
-        }
-        else {
-            validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    1},
-                                                            {1000,              1}});
-        }
+        sql = "SELECT id, wage, count(*) from S1 "+
+                "WHERE wage is distinct from  " +
+                "(SELECT wage FROM S2 where id is not distinct from 4) " +
+                "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 ORDER BY id;";
+        validateTableOfLongs(client, sql, new long[][] {{1, 1000,   1},
+                                                        {3, 3000,   1},
+                                                        {5, 2553,   1},
+                                                        {7, 4552,   1},
+                                                        {9, 5152,   1}});
 
-        sql = "SELECT wage salary, count(*)  from S2 " +
-                "WHERE  (select S2.wage from S2 where S2.ID<>1 and S2.id<>5) is distinct from wage "+
-                "GROUP BY WAGE HAVING COUNT(*) is distinct from 7;";
-        if(isHSQL()) {
-            validateTableOfLongs(client, sql, new long[][] {{1000, 1}, {5253, 1}});
-        }
-        else {
-            validateTableOfLongs(client, sql, new long[][] {{5253, 1}, {1000, 1}});
-        }
+        sql = "SELECT id, wage salary, count(*)  from S1 " +
+                "WHERE  (select S2.wage from S2 where S2.ID<>1 and S2.id<>5) is not distinct from wage "+
+                "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 ORDER BY wage;";
+        validateTableOfLongs(client, sql, new long[][] {{10,    Long.MIN_VALUE,    1}});
+
 
 
         sql = "select S1.wage, count(*) from S1 Right Join S2 "+
-                "On S2.WAGE is distinct from  " +
-                "(SELECT MIN(WAGE) FROM S2 where WAGE is  distinct from 1000)" +
-                "group by S1.wage  having COUNT(*) is not distinct from 1;";
+                "On S2.wage is distinct from  " +
+                "(SELECT MIN(wage) FROM S1 where wage is  distinct from 1000) " +
+                "GROUP BY S1.wage  having COUNT(*) is not distinct from 1;";
         validateTableOfLongs(client, sql, new long[][] {});
 
-        sql = "select * from S1 where S1.WAGE = ANY " +
-                "(select S2.wage from S2 where S2.wage is distinct from  5253 or S2.Wage is not distinct from  1000);";
+        sql = "select * from S1 where S1.wage = ANY " +
+                "(select S2.wage from S2 where S2.wage is distinct from  5253 or S2.wage is not distinct from  1000);";
         validateTableOfLongs(client, sql, new long[][] {{1,     1000,      1}});
 
-        // currrently ANY/ALL operator is not supported with "is distinct from" comparison operator
+        // currently ANY/ALL operator is not supported with "is distinct from" comparison operator
         sql = "select * from S1 where S1.WAGE is not distinct from ANY " +
                 "(select S2.wage from S2 where S2.wage is distinct from  5253 or S2.Wage is not distinct from  1000);";
         verifyStmtFails(client, sql, "unexpected token: SELECT");
