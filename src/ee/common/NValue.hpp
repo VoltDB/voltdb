@@ -946,15 +946,15 @@ private:
         return *reinterpret_cast<bool*>(m_data);
     }
 
+    BOOST_STATIC_ASSERT(sizeof(PointType) < sizeof(m_data));
+
     PointType& getPoint() {
         assert(getValueType() == VALUE_TYPE_POINT);
-        assert(sizeof(PointType) == 8); // 2*sizeof(float)
         return *reinterpret_cast<PointType*>(m_data);
     }
 
     const PointType& getPoint() const {
         assert(getValueType() == VALUE_TYPE_POINT);
-        assert(sizeof(PointType) == 8); // 2*sizeof(float)
         return *reinterpret_cast<const PointType*>(m_data);
     }
 
@@ -1959,30 +1959,8 @@ private:
     int comparePointValue (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_POINT);
         switch (rhs.getValueType()) {
-        case VALUE_TYPE_POINT: {
-            float lhsLat = getPoint().getLatitude();
-            float rhsLat = rhs.getPoint().getLatitude();
-            if (lhsLat < rhsLat) {
-                return VALUE_COMPARE_LESSTHAN;
-            }
-
-            if (lhsLat > rhsLat) {
-                return VALUE_COMPARE_GREATERTHAN;
-            }
-
-            // latitude is equal; compare longitude
-            float lhsLng = getPoint().getLongitude();
-            float rhsLng = rhs.getPoint().getLongitude();
-            if (lhsLng < rhsLng) {
-                return VALUE_COMPARE_LESSTHAN;
-            }
-
-            if (lhsLng > rhsLng) {
-                return VALUE_COMPARE_GREATERTHAN;
-            }
-
-            return VALUE_COMPARE_EQUAL;
-        }
+        case VALUE_TYPE_POINT:
+            return getPoint().compareWith(rhs.getPoint());
         default:
             std::ostringstream oss;
             oss << "Type " << valueToString(rhs.getValueType())
@@ -2913,8 +2891,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         *reinterpret_cast<double* >(storage) = input.readDouble();
         break;
     case VALUE_TYPE_POINT:
-        reinterpret_cast<float*>(storage)[0] = input.readFloat();
-        reinterpret_cast<float*>(storage)[1] = input.readFloat();
+        *reinterpret_cast<PointType*>(storage) = PointType::deserializeFrom(input);
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -3059,9 +3036,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         break;
     }
     case VALUE_TYPE_POINT: {
-        float lat = input.readFloat();
-        float lng = input.readFloat();
-        getPoint() = PointType(lat, lng);
+        getPoint() = PointType::deserializeFrom(input);
         break;
     }
     case VALUE_TYPE_NULL: {
@@ -3132,8 +3107,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         break;
     }
     case VALUE_TYPE_POINT: {
-        output.writeFloat(getPoint().getLatitude());
-        output.writeFloat(getPoint().getLongitude());
+        getPoint().serializeTo(output);
         break;
     }
     default:
@@ -3185,8 +3159,7 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
          return;
      }
      case VALUE_TYPE_POINT: {
-         io.writeFloat(getPoint().getLatitude());
-         io.writeFloat(getPoint().getLongitude());
+         getPoint().serializeTo(io);
          return;
      }
      case VALUE_TYPE_INVALID:
@@ -3414,13 +3387,7 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_DECIMAL:
           getDecimal().hash(seed); break;
       case VALUE_TYPE_POINT:
-          // This might not be a good enough.
-          // See notes on hashing DOUBLE above.
-          // Since we expect internal representation to change,
-          // it's good enough for now.  If we decide to use
-          // floating point numbers to store lat/lng long term,
-          // we'll need to revisit this.
-          boost::hash_combine(seed, getPoint().toString()); break;
+          getPoint().hashCombine(seed); break;
       default:
           throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
     }

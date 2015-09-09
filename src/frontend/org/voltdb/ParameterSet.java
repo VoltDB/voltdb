@@ -151,7 +151,7 @@ public class ParameterSet implements JSONString {
                         }
                         break;
                     case POINT:
-                        size += 8 * ((PointType[])obj).length;
+                        size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck() * ((PointType[])obj).length;
                         break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
@@ -173,7 +173,7 @@ public class ParameterSet implements JSONString {
                 continue;
             }
             else if (obj == VoltType.NULL_POINT) {
-                size += 8;
+                size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck();
                 continue;
             } else if (obj instanceof BBContainer) {
                 size += 4 + ((BBContainer)obj).b().remaining();
@@ -209,7 +209,7 @@ public class ParameterSet implements JSONString {
                     size += 16;
                     break;
                 case POINT:
-                    size += 8; // two floats
+                    size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck();
                     break;
                 case VOLTTABLE:
                     size += ((VoltTable) obj).getSerializedSize();
@@ -576,9 +576,7 @@ public class ParameterSet implements JSONString {
                     break;
                 }
                 case POINT :
-                    float lat = in.getFloat();
-                    float lng = in.getFloat();
-                    value = new PointType(lat, lng);
+                    value = PointType.unflattenFromBuffer(in);
                     break;
                 case BOOLEAN:
                     value = in.get();

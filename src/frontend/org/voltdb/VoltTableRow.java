@@ -616,9 +616,7 @@ public abstract class VoltTableRow {
     }
 
     public final PointType getPoint(int columnIndex) {
-        float lat = m_buffer.getFloat(getOffset(columnIndex));
-        float lng = m_buffer.getFloat(getOffset(columnIndex) + 4);
-        PointType pt = new PointType(lat, lng);
+        PointType pt = PointType.unflattenFromBuffer(m_buffer, getOffset(columnIndex));
         m_wasNull = pt.isNull();
         return pt;
     }

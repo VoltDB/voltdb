@@ -21,6 +21,8 @@
 #include <limits>
 #include <sstream>
 
+#include "common/value_defs.h"
+
 namespace voltdb {
 /**
  * A class for representing instances of geo-spatial points.
@@ -30,9 +32,10 @@ class PointType {
 public:
     /** Constructor for a null point,
      * with both lat and lng init'd to NaN */
-    PointType() {
-        m_latitude = std::numeric_limits<float>::quiet_NaN();
-        m_longitude = std::numeric_limits<float>::quiet_NaN();
+    PointType()
+        : m_latitude(std::numeric_limits<float>::quiet_NaN())
+        , m_longitude(std::numeric_limits<float>::quiet_NaN())
+    {
     }
 
     PointType(float latitude, float longitude)
@@ -54,6 +57,56 @@ public:
 
     float getLongitude() const {
         return m_longitude;
+    }
+
+    int compareWith(const PointType& rhs) const {
+        float lhsLat = getLatitude();
+        float rhsLat = rhs.getLatitude();
+        if (lhsLat < rhsLat) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+
+        if (lhsLat > rhsLat) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+
+        // latitude is equal; compare longitude
+        float lhsLng = getLongitude();
+        float rhsLng = rhs.getLongitude();
+        if (lhsLng < rhsLng) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+
+        if (lhsLng > rhsLng) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+
+        return VALUE_COMPARE_EQUAL;
+    }
+
+    template<class Deserializer>
+    static PointType deserializeFrom(Deserializer& input) {
+        float lat = input.readFloat();
+        float lng = input.readFloat();
+        return PointType(lat, lng);
+    }
+
+    template<class Serializer>
+    void serializeTo(Serializer& output) const {
+        output.writeFloat(getLatitude());
+        output.writeFloat(getLongitude());
+    }
+
+    void hashCombine(std::size_t& seed) const {
+        // This might not be a good enough.  See notes on hashing in
+        // NValue::hashCombine, with respect to doubles returning
+        // different hashes for identical inputs.
+        //
+        // Since we expect internal representation to change, it's
+        // good enough for now.  If we decide to use floating point
+        // numbers to store lat/lng long term, we'll need to revisit
+        // this.
+        boost::hash_combine(seed, toString());
     }
 
     std::string toString() const {

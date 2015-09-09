@@ -87,6 +87,13 @@ public class PointType {
     }
 
     /**
+     * The number of bytes an instance of this class requires in serialized form.
+     */
+    static public int getLengthInBytes() {
+        return 8;
+    }
+
+    /**
      * Serialize this instance to a byte buffer.
      * @param buffer
      */
@@ -95,6 +102,29 @@ public class PointType {
         buffer.putFloat(getLongitude());
     }
 
+    /**
+     * Deserialize a point type from a byte buffer
+     * @param inBuffer
+     * @param offset    offset of point data in buffer
+     * @return a new instance of PointType
+     */
+    public static PointType unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
+        float lat = inBuffer.getFloat(offset);
+        float lng = inBuffer.getFloat(offset + 4);
+        return new PointType(lat, lng);
+    }
+
+    /**
+     * Deserialize a point type from a byte buffer
+     * @param inBuffer
+     * @param offset    offset of point data in buffer
+     * @return a new instance of PointType
+     */
+    public static PointType unflattenFromBuffer(ByteBuffer inBuffer) {
+        float lat = inBuffer.getFloat();
+        float lng = inBuffer.getFloat();
+        return new PointType(lat, lng);
+    }
 
     /**
      * Serialize the null point to a byte buffer

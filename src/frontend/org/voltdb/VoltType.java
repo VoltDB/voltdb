@@ -235,7 +235,7 @@ public enum VoltType {
      * Point type, for a geographical point (lat, long)
      */
     POINT ((byte)26,
-            8, // length in bytes
+            PointType.getLengthInBytes(),
             "POINT",
             new Class[] {PointType.class},
             PointType[].class,
