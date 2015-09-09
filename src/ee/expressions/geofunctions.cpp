@@ -87,7 +87,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     float lng = stringToFloat(origInput, latLng[1]);
 
     NValue returnValue(VALUE_TYPE_POINT);
-    returnValue.getPoint() = PointType(lat, lng);
+    returnValue.getPoint() = Point(lat, lng);
 
     return returnValue;
 }

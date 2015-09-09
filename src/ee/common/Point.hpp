@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef EE_COMMON_POINTTYPE_HPP
-#define EE_COMMON_POINTTYPE_HPP
+#ifndef EE_COMMON_POINT_HPP
+#define EE_COMMON_POINT_HPP
 
 #include <limits>
 #include <sstream>
@@ -28,17 +28,17 @@ namespace voltdb {
  * A class for representing instances of geo-spatial points.
  * Stored as a pair of floats, so it fits into an 8-byte word.
  */
-class PointType {
+class Point {
 public:
     /** Constructor for a null point,
      * with both lat and lng init'd to NaN */
-    PointType()
+    Point()
         : m_latitude(std::numeric_limits<float>::quiet_NaN())
         , m_longitude(std::numeric_limits<float>::quiet_NaN())
     {
     }
 
-    PointType(float latitude, float longitude)
+    Point(float latitude, float longitude)
         : m_latitude(latitude)
         , m_longitude(longitude)
     {
@@ -59,7 +59,7 @@ public:
         return m_longitude;
     }
 
-    int compareWith(const PointType& rhs) const {
+    int compareWith(const Point& rhs) const {
         float lhsLat = getLatitude();
         float rhsLat = rhs.getLatitude();
         if (lhsLat < rhsLat) {
@@ -85,10 +85,10 @@ public:
     }
 
     template<class Deserializer>
-    static PointType deserializeFrom(Deserializer& input) {
+    static Point deserializeFrom(Deserializer& input) {
         float lat = input.readFloat();
         float lng = input.readFloat();
-        return PointType(lat, lng);
+        return Point(lat, lng);
     }
 
     template<class Serializer>
@@ -122,4 +122,4 @@ private:
 
 } // end namespace
 
-#endif // EE_COMMON_POINTTYPE_HPP
+#endif // EE_COMMON_POINT_HPP
