@@ -151,6 +151,10 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     m_tempTupleMemory.reset(new char[m_schema->tupleLength() + TUPLE_HEADER_SIZE]);
     m_tempTuple = TableTuple(m_tempTupleMemory.get(), m_schema);
     ::memset(m_tempTupleMemory.get(), 0, m_tempTuple.tupleLength());
+    // default value of hidden dr timestamp is null
+    if (m_schema->hiddenColumnCount() > 0) {
+        m_tempTuple.setHiddenNValue(0, NValue::getNullValue(VALUE_TYPE_BIGINT));
+    }
     m_tempTuple.setActiveTrue();
 
     // set the data to be empty
@@ -228,6 +232,54 @@ int Table::getApproximateSizeToSerialize() const {
     // just max table serialization to 10MB
     return 1024 * 1024 * 10;
 }
+
+/*
+ * Warn: Iterate all tuples to get accurate size, don't use it on
+ * performance critical path if table is large.
+ */
+size_t Table::getAccurateSizeToSerialize(bool includeTotalSize) {
+
+    // column header size
+    size_t bytes = getColumnHeaderSizeToSerialize(includeTotalSize);
+
+    // tuples
+    bytes += sizeof(int32_t);  // tuple count
+    int64_t written_count = 0;
+    TableIterator titer = iterator();
+    TableTuple tuple(m_schema);
+    while (titer.next(tuple)) {
+        bytes += tuple.serializationSize();  // tuple size
+        ++written_count;
+    }
+    assert(written_count == m_tupleCount);
+
+    return bytes;
+}
+
+size_t Table::getColumnHeaderSizeToSerialize(bool includeTotalSize) const {
+    // table size
+    size_t bytes = includeTotalSize ? sizeof(int32_t) : 0;
+
+    // use a cache if possible
+    if (m_columnHeaderData) {
+        assert(m_columnHeaderSize != -1);
+        bytes += m_columnHeaderSize;
+    }
+    else {
+        // column header size, status code, column count
+        bytes += sizeof(int32_t) + sizeof(int8_t) + sizeof(int16_t);
+        // column types
+        bytes += sizeof(int8_t) * m_columnCount;
+        // column names
+        bytes += sizeof(int32_t) * m_columnCount;
+        for (int i = 0; i < m_columnCount; ++i) {
+            bytes += static_cast<int32_t>(columnName(i).size());
+        }
+    }
+
+    return bytes;
+}
+
 
 bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
 
@@ -328,6 +380,24 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
     int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
     assert(sz > 0);
     serialize_io.writeIntAt(pos, sz);
+
+    return true;
+}
+
+bool Table::serializeToWithoutTotalSize(SerializeOutput &serialize_io) {
+    if (!serializeColumnHeaderTo(serialize_io))
+        return false;
+
+    // active tuple counts
+    serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
+    int64_t written_count = 0;
+    TableIterator titer = iterator();
+    TableTuple tuple(m_schema);
+    while (titer.next(tuple)) {
+        tuple.serializeTo(serialize_io);
+        ++written_count;
+    }
+    assert(written_count == m_tupleCount);
 
     return true;
 }
@@ -472,11 +542,12 @@ void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
     }
 
     // Check if the column count matches what the temp table is expecting
-    if (colcount != m_schema->columnCount()) {
+    int16_t expectedColumnCount = static_cast<int16_t>(m_schema->columnCount() + m_schema->hiddenColumnCount());
+    if (colcount != expectedColumnCount) {
         std::stringstream message(std::stringstream::in
                                   | std::stringstream::out);
         message << "Column count mismatch. Expecting "
-                << m_schema->columnCount()
+                << expectedColumnCount
                 << ", but " << colcount << " given" << std::endl;
         message << "Expecting the following columns:" << std::endl;
         message << debug() << std::endl;

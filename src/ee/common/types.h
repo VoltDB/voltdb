@@ -277,6 +277,8 @@ enum ExpressionType {
     EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO    = 15, // greater than equal operator between left and right
     EXPRESSION_TYPE_COMPARE_LIKE                    = 16, // LIKE operator (left LIKE right). both children must be string.
     EXPRESSION_TYPE_COMPARE_IN                      = 17, // IN operator [left IN (right1, right2, ...)]
+    // value 18 is assigned to EXPRESSION_TYPE_OPERATOR_EXISTS
+    EXPRESSION_TYPE_COMPARE_NOTDISTINCT             = 19, // Not distinct operator between left and right
 
     // -----------------------------
     // Conjunction Operators
@@ -528,7 +530,7 @@ bool isNumeric(ValueType type);
 bool isIntegralType(ValueType type);
 
 // for testing, obtain a random instance of the specified type
-NValue getRandomValue(ValueType type);
+NValue getRandomValue(ValueType type, uint32_t maxLength);
 
 std::string valueToString(ValueType type);
 ValueType stringToValue(std::string str );
