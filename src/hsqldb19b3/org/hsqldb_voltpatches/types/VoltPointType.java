@@ -82,9 +82,9 @@ public class VoltPointType extends Type {
 
     @Override
     public Type getCombinedType(Type other, int operation) {
-        // The 'combined type' seems to refer to operators other than
-        // comparisons, which always return BOOLEAN, and are valid
-        // for POINTs.
+        // The 'combined type' seems to refer combining types with
+        // operators other than comparisons.   Comparisons always
+        // return BOOLEAN, and are valid for POINTs.
         //
         // We don't allow any non-comparison operators on POINTs, so
         // just throw here if anyone tries.
