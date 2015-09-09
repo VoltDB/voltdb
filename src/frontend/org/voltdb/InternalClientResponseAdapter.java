@@ -70,7 +70,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private class InternalCallback implements Callback {
 
         private final ProcedureCallback m_cb;
-        private final String m_procedure;
         private final int m_partition;
         private final InternalConnectionContext m_context;
         private final StoredProcedureInvocation m_task;
@@ -81,7 +80,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             m_task = task;
             m_proc = proc;
             m_cb = cb;
-            m_procedure = procName;
             m_partition = partition;
         }
 
@@ -93,13 +91,12 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
                 //Handle failure of transaction due to node kill
                 createTransaction(m_context, m_task.getProcName(), m_proc, m_cb, m_task, m_partition, System.nanoTime());
-                return;
             }
         }
 
         @Override
         public String getProcedureName() {
-            return m_procedure;
+            return m_task.getProcName();
         }
 
         @Override
@@ -199,6 +196,10 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             ByteBuffer buf = null;
             synchronized(this) {
                 final int serializedSize = ds.getSerializedSize();
+                if (serializedSize <= 0) {
+                    //Bad ignored transacton.
+                    return;
+                }
                 buf = ByteBuffer.allocate(serializedSize);
                 ds.serialize(buf);
             }
