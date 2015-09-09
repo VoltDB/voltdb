@@ -191,9 +191,7 @@ public class SerializationHelper {
         else if (type == PointType.class) {
             final PointType[] retval = new PointType[count];
             for (int i = 0; i < count; ++i) {
-                float lat = buf.getFloat();
-                float lng = buf.getFloat();
-                retval[i] = new PointType(lat, lng);
+                retval[i] = PointType.unflattenFromBuffer(buf);
             }
             return retval;
         }
