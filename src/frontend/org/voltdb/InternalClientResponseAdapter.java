@@ -74,12 +74,14 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         private final int m_partition;
         private final InternalConnectionContext m_context;
         private final StoredProcedureInvocation m_task;
+        private final Procedure m_proc;
 
-        public InternalCallback(final InternalConnectionContext context, StoredProcedureInvocation task, String proc, int partition, ProcedureCallback cb, long id) {
+        public InternalCallback(final InternalConnectionContext context, Procedure proc, StoredProcedureInvocation task, String procName, int partition, ProcedureCallback cb, long id) {
             m_context = context;
             m_task = task;
+            m_proc = proc;
             m_cb = cb;
-            m_procedure = proc;
+            m_procedure = procName;
             m_partition = partition;
         }
 
@@ -87,6 +89,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         public void handleResponse(ClientResponse response) throws Exception {
             if (m_cb != null) {
                 m_cb.clientCallback(response);
+            }
+            if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
+                //Handle failure of transaction due to node kill
+                createTransaction(m_context, m_task.getProcName(), m_proc, m_cb, m_task, m_partition, System.nanoTime());
+                return;
             }
         }
 
@@ -140,7 +147,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 public boolean submitTransaction() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final InternalCallback cb = new InternalCallback(context, task, procName, partition, proccb, handle);
+                    final InternalCallback cb = new InternalCallback(context, catProc, task, procName, partition, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
