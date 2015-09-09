@@ -56,6 +56,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.io.Files;
+import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -102,6 +103,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final int m_numberOfReplicas;
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private static final long KICK_REPLICA_USO = -1;
+    private boolean m_enableAck = false;
 
     /**
      * Create a new data source.
@@ -360,7 +362,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_signature;
     }
 
-    public int getPartitionId() {
+    public final int getPartitionId() {
         return m_partitionId;
     }
 
@@ -450,6 +452,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return m_committedBuffers.sizeInBytes();
                 }
             }).get();
+        } catch (RejectedExecutionException e) {
+                return 0;
         } catch (Throwable t) {
             Throwables.propagate(t);
             return 0;
@@ -559,6 +563,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
+                            exportLog.info("Push export buffer with uso " + uso + " Called for partition " + getPartitionId());
                             pushExportBufferImpl(uso, buffer, sync, endOfStream);
                         }
                     } catch (Throwable t) {
@@ -594,6 +599,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
+        if (m_es.isShutdown()) {
+            return Futures.immediateFuture(null);
+        }
         return m_es.submit((new Runnable() {
             @Override
             public void run() {
@@ -693,7 +701,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_firstUnpolledUso;
         }
         long auso = Math.min(m_lastAckUSO, m_firstUnpolledUso);
+        exportLog.info("Polling from export data for replica USO: " + auso);
         return auso;
+    }
+
+    private void setFirstUnpolledUso(long uso) {
+        if (m_isMaster) {
+            m_firstUnpolledUso = uso;
+        } else {
+            m_lastAckUSO = uso;
+            exportLog.info("Setting replica USO: " + m_lastAckUSO);
+        }
     }
 
     private void pollImpl(SettableFuture<BBContainer> fut) {
@@ -720,12 +738,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //Copying and sending the data will take place outside the critical section
             try {
                 Iterator<StreamBlock> iter = m_committedBuffers.iterator();
+                long fuso = getFirstUnpolledUso();
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data
-                    if (getFirstUnpolledUso() < block.uso() + block.totalUso()) {
+                    if (fuso < block.uso() + block.totalUso()) {
                         first_unpolled_block = block;
-                        m_firstUnpolledUso = block.uso() + block.totalUso();
+                        setFirstUnpolledUso(block.uso() + block.totalUso());
+                        exportLog.info("Setting first unpolled uso to " + fuso);
                         break;
                     } else {
                         blocksToDelete.add(block);
@@ -749,6 +769,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
             } else {
+                m_enableAck = true;
                 fut.set(
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
@@ -832,26 +853,23 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void ack(final long uso) {
-        if (m_runEveryWhere && !m_isMaster && uso == KICK_REPLICA_USO) {
-            //These are single threaded so no need to lock.
-            exportLog.info("Export generation " + this.getGeneration() + " replica run request for " + this.getPartitionId());
-            if (!m_replicaRunning) {
-                exportLog.info("Export generation " + this.getGeneration() + " accepting mastership for partition " + this.getPartitionId() + " as replica");
-                acceptMastership();
-                m_replicaRunning = true;
-                m_lastAckUSO = 0;
-            }
-            return;
-        }
+    public void ack(final long uso, final boolean fromMaster) {
 
-        if (m_replicaRunning) {
-            m_lastAckUSO = uso;
-        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
+                    if (m_runEveryWhere && !m_isMaster && uso == KICK_REPLICA_USO) {
+                        //These are single threaded so no need to lock.
+                        exportLog.info("Export generation " + getGeneration() + " replica run request for " + getPartitionId());
+                        if (!m_replicaRunning) {
+                            exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica overflow size = " + sizeInBytes());
+                            acceptMastership();
+                            m_replicaRunning = true;
+                            m_lastAckUSO = 0;
+                        }
+                        return;
+                    }
                     if (!m_es.isShutdown()) {
                         ackImpl(uso);
                     }
@@ -903,8 +921,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     m_allowAcceptingMastership.acquire();
-                    exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId());
                     if (!m_es.isShutdown()) {
+                        exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId());
                         m_onMastership.run();
                     }
                 } catch (Exception e) {
@@ -930,5 +948,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     //Set it from client.
     public void setRunEveryWhere(boolean runEveryWhere) {
         m_runEveryWhere = runEveryWhere;
+    }
+
+    public ListeningExecutorService getExecutorService() {
+        return m_es;
     }
 }

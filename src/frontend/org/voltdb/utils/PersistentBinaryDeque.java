@@ -435,6 +435,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                 if (m_usageSpecificLog.isDebugEnabled()) {
                                     m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted after discarding last buffer");
                                 }
+                                (new Exception()).printStackTrace();
                                 segment.closeAndDelete();
                             }
                         }

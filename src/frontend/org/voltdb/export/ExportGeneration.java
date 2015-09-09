@@ -572,7 +572,8 @@ public class ExportGeneration {
                     }
 
                     try {
-                        eds.ack(ackUSO);
+                        exportLog.info("Rcvd ack for partition: " + partition);
+                        eds.ack(ackUSO, true);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown
                     }
