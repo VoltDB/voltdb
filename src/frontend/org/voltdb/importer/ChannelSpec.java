@@ -163,7 +163,11 @@ public class ChannelSpec implements Comparable<ChannelSpec> {
             public boolean apply(Entry<ChannelSpec, V> e) {
                 return specs.contains(e.getKey());
             }
-        };
+            @Override
+            public String toString() {
+                return "Predicate.specKeyIn [Map.Entry.getKey() is contained in " + specs + " ]";
+            }
+         };
     }
 
     public static <K> Predicate<Map.Entry<K, ChannelSpec>> importerValueIs(final String importer, Class<K> clazz) {
