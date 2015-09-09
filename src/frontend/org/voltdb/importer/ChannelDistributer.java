@@ -1082,21 +1082,15 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         return;
                     }
 
-                    try {
-                        prev = m_specs.get(sstamp);
-                        oldspecs = Maps.filterEntries(prev, thisHost).navigableKeySet();
-                        // rebuild the assigned channel spec list
-                        mbldr = ImmutableSortedMap.naturalOrder();
-                        mbldr.putAll(Maps.filterEntries(prev, not(or(thisHost, inSpecs))));
-                        for (ChannelSpec spec: nodespecs.get()) {
-                            mbldr.put(spec, hval);
-                        }
-                    } catch (NullPointerException e) {
-                        LOG.error("STEBUG host is \"" + hval + "\", predicate is " + thisHost
-                                + ", path is \"" + path + "\""
-                                + "\nSpecs are: " + prev + "\ninSpecs are: " + inSpecs);
-                        throw e;
+                    prev = m_specs.get(sstamp);
+                    oldspecs = Maps.filterEntries(prev, thisHost).navigableKeySet();
+                    // rebuild the assigned channel spec list
+                    mbldr = ImmutableSortedMap.naturalOrder();
+                    mbldr.putAll(Maps.filterEntries(prev, not(or(thisHost, inSpecs))));
+                    for (ChannelSpec spec: nodespecs.get()) {
+                        mbldr.put(spec, hval);
                     }
+
                 } while (!m_specs.compareAndSet(prev, mbldr.build(), sstamp[0], sstamp[0]+1));
 
                 if (hval.equals(m_hostId) && !m_done.get()) {
