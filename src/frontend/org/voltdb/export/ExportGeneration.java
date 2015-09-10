@@ -61,7 +61,6 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import java.util.concurrent.Semaphore;
-import org.voltcore.logging.Level;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.zk.StateMachineInstance;
 import org.voltcore.zk.SynchronizedStatesManager;
@@ -75,17 +74,14 @@ import org.voltdb.utils.VoltFile;
  */
 public class ExportGeneration {
 
-
-    final Task m_task;
+    // This task ensures that all nodes which has replicas for partition have their mailboxes setup.
+    private EnsureMailboxSetupTask m_task = null;
 
     /**
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    static {
-        exportLog.setLevel(Level.DEBUG);
-    }
     public Long m_timestamp;
     public final File m_directory;
 
@@ -184,7 +180,9 @@ public class ExportGeneration {
             }
         }
         m_isContinueingGeneration = true;
-        m_task = new Task(m_ssm, "ExportGeneration", exportLog);
+        if (!isRejoin) {
+            m_task = new EnsureMailboxSetupTask(m_ssm, "ExportGeneration", exportLog);
+        }
 
         exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
     }
@@ -203,7 +201,6 @@ public class ExportGeneration {
         } catch (NumberFormatException ex) {
             throw new IOException("Invalid Generation directory, directory name must be a number.");
         }
-        m_task = new Task(m_ssm, "ExportGeneration", exportLog);
 
         m_isContinueingGeneration = (catalogGen == m_timestamp);
     }
@@ -437,15 +434,17 @@ public class ExportGeneration {
         }
     }
 
-    public class Task extends StateMachineInstance {
+    //The task is done when all partitions are seen.
+    public class EnsureMailboxSetupTask extends StateMachineInstance {
         private boolean m_done = false;
         private boolean m_requestPending = false;
         private boolean m_taskStarted = false;
         private final Set<Integer> m_partitions = new HashSet<Integer>();
         private final Set<Integer> m_done_partitions = new HashSet<Integer>();
         private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
+        private final ByteBuffer m_dummyBuffer = ByteBuffer.allocate(0);
 
-        public Task(SynchronizedStatesManager mgr, String instanceName, VoltLogger logger) {
+        public EnsureMailboxSetupTask(SynchronizedStatesManager mgr, String instanceName, VoltLogger logger) {
             super(mgr, instanceName, logger);
         }
 
@@ -460,29 +459,26 @@ public class ExportGeneration {
                 cancelLockRequest();
                 return;
             }
-            initiateCoordinatedTask(false, ByteBuffer.allocate(0));
+            initiateCoordinatedTask(false, m_dummyBuffer);
         }
 
         public void setCompleted(int i) {
-            System.out.println("Partition completed is: " + i);
-            m_partitions.remove(new Integer(i));
+            m_partitions.remove(i);
             m_done_partitions.add(i);
-            if (m_partitions.size() == 0 && m_requestPending) {
-                requestedTaskComplete(ByteBuffer.allocate(0));
+            if (m_partitions.isEmpty() && m_requestPending) {
+                requestedTaskComplete(m_dummyBuffer);
             }
         }
 
         public void setPartitions(Set<Integer> localPartitions) {
             m_partitions.addAll(localPartitions);
-            System.out.println("Waiting for partitions: " + m_partitions);
         }
 
         @Override
         protected void taskRequested(ByteBuffer proposedTask) {
             m_requestPending = true;
-            if (m_partitions.size() == 0) {
-                //Implement code to build this buffer block until we have all my mailboxes.
-                requestedTaskComplete(ByteBuffer.allocate(0));
+            if (m_partitions.isEmpty()) {
+                requestedTaskComplete(m_dummyBuffer);
             }
         }
 
@@ -494,16 +490,14 @@ public class ExportGeneration {
         @Override
         protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, List<ByteBuffer> results) {
             m_done = true;
-            System.out.println("uncorrelatedTaskCompleted waiting partitions done. " + m_partitions);
-            if (m_partitions.size() == 0) {
+            if (m_partitions.isEmpty()) {
+                //Since the task is complete allow data source to take on mastership if its asked for.
                 for (Integer partition : m_done_partitions) {
                     Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
                     for (ExportDataSource eds : dataSourcesForPartition.values()) {
                         eds.allowMastership();
                     }
                 }
-
-                System.out.println("All waiting partitions done. " + m_partitions);
             }
             m_taskStarted = false;
         }
@@ -537,11 +531,21 @@ public class ExportGeneration {
 
         // for new generations Create a task and wait for all mailboxes setup.
         try {
-            m_task.setPartitions(localPartitions);
-            m_ssm.registerStateMachine(m_task);
-            m_task.attemptTask();
-        } catch (Exception ex) {
-            ex.printStackTrace();
+            if (m_task != null) {
+                m_task.setPartitions(localPartitions);
+                m_ssm.registerStateMachine(m_task);
+                m_task.attemptTask();
+            } else {
+                //allow mastership without the task.
+                for (Integer partition : localPartitions) {
+                    Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+                    for (ExportDataSource eds : dataSourcesForPartition.values()) {
+                        eds.allowMastership();
+                    }
+                }
+            }
+        } catch (InterruptedException ex) {
+            exportLog.error("Error setting up state machine for ensure mailbox task.", ex);
         }
 
         m_mbox = new LocalMailbox(messenger) {
