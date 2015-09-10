@@ -301,14 +301,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void allowMastership() {
         m_allowAcceptingMastership.release();
-        exportLog.info("All replicas seen For partition " + getPartitionId() + " Allow mastership NOW complete");
+        exportLog.info("All replicas seen For partition or rejoin " + getPartitionId() + " allow mastership now.");
     }
 
     public synchronized void updateAckMailboxes(EnsureMailboxSetupTask task, final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         m_ackMailboxRefs.set( ackMailboxes);
-        if (m_ackMailboxRefs.get().getSecond().size() == m_numberOfReplicas) {
-            ImmutableList<Long> p = m_ackMailboxRefs.get().getSecond();
-            task.setCompleted(getPartitionId());
+        if (task != null) {
+            if (m_ackMailboxRefs.get().getSecond().size() == m_numberOfReplicas) {
+                ImmutableList<Long> p = m_ackMailboxRefs.get().getSecond();
+                task.setCompleted(getPartitionId());
+            }
         }
     }
 

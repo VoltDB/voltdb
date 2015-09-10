@@ -466,7 +466,11 @@ public class ExportGeneration {
             m_partitions.remove(i);
             m_done_partitions.add(i);
             if (m_partitions.isEmpty() && m_requestPending) {
-                requestedTaskComplete(m_dummyBuffer);
+                if (!m_done) {
+                    requestedTaskComplete(m_dummyBuffer);
+                }
+            } else {
+                exportLog.info("Task not complete: " + m_partitions + " Done: " + m_done_partitions);
             }
         }
 
