@@ -715,9 +715,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void pollImpl(SettableFuture<BBContainer> fut) {
+        exportLog.info("Export poll for partition " + getPartitionId());
         if (fut == null) {
             return;
         }
+        exportLog.info("Export poll for partition with future " + getPartitionId() + " USO: " + getFirstUnpolledUso());
 
         try {
             StreamBlock first_unpolled_block = null;
@@ -853,25 +855,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void ack(final long uso, final boolean fromMaster) {
+    public void ack(final long uso) {
+        if (m_runEveryWhere && !m_isMaster && uso == KICK_REPLICA_USO) {
+            //These are single threaded so no need to lock.
+            exportLog.info("Export generation " + getGeneration() + " replica run request for " + getPartitionId());
+            if (!m_replicaRunning) {
+                exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica overflow size = " + sizeInBytes());
+                acceptMastership();
+                m_replicaRunning = true;
+                m_lastAckUSO = 0;
+            }
+            return;
+        }
 
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    if (m_runEveryWhere && !m_isMaster && uso == KICK_REPLICA_USO) {
-                        //These are single threaded so no need to lock.
-                        exportLog.info("Export generation " + getGeneration() + " replica run request for " + getPartitionId());
-                        if (!m_replicaRunning) {
-                            exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica overflow size = " + sizeInBytes());
-                            acceptMastership();
-                            m_replicaRunning = true;
-                            m_lastAckUSO = 0;
+                    if (!m_replicaRunning) {
+                        if (!m_es.isShutdown()) {
+                            ackImpl(uso);
                         }
-                        return;
-                    }
-                    if (!m_es.isShutdown()) {
-                        ackImpl(uso);
                     }
                     m_lastAckUSO = uso;
                 } catch (Exception e) {
@@ -902,6 +906,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void setMaster() {
+        exportLog.info("Setting master for partition: " + getPartitionId());
         m_isMaster = true;
     }
 
