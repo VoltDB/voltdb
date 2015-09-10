@@ -36,6 +36,7 @@
 
 #include "common/ExportSerializeIo.h"
 #include "common/FatalException.hpp"
+#include "common/Point.hpp"
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
 #include "common/StringRef.h"
@@ -945,6 +946,20 @@ private:
         return *reinterpret_cast<bool*>(m_data);
     }
 
+    Point& getPoint() {
+        assert(getValueType() == VALUE_TYPE_POINT);
+        return *reinterpret_cast<Point*>(m_data);
+    }
+
+    const Point& getPoint() const {
+
+        BOOST_STATIC_ASSERT_MSG(sizeof(Point) <= sizeof(m_data),
+                                "Size of Point is too large for NValue m_data");
+
+        assert(getValueType() == VALUE_TYPE_POINT);
+        return *reinterpret_cast<const Point*>(m_data);
+    }
+
     bool isBooleanNULL() const ;
 
     std::size_t getAllocationSizeForObject() const;
@@ -1425,6 +1440,9 @@ private:
         case VALUE_TYPE_TIMESTAMP: {
             streamTimestamp(value);
             break;
+        }
+        case VALUE_TYPE_POINT: {
+            value << getPoint().toString(); break;
         }
         default:
             throwCastSQLException(type, VALUE_TYPE_VARCHAR);
@@ -1940,6 +1958,23 @@ private:
         }
     }
 
+    int comparePointValue (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_POINT);
+        switch (rhs.getValueType()) {
+        case VALUE_TYPE_POINT:
+            return getPoint().compareWith(rhs.getPoint());
+        default:
+            std::ostringstream oss;
+            oss << "Type " << valueToString(rhs.getValueType())
+                << " cannot be cast for comparison to type "
+                << valueToString(getValueType());
+            throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                               oss.str().c_str());
+            // Not reached
+            return 0;
+        }
+    }
+
     NValue opAddBigInts(const int64_t lhs, const int64_t rhs) const {
         //Scary overflow check from https://www.securecoding.cert.org/confluence/display/cplusplus/INT32-CPP.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
         if ( ((lhs^rhs)
@@ -2299,6 +2334,8 @@ private:
 
 };
 
+
+
 /**
  * Public constructor that initializes to an NValue that is unusable
  * with other NValues.  Useful for declaring storage for an NValue.
@@ -2417,6 +2454,8 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(TTInt);
       case VALUE_TYPE_BOOLEAN:
         return sizeof(bool);
+      case VALUE_TYPE_POINT:
+        return sizeof(Point);
       default:
           char message[128];
           snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
@@ -2475,6 +2514,8 @@ inline int NValue::compare_withoutNull(const NValue rhs) const {
         return compareBinaryValue(rhs);
     case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
+    case VALUE_TYPE_POINT:
+        return comparePointValue(rhs);
     default: {
         throwDynamicSQLException(
                 "non comparable types lhs '%s' rhs '%s'",
@@ -2537,6 +2578,9 @@ inline void NValue::setNull() {
         break;
     case VALUE_TYPE_DECIMAL:
         getDecimal().SetMin();
+        break;
+    case VALUE_TYPE_POINT:
+        getPoint() = Point();
         break;
     default: {
         throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
@@ -2660,6 +2704,14 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
         ::memcpy(retval.m_data, storage, sizeof(TTInt));
         break;
     }
+    case VALUE_TYPE_POINT:
+    {
+        retval.getPoint() = *reinterpret_cast<const Point*>(storage);
+        if (retval.getPoint().isNull()) {
+            retval.tagAsNull();
+        }
+        break;
+    }
     default:
         throwDynamicSQLException("NValue::initFromTupleStorage() invalid column type '%s'",
                                  getTypeName(type).c_str());
@@ -2700,6 +2752,9 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         break;
     case VALUE_TYPE_DECIMAL:
         ::memcpy(storage, m_data, sizeof(TTInt));
+        break;
+    case VALUE_TYPE_POINT:
+        ::memcpy(storage, m_data, sizeof(Point));
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -2768,6 +2823,9 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
     case VALUE_TYPE_DECIMAL:
         ::memcpy( storage, m_data, sizeof(TTInt));
         break;
+    case VALUE_TYPE_POINT:
+        ::memcpy( storage, m_data, sizeof(Point));
+        break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
         //Potentially non-inlined type requires special handling
@@ -2835,6 +2893,9 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         break;
     case VALUE_TYPE_DOUBLE:
         *reinterpret_cast<double* >(storage) = input.readDouble();
+        break;
+    case VALUE_TYPE_POINT:
+        *reinterpret_cast<Point*>(storage) = Point::deserializeFrom(input);
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -2978,6 +3039,10 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         getDecimal().table[0] = input.readLong();
         break;
     }
+    case VALUE_TYPE_POINT: {
+        getPoint() = Point::deserializeFrom(input);
+        break;
+    }
     case VALUE_TYPE_NULL: {
         setNull();
         break;
@@ -3045,6 +3110,10 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         output.writeLong(getDecimal().table[0]);
         break;
     }
+    case VALUE_TYPE_POINT: {
+        getPoint().serializeTo(output);
+        break;
+    }
     default:
         throwDynamicSQLException( "NValue::serializeTo() found a column "
                 "with ValueType '%s' that is not handled", getValueTypeString().c_str());
@@ -3091,6 +3160,10 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
          io.writeByte((int8_t)16);  //number of bytes in decimal
          io.writeLong(htonll(getDecimal().table[1]));
          io.writeLong(htonll(getDecimal().table[0]));
+         return;
+     }
+     case VALUE_TYPE_POINT: {
+         getPoint().serializeTo(io);
          return;
      }
      case VALUE_TYPE_INVALID:
@@ -3317,6 +3390,8 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       }
       case VALUE_TYPE_DECIMAL:
           getDecimal().hash(seed); break;
+      case VALUE_TYPE_POINT:
+          getPoint().hashCombine(seed); break;
       default:
           throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
     }
@@ -3613,6 +3688,7 @@ inline int32_t NValue::murmurHash3() const {
     case VALUE_TYPE_INTEGER:
     case VALUE_TYPE_SMALLINT:
     case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_POINT:
         return MurmurHash3_x64_128( m_data, 8, 0);
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_VARCHAR:

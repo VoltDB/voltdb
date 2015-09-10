@@ -444,6 +444,8 @@ private:
                   return (sizeof (int32_t) + ValuePeeker::peekObjectLength_withoutNull(getNValue(colIndex)));
               }
               return (size_t)0;
+          case VALUE_TYPE_POINT:
+              return sizeof (Point);
           default:
             // let caller handle this error
             throwDynamicSQLException(
