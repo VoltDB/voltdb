@@ -854,9 +854,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (!m_es.isShutdown()) {
                         if (!m_replicaRunning) {
                             ackImpl(uso);
+                        } else {
+                            //we get -ve uso for replicas.
+                            m_lastAckUSO = uso*-1;
                         }
                     }
-                    m_lastAckUSO = uso;
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
                 } catch (Error e) {
@@ -901,11 +903,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
+        try {
+            m_allowAcceptingMastership.acquire();
+        } catch (InterruptedException ex) {
+            exportLog.warn("Export generation " + getGeneration() + " failed to acquire mastership semaphore.");
+        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    m_allowAcceptingMastership.acquire();
                     if (!m_es.isShutdown() || !m_closed) {
                         exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId());
                         m_onMastership.run();
