@@ -113,9 +113,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
