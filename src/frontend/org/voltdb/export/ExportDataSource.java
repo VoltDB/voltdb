@@ -904,12 +904,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * executor service
      */
     public void acceptMastership() {
-        Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
         try {
             m_allowAcceptingMastership.acquire();
         } catch (InterruptedException ex) {
             exportLog.warn("Export generation " + getGeneration() + " failed to acquire mastership semaphore.");
         }
+        Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
         m_es.execute(new Runnable() {
             @Override
             public void run() {

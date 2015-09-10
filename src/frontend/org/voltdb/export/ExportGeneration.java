@@ -539,14 +539,6 @@ public class ExportGeneration {
                 m_task.setPartitions(localPartitions);
                 m_ssm.registerStateMachine(m_task);
                 m_task.attemptTask();
-            } else {
-                //allow mastership without the task.
-                for (Integer partition : localPartitions) {
-                    Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-                    for (ExportDataSource eds : dataSourcesForPartition.values()) {
-                        eds.allowMastership();
-                    }
-                }
             }
         } catch (InterruptedException ex) {
             exportLog.error("Error setting up state machine for ensure mailbox task.", ex);
@@ -649,6 +641,17 @@ public class ExportGeneration {
             fut.get();
         } catch (Throwable t) {
             Throwables.propagate(t);
+        }
+
+        //If we are joining we dont depend on task and just allow mastership if its presented.
+        if (m_task != null) {
+            //allow mastership without the task.
+            for (Integer partition : localPartitions) {
+                Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+                for (ExportDataSource eds : dataSourcesForPartition.values()) {
+                    eds.allowMastership();
+                }
+            }
         }
 
     }
