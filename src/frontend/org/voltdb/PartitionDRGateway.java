@@ -217,6 +217,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                     log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " old row length " + oldRowLengthPrefix +
                               " new row length " + newRowLengthPrefix + " checksum " + checksum +
                               (recordType == DRRecordType.UPDATE_BY_INDEX ? (" index checksum " + oldRowIndexCrc) : ""));
+                    break;
                 }
                 case BEGIN_TXN: {
                     //Begin txn

@@ -71,20 +71,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
 
-    // Transaction IDs for transactions applied to this tuple stream
-    // should always be moving forward in time.
-    if (spHandle < m_openSpHandle) {
-        throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)spHandle
-                );
-    }
-
-    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
-    if (!m_opened) {
-        beginTransaction(m_openSequenceNumber, uniqueId);
-    }
-    assert(m_opened);
+    transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);

@@ -355,11 +355,10 @@ TEST_F(DRTupleStreamTest, Fill) {
 
 /**
  * Fill a buffer with a single TXN, and then finally close it in the next
- * buffer.
+ * buffer using periodicFlush
  */
-TEST_F(DRTupleStreamTest, FillSingleTxnAndAppend) {
-
-    int tuples_to_fill = (BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
+TEST_F(DRTupleStreamTest, FillSingleTxnAndFlush) {
+    int tuples_to_fill = (BUFFER_SIZE - 2 * MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
     appendTuple(0, 1);
     m_wrapper.endTransaction();
     // fill with just enough tuples to avoid exceeding buffer
@@ -369,61 +368,25 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndAppend) {
     }
     // We shouldn't yet get a buffer because we haven't forced the
     // generation of a new one by exceeding the current one.
-    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    ASSERT_FALSE(m_topend.receivedDRBuffer);
 
     // now, drop in one more on the same TXN ID
     appendTuple(1, 2);
 
-    // We shouldn't yet get a buffer because we haven't closed the current
-    // transaction
-    ASSERT_TRUE(m_topend.receivedDRBuffer);
-
-    // now, finally drop in a tuple that closes the first TXN
-    m_wrapper.endTransaction();
-
+    // We should have received a buffer containing only the first txn
     ASSERT_TRUE(m_topend.receivedDRBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
-}
-
-/**
- * Fill a buffer with a single TXN, and then finally close it in the next
- * buffer using periodicFlush
- */
-TEST_F(DRTupleStreamTest, FillSingleTxnAndFlush) {
-
-    int tuples_to_fill = (BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
-    appendTuple(0, 1);
-    m_wrapper.endTransaction();
-    // fill with just enough tuples to avoid exceeding buffer
-    for (int i = 2; i <= tuples_to_fill; i++)
-    {
-        appendTuple(1, 2);
-    }
-    // We shouldn't yet get a buffer because we haven't forced the
-    // generation of a new one by exceeding the current one.
-    ASSERT_TRUE(m_topend.receivedDRBuffer);
-
-    // now, drop in one more on the same TXN ID
-    appendTuple(1, 2);
-
-    // We shouldn't yet get a buffer because we haven't closed the current
-    // transaction
-    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE));
+    m_topend.receivedDRBuffer = false;
 
     // Now, flush the buffer with the tick
     m_wrapper.endTransaction();
     m_wrapper.periodicFlush(-1, addPartitionId(2));
 
-    // should be able to get 2 buffers, one full and one with one tuple
+    // should now receive the buffer containing the second, larger txn
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
-
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);

@@ -703,7 +703,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(0));
     temp_tuple.setNValue(1, ValueFactory::getBigIntValue(1));
     TableTuple third_tuple = insertTuple(m_otherTableWithIndex, temp_tuple);
-    m_otherTableWithoutIndex->tempTuple();
+    temp_tuple = m_otherTableWithoutIndex->tempTuple();
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(2));
     temp_tuple.setNValue(1, ValueFactory::getBigIntValue(3));
     TableTuple fourth_tuple = insertTuple(m_otherTableWithoutIndex, temp_tuple);
