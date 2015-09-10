@@ -36,6 +36,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.EEException;
@@ -457,5 +458,34 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(r1.getBinaryLogUniqueId(), r2.getBinaryLogUniqueId());
         assertTrue(r1.hasHashinatorConfig());
         assertEquals(r1.getHashinatorVersionedConfig().getFirst(),new Long(2));
+    }
+
+    public void testLargeNumberOfTableResults() throws Exception
+    {
+        ColumnInfo columnInfo = new ColumnInfo("intcol", VoltType.INTEGER);
+        VoltTable table = new VoltTable(columnInfo);
+        table.addRow(10);
+        int count = Short.MAX_VALUE + 1;
+        VoltTable[] results = new VoltTable[count];
+        for (int i=0; i<count; i++) {
+            results[i] = table;
+        }
+        String statusStr = "Success!";
+        ClientResponseImpl expected = new ClientResponseImpl(ClientResponse.SUCCESS, results, statusStr);
+        assertEquals(count, expected.getResults().length);
+        assertEquals(ClientResponse.SUCCESS, expected.getStatus());
+        assertEquals(statusStr, expected.getStatusString());
+
+        int size = expected.getSerializedSize();
+        ByteBuffer buf = ByteBuffer.allocate(size);
+        expected.flattenToBuffer(buf);
+        buf.flip();
+
+        ClientResponseImpl deserialized = new ClientResponseImpl();
+        deserialized.initFromBuffer(buf);
+
+        assertEquals(expected.getStatus(), deserialized.getStatus());
+        assertEquals(expected.getStatusString(), deserialized.getStatusString());
+        assertEquals(expected.getResults().length, deserialized.getResults().length);
     }
 }
