@@ -82,7 +82,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 
     // handle index for min / max support
     setIndexForMinMax(mvInfo->indexForMinMax());
-    // set up fallback query executors for min/max recalculation (ENG-8641)
+    // set up fallback query executors for min/max recalculation
     // must be set after indexForMinMax
     setFallbackExecutorVectors(mvInfo->fallbackQueryStmts());
 
@@ -136,17 +136,6 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     oldTarget->decrementRefcount();
 }
 
-string hexDecodeToString(const string hexString) {
-    size_t len = hexString.length();
-    string retval;
-    for(int i=0; i<len; i+=2) {
-        string byte = hexString.substr(i,2);
-        char chr = (char) (int)strtol(byte.c_str(), NULL, 16);
-        retval.push_back(chr);
-    }
-    return retval;
-}
-
 void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts) {
     m_fallbackExecutorVectors.clear();
     m_usePlanForAgg.clear();
@@ -154,9 +143,8 @@ void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::Catalog
     int idx = 0;
     BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
         catalog::Statement *stmt = labeledStatement.second;
-        const string b64plan = stmt->fragments().begin()->second->plannodetree();
-        string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
-        string explanation = hexDecodeToString(stmt->explainplan());
+        const string& b64plan = stmt->fragments().begin()->second->plannodetree();
+        const string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
 
         boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
         // We don't need the send executor.
@@ -174,27 +162,37 @@ void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::Catalog
          */
         vector<AbstractExecutor*> executorList = execVec->getExecutorList();
         AbstractPlanNode* apn = executorList[0]->getPlanNode();
-        if ( apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN ) {
-            if ( m_indexForMinMax[idx] ) {
+        bool usePlanForAgg = false;
+        if (apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN) {
+            TableIndex* hardCodedIndex = m_indexForMinMax[idx];
+            if (hardCodedIndex) {
+#ifdef VOLT_TRACE_ENABLED
                 if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-                    cout << "hard-coded function uses: " << m_indexForMinMax[idx]->getName() << endl;
-                    cout << "plan uses: " << ((IndexScanPlanNode *)apn)->getTargetIndexName() << endl;
+                    cout << "hard-coded function uses: " << hardCodedIndex->getName() << "\n"
+                            << "plan uses: " << ((IndexScanPlanNode *)apn)->getTargetIndexName() << endl;
                 }
-                m_usePlanForAgg.push_back( m_indexForMinMax[idx]->getName().compare( ((IndexScanPlanNode *)apn)->getTargetIndexName() ) != 0 );
+#endif
+                usePlanForAgg = hardCodedIndex->getName().compare( ((IndexScanPlanNode *)apn)->getTargetIndexName() ) != 0;
             }
             else {
-                m_usePlanForAgg.push_back(true);
+                usePlanForAgg = true;
             }
         }
-        else {
-            m_usePlanForAgg.push_back(false);
-        }
-        // For debug:
+        m_usePlanForAgg.push_back(usePlanForAgg);
+
+#ifdef VOLT_TRACE_ENABLED
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-            cout << "Aggregation " << idx << endl;
-            cout << explanation << endl;
-            cout << "Uses " << (m_usePlanForAgg[idx] ? "plan." : "hard-coded function.") << endl << endl;
+            const string& hexString = stmt->explainplan();
+            assert(hexString.length() % 2 == 0);
+            int bufferLength = (int)hexString.size() / 2 + 1;
+            char* explanation = new char[bufferLength];
+            boost::shared_array<char> memoryGuard(explanation);
+            catalog::Catalog::hexDecodeString(hexString, explanation);
+            cout << "Aggregation " << idx << "\n"
+                    << explanation << "\n"
+                    << "Uses " << (usePlanForAgg ? "plan.\n" : "hard-coded function.\n") << endl;
         }
+#endif
         ++ idx;
     }
 }
@@ -285,7 +283,7 @@ void MaterializedViewMetadata::allocateBackedTuples()
 
 AbstractExpression* MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *mvInfo)
 {
-    std::string hexString = mvInfo->predicate();
+    const string& hexString = mvInfo->predicate();
     if (hexString.size() == 0) {
         return NULL;
     }
@@ -304,7 +302,7 @@ AbstractExpression* MaterializedViewMetadata::parsePredicate(catalog::Materializ
 
 std::size_t MaterializedViewMetadata::parseGroupBy(catalog::MaterializedViewInfo *mvInfo)
 {
-    const std::string expressionsAsText = mvInfo->groupbyExpressionsJson();
+    const string& expressionsAsText = mvInfo->groupbyExpressionsJson();
     if (expressionsAsText.length() == 0) {
         // set up the group by columns from the catalog info
         const catalog::CatalogMap<catalog::ColumnRef>& columns = mvInfo->groupbycols();
@@ -323,7 +321,7 @@ std::size_t MaterializedViewMetadata::parseGroupBy(catalog::MaterializedViewInfo
 
 std::size_t MaterializedViewMetadata::parseAggregation(catalog::MaterializedViewInfo *mvInfo)
 {
-    const std::string expressionsAsText = mvInfo->aggregationExpressionsJson();
+    const string& expressionsAsText = mvInfo->aggregationExpressionsJson();
     bool usesComplexAgg = expressionsAsText.length() > 0;
     // set up the mapping from input col to output col
     const catalog::CatalogMap<catalog::Column>& columns = mvInfo->dest()->columns();
@@ -574,9 +572,9 @@ NValue MaterializedViewMetadata::findFallbackValueUsingPlan(const TableTuple& ol
     }
     // For debug:
     // if (context->m_siteId == 0) {
-    //     cout << "oldTuple: " << oldTuple.debugNoHeader() << endl;
-    //     cout << "Return table: " << endl << tbl->debug() << endl;
-    //     cout << "newValue: " << newValue.debug() << endl;
+    //     cout << "oldTuple: " << oldTuple.debugNoHeader() << "\n"
+    //             << "Return table: " << endl << tbl->debug() << "\n"
+    //             << "newValue: " << newValue.debug() << endl;
     // }
     // restore
     for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
