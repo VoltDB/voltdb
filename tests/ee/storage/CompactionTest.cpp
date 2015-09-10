@@ -363,10 +363,7 @@ TEST_F(CompactionTest, BasicCompaction) {
         m_table->deleteTuple(tuple, true);
     }
     m_table->doForcedCompaction();
-
-    // At any given point, persistent table will have atleast one block available
-    // with m_data even if that block is empty
-    ASSERT_EQ( m_table->m_data.size(), 1);
+    ASSERT_EQ( m_table->m_data.size(), 0);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }
 
@@ -495,7 +492,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         }
     }
     m_table->doForcedCompaction();
-    ASSERT_EQ( m_table->m_data.size(), 1);
+    ASSERT_EQ( m_table->m_data.size(), 0);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
     for (int ii = 0; ii < tupleCount; ii++) {
         ASSERT_TRUE(COWTuples.exists(ii));
