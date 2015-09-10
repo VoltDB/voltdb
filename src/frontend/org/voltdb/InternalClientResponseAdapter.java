@@ -43,7 +43,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
-import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -86,11 +85,9 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         private final String m_procedure;
         private final int m_partition;
         private final InternalConnectionContext m_context;
-        private final StoredProcedureInvocation m_task;
 
-        public InternalCallback(final InternalConnectionContext context, StoredProcedureInvocation task, String proc, int partition, ProcedureCallback cb, long id) {
+        public InternalCallback(final InternalConnectionContext context, String proc, int partition, ProcedureCallback cb, long id) {
             m_context = context;
-            m_task = task;
             m_cb = cb;
             m_procedure = proc;
             m_partition = partition;
@@ -135,36 +132,25 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final  AsyncCompilerWork.AsyncCompilerWorkCompletionHandler m_adhocCompletionHandler = new AsyncCompilerWork.AsyncCompilerWorkCompletionHandler() {
         @Override
         public void onCompletion(AsyncCompilerResult result) {
+            final Connection c = (Connection)result.clientData;
             if (result instanceof CatalogChangeResult) {
                 final CatalogChangeResult changeResult = (CatalogChangeResult) result;
 
                 // if the catalog change is a null change
                 if (changeResult.encodedDiffCommands.trim().length() == 0) {
-                    ClientResponseImpl shortcutResponse =
+                    ClientResponseImpl response =
                             new ClientResponseImpl(
                                     ClientResponseImpl.SUCCESS,
                                     new VoltTable[0], "Catalog update with no changes was skipped.",
                                     result.clientHandle);
+                    ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    response.flattenToBuffer(buf);
+                    buf.flip();
+                    c.writeStream().enqueue(buf);
                 }
                 else {
-                    // create the execution site task
-                    StoredProcedureInvocation task = new StoredProcedureInvocation();
-                    task.procName = "@UpdateApplicationCatalog";
-                    task.setParams(changeResult.encodedDiffCommands,
-                                   changeResult.catalogHash,
-                                   changeResult.catalogBytes,
-                                   changeResult.expectedCatalogVersion,
-                                   changeResult.deploymentString,
-                                   changeResult.tablesThatMustBeEmpty,
-                                   changeResult.reasonsForEmptyTables,
-                                   changeResult.requiresSnapshotIsolation ? 1 : 0,
-                                   changeResult.worksWithElastic ? 1 : 0,
-                                   changeResult.deploymentHash);
-                    task.clientHandle = changeResult.clientHandle;
-                    // DR stuff
-                    task.type = changeResult.invocationType;
-                    task.originalTxnId = changeResult.originalTxnId;
-                    task.originalUniqueId = changeResult.originalUniqueId;
+                    StoredProcedureInvocation task = VoltDB.instance().getClientInterface().getUpdateCatalogExecutionTask(changeResult);
 
                     /*
                      * Round trip the invocation to initialize it for command logging
@@ -255,7 +241,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 public boolean submitTransaction() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final InternalCallback cb = new InternalCallback(context, task, procName, partition, proccb, handle);
+                    final InternalCallback cb = new InternalCallback(context, procName, partition, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.

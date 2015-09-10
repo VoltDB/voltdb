@@ -2320,6 +2320,28 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    public StoredProcedureInvocation getUpdateCatalogExecutionTask(CatalogChangeResult changeResult) {
+     // create the execution site task
+        StoredProcedureInvocation task = new StoredProcedureInvocation();
+        task.procName = "@UpdateApplicationCatalog";
+        task.setParams(changeResult.encodedDiffCommands,
+                       changeResult.catalogHash,
+                       changeResult.catalogBytes,
+                       changeResult.expectedCatalogVersion,
+                       changeResult.deploymentString,
+                       changeResult.tablesThatMustBeEmpty,
+                       changeResult.reasonsForEmptyTables,
+                       changeResult.requiresSnapshotIsolation ? 1 : 0,
+                       changeResult.worksWithElastic ? 1 : 0,
+                       changeResult.deploymentHash);
+        task.clientHandle = changeResult.clientHandle;
+        // DR stuff
+        task.type = changeResult.invocationType;
+        task.originalTxnId = changeResult.originalTxnId;
+        task.originalUniqueId = changeResult.originalUniqueId;
+        return task;
+    }
+
     /*
      * Invoked from the AsyncCompilerWorkCompletionHandler from the AsyncCompilerAgent thread.
      * Has the effect of immediately handing the completed work to the network thread of the
@@ -2389,23 +2411,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                         else {
                             // create the execution site task
-                            StoredProcedureInvocation task = new StoredProcedureInvocation();
-                            task.procName = "@UpdateApplicationCatalog";
-                            task.setParams(changeResult.encodedDiffCommands,
-                                           changeResult.catalogHash,
-                                           changeResult.catalogBytes,
-                                           changeResult.expectedCatalogVersion,
-                                           changeResult.deploymentString,
-                                           changeResult.tablesThatMustBeEmpty,
-                                           changeResult.reasonsForEmptyTables,
-                                           changeResult.requiresSnapshotIsolation ? 1 : 0,
-                                           changeResult.worksWithElastic ? 1 : 0,
-                                           changeResult.deploymentHash);
-                            task.clientHandle = changeResult.clientHandle;
-                            // DR stuff
-                            task.type = changeResult.invocationType;
-                            task.originalTxnId = changeResult.originalTxnId;
-                            task.originalUniqueId = changeResult.originalUniqueId;
+                            StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
 
                             ClientResponseImpl error = null;
                             if ((error = m_permissionValidator.shouldAccept(task.procName, result.user, task,
