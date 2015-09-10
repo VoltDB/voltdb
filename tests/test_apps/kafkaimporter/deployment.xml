@@ -9,7 +9,15 @@
         <configuration module="kafkastream.jar" type="custom" enabled="true">
             <property name="brokers">kafka2:9092</property>
             <property name="topics">T1_KAFKAEXPORTTABLE1</property>
+            <property name="groupid">A8</property>
             <property name="procedure">InsertImport</property>
+        </configuration>
+    
+        <configuration module="kafkastream.jar" type="custom" enabled="true">
+            <property name="brokers">kafka2:9092</property>
+            <property name="topics">T8_KAFKAEXPORTTABLE2</property>
+            <property name="groupid">T8</property>
+            <property name="procedure">InsertImport2</property>
         </configuration>
     </import>
 
@@ -19,7 +27,7 @@
             <property name="producer.type">async</property>
             <property name="request.required.acks">1</property>
             <property name="skipinternals">true</property>
-            <property name="topic.prefix">T1_</property>
+            <property name="topic.prefix">T8_</property>
         </configuration>
     </export>
 </deployment>
