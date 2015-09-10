@@ -17,7 +17,9 @@
 
 package org.voltdb.importer;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+import static com.google_voltpatches.common.base.Preconditions.checkState;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.isNull;
 import static com.google_voltpatches.common.base.Predicates.not;
@@ -299,11 +301,11 @@ public class ChannelDistributer implements ChannelChangeCallback {
         mkdirs(zk, MASTER_DN, EMPTY_ARRAY);
 
         GetOperationMode opMode = new GetOperationMode(VoltZK.operationMode);
-        MonitorHostNodes monitor = new MonitorHostNodes(HOST_DN);
         CreateNode createHostNode = new CreateNode(
                 joinZKPath(HOST_DN, hostId),
                 EMPTY_ARRAY, CreateMode.EPHEMERAL
                 );
+        MonitorHostNodes monitor = new MonitorHostNodes(HOST_DN);
         CreateNode electionCandidate = new CreateNode(
                 CANDIDATE_PN,
                 EMPTY_ARRAY, CreateMode.EPHEMERAL_SEQUENTIAL
@@ -722,6 +724,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<DistributerException> fault = Optional.absent();
 
         CreateNode(String path, byte [] data, CreateMode cmode) {
+            checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             m_zk.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, cmode, this, null);
         }
 
@@ -764,6 +767,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<Code> callbackCode = Optional.absent();
 
         DeleteNode(String path) {
+            checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             this.path = path;
             m_zk.delete(path, -1, this, null);
         }
@@ -817,6 +821,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<DistributerException> fault = Optional.absent();
 
         GetChildren(String path) {
+            checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             this.path = path;
             m_zk.getChildren(path, this, this, null);
         }
@@ -869,7 +874,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new GetChildren(path);
+            GetChildren ng = new GetChildren(path);
+            checkState(
+                    ng.path.equals(path),
+                    "mismatched paths on watcher resubmit: %s <> %s",
+                    path, ng.path
+                    );
         }
     }
 
@@ -915,7 +925,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new ElectLeader(path, leaderCandidate);
+            ElectLeader ng = new ElectLeader(path, leaderCandidate);
+            checkState(
+                    ng.path.equals(path),
+                    "mismatched paths on watcher resubmit: %s <> %s",
+                    path, ng.path
+                    );
         }
     }
 
@@ -932,7 +947,8 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<byte[]> data = Optional.absent();
         volatile Optional<DistributerException> fault = Optional.absent();
 
-        GetData(String path) {
+        GetData(final String path) {
+            checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             this.path = path;
             m_zk.getData(path, this, this, null);
         }
@@ -972,7 +988,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new GetData(path);
+            GetData ng = new GetData(path);
+            checkState(
+                    ng.path.equals(path),
+                    "mismatched paths on watcher resubmit: %s <> %s",
+                    path, ng.path
+                    );
         }
 
         public byte [] getData() {
@@ -996,12 +1017,14 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
 
         final String host;
-        final Predicate<Map.Entry<ChannelSpec,String>> thisHost;
 
-        public GetHostChannels(String path) {
+        public GetHostChannels(final String path) {
             super(path);
             this.host = basename.apply(path);
-            this.thisHost = hostValueIs(this.host, ChannelSpec.class);
+            checkArgument(
+                    this.host != null && !this.host.trim().isEmpty(),
+                    "path has undiscernable basename: %s", path
+                    );
         }
 
         @Override
@@ -1020,14 +1043,27 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     return;
                 }
 
+                final String hval = basename.apply(path);
+                if (hval == null || hval.trim().isEmpty()) {
+                    IllegalArgumentException e = new IllegalArgumentException(
+                            "path has undiscernable basename: \"" + path + "\""
+                            );
+                    fault = Optional.of(
+                            loggedDistributerException(e, "could not derive host from %s", path)
+                            );
+                    return;
+                }
+
                 Predicate<Map.Entry<ChannelSpec,String>> inSpecs =
                         ChannelSpec.specKeyIn(nodespecs.get(), String.class);
+                Predicate<Map.Entry<ChannelSpec,String>> thisHost =
+                        hostValueIs(hval, ChannelSpec.class);
 
                 int [] sstamp = new int[]{0};
-                AtomicInteger dstamp = m_hosts.getReference().get(host);
+                AtomicInteger dstamp = m_hosts.getReference().get(hval);
                 if (dstamp == null) {
                     LOG.warn("(" + m_hostId + ") has no data stamp for "
-                            + host + ", host registry contains: " + m_hosts.getReference()
+                            + hval + ", host registry contains: " + m_hosts.getReference()
                             );
                     dstamp = new AtomicInteger(0);
                 }
@@ -1052,11 +1088,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     mbldr = ImmutableSortedMap.naturalOrder();
                     mbldr.putAll(Maps.filterEntries(prev, not(or(thisHost, inSpecs))));
                     for (ChannelSpec spec: nodespecs.get()) {
-                        mbldr.put(spec, host);
+                        mbldr.put(spec, hval);
                     }
+
                 } while (!m_specs.compareAndSet(prev, mbldr.build(), sstamp[0], sstamp[0]+1));
 
-                if (host.equals(m_hostId) && !m_done.get()) {
+                if (hval.equals(m_hostId) && !m_done.get()) {
                     ChannelAssignment assignment = new ChannelAssignment(
                             oldspecs, nodespecs.get(), stat.getVersion()
                             );
@@ -1077,7 +1114,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new GetHostChannels(path);
+            GetHostChannels ng = new GetHostChannels(path);
+            checkState(
+                    ng.host.equals(host),
+                    "mismatched hosts on watcher resubmit: %s <> %s",
+                    host, ng.host
+                    );
         }
 
         NavigableSet<ChannelSpec> getSpecs() {
@@ -1134,7 +1176,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new GetChannels(path);
+            GetChannels ng = new GetChannels(path);
+            checkState(
+                    ng.path.equals(path),
+                    "mismatched paths on watcher resubmit: %s <> %s",
+                    path, ng.path
+                    );
         }
 
         NavigableSet<ChannelSpec> getChannels() {
@@ -1200,7 +1247,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new GetOperationMode(path);
+            GetOperationMode ng = new GetOperationMode(path);
+            checkState(
+                    ng.path.equals(path),
+                    "mismatched paths on watcher resubmit: %s <> %s",
+                    path, ng.path
+                    );
         }
 
         VersionedOperationMode getMode() {
@@ -1293,7 +1345,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            new MonitorHostNodes(path);
+            MonitorHostNodes ng = new MonitorHostNodes(path);
+            checkState(
+                    ng.path.equals(path),
+                    "mismatched paths on watcher resubmit: %s <> %s",
+                    path, ng.path
+                    );
         }
     }
 
@@ -1359,6 +1416,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
             @Override
             public boolean apply(Entry<K, String> e) {
                 return s.equals(e.getValue());
+            }
+            @Override
+            public String toString() {
+                return "Predicate.hostValueIs[Map.Entry.getValue() is \"" + s + "\" ]";
             }
         };
     }
