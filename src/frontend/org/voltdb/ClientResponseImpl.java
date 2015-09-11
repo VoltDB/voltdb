@@ -165,7 +165,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         } else {
             m_hash = null;
         }
-        int tableCount = buf.getShort();
+        int tableCount = buf.getInt();
+        if (tableCount < 0) {
+            throw new IOException("Table count is negative: " + tableCount);
+        }
         results = new VoltTable[tableCount];
         for (int i = 0; i < tableCount; i++) {
             int tableSize = buf.getInt();
@@ -186,7 +189,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             + 1 // status
             + 1 // app status
             + 4 // cluster roundtrip time
-            + 2; // number of result tables
+            + 4; // number of result tables
 
         if (appStatusString != null) {
             encodedAppStatusString = appStatusString.getBytes(Constants.UTF8ENCODING);
@@ -238,7 +241,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         if (m_hash != null) {
             buf.putInt(m_hash.intValue());
         }
-        buf.putShort((short)results.length);
+        buf.putInt(results.length);
         for (VoltTable vt : results)
         {
             vt.flattenToBuffer(buf);
