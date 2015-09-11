@@ -399,7 +399,7 @@ public class ProcedureRunner {
             if (results == null) {
                 results = new VoltTable[0];
             } else if (results.length > Short.MAX_VALUE) {
-                String statusString = "Output from procedure exceeded the limit of " + Short.MAX_VALUE + " tables";
+                String statusString = "Stored procedure returns too much data. Exceeded  maximum number of VoltTables: " + Short.MAX_VALUE;
                 retval = new ClientResponseImpl(
                         ClientResponse.GRACEFUL_FAILURE,
                         ClientResponse.GRACEFUL_FAILURE,
