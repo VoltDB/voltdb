@@ -775,7 +775,6 @@
             });
             
             MonitorGraphUI.ChartLatency.tooltip.contentGenerator(function (d) {
-                console.log(d);
                 var html = '';
                 d.series.forEach(function (elem) {
                     html += "<h3 style='color:" + elem.color + "'>"
@@ -787,7 +786,6 @@
             });
             
             MonitorGraphUI.ChartTransactions.tooltip.contentGenerator(function (d) {
-                console.log(d);
                 var html = '';
                 d.series.forEach(function (elem) {
                     html += "<h3 style='color:" + elem.color + "'>"
@@ -799,7 +797,6 @@
             });
             
             MonitorGraphUI.ChartCommandlog.tooltip.contentGenerator(function (d) {
-                console.log(d);
                 var html = '';
                 d.series.forEach(function (elem) {
                     html += "<h3 style='color:" + elem.color + "'>"
@@ -811,7 +808,6 @@
             });
             
             MonitorGraphUI.ChartDrReplicationRate.tooltip.contentGenerator(function (d) {
-                console.log(d);
                 var html = '';
                 d.series.forEach(function (elem) {
                     html += "<h3 style='color:" + elem.color + "'>"
