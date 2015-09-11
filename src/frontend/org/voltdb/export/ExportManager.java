@@ -223,6 +223,8 @@ public class ExportManager
                     } else {
                         //Just set the next generation.
                         m_processor.get().setExportGeneration(nextGeneration);
+                        //make sure so that we can re acquire.
+                        m_processor.get().startPolling();
                     }
 
                     if (!nextGeneration.isContinueingGeneration()) {
