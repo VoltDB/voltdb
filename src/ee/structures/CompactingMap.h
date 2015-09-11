@@ -275,9 +275,9 @@ public:
     ~CompactingMap();
 
     // TODO: remove this. But two eecheck depend on this.
-    bool insert(std::pair<Key, Data> value) { return insert(value.first, value.second); };
+    bool insert(std::pair<Key, Data> value) { return (insert(value.first, value.second) == NULL); };
     // A syntactically convenient analog to CompactingHashTable's insert function
-    bool insert(const Key &key, const Data &data);
+    const Data *insert(const Key &key, const Data &data);
     bool erase(const Key &key);
     bool erase(iterator &iter);
     void clear();
@@ -520,7 +520,8 @@ bool CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::erase(iterator &i
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank, typename ValueType>
-bool CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::insert(const Key &key, const Data &value)
+const typename CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::Data *
+CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::insert(const Key &key, const Data &value)
 {
     if (m_root != &NIL) {
         // find a place to put the new node
@@ -539,13 +540,14 @@ bool CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::insert(const Key 
                 if (m_unique && (cmp == 0)) {
                     // Inserting exact matches fails for unique indexes.
                     // Undo the optimistic bumping of subcounts done already on the way down.
+                    const Data *collidingData = &x->value();
                     if (hasRank) {
                         while (x != &NIL) {
                             x = x->parent;
                             decSubct(x);
                         }
                     }
-                    return false;
+                    return collidingData;
                 }
                 x = x->right;
             }
@@ -587,7 +589,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::insert(const Key 
     }
     m_count++;
     assert(m_allocator.count() == m_count);
-    return true;
+    return NULL;
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank, typename ValueType>

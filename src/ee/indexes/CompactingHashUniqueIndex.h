@@ -72,7 +72,7 @@ class CompactingHashUniqueIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
-    bool addEntryDo(const TableTuple *tuple) {
+    const void* const* addEntryDo(const TableTuple *tuple) {
         ++m_inserts;
         return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
@@ -94,7 +94,7 @@ class CompactingHashUniqueIndex : public TableIndex
             if ( ! CompactingHashUniqueIndex::deleteEntry(&originalTuple)) {
                 return false;
             }
-            return CompactingHashUniqueIndex::addEntry(&destinationTuple);
+            return (CompactingHashUniqueIndex::addEntry(&destinationTuple) == NULL);
         }
 
         MapIterator mapiter = findTuple(originalTuple);
