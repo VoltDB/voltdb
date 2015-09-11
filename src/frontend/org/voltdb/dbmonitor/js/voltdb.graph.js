@@ -242,10 +242,21 @@
                 .axisLabel('(%)')
                 .axisLabelDistance(10);
 
-            MonitorGraphUI.ChartCpu.tooltipContent(function (key, y, e, graph) {
-                return '<h3> CPU </h3>'
-                    + '<p>' + e + '% at ' + y + '</p>';
-            });
+
+
+            //
+            //            MonitorGraphUI.ChartCpu.tooltip.contentGenerator(function(d) {
+            //                console.log(d);
+            //                var html = '';
+            //                d.series.forEach(function (elem) {
+            //                    html += "<h3 style='color:" + elem.color + "'>"
+            //                        + elem.key + "</h3>";
+            //                });
+            //                html = html + "<h2>" + parseFloat(d.pointIndex).toFixed(2) + "% at " + d3.time.format('%d %b %X')(new Date(d.value)) + "</h2>";
+            //
+            //                return html;
+            //            });
+
 
             MonitorGraphUI.ChartCpu.margin({ left: 80 });
             MonitorGraphUI.ChartCpu.yAxis.scale().domain([0, 100]);
@@ -279,10 +290,12 @@
             MonitorGraphUI.ChartRam.margin({ left: 80 });
             MonitorGraphUI.ChartRam.lines.forceY([0, 0.1]);
 
-            MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
-                return '<h3> RAM </h3>'
-                    + '<p>' + e + ' GB at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> RAM </h3>'
+            //                    + '<p>' + e + ' GB at ' + y + '</p>';
+            //            });
+
+            MonitorGraphUI.ChartRam.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualisationRam')
                 .datum(dataRam)
@@ -313,10 +326,12 @@
             MonitorGraphUI.ChartLatency.margin({ left: 80 });
             MonitorGraphUI.ChartLatency.lines.forceY([0, 1]);
 
-            MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
-                return '<h3> Latency </h3>'
-                    + '<p>' + e + ' ms at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> Latency </h3>'
+            //                    + '<p>' + e + ' ms at ' + y + '</p>';
+            //            });
+
+            MonitorGraphUI.ChartLatency.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualisationLatency')
                 .datum(dataLatency)
@@ -347,10 +362,12 @@
             MonitorGraphUI.ChartTransactions.margin({ left: 80 });
             MonitorGraphUI.ChartTransactions.lines.forceY([0, 1]);
 
-            MonitorGraphUI.ChartTransactions.tooltipContent(function (key, y, e, graph) {
-                return '<h3> Transactions </h3>'
-                    + '<p>' + e + ' tps at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartTransactions.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> Transactions </h3>'
+            //                    + '<p>' + e + ' tps at ' + y + '</p>';
+            //            });
+
+            MonitorGraphUI.ChartTransactions.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualisationTransaction')
                 .datum(dataTransactions)
@@ -415,10 +432,12 @@
             MonitorGraphUI.ChartDrReplicationRate.margin({ left: 80 });
             MonitorGraphUI.ChartDrReplicationRate.lines.forceY([0, 1]);
 
-            MonitorGraphUI.ChartDrReplicationRate.tooltipContent(function (key, y, e, graph) {
-                return '<h3> Replication Rate </h3>'
-                    + '<p>' + e + ' KBps at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartDrReplicationRate.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> Replication Rate </h3>'
+            //                    + '<p>' + e + ' KBps at ' + y + '</p>';
+            //            });
+
+            MonitorGraphUI.ChartDrReplicationRate.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualizationDrReplicationRate')
                 .datum(dataDrReplicationRate)
@@ -449,10 +468,12 @@
             MonitorGraphUI.ChartCommandlog.margin({ left: 80 });
             MonitorGraphUI.ChartCommandlog.lines.forceY([0, 0.1]);
 
-            MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
-                return '<h3> Command Log Statistic </h3>'
-                    + '<p>' + e + ' Pending at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> Command Log Statistic </h3>'
+            //                    + '<p>' + e + ' Pending at ' + y + '</p>';
+            //            });
+            //            
+            MonitorGraphUI.ChartCommandlog.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualisationCommandLog')
                 .datum(dataCommandLog)
@@ -727,6 +748,80 @@
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
+
+            MonitorGraphUI.ChartCpu.tooltip.contentGenerator(function (d) {
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+
+
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + "% at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+
+                return html;
+            });
+
+            MonitorGraphUI.ChartRam.tooltip.contentGenerator(function (d) {
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+            
+            MonitorGraphUI.ChartLatency.tooltip.contentGenerator(function (d) {
+                console.log(d);
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " ms at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+            
+            MonitorGraphUI.ChartTransactions.tooltip.contentGenerator(function (d) {
+                console.log(d);
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " tps at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+            
+            MonitorGraphUI.ChartCommandlog.tooltip.contentGenerator(function (d) {
+                console.log(d);
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " Pending at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+            
+            MonitorGraphUI.ChartDrReplicationRate.tooltip.contentGenerator(function (d) {
+                console.log(d);
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " KBps at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+
         };
 
         var dataView = {
