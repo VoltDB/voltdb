@@ -162,7 +162,7 @@ namespace voltdb {
         /** find an exact key/value match (optionaly searching by value first) */
         iterator find(const Key &key, const Data &value) const;
         /** simple insert */
-        bool insert(const Key &key, const Data &value);
+        const Data *insert(const Key &key, const Data &value);
         /** delete by key (unique only) */
         bool erase(const Key &key);
         /** delete by kv pair */
@@ -184,7 +184,7 @@ namespace voltdb {
         /** find and exact match, given a bucket */
         HashNode *find(const HashNode *bucket, const Key &key, const Data &value) const;
         /** insert, given a bucket */
-        bool insert(HashNode **bucket, uint64_t hash, const Key &key, const Data &value);
+        const Data *insert(HashNode **bucket, uint64_t hash, const Key &key, const Data &value);
         /** remove, given a bucket and an exact node */
         bool remove(HashNode **bucket, HashNode *prevBucketNode, HashNode *keyHeadNode, HashNode *prevKeyNode, HashNode *node);
         bool removeUnique(HashNode **bucket, HashNode *prevBucketNode, HashNode *node);
@@ -299,7 +299,7 @@ namespace voltdb {
     }
 
     template<class K, class T, class H, class EK, class ET>
-    bool CompactingHashTable<K, T, H, EK, ET>::insert(const Key &key, const Data &value) {
+    const typename CompactingHashTable<K, T, H, EK, ET>::Data *CompactingHashTable<K, T, H, EK, ET>::insert(const Key &key, const Data &value) {
         uint64_t hash = m_hasher(key);
 
         uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
@@ -388,10 +388,11 @@ namespace voltdb {
     }
 
     template<class K, class T, class H, class EK, class ET>
-    bool CompactingHashTable<K, T, H, EK, ET>::insert(HashNode **bucket, uint64_t hash, const Key &key, const Data &value) {
+    const typename CompactingHashTable<K, T, H, EK, ET>::Data *
+    CompactingHashTable<K, T, H, EK, ET>::insert(HashNode **bucket, uint64_t hash, const Key &key, const Data &value) {
         HashNode *existing = find(*bucket, key);
         // protect unique constraint
-        if (existing && m_unique) return false;
+        if (existing && m_unique) return &existing->value;
 
         // create a new node
         void *memory = m_allocator.alloc();
@@ -424,7 +425,7 @@ namespace voltdb {
         }
 
         checkLoadFactor();
-        return true;
+        return NULL;
     }
 
     template<class K, class T, class H, class EK, class ET>

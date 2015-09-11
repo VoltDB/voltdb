@@ -75,7 +75,7 @@ class CompactingTreeUniqueIndex : public TableIndex
         return *reinterpret_cast<MapConstIterator*> (cursor.m_keyIter);
     }
 
-    bool addEntryDo(const TableTuple *tuple)
+    const void* const* addEntryDo(const TableTuple *tuple)
     {
         ++m_inserts;
         return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
@@ -99,7 +99,7 @@ class CompactingTreeUniqueIndex : public TableIndex
             if ( ! CompactingTreeUniqueIndex::deleteEntry(&originalTuple)) {
                 return false;
             }
-            return CompactingTreeUniqueIndex::addEntry(&destinationTuple);
+            return (CompactingTreeUniqueIndex::addEntry(&destinationTuple) == NULL);
         }
 
         MapIterator mapIter = findTuple(originalTuple);

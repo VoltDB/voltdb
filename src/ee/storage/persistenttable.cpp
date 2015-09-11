@@ -460,9 +460,11 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         target.setDirtyFalse();
     }
 
-    if (!tryInsertOnAllIndexes(&target)) {
-        throw ConstraintFailureException(this, source, TableTuple(),
-                CONSTRAINT_TYPE_UNIQUE);
+    const void* const* collidingEntry = tryInsertOnAllIndexes(&target);
+    if (collidingEntry != NULL) {
+        TableTuple collidingTuple(m_schema);
+        collidingTuple.move(const_cast<void*>(*collidingEntry));
+        throw ConstraintFailureException(this, source, collidingTuple, CONSTRAINT_TYPE_UNIQUE);
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -519,7 +521,7 @@ void PersistentTable::insertTupleForUndo(char *tuple)
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
      * just marked as deleted.
      */
-    if (!tryInsertOnAllIndexes(&target)) {
+    if (tryInsertOnAllIndexes(&target) != NULL) {
         // First off, it should be impossible to violate a constraint when RESTORING an index to a
         // known good state via an UNDO of a delete.  So, assume that something is badly broken, here.
         // It's probably safer NOT to do too much cleanup -- such as trying to call deleteTupleStorage --
@@ -683,7 +685,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         if (!indexRequiresUpdate[i]) {
             continue;
         }
-        if (!index->addEntry(&targetTupleToUpdate)) {
+        if (index->addEntry(&targetTupleToUpdate) != NULL) {
             throwFatalException("Failed to insert updated tuple into index in Table: %s Index %s",
                                 m_name.c_str(), index->getName().c_str());
         }
@@ -749,7 +751,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
         BOOST_FOREACH(TableIndex *index, m_indexes) {
-            if (!index->addEntry(&targetTupleToUpdate)) {
+            if (index->addEntry(&targetTupleToUpdate) != NULL) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
                                     m_name.c_str(), index->getName().c_str());
             }
@@ -940,7 +942,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
 
 void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
     BOOST_FOREACH(TableIndex *index, m_indexes) {
-        if (!index->addEntry(tuple)) {
+        if (index->addEntry(tuple) != NULL) {
             throwFatalException(
                     "Failed to insert tuple in Table: %s Index %s", m_name.c_str(), index->getName().c_str());
         }
@@ -956,19 +958,20 @@ void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
     }
 }
 
-bool PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
+const void* const* PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
     for (int i = static_cast<int>(m_indexes.size()) - 1; i >= 0; --i) {
-        FAIL_IF(!m_indexes[i]->addEntry(tuple)) {
+        const void* const* collidingEntry = m_indexes[i]->addEntry(tuple);
+        FAIL_IF(collidingEntry != NULL) {
             VOLT_DEBUG("Failed to insert into index %s,%s",
                        m_indexes[i]->getTypeName().c_str(),
                        m_indexes[i]->getName().c_str());
             for (int j = i + 1; j < m_indexes.size(); ++j) {
                 m_indexes[j]->deleteEntry(tuple);
             }
-            return false;
+            return collidingEntry ;
         }
     }
-    return true;
+    return NULL;
 }
 
 bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
