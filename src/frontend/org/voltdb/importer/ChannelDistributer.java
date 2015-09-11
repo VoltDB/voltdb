@@ -874,12 +874,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            GetChildren ng = new GetChildren(path);
-            checkState(
-                    ng.path.equals(path),
-                    "mismatched paths on watcher resubmit: %s <> %s",
-                    path, ng.path
-                    );
+            new GetChildren(path);
         }
     }
 
@@ -947,9 +942,19 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<byte[]> data = Optional.absent();
         volatile Optional<DistributerException> fault = Optional.absent();
 
-        GetData(final String path) {
+        protected GetData(final String path, final boolean doInvokeZookeeper) {
             checkArgument(path != null && !path.trim().isEmpty(), "path is null or empty or blank");
             this.path = path;
+            if (doInvokeZookeeper) {
+                invokeZookeeperGetData();
+            }
+        }
+
+        public GetData(final String path) {
+            this(path, true);
+        }
+
+        protected void invokeZookeeperGetData() {
             m_zk.getData(path, this, this, null);
         }
 
@@ -1014,17 +1019,19 @@ public class ChannelDistributer implements ChannelChangeCallback {
      *
      */
     class GetHostChannels extends GetData {
-        volatile Optional<NavigableSet<ChannelSpec>> nodespecs = Optional.absent();
+        volatile Optional<NavigableSet<ChannelSpec>> nodespecs;
 
         final String host;
 
         public GetHostChannels(final String path) {
-            super(path);
+            super(path,false);
             this.host = basename.apply(path);
             checkArgument(
                     this.host != null && !this.host.trim().isEmpty(),
                     "path has undiscernable basename: %s", path
                     );
+            nodespecs = Optional.absent();
+            invokeZookeeperGetData();
         }
 
         @Override
@@ -1034,14 +1041,16 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
+                NavigableSet<ChannelSpec> nspecs;
                 try {
-                    nodespecs = Optional.of(asChannelSet(data));
+                    nspecs = asChannelSet(data);
                 } catch (IllegalArgumentException|JSONException e) {
                     fault = Optional.of(
                             loggedDistributerException(e, "failed to parse json in %s", path)
                             );
                     return;
                 }
+                nodespecs = Optional.of(nspecs);
 
                 final String hval = basename.apply(path);
                 if (hval == null || hval.trim().isEmpty()) {
@@ -1055,7 +1064,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 }
 
                 Predicate<Map.Entry<ChannelSpec,String>> inSpecs =
-                        ChannelSpec.specKeyIn(nodespecs.get(), String.class);
+                        ChannelSpec.specKeyIn(nspecs, String.class);
                 Predicate<Map.Entry<ChannelSpec,String>> thisHost =
                         hostValueIs(hval, ChannelSpec.class);
 
@@ -1087,7 +1096,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     // rebuild the assigned channel spec list
                     mbldr = ImmutableSortedMap.naturalOrder();
                     mbldr.putAll(Maps.filterEntries(prev, not(or(thisHost, inSpecs))));
-                    for (ChannelSpec spec: nodespecs.get()) {
+                    for (ChannelSpec spec: nspecs) {
                         mbldr.put(spec, hval);
                     }
 
@@ -1095,7 +1104,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
                 if (hval.equals(m_hostId) && !m_done.get()) {
                     ChannelAssignment assignment = new ChannelAssignment(
-                            oldspecs, nodespecs.get(), stat.getVersion()
+                            oldspecs, nspecs, stat.getVersion()
                             );
                     for (ImporterChannelAssignment cassigns: assignment.getImporterChannelAssignments()) {
                         m_eb.post(cassigns);
@@ -1114,12 +1123,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            GetHostChannels ng = new GetHostChannels(path);
-            checkState(
-                    ng.host.equals(host),
-                    "mismatched hosts on watcher resubmit: %s <> %s",
-                    host, ng.host
-                    );
+            new GetHostChannels(path);
         }
 
         NavigableSet<ChannelSpec> getSpecs() {
@@ -1135,10 +1139,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
      */
     class GetChannels extends GetData {
 
-        volatile Optional<NavigableSet<ChannelSpec>> channels = Optional.absent();
+        volatile Optional<NavigableSet<ChannelSpec>> channels;
 
         public GetChannels(String path) {
-            super(path);
+            super(path, false);
+            channels = Optional.absent();
+            invokeZookeeperGetData();
         }
 
         @Override
@@ -1176,12 +1182,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            GetChannels ng = new GetChannels(path);
-            checkState(
-                    ng.path.equals(path),
-                    "mismatched paths on watcher resubmit: %s <> %s",
-                    path, ng.path
-                    );
+            new GetChannels(path);
         }
 
         NavigableSet<ChannelSpec> getChannels() {
@@ -1201,7 +1202,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
         volatile Optional<VersionedOperationMode> opmode = Optional.absent();
 
         GetOperationMode(String path) {
-            super(path);
+            super(path,false);
+            opmode = Optional.absent();
+            invokeZookeeperGetData();
         }
 
         @Override
@@ -1247,12 +1250,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            GetOperationMode ng = new GetOperationMode(path);
-            checkState(
-                    ng.path.equals(path),
-                    "mismatched paths on watcher resubmit: %s <> %s",
-                    path, ng.path
-                    );
+            new GetOperationMode(path);
         }
 
         VersionedOperationMode getMode() {
@@ -1345,12 +1343,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void susceptibleRun() throws Exception {
-            MonitorHostNodes ng = new MonitorHostNodes(path);
-            checkState(
-                    ng.path.equals(path),
-                    "mismatched paths on watcher resubmit: %s <> %s",
-                    path, ng.path
-                    );
+            new MonitorHostNodes(path);
         }
     }
 
