@@ -246,8 +246,10 @@ public class KafkaImportBenchmark {
                         System.exit(-1);
                     }
                 }
-                if (importProgress.size() > 1)
-                    log.info("Import Throughput " + (count - importProgress.get(importProgress.size() - 2)) / period + "/s, Total Rows: " + count);
+                int sz = importProgress.size();
+                if (sz > 1) {
+                    log.info("Import Throughput " + (count - importProgress.get(sz - 2)) / period + "/s, Total Rows: " + count);
+                }
             }
         },
         config.displayinterval * 1000,
@@ -366,7 +368,7 @@ public class KafkaImportBenchmark {
         if (config.useexport) {
             log.info("Total rows exported: " + finalInsertCount);
             log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorRows);
-            log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
+            log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRowCount);
 
             if (mirrorRows != 0) {
                 log.error(mirrorRows + " Rows are missing from the import stream, failing test");
