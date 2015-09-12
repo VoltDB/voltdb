@@ -13,9 +13,9 @@ public class FindIntersectingPolygons extends VoltProcedure {
 
     public VoltTable run(long ptId) {
         voltQueueSQL(selectCellId, ptId);
-        long ptCellId = voltExecuteSQL()[0].asScalarLong();
+        //long ptCellId = voltExecuteSQL()[0].asScalarLong();
 
-        // ???
+        // for each level ...
 
         return null;
     }

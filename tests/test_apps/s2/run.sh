@@ -114,6 +114,11 @@ if (($? != 0)); then
     exit 1
 fi
 
+echo
+echo
+echo
+
+
 voltdb create &
 wait_for_startup
 
@@ -122,6 +127,10 @@ if (($? != 0)); then
     echo "Error loading DDL"
     exit 1
 fi
+
+echo
+echo
+echo
 
 export CLASSPATH=${CLASSPATH}:${PWD}/client.jar
 
