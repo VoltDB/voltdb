@@ -333,12 +333,18 @@ public class Benchmark {
         System.out.println(HORIZONTAL_RULE);
 
         client.callProcedure("InsertPoint", 0, "Fort Collins", 40.584298, -105.077485);
+        client.callProcedure("InsertPoint", 1, "Santa Cruz", 36.962954, -122.049423);
+
         client.callProcedure("InsertPolygon", 0, "Colorado", new double[] {
                 41.000636, -109.050057,
                 36.999074, -109.045216,
                 36.993009, -102.042096,
                 41.002073, -102.051565
         });
+
+        VoltTable vt = client.callProcedure("FindContainedPoints", 0).getResults()[0];
+        System.out.println(vt);
+        //client.callProcedure("FindIntersectingPolygons", 0);
 
 //        benchmarkStartTS = System.currentTimeMillis();
 //        schedulePeriodicStats();

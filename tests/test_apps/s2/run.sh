@@ -31,9 +31,6 @@ else
     VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
-echo "*** CLASSPATH is"
-echo $CLASSPATH
-
 APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
@@ -63,10 +60,13 @@ function wait_for_startup() {
 
 ## --------------------------------------------------------------------
 
+echo
+echo
+echo
 
 pid=`jps | grep VoltDB | sed s/VoltDB//`
 if [ "$pid" != "" ]; then
-    echo Killing $pid...
+    echo "****** Killing running VoltDB Instance $pid ******"
     kill $pid
     sleep 1
 fi
@@ -75,6 +75,10 @@ rm -f *.jar
 rm -f procedures/s2demo/*.class
 rm -f client/s2demo/*.class
 rm -f s2-src/com/google/common/geometry/*.class
+
+echo
+echo
+echo
 
 echo "****** Compiling S2 ******"
 javac -target 1.7 -source 1.7 -classpath ${APPCLASSPATH} s2-src/com/google_voltpatches/common/geometry/*.java
