@@ -31,7 +31,7 @@ import com.google_voltpatches.common.geometry.S2LatLng;
 
 public class InsertPoint extends VoltProcedure {
 
-    final SQLStmt insStmt = new SQLStmt("insert into cities values ("
+    final SQLStmt insStmt = new SQLStmt("insert into points values ("
             + "?, "                // id
             + "?, "                // name
             + "pointfromtext(?), " // point

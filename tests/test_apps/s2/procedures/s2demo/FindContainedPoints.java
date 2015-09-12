@@ -11,12 +11,12 @@ public class FindContainedPoints extends VoltProcedure {
 
     final SQLStmt selPolyCellIds = new SQLStmt(
             "select cellid "
-            + "from cellid_state_map "
-            + "where stateid = ?");
+            + "from cellid_poly_map "
+            + "where polyid = ?");
 
     final SQLStmt selPointsByCellRange = new SQLStmt(
             "select id, name "
-            + "from cities "
+            + "from points "
             + "where cellid between ? and ?");
 
     public VoltTable run(long polyId) {

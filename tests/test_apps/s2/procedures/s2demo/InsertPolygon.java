@@ -16,14 +16,14 @@ import com.google_voltpatches.common.geometry.S2RegionCoverer;
 
 public class InsertPolygon extends VoltProcedure {
 
-    final SQLStmt insPolygon = new SQLStmt("insert into states values ("
+    final SQLStmt insPolygon = new SQLStmt("insert into polygons values ("
             + "?, " // state id
             + "?"   // name
             + ")");
 
-    final SQLStmt insPolygonCellMap = new SQLStmt("insert into cellid_state_map values ("
+    final SQLStmt insPolygonCellMap = new SQLStmt("insert into cellid_poly_map values ("
             + "?, " // cellid
-            + "?"   // stateid
+            + "?"   // polyid
             + ")");
 
     public long run(long id, String name, double[] points) {

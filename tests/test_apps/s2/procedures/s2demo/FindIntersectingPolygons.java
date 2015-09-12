@@ -8,7 +8,7 @@ public class FindIntersectingPolygons extends VoltProcedure {
 
     final SQLStmt selectCellId = new SQLStmt(
             "select cellid "
-            + "from cities "
+            + "from points "
             + "where id = ?");
 
     public VoltTable run(long ptId) {
