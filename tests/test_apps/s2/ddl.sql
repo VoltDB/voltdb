@@ -5,7 +5,7 @@ file -inlinebatch EOB
 
 create table points (
        id bigint not null primary key,
-       name varchar(64),
+       name varchar(64) not null,
        pt point not null,
        cellid bigint not null
 );
@@ -14,7 +14,7 @@ create index pts_cellid_idx on points(cellid);
 
 create table polygons (
        id bigint not null primary key,
-       name varchar(64)
+       name varchar(64) not null
 );
 
 create table cellid_poly_map (
