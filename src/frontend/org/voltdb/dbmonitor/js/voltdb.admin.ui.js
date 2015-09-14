@@ -1613,7 +1613,7 @@ function loadAdminPage() {
             adminEditObjects.ddlMemoryLimitSizeUnit.hide();
             adminEditObjects.spanMemoryLimitSizeUnit.show();
             //            if (adminEditObjects.spanMemoryLimitSize.text() == "Not Enforced")
-            adminEditObjects.spanMemoryLimitSizeUnit.text("");
+          //  adminEditObjects.spanMemoryLimitSizeUnit.text("");
         }
     };
 
@@ -1781,7 +1781,6 @@ function loadAdminPage() {
                 }
                 //Set the new value to be saved.
                 var memoryLimitSize = "";
-                debugger;
                 memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + (adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? "%" : "");
                 //adminEditObjects.txtMemoryLimitSize.val() + adminEditObjects.ddlMemoryLimitSizeUnit.val();
 
@@ -1794,13 +1793,10 @@ function loadAdminPage() {
                 toggleMemorySizeEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     if (result.status == "1") {
-                        adminEditObjects.spanMemoryLimitSizeValue = adminEditObjects.txtMemoryLimitSize.val();
-                        adminEditObjects.spanMemoryLimitSize.html(adminEditObjects.spanMemoryLimitSizeValue);
-                        adminEditObjects.spanMemoryLimitSizeUnit.html(adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? "%" : "");
-                        adminEditObjects.btnDeleteMemory.show();
-
+                        
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            adminEditObjects.btnDeleteMemory.show();
                             VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
                             toggleMemorySizeEdit(editStates.ShowEdit);
                         });
