@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
@@ -35,6 +36,8 @@ import org.voltdb.utils.SerializationHelper;
  *
  */
 public class ClientResponseImpl implements ClientResponse, JSONString {
+    private static final VoltLogger m_logger = new VoltLogger("ClientResponse");
+
     private boolean setProperly = false;
     private byte status = 0;
     private String statusString = null;
@@ -167,6 +170,13 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         }
         int tableCount = buf.getShort();
         if (tableCount < 0) {
+            m_logger.error("Got negative table count. ByteBuffer content is: ");
+            byte[] bbArray = buf.array();
+            StringBuffer sb = new StringBuffer();
+            for (int i=0; i<bbArray.length; i++) {
+                sb.append(bbArray[i] + " ");
+            }
+            m_logger.error(sb);
             throw new IOException("Table count is negative: " + tableCount);
         }
         results = new VoltTable[tableCount];
