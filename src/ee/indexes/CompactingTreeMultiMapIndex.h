@@ -80,10 +80,10 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return *reinterpret_cast<MapConstIterator*> (cursor.m_keyEndIter);
     }
 
-    const void* const* addEntryDo(const TableTuple *tuple)
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple)
     {
         ++m_inserts;
-        return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
     bool deleteEntryDo(const TableTuple *tuple)
@@ -106,7 +106,9 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
             return false;
         }
-        return (CompactingTreeMultiMapIndex::addEntry(&destinationTuple) == NULL);
+        TableTuple conflict(destinationTuple.getSchema());
+        CompactingTreeMultiMapIndex::addEntry(&destinationTuple, &conflict);
+        return conflict.isNullTuple();
     }
 
     bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }

@@ -533,7 +533,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
-    const void* const* tryInsertOnAllIndexes(TableTuple *tuple);
+    void tryInsertOnAllIndexes(TableTuple *tuple, TableTuple *conflict);
     bool checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
                                     const TableTuple &sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const &indexesToUpdate);
