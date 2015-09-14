@@ -1569,6 +1569,7 @@ function loadAdminPage() {
 
     //Memory Limit
     var toggleMemorySizeEdit = function (state) {
+        debugger;
         adminEditObjects.txtMemoryLimitSize.val(adminEditObjects.spanMemoryLimitSizeValue);
         if (adminEditObjects.spanMemoryLimitSizeUnit.text() != "")
             adminEditObjects.ddlMemoryLimitSizeUnit.val(adminEditObjects.spanMemoryLimitSizeUnit.text());
@@ -1602,6 +1603,7 @@ function loadAdminPage() {
             adminEditObjects.ddlMemoryLimitSizeUnit.show();
             //adminEditObjects.spanMemoryLimitSizeUnit.text("GB");
         } else {
+          
             adminEditObjects.loadingMemoryLimit.hide();
             adminEditObjects.btnEditMemorySize.show();
             adminEditObjects.btnEditMemorySizeOk.hide();
@@ -1610,10 +1612,14 @@ function loadAdminPage() {
 
             adminEditObjects.txtMemoryLimitSize.hide();
             adminEditObjects.spanMemoryLimitSize.show();
+            if (adminEditObjects.spanMemoryLimitSize.text() != "Not Enforced") {
+                adminEditObjects.btnDeleteMemory.show();
+            }
             adminEditObjects.ddlMemoryLimitSizeUnit.hide();
             adminEditObjects.spanMemoryLimitSizeUnit.show();
+          
             //            if (adminEditObjects.spanMemoryLimitSize.text() == "Not Enforced")
-          //  adminEditObjects.spanMemoryLimitSizeUnit.text("");
+            //  adminEditObjects.spanMemoryLimitSizeUnit.text("");
         }
     };
 
@@ -3583,7 +3589,7 @@ function loadAdminPage() {
                 memoryLimitValue = undefined;
                 adminEditObjects.btnDeleteMemory.hide();
             }
-            adminDOMObjects.memoryLimitSize.text(adminConfigValues.memorylimit != undefined ? memoryLimitValue : "");
+            adminDOMObjects.memoryLimitSize.text(adminConfigValues.memorylimit != undefined ? memoryLimitValue : "Not Enforced");
             if (!VoltDbAdminConfig.isMemoryLimitEditMode)
                 adminDOMObjects.memoryLimitSizeUnit.text(adminConfigValues.memorylimit != undefined ? memoryLimitUnit : "");
             adminEditObjects.spanMemoryLimitSizeValue = memoryLimitValue;
