@@ -838,12 +838,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso) {
+        exportLog.info("Export generation " + getGeneration() + " ack request for " + getPartitionId() + " USO: " + uso + " Master: " + m_isMaster + " Replica run: " + m_replicaRunning + " Run everywhere:" + m_runEveryWhere);
         if (m_runEveryWhere && !m_isMaster && uso < 0) {
             //These are single threaded so no need to lock.
             exportLog.info("Export generation " + getGeneration() + " replica run request for " + getPartitionId());
             if (!m_replicaRunning) {
                 exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica");
                 m_replicaRunning = true;
+                m_isMaster = false;
                 acceptMastership(true);
             }
             return;
