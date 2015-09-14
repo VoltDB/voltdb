@@ -1781,7 +1781,7 @@ function loadAdminPage() {
                 }
                 //Set the new value to be saved.
                 var memoryLimitSize = "";
-
+                debugger;
                 memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + (adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? "%" : "");
                 //adminEditObjects.txtMemoryLimitSize.val() + adminEditObjects.ddlMemoryLimitSizeUnit.val();
 
@@ -1794,8 +1794,8 @@ function loadAdminPage() {
                 toggleMemorySizeEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     if (result.status == "1") {
-                        adminEditObjects.spanMemoryLimitSizeValue = adminEditObjects.txtMemoryLimitSize.val();
-                        adminEditObjects.spanMemoryLimitSize.html(adminEditObjects.spanMemoryLimitSizeValue);
+//                        adminEditObjects.spanMemoryLimitSizeValue = adminEditObjects.txtMemoryLimitSize.val();
+//                        adminEditObjects.spanMemoryLimitSize.html(adminEditObjects.spanMemoryLimitSizeValue);
                         adminEditObjects.btnDeleteMemory.show();
 
                         //Reload Admin configurations for displaying the updated value
@@ -1861,8 +1861,8 @@ function loadAdminPage() {
                 toggleMemorySizeEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     if (result.status == "1") {
-                        adminEditObjects.spanMemoryLimitSizeValue = adminEditObjects.txtMemoryLimitSize.val();
-                        adminEditObjects.spanMemoryLimitSize.html(adminEditObjects.spanMemoryLimitSizeValue);
+//                        adminEditObjects.spanMemoryLimitSizeValue = adminEditObjects.txtMemoryLimitSize.val();
+//                        adminEditObjects.spanMemoryLimitSize.html(adminEditObjects.spanMemoryLimitSizeValue);
 
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
@@ -3568,7 +3568,7 @@ function loadAdminPage() {
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != null ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != null ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
-            // debugger;
+             debugger;
             var memoryLimitText = adminConfigValues.memorylimit;
             var memoryLimitUnit = "GB";
             var memoryLimitValue = 0;
