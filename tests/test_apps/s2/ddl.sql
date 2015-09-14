@@ -28,5 +28,6 @@ create procedure from class s2demo.InsertPoint;
 create procedure from class s2demo.InsertPolygon;
 create procedure from class s2demo.FindContainedPoints;
 create procedure from class s2demo.FindIntersectingPolygons;
+create procedure from class s2demo.FindNearestPoints;
 
 EOB

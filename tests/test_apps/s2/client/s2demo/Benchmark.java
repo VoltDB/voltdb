@@ -334,9 +334,35 @@ public class Benchmark {
                 41.002073, -102.051565
         });
 
+
         VoltTable vt = client.callProcedure("FindContainedPoints", 0).getResults()[0];
+        System.out.println("Cities in Colorado:");
         System.out.println(vt);
-        //client.callProcedure("FindIntersectingPolygons", 0);
+
+        vt = client.callProcedure("FindIntersectingPolygons", 0).getResults()[0];
+        System.out.println("States enclosing Fort Collins:");
+        System.out.println(vt);
+
+        vt = client.callProcedure("FindIntersectingPolygons", 1).getResults()[0];
+        System.out.println("States enclosing Santa Cruz:");
+        System.out.println(vt);
+
+        System.out.println("\n\nSanta Clara is about 55km from Santa Cruz and ~2000km to Fort Collins.\n\n");
+
+        vt = client.callProcedure("FindNearestPoints", 37.357865, -121.935444, 60.0)
+                .getResults()[0];
+        System.out.println("Points within 60km Santa Clara:");
+        System.out.println(vt);
+
+        vt = client.callProcedure("FindNearestPoints", 37.357865, -121.935444, 30.0)
+                .getResults()[0];
+        System.out.println("Points within 30km of Santa Clara:");
+        System.out.println(vt);
+
+        vt = client.callProcedure("FindNearestPoints", 37.357865, -121.935444, 2000.0)
+                .getResults()[0];
+        System.out.println("Points within 2000km of Santa Clara:");
+        System.out.println(vt);
 
 //        benchmarkStartTS = System.currentTimeMillis();
 //        schedulePeriodicStats();

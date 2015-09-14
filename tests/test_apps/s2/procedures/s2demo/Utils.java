@@ -5,6 +5,14 @@ import com.google_voltpatches.common.geometry.S2CellId;
 import com.google_voltpatches.common.geometry.S2RegionCoverer;
 
 public class Utils {
+
+    /**
+     * @return radius of earth in KM^2
+     */
+    public static double radiusOfEarth() {
+        return 6371.0;
+    }
+
     /**
      * @return radius of earth squared, in KM^2
      */
@@ -14,7 +22,7 @@ public class Utils {
 
     private static final int COVERER_MAX_LEVEL = 14; // avg cell size 0.317 km^2
 
-    public static double getCovereMaxLevel() {
+    public static int getCovererMaxLevel() {
         return COVERER_MAX_LEVEL;
     }
 
