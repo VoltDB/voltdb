@@ -254,30 +254,6 @@ def buildMakefile(CTX):
     makefile.write("\n")
 
     LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
-    # This is a list of pairs (filename, cppflags) for all files
-    # we will compile.  This is only used to generate dependence
-    # lists.
-    allsources = []
-    # The elements, of input_paths will be file descriptions.
-    # A file description, file_descr_ is a dictionary containing
-    # the actual name, as file_descr['filename'],
-    # the cpp flags, as file_descr['cppflags'], and
-    # the list of include files, as file_descr['includes'].
-    for file_descr in input_paths:
-        filename = file_descr['filename']
-        cppflags = file_descr['cppflags']
-        includes = " ".join(["-I %s" % includename for includename in file_descr['includes']])
-        allsources += [(filename, LOCALCPPFLAGS + " " + cppflags + includes, IGNORE_SYS_PREFIXES)]
-    # The third_parth_input_paths also are file descriptions.
-    for file_descr in third_party_input_paths:
-        filename = file_descr['filename']
-        cppflags = file_descr['cppflags']
-        includes = " ".join(["-I %s" % includename for includename in file_descr['includes']])
-        allsources += [(filename, LOCALCPPFLAGS + cppflags + " " + includes, IGNORE_SYS_PREFIXES)]
-    for test in tests:
-        binname, objectname, sourcename = namesForTestCode(test)
-        allsources += [(sourcename, LOCALTESTCPPFLAGS, IGNORE_SYS_PREFIXES)]
-
     for file_descr in input_paths:
         filename = file_descr['filename']
         cppflags = file_descr['cppflags']
@@ -319,9 +295,6 @@ def buildMakefile(CTX):
 
         # build the object file
         makefile.write("%s: ../../%s" % (objectname, sourcename))
-        # mydeps = deps[sourcename]
-        # for dep in mydeps:
-        #    makefile.write(" ../../%s" % (dep))
         makefile.write("\n")
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -o $@ ../../%s\n" % (TEST_PREFIX, sourcename))
 
