@@ -72,9 +72,12 @@ class CompactingHashUniqueIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
-    const void* const* addEntryDo(const TableTuple *tuple) {
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) {
         ++m_inserts;
-        return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        const void* const* conflictEntry = m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        if (conflictEntry != NULL && conflictTuple != NULL) {
+            conflictTuple->move(const_cast<void*>(*conflictEntry));
+        }
     }
 
     bool deleteEntryDo(const TableTuple *tuple) {
@@ -94,7 +97,9 @@ class CompactingHashUniqueIndex : public TableIndex
             if ( ! CompactingHashUniqueIndex::deleteEntry(&originalTuple)) {
                 return false;
             }
-            return (CompactingHashUniqueIndex::addEntry(&destinationTuple) == NULL);
+            TableTuple conflict(destinationTuple.getSchema());
+            CompactingHashUniqueIndex::addEntry(&destinationTuple, &conflict);
+            return conflict.isNullTuple();
         }
 
         MapIterator mapiter = findTuple(originalTuple);

@@ -216,7 +216,7 @@ public:
     /**
      * adds passed value as an index entry linked to given tuple
      */
-    const void* const* addEntry(const TableTuple *tuple);
+    void addEntry(const TableTuple *tuple, TableTuple *conflictTuple);
 
     /**
      * removes the index entry linked to given value (and tuple
@@ -526,7 +526,7 @@ protected:
 
 protected:
     // Index specific implementations
-    virtual const void* const* addEntryDo(const TableTuple *tuple) = 0;
+    virtual void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) = 0;
     virtual bool deleteEntryDo(const TableTuple *tuple) = 0;
     virtual bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple,
                                          const TableTuple &originalTuple) = 0;
