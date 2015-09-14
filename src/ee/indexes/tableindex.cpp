@@ -164,13 +164,13 @@ bool TableIndex::equals(const TableIndex *other) const
     return true;
 }
 
-const void* const* TableIndex::addEntry(const TableTuple *tuple)
+void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple)
 {
     if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
         // Tuple fails the predicate. Do not add it.
-        return NULL;
+        return;
     }
-    return addEntryDo(tuple);
+    addEntryDo(tuple, conflictTuple);
 }
 
 bool TableIndex::deleteEntry(const TableTuple *tuple)
@@ -194,7 +194,9 @@ bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, con
         } else if (predicate->eval(&destinationTuple, NULL).isTrue() && !predicate->eval(&originalTuple, NULL).isTrue()) {
             // The original tuple fails the predicate meaning the tuple is not indexed.
             // Simply add the new tuple
-            return (addEntryDo(&destinationTuple) == NULL);
+            TableTuple conflict(destinationTuple.getSchema());
+            addEntryDo(&destinationTuple, &conflict);
+            return conflict.isNullTuple();
         } else if (!predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue()) {
             // The destination tuple fails the predicate. Simply delete the original tuple
             return deleteEntryDo(&originalTuple);
