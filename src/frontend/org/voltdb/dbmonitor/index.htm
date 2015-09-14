@@ -800,11 +800,11 @@
                                 </tr>
                                 <tr class="child-row-6 subLabelRow" id="memorySizeTimeout">
                                     <td class="configLabel">Memory Limit</td>
-                                    <td align="right" class="memorySize">
+                                    <td align="right" class="btnEditMemorySize">
                                         <form id="formMemoryLimit" method="get" action="">
                                             <div id="loadingMemoryLimit" class="loading-small" style="display: none;"></div>
                                             <span id="memoryLimitSize"></span>
-                                            <input id="txtMemoryLimitSize" name="txtMemoryLimitSize" placeholder="Not Enforced" class="exitableMemoryLimit" type="text" style="display: none" />
+                                            <input id="txtMemoryLimitSize" name="txtMemoryLimitSize"  class="exitableMemoryLimit" type="text" style="display: none" />
                                             <span id="memoryLimitSizeUnit"></span>
                                             <select id="ddlMemoryLimitUnit" style="display: none;">
                                                 <option>GB</option>
@@ -815,10 +815,12 @@
                                     </td>
                                     <td>&nbsp;</td>
                                     <td>
+                                       
                                         <a id="btnEditMemorySizeOk" href="#MemoryLimitPopup" class="editOk" title="Save" style="">Ok</a>
                                         <a id="btnEditMemorySizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
                                         <a id="btnEditMemorySize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
                                         <a href="#addDiskLimitPopup" id="addDiskLimitPopupLink" data-id="-1" title="Add Disk Limit" style="display: none">Add Disk Limit</a>
+                                        <a id="btnDeleteMemory" href="#deleteMemoryLimitPopup" class="deleteSmall" title="Delete" style="display:none;">&nbsp;</a>
                                     </td>
 
                                 </tr>
@@ -1532,6 +1534,15 @@
             <p class="txt-bold">Do you want to save the value?</p>
         </div>
         <div class="overlay-btns"><a class="btn" id="btnPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupMemoryLimitCancel">Cancel</a> </div>
+    </div>
+    
+    <div id="deleteMemoryLimitPopup" style="display:none">
+        <div class="overlay-title icon-alert">Memory Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to delete the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnDelPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnDelPopupMemoryLimitCancel">Cancel</a> </div>
     </div>
 
     <!-- POPUP Query timeout Popup -->

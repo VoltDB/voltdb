@@ -171,6 +171,7 @@ function loadAdminPage() {
         btnEditMemorySize: $("#btnEditMemorySize"),
         btnEditMemorySizeOk: $("#btnEditMemorySizeOk"),
         btnEditMemorySizeCancel: $("#btnEditMemorySizeCancel"),
+        btnDeleteMemory: $("#btnDeleteMemory"),
         spanMemoryLimitSizeValue: $("#memoryLimitSize").text(),
         spanMemoryLimitSize: $("#memoryLimitSize"),
         txtMemoryLimitSize: $("#txtMemoryLimitSize"),
@@ -263,12 +264,14 @@ function loadAdminPage() {
             digits: "Please enter a positive number without any decimal."
         },
         memoryLimitRules: {
-            min: 0,
+            required:true,
+            min: 1,
             max: 99,
             digits: true
             //regex: /[^0-9\.]/ // "^[0-9]+(\.[0-9]{0,4})?$"
         },
         memoryLimitMessages: {
+            required: "This field is required",
             min: "Please enter a positive number.",
             max: "Please enter a positive number less than 100.",
             digits: "Please enter a positive number without any decimal." //"Only four digits are allowed after decimal."
@@ -1298,7 +1301,7 @@ function loadAdminPage() {
         }
     });
 
-        $("#formAddDiskLimit").validate();
+    $("#formAddDiskLimit").validate();
 
     adminEditObjects.btnEditAutoSnapshotOk.popup({
         open: function (event, ui, ele) {
@@ -1609,7 +1612,7 @@ function loadAdminPage() {
             adminEditObjects.spanMemoryLimitSize.show();
             adminEditObjects.ddlMemoryLimitSizeUnit.hide();
             adminEditObjects.spanMemoryLimitSizeUnit.show();
-            if (adminEditObjects.spanMemoryLimitSize.text() == "Not Enforced")
+//            if (adminEditObjects.spanMemoryLimitSize.text() == "Not Enforced")
                 adminEditObjects.spanMemoryLimitSizeUnit.text("");
         }
     };
@@ -1621,10 +1624,12 @@ function loadAdminPage() {
         var unit = $('#ddlMemoryLimitUnit').val();
         if (unit == "%") {
             $("#txtMemoryLimitSize").rules("add", {
-                min: 0,
+                required: true,
+                min: 1,
                 max: 99,
                 digits: true,
                 messages: {
+                    required: "This field is required",
                     min: "Please enter a positive number.",
                     max: "Maximum value of percentage cannot be greater than 99.",
                     digits: "Please enter a positive number without any decimal."
@@ -1632,9 +1637,11 @@ function loadAdminPage() {
             });
         } else if (unit == "GB") {
             $("#txtMemoryLimitSize").rules("add", {
-                min: 0,
+                required:true,
+                min: 1,
                 digits: true,
                 messages: {
+                    required: "This field is required",
                     min: "Please enter a positive number.",
                     digits: "Please enter a positive number without any decimal."
                 }
@@ -1736,6 +1743,7 @@ function loadAdminPage() {
 
     adminEditObjects.btnEditMemorySize.on("click", function () {
         toggleMemorySizeEdit(editStates.ShowOkCancel);
+        adminEditObjects.btnDeleteMemory.hide();
         $("td.memorySize span").toggleClass("unit");
     });
 
@@ -1751,6 +1759,7 @@ function loadAdminPage() {
             }, 2000);
         }
     });
+    
 
     adminEditObjects.btnEditMemorySizeCancel.on("click", function () {
         toggleMemorySizeEdit(editStates.ShowEdit);
@@ -1787,6 +1796,7 @@ function loadAdminPage() {
                     if (result.status == "1") {
                         adminEditObjects.spanMemoryLimitSizeValue = adminEditObjects.txtMemoryLimitSize.val();
                         adminEditObjects.spanMemoryLimitSize.html(adminEditObjects.spanMemoryLimitSizeValue);
+                        adminEditObjects.btnDeleteMemory.show();
 
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
@@ -1827,8 +1837,70 @@ function loadAdminPage() {
         }
     });
     //
+    
 
+    adminEditObjects.btnDeleteMemory.popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnDelPopupMemoryLimitOk").on("click", function () {
+                adminEditObjects.btnDeleteMemory.hide();
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (adminConfigurations.systemsettings.resourcemonitor == null) {
+                    adminConfigurations.systemsettings.resourcemonitor = {};
+                }
+                if (adminConfigurations.systemsettings.resourcemonitor.memorylimit == null) {
+                    adminConfigurations.systemsettings.resourcemonitor.memorylimit = {};
+                }
+                //Set the new value to be saved.
+                var memoryLimitSize = "";
 
+               // memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + (adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? "%" : "");
+                //adminEditObjects.txtMemoryLimitSize.val() + adminEditObjects.ddlMemoryLimitSizeUnit.val();
+
+                if (adminEditObjects.txtMemoryLimitSize.val() != "") {
+                    adminConfigurations.systemsettings.resourcemonitor.memorylimit.size = memoryLimitSize;
+                } else {
+                    adminConfigurations.systemsettings.resourcemonitor.memorylimit = null;
+                }
+                //Call the loading image only after setting the new value to be saved.
+                toggleMemorySizeEdit(editStates.ShowLoading);
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+                        adminEditObjects.spanMemoryLimitSizeValue = adminEditObjects.txtMemoryLimitSize.val();
+                        adminEditObjects.spanMemoryLimitSize.html(adminEditObjects.spanMemoryLimitSizeValue);
+
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleMemorySizeEdit(editStates.ShowEdit);
+                        });
+
+                    } else {
+                        toggleMemorySizeEdit(editStates.ShowEdit);
+                        var msg = '"' + adminEditObjects.memoryLimitErrorFieldMsg + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+
+                        adminEditObjects.memoryLimitUpdateErrorFieldMsg.text(msg);
+                        $("#memorySizeUpdateErrorPopupLink").trigger("click");
+                    }
+                });
+                //Close the popup
+                popup.close();
+            });
+
+            $("#btnDelPopupMemoryLimitCancel").on("click", function () {
+                popup.close();
+            });
+
+        }
+    });
+    
     //Disk Limit
     adminEditObjects.btnEditDiskSize.on("click", function () {
         toggleDiskSizeEdit(editStates.ShowOkCancel);
@@ -3503,18 +3575,26 @@ function loadAdminPage() {
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != null ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != null ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
+           // debugger;
             var memoryLimitText = adminConfigValues.memorylimit;
             var memoryLimitUnit = "GB";
             var memoryLimitValue = 0;
             if (memoryLimitText != undefined && memoryLimitText.indexOf("%") > -1) {
                 memoryLimitUnit = "%";
                 memoryLimitValue = memoryLimitText.replace("%", "");
+                if (adminEditObjects.btnEditMemorySize.is(":visible")) {
+                    adminEditObjects.btnDeleteMemory.show();
+                }
             } else if (memoryLimitText != undefined && memoryLimitText.indexOf("%") == -1) {
                 memoryLimitValue = memoryLimitText;
+                if (adminEditObjects.btnEditMemorySize.is(":visible")) {
+                    adminEditObjects.btnDeleteMemory.show();
+                }
             } else if (memoryLimitText == undefined) {
                 memoryLimitValue = undefined;
+                adminEditObjects.btnDeleteMemory.hide();
             }
-            adminDOMObjects.memoryLimitSize.text(adminConfigValues.memorylimit != undefined ? memoryLimitValue : "Not Enforced");
+            adminDOMObjects.memoryLimitSize.text(adminConfigValues.memorylimit != undefined ? memoryLimitValue : "");
             if (!VoltDbAdminConfig.isMemoryLimitEditMode)
                 adminDOMObjects.memoryLimitSizeUnit.text(adminConfigValues.memorylimit != undefined ? memoryLimitUnit : "");
             adminEditObjects.spanMemoryLimitSizeValue = memoryLimitValue;
@@ -3537,6 +3617,8 @@ function loadAdminPage() {
             getDrMode(adminConfigValues.drListen);
 
             getImportProperties(adminConfigValues.importConfiguration);
+            
+            
 
             getDiskLimits(adminConfigValues.disklimit);
             //adminConfigValues.drListen = false;
