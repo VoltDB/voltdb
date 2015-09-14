@@ -52,6 +52,7 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
     while (true) {
         if (m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
             if (m_blockIterator == m_end) {
+                std::cout<<"finished scanning block" << std::endl;
                 m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, TBPtr());
                 break;
             }

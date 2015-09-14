@@ -107,7 +107,7 @@ private:
      * Configuration parameter that controls whether the table iterator
      * stops when it has found the expected number of tuples or when it has iterated
      * all the blocks. The former is able to stop sooner without having to read to the end of
-     * of the block. The latter is useful when the table will be modified after the creation of
+     * the block. The latter is useful when the table will be modified after the creation of
      * the iterator. It is assumed that the code invoking this iterator is handling
      * the modifications that occur after the iterator is created.
      *
