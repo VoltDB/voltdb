@@ -36,7 +36,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.EEException;
@@ -460,35 +459,6 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(r1.getHashinatorVersionedConfig().getFirst(),new Long(2));
     }
 
-    public void testLargeNumberOfTableResults() throws Exception
-    {
-        ColumnInfo columnInfo = new ColumnInfo("intcol", VoltType.INTEGER);
-        VoltTable table = new VoltTable(columnInfo);
-        table.addRow(10);
-        int count = Short.MAX_VALUE + 1;
-        VoltTable[] results = new VoltTable[count];
-        for (int i=0; i<count; i++) {
-            results[i] = table;
-        }
-        String statusStr = "Success!";
-        ClientResponseImpl expected = new ClientResponseImpl(ClientResponse.SUCCESS, results, statusStr);
-        assertEquals(count, expected.getResults().length);
-        assertEquals(ClientResponse.SUCCESS, expected.getStatus());
-        assertEquals(statusStr, expected.getStatusString());
-
-        int size = expected.getSerializedSize();
-        ByteBuffer buf = ByteBuffer.allocate(size);
-        expected.flattenToBuffer(buf);
-        buf.flip();
-
-        ClientResponseImpl deserialized = new ClientResponseImpl();
-        deserialized.initFromBuffer(buf);
-
-        assertEquals(expected.getStatus(), deserialized.getStatus());
-        assertEquals(expected.getStatusString(), deserialized.getStatusString());
-        assertEquals(expected.getResults().length, deserialized.getResults().length);
-    }
-
     public void testInvalidTableCount() throws Exception
     {
         int size = 1 // version
@@ -497,7 +467,7 @@ public class TestVoltMessageSerialization extends TestCase {
             + 1 // status
             + 1 // app status
             + 4 // cluster roundtrip time
-            + 4; // number of result tables
+            + 2; // number of result tables
         ByteBuffer buf = ByteBuffer.allocate(size);
         buf.put((byte)0); //version
         buf.putLong(1L);
@@ -506,7 +476,7 @@ public class TestVoltMessageSerialization extends TestCase {
         buf.put(ClientResponse.SUCCESS);
         buf.put(ClientResponse.SUCCESS);
         buf.putInt(100);
-        buf.putInt(Integer.MAX_VALUE + 1);
+        buf.putShort( (short) (Short.MAX_VALUE + 1));
         buf.flip();
 
         ClientResponseImpl deserialized = new ClientResponseImpl();
